@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FixNow | Profile Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#4d44e3",
+                        "outline-variant": "#c7c4d8",
+                        "surface-bright": "#faf8ff",
+                        "on-tertiary-fixed": "#351000",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#4cd7f6",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#001f26",
+                        "secondary-container": "#57dffe",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#464555",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#4f46e5",
+                        "tertiary": "#7e3000",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed": "#acedff",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-container": "#ffd2be",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "primary-fixed": "#e2dfff",
+                        "outline": "#777587",
+                        "on-secondary-container": "#006172",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "inverse-surface": "#283044",
+                        "inverse-on-surface": "#eef0ff",
+                        "surface-container-low": "#f2f3ff",
+                        "secondary": "#00687a",
+                        "surface": "#faf8ff",
+                        "surface-container": "#eaedff",
+                        "tertiary-fixed": "#ffdbcc",
+                        "surface-variant": "#dae2fd",
+                        "on-background": "#131b2e",
+                        "surface-container-high": "#e2e7ff",
+                        "on-secondary-fixed-variant": "#004e5c",
+                        "error": "#ba1a1a",
+                        "primary": "#3525cd",
+                        "on-primary-container": "#dad7ff",
+                        "inverse-primary": "#c3c0ff",
+                        "tertiary-fixed-dim": "#ffb695",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "on-primary": "#ffffff",
+                        "on-surface": "#131b2e",
+                        "surface-container-highest": "#dae2fd",
+                        "tertiary-container": "#a44100",
+                        "background": "#faf8ff",
+                        "surface-dim": "#d2d9f4",
+                        "on-primary-fixed": "#0f0069"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "lg": "48px",
+                        "sm": "12px",
+                        "container-max": "1280px",
+                        "base": "8px",
+                        "xl": "80px",
+                        "gutter": "24px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-xl": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                        "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .status-badge-active {
+            background: rgba(0, 104, 122, 0.1);
+            color: #00687a;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c7c4d8; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface overflow-x-hidden">
+<!-- TopNavBar -->
+<nav class="sticky top-4 z-50 flex items-center justify-between px-md py-base bg-surface/80 backdrop-blur-md font-headline-md text-headline-md docked top-4 mx-auto rounded-xl max-w-[calc(100%-48px)] border border-outline-variant/50 shadow-md">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-bold text-primary">FixNow</span>
+<div class="hidden md:flex items-center ml-lg gap-gutter">
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 px-3 py-1 rounded-lg text-label-md font-label-md" href="#">Explore</a>
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 px-3 py-1 rounded-lg text-label-md font-label-md" href="#">Services</a>
+<a class="text-primary font-bold text-label-md font-label-md" href="#">Profile</a>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<button class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-all">notifications</button>
+<button class="material-symbols-outlined p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-all">chat_bubble</button>
+<div class="h-10 w-10 rounded-full border border-primary p-0.5 overflow-hidden">
+<img alt="User avatar" class="h-full w-full object-cover rounded-full" data-alt="A professional studio portrait of a friendly male service provider, with bright, high-key lighting that emphasizes a clean and modern aesthetic. He is wearing a minimalist navy blue polo shirt. The background is a soft, out-of-focus modern office space with indigo and white color tones, creating a premium and reliable atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBf1pGeLDiMjOBInjOqvTm-iqnHOwm12uhjV7Kz4he8OpQhNUOwn4xnZNYWtkwgipxJWEEC7McqqjH_mMkhqTpsWX2gwsNc5vzSO1nAQbfHi6suk9sKXSE_oLc6A0nPe8GpftWKWhYFwCCN2SGXA43MA8MJzvvt9VwIJ7btLJC7xARiGHgTYZK6GE6EbF2K6syx_QpoQwxRV1I7PTMygenkokSg-vnP86oGh15LXtnnDdmIUFlA62Duw1qP-qJTbL9HPIXNicgBp9M"/>
+</div>
+</div>
+</nav>
+<div class="flex min-h-screen pt-4">
+<!-- SideNavBar (Desktop) -->
+<aside class="hidden md:flex flex-col h-screen p-md gap-4 h-full w-64 fixed left-0 top-0 border-r border-outline-variant/30 bg-surface shadow-sm z-40">
+<div class="mb-lg pt-4">
+<h2 class="font-headline-md text-headline-md font-bold text-primary">FixNow</h2>
+<p class="text-on-surface-variant font-body-md text-[13px]">Premium Service Hub</p>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-low p-3 rounded-lg hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-low p-3 rounded-lg hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">event_available</span>
+<span class="font-label-md text-label-md">Bookings</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-low p-3 rounded-lg hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">mail</span>
+<span class="font-label-md text-label-md">Inbox</span>
+</a>
+<a class="flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-low p-3 rounded-lg hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-md text-label-md">Wallet</span>
+</a>
+<a class="flex items-center gap-3 bg-primary-container text-on-primary-container rounded-lg p-3 font-semibold scale-[0.98] transition-transform" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+<div class="mt-auto pb-4">
+<button class="w-full py-3 px-4 bg-primary text-on-primary rounded-xl font-label-md text-label-md hover:shadow-lg transition-all duration-300">Switch to Provider</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 md:ml-64 px-4 md:px-lg pb-xl">
+<div class="max-w-5xl mx-auto space-y-md">
+<!-- Hero Cover & Profile Header -->
+<section class="relative h-[320px] rounded-3xl overflow-hidden mt-base border border-outline-variant/30">
+<img alt="Cover photo" class="w-full h-full object-cover" data-alt="A high-end, minimalist architectural shot of a modern home interior with expansive windows and soft natural light. The scene features a clean, airy atmosphere with whites, light greys, and subtle indigo accents. The lighting is bright and ethereal, reflecting a premium home maintenance and luxury living brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpMJM1jH35NgarwqSriwzgk7kuz375mFY2PklXs5vmgHD3jI4IRTv8ElL5vMPHcaA4ki3o5dtnT6r-gEko4L1sUxScQPSaPoHvcE2LPaS-RL3Lme67PTldq4oawc7kGrd0_Pc-sSi7dKTQGvYQB6SQGvaGHinHnPT_NguR4XkEd4QsCFgRXLL0obCkkghrxVb5TzqtuoYs6-H10n35m0lT8IwsI_kBjHn3gXH4T-B4wO0p5ueM53J-0119whBBpgCbw8oKIhDMNRk"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent"></div>
+<div class="absolute bottom-6 left-6 flex items-end gap-md">
+<div class="relative">
+<div class="h-32 w-32 rounded-2xl border-4 border-background overflow-hidden shadow-xl">
+<img alt="Profile avatar" class="h-full w-full object-cover" data-alt="A detailed portrait of a service professional with a confident and trustworthy expression. He is lit by soft, balanced studio lighting that creates a bright, light-mode feel. The setting is modern and clean, with a neutral color palette that emphasizes professional reliability and high-end service standards." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYsy-DKcuOjXk3bJ2TZ7yIFHGaiQzpdN3in_X8y1TGZ6yZICvKNAltClr4Ex-3ZRwUjFMrn7qkJfdwwDB4j9Jw8pXrNf73FuLCJ7F3ss4q9DmTTfqKXlwdD1GCwMeXUJ8r_u2xkDAFu5oZAFNXUj876n6FeBW2YlSffXSv_aTSSFgBZNjvXD2G37HhWRNIjVDOH0sr9NYXZhjngyMo0F3fdhuvcMTGkDlsI0F_KFeIUZilvPBFO3pD0aZb4PkzT1wAtL1o0dTmfTw"/>
+</div>
+<span class="absolute -bottom-2 -right-2 h-8 w-8 bg-surface border-4 border-background rounded-full flex items-center justify-center">
+<span class="h-3 w-3 bg-secondary rounded-full animate-pulse"></span>
+</span>
+</div>
+<div class="mb-xs">
+<h1 class="font-headline-lg text-headline-lg text-on-background">Alex Henderson</h1>
+<p class="text-on-surface-variant font-body-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">verified</span> 
+                                Platinum Provider • Home Specialist
+                            </p>
+</div>
+</div>
+<button class="absolute bottom-6 right-6 flex items-center gap-2 bg-surface/40 hover:bg-surface/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 transition-all font-label-md text-label-md">
+<span class="material-symbols-outlined text-[20px]">photo_camera</span> Edit Cover
+                    </button>
+</section>
+<!-- Profile Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Navigation & Stats -->
+<div class="lg:col-span-4 space-y-md">
+<!-- Stats Card -->
+<div class="glass-card p-md rounded-2xl">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-4">Activity Overview</h3>
+<div class="space-y-4">
+<div class="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+<span class="text-on-surface-variant font-label-md">Total Bookings</span>
+<span class="font-bold text-primary">142</span>
+</div>
+<div class="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+<span class="text-on-surface-variant font-label-md">Avg. Rating</span>
+<span class="flex items-center gap-1 font-bold text-on-surface">
+                                        4.9 <span class="material-symbols-outlined text-[16px] text-tertiary-container" style="font-variation-settings: 'FILL' 1;">star</span>
+</span>
+</div>
+<div class="flex justify-between items-center p-3 bg-surface-container-low rounded-xl">
+<span class="text-on-surface-variant font-label-md">Join Date</span>
+<span class="font-bold text-on-surface">Mar 2023</span>
+</div>
+</div>
+</div>
+<!-- Sidebar Quick Links -->
+<div class="glass-card p-md rounded-2xl">
+<nav class="space-y-1">
+<button class="w-full flex items-center gap-3 p-3 rounded-xl bg-primary-container text-on-primary-container font-semibold transition-all">
+<span class="material-symbols-outlined">person</span> Personal Info
+                                </button>
+<button class="w-full flex items-center gap-3 p-3 rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined">security</span> Security
+                                </button>
+<button class="w-full flex items-center gap-3 p-3 rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined">notifications_active</span> Notifications
+                                </button>
+<button class="w-full flex items-center gap-3 p-3 rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined">badge</span> Professional Details
+                                </button>
+</nav>
+</div>
+</div>
+<!-- Right Column: Forms -->
+<div class="lg:col-span-8 space-y-md">
+<!-- Section: Personal Info -->
+<div class="glass-card p-lg rounded-3xl">
+<div class="flex justify-between items-center mb-lg">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Personal Information</h3>
+<button class="text-primary font-bold hover:underline font-label-md">Edit Profile</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div class="space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Full Name</label>
+<input class="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-bright focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" type="text" value="Alex Henderson"/>
+</div>
+<div class="space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Email Address</label>
+<input class="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-bright focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" type="email" value="alex.h@fixnow.com"/>
+</div>
+<div class="space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Phone Number</label>
+<input class="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-bright focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" type="tel" value="+1 (555) 928-3344"/>
+</div>
+<div class="space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Current City</label>
+<input class="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-bright focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" type="text" value="San Francisco, CA"/>
+</div>
+<div class="md:col-span-2 space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Physical Address</label>
+<input class="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-bright focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" type="text" value="242 Berry St, Suite 400, San Francisco, CA 94158"/>
+</div>
+</div>
+</div>
+<!-- Section: Professional Details (Provider Only) -->
+<div class="glass-card p-lg rounded-3xl">
+<div class="flex items-center gap-3 mb-lg">
+<h3 class="font-headline-lg text-headline-lg text-on-surface">Professional Details</h3>
+<span class="status-badge-active px-3 py-1 rounded-full text-label-sm">Verified Provider</span>
+</div>
+<div class="space-y-md">
+<div class="space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Professional Bio</label>
+<textarea class="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-bright focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" rows="4">Experienced HVAC and electrical specialist with over 8 years in the field. I focus on energy-efficient home solutions and high-end residential maintenance. Dedicated to providing frictionless, expert service with clear communication.</textarea>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div class="space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Primary Skills</label>
+<div class="flex flex-wrap gap-2 pt-1">
+<span class="px-3 py-1.5 bg-secondary-fixed text-on-secondary-fixed rounded-lg text-label-sm flex items-center gap-1">
+                                                HVAC <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+<span class="px-3 py-1.5 bg-secondary-fixed text-on-secondary-fixed rounded-lg text-label-sm flex items-center gap-1">
+                                                Electrical <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+<span class="px-3 py-1.5 bg-secondary-fixed text-on-secondary-fixed rounded-lg text-label-sm flex items-center gap-1">
+                                                Smart Home <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+<button class="px-3 py-1.5 border border-dashed border-outline rounded-lg text-label-sm text-outline hover:border-primary hover:text-primary transition-all">+ Add</button>
+</div>
+</div>
+<div class="space-y-2">
+<label class="text-label-sm text-on-surface-variant block ml-1">Certifications</label>
+<div class="flex items-center gap-3 p-3 bg-surface-container rounded-xl">
+<span class="material-symbols-outlined text-primary">verified_user</span>
+<div>
+<p class="font-label-md text-label-md">Licensed Electrician (State of CA)</p>
+<p class="text-[12px] text-on-surface-variant">Expires: Oct 2025</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section: Security -->
+<div class="glass-card p-lg rounded-3xl">
+<h3 class="font-headline-lg text-headline-lg text-on-surface mb-lg">Security &amp; Privacy</h3>
+<div class="space-y-gutter">
+<div class="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20 hover:border-primary/30 transition-all">
+<div class="flex items-center gap-md">
+<div class="h-12 w-12 bg-primary-container/20 text-primary rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined">lock</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Password</p>
+<p class="text-body-md text-on-surface-variant text-sm">Last changed 4 months ago</p>
+</div>
+</div>
+<button class="px-6 py-2 border border-primary text-primary rounded-xl font-label-md hover:bg-primary-container transition-all">Update</button>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-outline-variant/20">
+<div class="flex items-center gap-md">
+<div class="h-12 w-12 bg-secondary-container/20 text-secondary rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined">shield_person</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Two-Factor Authentication (2FA)</p>
+<p class="text-body-md text-on-surface-variant text-sm">Add an extra layer of security to your account.</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Section: Notifications -->
+<div class="glass-card p-lg rounded-3xl">
+<h3 class="font-headline-lg text-headline-lg text-on-surface mb-lg">Notification Preferences</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between py-2">
+<div>
+<p class="font-label-md text-label-md">Booking Updates</p>
+<p class="text-sm text-on-surface-variant">Get notified when a booking is confirmed or changed.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<hr class="border-outline-variant/30"/>
+<div class="flex items-center justify-between py-2">
+<div>
+<p class="font-label-md text-label-md">Marketing &amp; Promos</p>
+<p class="text-sm text-on-surface-variant">Receive personalized offers and marketplace news.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<hr class="border-outline-variant/30"/>
+<div class="flex items-center justify-between py-2">
+<div>
+<p class="font-label-md text-label-md">Instant Chat SMS</p>
+<p class="text-sm text-on-surface-variant">Send messages directly to your phone via SMS.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Save Actions -->
+<div class="flex justify-end gap-md pt-lg">
+<button class="px-8 py-3 text-on-surface-variant font-label-md hover:text-primary transition-all">Cancel Changes</button>
+<button class="px-12 py-3 bg-primary text-on-primary rounded-2xl font-bold hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 shadow-md">Save All Updates</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Mobile Navigation (BottomNavBar) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-surface/90 backdrop-blur-xl border-t border-outline-variant/20 flex justify-around items-center py-4 px-6 z-50">
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="text-[10px] font-semibold">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">event_available</span>
+<span class="text-[10px] font-semibold">Bookings</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[10px] font-semibold">Profile</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">mail</span>
+<span class="text-[10px] font-semibold">Inbox</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-semibold">More</span>
+</button>
+</nav>
+<script>
+        // Simple micro-interaction for input fields
+        document.querySelectorAll('input, textarea').forEach(el => {
+            el.addEventListener('focus', () => {
+                el.parentElement.style.transform = 'translateY(-2px)';
+                el.parentElement.style.transition = 'transform 0.2s ease-out';
+            });
+            el.addEventListener('blur', () => {
+                el.parentElement.style.transform = 'translateY(0px)';
+            });
+        });
+
+        // Toggle behavior for checkboxes
+        document.querySelectorAll('input[type="checkbox"]').forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                const parent = this.closest('.glass-card');
+                if(this.checked) {
+                    console.log('Preference enabled');
+                }
+            });
+        });
+    </script>
+</body></html>
