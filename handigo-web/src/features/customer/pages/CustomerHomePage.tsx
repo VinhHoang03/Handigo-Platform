@@ -8,28 +8,28 @@ const CustomerHomePage: React.FC = () => {
   const navigate = useNavigate();
 
   const navItems = [
-    { icon: 'grid_view', label: 'Dashboard', path: '/customer' },
-    { icon: 'event_available', label: 'Bookings', path: '#' },
-    { icon: 'mail', label: 'Inbox', path: '#' },
-    { icon: 'payments', label: 'Wallet', path: '#' },
-    { icon: 'settings', label: 'Settings', path: '#' },
+    { icon: 'grid_view', label: 'Bảng điều khiển', path: '/customer' },
+    { icon: 'event_available', label: 'Đặt lịch', path: '#' },
+    { icon: 'mail', label: 'Tin nhắn', path: '#' },
+    { icon: 'payments', label: 'Ví', path: '#' },
+    { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
   ];
 
   const categories: Category[] = [
-    { icon: 'plumbing', name: 'Plumbing' },
-    { icon: 'bolt', name: 'Electrical' },
-    { icon: 'cleaning_services', name: 'Cleaning' },
-    { icon: 'air_purifier_gen', name: 'HVAC' },
-    { icon: 'pest_control', name: 'Pests' },
-    { icon: 'carpenter', name: 'Handyman' },
+    { icon: 'plumbing', name: 'Ống nước' },
+    { icon: 'bolt', name: 'Điện' },
+    { icon: 'cleaning_services', name: 'Dọn dẹp' },
+    { icon: 'air_purifier_gen', name: 'Điều hòa & Thông gió' },
+    { icon: 'pest_control', name: 'Diệt côn trùng' },
+    { icon: 'carpenter', name: 'Thợ đa năng' },
   ];
 
   const currentBookings: Booking[] = [
     {
       id: '1',
-      title: 'Kitchen Faucet Leak Repair',
+      title: 'Sửa rò rỉ vòi nước nhà bếp',
       providerName: 'David Miller • PlumbMaster LLC',
-      status: 'Confirmed',
+      status: 'Đã xác nhận',
       date: 'Oct 24',
       time: '2:00 PM',
       price: '$85.00',
@@ -37,8 +37,8 @@ const CustomerHomePage: React.FC = () => {
     },
     {
       id: '2',
-      title: 'Living Room Smart Lighting Setup',
-      status: 'Pending',
+      title: 'Lắp đặt đèn thông minh phòng khách',
+      status: 'Đang chờ',
       date: 'Oct 26',
       time: '10:00 AM',
       price: 'Est. $120.00',
@@ -50,7 +50,7 @@ const CustomerHomePage: React.FC = () => {
     {
       id: '1',
       name: 'Sarah Jenkins',
-      title: 'Certified Master Electrician',
+      title: 'Thợ điện được chứng nhận',
       rating: 4.9,
       reviewsCount: 124,
       avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDldzxeZoQT1iNnmlu8p-mZi0VA7EY2pT1j6JxYNOCKXrlUA31Bd-nyZduI90597S17VvVAtrp476ZhzTg7ttcRDSBLKLTWyNjGa0Hjm1Xpe8x-V8TSXlZQ8lqtcEIUyrvaEOJjh283oDslGcyXwV8oDyG4uEqeAr8mgh66Tv8aHx0NNsmA9S8a4g20WIqeN5ZFpOfQSYhy8QEc37djKTuJVrA_OJ7L68C7MlZiRMKb6BHv3iF9Nmp-cxVU_76M3U54BY5-Yi2UyT8',
@@ -58,7 +58,7 @@ const CustomerHomePage: React.FC = () => {
     {
       id: '2',
       name: 'Mike Thompson',
-      title: 'Deep Cleaning Specialist',
+      title: 'Chuyên gia dọn dẹp sâu',
       rating: 4.8,
       reviewsCount: 89,
       avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDq1tW5ylwzBdzZNrEv10thI-ahfVSlvMiHsW6kWN-d1Ab1x8j4Fn-6vCJ9e_7lL8h5LXON1EsZmNcDZ9ygNuEF85YnpsEFDKhbXRXAu-Sq_OmgDcZySNjIYTp37OkE2zBKWpvbnYKojyPzXUgoP7eBv_r_hp6u2WRaJOoqP2TsTz8I8Bx9Rq9MO0c_epc00lHkLmx3UGZ7LT0d7vkTHxFGRLlFOxc7QF5QDt_fLiIEkNY6CSW-9NI4L5UBFt1yIAULnDA-NXsy5d4',
@@ -68,19 +68,20 @@ const CustomerHomePage: React.FC = () => {
   return (
     <DashboardLayout
       navItems={navItems}
-      switchLabel="Switch to Provider"
-      onSwitch={() => navigate('/provider')}
+      switchLabel="Đăng ký thợ dịch vụ"
+      switchVariant="gradient"
+      onSwitch={() => navigate('/register-provider')}
       userAvatar="https://lh3.googleusercontent.com/aida-public/AB6AXuDEHJafX2qd3dTrHvNRy0dHwStQm_jFRmhcLv7V0Iflbe6KzeTksnzJoPq-9La8vc-adIj8yxCaNbKijj7uerHZrdZ26OjHWGwnN0LAasZmmwUJvNl29qnLlcWRpjXBtzvINjdOUc5Vqa7kppjp19pddoyUdVYqLk6tlS-7HLqNujhNuBLKccwxJqq8JLs_hR0DUZB7qr9wk45KYBT_ZrXMF28rWVmmvNL1wTSkAS7cYVUA3QSPnq_1_Vb47bF_AqhYh5TC1k28ILg"
     >
       {/* Welcome Header */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-md">
         <div className="space-y-xs">
-          <h2 className="font-headline-lg text-headline-lg text-on-background">Hello, James!</h2>
-          <p className="font-body-lg text-body-lg text-on-surface-variant">What can we help you fix today?</p>
+          <h2 className="font-headline-lg text-headline-lg text-on-background">Xin chào, James!</h2>
+          <p className="font-body-lg text-body-lg text-on-surface-variant">Hôm nay chúng tôi có thể giúp bạn sửa chữa gì?</p>
         </div>
         <div className="flex gap-2">
           <div className="flex flex-col items-center glass-card px-md py-sm rounded-xl">
-            <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Credit Limit</span>
+            <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Hạn mức tín dụng</span>
             <span className="font-headline-md text-headline-md text-primary">$2,500</span>
           </div>
         </div>
@@ -89,9 +90,9 @@ const CustomerHomePage: React.FC = () => {
       {/* Quick Book */}
       <section className="space-y-md">
         <div className="flex items-center justify-between">
-          <h3 className="font-headline-md text-headline-md">Quick Book</h3>
+          <h3 className="font-headline-md text-headline-md">Đặt nhanh</h3>
           <a className="text-primary font-label-md text-label-md flex items-center gap-1 hover:underline" href="#">
-            View All <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+            Xem tất cả <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
           </a>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-md">
@@ -105,7 +106,7 @@ const CustomerHomePage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
         {/* Current Bookings */}
         <section className="lg:col-span-2 space-y-md">
-          <h3 className="font-headline-md text-headline-md">Current Bookings</h3>
+          <h3 className="font-headline-md text-headline-md">Lịch đặt hiện tại</h3>
           <div className="space-y-md">
             {currentBookings.map((booking) => (
               <BookingCard key={booking.id} booking={booking} />
@@ -118,7 +119,7 @@ const CustomerHomePage: React.FC = () => {
           {/* Top Pros */}
           <section className="space-y-md">
             <div className="flex items-center justify-between">
-              <h3 className="font-headline-md text-headline-md">Top Pros Near You</h3>
+              <h3 className="font-headline-md text-headline-md">Chuyên gia hàng đầu gần bạn</h3>
               <div className="flex gap-2">
                 <button className="p-1 rounded-full border border-outline-variant text-outline hover:bg-surface-container-low">
                   <span className="material-symbols-outlined text-[18px]">chevron_left</span>

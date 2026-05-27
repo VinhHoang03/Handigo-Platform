@@ -184,10 +184,10 @@ const HomePage: React.FC = () => {
 
         {/* Features Section */}
         <section className="max-w-7xl mx-auto px-4 md:px-8 mt-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-          <FeatureCard icon="map" title="Real-time Tracking" desc="Theo dõi thợ di chuyển đến nhà bạn trên bản đồ theo thời gian thực." color="primary" />
-          <FeatureCard icon="verified_user" title="Verified Partners" desc="100% thợ được kiểm tra lý lịch và kỹ năng chuyên môn khắt khe." color="secondary" fill />
-          <FeatureCard icon="payments" title="Secure Payment" desc="Thanh toán an toàn qua ứng dụng, minh bạch giá cả, không phụ phí." color="tertiary" />
-          <FeatureCard icon="support_agent" title="24/7 Support" desc="Đội ngũ hỗ trợ luôn sẵn sàng giải quyết mọi vấn đề của bạn." color="primary" />
+          <FeatureCard icon="map" title="Theo dõi thời gian thực" desc="Theo dõi thợ di chuyển đến nhà bạn trên bản đồ theo thời gian thực." color="primary" />
+          <FeatureCard icon="verified_user" title="Đối tác đã xác minh" desc="100% thợ được kiểm tra lý lịch và kỹ năng chuyên môn khắt khe." color="secondary" fill />
+          <FeatureCard icon="payments" title="Thanh toán an toàn" desc="Thanh toán an toàn qua ứng dụng, minh bạch giá cả, không phụ phí." color="tertiary" />
+          <FeatureCard icon="support_agent" title="Hỗ trợ 24/7" desc="Đội ngũ hỗ trợ luôn sẵn sàng giải quyết mọi vấn đề của bạn." color="primary" />
         </section>
 
         {/* Stats Section */}
@@ -245,9 +245,9 @@ const HomePage: React.FC = () => {
               <SocialLink icon="language" />
             </div>
           </div>
-          <FooterColumn title="Dịch Vụ" links={["Plumbing", "Electrical", "Cleaning", "HVAC"]} />
-          <FooterColumn title="Công Ty" links={["About Us", "Careers", "Blog", "Press"]} />
-          <FooterColumn title="Hỗ Trợ" links={["Help Center", "Terms of Service", "Privacy Policy", "Safety"]} />
+          <FooterColumn title="Dịch Vụ" links={["Ống nước", "Điện", "Dọn dẹp", "Điều hòa"]} />
+          <FooterColumn title="Công Ty" links={["Về chúng tôi", "Tuyển dụng", "Blog", "Báo chí"]} />
+          <FooterColumn title="Hỗ Trợ" links={["Trung tâm hỗ trợ", "Điều khoản dịch vụ", "Chính sách bảo mật", "An toàn"]} />
           <div className="space-y-4">
             <h4 className="font-label-md text-label-md font-bold text-on-surface mb-4">Tải Ứng Dụng</h4>
             <div className="space-y-2">

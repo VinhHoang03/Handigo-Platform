@@ -39,3 +39,37 @@ export const updateProfileService = async (
 
   return user;
 };
+
+// CRUD Operations
+
+export const getAllUsersService = async (query: any = {}) => {
+  return await User.find(query).select("-passwordHash");
+};
+
+export const getUserByIdService = async (userId: string) => {
+  const user = await User.findById(userId).select("-passwordHash");
+  if (!user) {
+    throw new Error("User not found");
+  }
+  return user;
+};
+
+
+export const updateUserService = async (userId: string, data: any) => {
+  const user = await User.findByIdAndUpdate(userId, data, {
+    new: true,
+    runValidators: true,
+  }).select("-passwordHash");
+  if (!user) {
+    throw new Error("User not found");
+  }
+  return user;
+};
+
+export const deleteUserService = async (userId: string) => {
+  const user = await User.findByIdAndDelete(userId);
+  if (!user) {
+    throw new Error("User not found");
+  }
+  return user;
+};

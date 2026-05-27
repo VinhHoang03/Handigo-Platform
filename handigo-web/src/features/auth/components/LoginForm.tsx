@@ -1,37 +1,68 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 export const LoginForm: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const { login, isLoading, error } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const user = await login({ email, password });
+    if (user) {
+      if (user.role === 'customer' || user.role === 'CUSTOMER') {
+        navigate('/customer');
+      } else if (user.role === 'provider' || user.role === 'PROVIDER') {
+        navigate('/provider');
+      } else {
+        // Fallback for Admin or others
+        navigate('/');
+      }
+    }
+  };
+
   return (
-    <form action="#" className="space-y-5" method="POST">
-      {/* Email/SĐT Input */}
+    <form action="#" className="space-y-5" method="POST" onSubmit={handleSubmit}>
+      {error && (
+        <div className="p-3 text-sm text-error bg-error-container rounded-xl">
+          {error}
+        </div>
+      )}
+
+      {/* Email Input */}
       <div className="floating-label-group relative">
-        <input 
-          className="peer w-full h-12 px-4 pt-4 bg-surface-container-lowest dark:bg-on-surface-variant/10 border border-outline-variant dark:border-outline/30 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm text-on-surface dark:text-surface-bright" 
-          id="identifier" 
-          placeholder=" " 
-          required 
-          type="text" 
+        <input
+          className="peer w-full h-12 px-4 pt-4 bg-surface-container-lowest dark:bg-on-surface-variant/10 border border-outline-variant dark:border-outline/30 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm text-on-surface dark:text-surface-bright"
+          id="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder=" "
+          required
+          type="email"
         />
-        <label 
-          className="absolute left-4 top-3 text-sm text-on-surface-variant dark:text-outline-variant origin-left transition-all peer-focus:-translate-y-2.5 peer-focus:scale-85 peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-85" 
-          htmlFor="identifier"
+        <label
+          className="absolute left-4 top-3 text-sm text-on-surface-variant dark:text-outline-variant origin-left transition-all peer-focus:-translate-y-2.5 peer-focus:scale-85 peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-85"
+          htmlFor="email"
         >
-          Email hoặc Số điện thoại
+          Email
         </label>
       </div>
 
       {/* Password Input */}
       <div className="floating-label-group relative">
-        <input 
-          className="peer w-full h-12 px-4 pt-4 bg-surface-container-lowest dark:bg-on-surface-variant/10 border border-outline-variant dark:border-outline/30 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm text-on-surface dark:text-surface-bright" 
-          id="password" 
-          placeholder=" " 
-          required 
-          type="password" 
+        <input
+          className="peer w-full h-12 px-4 pt-4 bg-surface-container-lowest dark:bg-on-surface-variant/10 border border-outline-variant dark:border-outline/30 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm text-on-surface dark:text-surface-bright"
+          id="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder=" "
+          required
+          type="password"
         />
-        <label 
-          className="absolute left-4 top-3 text-sm text-on-surface-variant dark:text-outline-variant origin-left transition-all peer-focus:-translate-y-2.5 peer-focus:scale-85 peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-85" 
+        <label
+          className="absolute left-4 top-3 text-sm text-on-surface-variant dark:text-outline-variant origin-left transition-all peer-focus:-translate-y-2.5 peer-focus:scale-85 peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-85"
           htmlFor="password"
         >
           Mật khẩu
@@ -49,8 +80,12 @@ export const LoginForm: React.FC = () => {
         <Link className="text-primary hover:text-primary-container font-semibold transition-colors" to="#">Quên mật khẩu?</Link>
       </div>
 
-      <button className="w-full py-3 bg-primary text-on-primary text-base font-bold rounded-xl hover:bg-primary-container active:scale-95 transition-all shadow-lg shadow-primary/20" type="submit">
-        Đăng Nhập
+      <button
+        disabled={isLoading}
+        className="w-full flex justify-center py-3 bg-primary text-on-primary text-base font-bold rounded-xl hover:bg-primary-container active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-70 disabled:cursor-not-allowed"
+        type="submit"
+      >
+        {isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'}
       </button>
     </form>
   );

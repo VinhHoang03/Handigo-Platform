@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
-  role: 'customer' | 'provider';
+  role: 'customer' | 'provider' | 'CUSTOMER' | 'PROVIDER';
   avatarUrl?: string;
 }
 
@@ -12,7 +12,7 @@ export interface AuthResponse {
 }
 
 export interface LoginRequest {
-  identifier: string; // email or phone
+  email: string;
   password: string;
 }
 
@@ -21,5 +21,5 @@ export interface RegisterRequest {
   phone: string;
   fullName: string;
   password: string;
-  role: 'customer' | 'provider';
+  role: 'customer' | 'provider' | 'CUSTOMER' | 'PROVIDER';
 }

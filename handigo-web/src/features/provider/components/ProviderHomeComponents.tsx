@@ -7,37 +7,36 @@ interface JobCardProps {
 }
 
 export const JobCard: React.FC<JobCardProps> = ({ job }) => (
-  <div className={`p-md rounded-xl transition-colors ${
-    job.status === 'Active' 
-      ? 'relative pl-6 border-l-4 border-primary bg-primary/5' 
+  <div className={`p-md rounded-xl transition-colors ${job.status === 'Active'
+      ? 'relative pl-6 border-l-4 border-primary bg-primary/5'
       : 'pl-6 border-l-4 border-outline-variant hover:bg-surface-container-low'
-  }`}>
+    }`}>
     {job.status === 'Active' && (
       <div className="absolute -left-[10px] top-1/2 -translate-y-1/2 w-4 h-4 bg-primary rounded-full ring-4 ring-background"></div>
     )}
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-md">
       <div>
         <div className="flex items-center gap-2 mb-xs">
-          {job.status === 'Active' && (
-            <span className="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Active Now</span>
+          {job.status === 'Đang hoạt động' && (
+            <span className="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Đang hoạt động</span>
           )}
           <span className="font-label-md text-on-surface-variant">{job.startTime} - {job.endTime}</span>
         </div>
-        <h4 className={`text-on-background ${job.status === 'Active' ? 'font-headline-md text-headline-md' : 'font-body-lg font-semibold'}`}>
+        <h4 className={`text-on-background ${job.status === 'Đang hoạt động' || job.status === 'Active' ? 'font-headline-md text-headline-md' : 'font-body-lg font-semibold'}`}>
           {job.title}
         </h4>
         <p className="font-body-md text-on-surface-variant">{job.address}</p>
       </div>
       <div className="flex items-center gap-2">
-        {job.status === 'Active' ? (
+        {job.status === 'Đang hoạt động' || job.status === 'Active' ? (
           <>
-            <button className="bg-primary text-white px-6 py-2 rounded-xl font-label-md hover:shadow-lg transition-all">Start Task</button>
+            <button className="bg-primary text-white px-6 py-2 rounded-xl font-label-md hover:shadow-lg transition-all">Bắt đầu công việc</button>
             <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-lg">
               <span className="material-symbols-outlined">directions</span>
             </button>
           </>
         ) : (
-          <span className="px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold uppercase">Confirmed</span>
+          <span className="px-3 py-1 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold uppercase">Đã xác nhận</span>
         )}
       </div>
     </div>
@@ -53,11 +52,11 @@ interface WalletWidgetProps {
 export const WalletWidget: React.FC<WalletWidgetProps> = ({ balance, weeklyEarnings }) => (
   <div className="glass-card p-md rounded-xl">
     <div className="flex items-center justify-between mb-md">
-      <h3 className="font-headline-md text-headline-md">Wallet</h3>
+      <h3 className="font-headline-md text-headline-md">Ví</h3>
       <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
     </div>
     <div className="mb-lg">
-      <p className="font-label-sm text-on-surface-variant uppercase tracking-widest mb-xs">Available Balance</p>
+      <p className="font-label-sm text-on-surface-variant uppercase tracking-widest mb-xs">Số dư khả dụng</p>
       <p className="text-[40px] font-bold text-on-background leading-tight">{balance}</p>
     </div>
     <div className="space-y-md">
@@ -67,13 +66,13 @@ export const WalletWidget: React.FC<WalletWidgetProps> = ({ balance, weeklyEarni
             <span className="material-symbols-outlined">trending_up</span>
           </div>
           <div>
-            <p className="font-label-md">Weekly Earnings</p>
-            <p className="text-xs text-on-surface-variant">+12% from last week</p>
+            <p className="font-label-md">Thu nhập hàng tuần</p>
+            <p className="text-xs text-on-surface-variant">+12% so với tuần trước</p>
           </div>
         </div>
         <p className="font-semibold text-on-background">{weeklyEarnings}</p>
       </div>
-      <button className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:scale-[1.02] transition-transform">Payout Now</button>
+      <button className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:scale-[1.02] transition-transform">Rút tiền ngay</button>
     </div>
   </div>
 );
@@ -81,7 +80,7 @@ export const WalletWidget: React.FC<WalletWidgetProps> = ({ balance, weeklyEarni
 // EarningsChart
 export const EarningsChart: React.FC = () => (
   <div className="glass-card p-md rounded-xl overflow-hidden relative min-h-[220px] flex flex-col">
-    <h3 className="font-label-md text-on-surface-variant mb-base">Service Demand (Weekly)</h3>
+    <h3 className="font-label-md text-on-surface-variant mb-base">Nhu cầu dịch vụ (Hàng tuần)</h3>
     <div className="mt-auto flex items-end justify-between gap-1 h-32">
       <div className="flex-1 bg-primary/20 rounded-t-lg transition-all hover:bg-primary" style={{ height: '45%' }}></div>
       <div className="flex-1 bg-primary/20 rounded-t-lg transition-all hover:bg-primary" style={{ height: '60%' }}></div>
