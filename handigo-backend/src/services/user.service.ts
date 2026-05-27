@@ -7,7 +7,7 @@ interface UpdateProfileInput {
 }
 
 export const getProfileService = async (userId: string) => {
-  const user = await User.findById(userId).select("-passwordHash -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
+  const user = await User.findById(userId).select("-passwordHash -registerOtp -registerOtpExpire -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
   if (!user) {
     throw new Error("User not found");
   }
@@ -29,9 +29,10 @@ export const updateProfileService = async (
     userId,
     updateData,
     {
-      returnDocument: "after"
-    }
-  );
+      new: true,
+      runValidators: true,
+    },
+  ).select("-passwordHash -registerOtp -registerOtpExpire -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
 
   if (!user) {
     throw new Error("User not found");

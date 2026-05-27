@@ -1,28 +1,27 @@
+interface FacebookSdk {
+  init: (config: {
+    appId: string;
+    cookie: boolean;
+    xfbml: boolean;
+    version: string;
+  }) => void;
+}
+
 declare global {
   interface Window {
-    FB: {
-      init: (params: {
-        appId: string | undefined;
-        cookie: boolean;
-        xfbml: boolean;
-        version: string;
-      }) => void;
-    };
+    FB: FacebookSdk;
     fbAsyncInit: () => void;
   }
 }
 
 export const loadFacebookSDK = () => {
-
-  return new Promise((resolve) => {
-
+  return new Promise<FacebookSdk>((resolve) => {
     if (window.FB) {
       resolve(window.FB);
       return;
     }
 
     window.fbAsyncInit = function () {
-
       window.FB.init({
         appId: import.meta.env.VITE_FACEBOOK_APP_ID,
 
@@ -38,8 +37,7 @@ export const loadFacebookSDK = () => {
 
     const script = document.createElement("script");
 
-    script.src =
-      "https://connect.facebook.net/en_US/sdk.js";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
 
     script.async = true;
 

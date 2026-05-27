@@ -67,17 +67,30 @@ export const LoginForm: React.FC = () => {
         >
           Mật khẩu
         </label>
-        <button className="absolute right-4 top-3 text-on-surface-variant" type="button">
+        <button
+          className="absolute right-4 top-3 text-on-surface-variant"
+          type="button"
+        >
           <span className="material-symbols-outlined text-xl">visibility</span>
         </button>
       </div>
 
       <div className="flex items-center justify-between text-xs font-medium">
         <label className="flex items-center space-x-2 cursor-pointer group">
-          <input className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary bg-transparent" type="checkbox" />
-          <span className="text-on-surface-variant dark:text-outline-variant group-hover:text-primary transition-colors">Ghi nhớ</span>
+          <input
+            className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary bg-transparent"
+            type="checkbox"
+          />
+          <span className="text-on-surface-variant dark:text-outline-variant group-hover:text-primary transition-colors">
+            Ghi nhớ
+          </span>
         </label>
-        <Link className="text-primary hover:text-primary-container font-semibold transition-colors" to="#">Quên mật khẩu?</Link>
+        <Link
+          className="text-primary hover:text-primary-container font-semibold transition-colors"
+          to="#"
+        >
+          Quên mật khẩu?
+        </Link>
       </div>
 
       <button
