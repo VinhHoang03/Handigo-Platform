@@ -17,7 +17,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    https: true,
+    https: {},
     port: 5173,
   },
   resolve: {

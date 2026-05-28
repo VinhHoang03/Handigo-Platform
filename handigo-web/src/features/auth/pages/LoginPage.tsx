@@ -89,7 +89,7 @@ const LoginPage: React.FC = () => {
             </span>
             <Link
               className="text-primary hover:text-primary-container font-bold ml-1 transition-colors"
-              to="#"
+              to="/register"
             >
               Đăng ký ngay
             </Link>
