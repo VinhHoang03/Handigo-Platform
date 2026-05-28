@@ -1,8 +1,52 @@
 import api from '@/api/client';
-import type { LoginRequest, AuthResponse } from '../types/auth.types';
+import type {
+  LoginRequest,
+  AuthResponse,
+  RegisterRequest,
+  VerifyRegisterOtpRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+} from '../types/auth.types';
+
+interface MessageResponse {
+  message: string;
+}
 
 export const loginApi = async (data: LoginRequest): Promise<AuthResponse> => {
   const response = await api.post<AuthResponse>('/auth/login', data);
+  return response.data;
+};
+
+export const registerApi = async (data: RegisterRequest): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>('/auth/register', data);
+  return response.data;
+};
+
+export const verifyRegisterOtpApi = async (
+  data: VerifyRegisterOtpRequest,
+): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>('/auth/verify-register-otp', data);
+  return response.data;
+};
+
+export const resendRegisterOtpApi = async (
+  email: string,
+): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>('/auth/resend-register-otp', { email });
+  return response.data;
+};
+
+export const forgotPasswordApi = async (
+  data: ForgotPasswordRequest,
+): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>('/auth/forgot-password', data);
+  return response.data;
+};
+
+export const resetPasswordApi = async (
+  data: ResetPasswordRequest,
+): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>('/auth/reset-password', data);
   return response.data;
 };
 
@@ -16,8 +60,8 @@ export const facebookLoginApi = async (accessToken: string): Promise<AuthRespons
   return response.data;
 };
 
-export const logoutApi = async (): Promise<{ message: string }> => {
-  const response = await api.post<{ message: string }>('/auth/logout');
+export const logoutApi = async (): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>('/auth/logout');
   return response.data;
 };
 
@@ -26,7 +70,7 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-export const changePasswordApi = async (data: ChangePasswordRequest): Promise<{ message: string }> => {
-  const response = await api.post<{ message: string }>('/auth/change-password', data);
+export const changePasswordApi = async (data: ChangePasswordRequest): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>('/auth/change-password', data);
   return response.data;
 };

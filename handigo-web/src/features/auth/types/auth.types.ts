@@ -18,8 +18,22 @@ export interface LoginRequest {
 
 export interface RegisterRequest {
   email: string;
-  phone: string;
   fullName: string;
   password: string;
-  role: 'customer' | 'provider' | 'CUSTOMER' | 'PROVIDER';
+  phone?: string;
+}
+
+export interface VerifyRegisterOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
 }

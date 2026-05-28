@@ -87,7 +87,7 @@ export const LoginForm: React.FC = () => {
         </label>
         <Link
           className="text-primary hover:text-primary-container font-semibold transition-colors"
-          to="#"
+          to="/forgot-password"
         >
           Quên mật khẩu?
         </Link>
