@@ -139,7 +139,7 @@ export const register = async (payload: {
     existingUser.passwordHash = passwordHash;
     existingUser.fullName = payload.fullName;
     existingUser.phone = payload.phone;
-    existingUser.status = "ACTIVE";
+    existingUser.status = "UNLOCK";
     await createAndSendRegisterOtp(existingUser);
     return;
   }
@@ -150,7 +150,7 @@ export const register = async (payload: {
     fullName: payload.fullName,
     phone: payload.phone,
     role: "CUSTOMER",
-    status: "ACTIVE",
+    status: "UNLOCK",
     isEmailVerified: false,
   });
 
@@ -203,7 +203,7 @@ export const login = async (
     throw new AppError("Invalid email or password", 401);
   }
 
-  if (user.status === "BANNED" || user.status === "INACTIVE") {
+  if (user.status === "LOCK") {
     throw new AppError("Account is not allowed to login", 403);
   }
 
@@ -249,7 +249,7 @@ export const googleLogin = async (googleToken: string) => {
   const { email, name, picture } = payload;
   const user = await User.findOne({ email });
 
-  if (user && (user.status === "BANNED" || user.status === "INACTIVE")) {
+  if (user && (user.status === "LOCK" )) {
     throw new AppError("Account is not allowed to login", 403);
   }
 
@@ -265,7 +265,7 @@ export const googleLogin = async (googleToken: string) => {
       passwordHash,
       avatar: picture,
       role: "CUSTOMER",
-      status: "ACTIVE",
+      status: "UNLOCK",
       isEmailVerified: true,
     });
   } else if (!authenticatedUser.isEmailVerified) {
@@ -328,7 +328,7 @@ export const facebookLogin = async (accessToken: string) => {
 
   const existingUser = await User.findOne({ email });
 
-  if (existingUser && (existingUser.status === "BANNED" || existingUser.status === "INACTIVE")) {
+  if (existingUser && (existingUser.status === "LOCK")) {
     throw new AppError("Account is not allowed to login", 403);
   }
 
@@ -344,7 +344,7 @@ export const facebookLogin = async (accessToken: string) => {
       passwordHash,
       avatar: picture?.data?.url ?? null,
       role: "CUSTOMER",
-      status: "ACTIVE",
+      status: "UNLOCK",
       isEmailVerified: true,
     });
   } else if (!authenticatedUser.isEmailVerified) {
@@ -443,7 +443,7 @@ export const refreshToken = async (refreshToken: string): Promise<AuthTokens> =>
     throw new AppError("Refresh session is invalid or expired", 401);
   }
 
-  if (user.status === "BANNED" || user.status === "INACTIVE") {
+  if (user.status === "LOCK") {
     session.revokedAt = new Date();
     await user.save();
     throw new AppError("Account is not allowed to login", 403);
