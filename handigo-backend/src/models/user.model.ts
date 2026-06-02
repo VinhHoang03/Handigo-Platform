@@ -17,7 +17,7 @@ export interface IUser extends Document {
   phone?: string;
   avatar?: string | null;
   role: UserRole;
-  status: "ACTIVE" | "INACTIVE" | "BANNED";
+  status: "LOCK" | "UNLOCK";
   isEmailVerified: boolean;
 
   registerOtp?: string;
@@ -82,8 +82,8 @@ const UserSchema = new Schema<IUser>(
 
     status: {
       type: String,
-      enum: ["ACTIVE", "INACTIVE", "BANNED"],
-      default: "ACTIVE"
+      enum: ["LOCK", "UNLOCK"],
+      default: "UNLOCK"
     },
 
     isEmailVerified: {

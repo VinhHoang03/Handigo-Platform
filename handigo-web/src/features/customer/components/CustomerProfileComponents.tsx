@@ -18,9 +18,12 @@ export const ProfileSectionHeader: React.FC<ProfileSectionHeaderProps> = ({ icon
 
 interface AddressCardProps {
   address: Address;
+  onEdit?: (address: Address) => void;
+  onDelete?: (address: Address) => void;
+  isActionDisabled?: boolean;
 }
 
-export const AddressCard: React.FC<AddressCardProps> = ({ address }) => {
+export const AddressCard: React.FC<AddressCardProps> = ({ address, onEdit, onDelete, isActionDisabled }) => {
   const getIcon = () => {
     switch (address.type) {
       case 'home': return 'home';
@@ -44,13 +47,40 @@ export const AddressCard: React.FC<AddressCardProps> = ({ address }) => {
           <span className="material-symbols-outlined">{getIcon()}</span>
         </div>
         <div>
-          <h4 className="font-label-md text-label-md font-bold">{address.label}</h4>
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-label-md text-label-md font-bold">{address.label}</h4>
+            {address.isDefault && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
+                Mặc định
+              </span>
+            )}
+          </div>
           <p className="font-label-sm text-label-sm text-outline line-clamp-1">{address.address}</p>
         </div>
       </div>
       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button className="p-1 text-outline hover:text-primary"><span className="material-symbols-outlined text-lg">edit</span></button>
-        <button className="p-1 text-outline hover:text-error"><span className="material-symbols-outlined text-lg">delete</span></button>
+        <button
+          type="button"
+          className="p-1 text-outline hover:text-primary disabled:opacity-40"
+          disabled={isActionDisabled}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit?.(address);
+          }}
+        >
+          <span className="material-symbols-outlined text-lg">edit</span>
+        </button>
+        <button
+          type="button"
+          className="p-1 text-outline hover:text-error disabled:opacity-40"
+          disabled={isActionDisabled}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete?.(address);
+          }}
+        >
+          <span className="material-symbols-outlined text-lg">delete</span>
+        </button>
       </div>
     </div>
   );
