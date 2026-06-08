@@ -6,6 +6,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { Types } from "mongoose";
 import User, { IUser } from "../models/user.model";
+import { Session } from "../models/session.model";
 import { generateOtp, getOtpExpireDate, hashOtp } from "../utils/otp";
 import { sendOtpEmail } from "../utils/mail";
 import { getRefreshSecret, signAccessToken, signRefreshToken } from "../utils/token";
@@ -80,30 +81,21 @@ const issueSessionTokens = async (
   user: IUser,
   sessionId?: string,
 ): Promise<AuthTokens> => {
-  user.sessions = user.sessions || [];
-
   const sessionObjectId = sessionId ? new Types.ObjectId(sessionId) : new Types.ObjectId();
-  let session = user.sessions.find(
-    (item) => item._id.toString() === sessionObjectId.toString(),
-  );
-
-  if (!session) {
-    session = {
-      _id: sessionObjectId,
-      refreshTokenHash: "pending",
-      expiresAt: new Date(),
-      createdAt: new Date(),
-    };
-    user.sessions.push(session);
-  }
-
   const refreshToken = signRefreshToken(user, sessionObjectId.toString());
   const refreshTokenExpiresAt = getJwtExpiresAt(refreshToken);
 
-  session.refreshTokenHash = hashRefreshToken(refreshToken);
-  session.expiresAt = refreshTokenExpiresAt;
-  session.revokedAt = undefined;
-  await user.save();
+  await Session.findOneAndUpdate(
+    { _id: sessionObjectId, userId: user._id },
+    {
+      refreshTokenHash: hashRefreshToken(refreshToken),
+      expiresAt: refreshTokenExpiresAt,
+      revokedAt: null,
+      isDeleted: false,
+      deletedAt: null,
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
 
   return {
     token: signAccessToken(user),
@@ -139,7 +131,7 @@ export const register = async (payload: {
     existingUser.passwordHash = passwordHash;
     existingUser.fullName = payload.fullName;
     existingUser.phone = payload.phone;
-    existingUser.status = "UNLOCK";
+    existingUser.status = "active";
     await createAndSendRegisterOtp(existingUser);
     return;
   }
@@ -150,7 +142,7 @@ export const register = async (payload: {
     fullName: payload.fullName,
     phone: payload.phone,
     role: "CUSTOMER",
-    status: "UNLOCK",
+    status: "active",
     isEmailVerified: false,
   });
 
@@ -203,7 +195,7 @@ export const login = async (
     throw new AppError("Invalid email or password", 401);
   }
 
-  if (user.status === "LOCK") {
+  if (user.status === "locked") {
     throw new AppError("Account is not allowed to login", 403);
   }
 
@@ -253,7 +245,7 @@ export const googleLogin = async (googleToken: string) => {
   const { email, name, picture } = payload;
   const user = await User.findOne({ email });
 
-  if (user && (user.status === "LOCK" )) {
+  if (user && user.status === "locked") {
     throw new AppError("Account is not allowed to login", 403);
   }
 
@@ -269,7 +261,7 @@ export const googleLogin = async (googleToken: string) => {
       passwordHash,
       avatar: picture,
       role: "CUSTOMER",
-      status: "UNLOCK",
+      status: "active",
       isEmailVerified: true,
     });
   } else if (!authenticatedUser.isEmailVerified) {
@@ -332,7 +324,7 @@ export const facebookLogin = async (accessToken: string) => {
 
   const existingUser = await User.findOne({ email });
 
-  if (existingUser && (existingUser.status === "LOCK")) {
+  if (existingUser && existingUser.status === "locked") {
     throw new AppError("Account is not allowed to login", 403);
   }
 
@@ -348,7 +340,7 @@ export const facebookLogin = async (accessToken: string) => {
       passwordHash,
       avatar: picture?.data?.url ?? null,
       role: "CUSTOMER",
-      status: "UNLOCK",
+      status: "active",
       isEmailVerified: true,
     });
   } else if (!authenticatedUser.isEmailVerified) {
@@ -408,12 +400,10 @@ export const resetPassword = async (
   user.resetPasswordExpire = undefined;
   await user.save();
 
-  user.sessions.forEach((session) => {
-    if (!session.revokedAt) {
-      session.revokedAt = new Date();
-    }
-  });
-  await user.save();
+  await Session.updateMany(
+    { userId: user._id, revokedAt: null },
+    { revokedAt: new Date() },
+  );
 };
 
 export const refreshToken = async (refreshToken: string): Promise<AuthTokens> => {
@@ -435,21 +425,21 @@ export const refreshToken = async (refreshToken: string): Promise<AuthTokens> =>
     throw new AppError("User not found", 404);
   }
 
-  const session = user.sessions.find(
-    (item) =>
-      item._id.toString() === decoded.sessionId &&
-      item.refreshTokenHash === hashRefreshToken(refreshToken) &&
-      !item.revokedAt &&
-      item.expiresAt.getTime() > Date.now(),
-  );
+  const session = await Session.findOne({
+    _id: decoded.sessionId,
+    userId: user._id,
+    refreshTokenHash: hashRefreshToken(refreshToken),
+    revokedAt: null,
+    expiresAt: { $gt: new Date() },
+    isDeleted: false,
+  });
 
   if (!session) {
     throw new AppError("Refresh session is invalid or expired", 401);
   }
 
-  if (user.status === "LOCK") {
-    session.revokedAt = new Date();
-    await user.save();
+  if (user.status === "locked") {
+    await Session.findByIdAndUpdate(session._id, { revokedAt: new Date() });
     throw new AppError("Account is not allowed to login", 403);
   }
 
@@ -468,25 +458,15 @@ export const logout = async (refreshToken?: string): Promise<void> => {
       return;
     }
 
-    const user = await User.findById(decoded.id);
-
-    if (!user) {
-      return;
-    }
-
-    const session = user.sessions.find(
-      (item) =>
-        item._id.toString() === decoded.sessionId &&
-        item.refreshTokenHash === hashRefreshToken(refreshToken) &&
-        !item.revokedAt,
+    await Session.findOneAndUpdate(
+      {
+        _id: decoded.sessionId,
+        userId: decoded.id,
+        refreshTokenHash: hashRefreshToken(refreshToken),
+        revokedAt: null,
+      },
+      { revokedAt: new Date() },
     );
-
-    if (!session) {
-      return;
-    }
-
-    session.revokedAt = new Date();
-    await user.save();
   } catch (error) {
     return;
   }
@@ -516,17 +496,15 @@ export const changePassword = async (
   user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
   await user.save();
 
-  user.sessions.forEach((session) => {
-    if (!session.revokedAt) {
-      session.revokedAt = new Date();
-    }
-  });
-  await user.save();
+  await Session.updateMany(
+    { userId: user._id, revokedAt: null },
+    { revokedAt: new Date() },
+  );
 };
 
 export const getCurrentUser = async (userId: string): Promise<Partial<IUser>> => {
   const user = await User.findById(userId).select(
-    "-passwordHash -registerOtp -resetPasswordOtp -sessions",
+    "-passwordHash -registerOtp -resetPasswordOtp",
   );
 
   if (!user) {

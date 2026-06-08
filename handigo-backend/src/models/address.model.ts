@@ -2,15 +2,11 @@ import { Schema, model, Document, Types } from "mongoose";
 
 export interface IAddress extends Document {
   userId: Types.ObjectId;
-  label: string;
-  addressLine: string;
-  receiverName?: string;
-  phone?: string;
-  fullAddress?: string;
-  province?: string;
+  receiverName: string; // Sẽ có trường hợp người nhận không phải là chủ tài khoản, nên cần lưu tên người nhận
+  phone: string;
+  fullAddress: string;
+  province: string;
   ward: string;
-  district: string;
-  city: string;
   latitude?: number;
   longitude?: number;
   isDefault: boolean;
@@ -28,35 +24,23 @@ const addressSchema = new Schema<IAddress>(
       ref: "User",
       required: true,
     },
-    label: {
-      type: String,
-      required: true,
-    },
-    addressLine: {
-      type: String,
-      required: true,
-    },
     receiverName: {
       type: String,
+      required: true,
     },
     phone: {
       type: String,
+      required: true,
     },
     fullAddress: {
       type: String,
+      required: true,
     },
     province: {
       type: String,
+      required: true,
     },
     ward: {
-      type: String,
-      required: true,
-    },
-    district: {
-      type: String,
-      required: true,
-    },
-    city: {
       type: String,
       required: true,
     },
@@ -85,7 +69,7 @@ const addressSchema = new Schema<IAddress>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 addressSchema.index({ userId: 1 });

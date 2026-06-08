@@ -1,26 +1,27 @@
 import { z } from "zod";
 
 export const createAddressSchema = z.object({
-  label: z
+  receiverName: z
     .string()
-    .min(1, "Label is required")
-    .max(50, "Label must be less than 50 characters"),
+    .min(1, "Receiver name is required")
+    .max(100, "Receiver name must be less than 100 characters"),
 
-  addressLine: z
+  phone: z
     .string()
-    .min(5, "Address line must be at least 5 characters"),
+    .min(1, "Phone is required")
+    .max(20, "Phone must be less than 20 characters"),
+
+  fullAddress: z
+    .string()
+    .min(5, "Full address must be at least 5 characters"),
+
+  province: z
+    .string()
+    .min(1, "Province is required"),
 
   ward: z
     .string()
     .min(1, "Ward is required"),
-
-  district: z
-    .string()
-    .min(1, "District is required"),
-
-  city: z
-    .string()
-    .min(1, "City is required"),
 
   latitude: z
     .number()
@@ -37,29 +38,40 @@ export const createAddressSchema = z.object({
   isDefault: z
     .boolean()
     .optional(),
+
+  note: z
+    .string()
+    .nullable()
+    .optional(),
 });
 
 export const updateAddressSchema = z.object({
-  label: z
+  receiverName: z
     .string()
-    .max(50)
+    .max(100)
     .optional(),
 
-  addressLine: z
+  phone: z
+    .string()
+    .max(20)
+    .optional(),
+
+  fullAddress: z
     .string()
     .min(5)
+    .optional(),
+
+  province: z
+    .string()
     .optional(),
 
   ward: z
     .string()
     .optional(),
 
-  district: z
+  note: z
     .string()
-    .optional(),
-
-  city: z
-    .string()
+    .nullable()
     .optional(),
 
   latitude: z

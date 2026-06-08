@@ -1,16 +1,7 @@
-import mongoose, { Document, Schema, Types } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
 export type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
-export type HandigoRole = "customer" | "provider" | "admin";
-export type UserStatus = "LOCK" | "UNLOCK" | "active" | "locked";
-
-export interface IUserSession {
-  _id: Types.ObjectId;
-  refreshTokenHash: string;
-  expiresAt: Date;
-  revokedAt?: Date;
-  createdAt?: Date;
-}
+export type UserStatus = "active" | "locked";
 
 export interface IUser extends Document {
   email: string;
@@ -21,8 +12,6 @@ export interface IUser extends Document {
   phone?: string;
   avatar?: string | null;
   role: UserRole;
-  roles: HandigoRole[];
-  activeRole: HandigoRole;
   status: UserStatus;
   isEmailVerified: boolean;
   isDeleted: boolean;
@@ -36,28 +25,7 @@ export interface IUser extends Document {
 
   resetPasswordOtp?: string;
   resetPasswordOtpExpire?: Date;
-
-  sessions: IUserSession[];
 }
-
-const UserSessionSchema = new Schema<IUserSession>(
-  {
-    refreshTokenHash: {
-      type: String,
-      required: true
-    },
-    expiresAt: {
-      type: Date,
-      required: true
-    },
-    revokedAt: Date,
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  },
-  { _id: true }
-);
 
 const UserSchema = new Schema<IUser>(
   {
@@ -96,22 +64,10 @@ const UserSchema = new Schema<IUser>(
       default: "CUSTOMER"
     },
 
-    roles: {
-      type: [String],
-      enum: ["customer", "provider", "admin"],
-      default: ["customer"]
-    },
-
-    activeRole: {
-      type: String,
-      enum: ["customer", "provider", "admin"],
-      default: "customer"
-    },
-
     status: {
       type: String,
-      enum: ["LOCK", "UNLOCK", "active", "locked"],
-      default: "UNLOCK"
+      enum: ["active", "locked"],
+      default: "active"
     },
 
     isEmailVerified: {
@@ -127,11 +83,6 @@ const UserSchema = new Schema<IUser>(
 
     resetPasswordOtp: String,
     resetPasswordOtpExpire: Date,
-
-    sessions: {
-      type: [UserSessionSchema],
-      default: []
-    },
 
     isDeleted: {
       type: Boolean,
