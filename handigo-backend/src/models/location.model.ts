@@ -1,0 +1,49 @@
+import { Document, Schema, model, Types } from "mongoose";
+import { baseFields, IBaseDocument } from "./common";
+
+export interface IGeoPoint {
+  type: "Point";
+  coordinates: [number, number];
+}
+
+export interface ILocation extends Document, IBaseDocument {
+  userId: Types.ObjectId;
+  ownerType: "customer" | "provider";
+  coordinates: IGeoPoint;
+  addressText?: string | null;
+  province?: string | null;
+  ward?: string | null;
+  isActive: boolean;
+  lastUpdatedAt: Date;
+}
+
+const LocationSchema = new Schema<ILocation>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    ownerType: { type: String, enum: ["customer", "provider"], required: true },
+    coordinates: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+        required: true,
+      },
+      coordinates: {
+        type: [Number],
+        required: true,
+      },
+    },
+    addressText: { type: String, default: null },
+    province: { type: String, default: null },
+    ward: { type: String, default: null },
+    isActive: { type: Boolean, default: true },
+    lastUpdatedAt: { type: Date, default: Date.now },
+    ...baseFields,
+  },
+  { timestamps: true },
+);
+
+LocationSchema.index({ coordinates: "2dsphere" });
+LocationSchema.index({ userId: 1, ownerType: 1 });
+
+export const Location = model<ILocation>("Location", LocationSchema);

@@ -211,6 +211,10 @@ export const login = async (
     throw new AppError("Email is not verified", 403);
   }
 
+  if (!user.passwordHash) {
+    throw new AppError("Password login is not available for this account", 400);
+  }
+
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!isPasswordValid) {
@@ -497,6 +501,10 @@ export const changePassword = async (
 
   if (!user) {
     throw new AppError("User not found", 404);
+  }
+
+  if (!user.passwordHash) {
+    throw new AppError("Password login is not available for this account", 400);
   }
 
   const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
