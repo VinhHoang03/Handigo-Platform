@@ -32,4 +32,4 @@ const OrderStatusSchema = new Schema<IOrderStatus>(
 
 OrderStatusSchema.index({ orderId: 1 });
 
-export const OrderStatus = model<IOrderStatus>("OrderStatus", OrderStatusSchema);
+export const OrderStatus = model<IOrderStatus>("OrderStatus", OrderStatusSchema, "orderstatuses");

@@ -41,4 +41,4 @@ const ViolationSchema = new Schema<IViolation>(
 
 ViolationSchema.index({ userId: 1, status: 1 });
 
-export const Violation = model<IViolation>("Violation", ViolationSchema);
+export const Violation = model<IViolation>("Violation", ViolationSchema, "violations");

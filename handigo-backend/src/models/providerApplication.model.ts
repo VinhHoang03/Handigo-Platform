@@ -37,4 +37,5 @@ ProviderApplicationSchema.index(
 export const ProviderApplication = model<IProviderApplication>(
   "ProviderApplication",
   ProviderApplicationSchema,
+  "providerapplications",
 );

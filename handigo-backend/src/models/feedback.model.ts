@@ -29,4 +29,4 @@ const FeedbackSchema = new Schema<IFeedback>(
 
 FeedbackSchema.index({ providerId: 1, createdAt: -1 });
 
-export const Feedback = model<IFeedback>("Feedback", FeedbackSchema);
+export const Feedback = model<IFeedback>("Feedback", FeedbackSchema, "feedbacks");

@@ -173,4 +173,4 @@ OrderSchema.index({ customerId: 1, createdAt: -1 });
 OrderSchema.index({ providerId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
 
-export const Order = model<IOrder>("Order", OrderSchema);
+export const Order = model<IOrder>("Order", OrderSchema, "orders");

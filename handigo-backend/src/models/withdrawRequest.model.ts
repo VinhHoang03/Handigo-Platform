@@ -29,4 +29,4 @@ const WithdrawRequestSchema = new Schema<IWithdrawRequest>(
 
 WithdrawRequestSchema.index({ status: 1, createdAt: -1 });
 
-export const WithdrawRequest = model<IWithdrawRequest>("WithdrawRequest", WithdrawRequestSchema);
+export const WithdrawRequest = model<IWithdrawRequest>("WithdrawRequest", WithdrawRequestSchema, "withdrawrequests");

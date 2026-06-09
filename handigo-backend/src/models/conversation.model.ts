@@ -42,4 +42,4 @@ const ConversationSchema = new Schema<IConversation>(
   { timestamps: true },
 );
 
-export const Conversation = model<IConversation>("Conversation", ConversationSchema);
+export const Conversation = model<IConversation>("Conversation", ConversationSchema, "conversations");

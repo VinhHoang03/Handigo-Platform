@@ -31,4 +31,4 @@ const PromotionSchema = new Schema<IPromotion>(
 
 PromotionSchema.index({ isActive: 1, startAt: 1, endAt: 1 });
 
-export const Promotion = model<IPromotion>("Promotion", PromotionSchema);
+export const Promotion = model<IPromotion>("Promotion", PromotionSchema, "promotions");

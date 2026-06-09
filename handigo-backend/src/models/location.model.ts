@@ -46,4 +46,4 @@ const LocationSchema = new Schema<ILocation>(
 LocationSchema.index({ coordinates: "2dsphere" });
 LocationSchema.index({ userId: 1, ownerType: 1 });
 
-export const Location = model<ILocation>("Location", LocationSchema);
+export const Location = model<ILocation>("Location", LocationSchema, "locations");

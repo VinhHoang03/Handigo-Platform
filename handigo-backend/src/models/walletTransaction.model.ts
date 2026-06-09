@@ -61,4 +61,5 @@ WalletTransactionSchema.index({ walletId: 1, createdAt: -1 });
 export const WalletTransaction = model<IWalletTransaction>(
   "WalletTransaction",
   WalletTransactionSchema,
+  "wallettransactions",
 );

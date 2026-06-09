@@ -26,4 +26,4 @@ const ServiceSchema = new Schema<IService>(
 ServiceSchema.index({ categoryId: 1, slug: 1 }, { unique: true });
 ServiceSchema.index({ categoryId: 1 });
 
-export const Service = model<IService>("Service", ServiceSchema);
+export const Service = model<IService>("Service", ServiceSchema, "services");

@@ -22,4 +22,4 @@ const SessionSchema = new Schema<ISession>(
 SessionSchema.index({ userId: 1 });
 SessionSchema.index({ expiresAt: 1 });
 
-export const Session = model<ISession>("Session", SessionSchema);
+export const Session = model<ISession>("Session", SessionSchema, "sessions");

@@ -33,4 +33,4 @@ const ServiceOptionSchema = new Schema<IServiceOption>(
 
 ServiceOptionSchema.index({ serviceId: 1 });
 
-export const ServiceOption = model<IServiceOption>("ServiceOption", ServiceOptionSchema);
+export const ServiceOption = model<IServiceOption>("ServiceOption", ServiceOptionSchema, "serviceoptions");

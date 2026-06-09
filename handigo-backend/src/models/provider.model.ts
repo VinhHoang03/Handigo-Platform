@@ -34,4 +34,4 @@ const ProviderSchema = new Schema<IProvider>(
 ProviderSchema.index({ serviceCategoryIds: 1 });
 ProviderSchema.index({ activeStatus: 1, verified: 1 });
 
-export const Provider = model<IProvider>("Provider", ProviderSchema);
+export const Provider = model<IProvider>("Provider", ProviderSchema, "providers");

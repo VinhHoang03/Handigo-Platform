@@ -34,4 +34,4 @@ const AuditLogSchema = new Schema<IAuditLog>(
 AuditLogSchema.index({ targetType: 1, targetId: 1 });
 AuditLogSchema.index({ actorId: 1, createdAt: -1 });
 
-export const AuditLog = model<IAuditLog>("AuditLog", AuditLogSchema);
+export const AuditLog = model<IAuditLog>("AuditLog", AuditLogSchema, "auditlogs");

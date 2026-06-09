@@ -36,4 +36,4 @@ const ComplaintSchema = new Schema<IComplaint>(
 ComplaintSchema.index({ orderId: 1 });
 ComplaintSchema.index({ status: 1, createdAt: -1 });
 
-export const Complaint = model<IComplaint>("Complaint", ComplaintSchema);
+export const Complaint = model<IComplaint>("Complaint", ComplaintSchema, "complaints");

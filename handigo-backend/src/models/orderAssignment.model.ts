@@ -35,4 +35,5 @@ OrderAssignmentSchema.index({ providerId: 1, status: 1 });
 export const OrderAssignment = model<IOrderAssignment>(
   "OrderAssignment",
   OrderAssignmentSchema,
+  "orderassignments",
 );

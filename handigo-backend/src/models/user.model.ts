@@ -32,27 +32,27 @@ const UserSchema = new Schema<IUser>(
     email: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
     },
 
     passwordHash: {
       type: String,
-      default: null
+      default: null,
     },
 
     googleId: {
       type: String,
-      default: null
+      default: null,
     },
 
     facebookId: {
       type: String,
-      default: null
+      default: null,
     },
 
     fullName: {
       type: String,
-      required: true
+      required: true,
     },
 
     phone: { type: String, sparse: true },
@@ -61,18 +61,18 @@ const UserSchema = new Schema<IUser>(
     role: {
       type: String,
       enum: ["CUSTOMER", "PROVIDER", "ADMIN"],
-      default: "CUSTOMER"
+      default: "CUSTOMER",
     },
 
     status: {
       type: String,
       enum: ["active", "locked"],
-      default: "active"
+      default: "active",
     },
 
     isEmailVerified: {
       type: Boolean,
-      default: false
+      default: false,
     },
 
     registerOtp: String,
@@ -86,15 +86,15 @@ const UserSchema = new Schema<IUser>(
 
     isDeleted: {
       type: Boolean,
-      default: false
+      default: false,
     },
 
     deletedAt: {
       type: Date,
-      default: null
-    }
+      default: null,
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 UserSchema.index({ phone: 1 });
@@ -104,7 +104,10 @@ UserSchema.index(
 );
 UserSchema.index(
   { facebookId: 1 },
-  { unique: true, partialFilterExpression: { facebookId: { $type: "string" } } },
+  {
+    unique: true,
+    partialFilterExpression: { facebookId: { $type: "string" } },
+  },
 );
 
-export default mongoose.model<IUser>("User", UserSchema);
+export default mongoose.model<IUser>("User", UserSchema, "users");

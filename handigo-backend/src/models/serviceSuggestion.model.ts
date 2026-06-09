@@ -32,4 +32,5 @@ ServiceSuggestionSchema.index({ providerId: 1, status: 1 });
 export const ServiceSuggestion = model<IServiceSuggestion>(
   "ServiceSuggestion",
   ServiceSuggestionSchema,
+  "servicesuggestions",
 );

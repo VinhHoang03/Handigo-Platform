@@ -74,4 +74,4 @@ const addressSchema = new Schema<IAddress>(
 
 addressSchema.index({ userId: 1 });
 
-export const Address = model<IAddress>("Address", addressSchema);
+export const Address = model<IAddress>("Address", addressSchema, "addresses");
