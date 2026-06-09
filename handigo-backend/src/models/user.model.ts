@@ -1,6 +1,8 @@
 import mongoose, { Document, Schema, Types } from "mongoose";
 
 export type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
+export type HandigoRole = "customer" | "provider" | "admin";
+export type UserStatus = "LOCK" | "UNLOCK" | "active" | "locked";
 
 export interface IUserSession {
   _id: Types.ObjectId;
@@ -12,13 +14,19 @@ export interface IUserSession {
 
 export interface IUser extends Document {
   email: string;
-  passwordHash: string;
+  passwordHash: string | null;
+  googleId?: string | null;
+  facebookId?: string | null;
   fullName: string;
   phone?: string;
   avatar?: string | null;
   role: UserRole;
-  status: "LOCK" | "UNLOCK";
+  roles: HandigoRole[];
+  activeRole: HandigoRole;
+  status: UserStatus;
   isEmailVerified: boolean;
+  isDeleted: boolean;
+  deletedAt?: Date | null;
 
   registerOtp?: string;
   registerOtpExpire?: Date;
@@ -61,7 +69,17 @@ const UserSchema = new Schema<IUser>(
 
     passwordHash: {
       type: String,
-      required: true
+      default: null
+    },
+
+    googleId: {
+      type: String,
+      default: null
+    },
+
+    facebookId: {
+      type: String,
+      default: null
     },
 
     fullName: {
@@ -76,13 +94,23 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: ["CUSTOMER", "PROVIDER", "ADMIN"],
       default: "CUSTOMER"
+    },
 
-      
+    roles: {
+      type: [String],
+      enum: ["customer", "provider", "admin"],
+      default: ["customer"]
+    },
+
+    activeRole: {
+      type: String,
+      enum: ["customer", "provider", "admin"],
+      default: "customer"
     },
 
     status: {
       type: String,
-      enum: ["LOCK", "UNLOCK"],
+      enum: ["LOCK", "UNLOCK", "active", "locked"],
       default: "UNLOCK"
     },
 
@@ -103,9 +131,29 @@ const UserSchema = new Schema<IUser>(
     sessions: {
       type: [UserSessionSchema],
       default: []
+    },
+
+    isDeleted: {
+      type: Boolean,
+      default: false
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }
+);
+
+UserSchema.index({ phone: 1 });
+UserSchema.index(
+  { googleId: 1 },
+  { unique: true, partialFilterExpression: { googleId: { $type: "string" } } },
+);
+UserSchema.index(
+  { facebookId: 1 },
+  { unique: true, partialFilterExpression: { facebookId: { $type: "string" } } },
 );
 
 export default mongoose.model<IUser>("User", UserSchema);
