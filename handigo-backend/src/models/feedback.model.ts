@@ -10,7 +10,23 @@ export interface IFeedback extends Document, IBaseDocument {
   comment?: string | null;
   images: string[];
   isVisible: boolean;
+  providerReply?: {
+    content: string;
+    repliedBy: Types.ObjectId;
+    repliedAt: Date;
+    updatedAt: Date;
+  } | null;
 }
+
+const ProviderReplySchema = new Schema(
+  {
+    content: { type: String, required: true, trim: true, maxlength: 1000 },
+    repliedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    repliedAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
 
 const FeedbackSchema = new Schema<IFeedback>(
   {
@@ -22,11 +38,13 @@ const FeedbackSchema = new Schema<IFeedback>(
     comment: { type: String, default: null },
     images: { type: [String], default: [] },
     isVisible: { type: Boolean, default: true },
+    providerReply: { type: ProviderReplySchema, default: null },
     ...baseFields,
   },
   { timestamps: true },
 );
 
 FeedbackSchema.index({ providerId: 1, createdAt: -1 });
+FeedbackSchema.index({ isVisible: 1, rating: 1, createdAt: -1 });
 
 export const Feedback = model<IFeedback>("Feedback", FeedbackSchema, "feedbacks");

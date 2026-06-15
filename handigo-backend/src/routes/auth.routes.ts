@@ -10,7 +10,7 @@ import {
   resendRegisterOtpSchema,
   resetPasswordSchema,
   verifyRegisterOtpSchema,
-} from "../validations/auth.validation";
+} from "../validations/auth.validator";
 
 const router = Router();
 
