@@ -10,9 +10,6 @@ export interface ILocation extends Document, IBaseDocument {
   userId: Types.ObjectId;
   ownerType: "customer" | "provider";
   coordinates: IGeoPoint;
-  addressText?: string | null;
-  province?: string | null;
-  ward?: string | null;
   isActive: boolean;
   lastUpdatedAt: Date;
 }
@@ -33,9 +30,6 @@ const LocationSchema = new Schema<ILocation>(
         required: true,
       },
     },
-    addressText: { type: String, default: null },
-    province: { type: String, default: null },
-    ward: { type: String, default: null },
     isActive: { type: Boolean, default: true },
     lastUpdatedAt: { type: Date, default: Date.now },
     ...baseFields,
@@ -46,4 +40,4 @@ const LocationSchema = new Schema<ILocation>(
 LocationSchema.index({ coordinates: "2dsphere" });
 LocationSchema.index({ userId: 1, ownerType: 1 });
 
-export const Location = model<ILocation>("Location", LocationSchema);
+export const Location = model<ILocation>("Location", LocationSchema, "locations");

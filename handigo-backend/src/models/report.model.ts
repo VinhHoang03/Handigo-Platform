@@ -45,4 +45,4 @@ const ReportSchema = new Schema<IReport>(
 
 ReportSchema.index({ status: 1, createdAt: -1 });
 
-export const Report = model<IReport>("Report", ReportSchema);
+export const Report = model<IReport>("Report", ReportSchema, "reports");

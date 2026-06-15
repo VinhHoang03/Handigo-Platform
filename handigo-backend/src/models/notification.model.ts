@@ -27,4 +27,4 @@ const NotificationSchema = new Schema<INotification>(
 
 NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
 
-export const Notification = model<INotification>("Notification", NotificationSchema);
+export const Notification = model<INotification>("Notification", NotificationSchema, "notifications");

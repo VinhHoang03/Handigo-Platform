@@ -29,4 +29,4 @@ const ServicePackageSchema = new Schema<IServicePackage>(
 
 ServicePackageSchema.index({ providerId: 1, serviceId: 1 });
 
-export const ServicePackage = model<IServicePackage>("ServicePackage", ServicePackageSchema);
+export const ServicePackage = model<IServicePackage>("ServicePackage", ServicePackageSchema, "servicepackages");

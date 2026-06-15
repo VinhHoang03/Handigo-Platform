@@ -31,4 +31,4 @@ const PaymentSchema = new Schema<IPayment>(
 
 PaymentSchema.index({ orderId: 1 });
 
-export const Payment = model<IPayment>("Payment", PaymentSchema);
+export const Payment = model<IPayment>("Payment", PaymentSchema, "payments");

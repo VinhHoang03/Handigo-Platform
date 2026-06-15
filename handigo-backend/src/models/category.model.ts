@@ -7,7 +7,6 @@ export interface ICategory extends Document, IBaseDocument {
   description?: string | null;
   icon?: string | null;
   isActive: boolean;
-  sortOrder: number;
 }
 
 const CategorySchema = new Schema<ICategory>(
@@ -17,10 +16,9 @@ const CategorySchema = new Schema<ICategory>(
     description: { type: String, default: null },
     icon: { type: String, default: null },
     isActive: { type: Boolean, default: true },
-    sortOrder: { type: Number, default: 0 },
     ...baseFields,
   },
   { timestamps: true },
 );
 
-export const Category = model<ICategory>("Category", CategorySchema);
+export const Category = model<ICategory>("Category", CategorySchema, "categories");

@@ -1,16 +1,7 @@
-import mongoose, { Document, Schema, Types } from "mongoose";
+import mongoose, { Document, Schema } from "mongoose";
 
 export type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
-export type HandigoRole = "customer" | "provider" | "admin";
-export type UserStatus = "LOCK" | "UNLOCK" | "active" | "locked";
-
-export interface IUserSession {
-  _id: Types.ObjectId;
-  refreshTokenHash: string;
-  expiresAt: Date;
-  revokedAt?: Date;
-  createdAt?: Date;
-}
+export type UserStatus = "active" | "locked";
 
 export interface IUser extends Document {
   email: string;
@@ -21,8 +12,6 @@ export interface IUser extends Document {
   phone?: string;
   avatar?: string | null;
   role: UserRole;
-  roles: HandigoRole[];
-  activeRole: HandigoRole;
   status: UserStatus;
   isEmailVerified: boolean;
   isDeleted: boolean;
@@ -36,55 +25,34 @@ export interface IUser extends Document {
 
   resetPasswordOtp?: string;
   resetPasswordOtpExpire?: Date;
-
-  sessions: IUserSession[];
 }
-
-const UserSessionSchema = new Schema<IUserSession>(
-  {
-    refreshTokenHash: {
-      type: String,
-      required: true
-    },
-    expiresAt: {
-      type: Date,
-      required: true
-    },
-    revokedAt: Date,
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  },
-  { _id: true }
-);
 
 const UserSchema = new Schema<IUser>(
   {
     email: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
     },
 
     passwordHash: {
       type: String,
-      default: null
+      default: null,
     },
 
     googleId: {
       type: String,
-      default: null
+      default: null,
     },
 
     facebookId: {
       type: String,
-      default: null
+      default: null,
     },
 
     fullName: {
       type: String,
-      required: true
+      required: true,
     },
 
     phone: { type: String, sparse: true },
@@ -93,30 +61,18 @@ const UserSchema = new Schema<IUser>(
     role: {
       type: String,
       enum: ["CUSTOMER", "PROVIDER", "ADMIN"],
-      default: "CUSTOMER"
-    },
-
-    roles: {
-      type: [String],
-      enum: ["customer", "provider", "admin"],
-      default: ["customer"]
-    },
-
-    activeRole: {
-      type: String,
-      enum: ["customer", "provider", "admin"],
-      default: "customer"
+      default: "CUSTOMER",
     },
 
     status: {
       type: String,
-      enum: ["LOCK", "UNLOCK", "active", "locked"],
-      default: "UNLOCK"
+      enum: ["active", "locked"],
+      default: "active",
     },
 
     isEmailVerified: {
       type: Boolean,
-      default: false
+      default: false,
     },
 
     registerOtp: String,
@@ -128,22 +84,17 @@ const UserSchema = new Schema<IUser>(
     resetPasswordOtp: String,
     resetPasswordOtpExpire: Date,
 
-    sessions: {
-      type: [UserSessionSchema],
-      default: []
-    },
-
     isDeleted: {
       type: Boolean,
-      default: false
+      default: false,
     },
 
     deletedAt: {
       type: Date,
-      default: null
-    }
+      default: null,
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 UserSchema.index({ phone: 1 });
@@ -153,7 +104,10 @@ UserSchema.index(
 );
 UserSchema.index(
   { facebookId: 1 },
-  { unique: true, partialFilterExpression: { facebookId: { $type: "string" } } },
+  {
+    unique: true,
+    partialFilterExpression: { facebookId: { $type: "string" } },
+  },
 );
 
-export default mongoose.model<IUser>("User", UserSchema);
+export default mongoose.model<IUser>("User", UserSchema, "users");

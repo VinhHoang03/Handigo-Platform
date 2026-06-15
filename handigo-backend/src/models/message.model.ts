@@ -29,4 +29,4 @@ const MessageSchema = new Schema<IMessage>(
 
 MessageSchema.index({ conversationId: 1, createdAt: 1 });
 
-export const Message = model<IMessage>("Message", MessageSchema);
+export const Message = model<IMessage>("Message", MessageSchema, "messages");

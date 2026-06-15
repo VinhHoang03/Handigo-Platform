@@ -37,4 +37,4 @@ const VoucherSchema = new Schema<IVoucher>(
 
 VoucherSchema.index({ status: 1, startAt: 1, endAt: 1 });
 
-export const Voucher = model<IVoucher>("Voucher", VoucherSchema);
+export const Voucher = model<IVoucher>("Voucher", VoucherSchema, "vouchers");

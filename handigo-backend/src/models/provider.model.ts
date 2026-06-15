@@ -5,7 +5,7 @@ export interface IProvider extends Document, IBaseDocument {
   userId: Types.ObjectId;
   description: string;
   experienceYears: number;
-  activeStatus: "active" | "inactive";
+  availabilityStatus: "online" | "offline" | "busy";
   verified: boolean;
   serviceCategoryIds: Types.ObjectId[];
   workingAreas: string[];
@@ -19,7 +19,7 @@ const ProviderSchema = new Schema<IProvider>(
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
     description: { type: String, required: true },
     experienceYears: { type: Number, required: true, min: 0, default: 0 },
-    activeStatus: { type: String, enum: ["active", "inactive"], default: "inactive" },
+    availabilityStatus: { type: String, enum: ["online", "offline", "busy"], default: "offline" },
     verified: { type: Boolean, default: false },
     serviceCategoryIds: [{ type: Schema.Types.ObjectId, ref: "Category" }],
     workingAreas: { type: [String], default: [] },
@@ -32,6 +32,6 @@ const ProviderSchema = new Schema<IProvider>(
 );
 
 ProviderSchema.index({ serviceCategoryIds: 1 });
-ProviderSchema.index({ activeStatus: 1, verified: 1 });
+ProviderSchema.index({ availabilityStatus: 1, verified: 1 });
 
-export const Provider = model<IProvider>("Provider", ProviderSchema);
+export const Provider = model<IProvider>("Provider", ProviderSchema, "providers");
