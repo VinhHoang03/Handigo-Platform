@@ -9,7 +9,11 @@ import User, { IUser } from "../models/user.model";
 import { Session } from "../models/session.model";
 import { generateOtp, getOtpExpireDate, hashOtp } from "../utils/otp";
 import { sendOtpEmail } from "../utils/mail";
-import { getRefreshSecret, signAccessToken, signRefreshToken } from "../utils/token";
+import {
+  getRefreshSecret,
+  signAccessToken,
+  signRefreshToken,
+} from "../utils/token";
 import { AppError } from "../utils/appError";
 
 const SALT_ROUNDS = 10;
@@ -239,7 +243,10 @@ export const googleLogin = async (googleToken: string) => {
 
   const payload = ticket.getPayload();
   if (!payload?.email || payload.email_verified !== true) {
-    throw new AppError("Google login failed: invalid or unverified Google account", 400);
+    throw new AppError(
+      "Google login failed: invalid or unverified Google account",
+      400,
+    );
   }
 
   const { email, name, picture } = payload;
@@ -302,7 +309,10 @@ export const facebookLogin = async (accessToken: string) => {
 
   const { is_valid, user_id, error } = debugRes.data?.data ?? {};
   if (!is_valid || !user_id) {
-    throw new AppError(`Invalid Facebook access token: ${error?.message || "unknown error"}`, 400);
+    throw new AppError(
+      `Invalid Facebook access token: ${error?.message || "unknown error"}`,
+      400,
+    );
   }
 
   // Get user profile
@@ -406,11 +416,16 @@ export const resetPassword = async (
   );
 };
 
-export const refreshToken = async (refreshToken: string): Promise<AuthTokens> => {
+export const refreshToken = async (
+  refreshToken: string,
+): Promise<AuthTokens> => {
   let decoded: RefreshTokenPayload;
 
   try {
-    decoded = jwt.verify(refreshToken, getRefreshSecret()) as RefreshTokenPayload;
+    decoded = jwt.verify(
+      refreshToken,
+      getRefreshSecret(),
+    ) as RefreshTokenPayload;
   } catch (error) {
     throw new AppError("Invalid or expired refresh token", 401);
   }
@@ -452,7 +467,10 @@ export const logout = async (refreshToken?: string): Promise<void> => {
   }
 
   try {
-    const decoded = jwt.verify(refreshToken, getRefreshSecret()) as RefreshTokenPayload;
+    const decoded = jwt.verify(
+      refreshToken,
+      getRefreshSecret(),
+    ) as RefreshTokenPayload;
 
     if (!decoded.sessionId) {
       return;
@@ -502,7 +520,9 @@ export const changePassword = async (
   );
 };
 
-export const getCurrentUser = async (userId: string): Promise<Partial<IUser>> => {
+export const getCurrentUser = async (
+  userId: string,
+): Promise<Partial<IUser>> => {
   const user = await User.findById(userId).select(
     "-passwordHash -registerOtp -resetPasswordOtp",
   );

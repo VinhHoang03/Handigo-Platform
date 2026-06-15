@@ -6,6 +6,9 @@ export interface IService extends Document, IBaseDocument {
   name: string;
   slug: string;
   description?: string | null;
+  serviceType: "fixed_price" | "variable_price";
+  fixedPrice?: number;
+  depositAmount?: number;
   image?: string | null;
   isActive: boolean;
 }
@@ -16,6 +19,8 @@ const ServiceSchema = new Schema<IService>(
     name: { type: String, required: true },
     slug: { type: String, required: true, trim: true, lowercase: true },
     description: { type: String, default: null },
+    fixedPrice: { type: Number, default: null },
+    depositAmount: { type: Number, default: null },
     image: { type: String, default: null },
     isActive: { type: Boolean, default: true },
     ...baseFields,
@@ -25,5 +30,6 @@ const ServiceSchema = new Schema<IService>(
 
 ServiceSchema.index({ categoryId: 1, slug: 1 }, { unique: true });
 ServiceSchema.index({ categoryId: 1 });
+ServiceSchema.index({ fixedPrice: 1 });
 
 export const Service = model<IService>("Service", ServiceSchema, "services");
