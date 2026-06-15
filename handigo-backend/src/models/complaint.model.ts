@@ -4,7 +4,6 @@ import { baseFields, IBaseDocument } from "./common";
 export interface IComplaint extends Document, IBaseDocument {
   orderId: Types.ObjectId;
   complainantId: Types.ObjectId;
-  complainantRole: "customer" | "provider";
   targetUserId: Types.ObjectId;
   title: string;
   description: string;
@@ -19,7 +18,6 @@ const ComplaintSchema = new Schema<IComplaint>(
   {
     orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true },
     complainantId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    complainantRole: { type: String, enum: ["customer", "provider"], required: true },
     targetUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, required: true },
     description: { type: String, required: true },

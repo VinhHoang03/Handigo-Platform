@@ -3,8 +3,6 @@ import { baseFields, IBaseDocument, Money } from "./common";
 
 export type OrderStatusValue =
   | "created"
-  | "paid"
-  | "assigned"
   | "accepted"
   | "in_progress"
   | "completed"
@@ -19,18 +17,13 @@ export interface ISelectedOptionSnapshot {
 }
 
 export interface IOrderPricing {
-  connectionFee: Money;
-  fixedServiceFee: Money;
+  bookingAmount : Money;
   platformCommissionRate: number;
   platformCommissionAmount: Money;
   providerEarningAmount: Money;
   promotionDiscountAmount: Money;
   voucherDiscountAmount: Money;
   totalPaidAmount: Money;
-  repairCost?: Money | null;
-  repairCostNote?: string | null;
-  repairReportedBy?: Types.ObjectId | null;
-  repairReportedAt?: Date | null;
 }
 
 export interface IDiscountSnapshot {
@@ -48,7 +41,6 @@ export interface IOrderCancellation {
   cancelledByRole: "customer" | "provider" | "admin";
   reason: string;
   cancelledAt: Date;
-  isVoucherRestored: boolean;
 }
 
 export interface IOrderConfirmation {
@@ -65,10 +57,14 @@ export interface IOrder extends Document, IBaseDocument {
   selectedOptionIds: Types.ObjectId[];
   selectedOptionsSnapshot: ISelectedOptionSnapshot[];
   addressId: Types.ObjectId;
-  locationId?: Types.ObjectId | null;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | null;
   status: OrderStatusValue;
+  inspectionRequired: boolean;
+  hasAdditionalQuotation: boolean;
+  currentQuotationId?: Types.ObjectId | null;
+  problemDescription?: string | null;
+  customerAttachments?: string[];
   pricing: IOrderPricing;
   promotionSnapshot?: IDiscountSnapshot | null;
   voucherSnapshot?: IDiscountSnapshot | null;
@@ -78,7 +74,11 @@ export interface IOrder extends Document, IBaseDocument {
 
 const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
   {
-    optionId: { type: Schema.Types.ObjectId, ref: "ServiceOption", required: true },
+    optionId: {
+      type: Schema.Types.ObjectId,
+      ref: "ServiceOption",
+      required: true,
+    },
     name: { type: String, required: true },
     optionType: { type: String, required: true },
     fixedPrice: { type: Number, required: true, min: 0 },
@@ -89,18 +89,13 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
 
 const OrderPricingSchema = new Schema<IOrderPricing>(
   {
-    connectionFee: { type: Number, required: true, min: 0 },
-    fixedServiceFee: { type: Number, required: true, min: 0 },
+    bookingAmount : { type: Number, required: true, min: 0 },
     platformCommissionRate: { type: Number, required: true, min: 0 },
     platformCommissionAmount: { type: Number, required: true, min: 0 },
     providerEarningAmount: { type: Number, required: true, min: 0 },
     promotionDiscountAmount: { type: Number, default: 0, min: 0 },
     voucherDiscountAmount: { type: Number, default: 0, min: 0 },
     totalPaidAmount: { type: Number, required: true, min: 0 },
-    repairCost: { type: Number, default: null, min: 0 },
-    repairCostNote: { type: String, default: null },
-    repairReportedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
-    repairReportedAt: { type: Date, default: null },
   },
   { _id: false },
 );
@@ -111,7 +106,11 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
     voucherId: { type: Schema.Types.ObjectId, ref: "Voucher" },
     name: String,
     code: String,
-    discountType: { type: String, enum: ["fixed", "percentage"], required: true },
+    discountType: {
+      type: String,
+      enum: ["fixed", "percentage"],
+      required: true,
+    },
     discountValue: { type: Number, required: true, min: 0 },
     discountAmount: { type: Number, required: true, min: 0 },
   },
@@ -124,11 +123,17 @@ const OrderSchema = new Schema<IOrder>(
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     providerId: { type: Schema.Types.ObjectId, ref: "Provider", default: null },
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
-    servicePackageId: { type: Schema.Types.ObjectId, ref: "ServicePackage", default: null },
+    servicePackageId: {
+      type: Schema.Types.ObjectId,
+      ref: "ServicePackage",
+      default: null,
+    },
     selectedOptionIds: [{ type: Schema.Types.ObjectId, ref: "ServiceOption" }],
-    selectedOptionsSnapshot: { type: [SelectedOptionSnapshotSchema], default: [] },
+    selectedOptionsSnapshot: {
+      type: [SelectedOptionSnapshotSchema],
+      default: [],
+    },
     addressId: { type: Schema.Types.ObjectId, ref: "Address", required: true },
-    locationId: { type: Schema.Types.ObjectId, ref: "Location", default: null },
     orderType: {
       type: String,
       enum: ["normal", "urgent", "scheduled", "recurring"],
@@ -137,16 +142,29 @@ const OrderSchema = new Schema<IOrder>(
     scheduledAt: { type: Date, default: null },
     status: {
       type: String,
-      enum: ["created", "paid", "assigned", "accepted", "in_progress", "completed", "cancelled"],
+      enum: ["created", "accepted", "in_progress", "completed", "cancelled"],
       default: "created",
     },
+    inspectionRequired: { type: Boolean, default: false },
+    hasAdditionalQuotation: { type: Boolean, default: false },
+    currentQuotationId: {
+      type: Schema.Types.ObjectId,
+      ref: "RepairQuotation",
+      default: null,
+    },
+    problemDescription: { type: String, default: null, trim: true },
+    customerAttachments: { type: [String], default: [] },
     pricing: { type: OrderPricingSchema, required: true },
     promotionSnapshot: { type: DiscountSnapshotSchema, default: null },
     voucherSnapshot: { type: DiscountSnapshotSchema, default: null },
     cancellation: {
       type: new Schema<IOrderCancellation>(
         {
-          cancelledBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+          cancelledBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+          },
           cancelledByRole: {
             type: String,
             enum: ["customer", "provider", "admin"],
@@ -154,7 +172,6 @@ const OrderSchema = new Schema<IOrder>(
           },
           reason: { type: String, required: true },
           cancelledAt: { type: Date, required: true },
-          isVoucherRestored: { type: Boolean, default: false },
         },
         { _id: false },
       ),
