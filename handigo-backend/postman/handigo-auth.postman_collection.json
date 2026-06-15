@@ -29,6 +29,14 @@
     {
       "key": "token",
       "value": ""
+    },
+    {
+      "key": "googleCredential",
+      "value": ""
+    },
+    {
+      "key": "facebookAccessToken",
+      "value": ""
     }
   ],
   "item": [
@@ -263,6 +271,71 @@
             "change-password"
           ]
         }
+      }
+    },
+    {
+      "name": "Refresh Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('refresh token cookie issues a new access token', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('token', body.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/auth/refresh-token",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "refresh-token"]
+        },
+        "description": "Run Login first in the same Postman cookie jar."
+      }
+    },
+    {
+      "name": "Google Login - Missing Credential Validation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('missing Google credential returns 400', function () { pm.response.to.have.status(400); });"],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{}"},
+        "url": "{{baseUrl}}/auth/google-login"
+      }
+    },
+    {
+      "name": "Facebook Login - Missing Access Token Validation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('missing Facebook token returns 400', function () { pm.response.to.have.status(400); });"],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{}"},
+        "url": "{{baseUrl}}/auth/facebook-login"
       }
     },
     {

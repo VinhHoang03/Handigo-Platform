@@ -1,0 +1,107 @@
+import { Server as HttpServer } from "http";
+import jwt from "jsonwebtoken";
+import { Server, Socket } from "socket.io";
+import User from "../models/user.model";
+import * as chatService from "../services/chat.service";
+
+const getAccessSecret = (): string => {
+  const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
+
+  if (!secret) {
+    throw new Error("ACCESS_TOKEN_SECRET or JWT_SECRET is not defined.");
+  }
+
+  return secret;
+};
+
+interface SocketUser {
+  id: string;
+  email: string;
+  role: "CUSTOMER" | "PROVIDER" | "ADMIN";
+}
+
+type AuthedSocket = Socket & {
+  user?: SocketUser;
+};
+
+export const initSocket = (server: HttpServer) => {
+  const io = new Server(server, {
+    cors: {
+      origin: process.env.NODE_ENV === "production" ? undefined : true,
+      credentials: true,
+    },
+  });
+
+  io.use(async (socket: AuthedSocket, next) => {
+    try {
+      const token = socket.handshake.auth?.token;
+
+      if (!token || typeof token !== "string") {
+        return next(new Error("Missing socket token"));
+      }
+
+      const decoded = jwt.verify(token, getAccessSecret()) as SocketUser;
+      const user = await User.findOne({ _id: decoded.id, isDeleted: false });
+
+      if (!user || user.status === "locked") {
+        return next(new Error("Socket user is not allowed"));
+      }
+
+      socket.user = {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+      };
+      next();
+    } catch (error) {
+      next(new Error("Invalid socket token"));
+    }
+  });
+
+  io.on("connection", (socket: AuthedSocket) => {
+    socket.on("conversation:join", async (payload, callback) => {
+      try {
+        const conversationId = payload?.conversationId;
+        await chatService.getMessages(socket.user!.id, socket.user!.role, conversationId, {
+          page: 1,
+          limit: 1,
+        });
+        socket.join(`conversation:${conversationId}`);
+        callback?.({ success: true });
+      } catch (error: any) {
+        callback?.({ success: false, message: error.message });
+      }
+    });
+
+    socket.on("message:send", async (payload, callback) => {
+      try {
+        const message = await chatService.sendMessage(
+          socket.user!.id,
+          socket.user!.role,
+          payload?.conversationId,
+          payload,
+        );
+        io.to(`conversation:${payload.conversationId}`).emit("message:new", message);
+        callback?.({ success: true, data: message });
+      } catch (error: any) {
+        callback?.({ success: false, message: error.message });
+      }
+    });
+
+    socket.on("conversation:seen", async (payload, callback) => {
+      try {
+        const result = await chatService.markConversationSeen(
+          socket.user!.id,
+          socket.user!.role,
+          payload?.conversationId,
+        );
+        io.to(`conversation:${payload.conversationId}`).emit("message:seen", result);
+        callback?.({ success: true, data: result });
+      } catch (error: any) {
+        callback?.({ success: false, message: error.message });
+      }
+    });
+  });
+
+  return io;
+};

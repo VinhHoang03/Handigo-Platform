@@ -1,0 +1,343 @@
+<!DOCTYPE html><html lang="vi"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Theo dõi đơn hàng - Handigo</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Subtle mesh background effect */
+        .mesh-bg {
+            background-color: #faf8ff;
+            background-image: 
+                radial-gradient(at 10% 20%, hsla(245, 100%, 82%, 0.15) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, hsla(190, 100%, 75%, 0.15) 0px, transparent 50%);
+        }
+    </style>
+<!-- Tailwind Config -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error": "#ffffff",
+                    "on-background": "#131b2e",
+                    "inverse-on-surface": "#eef0ff",
+                    "outline": "#777587",
+                    "on-tertiary-fixed-variant": "#7b2f00",
+                    "on-surface": "#131b2e",
+                    "on-primary-fixed": "#0f0069",
+                    "on-surface-variant": "#464555",
+                    "error-container": "#ffdad6",
+                    "surface-glass": "rgba(255, 255, 255, 0.7)",
+                    "on-primary": "#ffffff",
+                    "surface-container-low": "#f2f3ff",
+                    "tertiary-container": "#7d3000",
+                    "secondary-fixed-dim": "#86d2e6",
+                    "inverse-surface": "#283044",
+                    "on-tertiary-container": "#ff9f72",
+                    "on-error-container": "#93000a",
+                    "background": "#faf8ff",
+                    "surface-variant": "#dae2fc",
+                    "surface-bright": "#faf8ff",
+                    "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "on-tertiary": "#ffffff",
+                    "surface-dim": "#d2d9f4",
+                    "surface-container-highest": "#dae2fc",
+                    "tertiary-fixed": "#ffdbcc",
+                    "success-green": "#4ade80",
+                    "on-secondary-fixed-variant": "#004e5c",
+                    "surface-container": "#eaedff",
+                    "primary-fixed": "#e2dfff",
+                    "primary-container": "#3525cd",
+                    "inverse-primary": "#c3c0ff",
+                    "surface-container-lowest": "#ffffff",
+                    "error": "#ba1a1a",
+                    "outline-variant": "#c7c4d8",
+                    "secondary-container": "#9ce8fd",
+                    "secondary-fixed": "#abedff",
+                    "secondary": "#00687a",
+                    "on-secondary-container": "#076a7c",
+                    "star-gold": "#facc15",
+                    "on-tertiary-fixed": "#351000",
+                    "tertiary": "#592000",
+                    "surface-tint": "#4d44e3",
+                    "tertiary-fixed-dim": "#ffb694",
+                    "on-primary-container": "#b1afff",
+                    "primary": "#1e00a9",
+                    "surface-container-high": "#e1e7ff",
+                    "surface": "#faf8ff",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "on-secondary-fixed": "#001f26",
+                    "on-secondary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "container-max": "1280px",
+                    "base": "8px",
+                    "md": "24px",
+                    "xs": "4px",
+                    "lg": "48px",
+                    "xl": "80px",
+                    "sm": "12px"
+            },
+            "fontFamily": {
+                    "headline-xl": ["Hanken Grotesk"],
+                    "body-md": ["Inter"],
+                    "headline-md": ["Hanken Grotesk"],
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "headline-lg-mobile": ["Hanken Grotesk"],
+                    "label-sm": ["Inter"],
+                    "label-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl": ["56px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}]
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md mesh-bg min-h-screen flex flex-col antialiased">
+<!-- TopNavBar Component -->
+<header class="bg-surface-glass backdrop-blur-md full-width top-0 sticky z-50 shadow-lg border-b border-outline-variant/30">
+<div class="flex justify-between items-center w-full px-md py-xs max-w-container-max mx-auto">
+<!-- Brand -->
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined fill text-on-primary" data-icon="handyman">handyman</span>
+</div>
+<h1 class="font-headline-md text-headline-md font-black text-primary">Handigo</h1>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-md">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high/50 transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high/50 transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-variant overflow-hidden border-2 border-primary-fixed">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional close-up headshot of an individual, serving as a user profile avatar. The person has a friendly expression and is well-lit with soft, natural lighting. The background is slightly blurred to keep focus on the face. This image fits a modern, high-end service application light mode aesthetic, emphasizing trust and approachability." src="https://lh3.googleusercontent.com/aida-public/AB6AXuApNLjerlDcjG7wX5BP2UKG_gqlwNOYR3BtOqaRoKRNwHJUtsJQeU2X5bDoiHzqlecafkTJ61tTCyW8ce2ncspxIKDH7dim9uRVPA8smMJci-Qj7rBEaB4KRJD0yAELgurKA9bv69Lkg6SZB9O4MhpOezJLoEwYlyrCaILEuozoPx-_phibM42I-oHE166pMN12kA5E8KIxnni-AwzHfaAx9TqEiZeMlChpBP0PP0WnLe7HE1O8DnOSa_5wYH5PiKyc5AggPzLNyaOm">
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-4 md:px-md py-lg md:py-xl">
+<!-- Header Section -->
+<div class="mb-lg flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<div class="flex items-center gap-sm mb-2">
+<span class="font-label-md text-label-md px-3 py-1 bg-primary-container text-on-primary-container rounded-full">Sửa chữa nước</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Hôm nay, 14:30</span>
+</div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">Theo dõi đơn hàng</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Mã đơn: <strong class="text-primary font-semibold">#HDG-8924A</strong></p>
+</div>
+<button class="flex items-center justify-center gap-2 px-6 py-3 bg-surface-container-lowest border border-outline-variant/30 text-primary rounded-lg font-label-md text-label-md hover:bg-surface-container-low transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[20px]" data-icon="receipt_long">receipt_long</span>
+                Xem chi tiết đơn
+            </button>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-md items-start">
+<!-- Left Column: Timeline (Col Span 8) -->
+<div class="lg:col-span-8 space-y-md">
+<div class="bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant/30 p-md md:p-lg relative overflow-hidden">
+<!-- Glassmorphic decoration -->
+<div class="absolute -top-10 -right-10 w-40 h-40 bg-secondary-container/20 rounded-full blur-3xl pointer-events-none"></div>
+<h3 class="font-headline-md text-headline-md text-on-background mb-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="timeline">timeline</span>
+                        Tiến trình dịch vụ
+                    </h3>
+<div class="relative pl-sm md:pl-md">
+<!-- Vertical connecting line -->
+<div class="absolute left-[27px] md:left-[35px] top-6 bottom-10 w-0.5 bg-surface-variant z-0"></div>
+<!-- Timeline active progress line -->
+<div class="absolute left-[27px] md:left-[35px] top-6 h-[60%] w-0.5 bg-primary z-0 transition-all duration-1000"></div>
+<!-- Step 1: Created (Done) -->
+<div class="relative z-10 flex gap-md mb-8 group">
+<div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105">
+<span class="material-symbols-outlined text-on-primary fill text-[20px]" data-icon="check_circle">check_circle</span>
+</div>
+<div class="pt-2 md:pt-3">
+<h4 class="font-label-md text-label-md font-bold text-on-background">Đã tạo đơn</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-1">Đơn hàng đã được ghi nhận trên hệ thống.</p>
+<span class="font-label-sm text-label-sm text-outline mt-1 block">14:00, 24/10/2024</span>
+</div>
+</div>
+<!-- Step 2: Paid (Done) -->
+<div class="relative z-10 flex gap-md mb-8 group">
+<div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105">
+<span class="material-symbols-outlined text-on-primary fill text-[20px]" data-icon="payments">payments</span>
+</div>
+<div class="pt-2 md:pt-3">
+<h4 class="font-label-md text-label-md font-bold text-on-background">Đã thanh toán</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-1">Thanh toán qua ví VNPay thành công.</p>
+<span class="font-label-sm text-label-sm text-outline mt-1 block">14:05, 24/10/2024</span>
+</div>
+</div>
+<!-- Step 3: Finding Provider (Done) -->
+<div class="relative z-10 flex gap-md mb-8 group">
+<div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105">
+<span class="material-symbols-outlined text-on-primary fill text-[20px]" data-icon="search">search</span>
+</div>
+<div class="pt-2 md:pt-3">
+<h4 class="font-label-md text-label-md font-bold text-on-background">Đã tìm thấy thợ</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-1">Hệ thống đã điều phối thợ gần nhất.</p>
+<span class="font-label-sm text-label-sm text-outline mt-1 block">14:10, 24/10/2024</span>
+</div>
+</div>
+<!-- Step 4: Provider Accepted (Active) -->
+<div class="relative z-10 flex gap-md mb-8 group">
+<!-- Pulse effect ring -->
+<div class="absolute w-10 h-10 md:w-12 md:h-12 rounded-full bg-secondary-container animate-ping opacity-75"></div>
+<div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-surface-container-lowest border-2 border-primary flex items-center justify-center shrink-0 shadow-md relative z-10">
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="handshake">handshake</span>
+</div>
+<div class="pt-2 md:pt-3">
+<h4 class="font-label-md text-label-md font-bold text-primary">Thợ đang di chuyển</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-1">Thợ đang trên đường đến địa chỉ của bạn. Dự kiến đến trong 15 phút.</p>
+<span class="font-label-sm text-label-sm text-primary font-medium mt-1 block">Cập nhật: Vừa xong</span>
+</div>
+</div>
+<!-- Step 5: In Progress (Pending) -->
+<div class="relative z-10 flex gap-md mb-8 opacity-50">
+<div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-surface-container flex items-center justify-center shrink-0 border border-outline-variant">
+<span class="material-symbols-outlined text-outline text-[20px]" data-icon="build">build</span>
+</div>
+<div class="pt-2 md:pt-3">
+<h4 class="font-label-md text-label-md font-medium text-on-surface-variant">Đang thực hiện</h4>
+<p class="font-body-md text-body-md text-outline text-sm mt-1">Thợ tiến hành kiểm tra và sửa chữa.</p>
+</div>
+</div>
+<!-- Step 6: Completed (Pending) -->
+<div class="relative z-10 flex gap-md opacity-50">
+<div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-surface-container flex items-center justify-center shrink-0 border border-outline-variant">
+<span class="material-symbols-outlined text-outline text-[20px]" data-icon="task_alt">task_alt</span>
+</div>
+<div class="pt-2 md:pt-3">
+<h4 class="font-label-md text-label-md font-medium text-on-surface-variant">Hoàn thành</h4>
+<p class="font-body-md text-body-md text-outline text-sm mt-1">Nghiệm thu và kết thúc dịch vụ.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Provider & Actions (Col Span 4) -->
+<div class="lg:col-span-4 space-y-md">
+<!-- Provider Glass Card -->
+<div class="bg-surface-glass backdrop-blur-md rounded-xl shadow-lg border border-outline-variant/30 p-md relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/30 rounded-bl-full -z-10 blur-xl"></div>
+<h3 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-4">Thông tin thợ dịch vụ</h3>
+<div class="flex items-center gap-4 mb-4">
+<div class="relative">
+<img alt="Provider Profile" class="w-16 h-16 rounded-[15%] object-cover border-2 border-surface-container-lowest shadow-sm" data-alt="A portrait of a professional service technician wearing a clean uniform. The individual has a confident, trustworthy smile. The lighting is bright and modern, set against a clean, light-colored background. This image perfectly aligns with a premium home service application, projecting reliability and competence within a glassmorphic UI design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAegWqDrCj_6y-Hj5Gn9MpEZbFZZtt8pncxncBRBJWfoPz8bCThvSEcyrdUHlZ_xqS3YAbSycLYdCooGcFPqFDzSHiavqtLPqeOq-_qScqBe154FeVq3KSvD2rMOLasQrhvs5NkHs3SpSPPI2WH9PFAvfvXpVEfA-3Gmxgk8creO8E8E7SOy8wYTnKPjWGPXo1Ix5ag3jlVTDDkaxNLNIJvvA84cVqhTNMRd1Tk4eVlCNON5M6duaEmXA28nIAkEt37wsdidQApMdN2">
+<!-- Online Status Pulse -->
+<div class="absolute -bottom-1 -right-1 w-4 h-4 bg-success-green rounded-full border-2 border-surface-container-lowest"></div>
+</div>
+<div>
+<h4 class="font-headline-md text-headline-md text-on-background text-xl">Trần Văn Cường</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Chuyên gia Điện nước</p>
+<!-- Floating Rating Glass Tag -->
+<div class="inline-flex items-center gap-1 bg-surface-container-lowest/80 backdrop-blur-sm px-2 py-0.5 rounded-md border border-outline-variant/20 mt-2 shadow-sm">
+<span class="material-symbols-outlined fill text-star-gold text-[16px]" data-icon="star">star</span>
+<span class="font-label-md text-label-md font-bold text-on-surface">4.9</span>
+<span class="font-label-sm text-label-sm text-outline ml-1">(128 chuyến)</span>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex flex-col gap-sm mt-6">
+<button class="w-full flex items-center justify-center gap-2 bg-surface-container-low text-primary hover:bg-primary-fixed hover:text-on-primary-fixed-variant transition-colors py-3 rounded-lg font-label-md text-label-md font-bold shadow-sm active:scale-95 duration-200">
+<span class="material-symbols-outlined text-[20px]" data-icon="chat">chat</span>
+                            Nhắn tin với thợ
+                        </button>
+<button class="w-full flex items-center justify-center gap-2 bg-surface-container-lowest border border-outline-variant/50 text-on-surface hover:bg-surface-variant transition-colors py-3 rounded-lg font-label-md text-label-md font-semibold shadow-sm active:scale-95 duration-200">
+<span class="material-symbols-outlined text-[20px]" data-icon="call">call</span>
+                            Gọi điện (090xxxxxxx)
+                        </button>
+</div>
+</div>
+<!-- Location Map Snippet Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant/30 overflow-hidden">
+<div class="h-32 w-full bg-surface-variant relative">
+<!-- Abstract Map representation -->
+<img alt="Map Location" class="w-full h-full object-cover opacity-80 mix-blend-luminosity" data-alt="An abstract, stylized overhead map view of a modern city grid in a light mode palette. The streets are represented by clean, minimal lines in soft greys and whites, with very subtle hints of primary blue highlighting a route. The image has a slight blur and low contrast to serve as a sophisticated background element in a premium service tracking interface." data-location="Ho Chi Minh City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaC3Xs6Rm9elmLXIvRAKssuD_TWppKnkO3imSzvH12WhzJMoUp4JGsfH3xwYR8ySiuoHWpbWLxis4xwJ7PNVdhHqkVpMB73xxo2ufaHi8pY59IbDM2GWB-mf4fiouzJXXyWPK-zqWmH3r_19GSbNcrzaOkdo2Ztbi-Lt9-oz3-957Reoxk_V-Y8YXYor6oZyBaLUnJ0DpnY6yyP0Bj2ereFpbc1IfRHDXjzwUDqInIYeuJiLlmIHZoGfk8kU5qsnrcg4vuWmzumWMc">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest to-transparent"></div>
+<!-- Map Pin -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center animate-bounce">
+<div class="bg-error text-on-error rounded-full p-1 shadow-md">
+<span class="material-symbols-outlined fill text-[20px]" data-icon="location_on">location_on</span>
+</div>
+<div class="w-2 h-1 bg-on-surface/20 rounded-[100%] mt-1 shadow-sm"></div>
+</div>
+</div>
+<div class="p-4 flex items-start gap-3">
+<span class="material-symbols-outlined text-outline mt-0.5" data-icon="home_pin">home_pin</span>
+<div>
+<p class="font-label-sm text-label-sm text-outline uppercase">Địa chỉ dịch vụ</p>
+<p class="font-body-md text-body-md text-on-surface mt-1 line-clamp-2">Căn hộ 12A, Tòa B, Chung cư Sunrise City, Quận 7, TP. HCM</p>
+</div>
+</div>
+</div>
+<!-- Primary Action Container -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant/30 p-md flex flex-col items-center text-center">
+<span class="material-symbols-outlined text-outline text-4xl mb-2" data-icon="verified">verified</span>
+<h4 class="font-headline-md text-headline-md text-on-background text-lg mb-1">Xác nhận dịch vụ</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mb-4">Chỉ nhấn xác nhận khi thợ đã hoàn thành xong công việc tại nhà bạn.</p>
+<button class="w-full min-h-[48px] flex items-center justify-center gap-2 bg-primary-container text-on-primary-container hover:brightness-110 transition-all py-3 rounded-lg font-label-md text-label-md font-bold shadow-md active:scale-95 duration-200">
+<span class="material-symbols-outlined text-[20px]" data-icon="done_all">done_all</span>
+                        Xác nhận hoàn thành
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer Component -->
+<footer class="bg-surface-container-low mt-auto full-width border-t border-outline-variant flat no shadows">
+<div class="flex flex-col md:flex-row justify-between items-center px-md py-lg max-w-container-max mx-auto gap-4">
+<div class="font-headline-md text-headline-md text-on-surface font-bold">
+                Handigo
+            </div>
+<nav class="flex flex-wrap justify-center gap-x-6 gap-y-2">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Help Center</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Contact Us</a>
+</nav>
+<div class="font-body-md text-body-md text-on-surface-variant text-sm">
+                © 2024 Handigo. Powered by FixNow.
+            </div>
+</div>
+</footer>
+</body></html>

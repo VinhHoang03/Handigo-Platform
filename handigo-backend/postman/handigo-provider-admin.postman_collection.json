@@ -1,0 +1,184 @@
+{
+  "info": {
+    "name": "Handigo Provider Application & Admin",
+    "_postman_id": "c49b741d-4d94-4f67-9754-86c96e091bd1",
+    "description": "Category, provider application, admin user management and application review tests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "customerEmail", "value": "customer@example.com" },
+    { "key": "customerPassword", "value": "Password123" },
+    { "key": "adminEmail", "value": "admin@example.com" },
+    { "key": "adminPassword", "value": "Password123" },
+    { "key": "customerToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "applicationId", "value": "" },
+    { "key": "targetUserId", "value": "" },
+    { "key": "missingId", "value": "000000000000000000000000" }
+  ],
+  "item": [
+    {
+      "name": "Setup - Login Customer",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('customer login succeeds', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.expect(body.user.role).to.eql('CUSTOMER');",
+        "pm.collectionVariables.set('customerToken', body.token);",
+        "pm.collectionVariables.set('targetUserId', body.user.id);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "Setup - Login Admin",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('admin login succeeds', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.expect(body.user.role).to.eql('ADMIN');",
+        "pm.collectionVariables.set('adminToken', body.token);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "Categories - List Active",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('active categories returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data).to.be.an('array'); });",
+        "const items = pm.response.json().data;",
+        "if (items.length) pm.collectionVariables.set('categoryId', items[0]._id);"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/categories" }
+    },
+    {
+      "name": "Provider Application - Create",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('application created', () => pm.response.to.have.status(201));",
+        "const body = pm.response.json();",
+        "pm.expect(body.data.status).to.eql('pending');",
+        "pm.collectionVariables.set('applicationId', body.data._id);"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"description\": \"Experienced home service provider.\",\n  \"experienceYears\": 3,\n  \"serviceCategoryIds\": [\"{{categoryId}}\"],\n  \"workingAreas\": [\"District 1\", \"District 3\"]\n}" },
+        "url": "{{baseUrl}}/provider-applications"
+      }
+    },
+    {
+      "name": "Provider Application - Get Mine",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('own application returned', () => pm.response.to.have.status(200));",
+        "const data = pm.response.json().data;",
+        "if (data) pm.collectionVariables.set('applicationId', data._id);"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/provider-applications/me"
+      }
+    },
+    {
+      "name": "Admin - List Users with Filters",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('paginated users returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.items).to.be.an('array'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/admin/users?role=CUSTOMER&status=active&page=1&limit=10"
+      }
+    },
+    {
+      "name": "Admin - Get User Detail",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('user detail returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data._id).to.eql(pm.collectionVariables.get('targetUserId')); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/admin/users/{{targetUserId}}"
+      }
+    },
+    {
+      "name": "Admin - List Applications by Category",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('filtered applications returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.pagination).to.be.an('object'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/admin/provider-applications?status=pending&categoryId={{categoryId}}&page=1&limit=10"
+      }
+    },
+    {
+      "name": "Admin - Get Application Detail",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('application detail returned', () => pm.response.to.have.status(200));"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/admin/provider-applications/{{applicationId}}"
+      }
+    },
+    {
+      "name": "Admin - Review Application (Approve, destructive)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('application approved', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.status).to.eql('approved'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"approved\"\n}" },
+        "url": "{{baseUrl}}/admin/provider-applications/{{applicationId}}/review"
+      }
+    },
+    {
+      "name": "Negative - Rejection Requires Reason",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('missing rejection reason rejected', () => pm.response.to.have.status(400));"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"rejected\"\n}" },
+        "url": "{{baseUrl}}/admin/provider-applications/{{applicationId}}/review"
+      }
+    },
+    {
+      "name": "Negative - Customer Cannot Access Admin",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('customer forbidden', () => pm.response.to.have.status(403));"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/admin/users"
+      }
+    },
+    {
+      "name": "Negative - Invalid Category Id",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('invalid category rejected', () => pm.response.to.have.status(400));"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/admin/provider-applications?categoryId=invalid"
+      }
+    }
+  ]
+}

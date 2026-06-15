@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import User from "../models/user.model";
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -45,8 +46,25 @@ export const authMiddleware = (
 
   try {
     const decoded = jwt.verify(token, getAccessSecret()) as DecodedToken;
-    req.user = decoded;
-    next();
+    User.findOne({ _id: decoded.id, isDeleted: false })
+      .then((user) => {
+        if (!user) {
+          return res.status(401).json({ message: "User not found or deleted" });
+        }
+
+        if (user.status === "locked") {
+          return res.status(403).json({ message: "Account is locked" });
+        }
+
+        req.user = {
+          ...decoded,
+          id: user._id.toString(),
+          email: user.email,
+          role: user.role,
+        };
+        next();
+      })
+      .catch((error) => next(error));
   } catch (error) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
