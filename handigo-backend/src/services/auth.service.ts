@@ -85,11 +85,12 @@ const issueSessionTokens = async (
   user: IUser,
   sessionId?: string,
 ): Promise<AuthTokens> => {
-  const sessionObjectId = sessionId ? new Types.ObjectId(sessionId) : new Types.ObjectId();
+  const sessionObjectId = sessionId
+    ? new Types.ObjectId(sessionId)
+    : new Types.ObjectId();
   const refreshToken = signRefreshToken(user, sessionObjectId.toString());
   const refreshTokenExpiresAt = getJwtExpiresAt(refreshToken);
-
-  await Session.findOneAndUpdate(
+  await Session.updateOne(
     { _id: sessionObjectId, userId: user._id },
     {
       refreshTokenHash: hashRefreshToken(refreshToken),
@@ -98,7 +99,7 @@ const issueSessionTokens = async (
       isDeleted: false,
       deletedAt: null,
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true },
+    { upsert: true, setDefaultsOnInsert: true },
   );
 
   return {
@@ -505,7 +506,10 @@ export const changePassword = async (
     throw new AppError("Password login is not available for this account", 400);
   }
 
-  const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+  const isPasswordValid = await bcrypt.compare(
+    currentPassword,
+    user.passwordHash,
+  );
 
   if (!isPasswordValid) {
     throw new AppError("Current password is incorrect", 400);

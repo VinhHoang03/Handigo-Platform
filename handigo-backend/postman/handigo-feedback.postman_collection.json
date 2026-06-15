@@ -1,0 +1,842 @@
+{
+  "info": {
+    "name": "Handigo Feedback",
+    "_postman_id": "0f8b1c8d-7d1d-4fd5-9e56-8af78fbd5d01",
+    "description": "Feedback module test collection. Set completedOrderId and providerId from real database data before running protected feedback requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "customerEmail",
+      "value": "customer@example.com"
+    },
+    {
+      "key": "customerPassword",
+      "value": "Password123"
+    },
+    {
+      "key": "providerEmail",
+      "value": "provider@example.com"
+    },
+    {
+      "key": "providerPassword",
+      "value": "Password123"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@example.com"
+    },
+    {
+      "key": "adminPassword",
+      "value": "Password123"
+    },
+    {
+      "key": "customerToken",
+      "value": ""
+    },
+    {
+      "key": "providerToken",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "completedOrderId",
+      "value": "PUT_COMPLETED_ORDER_ID_HERE"
+    },
+    {
+      "key": "providerId",
+      "value": "PUT_PROVIDER_ID_HERE"
+    },
+    {
+      "key": "feedbackId",
+      "value": ""
+    },
+    {
+      "key": "uploadedImageUrls",
+      "value": "[]"
+    },
+    {
+      "key": "missingFeedbackId",
+      "value": "000000000000000000000000"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Auth - Login Customer",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login customer returns token', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('customerToken', body.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "02 Auth - Login Provider",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login provider returns token', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('providerToken', body.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{providerEmail}}\",\n  \"password\": \"{{providerPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "03 Auth - Login Admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('login admin returns token', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('adminToken', body.token);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "04 Feedback - Create Feedback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('create feedback succeeds', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data._id).to.be.a('string');",
+              "  pm.collectionVariables.set('feedbackId', body.data._id);",
+              "  if (body.data.providerId) pm.collectionVariables.set('providerId', body.data.providerId);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{completedOrderId}}\",\n  \"rating\": 5,\n  \"comment\": \"Dich vu tot, provider den dung gio.\",\n  \"images\": [\n    \"https://example.com/feedback-1.jpg\"\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/feedback",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback"
+          ]
+        }
+      }
+    },
+    {
+      "name": "05 Feedback - Get My Feedbacks",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('customer can list own feedbacks', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data).to.be.an('array');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/feedback/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "me"
+          ]
+        }
+      }
+    },
+    {
+      "name": "06 Feedback - Update My Feedback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('update feedback succeeds', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data.rating).to.eql(4);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Cap nhat feedback sau khi kiem tra lai.\",\n  \"images\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/feedback/{{feedbackId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "{{feedbackId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "07 Feedback - Get Provider Feedbacks Public",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('public provider feedback list works', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data.items).to.be.an('array');",
+              "  pm.expect(body.data.pagination).to.be.an('object');",
+              "  pm.expect(body.data.summary).to.be.an('object');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/feedback/provider/{{providerId}}?page=1&limit=10",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "provider",
+            "{{providerId}}"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "08 Feedback - Get My Provider Feedbacks",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('provider can list own feedbacks', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data.items).to.be.an('array');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{providerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/feedback/provider/me?page=1&limit=10",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "provider",
+            "me"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "09 Feedback - Admin Hide Feedback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('admin can hide feedback', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data.isVisible).to.eql(false);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"isVisible\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/feedback/{{feedbackId}}/visibility",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "{{feedbackId}}",
+            "visibility"
+          ]
+        }
+      }
+    },
+    {
+      "name": "10 Feedback - Admin Show Feedback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('admin can show feedback', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(true);",
+              "  pm.expect(body.data.isVisible).to.eql(true);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"isVisible\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/feedback/{{feedbackId}}/visibility",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "{{feedbackId}}",
+            "visibility"
+          ]
+        }
+      }
+    },
+    {
+      "name": "11 Negative - Invalid Rating Validation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('invalid rating returns 400', function () {",
+              "  pm.response.to.have.status(400);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.message).to.eql('Validation error');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{completedOrderId}}\",\n  \"rating\": 6,\n  \"comment\": \"Rating nay phai bi validate chan.\",\n  \"images\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/feedback",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback"
+          ]
+        }
+      }
+    },
+    {
+      "name": "12 Negative - Duplicate Feedback Same Order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('duplicate feedback returns 400', function () {",
+              "  pm.response.to.have.status(400);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(false);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{completedOrderId}}\",\n  \"rating\": 5,\n  \"comment\": \"Lan tao thu hai phai bi chan.\",\n  \"images\": []\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/feedback",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback"
+          ]
+        }
+      }
+    },
+    {
+      "name": "13 Negative - Customer Cannot Access Provider Route",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('customer cannot access provider me route', function () {",
+              "  pm.response.to.have.status(403);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/feedback/provider/me",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "provider",
+            "me"
+          ]
+        }
+      }
+    },
+    {
+      "name": "14 Negative - Update Missing Feedback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('missing feedback update returns 404', function () {",
+              "  pm.response.to.have.status(404);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.success).to.eql(false);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"rating\": 3\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/feedback/{{missingFeedbackId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "feedback",
+            "{{missingFeedbackId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "15 Feedback - Get Feedback By Order",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('order feedback lookup succeeds', function () {",
+        "  pm.response.to.have.status(200);",
+        "  const body = pm.response.json();",
+        "  pm.expect(body.success).to.eql(true);",
+        "  if (body.data) pm.collectionVariables.set('feedbackId', body.data._id);",
+        "});"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/feedback/orders/{{completedOrderId}}"
+      }
+    },
+    {
+      "name": "16 Feedback - Upload Images (select local files)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('images uploaded', function () {",
+        "  pm.response.to.have.status(201);",
+        "  const body = pm.response.json();",
+        "  pm.expect(body.data).to.be.an('array').and.not.empty;",
+        "  pm.collectionVariables.set('uploadedImageUrls', JSON.stringify(body.data));",
+        "});"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "POST",
+        "body": { "mode": "formdata", "formdata": [
+          { "key": "images", "type": "file", "src": "" }
+        ] },
+        "url": "{{baseUrl}}/feedback/images",
+        "description": "Select 1-5 image files in Body > form-data. Maximum size is 5 MB per file."
+      }
+    },
+    {
+      "name": "17 Feedback - Provider Filters and Rating Distribution",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('provider filters and summary returned', function () {",
+        "  pm.response.to.have.status(200);",
+        "  const data = pm.response.json().data;",
+        "  pm.expect(data.items).to.be.an('array');",
+        "  pm.expect(data.summary.ratingDistribution).to.be.an('object');",
+        "});"
+      ] } }],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/feedback/provider/{{providerId}}?rating=4&hasImages=false&replied=false&keyword=feedback&page=1&limit=10"
+      }
+    },
+    {
+      "name": "18 Feedback - Provider Create or Edit Reply",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('provider reply saved', function () {",
+        "  pm.response.to.have.status(200);",
+        "  const reply = pm.response.json().data.providerReply;",
+        "  pm.expect(reply.content).to.eql('Cam on ban da danh gia dich vu.');",
+        "  pm.expect(reply.updatedAt).to.be.a('string');",
+        "});"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{providerToken}}", "type": "string" }] },
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"content\": \"Cam on ban da danh gia dich vu.\"\n}" },
+        "url": "{{baseUrl}}/feedback/{{feedbackId}}/reply"
+      }
+    },
+    {
+      "name": "19 Feedback - Admin Moderation List",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('admin feedback list returned', function () {",
+        "  pm.response.to.have.status(200);",
+        "  const data = pm.response.json().data;",
+        "  pm.expect(data.items).to.be.an('array');",
+        "  pm.expect(data.pagination).to.be.an('object');",
+        "});"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/admin/feedbacks?rating=4&hasImages=false&replied=true&isVisible=true&keyword=feedback&page=1&limit=10"
+      }
+    },
+    {
+      "name": "20 Negative - Customer Cannot Reply",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('customer reply is forbidden', function () { pm.response.to.have.status(403); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"content\": \"Unauthorized reply\"\n}" },
+        "url": "{{baseUrl}}/feedback/{{feedbackId}}/reply"
+      }
+    }
+  ]
+}

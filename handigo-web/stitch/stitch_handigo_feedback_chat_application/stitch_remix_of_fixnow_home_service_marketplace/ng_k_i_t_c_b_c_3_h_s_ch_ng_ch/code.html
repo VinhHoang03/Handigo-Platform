@@ -1,0 +1,202 @@
+<!DOCTYPE html><html lang="vi"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Handigo - Đăng ký đối tác - Hồ sơ chuyên môn</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#076a7c",
+                        "surface-container-high": "#e1e7ff",
+                        "secondary-fixed": "#abedff",
+                        "primary-fixed": "#e2dfff",
+                        "surface-glass": "rgba(255, 255, 255, 0.7)",
+                        "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+                        "on-secondary-fixed-variant": "#004e5c",
+                        "star-gold": "#facc15",
+                        "on-surface": "#131b2e",
+                        "background": "#faf8ff",
+                        "on-primary-container": "#b1afff",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "secondary-container": "#9ce8fd",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "success-green": "#4ade80",
+                        "surface": "#faf8ff",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#d2d9f4",
+                        "tertiary-container": "#7d3000",
+                        "on-tertiary-fixed": "#351000",
+                        "on-primary-fixed": "#0f0069",
+                        "secondary": "#00687a",
+                        "on-secondary-fixed": "#001f26",
+                        "surface-tint": "#4d44e3",
+                        "on-surface-variant": "#464555",
+                        "inverse-surface": "#283044",
+                        "on-tertiary-container": "#ff9f72",
+                        "primary": "#1e00a9",
+                        "secondary-fixed-dim": "#86d2e6",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcc",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "on-background": "#131b2e",
+                        "surface-container": "#eaedff",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#faf8ff",
+                        "surface-variant": "#dae2fc",
+                        "outline-variant": "#c7c4d8",
+                        "outline": "#777587",
+                        "inverse-on-surface": "#eef0ff",
+                        "primary-container": "#3525cd",
+                        "surface-container-highest": "#dae2fc",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "surface-container-low": "#f2f3ff",
+                        "inverse-primary": "#c3c0ff",
+                        "tertiary-fixed-dim": "#ffb694",
+                        "tertiary": "#592000",
+                        "on-tertiary-fixed-variant": "#7b2f00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "xl": "80px",
+                        "lg": "48px",
+                        "container-max": "1280px",
+                        "xs": "4px",
+                        "base": "8px",
+                        "md": "24px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-md": ["Inter"],
+                        "headline-xl": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex flex-col items-center justify-center py-xl relative overflow-x-hidden">
+<!-- Decorative Background Elements (Glassmorphic vibe) -->
+<div class="fixed top-[-10%] left-[-10%] w-96 h-96 bg-primary-fixed rounded-full mix-blend-multiply filter blur-[80px] opacity-40 z-0 pointer-events-none"></div>
+<div class="fixed bottom-[-10%] right-[-10%] w-96 h-96 bg-secondary-container rounded-full mix-blend-multiply filter blur-[80px] opacity-40 z-0 pointer-events-none"></div>
+<div class="w-full max-w-3xl px-md relative z-10">
+<!-- Header -->
+<div class="text-center mb-lg">
+<h1 class="font-headline-lg text-headline-lg text-primary mb-sm">Hồ sơ chuyên môn &amp; Chứng chỉ</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Bước 3/3: Hoàn thiện hồ sơ để bắt đầu nhận việc trên Handigo.</p>
+</div>
+<!-- Progress Bar -->
+<div class="w-full bg-surface-container-high rounded-full h-2.5 mb-lg overflow-hidden">
+<div class="bg-primary h-2.5 rounded-full" style="width: 100%"></div>
+</div>
+<!-- Main Form Card -->
+<div class="bg-surface-glass backdrop-blur-md shadow-lg border border-outline-variant/30 rounded-xl p-md sm:p-lg">
+<form action="#" class="space-y-lg" method="POST">
+<!-- Section 1: Professional Info -->
+<div class="space-y-md">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 border-b border-outline-variant/30 pb-xs">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">work</span>
+                        Thông tin nghề nghiệp
+                    </h2>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-xs" for="bio">Giới thiệu ngắn (Bio)</label>
+<textarea class="w-full rounded-lg border-outline-variant bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-primary font-body-md p-sm shadow-sm transition-colors" id="bio" name="bio" placeholder="Chia sẻ kinh nghiệm và kỹ năng nổi bật của bạn..." rows="4"></textarea>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-xs" for="experience">Số năm kinh nghiệm</label>
+<select class="w-full rounded-lg border-outline-variant bg-surface-container-lowest text-on-surface focus:border-primary focus:ring-primary font-body-md p-sm shadow-sm transition-colors" id="experience" name="experience">
+<option>Dưới 1 năm</option>
+<option>1 - 3 năm</option>
+<option>3 - 5 năm</option>
+<option>Hơn 5 năm</option>
+</select>
+</div>
+</div>
+<!-- Section 2: Document Upload -->
+<div class="space-y-md">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 border-b border-outline-variant/30 pb-xs">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">badge</span>
+                        Chứng chỉ &amp; Giấy tờ
+                    </h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Vui lòng tải lên ảnh chụp mặt trước và mặt sau CCCD/CMND, và các chứng chỉ nghề nghiệp liên quan (nếu có).</p>
+<!-- Upload Area (Drag & Drop styled) -->
+<div class="border-2 border-dashed border-outline-variant rounded-xl p-lg flex flex-col items-center justify-center text-center hover:bg-surface-container-low transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-4xl text-primary mb-sm group-hover:scale-110 transition-transform duration-200">upload_file</span>
+<p class="font-label-md text-label-md text-on-surface mb-xs"><span class="text-primary font-semibold">Bấm để tải lên</span> hoặc kéo thả file vào đây</p>
+<p class="font-label-sm text-label-sm text-outline">PNG, JPG, PDF (Tối đa 5MB/file)</p>
+<input accept=".png,.jpg,.jpeg,.pdf" class="hidden" id="file-upload" multiple="" type="file">
+</div>
+<!-- Upload Preview Area -->
+<div class="space-y-sm">
+<!-- Preview Item 1 -->
+<div class="flex items-center justify-between p-sm bg-surface-container-lowest rounded-lg border border-outline-variant/30 shadow-sm">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-secondary">image</span>
+<div>
+<p class="font-label-md text-label-md text-on-surface">CCCD_MatTruoc.jpg</p>
+<p class="font-label-sm text-label-sm text-outline">2.4 MB</p>
+</div>
+</div>
+<button class="text-error hover:bg-error-container p-2 rounded-full transition-colors flex items-center justify-center" type="button">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+<!-- Preview Item 2 -->
+<div class="flex items-center justify-between p-sm bg-surface-container-lowest rounded-lg border border-outline-variant/30 shadow-sm">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-secondary">image</span>
+<div>
+<p class="font-label-md text-label-md text-on-surface">ChungChi_DienLanh.pdf</p>
+<p class="font-label-sm text-label-sm text-outline">1.1 MB</p>
+</div>
+</div>
+<button class="text-error hover:bg-error-container p-2 rounded-full transition-colors flex items-center justify-center" type="button">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="pt-md border-t border-outline-variant/30 flex flex-col sm:flex-row justify-end gap-sm">
+<button class="px-md py-sm rounded-lg font-label-md text-label-md text-on-surface-variant border border-outline hover:bg-surface-container-low transition-colors text-center" type="button">
+                        Quay lại
+                    </button>
+<button class="px-md py-sm rounded-lg font-label-md text-label-md bg-primary-container text-on-primary-container hover:scale-95 transition-transform duration-200 shadow-md flex items-center justify-center gap-2" type="submit">
+                        Hoàn tất đăng ký
+                        <span class="material-symbols-outlined">check_circle</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+</body></html>

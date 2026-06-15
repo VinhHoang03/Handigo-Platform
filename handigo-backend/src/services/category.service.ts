@@ -127,3 +127,12 @@ export const deleteCategory = async (id: string) => {
   category.isActive = false;
   await category.save();
 };
+
+export const getActiveCategories = async () => {
+  return Category.find({
+    isActive: true,
+    isDeleted: false,
+  })
+    .select("name slug icon isActive sortOrder")
+    .sort({ sortOrder: 1, name: 1 });
+};

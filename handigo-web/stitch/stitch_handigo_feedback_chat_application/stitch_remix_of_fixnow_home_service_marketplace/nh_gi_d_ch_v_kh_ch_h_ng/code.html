@@ -1,0 +1,236 @@
+<!DOCTYPE html><html lang="vi"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Handigo - Đánh giá dịch vụ</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-lowest": "#ffffff",
+                        "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "surface-container-highest": "#dae2fc",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "on-secondary-fixed-variant": "#004e5c",
+                        "tertiary-fixed": "#ffdbcc",
+                        "primary": "#1e00a9",
+                        "on-primary-container": "#b1afff",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-secondary-fixed": "#001f26",
+                        "surface-glass": "rgba(255, 255, 255, 0.7)",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#e2dfff",
+                        "surface-container-low": "#f2f3ff",
+                        "secondary-container": "#9ce8fd",
+                        "error": "#ba1a1a",
+                        "tertiary": "#592000",
+                        "surface-tint": "#4d44e3",
+                        "surface-container-high": "#e1e7ff",
+                        "tertiary-container": "#7d3000",
+                        "tertiary-fixed-dim": "#ffb694",
+                        "star-gold": "#facc15",
+                        "surface-bright": "#faf8ff",
+                        "primary-container": "#3525cd",
+                        "on-secondary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#283044",
+                        "success-green": "#4ade80",
+                        "on-primary-fixed": "#0f0069",
+                        "surface": "#faf8ff",
+                        "on-surface": "#131b2e",
+                        "secondary-fixed-dim": "#86d2e6",
+                        "background": "#faf8ff",
+                        "on-tertiary-fixed": "#351000",
+                        "surface-container": "#eaedff",
+                        "on-tertiary-container": "#ff9f72",
+                        "secondary-fixed": "#abedff",
+                        "on-background": "#131b2e",
+                        "surface-variant": "#dae2fc",
+                        "on-secondary-container": "#076a7c",
+                        "secondary": "#00687a",
+                        "on-surface-variant": "#464555",
+                        "outline-variant": "#c7c4d8",
+                        "surface-dim": "#d2d9f4",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "on-primary": "#ffffff",
+                        "outline": "#777587",
+                        "inverse-primary": "#c3c0ff",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "xl": "80px",
+                        "container-max": "1280px",
+                        "md": "24px",
+                        "sm": "12px",
+                        "lg": "48px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-xl": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.on-background'); }
+        .glass-card {
+            background: theme('colors.surface-glass');
+            backdrop-filter: blur(12px);
+            border: 1px solid theme('colors.outline-variant');
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-32">
+<!-- Header (Suppressed main nav as this is a transactional flow, but providing a top app bar for context) -->
+<header class="fixed top-0 left-0 w-full z-50 bg-surface-glass backdrop-blur-md shadow-sm h-16 flex items-center justify-center px-4 md:px-gutter mx-auto">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Handigo</h1>
+</header>
+<main class="pt-24 px-4 md:px-gutter max-w-container-max mx-auto md:max-w-3xl">
+<div class="text-center mb-lg">
+<span class="material-symbols-outlined text-success-green text-5xl mb-4" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary mb-2">Cảm ơn bạn đã sử dụng dịch vụ</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Đơn hàng của bạn đã được hoàn tất. Vui lòng để lại đánh giá để chúng tôi cải thiện chất lượng dịch vụ.</p>
+</div>
+<div class="space-y-md">
+<!-- Order Summary Card -->
+<section class="bg-surface-container-lowest rounded-xl p-md shadow-sm border border-outline-variant/30 flex flex-col md:flex-row gap-md items-start md:items-center justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-1">Dịch vụ</h3>
+<p class="font-body-md text-body-md font-medium">Sửa chữa điện nước tổng hợp</p>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-1">Mã đơn hàng</h3>
+<p class="font-body-md text-body-md font-medium text-primary">#HDG-89241</p>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-1">Ngày thực hiện</h3>
+<p class="font-body-md text-body-md font-medium">24/10/2023 - 14:30</p>
+</div>
+</section>
+<!-- Provider Profile & Rating -->
+<section class="glass-card rounded-xl p-md md:p-lg text-center relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-b from-surface-container-highest/50 to-transparent pointer-events-none"></div>
+<div class="relative z-10">
+<img alt="Avatar of the service provider" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-surface-container-lowest shadow-md object-cover" data-alt="A professional headshot of a friendly Vietnamese service technician in a clean navy blue uniform. The lighting is bright and studio-quality, emphasizing trustworthiness and competence. The background is a soft, blurred modern home interior setting, aligning with a high-end service platform aesthetic. Colors are balanced with a focus on deep blues and neutral tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXyBBnMo4fWkNsv9syx3oS6xwBwEOrQ3dXeL1RWCj0Gbftze8OC-Mej9RMKngybtKvnRkpJTF239YBwHoEMCNJMWduZPVog_354B-GLH4lNMDSui0zM_Lc0mQRzM5skXUlQGqy-_jPtSOnMUyx1jBlQBjwm9WIX8VfOil37-u94NeA3fx1GAEzJFq2XoaihRyHzBns8WxdcFOg6sufbvxMAXiF-p2V1lvcefm0hhPpdRHY9Wxp-XfFZD81tNjT99uOIXA4Ivx_kskh">
+<h3 class="font-headline-md text-headline-md text-on-background mb-1">Nguyễn Văn A</h3>
+<p class="font-label-md text-label-md text-on-surface-variant mb-6">Thợ sửa chữa điện nước</p>
+<div class="flex justify-center gap-2 mb-6" id="star-rating">
+<button class="group transition-transform hover:scale-110 active:scale-95 focus:outline-none" type="button">
+<span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-star-gold" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="group transition-transform hover:scale-110 active:scale-95 focus:outline-none" type="button">
+<span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-star-gold" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="group transition-transform hover:scale-110 active:scale-95 focus:outline-none" type="button">
+<span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-star-gold" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="group transition-transform hover:scale-110 active:scale-95 focus:outline-none" type="button">
+<span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-star-gold" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button class="group transition-transform hover:scale-110 active:scale-95 focus:outline-none" type="button">
+<span class="material-symbols-outlined text-4xl text-outline-variant group-hover:text-star-gold" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+</div>
+<!-- Quick Tags -->
+<div class="flex flex-wrap justify-center gap-sm mb-6">
+<button class="px-4 py-2 rounded-full border border-outline-variant text-label-md font-label-md text-on-surface-variant hover:bg-primary-container hover:text-on-primary-container hover:border-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Nhanh chóng</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-label-md font-label-md text-on-surface-variant hover:bg-primary-container hover:text-on-primary-container hover:border-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Chuyên nghiệp</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-label-md font-label-md text-on-surface-variant hover:bg-primary-container hover:text-on-primary-container hover:border-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Tận tâm</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-label-md font-label-md text-on-surface-variant hover:bg-primary-container hover:text-on-primary-container hover:border-primary-container transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">Giá hợp lý</button>
+</div>
+</div>
+</section>
+<!-- Detailed Feedback -->
+<section class="bg-surface-container-lowest rounded-xl p-md shadow-sm border border-outline-variant/30">
+<label class="block font-label-md text-label-md text-on-background mb-2" for="feedback-text">Nhận xét chi tiết</label>
+<textarea class="w-full rounded-lg border-outline-variant bg-surface focus:border-primary focus:ring-primary text-body-md font-body-md text-on-background placeholder:text-outline resize-none p-4" id="feedback-text" placeholder="Chia sẻ trải nghiệm của bạn với thợ Nguyễn Văn A..." rows="4"></textarea>
+</section>
+<!-- Image Upload -->
+<section class="bg-surface-container-lowest rounded-xl p-md shadow-sm border border-outline-variant/30 flex flex-col items-center justify-center border-dashed">
+<div class="w-24 h-24 mb-4 rounded-lg overflow-hidden flex items-center justify-center bg-surface-container-high">
+<img alt="Upload icon inspiration" class="object-cover w-full h-full opacity-80 hover:opacity-100 transition-opacity cursor-pointer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCWGiWAGKkIoK1I2QY_HVgQcbd4r7kiNrZsuNWlImyL9FJU5OGi1yFe3ypsY5P_pxCAe9CqNoKpAKNTbjKFRAALvgpGXJjeAJyvRhc_whhAV8vJyWkRcUKQwxsDIEQhSkLXjUZ8Tcgjb7IsgJVWuaR65EdfmWe4vZOtJPoJ0XO67WqhfBenPJBMe-riyLXxhp-RZFtfZBsrgp01aCeXmpjgHSAWlZrt7PXYAHSkMkpuPCRmEzRFX25pQ_GcsIw64y8M62KmKy-rDSh">
+</div>
+<p class="font-label-md text-label-md text-on-surface-variant mb-2">Đính kèm hình ảnh thực tế (không bắt buộc)</p>
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container text-primary font-label-md text-label-md hover:bg-surface-container-high transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+<span class="material-symbols-outlined">photo_camera</span>
+<span>Tải ảnh lên</span>
+</button>
+</section>
+</div>
+<div class="mt-lg flex justify-center">
+<button class="bg-primary-container text-on-primary-container font-label-md text-label-md md:font-body-md md:text-body-md py-3 px-8 rounded-lg shadow-md hover:shadow-lg active:scale-95 transition-all w-full md:w-auto min-w-[200px] flex justify-center items-center gap-2">
+                Gửi đánh giá
+                <span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</main>
+<script>
+        // Simple star rating interaction
+        const stars = document.querySelectorAll('#star-rating button');
+        let currentRating = 0;
+
+        stars.forEach((star, index) => {
+            star.addEventListener('click', () => {
+                currentRating = index + 1;
+                updateStars(currentRating);
+            });
+
+            star.addEventListener('mouseenter', () => {
+                updateStars(index + 1, true);
+            });
+
+            star.addEventListener('mouseleave', () => {
+                updateStars(currentRating);
+            });
+        });
+
+        function updateStars(rating, isHover = false) {
+            stars.forEach((s, i) => {
+                const icon = s.querySelector('span');
+                if (i < rating) {
+                    icon.classList.remove('text-outline-variant');
+                    icon.classList.add('text-star-gold');
+                    if(!isHover) icon.style.fontVariationSettings = "'FILL' 1";
+                } else {
+                    icon.classList.remove('text-star-gold');
+                    icon.classList.add('text-outline-variant');
+                     if(!isHover) icon.style.fontVariationSettings = "'FILL' 0";
+                }
+            });
+        }
+    </script>
+</body></html>

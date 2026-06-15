@@ -30,4 +30,6 @@ router.put(
 );
 router.delete("/:id", categoryController.deleteCategory);
 
+router.get("/", categoryController.getActiveCategories);
+
 export default router;
