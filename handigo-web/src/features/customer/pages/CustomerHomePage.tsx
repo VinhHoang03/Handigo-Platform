@@ -1,145 +1,144 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../../components/DashboardLayout';
-import { CategoryItem, BookingCard, ProCard, PromoCard } from '../components/CustomerHomeComponents';
-import type { Category, Booking, Pro } from '../types/customer.types';
+import {
+  CategoriesGrid,
+  CustomerHomeFooter,
+  HeroOffer,
+  RecentOrders,
+  TopProviders,
+} from '../components/CustomerHomeComponents';
+import type { Booking, Category, Pro } from '../types/customer.types';
+
+const heroImageUrl =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuBsIKP1_Fy6o_EMzoFqhEtqOBvPjSb8sWjrVk0GTpbKqMiLk7kT5jhuYsjGU9pC5GsC6ea09Y1dw0J4KvYwwgVPA-kZIB0Z4zTuj1FTbXqggjT8hU-TsqUAiSU8Gs6zuFSp8J54mSn6zpqnePLsR3tcilXdg5KxNyAzG9_xPY3RovK2erHpgpPDJ0pEkK3LPE8u4MskH_XYLz23B_t5ibO5ELQIUY3xN0ZGCiFIC6g3I9NBgEJp95ZTKhVNaXRIBoffqynowhjtO2g';
+
+const userAvatarUrl =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuBtFhL746CMy6BngQ7WoUHkbjpoCJe8bSs0QPuzJw4OpnoWZ7lEI9yhhTfZOqhRBzbuSkPKN6fKsAgTKwXDlRwmPzQ3cmibGWgtEtAdM4NzEQgeK7igATVXFqpf2HHFgYzD6IGxuyDS3rQN45lCkmt10XelvJao1pj6w6HsdUWV1zr_kqFhm_1e-Ehd0jxGytxxnHnk_HLGn0YmWhY50MNEK3be30LAMTuKEJx_hdumXzHJdphqkwoD2qBq4afxqe1ZrYKJYW4TOVI';
+
+const providerAvatarUrl =
+  'https://lh3.googleusercontent.com/aida-public/AB6AXuC1--RFwuMPWQUCUsJqFJtDg21-HdcfnLdSf1OjFhMQ0j9NST24FjBaSM7JOtzszWmIErKqMQXkdmnqxR_utEHb4TNZqahM9yrFFqESI_-xXht1pg77JxyVFam1MDuZphna3Zzdr7cgqcFhy5reOFD_N9RLOTsh0qCOMK0fLTu__c6jZwBY_lwO3VqXa-2B31covAs8bzABVOXq1Y2B3ziI6r3itdM--XjKZCx2Wu68KLuxv31UO4Xc5ad40bz8dGGl-KYcUt6HNrc';
+
+const legacyCustomerNavItems = [
+  { icon: 'dashboard', label: 'Bảng điều khiển', path: '/customer' },
+  { icon: 'calendar_today', label: 'Lịch đặt chỗ', path: '#' },
+  { icon: 'mail', label: 'Hộp thư', path: '#' },
+  { icon: 'account_balance_wallet', label: 'Ví tiền', path: '#' },
+  { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
+];
+
+const customerNavItems = [
+  { icon: 'dashboard', label: 'Bảng điều khiển', path: '/customer' },
+  { icon: 'calendar_today', label: 'Lịch đặt chỗ', path: '/customer/bookings' },
+  { icon: 'mail', label: 'Hộp thư', path: '/customer/inbox' },
+  { icon: 'account_balance_wallet', label: 'Ví tiền', path: '/customer/wallet' },
+  { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
+];
+
+void legacyCustomerNavItems;
+
+const categories: Category[] = [
+  {
+    icon: 'ac_unit',
+    name: 'Điện lạnh',
+    imageUrl:
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBceMJJI8IHQgE52oA0RxaLld12li12pnFBU_OYwDkKKGcpoFisSOQMWZl7g9npG-Hs4aGGYjPW5jdB_ktgaZN0vmvN7sBzcur9O7DZ7M-gKfgUETxj76o7GJK8BQ4WApMNMTztiEMBnS3JY6oj-SlQu5CGv3BBQGx6jJn0J8WyGiah9Bu97ypf1JX5qUcrVjdbcrcBA938U_Mpme9RMLlZ275rppfcynufQmWvkJkTCbuvkg-YRq5m47C2cUec0Pqs1s5amqsA2ec',
+    imageAlt: 'Thợ đang bảo dưỡng máy lạnh trong nhà',
+  },
+  {
+    icon: 'plumbing',
+    name: 'Điện nước',
+    imageUrl:
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBsu-32JdRxoSHkrKo_H4HM6kCmZRZ4440YUhaLa_0Hya62pmmo0rXNUCRtwqVvLfJAZIp84MhOp3JNrERclEF6jEAB0fNU3MdJZDjE4w5puPSV_jQUldg29bs3OQyXHcwf9VvM_QUg47xW4u56Z0u4ljQpH1-M4VV3ACfF_7ZFkwv-FYfPV6_q5xWwNzBVWWX0UAjgjfdET4O_cfIu_s7UDraqvqiiRvLPh3KrhBkp_CwbzXO49wcVr6Xf3Mo-sTt0R90EvgVwDw8',
+    imageAlt: 'Thợ lắp đặt vòi nước trong phòng tắm',
+  },
+  {
+    icon: 'cleaning_services',
+    name: 'Vệ sinh',
+    imageUrl:
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuALcFw4C6LkorICZDy462Zh-JZNdP_eRvA7aQJsFAm9w2nO3zyxVk9lqKaQTONlOTsXrvE2d_KGQBmistaMUNf8_ToL6COPCTMyYG_RZBNg1aarOHV-60OBjeGlybE04iTYqz8sHue3ErVziFJyvl-Gph_LCdOZVh1JbkKChgATiiwK2v_e6_VSZTTRUKwSO0UHw-XQV--Typ23K3doIp22OCqkJ9KPAEhz872E2o0P-tBazti4W1UxoFM3wXwPkkTU6CIlGMythp8',
+    imageAlt: 'Không gian giặt ủi sạch sẽ và ngăn nắp',
+  },
+  {
+    icon: 'home_repair_service',
+    name: 'Sửa nhà',
+    imageUrl:
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBSpmy0DLJkXOpU5pTbvIa2VeF4RmLnkYcV8sRN_rSag7sHqEg6_j20xV_J3KvF2AiPTWSdQWCNFR7MJgmdX9ph8YC8f_MhLJbG-L8HOeiihMRVz6Mt2GQJioaS9Zn5OOEBPVChdh9jf3Rb2KDuVkdRwPf8TNIoRglPKMr1vH7fV5cZoNMhpmVqT6KyttYIgeSF6j-m2uSOaTER_6winK8W08UWul3bzXGrk2_R1ng6BkQg_-vTcsSttttpiA4JsuKUGc2ro52zr94',
+    imageAlt: 'Vật liệu và bản vẽ cải tạo nhà',
+  },
+];
+
+const currentBookings: Booking[] = [
+  {
+    id: 'HG-9842',
+    title: 'Vệ sinh máy lạnh',
+    providerName: 'Trần Văn Nam',
+    providerAvatarUrl,
+    status: 'Confirmed',
+    statusLabel: 'Đã xác nhận',
+    statusTone: 'confirmed',
+    date: 'Thứ 4, 15/05',
+    time: '09:00',
+    price: '250.000đ',
+    icon: 'ac_unit',
+  },
+  {
+    id: 'HG-9710',
+    title: 'Sửa ống nước',
+    status: 'Pending',
+    statusLabel: 'Đang chờ',
+    statusTone: 'pending',
+    date: 'Thứ 6, 17/05',
+    time: '14:30',
+    price: '180.000đ',
+    icon: 'plumbing',
+  },
+];
+
+const topProviders: Pro[] = [
+  {
+    id: '1',
+    name: 'Sarah Jenkins',
+    title: 'Chuyên gia điện nước',
+    rating: 4.9,
+    reviewsCount: 124,
+    distance: '1.2 km',
+    isOnline: true,
+    avatarUrl:
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDldzxeZoQT1iNnmlu8p-mZi0VA7EY2pT1j6JxYNOCKXrlUA31Bd-nyZduI90597S17VvVAtrp476ZhzTg7ttcRDSBLKLTWyNjGa0Hjm1Xpe8x-V8TSXlZQ8lqtcEIUyrvaEOJjh283oDslGcyXwV8oDyG4uEqeAr8mgh66Tv8aHx0NNsmA9S8a4g20WIqeN5ZFpOfQSYhy8QEc37djKTuJVrA_OJ7L68C7MlZiRMKb6BHv3iF9Nmp-cxVU_76M3U54BY5-Yi2UyT8',
+  },
+  {
+    id: '2',
+    name: 'Mike Thompson',
+    title: 'Vệ sinh tổng quát',
+    rating: 4.8,
+    reviewsCount: 89,
+    distance: '0.8 km',
+    isOnline: false,
+    avatarUrl: providerAvatarUrl,
+  },
+];
 
 const CustomerHomePage: React.FC = () => {
   const navigate = useNavigate();
 
-  const navItems = [
-    { icon: 'grid_view', label: 'Bảng điều khiển', path: '/customer' },
-    { icon: 'event_available', label: 'Đặt lịch', path: '#' },
-    { icon: 'mail', label: 'Tin nhắn', path: '#' },
-    { icon: 'payments', label: 'Ví', path: '#' },
-    { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
-  ];
-
-  const categories: Category[] = [
-    { icon: 'plumbing', name: 'Ống nước' },
-    { icon: 'bolt', name: 'Điện' },
-    { icon: 'cleaning_services', name: 'Dọn dẹp' },
-    { icon: 'air_purifier_gen', name: 'Điều hòa & Thông gió' },
-    { icon: 'pest_control', name: 'Diệt côn trùng' },
-    { icon: 'carpenter', name: 'Thợ đa năng' },
-  ];
-
-  const currentBookings: Booking[] = [
-    {
-      id: '1',
-      title: 'Sửa rò rỉ vòi nước nhà bếp',
-      providerName: 'David Miller • PlumbMaster LLC',
-      status: 'Đã xác nhận',
-      date: 'Oct 24',
-      time: '2:00 PM',
-      price: '$85.00',
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCDkQeR3Etvy_bY_Y3Id6dALnVrjO2NWta-TNsN0b4hwK2G1EWN-lib-mfPWA-8c9qbqteT9pg3g5oFbKyges6I0UQxNVFH9I7CTS6vnmQW38CXABpz8ejijghNwA4pHVueFgRbEpxMzQl5qpEAL-cNBEXp3P_w6ZjSSNRrMyF8BOdBULeDy10Hnwrgckdj2V9hailN5uIll53MhC4L8qC8rs-msDaicSoU4RUjUBE70nSWvrxp0GZtX-w6jFiZaMq7dRqbuksj4d8',
-    },
-    {
-      id: '2',
-      title: 'Lắp đặt đèn thông minh phòng khách',
-      status: 'Đang chờ',
-      date: 'Oct 26',
-      time: '10:00 AM',
-      price: 'Est. $120.00',
-      imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDG8tpoQ4WA3ddw5h5TK8_bLfskZRKNYS9kRk0lbj0xkCabIc1r9Vv7vC3pM_87XuxtCVt_QP2jusfVQcoLCexCoWbn3EAw320RbBNbbGBD0D1I4st8s_SbGuggXL8pPg3EbhRdg0xVcajUQf1ou3Ed_JkFtP1UCHzdD8WUPNneFMkkAlBUj9lOrmVFJQhIcM0aTweqCW-A1IXXzsX_DCwmT_ZGdAleo2pVHTQ6fTxXuOo3xBpyAZdWRb11ywwBhTPa3Q4Ihbq0vZk',
-    },
-  ];
-
-  const topPros: Pro[] = [
-    {
-      id: '1',
-      name: 'Sarah Jenkins',
-      title: 'Thợ điện được chứng nhận',
-      rating: 4.9,
-      reviewsCount: 124,
-      avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDldzxeZoQT1iNnmlu8p-mZi0VA7EY2pT1j6JxYNOCKXrlUA31Bd-nyZduI90597S17VvVAtrp476ZhzTg7ttcRDSBLKLTWyNjGa0Hjm1Xpe8x-V8TSXlZQ8lqtcEIUyrvaEOJjh283oDslGcyXwV8oDyG4uEqeAr8mgh66Tv8aHx0NNsmA9S8a4g20WIqeN5ZFpOfQSYhy8QEc37djKTuJVrA_OJ7L68C7MlZiRMKb6BHv3iF9Nmp-cxVU_76M3U54BY5-Yi2UyT8',
-    },
-    {
-      id: '2',
-      name: 'Mike Thompson',
-      title: 'Chuyên gia dọn dẹp sâu',
-      rating: 4.8,
-      reviewsCount: 89,
-      avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDq1tW5ylwzBdzZNrEv10thI-ahfVSlvMiHsW6kWN-d1Ab1x8j4Fn-6vCJ9e_7lL8h5LXON1EsZmNcDZ9ygNuEF85YnpsEFDKhbXRXAu-Sq_OmgDcZySNjIYTp37OkE2zBKWpvbnYKojyPzXUgoP7eBv_r_hp6u2WRaJOoqP2TsTz8I8Bx9Rq9MO0c_epc00lHkLmx3UGZ7LT0d7vkTHxFGRLlFOxc7QF5QDt_fLiIEkNY6CSW-9NI4L5UBFt1yIAULnDA-NXsy5d4',
-    },
-  ];
-
   return (
     <DashboardLayout
-      navItems={navItems}
-      switchLabel="Đăng ký thợ dịch vụ"
+      navItems={customerNavItems}
+      switchLabel="Đăng tin dịch vụ"
       switchVariant="gradient"
       onSwitch={() => navigate('/register-provider')}
-      userAvatar="https://lh3.googleusercontent.com/aida-public/AB6AXuDEHJafX2qd3dTrHvNRy0dHwStQm_jFRmhcLv7V0Iflbe6KzeTksnzJoPq-9La8vc-adIj8yxCaNbKijj7uerHZrdZ26OjHWGwnN0LAasZmmwUJvNl29qnLlcWRpjXBtzvINjdOUc5Vqa7kppjp19pddoyUdVYqLk6tlS-7HLqNujhNuBLKccwxJqq8JLs_hR0DUZB7qr9wk45KYBT_ZrXMF28rWVmmvNL1wTSkAS7cYVUA3QSPnq_1_Vb47bF_AqhYh5TC1k28ILg"
+      userAvatar={userAvatarUrl}
     >
-      {/* Welcome Header */}
-      <section className="flex flex-col md:flex-row md:items-end justify-between gap-md">
-        <div className="space-y-xs">
-          <h2 className="font-headline-lg text-headline-lg text-on-background">Xin chào, James!</h2>
-          <p className="font-body-lg text-body-lg text-on-surface-variant">Hôm nay chúng tôi có thể giúp bạn sửa chữa gì?</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex flex-col items-center glass-card px-md py-sm rounded-xl">
-            <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Hạn mức tín dụng</span>
-            <span className="font-headline-md text-headline-md text-primary">$2,500</span>
-          </div>
-        </div>
+      <HeroOffer imageUrl={heroImageUrl} />
+      <CategoriesGrid categories={categories} />
+
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+        <RecentOrders bookings={currentBookings} />
+        <TopProviders providers={topProviders} />
       </section>
 
-      {/* Quick Book */}
-      <section className="space-y-md">
-        <div className="flex items-center justify-between">
-          <h3 className="font-headline-md text-headline-md">Đặt nhanh</h3>
-          <a className="text-primary font-label-md text-label-md flex items-center gap-1 hover:underline" href="#">
-            Xem tất cả <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-          </a>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-md">
-          {categories.map((cat) => (
-            <CategoryItem key={cat.name} category={cat} />
-          ))}
-        </div>
-      </section>
-
-      {/* Dashboard Widgets Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
-        {/* Current Bookings */}
-        <section className="lg:col-span-2 space-y-md">
-          <h3 className="font-headline-md text-headline-md">Lịch đặt hiện tại</h3>
-          <div className="space-y-md">
-            {currentBookings.map((booking) => (
-              <BookingCard key={booking.id} booking={booking} />
-            ))}
-          </div>
-        </section>
-
-        {/* Sidebar/Secondary Widget Area */}
-        <aside className="space-y-lg">
-          {/* Top Pros */}
-          <section className="space-y-md">
-            <div className="flex items-center justify-between">
-              <h3 className="font-headline-md text-headline-md">Chuyên gia hàng đầu gần bạn</h3>
-              <div className="flex gap-2">
-                <button className="p-1 rounded-full border border-outline-variant text-outline hover:bg-surface-container-low">
-                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                </button>
-                <button className="p-1 rounded-full border border-outline-variant text-outline hover:bg-surface-container-low">
-                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                </button>
-              </div>
-            </div>
-            <div className="space-y-md">
-              {topPros.map((pro) => (
-                <ProCard key={pro.id} pro={pro} />
-              ))}
-            </div>
-          </section>
-
-          {/* Promo Card */}
-          <PromoCard />
-        </aside>
-      </div>
+      <CustomerHomeFooter />
     </DashboardLayout>
   );
 };
