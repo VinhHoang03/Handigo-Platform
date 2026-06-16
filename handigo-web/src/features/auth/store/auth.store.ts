@@ -1,5 +1,6 @@
-import { create } from 'zustand';
-import type { User } from '../types/auth.types';
+import { create } from "zustand";
+import { tokenStorage } from "@/api/tokenStorage";
+import type { User } from "../types/auth.types";
 
 interface AuthState {
   user: User | null;
@@ -12,29 +13,26 @@ interface AuthState {
   logout: () => void;
 }
 
-const getStoredToken = () =>
-  localStorage.getItem('token') || sessionStorage.getItem('token');
-
-const initialToken = getStoredToken();
+const initialToken = tokenStorage.get();
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: initialToken,
-  isAuthenticated: Boolean(initialToken),
-  isInitializing: Boolean(initialToken),
+  isAuthenticated: !!initialToken,
+  isInitializing: true,
   setAuth: (user, token, remember = true) => {
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    const storage = remember ? localStorage : sessionStorage;
-    storage.setItem('token', token);
     localStorage.setItem('handigo:remember-login', String(remember));
+    tokenStorage.set(token);
     set({ user, token, isAuthenticated: true, isInitializing: false });
   },
-  setUser: (user) => set({ user, isAuthenticated: true, isInitializing: false }),
-  finishInitialization: () => set({ isInitializing: false }),
+  setUser: (user) => {
+    set({ user, isAuthenticated: true, isInitializing: false });
+  },
+  finishInitialization: () => {
+    set({ isInitializing: false });
+  },
   logout: () => {
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
+    tokenStorage.clear();
     set({ user: null, token: null, isAuthenticated: false, isInitializing: false });
   },
 }));
