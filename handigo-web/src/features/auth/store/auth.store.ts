@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { tokenStorage } from '@/api/tokenStorage';
 import type { User } from '../types/auth.types';
 
 interface AuthState {
@@ -11,14 +12,14 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  token: tokenStorage.get(),
+  isAuthenticated: !!tokenStorage.get(),
   setAuth: (user, token) => {
-    localStorage.setItem('token', token);
+    tokenStorage.set(token);
     set({ user, token, isAuthenticated: true });
   },
   logout: () => {
-    localStorage.removeItem('token');
+    tokenStorage.clear();
     set({ user: null, token: null, isAuthenticated: false });
   },
 }));

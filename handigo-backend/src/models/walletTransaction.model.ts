@@ -22,7 +22,9 @@ export interface IWalletTransaction extends Document, IBaseDocument {
   amount: Money;
   balanceAfter: Money;
   status: "pending" | "success" | "failed";
+  transactionCode?: string | null;
   description?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 const WalletTransactionSchema = new Schema<IWalletTransaction>(
@@ -50,13 +52,17 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     amount: { type: Number, required: true, min: 0 },
     balanceAfter: { type: Number, required: true, min: 0 },
     status: { type: String, enum: ["pending", "success", "failed"], default: "pending" },
+    transactionCode: { type: String, default: null },
     description: { type: String, default: null },
+    metadata: { type: Schema.Types.Mixed, default: null },
     ...baseFields,
   },
   { timestamps: true },
 );
 
 WalletTransactionSchema.index({ walletId: 1, createdAt: -1 });
+WalletTransactionSchema.index({ transactionCode: 1 });
+WalletTransactionSchema.index({ relatedOrderId: 1, type: 1, status: 1 });
 
 export const WalletTransaction = model<IWalletTransaction>(
   "WalletTransaction",

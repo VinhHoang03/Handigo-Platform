@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authApi } from '../../api/authApi';
+import { authService } from '../../features/auth/services/auth.service';
 import { BrandLogo } from '../common/BrandLogo';
 import { FloatingInput } from './FloatingInput';
 import { SocialButton } from './SocialButton';
@@ -27,8 +27,8 @@ export const SignInCard = () => {
     setIsSubmitting(true);
 
     try {
-      await authApi.login(email, password);
-      navigate('/profile');
+      const response = await authService.login({ email, password });
+      navigate(response.user.role === 'PROVIDER' ? '/provider' : '/customer');
     } catch {
       setError('Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu.');
     } finally {

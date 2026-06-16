@@ -1,9 +1,16 @@
 import express, { Application, NextFunction, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { ZodError } from "zod";
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
-// import paymentRoutes from "./routes/payment.routes";
+import paymentRoutes from "./routes/payment.routes";
+import voucherRoutes from "./routes/voucher.routes";
+import walletRoutes from "./routes/wallet.route";
+import withdrawalRoutes from "./routes/withdrawal.routes";
+import notificationRoutes from "./routes/notification.routes";
+import dashboardRoutes from "./routes/dashboard.route";
+import systemConfigRoutes from "./routes/systemConfig.route";
 // import requestRoutes from "./routes/request.routes";
 // import platformSettingRoutes from "./routes/platformSetting.routes";
 // import promotionRoutes from "./routes/promotion.routes";
@@ -65,7 +72,13 @@ app.use((req, res, next) => {
 });
 
 app.use("/auth", authRoutes);
-// app.use("/payments", paymentRoutes);
+app.use("/payments", paymentRoutes);
+app.use("/vouchers", voucherRoutes);
+app.use("/withdrawals", withdrawalRoutes);
+app.use("/wallets", walletRoutes);
+app.use("/notifications", notificationRoutes);
+app.use("/dashboard", dashboardRoutes);
+app.use("/system-configs", systemConfigRoutes);
 // app.use("/requests", requestRoutes);
 // app.use("/platform-settings", platformSettingRoutes);
 // app.use("/promotions", promotionRoutes);
@@ -86,9 +99,18 @@ app.use("/addresses", addressRoutes);
 
 app.use((err: Error & { statusCode?: number }, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid request data",
+      errors: err.issues,
+    });
+  }
+
   const statusCode = err.statusCode || 500;
 
   res.status(statusCode).json({
+    success: false,
     message: err.message || "Internal server error",
     error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
