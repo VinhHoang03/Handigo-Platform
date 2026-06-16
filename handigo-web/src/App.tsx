@@ -13,6 +13,7 @@ import AdminFeedbackPage from './features/feedback/pages/AdminFeedbackPage';
 import RegisterProviderPage from './features/provider-application/pages/RegisterProviderPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
 import AdminProviderApplicationsPage from './features/admin/pages/AdminProviderApplicationsPage';
+import AdminCategoryServicesPage from './features/admin/pages/AdminCategoryServicesPage';
 import { RouteGuard } from './components/common/RouteGuard';
 import './App.css';
 
@@ -33,6 +34,7 @@ function App() {
         <Route path="/register-provider" element={<RouteGuard roles={['CUSTOMER']}><RegisterProviderPage /></RouteGuard>} />
         <Route path="/admin/users" element={<RouteGuard roles={['ADMIN']}><AdminUsersPage /></RouteGuard>} />
         <Route path="/admin/provider-applications" element={<RouteGuard roles={['ADMIN']}><AdminProviderApplicationsPage /></RouteGuard>} />
+        <Route path="/admin/services" element={<RouteGuard roles={['ADMIN']}><AdminCategoryServicesPage /></RouteGuard>} />
         <Route path="/admin/feedbacks" element={<RouteGuard roles={['ADMIN']}><AdminFeedbackPage /></RouteGuard>} />
       </Routes>
     </Router>
