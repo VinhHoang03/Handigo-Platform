@@ -20,8 +20,10 @@ export const getCategoryById = async (
   next: NextFunction,
 ) => {
   try {
-    const data = await categoryService.getCategoryById(req.params.id as string);
-    return res.json({ success: true, data });
+    const category = await categoryService.getCategoryById(
+      req.params.id as string,
+    );
+    res.json({ success: true, data: category });
   } catch (error) {
     next(error);
   }
@@ -44,20 +46,46 @@ export const createCategory = async (
   }
 };
 
+export const getActiveCategories = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const categories = await categoryService.getActiveCategories();
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCategories = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await categoryService.getCategories(req.query);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const updateCategory = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const data = await categoryService.updateCategory(
+    const category = await categoryService.updateCategory(
       req.params.id as string,
       req.body,
     );
-    return res.json({
+    res.json({
       success: true,
+      data: category,
       message: "Category updated successfully",
-      data,
     });
   } catch (error) {
     next(error);
@@ -71,29 +99,12 @@ export const deleteCategory = async (
 ) => {
   try {
     await categoryService.deleteCategory(req.params.id as string);
-    return res.json({
+    res.json({
       success: true,
-      message: "Category deleted successfully",
       data: null,
+      message: "Category deleted successfully",
     });
   } catch (error) {
     next(error);
-  }
-};
-
-export const getActiveCategories = async (_req: Request, res: Response) => {
-  try {
-    const categories = await categoryService.getActiveCategories();
-
-    return res.json({
-      success: true,
-      data: categories,
-      message: "Success",
-    });
-  } catch (error: any) {
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message,
-    });
   }
 };

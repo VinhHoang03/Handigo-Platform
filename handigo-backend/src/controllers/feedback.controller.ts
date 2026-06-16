@@ -158,6 +158,18 @@ export const getFeedbackByOrder = async (req: Request, res: Response) => {
   }
 };
 
+export const getOrderFeedbackContext = async (req: Request, res: Response) => {
+  try {
+    const context = await feedbackService.getOrderFeedbackContext(
+      req.user!.id,
+      req.params.orderId as string,
+    );
+    return res.json({ success: true, data: context, message: "Success" });
+  } catch (error: any) {
+    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  }
+};
+
 export const upsertProviderReply = async (req: Request, res: Response) => {
   try {
     const feedback = await feedbackService.upsertProviderReply(

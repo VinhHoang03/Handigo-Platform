@@ -46,7 +46,7 @@ interface ProviderCardProps {
 }
 
 export const ProviderCard = ({ name, category, rating, dist, tags, img, catColor }: ProviderCardProps) => (
-  <div className="bg-white dark:bg-inverse-surface p-5 rounded-[32px] border border-outline-variant/20 shadow-sm hover:shadow-xl transition-all group">
+  <div className="group rounded-[32px] border border-outline-variant/20 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl">
     <div className="relative mb-4">
       <img alt={name} className="w-full h-48 object-cover rounded-2xl" src={img} />
       <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg flex items-center gap-1 shadow-sm">

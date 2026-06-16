@@ -1,9 +1,46 @@
 import { Address } from "../models/address.model";
-import { Types } from "mongoose";
 // import ServiceRequest from "../models/request.model";
 
-export const createAddress = async (userId: string, data: any) => {
-  if (data.isDefault) {
+type AddressPayload = {
+  fullAddress?: string;
+  province?: string;
+  ward?: string;
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
+  isDefault?: boolean;
+  note?: string | null;
+};
+
+const pickAddressPayload = (data: AddressPayload): AddressPayload => {
+  const payload: AddressPayload = {};
+  const fields: (keyof AddressPayload)[] = [
+    "fullAddress",
+    "province",
+    "ward",
+    "latitude",
+    "longitude",
+    "placeId",
+    "isDefault",
+    "note",
+  ];
+
+  for (const field of fields) {
+    if (data[field] !== undefined) {
+      payload[field] = data[field] as never;
+    }
+  }
+
+  if (payload.placeId === "") delete payload.placeId;
+  if (payload.note === "") payload.note = null;
+
+  return payload;
+};
+
+export const createAddress = async (userId: string, data: AddressPayload) => {
+  const payload = pickAddressPayload(data);
+
+  if (payload.isDefault) {
     await Address.updateMany(
       { userId },
       { isDefault: false }
@@ -11,7 +48,7 @@ export const createAddress = async (userId: string, data: any) => {
   }
 
   const address = await Address.create({
-    ...data,
+    ...payload,
     userId,
   });
 
@@ -21,9 +58,11 @@ export const createAddress = async (userId: string, data: any) => {
 export const updateAddress = async (
   addressId: string,
   userId: string,
-  data: any
+  data: AddressPayload
 ) => {
-  if (data.isDefault) {
+  const payload = pickAddressPayload(data);
+
+  if (payload.isDefault) {
     await Address.updateMany(
       { userId },
       { isDefault: false }
@@ -32,7 +71,7 @@ export const updateAddress = async (
 
   const address = await Address.findOneAndUpdate(
     { _id: addressId, userId },
-    data,
+    payload,
     { new: true }
   );
 

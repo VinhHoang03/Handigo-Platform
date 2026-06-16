@@ -18,18 +18,18 @@ export function AsyncState({
   children,
 }: AsyncStateProps) {
   if (loading) {
-    return <div className="rounded-2xl bg-surface-container-low p-8 text-center text-on-surface-variant">Đang tải dữ liệu...</div>;
+    return <div className="rounded-lg bg-surface-container-low p-8 text-center text-on-surface-variant">Đang tải dữ liệu...</div>;
   }
   if (error) {
     return (
-      <div className="rounded-2xl border border-error/20 bg-error/10 p-6 text-center text-error">
+      <div className="rounded-lg border border-error/20 bg-error/10 p-6 text-center text-error">
         <p>{error}</p>
-        {onRetry && <button onClick={onRetry} className="mt-3 rounded-xl bg-error px-4 py-2 text-on-error">Thử lại</button>}
+        {onRetry && <button type="button" onClick={onRetry} className="mt-3 rounded-lg bg-error px-4 py-2 text-on-error">Thử lại</button>}
       </div>
     );
   }
   if (empty) {
-    return <div className="rounded-2xl border border-dashed border-outline-variant p-8 text-center text-on-surface-variant">{emptyMessage}</div>;
+    return <div className="rounded-lg border border-dashed border-outline-variant p-8 text-center text-on-surface-variant">{emptyMessage}</div>;
   }
   return children;
 }
