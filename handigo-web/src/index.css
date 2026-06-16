@@ -111,33 +111,52 @@
 }
 
 @layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
   body {
-    @apply bg-background text-on-surface transition-colors duration-300;
+    @apply m-0 min-w-80 bg-background font-body-md text-body-md text-on-surface antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15;
+  }
+
+  button,
+  a {
+    @apply transition-colors duration-200;
   }
 }
 
 @layer components {
   .glass-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
-  
-  .dark .glass-card {
-    background: rgba(40, 48, 68, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(199, 196, 216, 0.45);
+    box-shadow: 0 4px 20px rgba(19, 27, 46, 0.06);
   }
 
   .glass-panel {
-    background: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.86);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
-
-  .dark .glass-panel {
-    background: rgba(19, 27, 46, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(199, 196, 216, 0.48);
   }
 
   .floating-anim {
@@ -150,16 +169,117 @@
     100% { transform: translateY(0px); }
   }
 
-  .floating-label-group input:focus ~ label,
-  .floating-label-group input:not(:placeholder-shown) ~ label {
-    transform: translateY(-24px) scale(0.85);
-    @apply text-primary;
-    background-color: transparent;
-    padding: 0 4px;
+  .form-field__control {
+    @apply relative;
   }
 
-  .floating-label-group label {
-    transition: all 0.2s ease-out;
-    pointer-events: none;
+  .form-field__input {
+    @apply min-h-14 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 pb-2 pt-6 text-sm text-on-surface outline-none transition duration-200 hover:border-outline focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-surface-container disabled:text-on-surface-variant;
+  }
+
+  .form-field__textarea {
+    @apply min-h-32 resize-y py-6;
+  }
+
+  .form-field__label {
+    @apply pointer-events-none absolute left-4 top-1/2 origin-left -translate-y-1/2 text-sm text-on-surface-variant transition-all duration-200;
+  }
+
+  .form-field__input:focus ~ .form-field__label,
+  .form-field__input:not(:placeholder-shown) ~ .form-field__label {
+    @apply top-2.5 translate-y-0 scale-[0.78] font-medium text-primary;
+  }
+
+  .form-field--error .form-field__input {
+    @apply border-error focus:border-error focus:ring-error/10;
+  }
+
+  .form-field--error .form-field__label {
+    @apply text-error;
+  }
+
+  .form-field__action {
+    @apply absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-primary disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .form-select {
+    @apply relative block min-w-40;
+  }
+
+  .form-select__label {
+    @apply pointer-events-none absolute left-4 top-2 z-10 text-[11px] font-medium text-primary;
+  }
+
+  .form-select__control {
+    @apply min-h-14 w-full appearance-none rounded-lg border border-outline-variant bg-surface-container-lowest px-4 pb-2 pt-6 text-sm text-on-surface outline-none transition duration-200 hover:border-outline focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-surface-container;
+  }
+
+  .social-login-button {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 56px;
+    min-height: 56px;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0 0.75rem;
+    color: var(--color-on-surface);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    box-shadow: 0 1px 2px rgba(19, 27, 46, 0.04);
+    transition: all 0.2s ease;
+  }
+
+  .social-login-button span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .social-login-button:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+    background: #f5f7ff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+  }
+
+  .social-login-button:disabled,
+  .social-login-button--disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .social-login-button:disabled:hover,
+  .social-login-button--disabled:hover {
+    transform: none;
+    border-color: var(--color-outline-variant);
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(19, 27, 46, 0.04);
+  }
+
+  .surface-card {
+    @apply rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-[0_4px_20px_rgba(19,27,46,0.05)];
+  }
+
+  .btn-primary {
+    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition duration-200 hover:bg-primary-container hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-primary px-5 py-3 font-semibold text-primary transition duration-200 hover:bg-primary/5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-medium text-primary transition duration-200 hover:bg-surface-container active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
 }

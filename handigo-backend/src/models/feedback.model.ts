@@ -9,7 +9,6 @@ export interface IFeedback extends Document, IBaseDocument {
   rating: number;
   comment?: string | null;
   images: string[];
-  providerReply?: string | null;
   isVisible: boolean;
   providerReply?: {
     content: string;
@@ -38,7 +37,6 @@ const FeedbackSchema = new Schema<IFeedback>(
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String, default: null },
     images: { type: [String], default: [] },
-    providerReply: { type: String, default: null },
     isVisible: { type: Boolean, default: true },
     providerReply: { type: ProviderReplySchema, default: null },
     ...baseFields,

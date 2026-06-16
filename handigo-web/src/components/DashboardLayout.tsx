@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logoImg from '../assets/logo.png';
-import { useAuthStore } from '../features/auth/store/auth.store';
 import { authService } from '../features/auth/services/auth.service';
+import { useAuthStore } from '../features/auth/store/auth.store';
 
 interface NavItem {
   icon: string;
@@ -17,57 +17,63 @@ interface SidebarProps {
   switchVariant?: 'outline' | 'gradient';
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ navItems, switchLabel, onSwitch, switchVariant = 'outline' }) => {
+export function Sidebar({
+  navItems,
+  switchLabel,
+  onSwitch,
+  switchVariant = 'outline',
+}: SidebarProps) {
   const location = useLocation();
 
   return (
-    <aside className="hidden md:flex flex-col h-screen p-md gap-4 fixed left-0 top-0 w-64 bg-surface dark:bg-on-background border-r border-outline-variant/30 z-[60] shadow-sm">
-      <div className="flex items-center gap-2 mb-base">
-        <img src={logoImg} alt="FixNow Logo" className="h-8 w-auto" />
-        <div className="flex flex-col">
-          <h1 className="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed leading-none">FixNow</h1>
-          <p className="text-[10px] font-label-md text-on-surface-variant">Trung Tâm Dịch Vụ Cao Cấp</p>
+    <aside className="fixed left-0 top-0 z-[60] hidden h-screen w-72 flex-col gap-5 border-r border-outline-variant/30 bg-white p-6 shadow-[4px_0_24px_rgba(19,27,46,0.04)] lg:flex">
+      <Link to="/" className="mb-2 flex items-center gap-3 rounded-xl px-1 py-2">
+        <img src={logoImg} alt="" className="h-9 w-9 object-contain" />
+        <div>
+          <h1 className="font-headline-md text-xl font-bold leading-none text-primary">Handigo</h1>
+          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-on-surface-variant">
+            Dịch vụ tại nhà
+          </p>
         </div>
-      </div>
+      </Link>
 
-      <nav className="flex-grow flex flex-col gap-2">
+      <nav className="flex flex-grow flex-col gap-1.5">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const active = location.pathname === item.path;
           return (
             <Link
               key={item.label}
               to={item.path}
-              className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-200 ${isActive
-                ? 'bg-primary-container text-on-primary-container dark:bg-primary dark:text-on-primary font-semibold scale-[0.98]'
-                : 'text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low hover:translate-x-1'
-                }`}
+              className={`flex min-h-12 items-center gap-3 rounded-xl px-4 py-3 transition-all ${
+                active
+                  ? 'bg-primary font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)]'
+                  : 'text-on-surface-variant hover:bg-surface-container-low hover:text-primary'
+              }`}
             >
               <span className="material-symbols-outlined">{item.icon}</span>
-              <span className="font-label-md text-label-md">{item.label}</span>
+              <span className="text-sm font-medium">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      {switchVariant === 'gradient' ? (
-        <button
-          onClick={onSwitch}
-          className="mt-auto w-full py-3 px-4 rounded-xl font-label-md text-label-md text-white font-bold bg-gradient-to-r from-primary to-secondary hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
-        >
-          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>engineering</span>
-          {switchLabel}
-        </button>
-      ) : (
-        <button
-          onClick={onSwitch}
-          className="mt-auto w-full py-3 px-4 border border-primary text-primary rounded-xl font-label-md text-label-md hover:bg-primary/5 transition-colors"
-        >
-          {switchLabel}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onSwitch}
+        className={
+          switchVariant === 'gradient'
+            ? 'btn-primary mt-auto w-full bg-gradient-to-r from-primary to-secondary'
+            : 'btn-secondary mt-auto w-full'
+        }
+      >
+        {switchVariant === 'gradient' && (
+          <span className="material-symbols-outlined text-base">engineering</span>
+        )}
+        {switchLabel}
+      </button>
     </aside>
   );
-};
+}
 
 interface HeaderProps {
   userAvatar: string;
@@ -76,11 +82,17 @@ interface HeaderProps {
   onStatusToggle?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ userAvatar, showStatusToggle, isOnline, onStatusToggle }) => {
+export function Header({
+  userAvatar,
+  showStatusToggle,
+  isOnline,
+  onStatusToggle,
+}: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const normalizedRole = user?.role?.toUpperCase();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -93,77 +105,95 @@ export const Header: React.FC<HeaderProps> = ({ userAvatar, showStatusToggle, is
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await authService.logout();
-      navigate('/');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
+    await authService.logout();
+    navigate('/', { replace: true });
   };
 
   return (
-    <header className="sticky top-4 z-50 flex items-center justify-between px-md py-base mx-auto rounded-xl max-w-[calc(100%-48px)] bg-surface/80 dark:bg-on-background/80 backdrop-blur-md border border-outline-variant/50 dark:border-outline-variant/20 shadow-md">
-      <div className="flex items-center gap-4 flex-grow">
-        <div className="md:hidden flex items-center gap-2">
-          <img src={logoImg} alt="FixNow Logo" className="h-6 w-auto" />
-          <span className="font-headline-md text-headline-md font-bold text-primary leading-none">FixNow</span>
-        </div>
-        <div className="relative w-full max-w-md hidden md:block">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+    <header className="sticky top-3 z-50 mx-3 flex items-center justify-between rounded-2xl border border-outline-variant/40 bg-white/85 px-4 py-3 shadow-[0_8px_30px_rgba(19,27,46,0.08)] backdrop-blur-xl sm:mx-5 sm:px-6 lg:mx-6">
+      <div className="flex min-w-0 flex-grow items-center gap-4">
+        <Link to="/" className="flex items-center gap-2 lg:hidden">
+          <img src={logoImg} alt="" className="h-8 w-8 object-contain" />
+          <span className="hidden font-headline-md text-xl font-bold text-primary sm:inline">
+            Handigo
+          </span>
+        </Link>
+        <div className="relative hidden w-full max-w-md sm:block">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
+            search
+          </span>
           <input
-            className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 focus:ring-2 focus:ring-primary transition-all text-label-md outline-none"
+            type="search"
+            aria-label="Tìm kiếm"
             placeholder="Tìm kiếm..."
-            type="text"
+            className="min-h-11 w-full rounded-full border border-transparent bg-surface-container-low py-2 pl-10 pr-4 text-sm outline-none transition-all hover:border-outline-variant focus:border-primary focus:ring-4 focus:ring-primary/10"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {showStatusToggle && (
-          <div className="hidden sm:flex items-center gap-3 bg-surface-container px-3 py-1.5 rounded-full">
-            <span className={`font-label-sm text-label-sm ${isOnline ? 'text-primary' : 'text-on-surface-variant'}`}>
+          <div className="hidden items-center gap-3 rounded-full bg-surface-container px-3 py-1.5 sm:flex">
+            <span className={`text-xs font-semibold ${isOnline ? 'text-primary' : 'text-on-surface-variant'}`}>
               {isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}
             </span>
-            <label className="relative inline-flex items-center cursor-pointer">
+            <label className="relative inline-flex cursor-pointer items-center">
               <input
                 type="checkbox"
                 checked={isOnline}
                 onChange={onStatusToggle}
-                className="sr-only peer"
+                className="peer sr-only"
               />
-              <div className="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+              <span className="h-6 w-11 rounded-full bg-outline-variant after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full" />
             </label>
           </div>
         )}
-        <button className="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-all">notifications</button>
-        <button className="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-all">chat_bubble</button>
-        <div className="relative" ref={menuRef}>
+        <button type="button" aria-label="Thông báo" className="material-symbols-outlined rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-primary">
+          notifications
+        </button>
+        <button type="button" aria-label="Tin nhắn" className="material-symbols-outlined rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-primary">
+          chat_bubble
+        </button>
+
+        <div ref={menuRef} className="relative">
           <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="h-8 w-8 rounded-full overflow-hidden bg-surface-container-highest border border-outline-variant focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+            type="button"
+            aria-label="Mở menu tài khoản"
+            aria-expanded={isMenuOpen}
+            onClick={() => setIsMenuOpen((open) => !open)}
+            className="h-10 w-10 overflow-hidden rounded-full border border-outline-variant bg-surface-container-highest transition-all hover:border-primary focus:ring-4 focus:ring-primary/15"
           >
-            <img alt="User avatar" src={userAvatar} className="w-full h-full object-cover" />
+            <img alt="Ảnh đại diện" src={userAvatar} className="h-full w-full object-cover" />
           </button>
 
           {isMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-surface rounded-xl shadow-lg border border-outline-variant/30 py-2 z-50">
-              <div className="px-4 py-3 border-b border-outline-variant/20">
-                <p className="font-label-md text-on-surface font-semibold truncate">{user?.fullName || 'Người dùng'}</p>
-                <p className="font-body-sm text-on-surface-variant truncate">{user?.email || 'N/A'}</p>
-                <p className="font-label-sm text-primary mt-1">{user?.role === 'CUSTOMER' ? 'Khách hàng' : user?.role === 'PROVIDER' ? 'Nhà cung cấp' : user?.role}</p>
+            <div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-outline-variant/30 bg-white py-2 shadow-[0_14px_40px_rgba(19,27,46,0.14)]">
+              <div className="border-b border-outline-variant/20 px-4 py-3">
+                <p className="truncate font-semibold text-on-surface">{user?.fullName || 'Người dùng'}</p>
+                <p className="truncate text-sm text-on-surface-variant">{user?.email || 'N/A'}</p>
+                <p className="mt-1 text-xs font-semibold text-primary">
+                  {normalizedRole === 'CUSTOMER'
+                    ? 'Khách hàng'
+                    : normalizedRole === 'PROVIDER'
+                      ? 'Nhà cung cấp'
+                      : 'Quản trị viên'}
+                </p>
               </div>
               <div className="py-2">
-                <Link
-                  to={user?.role === 'PROVIDER' ? '/provider/profile' : '/customer/profile'}
-                  className="w-full px-4 py-2 flex items-center gap-3 text-on-surface-variant hover:bg-surface-container-low transition-colors font-label-md"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <span className="material-symbols-outlined text-xl">person</span>
-                  Hồ sơ cá nhân
-                </Link>
+                {normalizedRole !== 'ADMIN' && (
+                  <Link
+                    to={normalizedRole === 'PROVIDER' ? '/provider/profile' : '/customer/profile'}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
+                  >
+                    <span className="material-symbols-outlined text-xl">person</span>
+                    Hồ sơ cá nhân
+                  </Link>
+                )}
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="w-full px-4 py-2 flex items-center gap-3 text-error hover:bg-error/10 transition-colors font-label-md mt-1"
+                  className="mt-1 flex w-full items-center gap-3 px-4 py-2 text-sm text-error hover:bg-error/10"
                 >
                   <span className="material-symbols-outlined text-xl">logout</span>
                   Đăng xuất
@@ -175,7 +205,7 @@ export const Header: React.FC<HeaderProps> = ({ userAvatar, showStatusToggle, is
       </div>
     </header>
   );
-};
+}
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -189,7 +219,7 @@ interface DashboardLayoutProps {
   onStatusToggle?: () => void;
 }
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
+export function DashboardLayout({
   children,
   navItems,
   switchLabel,
@@ -198,47 +228,47 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   userAvatar,
   showStatusToggle,
   isOnline,
-  onStatusToggle
-}) => {
+  onStatusToggle,
+}: DashboardLayoutProps) {
+  const location = useLocation();
+
   return (
-    <div className="font-body-md text-body-md overflow-x-hidden min-h-screen bg-background">
-      <Sidebar navItems={navItems} switchLabel={switchLabel} onSwitch={onSwitch} switchVariant={switchVariant} />
-      <main className="md:ml-64 min-h-screen relative pb-lg">
+    <div className="min-h-screen overflow-x-hidden bg-background font-body-md text-body-md">
+      <Sidebar
+        navItems={navItems}
+        switchLabel={switchLabel}
+        onSwitch={onSwitch}
+        switchVariant={switchVariant}
+      />
+      <main className="relative min-h-screen pb-28 lg:ml-72 lg:pb-12">
         <Header
           userAvatar={userAvatar}
           showStatusToggle={showStatusToggle}
           isOnline={isOnline}
           onStatusToggle={onStatusToggle}
         />
-        <div className="px-md mt-lg space-y-xl max-w-container-max mx-auto">
+        <div className="mx-auto mt-8 max-w-container-max space-y-12 px-4 sm:px-6 lg:px-8">
           {children}
         </div>
 
-        {/* Bottom Nav for Mobile */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface/90 backdrop-blur-md border-t border-outline-variant/30 px-base py-sm flex justify-around items-center z-50">
-          <Link to="/" className="flex flex-col items-center gap-1 text-primary">
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>grid_view</span>
-            <span className="text-[10px] font-bold">Trang chủ</span>
-          </Link>
-          <button className="flex flex-col items-center gap-1 text-on-surface-variant">
-            <span className="material-symbols-outlined">event_available</span>
-            <span className="text-[10px]">Đặt lịch</span>
-          </button>
-          <button className="flex flex-col items-center gap-1 text-on-surface-variant">
-            <span className="material-symbols-outlined">mail</span>
-            <span className="text-[10px]">Tin nhắn</span>
-          </button>
-          <button className="flex flex-col items-center gap-1 text-on-surface-variant">
-            <span className="material-symbols-outlined">account_circle</span>
-            <span className="text-[10px]">Hồ sơ</span>
-          </button>
+        <nav className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 border-t border-outline-variant/30 bg-white/92 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
+          {navItems.slice(0, 4).map((item) => {
+            const active = location.pathname === item.path;
+            return (
+              <Link
+                key={item.label}
+                to={item.path}
+                className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-center ${
+                  active ? 'bg-primary/10 text-primary' : 'text-on-surface-variant'
+                }`}
+              >
+                <span className="material-symbols-outlined text-xl">{item.icon}</span>
+                <span className="max-w-full truncate text-[10px] font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </main>
-
-      {/* FAB */}
-      <button className="fixed bottom-24 md:bottom-8 right-6 md:right-8 h-14 w-14 rounded-full bg-primary text-on-primary shadow-xl flex items-center justify-center z-50 active:scale-95 transition-all">
-        <span className="material-symbols-outlined text-[28px]">add</span>
-      </button>
     </div>
   );
-};
+}

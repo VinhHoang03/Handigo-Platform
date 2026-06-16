@@ -1,5 +1,5 @@
-import axios, { type InternalAxiosRequestConfig } from 'axios';
-import { tokenStorage } from './tokenStorage';
+import axios, { type InternalAxiosRequestConfig } from "axios";
+import { tokenStorage } from "./tokenStorage";
 
 interface RefreshTokenResponse {
   token: string;
@@ -10,9 +10,9 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 };
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000",
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
   withCredentials: true,
 });
@@ -34,12 +34,14 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
-      originalRequest.url !== '/auth/refresh-token'
+      originalRequest.url !== "/auth/refresh-token"
     ) {
       originalRequest._retry = true;
 
       try {
-        const response = await api.post<RefreshTokenResponse>('/auth/refresh-token');
+        const response = await api.post<RefreshTokenResponse>(
+          "/auth/refresh-token",
+        );
         tokenStorage.set(response.data.token);
         originalRequest.headers.Authorization = `Bearer ${response.data.token}`;
         return api.request(originalRequest);
@@ -50,7 +52,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

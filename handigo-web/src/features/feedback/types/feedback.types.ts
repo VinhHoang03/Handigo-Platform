@@ -33,3 +33,17 @@ export interface FeedbackQuery {
   isVisible?: boolean | '';
 }
 export interface FeedbackPayload { orderId: string; rating: number; comment?: string | null; images?: string[] }
+export interface FeedbackOrder {
+  _id: string;
+  orderCode: string;
+  status: string;
+  createdAt: string;
+  serviceId: string | { _id: string; name?: string; image?: string };
+  providerId?: string | (PersonRef & { userId?: PersonRef }) | null;
+}
+export interface OrderFeedbackContext {
+  order: FeedbackOrder;
+  feedback: Feedback | null;
+  canReview: boolean;
+  reason?: string | null;
+}

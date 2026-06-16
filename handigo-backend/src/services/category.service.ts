@@ -18,6 +18,13 @@ interface ListCategoriesQuery {
   isActive?: string;
 }
 
+interface CategoryQuery {
+  page?: number;
+  limit?: number;
+  keyword?: string;
+  isActive?: boolean | string;
+}
+
 const slugify = (value: string) =>
   value
     .normalize("NFD")
@@ -114,7 +121,10 @@ export const deleteCategory = async (id: string) => {
   const category = await Category.findOne({ _id: id, isDeleted: false });
   if (!category) throw new AppError("Category not found", 404);
 
-  const hasServices = await Service.exists({ categoryId: id, isDeleted: false });
+  const hasServices = await Service.exists({
+    categoryId: id,
+    isDeleted: false,
+  });
   if (hasServices) {
     throw new AppError(
       "Cannot delete a category that still contains services",
@@ -135,4 +145,44 @@ export const getActiveCategories = async () => {
   })
     .select("name slug icon isActive sortOrder")
     .sort({ sortOrder: 1, name: 1 });
+};
+
+export const getCategories = async (query: CategoryQuery = {}) => {
+  const page = Math.max(query.page || 1, 1);
+  const limit = Math.min(Math.max(query.limit || 20, 1), 100);
+  const filter: QueryFilter<ICategory> = { isDeleted: false };
+
+  if (query.keyword?.trim()) {
+    const keyword = query.keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    filter.$or = [
+      { name: { $regex: keyword, $options: "i" } },
+      { slug: { $regex: keyword, $options: "i" } },
+      { description: { $regex: keyword, $options: "i" } },
+    ];
+  }
+
+  if (query.isActive !== undefined) {
+    filter.isActive =
+      typeof query.isActive === "string"
+        ? query.isActive === "true"
+        : query.isActive;
+  }
+
+  const [items, total] = await Promise.all([
+    Category.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Category.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 };

@@ -1,105 +1,75 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FloatingInput } from '@/components/common/FloatingField';
 import { useAuth } from '../hooks/useAuth';
+import { getRoleHomePath } from '../utils/roleNavigation';
 
-export const LoginForm: React.FC = () => {
+interface LoginFormProps {
+  rememberMe: boolean;
+  onRememberMeChange: (checked: boolean) => void;
+}
+
+export function LoginForm({ rememberMe, onRememberMeChange }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, isLoading, error } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const user = await login({ email, password });
-    if (user) {
-      if (user.role === 'customer' || user.role === 'CUSTOMER') {
-        navigate('/customer');
-      } else if (user.role === 'provider' || user.role === 'PROVIDER') {
-        navigate('/provider');
-      } else {
-        // Fallback for Admin or others
-        navigate('/');
-      }
-    }
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const user = await login(
+      { email: email.trim().toLowerCase(), password },
+      rememberMe,
+    );
+    if (user) navigate(getRoleHomePath(user.role), { replace: true });
   };
 
   return (
-    <form action="#" className="space-y-5" method="POST" onSubmit={handleSubmit}>
+    <form className="space-y-4" onSubmit={handleSubmit}>
       {error && (
-        <div className="p-3 text-sm text-error bg-error-container rounded-xl">
+        <div role="alert" className="rounded-xl border border-error/20 bg-error/10 p-3 text-sm text-error">
           {error}
         </div>
       )}
 
-      {/* Email Input */}
-      <div className="floating-label-group relative">
-        <input
-          className="peer w-full h-12 px-4 pt-4 bg-surface-container-lowest dark:bg-on-surface-variant/10 border border-outline-variant dark:border-outline/30 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm text-on-surface dark:text-surface-bright"
-          id="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder=" "
-          required
-          type="email"
-        />
-        <label
-          className="absolute left-4 top-3 text-sm text-on-surface-variant dark:text-outline-variant origin-left transition-all peer-focus:-translate-y-2.5 peer-focus:scale-85 peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-85"
-          htmlFor="email"
-        >
-          Email
-        </label>
-      </div>
+      <FloatingInput
+        id="login-email"
+        label="Email"
+        type="email"
+        autoComplete="email"
+        inputMode="email"
+        required
+        value={email}
+        onValueChange={setEmail}
+      />
+      <FloatingInput
+        id="login-password"
+        label="Mật khẩu"
+        type="password"
+        autoComplete="current-password"
+        required
+        value={password}
+        onValueChange={setPassword}
+      />
 
-      {/* Password Input */}
-      <div className="floating-label-group relative">
-        <input
-          className="peer w-full h-12 px-4 pt-4 bg-surface-container-lowest dark:bg-on-surface-variant/10 border border-outline-variant dark:border-outline/30 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm text-on-surface dark:text-surface-bright"
-          id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder=" "
-          required
-          type="password"
-        />
-        <label
-          className="absolute left-4 top-3 text-sm text-on-surface-variant dark:text-outline-variant origin-left transition-all peer-focus:-translate-y-2.5 peer-focus:scale-85 peer-[:not(:placeholder-shown)]:-translate-y-2.5 peer-[:not(:placeholder-shown)]:scale-85"
-          htmlFor="password"
-        >
-          Mật khẩu
-        </label>
-        <button
-          className="absolute right-4 top-3 text-on-surface-variant"
-          type="button"
-        >
-          <span className="material-symbols-outlined text-xl">visibility</span>
-        </button>
-      </div>
-
-      <div className="flex items-center justify-between text-xs font-medium">
-        <label className="flex items-center space-x-2 cursor-pointer group">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-on-surface-variant">
           <input
-            className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary bg-transparent"
             type="checkbox"
+            checked={rememberMe}
+            onChange={(event) => onRememberMeChange(event.target.checked)}
+            className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
           />
-          <span className="text-on-surface-variant dark:text-outline-variant group-hover:text-primary transition-colors">
-            Ghi nhớ
-          </span>
+          <span>Ghi nhớ đăng nhập</span>
         </label>
-        <Link
-          className="text-primary hover:text-primary-container font-semibold transition-colors"
-          to="/forgot-password"
-        >
+        <Link className="font-medium text-primary hover:text-primary-container" to="/forgot-password">
           Quên mật khẩu?
         </Link>
       </div>
 
-      <button
-        disabled={isLoading}
-        className="w-full flex justify-center py-3 bg-primary text-on-primary text-base font-bold rounded-xl hover:bg-primary-container active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-70 disabled:cursor-not-allowed"
-        type="submit"
-      >
-        {isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'}
+      <button type="submit" disabled={isLoading} className="btn-primary w-full">
+        {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
       </button>
     </form>
   );
-};
+}
