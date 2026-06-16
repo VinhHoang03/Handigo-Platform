@@ -14,6 +14,7 @@ export function DashboardShell({ role, children }: {
     ? [
         { icon: 'people', label: 'Người dùng', path: '/admin/users' },
         { icon: 'verified_user', label: 'Hồ sơ thợ', path: '/admin/provider-applications' },
+        { icon: 'category', label: 'Danh mục & dịch vụ', path: '/admin/services' },
         { icon: 'reviews', label: 'Đánh giá', path: '/admin/feedbacks' },
       ]
     : role === 'PROVIDER'
