@@ -27,7 +27,9 @@ export interface Address {
   id: string;
   fullAddress: string;
   province: string;
+  provinceCode?: number;
   ward: string;
+  wardCode?: number;
   latitude?: number;
   longitude?: number;
   placeId?: string;
@@ -39,7 +41,9 @@ export interface Address {
 export interface CreateAddressPayload {
   fullAddress: string;
   province: string;
+  provinceCode?: number;
   ward: string;
+  wardCode?: number;
   latitude?: number;
   longitude?: number;
   placeId?: string;

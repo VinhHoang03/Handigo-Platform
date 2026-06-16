@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import { DashboardLayout } from '../../../components/DashboardLayout';
 import {
   BankAccountPanel,
@@ -14,6 +13,7 @@ import {
   SkillTags,
   VerificationPanel,
 } from '../components/ProviderProfileComponents';
+import { useProviderAvailability } from '../hooks/useProviderAvailability';
 import type {
   BankAccount,
   PerformanceStat,
@@ -83,26 +83,15 @@ const bankAccount: BankAccount = {
 };
 
 const ProviderProfilePage: React.FC = () => {
-  const navigate = useNavigate();
-  const [isOnline, setIsOnline] = useState(true);
-
-  const navItems = [
-    { icon: 'grid_view', label: 'Bảng điều khiển', path: '/provider' },
-    { icon: 'event_available', label: 'Đặt lịch', path: '#' },
-    { icon: 'mail', label: 'Tin nhắn', path: '#' },
-    { icon: 'payments', label: 'Thu nhập', path: '#' },
-    { icon: 'settings', label: 'Cài đặt', path: '/provider/profile' },
-  ];
+  const { isOnline, toggleAvailability } = useProviderAvailability();
 
   return (
     <DashboardLayout
-      navItems={navItems}
-      switchLabel="Chuyển sang Khách hàng"
-      onSwitch={() => navigate('/customer')}
+      role="PROVIDER"
       userAvatar={providerProfile.avatarUrl}
       showStatusToggle
       isOnline={isOnline}
-      onStatusToggle={() => setIsOnline((current) => !current)}
+      onStatusToggle={toggleAvailability}
     >
       <header className="mb-8">
         <h1 className="font-headline-lg text-headline-lg text-on-surface">Hồ sơ cá nhân</h1>

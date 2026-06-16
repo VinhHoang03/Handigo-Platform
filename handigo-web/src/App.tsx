@@ -12,6 +12,7 @@ import AdminFeedbackPage from './features/feedback/pages/AdminFeedbackPage';
 import RegisterProviderPage from './features/provider-application/pages/RegisterProviderPage';
 import AdminUsersPage from './features/admin/pages/AdminUsersPage';
 import AdminProviderApplicationsPage from './features/admin/pages/AdminProviderApplicationsPage';
+import { WalletPage } from './features/wallet/pages/WalletPage';
 import { RouteGuard } from './components/common/RouteGuard';
 import { AuthBootstrap } from './components/auth/AuthBootstrap';
 import { HomeRoute } from './components/auth/HomeRoute';
@@ -32,8 +33,10 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/customer" element={<RouteGuard roles={['CUSTOMER']}><CustomerHomePage /></RouteGuard>} />
         <Route path="/customer/profile" element={<RouteGuard roles={['CUSTOMER']}><CustomerProfilePage /></RouteGuard>} />
+        <Route path="/customer/wallet" element={<RouteGuard roles={['CUSTOMER']}><WalletPage role="CUSTOMER" /></RouteGuard>} />
         <Route path="/provider" element={<RouteGuard roles={['PROVIDER']}><ProviderHomePage /></RouteGuard>} />
         <Route path="/provider/profile" element={<RouteGuard roles={['PROVIDER']}><ProviderProfilePage /></RouteGuard>} />
+        <Route path="/provider/wallet" element={<RouteGuard roles={['PROVIDER']}><WalletPage role="PROVIDER" /></RouteGuard>} />
         <Route path="/customer/orders/:orderId/feedback" element={<RouteGuard roles={['CUSTOMER']}><CustomerFeedbackPage /></RouteGuard>} />
         <Route path="/provider/feedbacks" element={<RouteGuard roles={['PROVIDER']}><ProviderFeedbackPage /></RouteGuard>} />
         <Route path="/register-provider" element={<RouteGuard roles={['CUSTOMER']}><RegisterProviderPage /></RouteGuard>} />

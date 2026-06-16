@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const latitudeSchema = z.number().min(-90).max(90);
 const longitudeSchema = z.number().min(-180).max(180);
+const administrativeCodeSchema = z.number().int().positive();
 
 export const createAddressSchema = z.object({
   fullAddress: z
@@ -14,11 +15,14 @@ export const createAddressSchema = z.object({
     .trim()
     .min(1, "Province is required"),
 
+  provinceCode: administrativeCodeSchema.optional(),
+
   ward: z
     .string()
     .trim()
     .min(1, "Ward is required"),
 
+  wardCode: administrativeCodeSchema.optional(),
   latitude: latitudeSchema.optional(),
   longitude: longitudeSchema.optional(),
   placeId: z.string().trim().max(255).optional(),
@@ -39,12 +43,15 @@ export const updateAddressSchema = z.object({
     .min(1)
     .optional(),
 
+  provinceCode: administrativeCodeSchema.optional(),
+
   ward: z
     .string()
     .trim()
     .min(1)
     .optional(),
 
+  wardCode: administrativeCodeSchema.optional(),
   latitude: latitudeSchema.optional(),
   longitude: longitudeSchema.optional(),
   placeId: z.string().trim().max(255).optional(),

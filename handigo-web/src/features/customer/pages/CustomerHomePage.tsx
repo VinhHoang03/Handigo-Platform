@@ -1,20 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../../components/DashboardLayout';
 import { CategoryItem, BookingCard, ProCard, PromoCard } from '../components/CustomerHomeComponents';
 import type { Category, Booking, Pro } from '../types/customer.types';
 
 const CustomerHomePage: React.FC = () => {
-  const navigate = useNavigate();
-
-  const navItems = [
-    { icon: 'grid_view', label: 'Bảng điều khiển', path: '/customer' },
-    { icon: 'event_available', label: 'Đặt lịch', path: '#' },
-    { icon: 'mail', label: 'Tin nhắn', path: '#' },
-    { icon: 'payments', label: 'Ví', path: '#' },
-    { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
-  ];
-
   const categories: Category[] = [
     { icon: 'plumbing', name: 'Ống nước' },
     { icon: 'bolt', name: 'Điện' },
@@ -67,10 +56,7 @@ const CustomerHomePage: React.FC = () => {
 
   return (
     <DashboardLayout
-      navItems={navItems}
-      switchLabel="Đăng ký thợ dịch vụ"
-      switchVariant="gradient"
-      onSwitch={() => navigate('/register-provider')}
+      role="CUSTOMER"
       userAvatar="https://lh3.googleusercontent.com/aida-public/AB6AXuDEHJafX2qd3dTrHvNRy0dHwStQm_jFRmhcLv7V0Iflbe6KzeTksnzJoPq-9La8vc-adIj8yxCaNbKijj7uerHZrdZ26OjHWGwnN0LAasZmmwUJvNl29qnLlcWRpjXBtzvINjdOUc5Vqa7kppjp19pddoyUdVYqLk6tlS-7HLqNujhNuBLKccwxJqq8JLs_hR0DUZB7qr9wk45KYBT_ZrXMF28rWVmmvNL1wTSkAS7cYVUA3QSPnq_1_Vb47bF_AqhYh5TC1k28ILg"
     >
       {/* Welcome Header */}

@@ -8,7 +8,7 @@ export function ApplicationList({ items, onSelect }: { items: AdminApplication[]
         <button key={item._id} type="button" onClick={() => onSelect(item)} className="border-b border-outline-variant/40 p-5 text-left transition-colors hover:bg-surface-container-low">
           <div className="flex justify-between gap-3"><div className="flex items-center gap-3"><img src={item.userId.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.userId.fullName)}`} alt="" className="h-10 w-10 rounded-full object-cover" /><div><p className="font-bold">{item.userId.fullName}</p><p className="text-sm text-on-surface-variant">{item.userId.email}</p></div></div><StatusBadge value={item.status} /></div>
           <p className="mt-4 line-clamp-2">{item.description}</p>
-          <p className="mt-3 text-sm text-primary">{item.experienceYears} năm kinh nghiệm · {item.serviceCategoryIds.length} lĩnh vực</p>
+          <p className="mt-3 text-sm text-primary">{item.experienceYears} nam kinh nghiem · {item.serviceIds.length} dich vu</p>
         </button>
       ))}
     </div>

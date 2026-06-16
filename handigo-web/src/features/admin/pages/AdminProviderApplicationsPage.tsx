@@ -80,7 +80,7 @@ export default function AdminProviderApplicationsPage() {
                 {selected.userId.email} · {selected.userId.phone || 'Chưa có SĐT'}
               </p>
             </div>
-            <div><b>Lĩnh vực:</b> {selected.serviceCategoryIds.map((item) => item.name).join(', ')}</div>
+            <div><b>Dịch vụ:</b> {selected.serviceIds.map((item) => item.name).join(', ')}</div>
             <div><b>Kinh nghiệm:</b> {selected.experienceYears} năm</div>
             <div><b>Khu vực:</b> {selected.workingAreas.join(', ')}</div>
             <div>

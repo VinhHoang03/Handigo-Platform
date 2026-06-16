@@ -14,6 +14,7 @@
     { "key": "customerToken", "value": "" },
     { "key": "adminToken", "value": "" },
     { "key": "categoryId", "value": "" },
+    { "key": "serviceId", "value": "" },
     { "key": "applicationId", "value": "" },
     { "key": "targetUserId", "value": "" },
     { "key": "missingId", "value": "000000000000000000000000" }
@@ -51,13 +52,17 @@
       }
     },
     {
-      "name": "Categories - List Active",
+      "name": "Categories - Active With Services",
       "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-        "pm.test('active categories returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data).to.be.an('array'); });",
+        "pm.test('active categories with services returned', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data).to.be.an('array'); });",
         "const items = pm.response.json().data;",
-        "if (items.length) pm.collectionVariables.set('categoryId', items[0]._id);"
+        "const category = items.find((item) => item.services && item.services.length);",
+        "if (category) {",
+        "  pm.collectionVariables.set('categoryId', category._id);",
+        "  pm.collectionVariables.set('serviceId', category.services[0]._id);",
+        "}"
       ] } }],
-      "request": { "method": "GET", "url": "{{baseUrl}}/categories" }
+      "request": { "method": "GET", "url": "{{baseUrl}}/categories/active-with-services" }
     },
     {
       "name": "Provider Application - Create",
@@ -71,7 +76,7 @@
         "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"description\": \"Experienced home service provider.\",\n  \"experienceYears\": 3,\n  \"serviceCategoryIds\": [\"{{categoryId}}\"],\n  \"workingAreas\": [\"District 1\", \"District 3\"]\n}" },
+        "body": { "mode": "raw", "raw": "{\n  \"description\": \"Experienced home service provider.\",\n  \"experienceYears\": 3,\n  \"serviceIds\": [\"{{serviceId}}\"],\n  \"workingAreas\": [\"District 1\", \"District 3\"]\n}" },
         "url": "{{baseUrl}}/provider-applications"
       }
     },

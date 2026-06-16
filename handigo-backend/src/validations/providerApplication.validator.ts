@@ -8,7 +8,7 @@ const objectIdSchema = z
 export const createProviderApplicationSchema = z.object({
   description: z.string().trim().min(1).max(2000),
   experienceYears: z.number().int().min(0),
-  serviceCategoryIds: z.array(objectIdSchema).min(1),
+  serviceIds: z.array(objectIdSchema).min(1),
   workingAreas: z.array(z.string().trim().min(1).max(120)).min(1),
 });
 

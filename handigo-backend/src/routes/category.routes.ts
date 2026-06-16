@@ -10,6 +10,9 @@ import {
 
 const router = Router();
 
+router.get("/active-with-services", categoryController.getActiveCategoriesWithServices);
+router.get("/active", categoryController.getActiveCategories);
+
 router.use(authMiddleware, roleMiddleware("ADMIN"));
 router.get("/", categoryController.listCategories);
 router.get("/:id", categoryController.getCategoryById);
@@ -29,7 +32,5 @@ router.put(
   categoryController.updateCategory,
 );
 router.delete("/:id", categoryController.deleteCategory);
-
-router.get("/", categoryController.getActiveCategories);
 
 export default router;
