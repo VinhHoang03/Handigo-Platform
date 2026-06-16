@@ -205,6 +205,51 @@ export const getFeedbackByOrder = async (userId: string, orderId: string) => {
     .populate("providerReply.repliedBy", "fullName avatar");
 };
 
+export const getOrderFeedbackContext = async (userId: string, orderId: string) => {
+  assertObjectId(userId, "user id");
+  assertObjectId(orderId, "order id");
+
+  const order = await Order.findOne({
+    _id: orderId,
+    customerId: userId,
+    isDeleted: false,
+  })
+    .select("orderCode status providerId serviceId createdAt")
+    .populate("serviceId", "name image")
+    .populate({
+      path: "providerId",
+      select: "userId",
+      populate: { path: "userId", select: "fullName avatar" },
+    });
+
+  if (!order) {
+    throw new AppError("Order not found", 404);
+  }
+
+  const feedback = await Feedback.findOne({
+    orderId,
+    customerId: userId,
+    isDeleted: false,
+  })
+    .populate("orderId", "orderCode status")
+    .populate({
+      path: "providerId",
+      select: "userId averageRating totalFeedbacks",
+      populate: { path: "userId", select: "fullName avatar" },
+    })
+    .populate("serviceId", "name image")
+    .populate("providerReply.repliedBy", "fullName avatar");
+
+  const canReview = order.status === "completed" && Boolean(order.providerId);
+  const reason = order.status !== "completed"
+    ? "Chỉ đơn hàng đã hoàn tất mới có thể được đánh giá."
+    : !order.providerId
+      ? "Đơn hàng chưa có thợ nhận."
+      : null;
+
+  return { order, feedback, canReview, reason };
+};
+
 const parseBoolean = (value: string | boolean | undefined) => {
   if (value === true || value === "true") return true;
   if (value === false || value === "false") return false;

@@ -11,7 +11,7 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({ open, title, message, busy, onCancel, onConfirm }: ConfirmDialogProps) {
   return (
-    <Modal open={open} title={title} onClose={onCancel}>
+    <Modal open={open} title={title} onClose={onCancel} size="sm">
       <p className="text-on-surface-variant">{message}</p>
       <div className="mt-6 flex justify-end gap-3">
         <button onClick={onCancel} disabled={busy} className="rounded-xl bg-surface-container-high px-5 py-2.5">Hủy</button>

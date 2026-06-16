@@ -11,7 +11,7 @@ export interface ICategory extends Document, IBaseDocument {
 
 const CategorySchema = new Schema<ICategory>(
   {
-    name: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, trim: true, lowercase: true },
     description: { type: String, default: null },
     icon: { type: String, default: null },

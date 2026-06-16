@@ -7,6 +7,7 @@ export interface IAddress extends Document {
   ward: string;
   latitude?: number;
   longitude?: number;
+  placeId?: string;
   isDefault: boolean;
   note?: string | null;
   createdAt: Date;
@@ -37,6 +38,9 @@ const addressSchema = new Schema<IAddress>(
     },
     longitude: {
       type: Number,
+    },
+    placeId: {
+      type: String,
     },
     isDefault: {
       type: Boolean,

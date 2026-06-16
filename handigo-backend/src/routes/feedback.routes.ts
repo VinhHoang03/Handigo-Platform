@@ -37,6 +37,13 @@ router.get(
 );
 
 router.get(
+  "/orders/:orderId/context",
+  authMiddleware,
+  roleMiddleware("CUSTOMER"),
+  feedbackController.getOrderFeedbackContext,
+);
+
+router.get(
   "/orders/:orderId",
   authMiddleware,
   roleMiddleware("CUSTOMER"),

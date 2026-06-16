@@ -1,9 +1,13 @@
 export interface User {
   id: string;
+  _id?: string;
   email: string;
   fullName: string;
   role: 'customer' | 'provider' | 'admin' | 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
-  avatarUrl?: string;
+  phone?: string;
+  avatar?: string | null;
+  status?: 'active' | 'locked';
+  isEmailVerified?: boolean;
 }
 
 export interface AuthResponse {
@@ -15,6 +19,10 @@ export interface LoginRequest {
   email: string;
   password: string;
 }
+
+export type GoogleLoginRequest =
+  | { credential: string }
+  | { accessToken: string };
 
 export interface RegisterRequest {
   email: string;

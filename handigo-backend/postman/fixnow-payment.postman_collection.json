@@ -1,0 +1,320 @@
+{
+  "info": {
+    "name": "FixNow Payment API",
+    "_postman_id": "a4a10f1d-0a7c-4c89-9f8d-2d8a2a8a4b11",
+    "description": "Payment endpoints for FixNow backend: PayOS, cash payment tracking, payment lookup and history.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "payosOrderCode",
+      "value": "123456789"
+    },
+    {
+      "key": "payosPaymentLinkId",
+      "value": "sample-payment-link-id"
+    },
+    {
+      "key": "payosSignature",
+      "value": "replace-with-valid-payos-signature"
+    }
+  ],
+  "item": [
+    {
+      "name": "Create Fixed Payment - PayOS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json && json.data && json.data.payment && json.data.payment._id) {",
+              "  pm.collectionVariables.set('paymentId', json.data.payment._id);",
+              "}",
+              "if (json && json.data && json.data.payment && json.data.payment.gatewayOrderCode) {",
+              "  pm.collectionVariables.set('payosOrderCode', json.data.payment.gatewayOrderCode);",
+              "}",
+              "pm.test('response has success flag', function () {",
+              "  pm.expect(json).to.have.property('success');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"method\": \"PAYOS\",\n  \"paymentType\": \"FULL\",\n  \"returnUrl\": \"http://localhost:5173/payment/success\",\n  \"cancelUrl\": \"http://localhost:5173/payment/cancel\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/create",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "create"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Fixed Payment - Cash",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json && json.data && json.data.payment && json.data.payment._id) {",
+              "  pm.collectionVariables.set('paymentId', json.data.payment._id);",
+              "}",
+              "pm.test('cash payment request completed', function () {",
+              "  pm.expect(json).to.have.property('success');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"method\": \"CASH\",\n  \"paymentType\": \"FULL\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/create",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "create"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Inspection Deposit - PayOS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json && json.data && json.data.payment && json.data.payment._id) {",
+              "  pm.collectionVariables.set('paymentId', json.data.payment._id);",
+              "}",
+              "if (json && json.data && json.data.payment && json.data.payment.gatewayOrderCode) {",
+              "  pm.collectionVariables.set('payosOrderCode', json.data.payment.gatewayOrderCode);",
+              "}",
+              "pm.test('inspection deposit request completed', function () {",
+              "  pm.expect(json).to.have.property('success');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"method\": \"PAYOS\",\n  \"paymentType\": \"INSPECTION_DEPOSIT\",\n  \"returnUrl\": \"http://localhost:5173/payment/success\",\n  \"cancelUrl\": \"http://localhost:5173/payment/cancel\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/create",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "create"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PayOS Webhook - Success Sample",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"00\",\n  \"desc\": \"success\",\n  \"success\": true,\n  \"data\": {\n    \"orderCode\": {{payosOrderCode}},\n    \"amount\": 50000,\n    \"description\": \"Dat coc FixNow\",\n    \"accountNumber\": \"12345678\",\n    \"reference\": \"TF230204212323\",\n    \"transactionDateTime\": \"2026-06-16 10:00:00\",\n    \"currency\": \"VND\",\n    \"paymentLinkId\": \"{{payosPaymentLinkId}}\",\n    \"code\": \"00\",\n    \"desc\": \"Thanh cong\",\n    \"counterAccountBankId\": \"\",\n    \"counterAccountBankName\": \"\",\n    \"counterAccountName\": \"\",\n    \"counterAccountNumber\": \"\",\n    \"virtualAccountName\": \"\",\n    \"virtualAccountNumber\": \"\"\n  },\n  \"signature\": \"{{payosSignature}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/payos-webhook",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "payos-webhook"
+          ]
+        }
+      },
+      "description": "This sample requires a real PayOS signature. For real testing, use PayOS webhook delivery or generate a valid signed payload."
+    },
+    {
+      "name": "Get Payment By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "{{paymentId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Payments By Order",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/order/{{orderId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "order",
+            "{{orderId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Payment History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/history?page=1&limit=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "history"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "status",
+              "value": "paid",
+              "disabled": true
+            },
+            {
+              "key": "method",
+              "value": "payos",
+              "disabled": true
+            },
+            {
+              "key": "paymentType",
+              "value": "inspection_deposit",
+              "disabled": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

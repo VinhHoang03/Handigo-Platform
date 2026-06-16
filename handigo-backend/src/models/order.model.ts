@@ -61,6 +61,10 @@ export interface IOrder extends Document, IBaseDocument {
   scheduledAt?: Date | null;
   status: OrderStatusValue;
   inspectionRequired: boolean;
+  depositAmount: Money;
+  depositPaidAt?: Date | null;
+  readyForMatching: boolean;
+  platformFeeChargedAt?: Date | null;
   hasAdditionalQuotation: boolean;
   currentQuotationId?: Types.ObjectId | null;
   problemDescription?: string | null;
@@ -146,6 +150,10 @@ const OrderSchema = new Schema<IOrder>(
       default: "created",
     },
     inspectionRequired: { type: Boolean, default: false },
+    depositAmount: { type: Number, default: 0, min: 0 },
+    depositPaidAt: { type: Date, default: null },
+    readyForMatching: { type: Boolean, default: false },
+    platformFeeChargedAt: { type: Date, default: null },
     hasAdditionalQuotation: { type: Boolean, default: false },
     currentQuotationId: {
       type: Schema.Types.ObjectId,
@@ -189,5 +197,6 @@ const OrderSchema = new Schema<IOrder>(
 OrderSchema.index({ customerId: 1, createdAt: -1 });
 OrderSchema.index({ providerId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
+OrderSchema.index({ readyForMatching: 1, status: 1 });
 
 export const Order = model<IOrder>("Order", OrderSchema, "orders");

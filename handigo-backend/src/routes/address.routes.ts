@@ -8,6 +8,11 @@ import {
 } from "../controllers/address.controller";
 
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { validate } from "../middlewares/validate.middleware";
+import {
+  createAddressSchema,
+  updateAddressSchema,
+} from "../validations/address.validator";
 
 const router = Router();
 
@@ -23,13 +28,15 @@ router.get(
 
 router.post(
   "/",
-  authMiddleware,      
+  authMiddleware,
+  validate(createAddressSchema),
   createAddress
 );
 
 router.put(
   "/:id",
   authMiddleware,
+  validate(updateAddressSchema),
   updateAddress
 );
 

@@ -25,6 +25,20 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const googleLoginSchema = z
+  .object({
+    credential: z.string().trim().min(1, "Google credential is required").optional(),
+    accessToken: z.string().trim().min(1, "Google access token is required").optional(),
+  })
+  .refine((data) => Boolean(data.credential || data.accessToken), {
+    message: "Google credential or access token is required",
+    path: ["credential"],
+  });
+
+export const facebookLoginSchema = z.object({
+  accessToken: z.string().trim().min(1, "Facebook access token is required"),
+});
+
 export const forgotPasswordSchema = z.object({
   email: z.email().trim().toLowerCase(),
 });
