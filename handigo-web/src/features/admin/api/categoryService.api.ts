@@ -16,6 +16,10 @@ interface ApiResponse<T> {
   data: T;
 }
 
+interface UploadedImage {
+  url: string;
+}
+
 const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 export const categoryServiceApi = {
@@ -45,4 +49,12 @@ export const categoryServiceApi = {
 
   deleteService: async (id: string) =>
     unwrap<null>(await api.delete(`/services/${id}`)),
+
+  uploadImage: async (file: File) => {
+    const form = new FormData();
+    form.append('image', file);
+    return unwrap<UploadedImage>(await api.post('/admin/assets/images', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }));
+  },
 };

@@ -18,7 +18,7 @@ export interface Category {
 
 export interface Service {
   _id: string;
-  categoryId: string | Pick<Category, '_id' | 'name' | 'slug' | 'isActive'>;
+  categoryId: string | Pick<Category, '_id' | 'name' | 'slug' | 'isActive'> | null;
   name: string;
   slug: string;
   description?: string | null;

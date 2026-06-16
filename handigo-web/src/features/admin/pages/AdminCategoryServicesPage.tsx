@@ -41,6 +41,11 @@ const getErrorMessage = (error: unknown) => {
 };
 
 const categoryIcon = (category: Category | CategoryDetail | null) => category?.icon || 'category';
+const isImageUrl = (value: string | null | undefined) => /^https?:\/\//i.test(value || '');
+const getServiceCategoryId = (service: Service) => {
+  if (!service.categoryId) return '';
+  return typeof service.categoryId === 'string' ? service.categoryId : service.categoryId._id;
+};
 
 const categoryPayload = (form: CategoryFormState): CategoryPayload => ({
   name: form.name.trim(),
@@ -97,7 +102,8 @@ export default function AdminCategoryServicesPage() {
       ]);
       setCategories(categoryResult.items);
       setServiceCounts(serviceResult.items.reduce<Record<string, number>>((acc, service) => {
-        const categoryId = typeof service.categoryId === 'string' ? service.categoryId : service.categoryId._id;
+        const categoryId = getServiceCategoryId(service);
+        if (!categoryId) return acc;
         acc[categoryId] = (acc[categoryId] || 0) + 1;
         return acc;
       }, {}));
@@ -118,7 +124,12 @@ export default function AdminCategoryServicesPage() {
     setDetailLoading(true);
     setError('');
     try {
-      setSelected(await categoryServiceApi.getCategory(id));
+      const detail = await categoryServiceApi.getCategory(id);
+      setSelected(detail);
+      setServiceCounts((counts) => ({
+        ...counts,
+        [id]: detail.services.length,
+      }));
     } catch (err) {
       setSelected(null);
       setError(getErrorMessage(err));
@@ -284,7 +295,7 @@ export default function AdminCategoryServicesPage() {
                   <button key={category._id} onClick={() => setSelectedId(category._id)} className={`group flex w-full items-center justify-between rounded-xl border p-4 text-left transition-all ${active ? 'border-primary bg-primary/5 shadow-md' : 'border-outline-variant/30 bg-surface-container-lowest hover:border-primary/50'}`}>
                     <span className="flex min-w-0 items-center gap-4">
                       <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
-                        <span className="material-symbols-outlined text-3xl">{categoryIcon(category)}</span>
+                        <CategoryIconPreview value={categoryIcon(category)} className="h-full w-full" iconClassName="text-3xl" />
                       </span>
                       <span className="min-w-0">
                         <span className={`block truncate font-semibold ${active ? 'text-primary' : ''}`}>{category.name}</span>
@@ -310,7 +321,7 @@ export default function AdminCategoryServicesPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex gap-4">
                     <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <span className="material-symbols-outlined text-[48px]">{categoryIcon(selected)}</span>
+                      <CategoryIconPreview value={categoryIcon(selected)} className="h-full w-full" iconClassName="text-[48px]" />
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -385,12 +396,86 @@ function ServiceTable({ services, onEdit, onDelete }: { services: Service[]; onE
   );
 }
 
+function CategoryIconPreview({ value, className, iconClassName }: { value: string; className?: string; iconClassName?: string }) {
+  if (isImageUrl(value)) {
+    return <img src={value} alt="Category icon" className={`${className || ''} object-cover`} />;
+  }
+
+  return <span className={`material-symbols-outlined flex items-center justify-center ${className || ''} ${iconClassName || ''}`}>{value}</span>;
+}
+
+function AssetInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  mode,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  mode: 'icon' | 'image';
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setMessage('');
+    try {
+      const uploaded = await categoryServiceApi.uploadImage(file);
+      onChange(uploaded.url);
+      setMessage('Đã tải ảnh lên.');
+    } catch (err) {
+      setMessage(getErrorMessage(err));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-outline-variant bg-surface p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold">{label}</span>
+        <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
+          <span className="material-symbols-outlined text-[18px]">upload</span>
+          {uploading ? 'Đang tải...' : 'Chọn ảnh'}
+          <input type="file" accept="image/*" className="sr-only" onChange={(event) => void upload(event.target.files?.[0])} />
+        </label>
+      </div>
+      <div className="flex gap-3">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low text-primary">
+          {mode === 'icon'
+            ? <CategoryIconPreview value={value || 'category'} className="h-full w-full" iconClassName="text-3xl" />
+            : value && isImageUrl(value)
+              ? <img src={value} alt="Service" className="h-full w-full object-cover" />
+              : <span className="material-symbols-outlined text-3xl">image</span>}
+        </div>
+        <div className="min-w-0 flex-1">
+          <input
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={placeholder}
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-2 outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className={`text-xs ${message.includes('lỗi') || message.includes('Could') ? 'text-error' : 'text-on-surface-variant'}`}>{message || 'Có thể nhập URL ảnh hoặc chọn file từ máy.'}</p>
+            {value && <button type="button" onClick={() => onChange('')} className="text-xs font-semibold text-error">Xóa</button>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CategoryModal({ open, mode, form, busy, onChange, onClose, onSubmit }: { open: boolean; mode: 'create' | 'edit'; form: CategoryFormState; busy: boolean; onChange: (form: CategoryFormState) => void; onClose: () => void; onSubmit: (event: FormEvent) => void }) {
-  return <Modal open={open} title={mode === 'edit' ? 'Sửa danh mục' : 'Thêm danh mục'} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><FormInput label="Tên danh mục" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} /><FormInput label="Slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" /><FormInput label="Material icon hoặc URL icon" value={form.icon} onChange={(value) => onChange({ ...form, icon: value })} placeholder="cleaning_services" /><FormTextArea label="Mô tả" value={form.description} onChange={(value) => onChange({ ...form, description: value })} /><ToggleRow checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị danh mục" /><FormActions busy={busy} onCancel={onClose} /></form></Modal>;
+  return <Modal open={open} title={mode === 'edit' ? 'Sửa danh mục' : 'Thêm danh mục'} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><FormInput label="Tên danh mục" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} /><FormInput label="Slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" /><AssetInput label="Icon danh mục" value={form.icon} onChange={(value) => onChange({ ...form, icon: value })} placeholder="cleaning_services hoặc https://..." mode="icon" /><FormTextArea label="Mô tả" value={form.description} onChange={(value) => onChange({ ...form, description: value })} /><ToggleRow checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị danh mục" /><FormActions busy={busy} onCancel={onClose} /></form></Modal>;
 }
 
 function ServiceModal({ open, mode, form, busy, onChange, onClose, onSubmit }: { open: boolean; mode: 'create' | 'edit'; form: ServiceFormState; busy: boolean; onChange: (form: ServiceFormState) => void; onClose: () => void; onSubmit: (event: FormEvent) => void }) {
-  return <Modal open={open} title={mode === 'edit' ? 'Sửa dịch vụ' : 'Thêm dịch vụ'} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><FormInput label="Tên dịch vụ" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} /><FormInput label="Slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" /><FormInput label="Ảnh dịch vụ" value={form.image} onChange={(value) => onChange({ ...form, image: value })} placeholder="https://..." /><label className="block"><span className="mb-1 block text-sm font-semibold">Loại giá</span><select value={form.serviceType} onChange={(event) => onChange({ ...form, serviceType: event.target.value as ServiceFormState['serviceType'] })} className="w-full rounded-xl border border-outline-variant bg-surface p-3"><option value="fixed_price">Giá cố định</option><option value="variable_price">Giá linh hoạt</option></select></label><div className="grid gap-3 sm:grid-cols-2"><FormInput label="Giá cố định" type="number" required={form.serviceType === 'fixed_price'} value={form.fixedPrice} onChange={(value) => onChange({ ...form, fixedPrice: value })} /><FormInput label="Tiền đặt cọc" type="number" value={form.depositAmount} onChange={(value) => onChange({ ...form, depositAmount: value })} /></div><FormTextArea label="Mô tả" value={form.description} onChange={(value) => onChange({ ...form, description: value })} /><ToggleRow checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị dịch vụ" /><FormActions busy={busy} onCancel={onClose} /></form></Modal>;
+  return <Modal open={open} title={mode === 'edit' ? 'Sửa dịch vụ' : 'Thêm dịch vụ'} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><FormInput label="Tên dịch vụ" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} /><FormInput label="Slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" /><AssetInput label="Ảnh dịch vụ" value={form.image} onChange={(value) => onChange({ ...form, image: value })} placeholder="https://..." mode="image" /><label className="block"><span className="mb-1 block text-sm font-semibold">Loại giá</span><select value={form.serviceType} onChange={(event) => onChange({ ...form, serviceType: event.target.value as ServiceFormState['serviceType'] })} className="w-full rounded-xl border border-outline-variant bg-surface p-3"><option value="fixed_price">Giá cố định</option><option value="variable_price">Giá linh hoạt</option></select></label><div className="grid gap-3 sm:grid-cols-2"><FormInput label="Giá cố định" type="number" required={form.serviceType === 'fixed_price'} value={form.fixedPrice} onChange={(value) => onChange({ ...form, fixedPrice: value })} /><FormInput label="Tiền đặt cọc" type="number" value={form.depositAmount} onChange={(value) => onChange({ ...form, depositAmount: value })} /></div><FormTextArea label="Mô tả" value={form.description} onChange={(value) => onChange({ ...form, description: value })} /><ToggleRow checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị dịch vụ" /><FormActions busy={busy} onCancel={onClose} /></form></Modal>;
 }
 
 function FormInput({ label, value, onChange, placeholder, type = 'text', required }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; required?: boolean }) {
