@@ -1,0 +1,339 @@
+{
+  "info": {
+    "name": "Handigo Admin Category & Service",
+    "_postman_id": "fa0f5618-494d-4ba8-945e-da2c04b9e6b7",
+    "description": "CRUD tests for admin category and service APIs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "serviceId",
+      "value": ""
+    },
+    {
+      "key": "runId",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runId')) {",
+          "  pm.collectionVariables.set('runId', Date.now().toString());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Create category",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Postman Category {{runId}}\",\n  \"slug\": \"postman-category-{{runId}}\",\n  \"description\": \"Temporary category created by Postman\",\n  \"isActive\": true\n}"
+        },
+        "url": "{{baseUrl}}/categories"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "pm.test('Category is returned', () => pm.expect(json.data._id).to.be.a('string'));",
+              "pm.collectionVariables.set('categoryId', json.data._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List categories",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/categories?search=postman-category-{{runId}}&page=1&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('Created category appears in list', () => {",
+              "  const items = pm.response.json().data.items;",
+              "  pm.expect(items.some(item => item._id === pm.collectionVariables.get('categoryId'))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update category",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"description\": \"Updated by Postman\",\n  \"isActive\": false\n}"
+        },
+        "url": "{{baseUrl}}/categories/{{categoryId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "pm.test('Category fields are updated', () => {",
+              "  pm.expect(data.description).to.eql('Updated by Postman');",
+              "  pm.expect(data.isActive).to.eql(false);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create service",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"categoryId\": \"{{categoryId}}\",\n  \"name\": \"Postman Service {{runId}}\",\n  \"slug\": \"postman-service-{{runId}}\",\n  \"description\": \"Temporary service created by Postman\",\n  \"serviceType\": \"fixed_price\",\n  \"fixedPrice\": 150000,\n  \"depositAmount\": 50000,\n  \"isActive\": true\n}"
+        },
+        "url": "{{baseUrl}}/services"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "pm.test('Service is returned', () => pm.expect(json.data._id).to.be.a('string'));",
+              "pm.collectionVariables.set('serviceId', json.data._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get category with services",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/categories/{{categoryId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('Category contains created service', () => {",
+              "  const services = pm.response.json().data.services;",
+              "  pm.expect(services.some(item => item._id === pm.collectionVariables.get('serviceId'))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List services by category",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/services?categoryId={{categoryId}}&serviceType=fixed_price&page=1&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('Created service appears in list', () => {",
+              "  const items = pm.response.json().data.items;",
+              "  pm.expect(items.some(item => item._id === pm.collectionVariables.get('serviceId'))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update service",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fixedPrice\": 175000,\n  \"isActive\": false\n}"
+        },
+        "url": "{{baseUrl}}/services/{{serviceId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "const data = pm.response.json().data;",
+              "pm.test('Service fields are updated', () => {",
+              "  pm.expect(data.fixedPrice).to.eql(175000);",
+              "  pm.expect(data.isActive).to.eql(false);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject category deletion while service exists",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/categories/{{categoryId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete service",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/services/{{serviceId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete category",
+      "request": {
+        "method": "DELETE",
+        "url": "{{baseUrl}}/categories/{{categoryId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm deleted service is hidden",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/services/{{serviceId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm deleted category is hidden",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/categories/{{categoryId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
