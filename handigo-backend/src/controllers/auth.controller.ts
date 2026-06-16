@@ -109,10 +109,12 @@ export const refreshToken = async (
 
 export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { credential } = req.body;
-    if (!credential) throw new AppError("Google credential is required", 400);
+    const { credential, accessToken } = req.body;
+    if (!credential && !accessToken) {
+      throw new AppError("Google credential or access token is required", 400);
+    }
 
-    const result = await authService.googleLogin(credential);
+    const result = await authService.googleLogin({ credential, accessToken });
 
     res.cookie(
       REFRESH_TOKEN_COOKIE,

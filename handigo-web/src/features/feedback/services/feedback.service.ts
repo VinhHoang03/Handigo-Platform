@@ -2,6 +2,7 @@ import { feedbackApi } from '../api/feedback.api';
 import type { FeedbackPayload, FeedbackQuery } from '../types/feedback.types';
 
 export const feedbackService = {
+  loadOrderContext: feedbackApi.getOrderContext,
   loadOrderFeedback: feedbackApi.getByOrder,
   save: async (feedbackId: string | undefined, payload: FeedbackPayload, newImages: File[]) => {
     const uploaded = newImages.length ? await feedbackApi.uploadImages(newImages) : [];

@@ -47,7 +47,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     if (!authToken.get()) {
-      navigate('/signin');
+      navigate('/login');
       return;
     }
 
@@ -68,7 +68,7 @@ const ProfilePage = () => {
 
   const handleLogout = async () => {
     await authApi.logout();
-    navigate('/signin');
+    navigate('/login');
   };
 
   const handleProfileChange = (field: keyof ProfileUpdateInput, value: string) => {
@@ -135,7 +135,7 @@ const ProfilePage = () => {
         <div className="glass-card p-lg rounded-3xl max-w-md w-full text-center">
           <h1 className="font-headline-lg text-headline-lg text-on-surface mb-3">Không thể mở hồ sơ</h1>
           <p className="text-on-surface-variant mb-6">{error ?? 'Vui lòng đăng nhập lại.'}</p>
-          <button className="px-6 py-3 bg-primary text-on-primary rounded-xl font-label-md" type="button" onClick={() => navigate('/signin')}>
+          <button className="px-6 py-3 bg-primary text-on-primary rounded-xl font-label-md" type="button" onClick={() => navigate('/login')}>
             Đến trang đăng nhập
           </button>
         </div>

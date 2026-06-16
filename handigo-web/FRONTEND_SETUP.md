@@ -49,6 +49,7 @@ cp .env.example .env.local
 ```env
 VITE_API_BASE_URL=http://localhost:5000
 VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 ```
 
 ### 4. Chạy dev server
@@ -172,6 +173,9 @@ VITE_API_BASE_URL=http://localhost:5000
 
 # OAuth
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
+
+# Google Maps Places Autocomplete
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 
 # App
 VITE_APP_NAME=FixNow

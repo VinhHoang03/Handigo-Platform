@@ -25,23 +25,26 @@ export interface Category {
 
 export interface Address {
   id: string;
-  type?: 'home' | 'office' | 'other';
-  label: string;
-  addressLine: string;
+  fullAddress: string;
+  province: string;
   ward: string;
-  district: string;
-  city: string;
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
   isDefault?: boolean;
+  note?: string | null;
   address?: string;
 }
 
 export interface CreateAddressPayload {
-  label: string;
-  addressLine: string;
+  fullAddress: string;
+  province: string;
   ward: string;
-  district: string;
-  city: string;
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
   isDefault?: boolean;
+  note?: string | null;
 }
 
 export interface UserProfile {

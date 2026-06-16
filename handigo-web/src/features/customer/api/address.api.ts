@@ -4,41 +4,39 @@ import type { Address, CreateAddressPayload } from '../types/customer.types';
 interface BackendAddress {
   _id?: string;
   id?: string;
-  label: string;
-  addressLine: string;
+  fullAddress: string;
+  province: string;
   ward: string;
-  district: string;
-  city: string;
+  latitude?: number;
+  longitude?: number;
+  placeId?: string;
   isDefault?: boolean;
+  note?: string | null;
 }
 
-const normalizeAddressType = (label: string): Address['type'] => {
-  const normalized = label.toLowerCase();
-  if (normalized.includes('home') || normalized.includes('nhà') || normalized.includes('nha')) return 'home';
-  if (normalized.includes('office') || normalized.includes('văn phòng') || normalized.includes('van phong')) return 'office';
-  return 'other';
-};
+const mapAddress = (address: BackendAddress): Address => ({
+  id: address.id || address._id || '',
+  fullAddress: address.fullAddress,
+  province: address.province,
+  ward: address.ward,
+  latitude: address.latitude,
+  longitude: address.longitude,
+  placeId: address.placeId,
+  isDefault: address.isDefault,
+  note: address.note,
+  address: address.fullAddress,
+});
 
-const mapAddress = (address: BackendAddress): Address => {
-  const fullAddress = [
-    address.addressLine,
-    address.ward,
-    address.district,
-    address.city,
-  ].filter(Boolean).join(', ');
-
-  return {
-    id: address.id || address._id || '',
-    type: normalizeAddressType(address.label),
-    label: address.label,
-    addressLine: address.addressLine,
-    ward: address.ward,
-    district: address.district,
-    city: address.city,
-    isDefault: address.isDefault,
-    address: fullAddress,
-  };
-};
+const sanitizeAddressPayload = (payload: CreateAddressPayload): CreateAddressPayload => ({
+  fullAddress: payload.fullAddress.trim(),
+  province: payload.province.trim(),
+  ward: payload.ward.trim(),
+  latitude: payload.latitude,
+  longitude: payload.longitude,
+  placeId: payload.placeId?.trim() || undefined,
+  isDefault: payload.isDefault,
+  note: payload.note?.trim() || null,
+});
 
 export const getCustomerAddresses = async (): Promise<Address[]> => {
   const response = await api.get<{ success: boolean; data: BackendAddress[] }>('/addresses');
@@ -46,12 +44,12 @@ export const getCustomerAddresses = async (): Promise<Address[]> => {
 };
 
 export const createCustomerAddress = async (payload: CreateAddressPayload): Promise<Address> => {
-  const response = await api.post<{ success: boolean; data: BackendAddress }>('/addresses', payload);
+  const response = await api.post<{ success: boolean; data: BackendAddress }>('/addresses', sanitizeAddressPayload(payload));
   return mapAddress(response.data.data);
 };
 
 export const updateCustomerAddress = async (id: string, payload: CreateAddressPayload): Promise<Address> => {
-  const response = await api.put<{ success: boolean; data: BackendAddress }>(`/addresses/${id}`, payload);
+  const response = await api.put<{ success: boolean; data: BackendAddress }>(`/addresses/${id}`, sanitizeAddressPayload(payload));
   return mapAddress(response.data.data);
 };
 

@@ -1,11 +1,13 @@
 import api from '@/api/client';
 import type {
   LoginRequest,
+  GoogleLoginRequest,
   AuthResponse,
   RegisterRequest,
   VerifyRegisterOtpRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
+  User,
 } from '../types/auth.types';
 
 interface MessageResponse {
@@ -50,8 +52,8 @@ export const resetPasswordApi = async (
   return response.data;
 };
 
-export const googleLoginApi = async (credential: string): Promise<AuthResponse> => {
-  const response = await api.post<AuthResponse>('/auth/google-login', { credential });
+export const googleLoginApi = async (data: GoogleLoginRequest): Promise<AuthResponse> => {
+  const response = await api.post<AuthResponse>('/auth/google-login', data);
   return response.data;
 };
 
@@ -63,6 +65,12 @@ export const facebookLoginApi = async (accessToken: string): Promise<AuthRespons
 export const logoutApi = async (): Promise<MessageResponse> => {
   const response = await api.post<MessageResponse>('/auth/logout');
   return response.data;
+};
+
+export const getMeApi = async (): Promise<User> => {
+  const response = await api.get<{ user: User }>('/auth/me');
+  const user = response.data.user;
+  return { ...user, id: user.id || user._id || '' };
 };
 
 export interface ChangePasswordRequest {
