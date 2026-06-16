@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEventHandler } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi } from '../api/authApi';
-import { authToken } from '../api/http';
+import api from '../api/client';
+import { tokenStorage } from '../api/tokenStorage';
 import {
   ActivityOverview,
   MobileProfileNav,
@@ -14,6 +14,7 @@ import {
   ProfileTopNav,
   SecuritySection,
 } from '../components/profile';
+import { authService } from '../features/auth/services/auth.service';
 import type { AuthUser, ChangePasswordInput, ProfileUpdateInput } from '../types/auth';
 
 const emptyProfileForm: ProfileUpdateInput = {
@@ -33,6 +34,14 @@ const toProfileForm = (user: AuthUser): ProfileUpdateInput => ({
   avatar: user.avatar ?? '',
 });
 
+interface UserResponse {
+  user: AuthUser;
+}
+
+interface UpdateProfileResponse {
+  data: AuthUser;
+}
+
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -46,16 +55,16 @@ const ProfilePage = () => {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authToken.get()) {
+    if (!tokenStorage.get()) {
       navigate('/signin');
       return;
     }
 
     const loadProfile = async () => {
       try {
-        const response = await authApi.getProfile();
-        setUser(response.user);
-        setProfileForm(toProfileForm(response.user));
+        const response = await api.get<UserResponse>('/users/me');
+        setUser(response.data.user);
+        setProfileForm(toProfileForm(response.data.user));
       } catch {
         setError('Không thể tải hồ sơ. Vui lòng đăng nhập lại.');
       } finally {
@@ -67,7 +76,7 @@ const ProfilePage = () => {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await authApi.logout();
+    await authService.logout();
     navigate('/signin');
   };
 
@@ -94,7 +103,8 @@ const ProfilePage = () => {
     setProfileMessage(null);
 
     try {
-      const updatedUser = await authApi.updateProfile(profileForm);
+      const response = await api.put<UpdateProfileResponse>('/users/profile', profileForm);
+      const updatedUser = response.data.data;
       setUser(updatedUser);
       setProfileForm(toProfileForm(updatedUser));
       setProfileMessage('Cập nhật hồ sơ thành công');
@@ -111,7 +121,7 @@ const ProfilePage = () => {
     setPasswordMessage(null);
 
     try {
-      await authApi.changePassword(passwordForm);
+      await api.post('/auth/change-password', passwordForm);
       setPasswordForm(emptyPasswordForm);
       setPasswordMessage('Cập nhật mật khẩu thành công');
     } catch (err) {

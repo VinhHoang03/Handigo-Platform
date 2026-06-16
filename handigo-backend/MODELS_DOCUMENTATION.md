@@ -470,3 +470,48 @@ Tài liệu này liệt kê tất cả các collection MongoDB (Mongoose models)
 Nếu bạn muốn mô tả chi tiết hơn (giá trị ví dụ, sơ đồ quan hệ, hoặc tài liệu mẫu), hãy cho biết model nào cần mở rộng và tôi sẽ cập nhật file.
 
 File: [handigo-backend/MODELS_DOCUMENTATION.md](handigo-backend/MODELS_DOCUMENTATION.md)
+
+---
+
+## Payment API Update Notes
+
+### Business flow
+
+- Fixed-price services: customer creates an order, the system matches a provider, provider accepts, then the platform fee is deducted immediately from the provider wallet. Provider must top up wallet before accepting orders.
+- Inspection-quote services: customer must pay an inspection deposit by PayOS before matching. The deposit belongs to the platform.
+- Inspection-quote services do not deduct platform fee from provider wallet.
+- If a customer no-shows on an inspection-quote order, the inspection deposit can be transferred to the provider as compensation.
+- If no provider accepts an inspection-quote order, the inspection deposit can be marked as refunded.
+- Cash payment does not create provider debt.
+
+### Payment
+
+- `method`: now supports `payos|vnpay|cash`.
+- `paymentType`: `full|remaining|inspection_deposit`.
+- `gatewayOrderCode`: PayOS orderCode used to find the payment from webhook payload.
+- `gatewayPaymentLinkId`: PayOS payment link id for lookup/debugging.
+- `gatewayTransactionId`: real gateway/bank transaction reference from PayOS webhook.
+- `failedAt`: time when payment failed.
+- `failureReason`: reason for payment failure.
+- `refundReason`: reason for refund.
+- `compensatedToProviderId`: provider receiving the inspection deposit as no-show compensation.
+- `compensatedAt`: time when compensation was recorded.
+- `metadata`: extra business data.
+- New indexes: `{ gatewayOrderCode }`, `{ gatewayPaymentLinkId }`, `{ gatewayTransactionId }`, `{ orderId, paymentType, method, status }`.
+
+### Order
+
+- `depositAmount`: snapshot of the inspection deposit amount for the order. Fixed-price orders use `0`.
+- `depositPaidAt`: time when inspection deposit was paid.
+- `readyForMatching`: whether the order is eligible for provider matching.
+- `platformFeeChargedAt`: time when the fixed-price platform fee was deducted from provider wallet.
+- New index: `{ readyForMatching, status }`.
+
+### WalletTransaction
+
+- `transactionCode`: internal transaction code.
+- `metadata`: extra transaction data such as `orderCode` or compensation reason.
+- `platform_fee`: used when deducting fixed-price platform fee from provider wallet.
+- `provider_earning`: used when transferring inspection deposit compensation to provider.
+- `refund`: used for customer refund tracking when no provider accepts an inspection-quote order.
+- New indexes: `{ transactionCode }`, `{ relatedOrderId, type, status }`.
