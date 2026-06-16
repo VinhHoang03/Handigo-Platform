@@ -18,14 +18,18 @@ import { AppError } from "../utils/appError";
 
 const SALT_ROUNDS = 10;
 
-const getGoogleClient = (): OAuth2Client => {
+const getGoogleClientId = (): string => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
   if (!clientId) {
     throw new AppError("GOOGLE_CLIENT_ID is not configured", 500);
   }
 
-  return new OAuth2Client(clientId);
+  return clientId;
+};
+
+const getGoogleClient = (): OAuth2Client => {
+  return new OAuth2Client(getGoogleClientId());
 };
 
 type AuthUserResponse = {
@@ -48,6 +52,31 @@ type AuthTokens = {
   token: string;
   refreshToken: string;
   refreshTokenExpiresAt: Date;
+};
+
+type GoogleLoginPayload = {
+  credential?: string;
+  accessToken?: string;
+};
+
+type GoogleProfile = {
+  googleId: string;
+  email: string;
+  emailVerified: boolean;
+  name?: string;
+  picture?: string | null;
+};
+
+type GoogleTokenInfoResponse = {
+  aud?: string;
+  sub?: string;
+  email?: string;
+  email_verified?: boolean | string;
+};
+
+type GoogleUserInfoResponse = {
+  name?: string;
+  picture?: string;
 };
 
 const ensureOtpValid = (
@@ -85,11 +114,12 @@ const issueSessionTokens = async (
   user: IUser,
   sessionId?: string,
 ): Promise<AuthTokens> => {
-  const sessionObjectId = sessionId ? new Types.ObjectId(sessionId) : new Types.ObjectId();
+  const sessionObjectId = sessionId
+    ? new Types.ObjectId(sessionId)
+    : new Types.ObjectId();
   const refreshToken = signRefreshToken(user, sessionObjectId.toString());
   const refreshTokenExpiresAt = getJwtExpiresAt(refreshToken);
-
-  await Session.findOneAndUpdate(
+  await Session.updateOne(
     { _id: sessionObjectId, userId: user._id },
     {
       refreshTokenHash: hashRefreshToken(refreshToken),
@@ -98,7 +128,7 @@ const issueSessionTokens = async (
       isDeleted: false,
       deletedAt: null,
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true },
+    { upsert: true, setDefaultsOnInsert: true },
   );
 
   return {
@@ -234,23 +264,101 @@ export const login = async (
   };
 };
 
-export const googleLogin = async (googleToken: string) => {
+const isGoogleEmailVerified = (value: unknown): boolean =>
+  value === true || value === "true";
+
+const getGoogleProfileFromCredential = async (
+  credential: string,
+): Promise<GoogleProfile> => {
+  const clientId = getGoogleClientId();
   const client = getGoogleClient();
   const ticket = await client.verifyIdToken({
-    idToken: googleToken,
-    audience: process.env.GOOGLE_CLIENT_ID as string,
+    idToken: credential,
+    audience: clientId,
   });
 
   const payload = ticket.getPayload();
-  if (!payload?.email || payload.email_verified !== true) {
+  if (!payload?.sub || !payload.email || payload.email_verified !== true) {
     throw new AppError(
       "Google login failed: invalid or unverified Google account",
       400,
     );
   }
 
-  const { email, name, picture } = payload;
-  const user = await User.findOne({ email });
+  return {
+    googleId: payload.sub,
+    email: payload.email,
+    emailVerified: payload.email_verified,
+    name: payload.name,
+    picture: payload.picture,
+  };
+};
+
+const getGoogleProfileFromAccessToken = async (
+  accessToken: string,
+): Promise<GoogleProfile> => {
+  const clientId = getGoogleClientId();
+
+  try {
+    const tokenInfoResponse = await axios.get<GoogleTokenInfoResponse>(
+      "https://oauth2.googleapis.com/tokeninfo",
+      { params: { access_token: accessToken } },
+    );
+    const tokenInfo = tokenInfoResponse.data;
+
+    if (
+      tokenInfo.aud !== clientId ||
+      !tokenInfo.sub ||
+      !tokenInfo.email ||
+      !isGoogleEmailVerified(tokenInfo.email_verified)
+    ) {
+      throw new AppError(
+        "Google login failed: invalid or unverified Google account",
+        400,
+      );
+    }
+
+    const userInfoResponse = await axios.get<GoogleUserInfoResponse>(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+
+    return {
+      googleId: tokenInfo.sub,
+      email: tokenInfo.email,
+      emailVerified: true,
+      name: userInfoResponse.data.name,
+      picture: userInfoResponse.data.picture,
+    };
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError("Google login failed: unable to verify access token", 400);
+  }
+};
+
+export const googleLogin = async (payload: GoogleLoginPayload) => {
+  const googleProfile = payload.credential
+    ? await getGoogleProfileFromCredential(payload.credential)
+    : payload.accessToken
+      ? await getGoogleProfileFromAccessToken(payload.accessToken)
+      : null;
+
+  if (!googleProfile?.email || !googleProfile.emailVerified) {
+    throw new AppError(
+      "Google login failed: invalid or unverified Google account",
+      400,
+    );
+  }
+
+  const { googleId, email, name, picture } = googleProfile;
+  const normalizedEmail = email.toLowerCase();
+  const user = await User.findOne({
+    isDeleted: false,
+    $or: [{ googleId }, { email: normalizedEmail }],
+  });
 
   if (user && user.status === "locked") {
     throw new AppError("Account is not allowed to login", 403);
@@ -263,16 +371,21 @@ export const googleLogin = async (googleToken: string) => {
     const passwordHash = await bcrypt.hash(randomPassword, SALT_ROUNDS);
 
     authenticatedUser = await User.create({
-      email,
-      fullName: name || email.split("@")[0],
+      email: normalizedEmail,
+      googleId,
+      fullName: name || normalizedEmail.split("@")[0],
       passwordHash,
       avatar: picture,
       role: "CUSTOMER",
       status: "active",
       isEmailVerified: true,
     });
-  } else if (!authenticatedUser.isEmailVerified) {
+  } else {
+    authenticatedUser.googleId = googleId;
     authenticatedUser.isEmailVerified = true;
+    if (!authenticatedUser.avatar && picture) {
+      authenticatedUser.avatar = picture;
+    }
     await authenticatedUser.save();
   }
 
@@ -505,7 +618,10 @@ export const changePassword = async (
     throw new AppError("Password login is not available for this account", 400);
   }
 
-  const isPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+  const isPasswordValid = await bcrypt.compare(
+    currentPassword,
+    user.passwordHash,
+  );
 
   if (!isPasswordValid) {
     throw new AppError("Current password is incorrect", 400);

@@ -8,6 +8,7 @@ import {
   resendRegisterOtpApi,
   forgotPasswordApi,
   resetPasswordApi,
+  getMeApi,
 } from '../api/auth.api';
 import type {
   LoginRequest,
@@ -32,11 +33,28 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 export const authService = {
-  login: async (credentials: LoginRequest) => {
+  restoreSession: async () => {
+    const store = useAuthStore.getState();
+    if (!store.token) {
+      store.finishInitialization();
+      return null;
+    }
+
+    try {
+      const user = await getMeApi();
+      useAuthStore.getState().setUser(user);
+      return user;
+    } catch {
+      useAuthStore.getState().logout();
+      return null;
+    }
+  },
+
+  login: async (credentials: LoginRequest, remember = true) => {
     try {
       const response = await loginApi(credentials);
       const { user, token } = response;
-      useAuthStore.getState().setAuth(user, token);
+      useAuthStore.getState().setAuth(user, token, remember);
       return response;
     } catch (error) {
       const message = getErrorMessage(error, 'Failed to login');
@@ -89,11 +107,19 @@ export const authService = {
     }
   },
 
-  googleLogin: async (credential: string) => {
+  googleLogin: async (
+    googleToken: string,
+    remember = true,
+    tokenType: 'credential' | 'accessToken' = 'credential',
+  ) => {
     try {
-      const response = await googleLoginApi(credential);
+      const response = await googleLoginApi(
+        tokenType === 'accessToken'
+          ? { accessToken: googleToken }
+          : { credential: googleToken },
+      );
       const { user, token } = response;
-      useAuthStore.getState().setAuth(user, token);
+      useAuthStore.getState().setAuth(user, token, remember);
       return response;
     } catch (error) {
       const message = getErrorMessage(error, 'Google login failed');
@@ -101,11 +127,11 @@ export const authService = {
     }
   },
 
-  facebookLogin: async (accessToken: string) => {
+  facebookLogin: async (accessToken: string, remember = true) => {
     try {
       const response = await facebookLoginApi(accessToken);
       const { user, token } = response;
-      useAuthStore.getState().setAuth(user, token);
+      useAuthStore.getState().setAuth(user, token, remember);
       return response;
     } catch (error) {
       const message = getErrorMessage(error, 'Facebook login failed');

@@ -7,8 +7,8 @@ export interface IService extends Document, IBaseDocument {
   slug: string;
   description?: string | null;
   serviceType: "fixed_price" | "variable_price";
-  fixedPrice?: number;
-  depositAmount?: number;
+  fixedPrice?: number | null;
+  depositAmount?: number | null;
   image?: string | null;
   isActive: boolean;
 }
@@ -16,11 +16,16 @@ export interface IService extends Document, IBaseDocument {
 const ServiceSchema = new Schema<IService>(
   {
     categoryId: { type: Schema.Types.ObjectId, ref: "Category", required: true },
-    name: { type: String, required: true },
+    name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, trim: true, lowercase: true },
     description: { type: String, default: null },
-    fixedPrice: { type: Number, default: null },
-    depositAmount: { type: Number, default: null },
+    serviceType: {
+      type: String,
+      enum: ["fixed_price", "variable_price"],
+      required: true,
+    },
+    fixedPrice: { type: Number, min: 0, default: null },
+    depositAmount: { type: Number, min: 0, default: null },
     image: { type: String, default: null },
     isActive: { type: Boolean, default: true },
     ...baseFields,

@@ -8,11 +8,11 @@ export const useAuth = () => {
   const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated, logout } = useAuthStore();
 
-  const login = async (credentials: LoginRequest) => {
+  const login = async (credentials: LoginRequest, remember = true) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await authService.login(credentials);
+      const response = await authService.login(credentials, remember);
       return response.user;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during login');
@@ -22,11 +22,15 @@ export const useAuth = () => {
     }
   };
 
-  const googleLogin = async (credential: string) => {
+  const googleLogin = async (
+    token: string,
+    remember = true,
+    tokenType: 'credential' | 'accessToken' = 'credential',
+  ) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await authService.googleLogin(credential);
+      const response = await authService.googleLogin(token, remember, tokenType);
       return response.user;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google login failed');
@@ -36,11 +40,11 @@ export const useAuth = () => {
     }
   };
 
-  const facebookLogin = async (accessToken: string) => {
+  const facebookLogin = async (accessToken: string, remember = true) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await authService.facebookLogin(accessToken);
+      const response = await authService.facebookLogin(accessToken, remember);
       return response.user;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Facebook login failed');

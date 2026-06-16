@@ -5,12 +5,14 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
+  facebookLoginSchema,
+  googleLoginSchema,
   loginSchema,
   registerSchema,
   resendRegisterOtpSchema,
   resetPasswordSchema,
   verifyRegisterOtpSchema,
-} from "../validations/auth.validation";
+} from "../validations/auth.validator";
 
 const router = Router();
 
@@ -26,8 +28,16 @@ router.post(
   authController.resendRegisterOtp,
 );
 router.post("/login", validate(loginSchema), authController.login);
-router.post("/google-login", authController.googleLogin);
-router.post("/facebook-login", authController.facebookLogin);
+router.post(
+  "/google-login",
+  validate(googleLoginSchema),
+  authController.googleLogin,
+);
+router.post(
+  "/facebook-login",
+  validate(facebookLoginSchema),
+  authController.facebookLogin,
+);
 router.post("/refresh-token", authController.refreshToken);
 router.post(
   "/forgot-password",

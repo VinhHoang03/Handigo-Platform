@@ -14,7 +14,7 @@ const FooterColumn = ({ title, links }: { title: string; links: string[] }) => (
 );
 
 export const HomeFooter = () => (
-  <footer className="bg-surface-container-lowest dark:bg-inverse-surface border-t border-outline-variant/50 mt-xl">
+  <footer className="mt-xl border-t border-outline-variant/50 bg-surface-container-lowest">
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 px-4 md:px-8 py-16 max-w-7xl mx-auto">
       <div className="col-span-2 space-y-4">
         <BrandLogo compact />
