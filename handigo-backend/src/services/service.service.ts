@@ -9,6 +9,8 @@ interface ServiceInput {
   slug?: string;
   description?: string | null;
   serviceType?: "fixed_price" | "variable_price";
+  fixedPrice?: number | null;
+  depositAmount?: number | null;
   image?: string | null;
   isActive?: boolean;
 }

@@ -16,6 +16,8 @@ const serviceFields = {
   slug: slugSchema.optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   serviceType: z.enum(["fixed_price", "variable_price"]),
+  fixedPrice: z.number().min(0).nullable().optional(),
+  depositAmount: z.number().min(0).nullable().optional(),
   image: z.string().trim().max(500).nullable().optional(),
   isActive: z.boolean().optional(),
 };

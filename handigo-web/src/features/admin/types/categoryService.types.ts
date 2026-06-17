@@ -23,6 +23,8 @@ export interface Service {
   slug: string;
   description?: string | null;
   serviceType: 'fixed_price' | 'variable_price';
+  fixedPrice?: number | null;
+  depositAmount?: number | null;
   image?: string | null;
   isActive: boolean;
   createdAt: string;
@@ -64,6 +66,8 @@ export interface ServicePayload {
   slug?: string;
   description?: string | null;
   serviceType: 'fixed_price' | 'variable_price';
+  fixedPrice?: number | null;
+  depositAmount?: number | null;
   image?: string | null;
   isActive?: boolean;
 }

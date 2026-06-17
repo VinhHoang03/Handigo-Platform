@@ -70,8 +70,11 @@ const createNavbarItems = (role?: AppRole): NavbarItem[] => {
   if (role === "PROVIDER") {
     return [
       ...items,
-      { label: "Đơn của tôi", path: "#" },
-      { label: "Lịch", path: "#" },
+      {
+        label: "Kênh nhà cung cấp dịch vụ",
+        path: "/provider",
+        activePrefix: "/provider",
+      },
     ];
   }
 
@@ -99,7 +102,6 @@ export function Navbar({
 }: NavbarProps) {
   const [internalScrolled, setInternalScrolled] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -161,7 +163,7 @@ export function Navbar({
               <Link
                 key={item.label}
                 to={item.path}
-                className={`rounded-full px-3 py-2 text-sm font-semibold transition-colors ${
+                className={`whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold transition-colors ${
                   active
                     ? "bg-primary text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)]"
                     : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
@@ -174,6 +176,18 @@ export function Navbar({
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            to="/customer/bookings/new"
+            className={`hidden min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90 ${
+              currentRole === "CUSTOMER" ? "sm:inline-flex" : ""
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg">
+              cleaning_services
+            </span>
+            Đặt dịch vụ
+          </Link>
+
           {isAuthenticated && user ? (
             <>
               {showStatusToggle && (
@@ -253,6 +267,18 @@ export function Navbar({
                           ? "Quản lý hệ thống"
                           : "Hồ sơ cá nhân"}
                       </Link>
+                      {currentRole === "CUSTOMER" && (
+                        <Link
+                          to="/customer/bookings"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
+                        >
+                          <span className="material-symbols-outlined text-xl">
+                            receipt_long
+                          </span>
+                          Đơn dịch vụ của tôi
+                        </Link>
+                      )}
                       {(currentRole === "CUSTOMER" ||
                         currentRole === "PROVIDER") && (
                         <Link
@@ -300,48 +326,6 @@ export function Navbar({
         </div>
       </div>
 
-      {isMobileOpen && (
-        <div className="mt-3 border-t border-outline-variant/20 pt-3 xl:hidden">
-          {showStatusToggle && isAuthenticated && (
-            <div className="mb-2 flex items-center justify-between rounded-xl bg-surface-container px-3 py-2 lg:hidden">
-              <span
-                className={`text-sm font-semibold ${isOnline ? "text-primary" : "text-on-surface-variant"}`}
-              >
-                {isOnline ? "Trực tuyến" : "Ngoại tuyến"}
-              </span>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  checked={isOnline}
-                  onChange={onStatusToggle}
-                  className="peer sr-only"
-                />
-                <span className="h-6 w-11 rounded-full bg-outline-variant after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full" />
-              </label>
-            </div>
-          )}
-
-          <div className="grid gap-1 sm:grid-cols-2">
-            {navItems.map((item) => {
-              const active = isActive(item);
-              return (
-                <Link
-                  key={item.label}
-                  to={item.path}
-                  onClick={() => setIsMobileOpen(false)}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                    active
-                      ? "bg-primary text-on-primary"
-                      : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </nav>
   );
 }

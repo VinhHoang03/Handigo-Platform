@@ -364,8 +364,55 @@ export const AssignmentService = {
       providerId: provider._id,
       status: "pending",
     })
-      .populate("orderId")
+      .populate({
+        path: "orderId",
+        populate: [
+          { path: "customerId", select: "fullName avatar phone" },
+          { path: "serviceId", select: "name image serviceType depositAmount fixedPrice" },
+          { path: "addressId" },
+        ],
+      })
       .sort({ assignedAt: -1 })
       .lean();
+  },
+
+  /**
+   * Get current repair quotation for an order (customer/provider view).
+   */
+  async getQuotationByOrder(
+    orderId: string,
+    userId: string,
+    role: "CUSTOMER" | "PROVIDER",
+  ) {
+    const order = await Order.findById(orderId);
+    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+
+    if (role === "CUSTOMER") {
+      if (order.customerId.toString() !== userId) {
+        throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
+      }
+    } else {
+      const provider = await Provider.findOne({ userId });
+      if (!provider) throw new AppError("Provider không tồn tại.", 404);
+      if (
+        !order.providerId ||
+        order.providerId.toString() !== provider._id.toString()
+      ) {
+        throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
+      }
+    }
+
+    if (!order.currentQuotationId) {
+      return null;
+    }
+
+    const quotation = await RepairQuotation.findById(order.currentQuotationId).lean();
+    if (!quotation) return null;
+
+    const items = await RepairQuotationItem.find({
+      quotationId: quotation._id,
+    }).lean();
+
+    return { quotation, items };
   },
 };

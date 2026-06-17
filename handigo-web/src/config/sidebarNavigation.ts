@@ -1,4 +1,9 @@
-import type { NavItem } from '@/components/Sidebar';
+export interface NavItem {
+  icon: string;
+  label: string;
+  path: string;
+  matchPrefix?: boolean;
+}
 
 export type DashboardRole = 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
 
@@ -12,14 +17,15 @@ export const customerNavItems: NavItem[] = [
 ];
 
 export const providerNavItems: NavItem[] = [
-  { icon: 'grid_view', label: 'Bảng điều khiển', path: '/provider' },
+  { icon: 'grid_view', label: 'Tổng quan', path: '/provider' },
+  { icon: 'receipt_long', label: 'Đơn dịch vụ', path: '/provider/orders', matchPrefix: true },
+  { icon: 'event_available', label: 'Lịch làm việc', path: '#' },
   { icon: 'notifications', label: 'Thông báo', path: '/provider/notifications' },
   { icon: 'payments', label: 'Ví', path: '/provider/wallet' },
   { icon: 'account_balance', label: 'Tài khoản ngân hàng', path: '/provider/bank-accounts' },
   { icon: 'reviews', label: 'Đánh giá', path: '/provider/feedbacks' },
-  { icon: 'event_available', label: 'Đặt lịch', path: '#' },
   { icon: 'mail', label: 'Tin nhắn', path: '#' },
-  { icon: 'settings', label: 'Cài đặt', path: '/provider/profile' },
+  { icon: 'settings', label: 'Hồ sơ dịch vụ', path: '/provider/profile' },
 ];
 
 export const adminNavItems: NavItem[] = [
@@ -51,6 +57,6 @@ export const roleSwitchConfig: Record<
   { label: string; path: string; variant: 'outline' | 'gradient' }
 > = {
   CUSTOMER: { label: 'Đăng tin dịch vụ', path: '/register-provider', variant: 'gradient' },
-  PROVIDER: { label: 'Chuyển sang Khách hàng', path: '/customer', variant: 'outline' },
+  PROVIDER: { label: 'Chuyển sang Khách hàng', path: '/', variant: 'outline' },
   ADMIN: { label: 'Về trang chủ', path: '/', variant: 'outline' },
 };

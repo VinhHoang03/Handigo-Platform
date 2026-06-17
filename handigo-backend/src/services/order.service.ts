@@ -1,6 +1,8 @@
 import { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { Order, IOrder } from "../models/order.model";
+import { OrderAssignment } from "../models/orderAssignment.model";
+import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { Address } from "../models/address.model";
@@ -13,6 +15,22 @@ const PLATFORM_COMMISSION_RATE = 0.15; // 15 %
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
+}
+
+async function getProviderByUserId(providerUserId: string) {
+  const provider = await Provider.findOne({ userId: providerUserId }).select("_id");
+  if (!provider) {
+    throw new AppError("Provider không tồn tại.", 404);
+  }
+  return provider;
+}
+
+function getPopulatedId(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "object" && value !== null && "_id" in value) {
+    return String((value as { _id: unknown })._id);
+  }
+  return String(value);
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -195,26 +213,198 @@ export const OrderService = {
   },
 
   /**
+   * Get newest orders assigned to the currently logged-in provider.
+   */
+  async getRecentOrdersByProvider(
+    providerUserId: string,
+    limit = 5,
+  ): Promise<IOrder[]> {
+    const provider = await getProviderByUserId(providerUserId);
+
+    const safeLimit = Math.min(Math.max(limit, 1), 20);
+    const pendingAssignments = await OrderAssignment.find({
+      providerId: provider._id,
+      status: "pending",
+    }).select("orderId");
+    const pendingOrderIds = pendingAssignments.map((assignment) => assignment.orderId);
+
+    return Order.find({
+      $or: [
+        { providerId: provider._id },
+        { _id: { $in: pendingOrderIds } },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .populate("customerId", "fullName avatar phone")
+      .populate("serviceId", "name image serviceType")
+      .populate("addressId")
+      .lean() as Promise<IOrder[]>;
+  },
+
+  /**
+   * Get paginated list of orders assigned to the logged-in provider.
+   */
+  async getOrdersByProvider(
+    providerUserId: string,
+    page = 1,
+    limit = 10,
+    filters: { status?: string; search?: string } = {},
+  ): Promise<{
+    items: IOrder[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const provider = await getProviderByUserId(providerUserId);
+    const skip = (page - 1) * limit;
+    const conditions: Record<string, unknown>[] = [{ providerId: provider._id }];
+
+    if (filters.status && filters.status !== "all" && filters.status !== "Tất cả") {
+      conditions.push({ status: filters.status });
+    }
+
+    const search = filters.search?.trim();
+    if (search) {
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const matchedServices = await Service.find({
+        name: { $regex: escapedSearch, $options: "i" },
+      }).select("_id");
+      const serviceIds = matchedServices.map((s) => s._id);
+
+      conditions.push({
+        $or: [
+          { orderCode: { $regex: escapedSearch, $options: "i" } },
+          { problemDescription: { $regex: escapedSearch, $options: "i" } },
+          { serviceId: { $in: serviceIds } },
+        ],
+      });
+    }
+
+    const query = { $and: conditions };
+    const [data, total] = await Promise.all([
+      Order.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("customerId", "fullName avatar phone")
+        .populate("serviceId", "name image serviceType")
+        .populate("addressId")
+        .lean(),
+      Order.countDocuments(query),
+    ]);
+
+    return {
+      items: data as IOrder[],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+
+  /**
    * Get single order detail.
    */
   async getOrderById(orderId: string, userId: string): Promise<IOrder> {
     const order = await Order.findById(orderId)
-      .populate("serviceId", "name image serviceType categoryId")
+      .populate("customerId", "fullName avatar phone email")
+      .populate("serviceId", "name image serviceType categoryId depositAmount fixedPrice")
       .populate("addressId")
       .populate("providerId")
       .lean();
 
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
 
-    // Only customer or assigned provider can view
-    const isOwner = order.customerId.toString() === userId;
-    const isProvider =
-      order.providerId && order.providerId.toString() === userId;
-    if (!isOwner && !isProvider) {
+    const customerId = getPopulatedId(order.customerId);
+    const isCustomer = customerId === userId;
+
+    const provider = await Provider.findOne({ userId }).select("_id");
+    const providerIdOnOrder = getPopulatedId(order.providerId);
+    const isAssignedProvider =
+      !!provider && providerIdOnOrder === provider._id.toString();
+
+    let hasPendingAssignment = false;
+    if (provider && !isCustomer && !isAssignedProvider) {
+      const pending = await OrderAssignment.findOne({
+        orderId: order._id,
+        providerId: provider._id,
+        status: "pending",
+        responseDeadline: { $gte: new Date() },
+      }).lean();
+      hasPendingAssignment = !!pending;
+    }
+
+    if (!isCustomer && !isAssignedProvider && !hasPendingAssignment) {
       throw new AppError("Bạn không có quyền xem đơn hàng này.", 403);
     }
 
     return order as IOrder;
+  },
+
+  /**
+   * Provider starts working on an accepted fixed-price order.
+   */
+  async startOrder(orderId: string, providerUserId: string): Promise<IOrder> {
+    const provider = await getProviderByUserId(providerUserId);
+    const order = await Order.findById(orderId);
+    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+
+    if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
+      throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
+    }
+
+    if (order.status !== "accepted") {
+      throw new AppError(
+        `Không thể bắt đầu đơn hàng ở trạng thái "${order.status}".`,
+        400,
+      );
+    }
+
+    if (order.inspectionRequired) {
+      throw new AppError(
+        "Đơn hàng báo giá cần tạo báo giá sửa chữa trước khi bắt đầu.",
+        400,
+      );
+    }
+
+    order.status = "in_progress";
+    await order.save();
+    return order;
+  },
+
+  /**
+   * Provider marks an in-progress order as completed.
+   */
+  async completeOrder(orderId: string, providerUserId: string): Promise<IOrder> {
+    const provider = await getProviderByUserId(providerUserId);
+    const order = await Order.findById(orderId);
+    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+
+    if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
+      throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
+    }
+
+    if (order.status !== "in_progress") {
+      throw new AppError(
+        `Không thể hoàn thành đơn hàng ở trạng thái "${order.status}".`,
+        400,
+      );
+    }
+
+    order.status = "completed";
+    order.confirmation.providerConfirmedAt = new Date();
+    if (order.paymentStatus === "unpaid" || order.paymentStatus === "partially_paid") {
+      order.paymentStatus = "paid";
+    }
+    await order.save();
+
+    await Provider.findByIdAndUpdate(provider._id, {
+      $inc: { totalCompletedOrders: 1 },
+      availabilityStatus: "online",
+    });
+
+    return order;
   },
 
   /**
@@ -237,11 +427,15 @@ export const OrderService = {
       );
     }
 
-    if (
-      role === "customer" &&
-      order.customerId.toString() !== userId
-    ) {
+    if (role === "customer" && order.customerId.toString() !== userId) {
       throw new AppError("Bạn không có quyền hủy đơn hàng này.", 403);
+    }
+
+    if (role === "provider") {
+      const provider = await getProviderByUserId(userId);
+      if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
+        throw new AppError("Bạn không có quyền hủy đơn hàng này.", 403);
+      }
     }
 
     order.status = "cancelled";
@@ -252,6 +446,13 @@ export const OrderService = {
       cancelledAt: new Date(),
     };
     await order.save();
+
+    if (role === "provider" && order.providerId) {
+      await Provider.findByIdAndUpdate(order.providerId, {
+        availabilityStatus: "online",
+      });
+    }
+
     return order;
   },
 };

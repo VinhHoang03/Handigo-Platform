@@ -1,6 +1,7 @@
 import React, { type ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DashboardShell } from '@/components/common/DashboardShell';
+import { Navbar } from '@/components/common/Navbar';
 import {
   selectedServiceImage,
   type BookingListItem,
@@ -25,6 +26,17 @@ export const BookingShell: React.FC<BookingShellProps> = ({ children }) => (
   <DashboardShell role="CUSTOMER">{children}</DashboardShell>
 );
 
+export const OrderCreationShell: React.FC<BookingShellProps> = ({ children }) => (
+  <div className="min-h-screen overflow-x-hidden bg-background font-body-md text-body-md">
+    <Navbar role="CUSTOMER" />
+    <main className="relative min-h-screen pb-12 pt-32">
+      <div className="mx-auto max-w-container-max space-y-8 px-4 sm:px-5 lg:px-8">
+        {children}
+      </div>
+    </main>
+  </div>
+);
+
 export const BookingPageHeader: React.FC<{
   title: string;
   description: string;
@@ -47,7 +59,7 @@ export const BookingStepper: React.FC<{ currentStep: 1 | 2 | 3 }> = ({ currentSt
   ] as const;
 
   return (
-    <div className="flex items-center justify-between max-w-2xl mx-auto relative py-md">
+    <div className="flex items-center justify-between max-w-[620px] mx-auto relative py-md">
       <div className="absolute top-1/2 left-0 w-full h-0.5 bg-outline-variant -translate-y-1/2" />
       <div
         className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 transition-all"
@@ -61,10 +73,10 @@ export const BookingStepper: React.FC<{ currentStep: 1 | 2 | 3 }> = ({ currentSt
         return (
           <div key={step.id} className="relative z-10 flex flex-col items-center gap-2 text-center">
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-sm ${isDone || isActive
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${isDone || isActive
                 ? 'bg-primary text-white'
                 : 'bg-surface-container-highest border-2 border-outline-variant text-on-surface-variant'
-                } ${isActive ? 'ring-4 ring-primary-fixed/70' : ''}`}
+                } ${isActive ? 'ring-[3px] ring-primary-fixed/70' : ''}`}
             >
               {isDone ? <span className="material-symbols-outlined text-sm">check</span> : step.id}
             </div>

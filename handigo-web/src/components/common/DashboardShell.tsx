@@ -7,6 +7,7 @@ import {
   roleSwitchConfig,
   type DashboardRole,
 } from "@/config/sidebarNavigation";
+import { ProviderAssignmentModal } from "@/features/provider/components/ProviderAssignmentModal";
 
 interface DashboardShellProps {
   role: DashboardRole;
@@ -58,16 +59,25 @@ export function DashboardShell({
   return (
     <DashboardLayout
       role={role}
-      navItems={role === "ADMIN" ? adminNavItems : getNavItemsForRole(role)}
-      switchLabel={switchLabel ?? switchConfig.label}
-      onSwitch={onSwitch ?? (() => navigate(switchConfig.path))}
-      switchVariant={switchVariant ?? switchConfig.variant}
+      navItems={
+        role === "CUSTOMER"
+          ? []
+          : role === "ADMIN"
+            ? adminNavItems
+            : getNavItemsForRole(role)
+      }
+      switchLabel={role !== "PROVIDER" ? (switchLabel ?? switchConfig.label) : undefined}
+      onSwitch={role !== "PROVIDER" ? (onSwitch ?? (() => navigate(switchConfig.path))) : undefined}
+      switchVariant={role !== "PROVIDER" ? (switchVariant ?? switchConfig.variant) : undefined}
       userAvatar={avatar}
       showStatusToggle={showStatusToggle}
       isOnline={isOnline}
       onStatusToggle={onStatusToggle}
     >
       {children}
+      {role === "PROVIDER" && (
+        <ProviderAssignmentModal enabled={Boolean(isOnline)} />
+      )}
     </DashboardLayout>
   );
 }

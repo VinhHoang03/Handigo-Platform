@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookingPageHeader, BookingShell, BookingStepper, OrderSummaryCard } from '../components/BookingComponents';
+import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi, type CreateOrderPayload } from '../../../api/booking';
 import type { Address, Service, ServiceOption } from '../../../types/booking';
@@ -86,11 +86,7 @@ const ConfirmPaymentPage = () => {
   ];
 
   return (
-    <BookingShell>
-      <BookingPageHeader
-        title="Đặt lịch dịch vụ"
-        description="Vui lòng kiểm tra lại thông tin và chọn phương thức thanh toán."
-      />
+    <OrderCreationShell>
       <BookingStepper currentStep={3} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
@@ -183,7 +179,7 @@ const ConfirmPaymentPage = () => {
           />
         </div>
       </div>
-    </BookingShell>
+    </OrderCreationShell>
   );
 };
 
