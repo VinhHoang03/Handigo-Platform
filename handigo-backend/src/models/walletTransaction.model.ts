@@ -21,8 +21,12 @@ export interface IWalletTransaction extends Document, IBaseDocument {
   direction: "in" | "out";
   amount: Money;
   balanceAfter: Money;
-  status: "pending" | "success" | "failed";
+  status: "pending" | "success" | "failed" | "cancelled";
   transactionCode?: string | null;
+  gatewayOrderCode?: string | null;
+  gatewayPaymentLinkId?: string | null;
+  gatewayTransactionId?: string | null;
+  gatewayResponse?: Record<string, unknown> | null;
   description?: string | null;
   metadata?: Record<string, unknown> | null;
 }
@@ -51,8 +55,12 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     direction: { type: String, enum: ["in", "out"], required: true },
     amount: { type: Number, required: true, min: 0 },
     balanceAfter: { type: Number, required: true, min: 0 },
-    status: { type: String, enum: ["pending", "success", "failed"], default: "pending" },
+    status: { type: String, enum: ["pending", "success", "failed", "cancelled"], default: "pending" },
     transactionCode: { type: String, default: null },
+    gatewayOrderCode: { type: String, default: null },
+    gatewayPaymentLinkId: { type: String, default: null },
+    gatewayTransactionId: { type: String, default: null },
+    gatewayResponse: { type: Schema.Types.Mixed, default: null },
     description: { type: String, default: null },
     metadata: { type: Schema.Types.Mixed, default: null },
     ...baseFields,
@@ -62,6 +70,8 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
 
 WalletTransactionSchema.index({ walletId: 1, createdAt: -1 });
 WalletTransactionSchema.index({ transactionCode: 1 });
+WalletTransactionSchema.index({ gatewayOrderCode: 1 });
+WalletTransactionSchema.index({ gatewayPaymentLinkId: 1 });
 WalletTransactionSchema.index({ relatedOrderId: 1, type: 1, status: 1 });
 
 export const WalletTransaction = model<IWalletTransaction>(

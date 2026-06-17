@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getAdminNotifications,
   getMyNotifications,
   getUnreadCount,
   markAllAsRead,
@@ -14,6 +15,7 @@ const notificationRoutes = Router();
 notificationRoutes.use(authMiddleware);
 notificationRoutes.get("/", getMyNotifications);
 notificationRoutes.get("/unread-count", getUnreadCount);
+notificationRoutes.get("/admin", roleMiddleware("ADMIN"), getAdminNotifications);
 notificationRoutes.patch("/read-all", markAllAsRead);
 notificationRoutes.patch("/:id/read", markAsRead);
 notificationRoutes.post(

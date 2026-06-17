@@ -28,6 +28,10 @@ export const notificationListQuerySchema = z.object({
   type: notificationTypeSchema.optional(),
 });
 
+export const adminNotificationListQuerySchema = notificationListQuerySchema.extend({
+  targetRole: targetRoleSchema.optional(),
+});
+
 export const sendSystemNotificationSchema = z.object({
   targetRole: targetRoleSchema,
   title: z.string().trim().min(1, "Title is required").max(200),
@@ -38,4 +42,5 @@ export const sendSystemNotificationSchema = z.object({
 
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
+export type AdminNotificationListQuery = z.infer<typeof adminNotificationListQuerySchema>;
 export type SendSystemNotificationInput = z.infer<typeof sendSystemNotificationSchema>;

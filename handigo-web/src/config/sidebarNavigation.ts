@@ -4,25 +4,30 @@ export type DashboardRole = 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
 
 export const customerNavItems: NavItem[] = [
   { icon: 'dashboard', label: 'Bảng điều khiển', path: '/customer' },
+  { icon: 'notifications', label: 'Thông báo', path: '/customer/notifications' },
   { icon: 'calendar_today', label: 'Lịch đặt chỗ', path: '/customer/bookings', matchPrefix: true },
   { icon: 'mail', label: 'Hộp thư', path: '#' },
-  { icon: 'account_balance_wallet', label: 'Ví tiền', path: '#' },
+  { icon: 'account_balance_wallet', label: 'Ví tiền', path: '/customer/wallet' },
   { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
 ];
 
 export const providerNavItems: NavItem[] = [
   { icon: 'grid_view', label: 'Bảng điều khiển', path: '/provider' },
+  { icon: 'notifications', label: 'Thông báo', path: '/provider/notifications' },
+  { icon: 'payments', label: 'Ví', path: '/provider/wallet' },
+  { icon: 'account_balance', label: 'Tài khoản ngân hàng', path: '/provider/bank-accounts' },
   { icon: 'reviews', label: 'Đánh giá', path: '/provider/feedbacks' },
   { icon: 'event_available', label: 'Đặt lịch', path: '#' },
   { icon: 'mail', label: 'Tin nhắn', path: '#' },
-  { icon: 'payments', label: 'Ví', path: '#' },
   { icon: 'settings', label: 'Cài đặt', path: '/provider/profile' },
 ];
 
 export const adminNavItems: NavItem[] = [
   { icon: 'people', label: 'Người dùng', path: '/admin/users' },
+  { icon: 'notifications', label: 'Thông báo', path: '/admin/notifications' },
   { icon: 'verified_user', label: 'Hồ sơ thợ', path: '/admin/provider-applications' },
   { icon: 'reviews', label: 'Đánh giá', path: '/admin/feedbacks' },
+  { icon: 'local_offer', label: 'Khuyến mãi', path: '/admin/promotions' },
 ];
 
 export function getNavItemsForRole(role: DashboardRole): NavItem[] {
