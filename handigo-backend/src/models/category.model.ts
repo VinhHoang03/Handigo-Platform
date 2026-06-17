@@ -1,0 +1,24 @@
+import { Document, Schema, model } from "mongoose";
+import { baseFields, IBaseDocument } from "./common";
+
+export interface ICategory extends Document, IBaseDocument {
+  name: string;
+  slug: string;
+  description?: string | null;
+  icon?: string | null;
+  isActive: boolean;
+}
+
+const CategorySchema = new Schema<ICategory>(
+  {
+    name: { type: String, required: true, trim: true },
+    slug: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    description: { type: String, default: null },
+    icon: { type: String, default: null },
+    isActive: { type: Boolean, default: true },
+    ...baseFields,
+  },
+  { timestamps: true },
+);
+
+export const Category = model<ICategory>("Category", CategorySchema, "categories");

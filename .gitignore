@@ -1,3 +1,8 @@
+HANDIGO_PROJECT_INFO.md
+handigo-backend/BACKEND_INFO.md
+handigo-web/FRONTEND_WEB_INFO.md
+AGENTS.md
+docs/
 # Node modules cho cả 2 ứng dụng
 node_modules/
 node_modules

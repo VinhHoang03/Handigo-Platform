@@ -1,17 +1,28 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodSchema } from "zod";
 
+type RequestSource = "body" | "params" | "query";
+
 export const validate =
-  (schema: ZodSchema<any>) =>
+  (schema: ZodSchema<any>, source: RequestSource = "body") =>
   (req: Request, res: Response, next: NextFunction) => {
     try {
-      schema.parse(req.body);
+      const parsed = schema.parse(req[source]);
+      if (source === "query") {
+        Object.defineProperty(req, "query", {
+          value: parsed,
+          writable: true,
+          configurable: true,
+        });
+      } else {
+        req[source] = parsed;
+      }
 
       next();
     } catch (error: any) {
       return res.status(400).json({
-        message: "Validation error",
-        errors: error.errors
+        message: "Dữ liệu không hợp lệ",
+        errors: error.issues || error.errors,
       });
     }
   };

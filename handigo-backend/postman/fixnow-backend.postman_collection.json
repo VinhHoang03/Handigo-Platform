@@ -1,0 +1,642 @@
+{
+  "info": {
+    "_postman_id": "b7c5874c-65dd-4bd6-bdc1-fixnow-backend",
+    "name": "FixNow Backend API",
+    "description": "Postman collection for all currently mounted FixNow backend routes. Set baseUrl and accessToken in collection variables before testing protected endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": []
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": []
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "orderId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "paymentId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "voucherId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "addressId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "providerId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "withdrawalId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "walletDepositTransactionId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "payosOrderCode",
+      "value": "123456789"
+    },
+    {
+      "key": "payosPaymentLinkId",
+      "value": "sample-payment-link-id"
+    },
+    {
+      "key": "notificationId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "systemConfigKey",
+      "value": "HOTLINE_PHONE"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"Password123\",\n  \"fullName\": \"FixNow Customer\",\n  \"phone\": \"0900000000\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Verify Register OTP",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/verify-register-otp", "host": ["{{baseUrl}}"], "path": ["auth", "verify-register-otp"] }
+          }
+        },
+        {
+          "name": "Resend Register OTP",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/resend-register-otp", "host": ["{{baseUrl}}"], "path": ["auth", "resend-register-otp"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json.token || json.accessToken || json.data?.token || json.data?.accessToken;",
+                  "if (token) pm.collectionVariables.set('accessToken', token);",
+                  "const refreshToken = json.refreshToken || json.data?.refreshToken;",
+                  "if (refreshToken) pm.collectionVariables.set('refreshToken', refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"Password123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Google Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"credential\": \"google_id_token\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/google-login", "host": ["{{baseUrl}}"], "path": ["auth", "google-login"] }
+          }
+        },
+        {
+          "name": "Facebook Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"accessToken\": \"facebook_access_token\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/facebook-login", "host": ["{{baseUrl}}"], "path": ["auth", "facebook-login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json.token || json.accessToken || json.data?.token || json.data?.accessToken;",
+                  "if (token) pm.collectionVariables.set('accessToken', token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/auth/refresh-token", "host": ["{{baseUrl}}"], "path": ["auth", "refresh-token"] }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"customer@example.com\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/forgot-password", "host": ["{{baseUrl}}"], "path": ["auth", "forgot-password"] }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"customer@example.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword123\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["auth", "reset-password"] }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"Password123\",\n  \"newPassword\": \"NewPassword123\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/change-password", "host": ["{{baseUrl}}"], "path": ["auth", "change-password"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] }
+          }
+        },
+        {
+          "name": "Get Auth Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"] } }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"FixNow User\",\n  \"phone\": \"0900000001\",\n  \"avatar\": \"https://example.com/avatar.png\"\n}" },
+            "url": { "raw": "{{baseUrl}}/users/profile", "host": ["{{baseUrl}}"], "path": ["users", "profile"] }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] } }
+        },
+        {
+          "name": "Get User By Id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] } }
+        },
+        {
+          "name": "Update User By Id",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Updated User\",\n  \"phone\": \"0900000002\",\n  \"status\": \"active\"\n}" },
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "Delete User By Id",
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] } }
+        }
+      ]
+    },
+    {
+      "name": "Addresses",
+      "item": [
+        {
+          "name": "Get Addresses",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/addresses", "host": ["{{baseUrl}}"], "path": ["addresses"] } }
+        },
+        {
+          "name": "Create Address",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"label\": \"Home\",\n  \"addressLine\": \"123 Nguyen Trai\",\n  \"ward\": \"Ben Thanh\",\n  \"district\": \"District 1\",\n  \"city\": \"Ho Chi Minh City\",\n  \"isDefault\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/addresses", "host": ["{{baseUrl}}"], "path": ["addresses"] }
+          }
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"label\": \"Office\",\n  \"addressLine\": \"456 Le Loi\",\n  \"ward\": \"Ben Thanh\",\n  \"district\": \"District 1\",\n  \"city\": \"Ho Chi Minh City\",\n  \"isDefault\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/addresses/{{addressId}}", "host": ["{{baseUrl}}"], "path": ["addresses", "{{addressId}}"] }
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/addresses/{{addressId}}", "host": ["{{baseUrl}}"], "path": ["addresses", "{{addressId}}"] } }
+        },
+        {
+          "name": "Get Service History",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/addresses/service-history", "host": ["{{baseUrl}}"], "path": ["addresses", "service-history"] } }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"method\": \"PAYOS\",\n  \"paymentType\": \"FULL\",\n  \"returnUrl\": \"http://localhost:5173/payment/success\",\n  \"cancelUrl\": \"http://localhost:5173/payment/cancel\"\n}" },
+            "url": { "raw": "{{baseUrl}}/payments/create", "host": ["{{baseUrl}}"], "path": ["payments", "create"] }
+          }
+        },
+        {
+          "name": "PayOS Webhook",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"00\",\n  \"desc\": \"success\",\n  \"data\": {}\n}" },
+            "url": { "raw": "{{baseUrl}}/payments/payos-webhook", "host": ["{{baseUrl}}"], "path": ["payments", "payos-webhook"] }
+          }
+        },
+        {
+          "name": "Get Payment History",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/payments/history?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["payments", "history"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] } }
+        },
+        {
+          "name": "Get Payments By Order",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/payments/order/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["payments", "order", "{{orderId}}"] } }
+        },
+        {
+          "name": "Get Payment By Id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/payments/{{paymentId}}", "host": ["{{baseUrl}}"], "path": ["payments", "{{paymentId}}"] } }
+        }
+      ]
+    },
+    {
+      "name": "Vouchers",
+      "item": [
+        {
+          "name": "Apply Voucher",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"code\": \"WELCOME10\"\n}" },
+            "url": { "raw": "{{baseUrl}}/vouchers/apply", "host": ["{{baseUrl}}"], "path": ["vouchers", "apply"] }
+          }
+        },
+        {
+          "name": "Remove Voucher",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/vouchers/remove", "host": ["{{baseUrl}}"], "path": ["vouchers", "remove"] }
+          }
+        },
+        {
+          "name": "Get Available Vouchers",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/vouchers/available?orderId={{orderId}}", "host": ["{{baseUrl}}"], "path": ["vouchers", "available"], "query": [{ "key": "orderId", "value": "{{orderId}}" }] } }
+        },
+        {
+          "name": "Admin Create Voucher",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"WELCOME10\",\n  \"name\": \"Welcome 10%\",\n  \"description\": \"Discount for first order\",\n  \"discountType\": \"PERCENT\",\n  \"discountValue\": 10,\n  \"maxDiscountAmount\": 50000,\n  \"minOrderAmount\": 100000,\n  \"usageLimit\": 100,\n  \"startAt\": \"2026-06-01T00:00:00.000Z\",\n  \"endAt\": \"2026-12-31T23:59:59.000Z\",\n  \"status\": \"ACTIVE\"\n}" },
+            "url": { "raw": "{{baseUrl}}/vouchers", "host": ["{{baseUrl}}"], "path": ["vouchers"] }
+          }
+        },
+        {
+          "name": "Admin Get Vouchers",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/vouchers?page=1&limit=10&status=ACTIVE", "host": ["{{baseUrl}}"], "path": ["vouchers"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "10" }, { "key": "status", "value": "ACTIVE" }] } }
+        },
+        {
+          "name": "Admin Get Voucher By Id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/vouchers/{{voucherId}}", "host": ["{{baseUrl}}"], "path": ["vouchers", "{{voucherId}}"] } }
+        },
+        {
+          "name": "Admin Update Voucher",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Welcome Updated\",\n  \"discountValue\": 15,\n  \"status\": \"ACTIVE\"\n}" },
+            "url": { "raw": "{{baseUrl}}/vouchers/{{voucherId}}", "host": ["{{baseUrl}}"], "path": ["vouchers", "{{voucherId}}"] }
+          }
+        },
+        {
+          "name": "Admin Disable Voucher",
+          "request": { "method": "PATCH", "header": [], "url": { "raw": "{{baseUrl}}/vouchers/{{voucherId}}/disable", "host": ["{{baseUrl}}"], "path": ["vouchers", "{{voucherId}}", "disable"] } }
+        },
+        {
+          "name": "Admin Enable Voucher",
+          "request": { "method": "PATCH", "header": [], "url": { "raw": "{{baseUrl}}/vouchers/{{voucherId}}/enable", "host": ["{{baseUrl}}"], "path": ["vouchers", "{{voucherId}}", "enable"] } }
+        },
+        {
+          "name": "Admin Delete Voucher",
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/vouchers/{{voucherId}}", "host": ["{{baseUrl}}"], "path": ["vouchers", "{{voucherId}}"] } }
+        }
+      ]
+    },
+    {
+      "name": "Wallets",
+      "item": [
+        {
+          "name": "Provider Get My Wallet",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/wallets/me", "host": ["{{baseUrl}}"], "path": ["wallets", "me"] } }
+        },
+        {
+          "name": "Provider Create Wallet Deposit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.data && json.data.transaction && json.data.transaction._id) {",
+                  "  pm.collectionVariables.set('walletDepositTransactionId', json.data.transaction._id);",
+                  "}",
+                  "if (json && json.data && json.data.transaction && json.data.transaction.gatewayOrderCode) {",
+                  "  pm.collectionVariables.set('payosOrderCode', json.data.transaction.gatewayOrderCode);",
+                  "}",
+                  "if (json && json.data && json.data.transaction && json.data.transaction.gatewayPaymentLinkId) {",
+                  "  pm.collectionVariables.set('payosPaymentLinkId', json.data.transaction.gatewayPaymentLinkId);",
+                  "}",
+                  "pm.test('wallet deposit link created', function () {",
+                  "  pm.expect(json).to.have.property('success', true);",
+                  "  pm.expect(json.data).to.have.property('checkoutUrl');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 100000,\n  \"returnUrl\": \"http://localhost:5173/wallet/deposit/success\",\n  \"cancelUrl\": \"http://localhost:5173/wallet/deposit/cancel\"\n}" },
+            "url": { "raw": "{{baseUrl}}/wallets/me/deposit", "host": ["{{baseUrl}}"], "path": ["wallets", "me", "deposit"] }
+          }
+        },
+        {
+          "name": "Provider Get My Wallet Transactions",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/wallets/me/transactions?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["wallets", "me", "transactions"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] } }
+        },
+        {
+          "name": "Provider Get My Wallet Summary",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/wallets/me/summary", "host": ["{{baseUrl}}"], "path": ["wallets", "me", "summary"] } }
+        },
+        {
+          "name": "Admin Get Wallets",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/wallets/admin?page=1&limit=20&sortByBalance=desc", "host": ["{{baseUrl}}"], "path": ["wallets", "admin"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }, { "key": "sortByBalance", "value": "desc" }] } }
+        },
+        {
+          "name": "Admin Get Wallet By Provider",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/wallets/admin/{{providerId}}", "host": ["{{baseUrl}}"], "path": ["wallets", "admin", "{{providerId}}"] } }
+        },
+        {
+          "name": "Admin Get Provider Wallet Transactions",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/wallets/admin/{{providerId}}/transactions?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["wallets", "admin", "{{providerId}}", "transactions"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] } }
+        },
+        {
+          "name": "Admin Adjust Wallet",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 100000,\n  \"direction\": \"in\",\n  \"reason\": \"Manual adjustment\"\n}" },
+            "url": { "raw": "{{baseUrl}}/wallets/admin/{{providerId}}/adjust", "host": ["{{baseUrl}}"], "path": ["wallets", "admin", "{{providerId}}", "adjust"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Withdrawals",
+      "item": [
+        {
+          "name": "Provider Create Withdrawal",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 100000,\n  \"bankAccountId\": \"000000000000000000000000\"\n}" },
+            "url": { "raw": "{{baseUrl}}/withdrawals", "host": ["{{baseUrl}}"], "path": ["withdrawals"] }
+          }
+        },
+        {
+          "name": "Provider Get My Withdrawals",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/withdrawals/me?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["withdrawals", "me"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] } }
+        },
+        {
+          "name": "Provider Get My Withdrawal By Id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/withdrawals/{{withdrawalId}}", "host": ["{{baseUrl}}"], "path": ["withdrawals", "{{withdrawalId}}"] } }
+        },
+        {
+          "name": "Admin Get Withdrawals",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/withdrawals/admin?page=1&limit=20&status=pending", "host": ["{{baseUrl}}"], "path": ["withdrawals", "admin"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }, { "key": "status", "value": "pending" }] } }
+        },
+        {
+          "name": "Admin Get Withdrawal By Id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/withdrawals/admin/{{withdrawalId}}", "host": ["{{baseUrl}}"], "path": ["withdrawals", "admin", "{{withdrawalId}}"] } }
+        },
+        {
+          "name": "Admin Approve Withdrawal",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"adminNote\": \"Approved\"\n}" },
+            "url": { "raw": "{{baseUrl}}/withdrawals/admin/{{withdrawalId}}/approve", "host": ["{{baseUrl}}"], "path": ["withdrawals", "admin", "{{withdrawalId}}", "approve"] }
+          }
+        },
+        {
+          "name": "Admin Reject Withdrawal",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"adminNote\": \"Rejected\"\n}" },
+            "url": { "raw": "{{baseUrl}}/withdrawals/admin/{{withdrawalId}}/reject", "host": ["{{baseUrl}}"], "path": ["withdrawals", "admin", "{{withdrawalId}}", "reject"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/notifications?page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["notifications"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "10" }] } }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/notifications/unread-count", "host": ["{{baseUrl}}"], "path": ["notifications", "unread-count"] } }
+        },
+        {
+          "name": "Mark All As Read",
+          "request": { "method": "PATCH", "header": [], "url": { "raw": "{{baseUrl}}/notifications/read-all", "host": ["{{baseUrl}}"], "path": ["notifications", "read-all"] } }
+        },
+        {
+          "name": "Mark Notification As Read",
+          "request": { "method": "PATCH", "header": [], "url": { "raw": "{{baseUrl}}/notifications/{{notificationId}}/read", "host": ["{{baseUrl}}"], "path": ["notifications", "{{notificationId}}", "read"] } }
+        },
+        {
+          "name": "Admin Send System Notification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"targetRole\": \"ALL\",\n  \"title\": \"System maintenance\",\n  \"content\": \"FixNow will be under maintenance tonight.\",\n  \"type\": \"SYSTEM\",\n  \"data\": {\n    \"screen\": \"notifications\"\n  }\n}" },
+            "url": { "raw": "{{baseUrl}}/notifications/send", "host": ["{{baseUrl}}"], "path": ["notifications", "send"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Overview",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/dashboard/overview?fromDate=2026-06-01&toDate=2026-06-30", "host": ["{{baseUrl}}"], "path": ["dashboard", "overview"], "query": [{ "key": "fromDate", "value": "2026-06-01" }, { "key": "toDate", "value": "2026-06-30" }] } }
+        },
+        {
+          "name": "Admin Revenue Dashboard",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/dashboard/revenue?fromDate=2026-06-01&toDate=2026-06-30", "host": ["{{baseUrl}}"], "path": ["dashboard", "revenue"], "query": [{ "key": "fromDate", "value": "2026-06-01" }, { "key": "toDate", "value": "2026-06-30" }] } }
+        },
+        {
+          "name": "Admin Orders Dashboard",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/dashboard/orders?fromDate=2026-06-01&toDate=2026-06-30", "host": ["{{baseUrl}}"], "path": ["dashboard", "orders"], "query": [{ "key": "fromDate", "value": "2026-06-01" }, { "key": "toDate", "value": "2026-06-30" }] } }
+        },
+        {
+          "name": "Admin Providers Dashboard",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/dashboard/providers?fromDate=2026-06-01&toDate=2026-06-30&topLimit=10", "host": ["{{baseUrl}}"], "path": ["dashboard", "providers"], "query": [{ "key": "fromDate", "value": "2026-06-01" }, { "key": "toDate", "value": "2026-06-30" }, { "key": "topLimit", "value": "10" }] } }
+        },
+        {
+          "name": "Provider Earnings Dashboard",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/dashboard/earnings?fromDate=2026-06-01&toDate=2026-06-30&page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["dashboard", "earnings"], "query": [{ "key": "fromDate", "value": "2026-06-01" }, { "key": "toDate", "value": "2026-06-30" }, { "key": "page", "value": "1" }, { "key": "limit", "value": "10" }] } }
+        }
+      ]
+    },
+    {
+      "name": "System Configs",
+      "item": [
+        {
+          "name": "Get Public System Configs",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/system-configs/public", "host": ["{{baseUrl}}"], "path": ["system-configs", "public"] } }
+        },
+        {
+          "name": "Admin Get System Configs",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/system-configs?type=STRING&isPublic=true", "host": ["{{baseUrl}}"], "path": ["system-configs"], "query": [{ "key": "type", "value": "STRING" }, { "key": "isPublic", "value": "true" }] } }
+        },
+        {
+          "name": "Admin Get System Config By Key",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/system-configs/{{systemConfigKey}}", "host": ["{{baseUrl}}"], "path": ["system-configs", "{{systemConfigKey}}"] } }
+        },
+        {
+          "name": "Admin Create System Config",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"key\": \"HOTLINE_PHONE\",\n  \"value\": \"1900 0000\",\n  \"type\": \"STRING\",\n  \"description\": \"Customer hotline phone number\",\n  \"isPublic\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/system-configs", "host": ["{{baseUrl}}"], "path": ["system-configs"] }
+          }
+        },
+        {
+          "name": "Admin Update System Config",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"value\": \"1900 1111\",\n  \"type\": \"STRING\",\n  \"description\": \"Updated hotline phone number\",\n  \"isPublic\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/system-configs/{{systemConfigKey}}", "host": ["{{baseUrl}}"], "path": ["system-configs", "{{systemConfigKey}}"] }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,189 @@
+import { Types } from "mongoose";
+import { Order } from "../models/order.model";
+import { OrderAssignment } from "../models/orderAssignment.model";
+import { Provider } from "../models/provider.model";
+import { MatchingService, ProviderCandidate } from "./matching.service";
+import { AppError } from "../utils/appError";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Seconds a provider has to accept before the next one is tried. */
+const ASSIGNMENT_TIMEOUT_SECONDS = 30;
+
+/** Maximum number of providers to try before giving up. */
+const MAX_DISPATCH_ATTEMPTS = 5;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DispatchContext {
+  latitude?: number;
+  longitude?: number;
+  serviceCategoryId: string;
+}
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
+export const DispatchService = {
+  /**
+   * Step 3 – Dispatch order to nearest available provider.
+   *
+   * This is designed to run asynchronously (fire-and-forget from OrderService).
+   * It:
+   *  1. Finds nearest providers via MatchingService.
+   *  2. Creates an OrderAssignment record for the first candidate.
+   *  3. Schedules a 30-second timeout callback (Step 5) that auto-advances to
+   *     the next provider if the current one hasn't responded.
+   */
+  async dispatchOrder(
+    orderId: string,
+    ctx: DispatchContext,
+    triedProviderIds: Types.ObjectId[] = [],
+    attemptNumber = 1,
+  ): Promise<void> {
+    if (attemptNumber > MAX_DISPATCH_ATTEMPTS) {
+      // All candidates exhausted – cancel the order
+      await Order.findByIdAndUpdate(orderId, {
+        status: "cancelled",
+        "cancellation.cancelledByRole": "admin",
+        "cancellation.reason":
+          "Không tìm được provider phù hợp sau nhiều lần thử.",
+        "cancellation.cancelledAt": new Date(),
+      });
+      console.warn(
+        `[DispatchService] No provider found for order ${orderId} after ${MAX_DISPATCH_ATTEMPTS} attempts.`,
+      );
+      return;
+    }
+
+    // 1. Find nearest providers (excluding already-tried ones)
+    const candidates: ProviderCandidate[] =
+      await MatchingService.findNearestProviders({
+        latitude: ctx.latitude,
+        longitude: ctx.longitude,
+        serviceCategoryId: ctx.serviceCategoryId,
+        excludeProviderIds: triedProviderIds,
+        limit: 1, // take only the best candidate per round
+      });
+
+    if (candidates.length === 0) {
+      await Order.findByIdAndUpdate(orderId, {
+        status: "cancelled",
+        "cancellation.cancelledByRole": "admin",
+        "cancellation.reason": "Không có provider khả dụng trong khu vực.",
+        "cancellation.cancelledAt": new Date(),
+      });
+      console.warn(
+        `[DispatchService] No available provider found for order ${orderId}.`,
+      );
+      return;
+    }
+
+    const candidate = candidates[0];
+    const deadline = new Date(
+      Date.now() + ASSIGNMENT_TIMEOUT_SECONDS * 1000,
+    );
+
+    // 2. Create assignment record
+    const assignment = await OrderAssignment.create({
+      orderId: new Types.ObjectId(orderId),
+      providerId: candidate.providerId,
+      status: "pending",
+      assignedAt: new Date(),
+      responseDeadline: deadline,
+    });
+
+    console.log(
+      `[DispatchService] Order ${orderId} assigned to provider ${candidate.providerId} ` +
+      `(attempt #${attemptNumber}, dist: ${candidate.distanceMeters}m). ` +
+      `Deadline: ${deadline.toISOString()}`,
+    );
+
+    // 3. TODO: emit real-time push / socket event to provider here
+
+    // 4. Schedule timeout retry (Step 5)
+    setTimeout(async () => {
+      await DispatchService._onAssignmentTimeout(
+        orderId,
+        assignment._id.toString(),
+        candidate.providerId,
+        ctx,
+        triedProviderIds,
+        attemptNumber,
+      );
+    }, ASSIGNMENT_TIMEOUT_SECONDS * 1000);
+  },
+
+  /**
+   * Step 5 – Timeout retry matching.
+   *
+   * Called automatically after ASSIGNMENT_TIMEOUT_SECONDS if the provider
+   * hasn't accepted or rejected yet.
+   */
+  async _onAssignmentTimeout(
+    orderId: string,
+    assignmentId: string,
+    timedOutProviderId: Types.ObjectId,
+    ctx: DispatchContext,
+    triedProviderIds: Types.ObjectId[],
+    attemptNumber: number,
+  ): Promise<void> {
+    // Re-read assignment to check if it was already responded to
+    const assignment = await OrderAssignment.findById(assignmentId);
+    if (!assignment || assignment.status !== "pending") {
+      // Provider already accepted or rejected – nothing to do
+      return;
+    }
+
+    // Mark as timed out
+    assignment.status = "timeout";
+    await assignment.save();
+    console.log(
+      `[DispatchService] Assignment ${assignmentId} timed out. Retrying next provider...`,
+    );
+
+    // Re-check order status
+    const order = await Order.findById(orderId);
+    if (!order || order.status !== "created") {
+      return; // Order was already handled (e.g. customer cancelled)
+    }
+
+    // Recurse with this provider excluded
+    await DispatchService.dispatchOrder(
+      orderId,
+      ctx,
+      [...triedProviderIds, timedOutProviderId],
+      attemptNumber + 1,
+    );
+  },
+
+  /**
+   * Re-dispatch an already existing order manually (admin / retry endpoint).
+   */
+  async redispatch(orderId: string): Promise<void> {
+    const order = await Order.findById(orderId).populate(
+      "serviceId",
+      "categoryId",
+    );
+    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+    if (order.status !== "created") {
+      throw new AppError(
+        "Chỉ có thể re-dispatch đơn hàng ở trạng thái created.",
+        400,
+      );
+    }
+
+    const address = await (
+      await import("../models/address.model")
+    ).Address.findById(order.addressId);
+
+    const service = await (
+      await import("../models/service.model")
+    ).Service.findById(order.serviceId);
+
+    await DispatchService.dispatchOrder(order._id.toString(), {
+      latitude: address?.latitude,
+      longitude: address?.longitude,
+      serviceCategoryId: (service as any)?.categoryId?.toString() ?? "",
+    });
+  },
+};

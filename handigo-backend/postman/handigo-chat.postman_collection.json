@@ -1,0 +1,138 @@
+{
+  "info": {
+    "name": "Handigo Chat",
+    "_postman_id": "3ebba350-5ec7-4d8e-b0f5-c511f7bd5540",
+    "description": "REST chat tests. Socket.IO events are not executed by Collection Runner.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "customerEmail", "value": "customer@example.com" },
+    { "key": "customerPassword", "value": "Password123" },
+    { "key": "providerEmail", "value": "provider@example.com" },
+    { "key": "providerPassword", "value": "Password123" },
+    { "key": "customerToken", "value": "" },
+    { "key": "providerToken", "value": "" },
+    { "key": "chatOrderId", "value": "PUT_CHAT_ENABLED_ORDER_ID_HERE" },
+    { "key": "conversationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Setup - Login Customer",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('customer login succeeds', () => pm.response.to.have.status(200));",
+        "pm.collectionVariables.set('customerToken', pm.response.json().token);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "Setup - Login Provider",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('provider login succeeds', () => pm.response.to.have.status(200));",
+        "pm.collectionVariables.set('providerToken', pm.response.json().token);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{providerEmail}}\",\n  \"password\": \"{{providerPassword}}\"\n}" },
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "Customer - Get or Create Conversation",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('conversation returned', () => pm.response.to.have.status(200));",
+        "pm.collectionVariables.set('conversationId', pm.response.json().data._id);"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/chat/orders/{{chatOrderId}}/conversation"
+      }
+    },
+    {
+      "name": "Customer - Send Text Message",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('text message created', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().data.messageType).to.eql('text'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"messageType\": \"text\",\n  \"content\": \"Hello from Postman\"\n}" },
+        "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/messages"
+      }
+    },
+    {
+      "name": "Provider - Send Image Message",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('image message created', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().data.messageType).to.eql('image'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{providerToken}}", "type": "string" }] },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"messageType\": \"image\",\n  \"imageUrl\": \"https://res.cloudinary.com/demo/image/upload/sample.jpg\"\n}" },
+        "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/messages"
+      }
+    },
+    {
+      "name": "Customer - List Conversations",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('conversations paginated', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.items).to.be.an('array'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/chat/conversations?page=1&limit=20"
+      }
+    },
+    {
+      "name": "Provider - Get Messages",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('messages paginated', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.items).to.be.an('array'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{providerToken}}", "type": "string" }] },
+        "method": "GET",
+        "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/messages?page=1&limit=20"
+      }
+    },
+    {
+      "name": "Provider - Mark Seen",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('conversation marked seen', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.seenAt).to.be.a('string'); });"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{providerToken}}", "type": "string" }] },
+        "method": "PATCH",
+        "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/seen"
+      }
+    },
+    {
+      "name": "Negative - Empty Text Message",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('empty message rejected', () => pm.response.to.have.status(400));"
+      ] } }],
+      "request": {
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customerToken}}", "type": "string" }] },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"messageType\": \"text\",\n  \"content\": \"\"\n}" },
+        "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/messages"
+      }
+    },
+    {
+      "name": "Negative - Missing Token",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('authentication required', () => pm.response.to.have.status(401));"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/chat/conversations" }
+    }
+  ]
+}
