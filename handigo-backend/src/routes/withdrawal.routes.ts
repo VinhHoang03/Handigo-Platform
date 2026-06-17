@@ -23,7 +23,6 @@ router.post(
   createWithdrawal,
 );
 router.get("/me", authMiddleware, roleMiddleware("PROVIDER"), getMyWithdrawals);
-router.get("/:id", authMiddleware, roleMiddleware("PROVIDER"), getMyWithdrawalById);
 
 router.get("/admin", authMiddleware, roleMiddleware("ADMIN"), getAdminWithdrawals);
 router.get(
@@ -44,5 +43,7 @@ router.patch(
   roleMiddleware("ADMIN"),
   rejectWithdrawal,
 );
+
+router.get("/:id", authMiddleware, roleMiddleware("PROVIDER"), getMyWithdrawalById);
 
 export default router;
