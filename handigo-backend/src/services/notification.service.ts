@@ -3,6 +3,7 @@ import { Notification, INotification } from "../models/notification.model";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
 import type {
+  AdminNotificationListQuery,
   NotificationListQuery,
   NotificationType,
   SendSystemNotificationInput,
@@ -33,6 +34,31 @@ const toNotificationResponse = (notification: INotification) => ({
   createdAt: notification.createdAt,
   updatedAt: notification.updatedAt,
 });
+
+const toAdminNotificationResponse = (notification: INotification) => {
+  const base = toNotificationResponse(notification);
+  const populatedUser = notification.userId as unknown as {
+    _id?: Types.ObjectId;
+    fullName?: string;
+    email?: string;
+    role?: string;
+  };
+
+  if (!populatedUser || !populatedUser._id) {
+    return { ...base, recipient: null };
+  }
+
+  return {
+    ...base,
+    userId: populatedUser._id,
+    recipient: {
+      id: populatedUser._id,
+      fullName: populatedUser.fullName,
+      email: populatedUser.email,
+      role: populatedUser.role,
+    },
+  };
+};
 
 const ensureObjectId = (id: string | Types.ObjectId) =>
   typeof id === "string" ? new Types.ObjectId(id) : id;
@@ -77,6 +103,53 @@ export const getMyNotifications = async (user: RequestUser, query: NotificationL
 
   return {
     items: items.map(toNotificationResponse),
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit),
+    },
+  };
+};
+
+export const getAdminNotifications = async (
+  admin: RequestUser,
+  query: AdminNotificationListQuery,
+) => {
+  ensureAdmin(admin);
+
+  const filter: Record<string, unknown> = {
+    isDeleted: false,
+  };
+
+  if (query.isRead !== undefined) {
+    filter.isRead = query.isRead;
+  }
+
+  if (query.type) {
+    filter.type = query.type;
+  }
+
+  if (query.targetRole && query.targetRole !== "ALL") {
+    const users = await User.find({
+      role: query.targetRole,
+      isDeleted: false,
+    }).select("_id");
+    filter.userId = { $in: users.map((user) => user._id) };
+  }
+
+  const skip = (query.page - 1) * query.limit;
+  const [items, total] = await Promise.all([
+    Notification.find(filter)
+      .populate("userId", "fullName email role")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(query.limit),
+    Notification.countDocuments(filter),
+  ]);
+
+  return {
+    items: items.map(toAdminNotificationResponse),
     pagination: {
       page: query.page,
       limit: query.limit,

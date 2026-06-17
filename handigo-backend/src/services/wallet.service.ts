@@ -47,6 +47,18 @@ const DEFAULT_WALLET_DEPOSIT_RETURN_URL =
 const DEFAULT_WALLET_DEPOSIT_CANCEL_URL =
   process.env.PAYOS_WALLET_DEPOSIT_CANCEL_URL || "http://localhost:5173/wallet/deposit/cancel";
 
+const appendQueryParams = (url: string, params: Record<string, string>) => {
+  try {
+    const parsedUrl = new URL(url);
+    Object.entries(params).forEach(([key, value]) => {
+      parsedUrl.searchParams.set(key, value);
+    });
+    return parsedUrl.toString();
+  } catch {
+    return url;
+  }
+};
+
 const assertPositiveAmount = (amount: number) => {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new WalletError("INVALID_AMOUNT", "Số tiền không hợp lệ", 400);
@@ -334,12 +346,17 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
   let paymentLink;
 
   try {
+    const cancelUrl = appendQueryParams(input.cancelUrl || DEFAULT_WALLET_DEPOSIT_CANCEL_URL, {
+      walletDeposit: "cancelled",
+      orderCode: orderCode.toString(),
+    });
+
     paymentLink = await payos.paymentRequests.create({
       orderCode,
       amount: input.amount,
       description: "Nap vi Handigo",
       returnUrl: input.returnUrl || DEFAULT_WALLET_DEPOSIT_RETURN_URL,
-      cancelUrl: input.cancelUrl || DEFAULT_WALLET_DEPOSIT_CANCEL_URL,
+      cancelUrl,
       items: [
         {
           name: "Nap tien vao vi Handigo",
@@ -373,6 +390,43 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
   };
 };
 
+export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) => {
+  if (user.role !== "PROVIDER") {
+    throw new WalletError("UNAUTHORIZED_ACCESS", "Ban khong co quyen huy giao dich nay", 403);
+  }
+
+  await getProviderByUserId(user.id);
+
+  const transaction = await WalletTransaction.findOne({
+    userId: user.id,
+    type: "deposit",
+    gatewayOrderCode: orderCode,
+    isDeleted: false,
+  });
+
+  if (!transaction) {
+    throw new AppError("Khong tim thay giao dich nap vi", 404);
+  }
+
+  if (transaction.status === "success") {
+    return transaction;
+  }
+
+  if (transaction.status === "pending") {
+    transaction.status = "cancelled";
+    transaction.gatewayResponse = {
+      ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
+      cancelledAt: new Date(),
+      cancelledBy: "provider",
+      cancelReason: "Provider cancelled PayOS payment link",
+    };
+    transaction.description = "Giao dich nap vi da huy";
+    await transaction.save();
+  }
+
+  return transaction;
+};
+
 export const handleWalletDepositPayosWebhook = async (webhookData: any, payload: any) => {
   const orderCode = webhookData.orderCode?.toString();
 
@@ -390,6 +444,10 @@ export const handleWalletDepositPayosWebhook = async (webhookData: any, payload:
   }
 
   if (transaction.status === "success") {
+    return transaction;
+  }
+
+  if (transaction.status === "cancelled") {
     return transaction;
   }
 

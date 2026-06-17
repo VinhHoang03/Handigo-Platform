@@ -1,7 +1,7 @@
 export function StatusBadge({ value }: { value: string }) {
   const tone = value === 'approved' || value === 'active' || value === 'visible'
     ? 'bg-emerald-100 text-emerald-700'
-    : value === 'rejected' || value === 'locked' || value === 'hidden'
+    : value === 'rejected' || value === 'locked' || value === 'hidden' || value === 'expired'
       ? 'bg-red-100 text-red-700'
       : 'bg-amber-100 text-amber-700';
   const labels: Record<string, string> = {
@@ -9,6 +9,8 @@ export function StatusBadge({ value }: { value: string }) {
     pending: 'Chờ duyệt',
     rejected: 'Từ chối',
     active: 'Hoạt động',
+    inactive: 'Tạm dừng',
+    expired: 'Hết hạn',
     locked: 'Bị khóa',
     visible: 'Đang hiển thị',
     hidden: 'Đã ẩn',

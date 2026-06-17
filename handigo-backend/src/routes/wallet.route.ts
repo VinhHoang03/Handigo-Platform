@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   adjustAdminWallet,
+  cancelMyWalletDeposit,
   createMyWalletDeposit,
   getAdminWalletByProviderId,
   getAdminWallets,
@@ -23,6 +24,12 @@ router.post(
   roleMiddleware("PROVIDER"),
   validate(walletDepositSchema),
   createMyWalletDeposit,
+);
+router.patch(
+  "/me/deposit/:orderCode/cancel",
+  authMiddleware,
+  roleMiddleware("PROVIDER"),
+  cancelMyWalletDeposit,
 );
 router.get(
   "/me/transactions",

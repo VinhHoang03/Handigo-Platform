@@ -35,6 +35,10 @@ export const providerIdParamSchema = z.object({
   providerId: objectIdSchema,
 });
 
+export const walletDepositOrderCodeParamSchema = z.object({
+  orderCode: z.string().trim().regex(/^\d+$/, "orderCode khong hop le"),
+});
+
 export const adminWalletAdjustmentSchema = z.object({
   amount: z.coerce.number().positive("Số tiền phải lớn hơn 0"),
   direction: z.enum(["in", "out"]),
