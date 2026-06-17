@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import logoImg from "../assets/logo.png";
 import { Navbar, type AppRole } from "./common/Navbar";
 import { useAuthStore } from "../features/auth/store/auth.store";
 import { isNavItemActive } from "@/config/sidebarNavigation";
@@ -56,7 +55,7 @@ export function Sidebar({
         to={homePath}
         className="mb-1 flex items-center gap-3 rounded-xl px-1 py-2"
       >
-        <img src={logoImg} alt="" className="h-9 w-9 object-contain" />
+        {/* <img src={logoImg} alt="" className="h-9 w-9 object-contain" /> */}
         <div>
           <h1 className="font-headline-md text-xl font-bold leading-none text-primary">
             Handigo

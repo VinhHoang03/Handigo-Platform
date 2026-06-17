@@ -11,11 +11,15 @@ export interface IUser extends Document {
   fullName: string;
   phone?: string;
   avatar?: string | null;
+  birthday?: Date | null;
+  gender?: "male" | "female" | "other" | null;
   role: UserRole;
   status: UserStatus;
   isEmailVerified: boolean;
   isDeleted: boolean;
   deletedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 
   registerOtp?: string;
   registerOtpExpire?: Date;
@@ -57,6 +61,12 @@ const UserSchema = new Schema<IUser>(
 
     phone: { type: String, unique: true, sparse: true },
     avatar: { type: String, default: null },
+    birthday: { type: Date, default: null },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      default: null,
+    },
 
     role: {
       type: String,

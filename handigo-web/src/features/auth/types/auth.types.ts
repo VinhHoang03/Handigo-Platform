@@ -6,6 +6,8 @@ export interface User {
   role: 'customer' | 'provider' | 'admin' | 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
   phone?: string;
   avatar?: string | null;
+  birthday?: string | null;
+  gender?: 'male' | 'female' | 'other' | null;
   status?: 'active' | 'locked';
   isEmailVerified?: boolean;
 }
