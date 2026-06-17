@@ -3,3 +3,48 @@ handigo-backend/BACKEND_INFO.md
 handigo-web/FRONTEND_WEB_INFO.md
 AGENTS.md
 docs/
+# Node modules cho cả 2 ứng dụng
+node_modules/
+node_modules
+
+# Environment files (chứa key bí mật - rất quan trọng)
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+dist-ssr
+dist
+build
+
+# Runtime data (logs, PID files...)
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Thư mục upload của backend (không nên đưa lên Git)
+handigo-backend/uploads/
+uploads/
+
+# Local development files
+*.local
+*.tmp
+
+# IDE và editor directories
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+Thumbs.db
