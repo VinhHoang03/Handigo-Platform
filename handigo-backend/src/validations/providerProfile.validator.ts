@@ -35,6 +35,7 @@ export const submitIdentitySchema = z
     documentNumber: optionalText(50),
     numberLast4: z.string().trim().regex(/^\d{4}$/).optional(),
     fullName: optionalText(120),
+    issuedPlace: optionalText(200),
     issuedAt: dateStringSchema.optional(),
     expiresAt: dateStringSchema.optional(),
     dateOfBirth: dateStringSchema.optional(),
