@@ -138,7 +138,7 @@ export function DashboardLayout({
       <main className={`relative min-h-screen pb-12 pt-32 ${isAdmin ? 'lg:pl-80 xl:pl-[21rem]' : ''}`}>
         <div
           className={`mx-auto space-y-8 px-4 sm:px-5 ${
-            isAdmin ? 'max-w-6xl lg:px-5 xl:px-6' : 'max-w-container-max lg:px-8'
+            isAdmin ? 'max-w-6xl lg:px-3 xl:px-4' : 'max-w-container-max lg:px-8'
           }`}
         >
           {children}

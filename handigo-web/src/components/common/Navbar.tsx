@@ -167,16 +167,6 @@ export function Navbar({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Mở menu điều hướng"
-            aria-expanded={isMobileOpen}
-            onClick={() => setIsMobileOpen((open) => !open)}
-            className="material-symbols-outlined rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary xl:hidden"
-          >
-            {isMobileOpen ? "close" : "menu"}
-          </button>
-
           {isAuthenticated && user ? (
             <>
               {showStatusToggle && (
@@ -256,7 +246,8 @@ export function Navbar({
                           ? "Quản lý hệ thống"
                           : "Hồ sơ cá nhân"}
                       </Link>
-                      {(currentRole === "CUSTOMER" || currentRole === "PROVIDER") && (
+                      {(currentRole === "CUSTOMER" ||
+                        currentRole === "PROVIDER") && (
                         <Link
                           to={getWalletPath(currentRole)}
                           onClick={() => setIsAccountOpen(false)}
