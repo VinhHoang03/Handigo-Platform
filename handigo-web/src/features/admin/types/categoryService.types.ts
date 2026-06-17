@@ -23,8 +23,6 @@ export interface Service {
   slug: string;
   description?: string | null;
   serviceType: 'fixed_price' | 'variable_price';
-  fixedPrice?: number | null;
-  depositAmount?: number | null;
   image?: string | null;
   isActive: boolean;
   createdAt: string;
@@ -66,8 +64,26 @@ export interface ServicePayload {
   slug?: string;
   description?: string | null;
   serviceType: 'fixed_price' | 'variable_price';
-  fixedPrice?: number | null;
-  depositAmount?: number | null;
   image?: string | null;
+  isActive?: boolean;
+}
+
+export type ServiceOptionType = "room_count" | "area_size" | "package" | "add_on" | "other";
+
+export interface ServiceOption {
+  _id: string;
+  serviceId: string;
+  name: string;
+  optionType: ServiceOptionType;
+  price: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceOptionPayload {
+  name: string;
+  optionType: ServiceOptionType;
+  price: number;
   isActive?: boolean;
 }

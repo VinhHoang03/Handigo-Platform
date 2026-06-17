@@ -21,7 +21,8 @@ import RegisterProviderPage from "./features/provider-application/pages/Register
 import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 import AdminProviderApplicationsPage from "./features/admin/pages/AdminProviderApplicationsPage";
 import { WalletPage } from "./features/wallet/pages/WalletPage";
-import AdminCategoryServicesPage from "./features/admin/pages/AdminCategoryServicesPage";
+import AdminCategoriesPage from "./features/admin/pages/AdminCategoriesPage";
+import AdminServicesPage from "./features/admin/pages/AdminServicesPage";
 import AdminPromotionsPage from "./features/admin/pages/AdminPromotionsPage";
 import { RouteGuard } from "./components/common/RouteGuard";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
@@ -179,10 +180,18 @@ function App() {
             }
           />
           <Route
+            path="/admin/categories"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminCategoriesPage />
+              </RouteGuard>
+            }
+          />
+          <Route
             path="/admin/services"
             element={
               <RouteGuard roles={["ADMIN"]}>
-                <AdminCategoryServicesPage />
+                <AdminServicesPage />
               </RouteGuard>
             }
           />

@@ -12,8 +12,7 @@ export interface ISelectedOptionSnapshot {
   optionId: Types.ObjectId;
   name: string;
   optionType: string;
-  fixedPrice: Money;
-  isFixedPrice: boolean;
+  price: Money;
 }
 
 export interface IOrderPricing {
@@ -87,8 +86,7 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
     },
     name: { type: String, required: true },
     optionType: { type: String, required: true },
-    fixedPrice: { type: Number, required: true, min: 0 },
-    isFixedPrice: { type: Boolean, required: true },
+    price: { type: Number, required: true, min: 0 },
   },
   { _id: false },
 );
