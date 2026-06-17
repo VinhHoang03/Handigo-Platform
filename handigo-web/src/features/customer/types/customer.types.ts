@@ -62,8 +62,10 @@ export interface CreateAddressPayload {
 export interface UserProfile {
   fullName: string;
   email: string;
-  phone?: string;
+  phone?: string | null;
   avatar?: string | null;
+  birthday?: string | null;
+  gender?: 'male' | 'female' | 'other' | null;
   role?: string;
   status?: string;
   isEmailVerified?: boolean;

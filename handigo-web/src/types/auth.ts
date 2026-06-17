@@ -5,6 +5,8 @@ export interface AuthUser {
   fullName: string;
   phone?: string | null;
   avatar?: string | null;
+  birthday?: string | null;
+  gender?: 'male' | 'female' | 'other' | null;
   role: 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
   status: 'ACTIVE' | 'INACTIVE' | 'BANNED';
   isEmailVerified: boolean;
@@ -16,6 +18,8 @@ export interface ProfileUpdateInput {
   fullName: string;
   phone?: string;
   avatar?: string;
+  birthday?: string | null;
+  gender?: 'male' | 'female' | 'other' | null;
 }
 
 export interface ChangePasswordInput {

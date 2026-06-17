@@ -1,597 +1,235 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
-import { DashboardLayout } from "../../../components/DashboardLayout";
-import {
-  FloatingInput,
-  FloatingTextarea,
-} from "@/components/common/FloatingField";
+import { DashboardShell } from "@/components/common/DashboardShell";
 import { Modal } from "@/components/common/Modal";
+import { AddressBookModal } from "@/components/profile/AddressBookModal";
+import { UserProfileSection } from "@/components/profile/UserProfileSection";
+import { changePasswordApi } from "@/features/auth/api/auth.api";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { ToggleOption } from "@/features/customer/components/CustomerProfileComponents";
 import {
-  SearchableSelect,
-  type SearchableSelectOption,
-} from "@/components/common/SearchableSelect";
+  createUserAddress,
+  deleteUserAddress,
+  getUserAddresses,
+  updateUserAddress,
+} from "@/features/profile/api/addressBook.api";
 import {
-  AddressCard,
-  ProfileSectionHeader,
-  ToggleOption,
-} from "../components/CustomerProfileComponents";
+  getUserProfile,
+  updateUserProfile,
+} from "@/features/profile/api/userProfile.api";
 import type {
-  Address,
-  CreateAddressPayload,
-  UserProfile,
-} from "../types/customer.types";
-import { getCustomerProfile, updateCustomerProfile } from "../api/customer.api";
-import {
-  createCustomerAddress,
-  deleteCustomerAddress,
-  getCustomerAddresses,
-  updateCustomerAddress,
-} from "../api/address.api";
-import {
-  getProvinces,
-  getWardsByProvince,
-  type AdministrativeUnit,
-} from "../api/vietnamAddress.api";
-import {
-  mountPlaceAutocompleteElement,
-  type ParsedPlaceAddress,
-} from "../utils/googlePlacesAutocomplete";
-import { changePasswordApi } from "../../auth/api/auth.api";
+  UserAddress,
+  UserAddressPayload,
+  UserProfileData,
+  UserProfileFormValue,
+} from "@/features/profile/types/profile.types";
 
 const DEFAULT_AVATAR =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCbANF75d7I2j7S59JuBrIhjAZDYPgm9Yc_c5apOhMA5BjhRdccGvK3czXb7T822QwtjdzRWASs_O2t7aHmoOqNtz1eCmvAu3FN-3wmLRpdWr35v4ghB_HAhSmXVWOqnocR4E3XtXVgp2QCFa3eIkEbdQkVMf6R-uwYn05Mw-YXMFpbTjKeN9gdBVTM5VcI9rjungxUY-otBLoWGeWXcplc0h65LBFyBz_QtA-fyp5yRuoPBWRK8r7SvxrxcxpNcof_Ewvv1HskQ-g";
+  "https://ui-avatars.com/api/?name=Customer&background=4f46e5&color=fff";
 
-type AddressFormState = CreateAddressPayload & {
-  addressLine: string;
+const getErrorMessage = (error: unknown, fallback: string) => {
+  const err = error as { response?: { data?: { message?: string } } };
+  return err?.response?.data?.message || fallback;
 };
 
-const EMPTY_ADDRESS_FORM: AddressFormState = {
-  addressLine: "",
-  fullAddress: "",
-  province: "",
-  provinceCode: undefined,
-  ward: "",
-  wardCode: undefined,
-  note: "",
-  isDefault: false,
-};
-
-function maskEmail(email?: string | null) {
-  if (!email) return "";
-  const [localPart, domain] = email.split("@");
-  if (!domain) return email;
-
-  const visibleLength = Math.min(5, Math.max(1, localPart.length));
-  return `${localPart.slice(0, visibleLength)}******@${domain}`;
-}
-
-function ProfileInfoField({
-  label,
-  value,
-  editValue,
-  isEditing,
-  editable = false,
-  readOnly = false,
-  type = "text",
-  onChange,
-  action,
+function AccountActionRow({
+  icon,
+  title,
+  description,
+  onClick,
 }: {
-  label: string;
-  value?: string | null;
-  editValue?: string | null;
-  isEditing: boolean;
-  editable?: boolean;
-  readOnly?: boolean;
-  type?: string;
-  onChange?: (value: string) => void;
-  action?: ReactNode;
+  icon: string;
+  title: string;
+  description: string;
+  onClick?: () => void;
 }) {
-  const content =
-    isEditing && editable && !readOnly ? editValue || "" : value || "";
-
   return (
-    <div className="space-y-2">
-      <label className="ml-1 block text-label-sm font-medium text-on-surface-variant">
-        {label}
-      </label>
-      <div className="relative">
-        {isEditing && editable && !readOnly ? (
-          <input
-            type={type}
-            value={content}
-            onChange={(event) => onChange?.(event.target.value)}
-            className="h-14 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-4 text-sm text-on-surface outline-none transition duration-200 hover:border-outline focus:border-primary focus:ring-4 focus:ring-primary/10"
-          />
-        ) : (
-          <div
-            aria-readonly="true"
-            title={
-              readOnly ? "Email không thể thay đổi sau khi đăng ký." : undefined
-            }
-            className={[
-              "flex h-14 w-full items-center rounded-xl border px-4 text-sm transition duration-200",
-              readOnly
-                ? "cursor-not-allowed border-outline-variant/60 bg-surface-container text-on-surface"
-                : "border-outline-variant/40 bg-surface-container-low text-on-surface",
-              action ? "pr-12" : "",
-            ].join(" ")}
-          >
-            <span className="truncate">{content || "—"}</span>
-          </div>
-        )}
-        {action}
-      </div>
-    </div>
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low p-4 text-left transition hover:border-primary/30 hover:bg-surface-container"
+      onClick={onClick}
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <span className="material-symbols-outlined text-[20px]">{icon}</span>
+        </span>
+        <span className="min-w-0">
+          <span className="block font-label-md font-bold text-on-surface">
+            {title}
+          </span>
+          <span className="mt-1 block text-sm text-on-surface-variant">
+            {description}
+          </span>
+        </span>
+      </span>
+      <span className="material-symbols-outlined text-outline-variant">
+        chevron_right
+      </span>
+    </button>
   );
 }
 
-const toSelectOptions = (
-  items: AdministrativeUnit[],
-): SearchableSelectOption[] =>
-  items.map((item) => ({
-    value: item.code,
-    label: item.name,
-    searchText: `${item.codeName} ${item.divisionType}`,
-  }));
-
-const composeFullAddress = (
-  addressLine: string,
-  ward: string,
-  province: string,
-) =>
-  [addressLine, ward, province]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
-
-const extractAddressLine = (
-  fullAddress: string,
-  ward?: string,
-  province?: string,
-) => {
-  const administrativeParts = [ward, province]
-    .map((part) => part?.trim().toLowerCase())
-    .filter(Boolean);
-
-  return fullAddress
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => !administrativeParts.includes(part.toLowerCase()))
-    .join(", ")
-    .trim();
-};
-
 export default function CustomerProfilePage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [formData, setFormData] = useState<Partial<UserProfile>>({});
-  const [isEditing, setIsEditing] = useState(false);
-  const [isEmailVisible, setIsEmailVisible] = useState(false);
+
+  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const [addresses, setAddresses] = useState<Address[]>([]);
   const [isAddressLoading, setIsAddressLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isAddressSaving, setIsAddressSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const [addressError, setAddressError] = useState("");
-  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [addressForm, setAddressForm] =
-    useState<AddressFormState>(EMPTY_ADDRESS_FORM);
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
-  const [isCreatingAddress, setIsCreatingAddress] = useState(false);
-  const [addressFormError, setAddressFormError] = useState("");
-  const [addressAutocompleteError, setAddressAutocompleteError] = useState("");
-  const addressAutocompleteContainerRef = useRef<HTMLDivElement>(null);
-  const addressLineValueRef = useRef("");
-  const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
-  const [wards, setWards] = useState<AdministrativeUnit[]>([]);
-  const [isProvinceLoading, setIsProvinceLoading] = useState(false);
-  const [isWardLoading, setIsWardLoading] = useState(false);
-  const [administrativeError, setAdministrativeError] = useState("");
 
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
+
+  const [isPwdConfirmOpen, setIsPwdConfirmOpen] = useState(false);
   const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
-  const [pwdData, setPwdData] = useState({ current: "", new: "", confirm: "" });
+  const [pwdData, setPwdData] = useState({ current: "", next: "", confirm: "" });
   const [pwdError, setPwdError] = useState("");
   const [pwdMsg, setPwdMsg] = useState("");
   const [isUpdatingPwd, setIsUpdatingPwd] = useState(false);
 
-  useEffect(() => {
-    addressLineValueRef.current = addressForm.addressLine;
-  }, [addressForm.addressLine]);
+  const syncAuthUser = useCallback((nextProfile: UserProfileData) => {
+    const { user, setUser } = useAuthStore.getState();
+    if (!user) return;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        setIsLoading(true);
-        setIsAddressLoading(true);
-        const data = await getCustomerProfile();
-        if (cancelled) return;
-
-        const loaded = {
-          ...data,
-          avatarUrl: data.avatarUrl || DEFAULT_AVATAR,
-          joinDate: data.joinDate || "Jan 2026",
-        };
-        setProfile(loaded);
-        setFormData(loaded);
-
-        try {
-          setAddressError("");
-          const addressData = await getCustomerAddresses();
-          if (!cancelled) setAddresses(addressData);
-        } catch {
-          if (!cancelled) setAddressError("Không tải được địa chỉ đã lưu.");
-        }
-      } catch {
-        if (cancelled) return;
-        const fallback: UserProfile = {
-          fullName: "Người dùng",
-          email: "",
-          phone: "",
-          avatarUrl: DEFAULT_AVATAR,
-        };
-        setProfile(fallback);
-        setFormData(fallback);
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-          setIsAddressLoading(false);
-        }
-      }
+    const nextUser = {
+      ...user,
+      fullName: nextProfile.fullName,
+      phone: nextProfile.phone || undefined,
+      avatar: nextProfile.avatar ?? null,
+      birthday: nextProfile.birthday,
+      gender: nextProfile.gender,
     };
 
-    load();
-    return () => {
-      cancelled = true;
-    };
+    const hasChanged =
+      user.fullName !== nextUser.fullName ||
+      (user.phone || undefined) !== nextUser.phone ||
+      (user.avatar ?? null) !== nextUser.avatar ||
+      (user.birthday ?? null) !== (nextUser.birthday ?? null) ||
+      (user.gender ?? null) !== (nextUser.gender ?? null);
+
+    if (hasChanged) setUser(nextUser);
   }, []);
 
-  useEffect(() => {
-    if (!isAddressModalOpen) return undefined;
-
-    let cancelled = false;
-
-    const loadProvinces = async () => {
-      try {
-        setIsProvinceLoading(true);
-        setAdministrativeError("");
-        const data = await getProvinces();
-        if (!cancelled) setProvinces(data);
-      } catch {
-        if (!cancelled)
-          setAdministrativeError("Không tải được danh sách tỉnh/thành.");
-      } finally {
-        if (!cancelled) setIsProvinceLoading(false);
-      }
-    };
-
-    if (provinces.length === 0) {
-      void loadProvinces();
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAddressModalOpen, provinces.length]);
-
-  useEffect(() => {
-    if (!isAddressModalOpen || !addressForm.provinceCode) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    const loadWards = async () => {
-      try {
-        setIsWardLoading(true);
-        setAdministrativeError("");
-        const data = await getWardsByProvince(
-          addressForm.provinceCode as number,
-        );
-        if (!cancelled) setWards(data);
-      } catch {
-        if (!cancelled)
-          setAdministrativeError("Không tải được danh sách phường/xã.");
-      } finally {
-        if (!cancelled) setIsWardLoading(false);
-      }
-    };
-
-    void loadWards();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAddressModalOpen, addressForm.provinceCode]);
-
-  useEffect(() => {
-    if (!isAddressModalOpen || !addressAutocompleteContainerRef.current) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    let detachAutocomplete: (() => void) | undefined;
-    setAddressAutocompleteError("");
-
-    const handlePlaceInput = (value: string) => {
-      setAddressForm((current) => {
-        const next = {
-          ...current,
-          addressLine: extractAddressLine(
-            value,
-            current.ward,
-            current.province,
-          ),
-        };
-        delete next.latitude;
-        delete next.longitude;
-        delete next.placeId;
-        return next;
-      });
-    };
-
-    const handlePlaceSelect = (placeAddress: ParsedPlaceAddress) => {
-      setAddressForm((current) => ({
-        ...current,
-        addressLine: extractAddressLine(
-          placeAddress.fullAddress || current.addressLine,
-          current.ward,
-          current.province,
-        ),
-        latitude: placeAddress.latitude,
-        longitude: placeAddress.longitude,
-        placeId: placeAddress.placeId,
-      }));
-    };
-
-    const contextParts = [addressForm.ward, addressForm.province]
-      .map((part) => part.trim())
-      .filter(Boolean);
-
-    void mountPlaceAutocompleteElement({
-      container: addressAutocompleteContainerRef.current,
-      value: addressLineValueRef.current,
-      placeholder: contextParts.length
-        ? `Nhập số nhà, tên đường, ${contextParts.join(", ")}`
-        : "Nhập số nhà, tên đường",
-      onInput: handlePlaceInput,
-      onPlaceSelect: handlePlaceSelect,
-    })
-      .then((detach) => {
-        if (cancelled) {
-          detach();
-        } else {
-          detachAutocomplete = detach;
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.warn("Google Places autocomplete failed", error);
-          setAddressAutocompleteError(
-            "Google Places chưa sẵn sàng. Kiểm tra API key, billing, Places API (New) và HTTP referrer trong Google Cloud.",
-          );
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      detachAutocomplete?.();
-    };
-  }, [addressForm.province, addressForm.ward, isAddressModalOpen]);
-
-  const defaultAddress = addresses.find((address) => address.isDefault);
-  const provinceOptions = useMemo(
-    () => toSelectOptions(provinces),
-    [provinces],
-  );
-  const wardOptions = useMemo(() => toSelectOptions(wards), [wards]);
-
-  const handleEditToggle = () => {
-    if (isEditing) setFormData(profile || {});
-    setErrorMsg("");
-    setIsEditing(!isEditing);
-  };
-
-  const handleProfileChange = (field: keyof UserProfile, value: string) => {
-    setFormData((current) => ({ ...current, [field]: value }));
-  };
-
-  const handleSave = async () => {
+  const loadAddresses = useCallback(async () => {
+    setIsAddressLoading(true);
     try {
-      setIsSaving(true);
-      setErrorMsg("");
-      const updated = await updateCustomerProfile(formData);
-      const updatedProfile = { ...profile, ...updated } as UserProfile;
-      setProfile(updatedProfile);
-      setFormData(updatedProfile);
-      setIsEditing(false);
+      const nextAddresses = await getUserAddresses();
+      setAddresses(nextAddresses);
+      setAddressError("");
     } catch {
-      setErrorMsg("Cập nhật thất bại. Vui lòng kiểm tra kết nối.");
+      setAddressError("Không tải được địa chỉ đã lưu.");
+    } finally {
+      setIsAddressLoading(false);
+    }
+  }, []);
+
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMsg("");
+
+    try {
+      const nextProfile = await getUserProfile();
+      setProfile(nextProfile);
+      syncAuthUser(nextProfile);
+    } catch {
+      setErrorMsg("Không tải được hồ sơ. Vui lòng thử lại.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [syncAuthUser]);
+
+  useEffect(() => {
+    // Initial remote loads are intentionally started from this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadProfile();
+    void loadAddresses();
+  }, [loadAddresses, loadProfile]);
+
+  const handleSaveProfile = async (payload: UserProfileFormValue) => {
+    setIsSaving(true);
+    setErrorMsg("");
+
+    try {
+      const nextProfile = await updateUserProfile(payload);
+      setProfile(nextProfile);
+      syncAuthUser(nextProfile);
+    } catch (error) {
+      setErrorMsg(
+        getErrorMessage(error, "Cập nhật hồ sơ thất bại. Vui lòng thử lại."),
+      );
+      throw error;
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleOpenAddressModal = () => {
-    setEditingAddress(null);
-    setAddressForm({
-      ...EMPTY_ADDRESS_FORM,
-      isDefault: addresses.length === 0,
-    });
-    setAddressFormError("");
-    setAddressAutocompleteError("");
-    setIsAddressModalOpen(true);
+  const refreshAddresses = async () => {
+    const nextAddresses = await getUserAddresses();
+    setAddresses(nextAddresses);
+    setAddressError("");
   };
 
-  const handleOpenEditAddressModal = (address: Address) => {
-    setEditingAddress(address);
-    setAddressForm({
-      addressLine: extractAddressLine(
-        address.fullAddress,
-        address.ward,
-        address.province,
-      ),
-      fullAddress: address.fullAddress,
-      province: address.province,
-      provinceCode: address.provinceCode,
-      ward: address.ward,
-      wardCode: address.wardCode,
-      latitude: address.latitude,
-      longitude: address.longitude,
-      placeId: address.placeId,
-      note: address.note || "",
-      isDefault: Boolean(address.isDefault),
-    });
-    setAddressFormError("");
-    setAddressAutocompleteError("");
-    setIsAddressModalOpen(true);
-  };
-
-  const handleAddressInputChange = (
-    field: keyof AddressFormState,
-    value: string | boolean,
+  const handleSubmitAddress = async (
+    payload: UserAddressPayload,
+    address: UserAddress | null,
   ) => {
-    setAddressForm((current) => {
-      const next = { ...current, [field]: value };
-      if (field === "addressLine") {
-        delete next.latitude;
-        delete next.longitude;
-        delete next.placeId;
-      }
-      return next;
-    });
-  };
-
-  const handleProvinceChange = (option: SearchableSelectOption | null) => {
-    setAddressForm((current) => ({
-      ...current,
-      province: option?.label || "",
-      provinceCode: option?.value,
-      ward: "",
-      wardCode: undefined,
-    }));
-    setWards([]);
-  };
-
-  const handleWardChange = (option: SearchableSelectOption | null) => {
-    setAddressForm((current) => ({
-      ...current,
-      ward: option?.label || "",
-      wardCode: option?.value,
-    }));
-  };
-
-  const getCurrentPlacesInputValue = () => {
-    const element = addressAutocompleteContainerRef.current?.querySelector(
-      ".google-place-autocomplete",
-    ) as { value?: string } | null;
-
-    return element?.value?.trim() || "";
-  };
-
-  const handleCreateAddress = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAddressFormError("");
-    const currentAddressLine =
-      addressForm.addressLine.trim() ||
-      extractAddressLine(
-        getCurrentPlacesInputValue(),
-        addressForm.ward,
-        addressForm.province,
-      );
-
-    if (
-      !currentAddressLine ||
-      !addressForm.province.trim() ||
-      !addressForm.ward.trim()
-    ) {
-      setAddressFormError(
-        "Vui lòng nhập đầy đủ địa chỉ cụ thể, tỉnh/thành và phường/xã.",
-      );
-      return;
-    }
-
+    setIsAddressSaving(true);
     try {
-      setIsCreatingAddress(true);
-      const payload: CreateAddressPayload = {
-        fullAddress: composeFullAddress(
-          currentAddressLine,
-          addressForm.ward,
-          addressForm.province,
-        ),
-        province: addressForm.province,
-        provinceCode: addressForm.provinceCode,
-        ward: addressForm.ward,
-        wardCode: addressForm.wardCode,
-        latitude: addressForm.latitude,
-        longitude: addressForm.longitude,
-        placeId: addressForm.placeId,
-        note: addressForm.note,
-        isDefault: addressForm.isDefault,
-      };
-      if (editingAddress) {
-        await updateCustomerAddress(editingAddress.id, payload);
+      if (address) {
+        await updateUserAddress(address.id, payload);
       } else {
-        await createCustomerAddress(payload);
+        await createUserAddress(payload);
       }
-      const freshAddresses = await getCustomerAddresses();
-      setAddresses(freshAddresses);
-      setAddressError("");
-      closeAddressModal();
+      await refreshAddresses();
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      setAddressFormError(
-        err?.response?.data?.message ||
-          "Không thể lưu địa chỉ. Vui lòng thử lại.",
+      setAddressError(
+        getErrorMessage(error, "Không thể lưu địa chỉ. Vui lòng thử lại."),
       );
+      throw error;
     } finally {
-      setIsCreatingAddress(false);
+      setIsAddressSaving(false);
     }
+  };
+
+  const handleDeleteAddress = async (address: UserAddress) => {
+    setIsAddressSaving(true);
+    try {
+      await deleteUserAddress(address.id);
+      await refreshAddresses();
+    } catch (error) {
+      setAddressError(
+        getErrorMessage(error, "Không thể xóa địa chỉ. Vui lòng thử lại."),
+      );
+      throw error;
+    } finally {
+      setIsAddressSaving(false);
+    }
+  };
+
+  const openCreateAddressModal = () => {
+    setEditingAddress(null);
+    setAddressError("");
+    setIsAddressModalOpen(true);
+  };
+
+  const openEditAddressModal = (address: UserAddress) => {
+    setEditingAddress(address);
+    setAddressError("");
+    setIsAddressModalOpen(true);
   };
 
   const closeAddressModal = () => {
     setIsAddressModalOpen(false);
     setEditingAddress(null);
-    setAddressForm({ ...EMPTY_ADDRESS_FORM });
-    setAddressFormError("");
-    setAddressAutocompleteError("");
-    setAdministrativeError("");
-    setWards([]);
-  };
-
-  const handleDeleteAddress = async (address: Address) => {
-    const confirmed = window.confirm(`Xóa địa chỉ "${address.fullAddress}"?`);
-    if (!confirmed) return;
-
-    try {
-      setIsCreatingAddress(true);
-      await deleteCustomerAddress(address.id);
-      const freshAddresses = await getCustomerAddresses();
-      setAddresses(freshAddresses);
-      setAddressError("");
-    } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      setAddressError(
-        err?.response?.data?.message ||
-          "Không thể xóa địa chỉ. Vui lòng thử lại.",
-      );
-    } finally {
-      setIsCreatingAddress(false);
-    }
   };
 
   const closePasswordModal = () => {
     setIsPwdModalOpen(false);
-    setPwdData({ current: "", new: "", confirm: "" });
+    setPwdData({ current: "", next: "", confirm: "" });
     setPwdError("");
     setPwdMsg("");
   };
@@ -601,7 +239,17 @@ export default function CustomerProfilePage() {
     setPwdError("");
     setPwdMsg("");
 
-    if (pwdData.new !== pwdData.confirm) {
+    if (!pwdData.current.trim()) {
+      setPwdError("Vui lòng nhập mật khẩu hiện tại.");
+      return;
+    }
+
+    if (pwdData.next.length < 8) {
+      setPwdError("Mật khẩu mới phải có ít nhất 8 ký tự.");
+      return;
+    }
+
+    if (pwdData.next !== pwdData.confirm) {
       setPwdError("Mật khẩu xác nhận không khớp.");
       return;
     }
@@ -610,327 +258,125 @@ export default function CustomerProfilePage() {
       setIsUpdatingPwd(true);
       await changePasswordApi({
         currentPassword: pwdData.current,
-        newPassword: pwdData.new,
+        newPassword: pwdData.next,
       });
       setPwdMsg("Cập nhật mật khẩu thành công.");
       window.setTimeout(closePasswordModal, 1200);
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
       setPwdError(
-        err?.response?.data?.message ||
+        getErrorMessage(
+          error,
           "Không thể cập nhật mật khẩu. Vui lòng kiểm tra lại mật khẩu cũ.",
+        ),
       );
     } finally {
       setIsUpdatingPwd(false);
     }
   };
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
-      <DashboardLayout role="CUSTOMER" userAvatar={DEFAULT_AVATAR}>
-        <div className="flex min-h-[400px] items-center justify-center text-on-surface-variant">
+      <DashboardShell role="CUSTOMER" userAvatar={DEFAULT_AVATAR}>
+        <div className="rounded-xl bg-white p-8 text-center text-on-surface-variant">
           Đang tải hồ sơ...
         </div>
-      </DashboardLayout>
+      </DashboardShell>
     );
   }
 
-  return (
-    <DashboardLayout
-      role="CUSTOMER"
-      userAvatar={profile.avatarUrl || profile.avatar || DEFAULT_AVATAR}
-    >
-      <div className="mx-auto max-w-5xl space-y-6">
-        {errorMsg && (
-          <div className="rounded-2xl bg-error/10 p-3 font-label-md text-error">
-            {errorMsg}
-          </div>
-        )}
+  if (!profile) {
+    return (
+      <DashboardShell role="CUSTOMER" userAvatar={DEFAULT_AVATAR}>
+        <div className="rounded-xl border border-error/20 bg-error/10 p-8 text-center text-error">
+          <p>{errorMsg || "Không thể mở hồ sơ."}</p>
+          <button
+            type="button"
+            className="mt-4 rounded-lg bg-error px-4 py-2 font-bold text-on-error"
+            onClick={() => void loadProfile()}
+          >
+            Thử lại
+          </button>
+        </div>
+      </DashboardShell>
+    );
+  }
 
-        {profile.role === "CUSTOMER" && (
-          <section className="relative flex flex-col items-start justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-r from-primary to-secondary p-5 md:flex-row md:items-center">
-            <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-            <div className="relative flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20">
-                <span className="material-symbols-outlined text-2xl text-white">
+  const canRegisterProvider = String(profile.role || "").toUpperCase() === "CUSTOMER";
+
+  return (
+    <DashboardShell
+      role="CUSTOMER"
+      userAvatar={profile.avatar || profile.avatarUrl || DEFAULT_AVATAR}
+    >
+      <div className="mx-auto max-w-6xl space-y-6">
+        {canRegisterProvider && (
+          <section className="flex flex-col justify-between gap-4 rounded-xl border border-primary/15 bg-primary p-5 text-on-primary md:flex-row md:items-center">
+            <div className="flex items-center gap-4">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15">
+                <span className="material-symbols-outlined text-2xl">
                   engineering
                 </span>
               </div>
               <div>
-                <p className="font-headline-sm font-bold text-white">
+                <p className="font-headline-sm font-bold">
                   Trở thành thợ dịch vụ
                 </p>
-                <p className="text-sm text-white/80">
-                  Kiếm thêm thu nhập bằng kỹ năng của bạn. Gửi hồ sơ để được xét
-                  duyệt.
+                <p className="mt-1 text-sm text-on-primary/80">
+                  Gửi hồ sơ để mở rộng vai trò provider trên cùng tài khoản.
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => navigate("/register-provider")}
-              className="relative rounded-xl bg-white px-6 py-2.5 font-bold text-primary shadow-lg transition hover:shadow-xl"
+              className="rounded-lg bg-white px-5 py-2.5 font-bold text-primary shadow-sm transition hover:bg-white/90"
             >
               Đăng ký ngay
             </button>
           </section>
         )}
 
-        <section className="glass-card rounded-3xl p-6">
-          <div className="flex flex-col items-center gap-6 md:flex-row">
-            <div className="relative shrink-0">
-              <img
-                src={
-                  isEditing
-                    ? formData.avatar || formData.avatarUrl || DEFAULT_AVATAR
-                    : profile.avatar || profile.avatarUrl || DEFAULT_AVATAR
-                }
-                alt="Avatar"
-                className="h-24 w-24 rounded-full border-4 border-primary/20 object-cover shadow-lg md:h-32 md:w-32"
-              />
-              {isEditing && (
-                <label
-                  htmlFor="avatar-upload"
-                  className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary text-on-primary shadow-md transition hover:bg-primary/85"
-                  title="Đổi ảnh đại diện"
-                >
-                  <span className="material-symbols-outlined text-base">
-                    photo_camera
-                  </span>
-                  <input
-                    id="avatar-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const avatar = reader.result as string;
-                        setFormData((current) => ({
-                          ...current,
-                          avatar,
-                          avatarUrl: avatar,
-                        }));
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                </label>
-              )}
-            </div>
+        <UserProfileSection
+          user={profile}
+          addresses={addresses}
+          isSaving={isSaving}
+          isAddressLoading={isAddressLoading}
+          isAddressSaving={isAddressSaving}
+          error={errorMsg}
+          addressError={addressError}
+          defaultAvatar={DEFAULT_AVATAR}
+          onSaveProfile={handleSaveProfile}
+          onAddAddress={openCreateAddressModal}
+          onEditAddress={openEditAddressModal}
+          onDeleteAddress={handleDeleteAddress}
+        />
 
-            <div className="flex-1 text-center md:text-left">
-              <h1 className="font-headline-lg text-headline-lg text-on-surface">
-                {profile.fullName}
-              </h1>
-              <p className="mt-1 text-on-surface-variant">
-                Thành viên từ {profile.joinDate}
-              </p>
-              {profile.isEmailVerified && (
-                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-secondary-container/30 px-2 py-1 text-xs font-medium text-on-secondary-container">
-                  <span className="material-symbols-outlined text-sm">
-                    verified
-                  </span>
-                  Email đã xác minh
-                </span>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={handleEditToggle}
-              className="btn-primary min-w-40 shrink-0"
-            >
-              {isEditing ? "Hủy" : "Chỉnh sửa hồ sơ"}
-            </button>
-          </div>
-        </section>
-
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          <section
-            className={[
-              "glass-card h-full rounded-3xl p-6 transition duration-200",
-              isEditing ? "ring-2 ring-primary/15" : "",
-            ].join(" ")}
-          >
-            <ProfileSectionHeader
-              icon="person"
-              title="Thông tin cá nhân"
-              action={
-                <span
-                  className={[
-                    "rounded-full px-3 py-1 text-xs font-semibold transition duration-200",
-                    isEditing
-                      ? "bg-primary/10 text-primary"
-                      : "bg-surface-container text-on-surface-variant",
-                  ].join(" ")}
-                >
-                  {isEditing ? "Đang chỉnh sửa" : "Chế độ xem"}
-                </span>
-              }
-            />
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <ProfileInfoField
-                label="Họ và tên"
-                value={profile.fullName}
-                editValue={formData.fullName}
-                isEditing={isEditing}
-                editable
-                onChange={(value) => handleProfileChange("fullName", value)}
-              />
-
-              <ProfileInfoField
-                label="Số điện thoại"
-                value={profile.phone}
-                editValue={formData.phone}
-                isEditing={isEditing}
-                editable
-                type="tel"
-                onChange={(value) => handleProfileChange("phone", value)}
-              />
-
-              <div className="md:col-span-2">
-                <ProfileInfoField
-                  label="Địa chỉ Email"
-                  value={
-                    isEmailVisible ? profile.email : maskEmail(profile.email)
-                  }
-                  isEditing={isEditing}
-                  readOnly
-                  action={
-                    <button
-                      type="button"
-                      title={isEmailVisible ? "Ẩn email" : "Hiện email"}
-                      aria-label={isEmailVisible ? "Ẩn email" : "Hiện email"}
-                      className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary focus:outline-none focus:ring-4 focus:ring-primary/10"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setIsEmailVisible((visible) => !visible);
-                      }}
-                    >
-                      {isEmailVisible ? (
-                        <EyeOff size={18} />
-                      ) : (
-                        <Eye size={18} />
-                      )}
-                    </button>
-                  }
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <ProfileInfoField
-                  label="Địa chỉ chính"
-                  value={
-                    defaultAddress?.address || "Chưa chọn địa chỉ mặc định"
-                  }
-                  isEditing={isEditing}
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 flex min-h-11 flex-col justify-end gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleEditToggle}
-                disabled={!isEditing || isSaving}
-                className={[
-                  "btn-secondary transition duration-200",
-                  isEditing ? "opacity-100" : "pointer-events-none opacity-0",
-                ].join(" ")}
-              >
-                Hủy thay đổi
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!isEditing || isSaving}
-                className={[
-                  "btn-primary transition duration-200",
-                  isEditing ? "opacity-100" : "pointer-events-none opacity-0",
-                ].join(" ")}
-              >
-                {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-              </button>
-            </div>
-          </section>
-          <section className="glass-card h-full rounded-3xl p-6">
-            <ProfileSectionHeader
-              icon="distance"
-              title="Địa chỉ đã lưu"
-              action={
-                <button
-                  type="button"
-                  onClick={handleOpenAddressModal}
-                  className="btn-ghost px-0"
-                >
-                  <span className="material-symbols-outlined text-sm">add</span>
-                  Thêm mới
-                </button>
-              }
-            />
-            {isAddressLoading ? (
-              <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4 text-on-surface-variant">
-                Đang tải địa chỉ...
-              </div>
-            ) : addressError ? (
-              <div className="rounded-2xl border border-error/20 bg-error/10 p-4 text-error">
-                {addressError}
-              </div>
-            ) : addresses.length > 0 ? (
-              <div className="grid grid-cols-1 gap-3">
-                {addresses.map((address) => (
-                  <AddressCard
-                    key={address.id}
-                    address={address}
-                    isActionDisabled={isCreatingAddress}
-                    onDelete={handleDeleteAddress}
-                    onEdit={handleOpenEditAddressModal}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-outline-variant/60 bg-surface-container-low p-5 text-center text-on-surface-variant">
-                Chưa có địa chỉ đã lưu.
-              </div>
-            )}
-          </section>
-        </div>
-
-        <section className="glass-card rounded-3xl p-6">
-          <h3 className="mb-5 font-headline-lg text-headline-lg text-on-surface">
-            Bảo mật & Quyền riêng tư
+        <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+          <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
+            Chức năng tài khoản
           </h3>
-          <div className="space-y-6">
-            <div className="flex flex-col justify-between gap-3 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 sm:flex-row sm:items-center">
-              <div>
-                <p className="font-label-md">Mật khẩu</p>
-                <p className="text-sm text-on-surface-variant">
-                  Đổi mật khẩu định kỳ để bảo vệ tài khoản.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsPwdModalOpen(true)}
-                className="btn-secondary"
-              >
-                Cập nhật
-              </button>
-            </div>
-            <ToggleOption
-              label="Xác thực hai yếu tố (2FA)"
-              desc="Thêm bảo mật bổ sung cho đăng nhập."
-              icon="shield_person"
-              checked
-              color="bg-secondary-container/20 text-secondary"
+          <div className="space-y-3">
+            <AccountActionRow
+              icon="lock"
+              title="Mật khẩu và bảo mật"
+              description="Cập nhật mật khẩu để bảo vệ tài khoản."
+              onClick={() => setIsPwdConfirmOpen(true)}
+            />
+            <AccountActionRow
+              icon="shield"
+              title="Quyền riêng tư"
+              description="Các tùy chọn quyền riêng tư sẽ được bổ sung."
+            />
+            <AccountActionRow
+              icon="more_horiz"
+              title="Các tùy chọn khác"
+              description="Khu vực placeholder cho các thiết lập tài khoản khác."
             />
           </div>
         </section>
 
-        <section className="glass-card rounded-3xl p-6">
-          <h3 className="mb-5 font-headline-lg text-headline-lg text-on-surface">
+        <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+          <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
             Cài đặt thông báo
           </h3>
           <div className="space-y-5">
@@ -941,8 +387,8 @@ export default function CustomerProfilePage() {
               checked
             />
             <ToggleOption
-              label="Tiếp thị & Khuyến mãi"
-              desc="Nhận các ưu đãi và cập nhật trên thị trường."
+              label="Tiếp thị và khuyến mãi"
+              desc="Nhận các ưu đãi và cập nhật từ Handigo."
               icon="campaign"
             />
             <ToggleOption
@@ -955,184 +401,120 @@ export default function CustomerProfilePage() {
         </section>
       </div>
 
+      {isAddressModalOpen && (
+        <AddressBookModal
+          key={editingAddress?.id || "new-address"}
+          open={isAddressModalOpen}
+          address={editingAddress}
+          addressCount={addresses.length}
+          isSaving={isAddressSaving}
+          onClose={closeAddressModal}
+          onSubmit={handleSubmitAddress}
+        />
+      )}
+
       <Modal
-        open={isAddressModalOpen}
-        title={editingAddress ? "Cập nhật địa chỉ" : "Thêm địa chỉ mới"}
-        onClose={closeAddressModal}
-        size="lg"
+        open={isPwdConfirmOpen}
+        title="Mật khẩu và bảo mật"
+        onClose={() => setIsPwdConfirmOpen(false)}
+        size="sm"
       >
-        <form onSubmit={handleCreateAddress} className="space-y-4">
-          {addressFormError && (
-            <div className="rounded-2xl bg-error/10 p-3 text-sm text-error">
-              {addressFormError}
-            </div>
-          )}
-          {administrativeError && (
-            <div className="rounded-2xl bg-error/10 p-3 text-sm text-error">
-              {administrativeError}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="order-3 space-y-2 md:col-span-2">
-              <label
-                htmlFor="address-line-google-places"
-                className="ml-1 block text-label-sm font-medium text-on-surface-variant"
-              >
-                Địa chỉ cụ thể
-              </label>
-              {addressAutocompleteError ? (
-                <input
-                  id="address-line-google-places"
-                  type="text"
-                  value={addressForm.addressLine}
-                  minLength={2}
-                  required
-                  placeholder="Nhập số nhà, tên đường"
-                  className="form-field__input pb-2 pt-2"
-                  onChange={(event) =>
-                    handleAddressInputChange("addressLine", event.target.value)
-                  }
-                />
-              ) : (
-                <div
-                  ref={addressAutocompleteContainerRef}
-                  className="google-place-autocomplete-shell"
-                />
-              )}
-              <p
-                className={`px-1 text-xs ${
-                  addressAutocompleteError
-                    ? "text-error"
-                    : "text-on-surface-variant"
-                }`}
-              >
-                {addressAutocompleteError ||
-                  "Google Places New sẽ gợi ý địa chỉ tại Việt Nam. Tỉnh/thành và phường/xã vẫn lấy từ dropdown đã chọn."}
-              </p>
-            </div>
-            <SearchableSelect
-              id="address-province"
-              label="Tỉnh / Thành phố"
-              value={addressForm.provinceCode}
-              options={provinceOptions}
-              loading={isProvinceLoading}
-              placeholder="Nhập để tìm kiếm tỉnh/thành"
-              emptyText="Không tìm thấy tỉnh/thành."
-              containerClassName="order-1"
-              onChange={handleProvinceChange}
-            />
-            <SearchableSelect
-              id="address-ward"
-              label="Phường / Xã"
-              value={addressForm.wardCode}
-              options={wardOptions}
-              loading={isWardLoading}
-              disabled={!addressForm.provinceCode}
-              placeholder="Nhập để tìm kiếm phường/xã"
-              emptyText="Không tìm thấy phường/xã."
-              containerClassName="order-2"
-              onChange={handleWardChange}
-            />
-            <FloatingTextarea
-              id="address-note"
-              label="Ghi chú"
-              value={addressForm.note || ""}
-              rows={3}
-              maxLength={200}
-              containerClassName="order-4 md:col-span-2"
-              onValueChange={(value) => handleAddressInputChange("note", value)}
-            />
-          </div>
-
-          <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-surface-container-low p-4">
-            <input
-              type="checkbox"
-              checked={Boolean(addressForm.isDefault)}
-              onChange={(event) =>
-                handleAddressInputChange("isDefault", event.target.checked)
-              }
-              className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary"
-            />
-            <span className="font-label-md text-on-surface">
-              Đặt làm địa chỉ mặc định
-            </span>
-          </label>
-
-          <div className="flex flex-col justify-end gap-3 pt-2 sm:flex-row">
+        <div className="space-y-5">
+          <p className="text-on-surface">
+            Bạn có muốn cập nhật mật khẩu không?
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={closeAddressModal}
-              disabled={isCreatingAddress}
-              className="btn-secondary"
+              className="btn-secondary flex-1"
+              onClick={() => setIsPwdConfirmOpen(false)}
             >
-              Hủy
+              Không
             </button>
             <button
-              type="submit"
-              disabled={isCreatingAddress}
-              className="btn-primary"
+              type="button"
+              className="btn-primary flex-1"
+              onClick={() => {
+                setIsPwdConfirmOpen(false);
+                setIsPwdModalOpen(true);
+              }}
             >
-              {isCreatingAddress
-                ? "Đang lưu..."
-                : editingAddress
-                  ? "Cập nhật địa chỉ"
-                  : "Lưu địa chỉ"}
+              Đồng ý
             </button>
           </div>
-        </form>
+        </div>
       </Modal>
 
       <Modal
         open={isPwdModalOpen}
-        title="Bảo vệ tài khoản"
+        title="Cập nhật mật khẩu"
         onClose={closePasswordModal}
         size="sm"
       >
         <form onSubmit={handleUpdatePassword} className="space-y-4">
           {(pwdError || pwdMsg) && (
             <div
-              className={`rounded-2xl p-4 text-sm ${pwdError ? "bg-error/10 text-error" : "bg-primary/10 text-primary"}`}
+              className={`rounded-lg p-4 text-sm ${
+                pwdError ? "bg-error/10 text-error" : "bg-primary/10 text-primary"
+              }`}
             >
               {pwdError || pwdMsg}
             </div>
           )}
 
-          <FloatingInput
-            id="current-password"
-            label="Mật khẩu hiện tại"
-            type="password"
-            value={pwdData.current}
-            autoComplete="current-password"
-            required
-            onValueChange={(value) =>
-              setPwdData((current) => ({ ...current, current: value }))
-            }
-          />
-          <FloatingInput
-            id="new-password"
-            label="Mật khẩu mới"
-            type="password"
-            value={pwdData.new}
-            autoComplete="new-password"
-            minLength={8}
-            required
-            onValueChange={(value) =>
-              setPwdData((current) => ({ ...current, new: value }))
-            }
-          />
-          <FloatingInput
-            id="confirm-password"
-            label="Xác nhận mật khẩu mới"
-            type="password"
-            value={pwdData.confirm}
-            autoComplete="new-password"
-            minLength={8}
-            required
-            onValueChange={(value) =>
-              setPwdData((current) => ({ ...current, confirm: value }))
-            }
-          />
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-on-surface">
+              Mật khẩu hiện tại
+            </span>
+            <input
+              type="password"
+              value={pwdData.current}
+              autoComplete="current-password"
+              required
+              onChange={(event) =>
+                setPwdData((current) => ({
+                  ...current,
+                  current: event.target.value,
+                }))
+              }
+              className="min-h-12 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-on-surface">
+              Mật khẩu mới
+            </span>
+            <input
+              type="password"
+              value={pwdData.next}
+              autoComplete="new-password"
+              minLength={8}
+              required
+              onChange={(event) =>
+                setPwdData((current) => ({ ...current, next: event.target.value }))
+              }
+              className="min-h-12 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-on-surface">
+              Xác nhận mật khẩu mới
+            </span>
+            <input
+              type="password"
+              value={pwdData.confirm}
+              autoComplete="new-password"
+              minLength={8}
+              required
+              onChange={(event) =>
+                setPwdData((current) => ({
+                  ...current,
+                  confirm: event.target.value,
+                }))
+              }
+              className="min-h-12 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row">
             <button
@@ -1152,6 +534,6 @@ export default function CustomerProfilePage() {
           </div>
         </form>
       </Modal>
-    </DashboardLayout>
+    </DashboardShell>
   );
 }
