@@ -1,30 +1,32 @@
 import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument, Money } from "./common";
 
-export type ServiceOptionType = "inspection" | "cleaning" | "installation" | "repair" | "other";
+export type ServiceOptionType =
+  | "room_count"  // Theo số phòng: 1PN, 2PN, 3PN...
+  | "area_size"   // Theo diện tích: dưới 50m², 50-100m²...
+  | "package"     // Gói đặc biệt: tổng vệ sinh, cao cấp...
+  | "add_on"      // Dịch vụ thêm: vệ sinh máy lạnh, khử khuẩn...
+  | "other";
 
 export interface IServiceOption extends Document, IBaseDocument {
   serviceId: Types.ObjectId;
   name: string;
-  description?: string | null;
   optionType: ServiceOptionType;
-  fixedPrice: Money;
-  isFixedPrice: boolean;
+  price: Money;
   isActive: boolean;
 }
 
 const ServiceOptionSchema = new Schema<IServiceOption>(
   {
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
-    name: { type: String, required: true },
-    description: { type: String, default: null },
+    name: { type: String, required: true, trim: true },
     optionType: {
       type: String,
-      enum: ["inspection", "cleaning", "installation", "repair", "other"],
+      enum: ["room_count", "area_size", "package", "add_on", "other"],
       required: true,
+      default: "other",
     },
-    fixedPrice: { type: Number, required: true, min: 0, default: 0 },
-    isFixedPrice: { type: Boolean, default: true },
+    price: { type: Number, required: true, min: 0 },
     isActive: { type: Boolean, default: true },
     ...baseFields,
   },

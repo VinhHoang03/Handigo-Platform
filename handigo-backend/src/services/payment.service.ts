@@ -41,8 +41,7 @@ const getPaymentAmount = async (order: any, paymentType: PaymentType) => {
     return Math.max(order.pricing?.totalPaidAmount || order.pricing?.bookingAmount || 0, 0);
   }
 
-  const service = await Service.findById(order.serviceId);
-  const depositAmount = service?.depositAmount || order.depositAmount || 0;
+  const depositAmount = order.depositAmount || 0;
 
   if (depositAmount <= 0) {
     throw new AppError("Dịch vụ khảo sát chưa cấu hình tiền đặt cọc", 400);
