@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
 import {
   SearchableSelect,
@@ -190,7 +184,9 @@ export function AddressBookModal({
       try {
         setIsWardLoading(true);
         setAdministrativeError("");
-        const data = await getWardsByProvince(addressForm.provinceCode as number);
+        const data = await getWardsByProvince(
+          addressForm.provinceCode as number,
+        );
         if (!cancelled) setWards(data);
       } catch {
         if (!cancelled) {
@@ -223,7 +219,11 @@ export function AddressBookModal({
       setAddressForm((current) => {
         const next = {
           ...current,
-          addressLine: extractAddressLine(value, current.ward, current.province),
+          addressLine: extractAddressLine(
+            value,
+            current.ward,
+            current.province,
+          ),
         };
         delete next.latitude;
         delete next.longitude;
@@ -278,12 +278,7 @@ export function AddressBookModal({
       cancelled = true;
       detachAutocomplete?.();
     };
-  }, [
-    addressAutocompleteError,
-    addressForm.province,
-    addressForm.ward,
-    open,
-  ]);
+  }, [addressAutocompleteError, addressForm.province, addressForm.ward, open]);
 
   const handleAddressInputChange = (
     field: keyof AddressFormState,
@@ -372,7 +367,10 @@ export function AddressBookModal({
       onClose();
     } catch (submitError) {
       setAddressFormError(
-        getErrorMessage(submitError, "Không thể lưu địa chỉ. Vui lòng thử lại."),
+        getErrorMessage(
+          submitError,
+          "Không thể lưu địa chỉ. Vui lòng thử lại.",
+        ),
       );
     }
   };
@@ -394,7 +392,7 @@ export function AddressBookModal({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <SearchableSelect
             id="address-province"
-            label="Tỉnh / Thành phố"
+            label="Tỉnh /Thành phố"
             value={addressForm.provinceCode}
             options={provinceOptions}
             loading={isProvinceLoading}

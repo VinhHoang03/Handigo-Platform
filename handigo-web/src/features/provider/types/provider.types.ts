@@ -50,6 +50,7 @@ export interface IdentityDocument {
   documentNumber?: string;
   numberLast4?: string;
   fullName?: string;
+  issuedPlace?: string;
   issuedAt?: string;
   expiresAt?: string;
   dateOfBirth?: string;
@@ -70,6 +71,7 @@ export interface SubmitIdentityPayload {
   documentNumber?: string;
   numberLast4?: string;
   fullName?: string;
+  issuedPlace?: string;
   issuedAt?: string;
   expiresAt?: string;
   dateOfBirth?: string;

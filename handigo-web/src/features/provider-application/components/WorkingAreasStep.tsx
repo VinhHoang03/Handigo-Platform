@@ -36,7 +36,10 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
   const [loadingWards, setLoadingWards] = useState(false);
   const [error, setError] = useState("");
 
-  const provinceOptions = useMemo(() => toSelectOptions(provinces), [provinces]);
+  const provinceOptions = useMemo(
+    () => toSelectOptions(provinces),
+    [provinces],
+  );
   const wardOptions = useMemo(() => toSelectOptions(wards), [wards]);
   const selectedArea = [wardName, provinceName].filter(Boolean).join(", ");
   const canAdd = Boolean(provinceCode && wardCode && selectedArea);
@@ -99,25 +102,27 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-headline-md font-bold">Khu vuc hoat dong</h2>
+        <h2 className="text-headline-md font-bold">Khu vực hoạt động</h2>
         <p className="mt-1 text-on-surface-variant">
-          Chon tinh/thanh va phuong/xa noi ban co the nhan viec.
+          Chọn tỉnh/thành và phường/xã nơi bạn có thể nhận việc.
         </p>
       </div>
 
       {error && (
-        <p className="rounded-2xl bg-error/10 p-3 text-sm text-error">{error}</p>
+        <p className="rounded-2xl bg-error/10 p-3 text-sm text-error">
+          {error}
+        </p>
       )}
 
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
         <SearchableSelect
           id="provider-working-province"
-          label="Tinh / Thanh pho"
+          label="Tỉnh /Thành phố"
           value={provinceCode}
           options={provinceOptions}
           loading={loadingProvinces}
-          placeholder="Tim tinh/thanh"
-          emptyText="Khong tim thay tinh/thanh."
+          placeholder="Tìm tỉnh/thành"
+          emptyText="Không tìm thấy tỉnh/thành."
           onChange={(option) => {
             setProvinceCode(option?.value);
             setProvinceName(option?.label || "");
@@ -128,13 +133,13 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
         />
         <SearchableSelect
           id="provider-working-ward"
-          label="Phuong / Xa"
+          label="Phường / Xã"
           value={wardCode}
           options={wardOptions}
           loading={loadingWards}
           disabled={!provinceCode}
-          placeholder="Tim phuong/xa"
-          emptyText="Khong tim thay phuong/xa."
+          placeholder="Tìm phường/xã"
+          emptyText="Không tìm thấy phường/xã."
           onChange={(option) => {
             setWardCode(option?.value);
             setWardName(option?.label || "");
@@ -146,7 +151,7 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
           disabled={!canAdd}
           className="btn-primary min-h-14 lg:self-end"
         >
-          <Plus size={18} /> Them
+          <Plus size={18} /> Thêm
         </button>
       </div>
 
@@ -165,7 +170,7 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
         </div>
       ) : (
         <p className="rounded-2xl border border-dashed border-outline-variant/60 bg-surface-container-low p-4 text-sm text-on-surface-variant">
-          Chua co khu vuc nao. Them it nhat mot khu vuc de tiep tuc.
+          Chưa có khu vực nào. Thêm ít nhất một khu vực để tiếp tục.
         </p>
       )}
     </section>

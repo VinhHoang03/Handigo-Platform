@@ -12,19 +12,34 @@ export function useProviderApplication() {
   const loadCategories = () => {
     setLoading(true);
     setLoadError('');
-    providerApplicationService.loadCategories()
+    providerApplicationService
+      .loadCategories()
       .then(setCategories)
-      .catch(() => setLoadError('Không thể tải lĩnh vực dịch vụ. Vui lòng thử lại.'))
+      .catch(() =>
+        setLoadError('Không thể tải lĩnh vực dịch vụ. Vui lòng thử lại.'),
+      )
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     let active = true;
-    providerApplicationService.loadCategories()
-      .then((value) => { if (active) setCategories(value); })
-      .catch(() => { if (active) setLoadError('Không thể tải lĩnh vực dịch vụ. Vui lòng thử lại.'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    providerApplicationService
+      .loadCategories()
+      .then((value) => {
+        if (active) setCategories(value);
+      })
+      .catch(() => {
+        if (active) {
+          setLoadError('Không thể tải lĩnh vực dịch vụ. Vui lòng thử lại.');
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const submit = async (payload: ProviderApplicationPayload) => {
@@ -33,12 +48,23 @@ export function useProviderApplication() {
       setSubmitError('');
       return await providerApplicationService.submit(payload);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Không thể gửi hồ sơ.');
+      setSubmitError(
+        error instanceof Error ? error.message : 'Không thể gửi hồ sơ.',
+      );
       throw error;
     } finally {
       setSubmitting(false);
     }
   };
 
-  return { categories, loading, submitting, loadError, submitError, loadCategories, submit };
+  return {
+    categories,
+    loading,
+    submitting,
+    loadError,
+    submitError,
+    loadCategories,
+    submit,
+    uploadImage: providerApplicationService.uploadImage,
+  };
 }

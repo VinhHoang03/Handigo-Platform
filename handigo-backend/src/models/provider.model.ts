@@ -26,6 +26,7 @@ export interface IIdentityDocument {
   documentNumber?: string;
   numberLast4?: string;
   fullName?: string;
+  issuedPlace?: string;
   issuedAt?: Date;
   expiresAt?: Date;
   dateOfBirth?: Date;
@@ -92,6 +93,7 @@ const IdentityDocumentSchema = new Schema<IIdentityDocument>(
     documentNumber: { type: String, trim: true, maxlength: 50 },
     numberLast4: { type: String, trim: true, maxlength: 4 },
     fullName: { type: String, trim: true },
+    issuedPlace: { type: String, trim: true, maxlength: 200 },
     issuedAt: { type: Date },
     expiresAt: { type: Date },
     dateOfBirth: { type: Date },

@@ -64,6 +64,7 @@ type IdentityForm = {
   type: IdentityDocumentType;
   documentNumber: string;
   fullName: string;
+  issuedPlace: string;
   issuedAt: string;
   expiresAt: string;
   frontImageUrl: string;
@@ -92,6 +93,7 @@ const emptyIdentityForm: IdentityForm = {
   type: "cccd",
   documentNumber: "",
   fullName: "",
+  issuedPlace: "",
   issuedAt: "",
   expiresAt: "",
   frontImageUrl: "",
@@ -166,6 +168,7 @@ const toIdentityForm = (identity?: IdentityDocument): IdentityForm => ({
   type: identity?.type || "cccd",
   documentNumber: identity?.documentNumber || identity?.numberLast4 || "",
   fullName: identity?.fullName || "",
+  issuedPlace: identity?.issuedPlace || "",
   issuedAt: toDateInput(identity?.issuedAt),
   expiresAt: toDateInput(identity?.expiresAt),
   frontImageUrl: identity?.frontImageUrl || "",
@@ -445,6 +448,12 @@ function IdentityDocumentForm({
           value={form.fullName}
           required
           onChange={(value) => onChange({ ...form, fullName: value })}
+        />
+        <TextInput
+          id="identity-issued-place"
+          label="Nơi cấp"
+          value={form.issuedPlace}
+          onChange={(value) => onChange({ ...form, issuedPlace: value })}
         />
         <TextInput
           id="identity-issued-at"
@@ -1007,6 +1016,7 @@ export default function ProviderProfilePage() {
         documentNumber: optional(identityForm.documentNumber),
         numberLast4: documentLast4(identityForm.documentNumber),
         fullName: optional(identityForm.fullName),
+        issuedPlace: optional(identityForm.issuedPlace),
         issuedAt: optional(identityForm.issuedAt),
         expiresAt: optional(identityForm.expiresAt),
         frontImageUrl:

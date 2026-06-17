@@ -47,9 +47,7 @@ export const providerProfileApi = {
     formData.append('purpose', purpose);
 
     return data<{ url: string }>(
-      await api.post('/provider-assets/images', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      }),
+      await api.post('/provider-assets/images', formData),
     );
   },
 };
