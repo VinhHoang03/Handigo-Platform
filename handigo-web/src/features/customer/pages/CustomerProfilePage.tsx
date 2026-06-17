@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import {
   useEffect,
   useMemo,
@@ -29,6 +30,16 @@ import type {
   UserProfile,
 } from "../types/customer.types";
 import { getCustomerProfile, updateCustomerProfile } from "../api/customer.api";
+=======
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { DashboardShell } from '@/components/common/DashboardShell';
+import { FloatingInput, FloatingTextarea } from '@/components/common/FloatingField';
+import { Modal } from '@/components/common/Modal';
+import { AddressCard, ProfileSectionHeader, ToggleOption } from '../components/CustomerProfileComponents';
+import type { Address, CreateAddressPayload, UserProfile } from '../types/customer.types';
+import { getCustomerProfile, updateCustomerProfile } from '../api/customer.api';
+>>>>>>> 06c4f89e4d6923ecd6caf1db8fbcec751bdd9220
 import {
   createCustomerAddress,
   deleteCustomerAddress,
@@ -64,6 +75,7 @@ const EMPTY_ADDRESS_FORM: AddressFormState = {
   isDefault: false,
 };
 
+<<<<<<< HEAD
 function maskEmail(email?: string | null) {
   if (!email) return "";
   const [localPart, domain] = email.split("@");
@@ -97,6 +109,9 @@ function ProfileInfoField({
   const content =
     isEditing && editable && !readOnly ? editValue || "" : value || "";
 
+=======
+function ReadOnlyField({ label, value }: { label: string; value?: string | null }) {
+>>>>>>> 06c4f89e4d6923ecd6caf1db8fbcec751bdd9220
   return (
     <div className="space-y-2">
       <label className="ml-1 block text-label-sm font-medium text-on-surface-variant">
@@ -627,19 +642,27 @@ export default function CustomerProfilePage() {
 
   if (isLoading || !profile) {
     return (
+<<<<<<< HEAD
       <DashboardLayout role="CUSTOMER" userAvatar={DEFAULT_AVATAR}>
+=======
+      <DashboardShell role="CUSTOMER">
+>>>>>>> 06c4f89e4d6923ecd6caf1db8fbcec751bdd9220
         <div className="flex min-h-[400px] items-center justify-center text-on-surface-variant">
           Đang tải hồ sơ...
         </div>
-      </DashboardLayout>
+      </DashboardShell>
     );
   }
 
   return (
+<<<<<<< HEAD
     <DashboardLayout
       role="CUSTOMER"
       userAvatar={profile.avatarUrl || profile.avatar || DEFAULT_AVATAR}
     >
+=======
+    <DashboardShell role="CUSTOMER">
+>>>>>>> 06c4f89e4d6923ecd6caf1db8fbcec751bdd9220
       <div className="mx-auto max-w-5xl space-y-6">
         {errorMsg && (
           <div className="rounded-2xl bg-error/10 p-3 font-label-md text-error">
@@ -1152,6 +1175,6 @@ export default function CustomerProfilePage() {
           </div>
         </form>
       </Modal>
-    </DashboardLayout>
+    </DashboardShell>
   );
 }

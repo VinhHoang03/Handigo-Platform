@@ -1,0 +1,340 @@
+<!DOCTYPE html><html class="light" lang="vi"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Theo dõi đơn hàng - HandiGo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Hanken+Grotesk:wght@600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .timeline-line {
+            background: linear-gradient(to bottom, #3525cd 50%, #e2e7ff 50%);
+            background-size: 100% 200%;
+            background-position: bottom;
+            transition: background-position 0.5s ease;
+        }
+        .active-step .timeline-line {
+            background-position: top;
+        }
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        .pulse-status {
+            animation: pulse-soft 2s infinite ease-in-out;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#c3c0ff",
+                        "primary": "#3525cd",
+                        "outline": "#777587",
+                        "on-secondary-fixed": "#001f26",
+                        "on-surface": "#131b2e",
+                        "tertiary": "#7e3000",
+                        "surface-bright": "#faf8ff",
+                        "background": "#faf8ff",
+                        "on-primary-fixed": "#0f0069",
+                        "surface-container-low": "#f2f3ff",
+                        "surface-container-high": "#e2e7ff",
+                        "on-primary-container": "#dad7ff",
+                        "inverse-on-surface": "#eef0ff",
+                        "surface-dim": "#d2d9f4",
+                        "primary-container": "#4f46e5",
+                        "surface-container-highest": "#dae2fd",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "secondary-fixed": "#acedff",
+                        "inverse-surface": "#283044",
+                        "surface-variant": "#dae2fd",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "surface": "#faf8ff",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "secondary": "#00687a",
+                        "on-tertiary-container": "#ffd2be",
+                        "on-background": "#131b2e",
+                        "tertiary-fixed-dim": "#ffb695",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-fixed": "#351000",
+                        "on-secondary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "surface-tint": "#4d44e3",
+                        "on-secondary-container": "#006172",
+                        "secondary-fixed-dim": "#4cd7f6",
+                        "secondary-container": "#57dffe",
+                        "primary-fixed": "#e2dfff",
+                        "on-primary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "outline-variant": "#c7c4d8",
+                        "error-container": "#ffdad6",
+                        "surface-container": "#eaedff",
+                        "on-surface-variant": "#464555",
+                        "on-secondary-fixed-variant": "#004e5c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "lg": "48px",
+                        "container-max": "1280px",
+                        "xs": "4px",
+                        "xl": "80px",
+                        "sm": "12px",
+                        "base": "8px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-xl": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md overflow-x-hidden">
+<!-- TopNavBar -->
+<nav class="flex justify-between items-center w-full px-md py-sm z-40 bg-surface/80 backdrop-blur-md sticky top-0 border-b border-outline-variant/30 shadow-sm">
+<div class="flex items-center gap-sm">
+<button class="material-symbols-outlined text-primary p-xs hover:bg-surface-container rounded-full transition-colors active:scale-95" onclick="history.back()">arrow_back</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">HandiGo</h1>
+</div>
+<div class="flex items-center gap-base">
+<button class="material-symbols-outlined text-on-surface-variant p-base hover:bg-surface-container transition-all duration-200 rounded-full">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant p-base hover:bg-surface-container transition-all duration-200 rounded-full">chat</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Ảnh đại diện người dùng" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNwJ1Zu5v7jbmwQjQNCU9XCp8mBOpkeltAAeT2_A4nZQXIImyHPTmHhnrHKArfiNwilXbZIxOK3BsCpRjmkv0pb40vAxNwEC_HTyBxv4J7UHaEBAmItnVj6fMfA5RQNHRbkP3T1UX4UkFX2VUyc5QItEZFjlHNH75DDlU5kfEJvqBwv8sFyAZ3EmkOho9RkEpDHqfosCxfcxpHor2N8r2Xy8oupGrnBT3g9Y_XNkCLgkOUzlz_Gv54AhV4TRMICvPQ5ZLlKV0j4BA">
+</div>
+</div>
+</nav>
+<main class="max-w-screen-xl mx-auto px-md py-lg grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Status & Timeline -->
+<div class="lg:col-span-8 flex flex-col gap-md">
+<!-- Order Header Card -->
+<div class="glass-card rounded-xl p-md shadow-sm">
+<div class="flex justify-between items-start mb-sm">
+<div>
+<span class="bg-primary/10 text-primary px-sm py-xs rounded-full font-label-sm text-label-sm mb-xs inline-block">Mã đơn: #HG-98231</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Sửa chữa máy lạnh chuyên sâu</h2>
+</div>
+<div class="flex flex-col items-end">
+<span class="flex items-center gap-xs text-primary font-bold">
+<span class="w-2 h-2 rounded-full bg-primary pulse-status"></span>
+                            Đang thực hiện
+                        </span>
+<p class="text-on-surface-variant text-label-md font-label-md mt-1">Dự kiến xong lúc: 15:30</p>
+</div>
+</div>
+<div class="h-[1px] bg-outline-variant/30 my-md"></div>
+<div class="flex gap-md">
+<div class="flex-1 flex flex-col gap-xs">
+<span class="text-on-surface-variant text-label-sm font-label-sm">ĐỊA ĐIỂM</span>
+<p class="font-medium">245 Trần Hưng Đạo, Quận 1, TP. HCM</p>
+</div>
+<div class="flex-1 flex flex-col gap-xs text-right">
+<span class="text-on-surface-variant text-label-sm font-label-sm">TỔNG THANH TOÁN</span>
+<p class="font-bold text-primary text-body-lg font-body-lg">450.000đ</p>
+</div>
+</div>
+</div>
+<!-- Detailed Status Timeline -->
+<div class="glass-card rounded-xl p-md shadow-sm overflow-hidden relative">
+<h3 class="font-headline-md text-headline-md mb-md">Trạng thái chi tiết</h3>
+<div class="space-y-0">
+<!-- Step 1: Confirmed -->
+<div class="flex gap-md group translate-y-0" style="opacity: 1;">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white z-10 shrink-0">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</div>
+<div class="w-0.5 h-16 bg-primary"></div>
+</div>
+<div class="pb-base">
+<h4 class="font-bold text-on-surface">Đã xác nhận thợ</h4>
+<p class="text-on-surface-variant text-label-md font-label-md">Thợ Nguyễn Văn An đã nhận lời thực hiện dịch vụ.</p>
+<span class="text-xs text-outline mt-1 block">09:15, 24 Tháng 5, 2024</span>
+</div>
+</div>
+<!-- Step 2: Arrived -->
+<div class="flex gap-md group translate-y-0" style="opacity: 1;">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white z-10 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</div>
+<div class="w-0.5 h-16 bg-primary"></div>
+</div>
+<div class="pb-base">
+<h4 class="font-bold text-on-surface">Thợ đã đến nơi</h4>
+<p class="text-on-surface-variant text-label-md font-label-md">Thợ đã có mặt tại địa chỉ yêu cầu và bắt đầu khảo sát.</p>
+<span class="text-xs text-outline mt-1 block">13:45, 24 Tháng 5, 2024</span>
+</div>
+</div>
+<!-- Step 3: In Progress (Highlighted) -->
+<div class="flex gap-md group active-step translate-y-0" style="opacity: 1;">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-primary z-10 shrink-0 border-4 border-white shadow-sm">
+<span class="material-symbols-outlined text-[18px] pulse-status">build</span>
+</div>
+<div class="w-0.5 h-16 bg-surface-container-high"></div>
+</div>
+<div class="pb-base">
+<h4 class="font-bold text-primary font-headline-md text-headline-md">Đang thực hiện</h4>
+<div class="bg-primary/5 border border-primary/20 rounded-lg p-sm mt-xs">
+<p class="text-on-surface-variant font-medium">Công việc hiện tại:</p>
+<ul class="list-disc list-inside text-sm mt-xs space-y-1 text-on-surface-variant">
+<li>Vệ sinh dàn lạnh và lưới lọc</li>
+<li>Kiểm tra áp suất gas và nạp bổ sung</li>
+<li>Thông tắc ống thoát nước ngưng</li>
+</ul>
+</div>
+<span class="text-xs text-primary font-bold mt-2 block">Bắt đầu lúc 14:00 (Đã làm 45 phút)</span>
+</div>
+</div>
+<!-- Step 4: Completion -->
+<div class="flex gap-md group opacity-40 translate-y-0" style="opacity: 1;">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant z-10 shrink-0">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+</div>
+</div>
+<div class="pb-base">
+<h4 class="font-bold text-on-surface-variant">Hoàn thành &amp; Nghiệm thu</h4>
+<p class="text-on-surface-variant text-label-md font-label-md italic">Dự kiến hoàn thành lúc 15:30</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Provider & Actions -->
+<div class="lg:col-span-4 flex flex-col gap-md">
+<!-- Provider Card -->
+<div class="glass-card rounded-xl p-md shadow-sm border-l-4 border-l-primary">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant mb-md uppercase tracking-wider">Thông tin thợ</h3>
+<div class="flex items-center gap-md mb-md">
+<div class="relative">
+<img alt="Thợ Nguyễn Văn An đang mỉm cười thân thiện trong đồng phục kỹ thuật chuyên nghiệp" class="w-20 h-20 rounded-xl object-cover shadow-sm" data-alt="A professional and friendly middle-aged Asian technician named Nguyen Van An, wearing a clean navy blue polo shirt with a company logo. He is standing in a brightly lit, modern apartment setting with professional toolbags nearby. The atmosphere is trustworthy and high-end, utilizing soft natural lighting and a clean, minimalist aesthetic with premium navy and white tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJ0GO_qWtP836LOZCHFgXzsplok2uJJMZ5lUVdKCKVdPAB3jB38Zw94IHT3_-Sr9GUgXeNd9nTTbgP0rwKQfAK4j3o63rYHiYzEunJiEnK0DIEoj8P-GRE0_SedVHxDQyHzVFzuL7EqWkUuGc8LqKoMLe8kEHZMf-_DrYldMluBCZy2FI3sxLbr0dFeKxvcPv-i0oWLeALEOPz_gls_nH4-KeOvFq40sBCEHMmV87_ZvkkjS8QZm6dL0JO7ibS7s6veYav-jTZD0A">
+<div class="absolute -bottom-2 -right-2 bg-green-500 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center" title="Đang trực tuyến">
+<span class="w-2 h-2 rounded-full bg-white"></span>
+</div>
+</div>
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface">Nguyễn Văn An</h4>
+<div class="flex items-center gap-1 text-tertiary">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-bold">4.9</span>
+<span class="text-on-surface-variant text-label-sm font-normal">(128 đánh giá)</span>
+</div>
+<span class="text-on-surface-variant text-label-md font-label-md">8 năm kinh nghiệm</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-sm mb-md">
+<div class="bg-surface-container rounded-lg p-sm flex flex-col items-center">
+<span class="material-symbols-outlined text-primary mb-1">security</span>
+<span class="text-[10px] text-on-surface-variant uppercase">Đã xác thực</span>
+</div>
+<div class="bg-surface-container rounded-lg p-sm flex flex-col items-center">
+<span class="material-symbols-outlined text-primary mb-1">local_shipping</span>
+<span class="text-[10px] text-on-surface-variant uppercase">Xe máy riêng</span>
+</div>
+</div>
+<div class="space-y-sm">
+<button class="w-full bg-primary text-white py-sm rounded-xl font-bold flex items-center justify-center gap-base active:scale-95 transition-transform hover:shadow-lg hover:bg-primary-container">
+<span class="material-symbols-outlined">chat</span>
+                        Chat với thợ
+                    </button>
+<button class="w-full border border-outline-variant text-on-surface py-sm rounded-xl font-medium flex items-center justify-center gap-base hover:bg-surface-container transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined">call</span>
+                        Gọi điện
+                    </button>
+</div>
+</div>
+<!-- Support Card -->
+<div class="bg-surface-container-low rounded-xl p-md border border-outline-variant/30">
+<div class="flex items-center gap-sm mb-sm text-on-surface">
+<span class="material-symbols-outlined text-primary">support_agent</span>
+<h3 class="font-bold">Bạn cần hỗ trợ?</h3>
+</div>
+<p class="text-on-surface-variant text-label-md mb-md leading-relaxed">
+                    Đội ngũ HandiGo luôn sẵn sàng giải quyết mọi vấn đề phát sinh trong quá trình sửa chữa.
+                </p>
+<button class="text-primary font-bold flex items-center gap-xs hover:translate-x-1 transition-transform">
+                    Trung tâm trợ giúp
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<!-- Live Location (Simulated) -->
+<div class="glass-card rounded-xl overflow-hidden shadow-sm h-48 relative">
+<div class="absolute inset-0 bg-slate-200">
+<img alt="Bản đồ mô phỏng vị trí công việc tại TP. Hồ Chí Minh" class="w-full h-full object-cover opacity-80" data-location="Ho Chi Minh City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGnjcan9CsiaELza0mHJzN_TBOVRwyfa6r9gyVr9MGZY2wgWN38Tck47YFBIgAOUUAnAaWxzy1xwF8XxmAOUJVPKb6tVs8bKP51W7k61dMp5yiUfOdqjDGoG8kO0j729hmkImtXNHw-9MTBWroy85EH27ty84oLZx98P8TX05e_NHVq4kCxzAYI7dYX3wqq8w_HuO8GYcixrdNvmaNWuVumYZ_UbFk6od116q6a_MNDbnjF2CQJ24GFX0rDuBcnDz210jkXdFlQQw">
+</div>
+<div class="absolute top-md left-md bg-white/90 backdrop-blur-sm px-sm py-xs rounded-full flex items-center gap-base shadow-sm">
+<div class="w-2 h-2 rounded-full bg-red-500"></div>
+<span class="text-xs font-bold">Vị trí thực hiện</span>
+</div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="relative">
+<div class="absolute inset-0 bg-primary/20 rounded-full scale-[2] animate-ping"></div>
+<div class="w-8 h-8 bg-primary rounded-full border-4 border-white shadow-md flex items-center justify-center z-10 relative">
+<span class="material-symbols-outlined text-white text-[16px]">home</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Mobile Action Bar (Responsive View Only) -->
+<div class="fixed bottom-0 left-0 right-0 bg-surface/90 backdrop-blur-xl border-t border-outline-variant/30 p-md flex items-center gap-md md:hidden z-50">
+<button class="flex-1 bg-primary text-white py-sm rounded-xl font-bold flex items-center justify-center gap-base active:scale-95 shadow-lg">
+<span class="material-symbols-outlined">chat</span>
+            Nhắn tin
+        </button>
+<button class="w-12 h-12 border border-outline-variant rounded-xl flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<script>
+        // Simple micro-interaction for status timeline
+        document.addEventListener('DOMContentLoaded', () => {
+            const steps = document.querySelectorAll('.group');
+            steps.forEach((step, index) => {
+                setTimeout(() => {
+                    step.style.opacity = '1';
+                    step.classList.add('translate-y-0');
+                }, index * 100);
+            });
+        });
+    </script>
+</body></html>

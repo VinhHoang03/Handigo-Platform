@@ -1,11 +1,11 @@
-import React from 'react';
-import { DashboardLayout } from '../../../components/DashboardLayout';
+import React, { useState } from 'react';
+import { DashboardShell } from '@/components/common/DashboardShell';
 import { JobCard, WalletWidget, EarningsChart, QuickAccessCard } from '../components/ProviderHomeComponents';
 import { useProviderAvailability } from '../hooks/useProviderAvailability';
 import type { Job } from '../types/provider.types';
 
-const ProviderHomePage: React.FC = () => {
-  const { isOnline, toggleAvailability } = useProviderAvailability();
+const ProviderHomePage: React.FC z
+  const [isOnline, setIsOnline] = useState(true);
 
   const todaySchedule: Job[] = [
     {
@@ -35,9 +35,8 @@ const ProviderHomePage: React.FC = () => {
   ];
 
   return (
-    <DashboardLayout
+    <DashboardShell
       role="PROVIDER"
-      userAvatar="https://lh3.googleusercontent.com/aida-public/AB6AXuAjpLVPoIGTa95MnukQDxDkwipVEdUK4tvywHaXPdLfsBuz3CBppL4xhrcd4KFx7IyKFsEu-oTQgItWCrfDH4bbmgdsr2QCzauPYzsV8wZKLoS5vzbTWRgaR7qArZjpW2aONOx3ZgYMLLFXtluy3RJqtRFqW9N8DAa82wW2MB-p2fuhghYyqMu-VvTCnd4FiH9L2t6YwTmaE9PKmeEJyHwaS8CYPJzieyrdiDjpoLKsPIPdIR6ioK-rCt_Vt9N59xHVs-Lu-F8U2DU"
       showStatusToggle
       isOnline={isOnline}
       onStatusToggle={toggleAvailability}
@@ -94,7 +93,7 @@ const ProviderHomePage: React.FC = () => {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </DashboardShell>
   );
 };
 

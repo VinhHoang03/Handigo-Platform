@@ -10,9 +10,13 @@ import {
 
 const router = Router();
 
+// Public / Authenticated GET routes
+router.get("/", authMiddleware, serviceController.listServices);
+router.get("/:id", authMiddleware, serviceController.getServiceById);
+router.get("/:id/options", authMiddleware, serviceController.getServiceOptions);
+
+// Admin-only write routes
 router.use(authMiddleware, roleMiddleware("ADMIN"));
-router.get("/", serviceController.listServices);
-router.get("/:id", serviceController.getServiceById);
 router.post("/", validate(createServiceSchema), serviceController.createService);
 router.patch(
   "/:id",

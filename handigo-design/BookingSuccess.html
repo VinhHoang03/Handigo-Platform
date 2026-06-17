@@ -1,0 +1,336 @@
+<!DOCTYPE html><html class="light" lang="vi"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Xác nhận đặt lịch thành công - HandiGo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-lowest": "#ffffff",
+                    "secondary-fixed": "#acedff",
+                    "tertiary": "#7e3000",
+                    "surface-container-low": "#f2f3ff",
+                    "outline-variant": "#c7c4d8",
+                    "secondary-fixed-dim": "#4cd7f6",
+                    "on-surface-variant": "#464555",
+                    "on-error": "#ffffff",
+                    "surface-container": "#eaedff",
+                    "surface-variant": "#dae2fd",
+                    "on-secondary-container": "#006172",
+                    "on-secondary": "#ffffff",
+                    "surface-tint": "#4d44e3",
+                    "on-tertiary-container": "#ffd2be",
+                    "inverse-surface": "#283044",
+                    "surface": "#faf8ff",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb695",
+                    "on-secondary-fixed-variant": "#004e5c",
+                    "inverse-primary": "#c3c0ff",
+                    "surface-container-high": "#e2e7ff",
+                    "secondary": "#00687a",
+                    "tertiary-container": "#a44100",
+                    "on-secondary-fixed": "#001f26",
+                    "tertiary-fixed": "#ffdbcc",
+                    "primary": "#3525cd",
+                    "on-tertiary-fixed": "#351000",
+                    "on-surface": "#131b2e",
+                    "secondary-container": "#57dffe",
+                    "inverse-on-surface": "#eef0ff",
+                    "surface-container-highest": "#dae2fd",
+                    "on-primary-container": "#dad7ff",
+                    "on-primary": "#ffffff",
+                    "background": "#faf8ff",
+                    "outline": "#777587",
+                    "on-background": "#131b2e",
+                    "primary-fixed": "#e2dfff",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "on-primary-fixed": "#0f0069",
+                    "on-tertiary-fixed-variant": "#7b2f00",
+                    "error": "#ba1a1a",
+                    "surface-bright": "#faf8ff",
+                    "primary-container": "#4f46e5",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "80px",
+                    "lg": "48px",
+                    "container-max": "1280px",
+                    "sm": "12px",
+                    "base": "8px",
+                    "xs": "4px",
+                    "md": "24px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "body-md": ["Inter"],
+                    "headline-xl": ["Hanken Grotesk"],
+                    "headline-md": ["Hanken Grotesk"],
+                    "label-sm": ["Inter"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+      }
+      @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+      }
+      .animate-float { animation: float 4s ease-in-out infinite; }
+      .success-checkmark {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto;
+        position: relative;
+        display: block;
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+      }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-x-hidden">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface dark:bg-surface-dim border-r border-outline-variant/30 dark:border-outline/20 shadow-md flex flex-col gap-sm p-md z-50 hidden md:flex">
+<div class="flex items-center gap-sm mb-lg px-base">
+<span class="material-symbols-outlined text-primary text-4xl" data-icon="home_repair_service">home_repair_service</span>
+<span class="font-headline-md text-headline-md font-extrabold text-primary dark:text-primary-fixed-dim">HandiGo</span>
+</div>
+<nav class="flex flex-col gap-xs flex-grow">
+<a class="flex items-center gap-base text-on-surface-variant hover:bg-surface-container px-md py-sm rounded-xl hover:translate-x-1 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Bảng điều khiển</span>
+</a>
+<!-- ACTIVE TAB: Lịch đặt chỗ as this is a booking confirmation flow -->
+<a class="flex items-center gap-base bg-primary-container text-on-primary-container rounded-xl px-md py-sm hover:translate-x-1 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_today">calendar_today</span>
+<span class="font-label-md text-label-md">Lịch đặt chỗ</span>
+</a>
+<a class="flex items-center gap-base text-on-surface-variant hover:bg-surface-container px-md py-sm rounded-xl hover:translate-x-1 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+<span class="font-label-md text-label-md">Hộp thư</span>
+</a>
+<a class="flex items-center gap-base text-on-surface-variant hover:bg-surface-container px-md py-sm rounded-xl hover:translate-x-1 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-md text-label-md">Ví tiền</span>
+</a>
+<a class="flex items-center gap-base text-on-surface-variant hover:bg-surface-container px-md py-sm rounded-xl hover:translate-x-1 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Cài đặt</span>
+</a>
+</nav>
+<button class="bg-primary text-on-primary font-label-md text-label-md py-sm px-md rounded-full shadow-sm hover:opacity-90 transition-opacity mt-auto">
+            Đăng tin dịch vụ
+        </button>
+</aside>
+<!-- Main Content Area -->
+<main class="md:ml-64 min-h-screen flex flex-col">
+<!-- TopNavBar (Authority: JSON) -->
+<header class="flex justify-between items-center w-full px-md py-sm z-40 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md border-b border-outline-variant/30 dark:border-outline/20 shadow-sm sticky top-0">
+<div class="flex items-center gap-md">
+<div class="md:hidden">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="menu">menu</span>
+</div>
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" data-icon="search">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-primary/50 w-64 text-label-md" placeholder="Tìm kiếm dịch vụ..." type="text">
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high/50 rounded-full transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high/50 rounded-full transition-all active:scale-95">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+</button>
+<div class="h-8 w-px bg-outline-variant/30 mx-base"></div>
+<img alt="Ảnh đại diện người dùng" class="w-10 h-10 rounded-full border-2 border-primary-container object-cover" data-alt="A close-up professional portrait of a smiling middle-aged man with kind eyes, set against a blurred high-end apartment interior. The lighting is soft and warm, typical of a luxury home lifestyle brand. The overall aesthetic is clean, minimalist, and premium, utilizing a soft blue and white color palette to evoke trust and dependability in a premium home services marketplace." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdK8r6ViWovpKckM6BE4CwSRrr10Vb9gDc6erQjbtKbwygNUaK9kKF19QNm6gL530wjmZgjq2Z01-oeSC19D8g18qRMu7G-JNlKy4UoTR3zGRT6CMdT6vUQpPenPzkl6FwJAMURBdZ2WlHYyqdviTMALzFB7AJJYZuBSTkqawqjNa61PoFmSITAqSdO-ZFVD46GHoQnsCiHOvD5Et0G518N6VZokV93Uj1Cebp0IuMJ2IJBU75M7OYtQqQ9-YCjKSYEnDem1aNL8E">
+</div>
+</header>
+<!-- Confirmation Content -->
+<div class="flex-grow container-max mx-auto px-md py-lg flex flex-col items-center justify-center">
+<!-- Success Animation & Main Heading -->
+<div class="text-center mb-lg w-full max-w-2xl">
+<div class="inline-flex items-center justify-center w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full mb-md animate-float shadow-lg shadow-emerald-200/50">
+<span class="material-symbols-outlined text-5xl font-bold" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-on-surface mb-sm">Đặt lịch thành công!</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Cảm ơn bạn đã tin tưởng HandiGo. Chuyên gia của chúng tôi sẽ sớm liên hệ với bạn.</p>
+</div>
+<!-- Booking Details Card (Bento-style Glassmorphic) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md w-full max-w-4xl">
+<!-- Main Info -->
+<div class="md:col-span-2 glass-card rounded-3xl p-md shadow-sm">
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Mã đơn hàng</span>
+<p class="font-headline-md text-headline-md text-primary">#HG-8829-2024</p>
+</div>
+<div class="bg-primary/10 text-primary px-sm py-xs rounded-full font-label-sm">
+                            Đã xác nhận
+                        </div>
+</div>
+<div class="space-y-md">
+<div class="flex gap-md">
+<img class="w-24 h-24 rounded-2xl object-cover shadow-sm" data-alt="A professional house cleaning service scene with a clean, minimalist aesthetic. A set of high-end eco-friendly cleaning supplies sits neatly on a pristine marble countertop in a bright, sun-drenched modern kitchen. The lighting is high-key and airy, emphasizing the premium quality of the service. Colors are dominated by soft whites and subtle indigo accents consistent with the HandiGo brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXO741IS-3HdfNGSGB2pLL2hvrO5UQ1vq-7sNi62YKQ8KklFVquL-xayj2f2ht_WLo34Rmjs-j_EZtPV-Q2cKQQggighr1S63cIz4bC6sNV4pfxehjK19Cxc-ehMf6-f5N_SOHSleL4NikEjmT6eGx6GpYzw8oZNy8PhMcOsqYeg0h7LV1ri8VQwho_JTU45bhT9fHisvwKEzBD9qoga5e_WDorhvjA3GooafEzowREV-xkhMdbqsrm3pKAjhAJkPLTbRYSLBtkUA">
+<div class="flex flex-col justify-center">
+<h3 class="font-headline-md text-headline-md text-on-surface">Vệ sinh căn hộ cao cấp</h3>
+<p class="text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-sm" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+                                    4.9 (120 đánh giá)
+                                </p>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-md border-t border-outline-variant/30 pt-md">
+<div class="flex items-start gap-sm">
+<div class="p-2 bg-surface-container rounded-lg text-primary">
+<span class="material-symbols-outlined" data-icon="schedule">schedule</span>
+</div>
+<div>
+<p class="font-label-sm text-on-surface-variant">Thời gian</p>
+<p class="font-label-md text-on-surface">09:00 - Thứ Tư, 24/05/2024</p>
+</div>
+</div>
+<div class="flex items-start gap-sm">
+<div class="p-2 bg-surface-container rounded-lg text-primary">
+<span class="material-symbols-outlined" data-icon="location_on">location_on</span>
+</div>
+<div>
+<p class="font-label-sm text-on-surface-variant">Địa chỉ</p>
+<p class="font-label-md text-on-surface">Căn hộ B-1204, Vinhomes Central Park, Bình Thạnh, TP. HCM</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Price & Summary -->
+<div class="md:col-span-1 flex flex-col gap-md">
+<div class="glass-card rounded-3xl p-md shadow-sm flex flex-col h-full">
+<h4 class="font-headline-md text-headline-md mb-md">Tóm tắt</h4>
+<div class="space-y-sm flex-grow">
+<div class="flex justify-between text-label-md">
+<span class="text-on-surface-variant">Giá dịch vụ</span>
+<span class="text-on-surface">450.000đ</span>
+</div>
+<div class="flex justify-between text-label-md">
+<span class="text-on-surface-variant">Phí di chuyển</span>
+<span class="text-on-surface">25.000đ</span>
+</div>
+<div class="flex justify-between text-label-md">
+<span class="text-on-surface-variant">Giảm giá</span>
+<span class="text-emerald-600">-50.000đ</span>
+</div>
+</div>
+<div class="border-t border-outline-variant/30 pt-sm mt-md">
+<div class="flex justify-between items-center">
+<span class="font-bold text-on-surface">Tổng cộng</span>
+<span class="font-headline-md text-headline-md text-primary">425.000đ</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex flex-col sm:flex-row gap-md mt-lg w-full max-w-4xl">
+<button class="flex-1 py-4 bg-primary text-on-primary rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg shadow-primary/20 active:scale-95 flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+                    Theo dõi đơn hàng
+                </button>
+<button class="flex-1 py-4 bg-surface-container-high/50 text-primary border border-outline-variant/30 rounded-2xl font-bold hover:bg-surface-container-highest/20 transition-all active:scale-95 flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+                    Về trang chủ
+                </button>
+</div>
+<!-- Map Preview (Minimalist) -->
+<div class="w-full max-w-4xl mt-lg h-48 rounded-3xl overflow-hidden border border-outline-variant/30 relative shadow-sm">
+<div class="absolute inset-0 bg-slate-200 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover opacity-60 grayscale" data-alt="A clean, minimalist vector-style map of a metropolitan area with soft pastel tones of light blue and white. The map features elegant, thin lines representing streets and subtle landmarks. A small indigo pin indicates a specific location, fitting perfectly with the premium and modern aesthetic of a high-end tech platform. The lighting is flat and high-key." data-location="Ho Chi Minh City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAerzJfsPS8nghMR08LbCJZwhcBwKTxrhbIuKolxea6DKHP8th11AJyFAAfaEhydbGXEN7zkDyVWRJWfrh2agnVk0ZCeGdvdTN4RyaYnYu5ejVHbw6KDGN_LAeah3w508cd5VWnz72jXmAasAKWCyqWQ-pnTNhmtomw7qh7-7CRCPqX6ZgRwwu2eGadAw8StDyLReibrN4Qb8Kv5Hdo92Jjvhh1nTVQYXywxPmT5Clbq0YjxxcGjpuLrseattxAAyD1iBUHt_6AWf0">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container/80 to-transparent"></div>
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-md py-xs rounded-full shadow-md flex items-center gap-sm">
+<div class="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+<span class="text-label-sm font-label-sm text-on-surface">Đang tìm chuyên gia gần nhất...</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="mt-auto px-md py-lg border-t border-outline-variant/20">
+<div class="container-max mx-auto flex flex-col md:flex-row justify-between items-center gap-md">
+<div class="flex items-center gap-sm">
+<span class="font-headline-md text-headline-md font-extrabold text-primary/50">HandiGo</span>
+<span class="text-on-surface-variant text-label-sm">© 2024 Dịch vụ gia đình cao cấp</span>
+</div>
+<div class="flex gap-md text-on-surface-variant text-label-sm">
+<a class="hover:text-primary transition-colors" href="#">Điều khoản</a>
+<a class="hover:text-primary transition-colors" href="#">Bảo mật</a>
+<a class="hover:text-primary transition-colors" href="#">Hỗ trợ</a>
+</div>
+</div>
+</footer>
+</main>
+<!-- Bottom Navigation (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-surface/90 backdrop-blur-lg border-t border-outline-variant/30 px-md py-sm flex justify-between items-center z-50">
+<button class="flex flex-col items-center gap-xs text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="text-[10px] font-medium">Trang chủ</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-primary">
+<span class="material-symbols-outlined" data-icon="calendar_today" style="font-variation-settings: 'FILL' 1;">calendar_today</span>
+<span class="text-[10px] font-bold">Lịch đặt</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+<span class="text-[10px] font-medium">Tin nhắn</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-[10px] font-medium">Tôi</span>
+</button>
+</nav>
+<script>
+        // Micro-interactions for buttons
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.transform = 'scale(1.02)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.transform = 'scale(1)';
+            });
+        });
+        
+        // Console confirmation
+        console.log("Booking Confirmed: HG-8829-2024 Initialized.");
+    </script>
+</body></html>
