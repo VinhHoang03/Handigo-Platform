@@ -36,3 +36,7 @@ export const dashboardQuerySchema = z
   });
 
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
+export const providerAvailabilitySchema = z.object({
+  availabilityStatus: z.enum(["online", "offline", "busy"]),
+});

@@ -12,8 +12,8 @@ import type { ProviderApplicationPayload } from '../types/providerApplication.ty
 
 const initial: ProviderApplicationPayload = {
   description: '',
-  experienceYears: 0,
-  serviceCategoryIds: [],
+  experienceYears: 2,
+  serviceIds: [],
   workingAreas: [],
 };
 
@@ -22,26 +22,24 @@ export default function RegisterProviderPage() {
   const providerApplication = useProviderApplication();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(initial);
-  const [area, setArea] = useState('');
   const [success, setSuccess] = useState('');
 
-  const toggleCategory = (id: string) => setForm((value) => ({
+  const toggleService = (id: string) => setForm((value) => ({
     ...value,
-    serviceCategoryIds: value.serviceCategoryIds.includes(id)
-      ? value.serviceCategoryIds.filter((item) => item !== id)
-      : [...value.serviceCategoryIds, id],
+    serviceIds: value.serviceIds.includes(id)
+      ? value.serviceIds.filter((item) => item !== id)
+      : [...value.serviceIds, id],
   }));
 
-  const addArea = () => {
+  const addArea = (area: string) => {
     const value = area.trim();
     if (value && !form.workingAreas.includes(value)) {
       setForm((current) => ({ ...current, workingAreas: [...current.workingAreas, value] }));
     }
-    setArea('');
   };
 
   const canContinue = step === 1
-    ? providerApplication.categories.length > 0 && form.serviceCategoryIds.length > 0
+    ? providerApplication.categories.some((category) => (category.services || []).length > 0) && form.serviceIds.length > 0
     : form.workingAreas.length > 0;
 
   const send = async () => {
@@ -76,17 +74,15 @@ export default function RegisterProviderPage() {
             {step === 1 && (
               <CategorySelectionStep
                 categories={providerApplication.categories}
-                selectedIds={form.serviceCategoryIds}
+                selectedIds={form.serviceIds}
                 experienceYears={form.experienceYears}
-                onToggle={toggleCategory}
+                onToggle={toggleService}
                 onExperienceChange={(experienceYears) => setForm({ ...form, experienceYears })}
               />
             )}
             {step === 2 && (
               <WorkingAreasStep
-                area={area}
                 areas={form.workingAreas}
-                onAreaChange={setArea}
                 onAdd={addArea}
                 onRemove={(value) => setForm({
                   ...form,

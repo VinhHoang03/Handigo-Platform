@@ -142,7 +142,7 @@ Tài liệu này liệt kê tất cả các collection MongoDB (Mongoose models)
 - `userId`: ObjectId (ref `User`) — người nộp đơn.
 - `description`: string — chi tiết đơn đăng ký.
 - `experienceYears`: number — số năm kinh nghiệm.
-- `serviceCategoryIds`: ObjectId[] (ref `Category`) — các danh mục dịch vụ có thể cung cấp.
+- `serviceIds`: ObjectId[] (ref `Service`) — các dịch vụ cụ thể có thể cung cấp.
 - `workingAreas`: string[] — khu vực phục vụ dạng văn bản.
 - `status`: enum `pending|approved|rejected` — trạng thái đơn đăng ký.
 - `rejectionReason`: string | null — lý do từ chối (nếu có).
@@ -158,15 +158,15 @@ Tài liệu này liệt kê tất cả các collection MongoDB (Mongoose models)
 - `userId`: ObjectId (ref `User`, unique) — tài khoản người dùng được liên kết.
 - `description`: string — giới thiệu về nhà cung cấp.
 - `experienceYears`: number — số năm kinh nghiệm.
-- `activeStatus`: enum `active|inactive` — trạng thái hoạt động.
+- `availabilityStatus`: enum `online|offline|busy` — trạng thái sẵn sàng nhận việc.
 - `verified`: boolean — cờ xác minh.
-- `serviceCategoryIds`: ObjectId[] — các danh mục dịch vụ phục vụ.
+- `serviceIds`: ObjectId[] (ref `Service`) — các dịch vụ cụ thể phục vụ.
 - `workingAreas`: string[] — khu vực phục vụ.
 - `averageRating`: number (0-5) — điểm đánh giá trung bình.
 - `totalFeedbacks`: number — tổng số đánh giá.
 - `totalCompletedOrders`: number — tổng số đơn hàng đã hoàn thành.
 - Các field cơ bản & timestamps.
-- Indexes: `{ serviceCategoryIds }`, `{ activeStatus, verified }`.
+- Indexes: `{ serviceIds }`, `{ availabilityStatus, verified }`.
 
 ---
 

@@ -59,6 +59,19 @@ export const getActiveCategories = async (
   }
 };
 
+export const getActiveCategoriesWithServices = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const categories = await categoryService.getActiveCategoriesWithServices();
+    res.json({ success: true, data: categories });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getCategories = async (
   req: Request,
   res: Response,

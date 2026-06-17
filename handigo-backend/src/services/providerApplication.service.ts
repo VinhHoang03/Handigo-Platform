@@ -3,12 +3,12 @@ import { AppError } from "../utils/appError";
 import User from "../models/user.model";
 import { Provider } from "../models/provider.model";
 import { ProviderApplication } from "../models/providerApplication.model";
-import { Category } from "../models/category.model";
+import { Service } from "../models/service.model";
 
 interface CreateProviderApplicationPayload {
   description: string;
   experienceYears: number;
-  serviceCategoryIds: string[];
+  serviceIds: string[];
   workingAreas: string[];
 }
 
@@ -38,17 +38,28 @@ const getPagination = (query: ApplicationQuery) => {
   return { page, limit, skip: (page - 1) * limit };
 };
 
-const assertCategoriesActive = async (categoryIds: string[]) => {
-  const uniqueIds = [...new Set(categoryIds)];
-  const count = await Category.countDocuments({
+const servicePopulate = {
+  path: "serviceIds",
+  select: "name slug categoryId serviceType fixedPrice image",
+  populate: {
+    path: "categoryId",
+    select: "name slug icon",
+  },
+};
+
+const assertServicesActive = async (serviceIds: string[]) => {
+  const uniqueIds = [...new Set(serviceIds)];
+  const count = await Service.countDocuments({
     _id: { $in: uniqueIds },
     isActive: true,
     isDeleted: false,
   });
 
   if (count !== uniqueIds.length) {
-    throw new AppError("One or more service categories are invalid", 400);
+    throw new AppError("One or more services are invalid", 400);
   }
+
+  return uniqueIds;
 };
 
 export const createApplication = async (
@@ -56,7 +67,7 @@ export const createApplication = async (
   payload: CreateProviderApplicationPayload,
 ) => {
   assertObjectId(userId, "user id");
-  await assertCategoriesActive(payload.serviceCategoryIds);
+  const serviceIds = await assertServicesActive(payload.serviceIds);
 
   const user = await User.findOne({ _id: userId, isDeleted: false });
 
@@ -86,7 +97,7 @@ export const createApplication = async (
     userId,
     description: payload.description,
     experienceYears: payload.experienceYears,
-    serviceCategoryIds: payload.serviceCategoryIds,
+    serviceIds,
     workingAreas: payload.workingAreas,
     status: "pending",
   });
@@ -97,7 +108,7 @@ export const getMyApplication = async (userId: string) => {
 
   return ProviderApplication.findOne({ userId, isDeleted: false })
     .sort({ createdAt: -1 })
-    .populate("serviceCategoryIds", "name slug icon")
+    .populate(servicePopulate)
     .populate("reviewedBy", "fullName email");
 };
 
@@ -121,7 +132,12 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
 
   if (query.categoryId) {
     assertObjectId(String(query.categoryId), "category id");
-    filter.serviceCategoryIds = new Types.ObjectId(String(query.categoryId));
+    const services = await Service.find({
+      categoryId: new Types.ObjectId(String(query.categoryId)),
+      isActive: true,
+      isDeleted: false,
+    }).select("_id");
+    filter.serviceIds = { $in: services.map((service) => service._id) };
   }
 
   const [items, total] = await Promise.all([
@@ -130,7 +146,7 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
       .skip(skip)
       .limit(limit)
       .populate("userId", "fullName email phone avatar role status")
-      .populate("serviceCategoryIds", "name slug icon")
+      .populate(servicePopulate)
       .populate("reviewedBy", "fullName email"),
     ProviderApplication.countDocuments(filter),
   ]);
@@ -154,7 +170,7 @@ export const getApplicationById = async (applicationId: string) => {
     isDeleted: false,
   })
     .populate("userId", "fullName email phone avatar role status")
-    .populate("serviceCategoryIds", "name slug icon")
+    .populate(servicePopulate)
     .populate("reviewedBy", "fullName email");
 
   if (!application) {
@@ -204,9 +220,9 @@ export const reviewApplication = async (
         userId: application.userId,
         description: application.description,
         experienceYears: application.experienceYears,
-        serviceCategoryIds: application.serviceCategoryIds,
+        serviceIds: application.serviceIds,
         workingAreas: application.workingAreas,
-        activeStatus: "inactive",
+        availabilityStatus: "offline",
         verified: true,
         isDeleted: false,
         deletedAt: null,

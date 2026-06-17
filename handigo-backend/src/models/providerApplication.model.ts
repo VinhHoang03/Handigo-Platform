@@ -5,7 +5,7 @@ export interface IProviderApplication extends Document, IBaseDocument {
   userId: Types.ObjectId;
   description: string;
   experienceYears: number;
-  serviceCategoryIds: Types.ObjectId[];
+  serviceIds: Types.ObjectId[];
   workingAreas: string[];
   status: "pending" | "approved" | "rejected";
   rejectionReason?: string | null;
@@ -18,7 +18,7 @@ const ProviderApplicationSchema = new Schema<IProviderApplication>(
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     description: { type: String, required: true },
     experienceYears: { type: Number, required: true, min: 0, default: 0 },
-    serviceCategoryIds: [{ type: Schema.Types.ObjectId, ref: "Category" }],
+    serviceIds: [{ type: Schema.Types.ObjectId, ref: "Service" }],
     workingAreas: { type: [String], default: [] },
     status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
     rejectionReason: { type: String, default: null },

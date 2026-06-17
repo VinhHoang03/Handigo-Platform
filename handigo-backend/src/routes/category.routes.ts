@@ -10,9 +10,14 @@ import {
 
 const router = Router();
 
+router.get(
+  "/active-with-services",
+  categoryController.getActiveCategoriesWithServices,
+);
+router.get("/active", categoryController.getActiveCategories);
+
 // Public / Authenticated GET routes
 router.get("/", authMiddleware, categoryController.listCategories);
-router.get("/active", authMiddleware, categoryController.getActiveCategories);
 router.get("/:id", authMiddleware, categoryController.getCategoryById);
 
 // Admin-only write routes

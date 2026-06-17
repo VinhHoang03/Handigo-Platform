@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import * as dashboardService from "../services/dashboard.service";
 import { AppError } from "../utils/appError";
-import { dashboardQuerySchema } from "../validations/dashboard.validator";
+import { dashboardQuerySchema, providerAvailabilitySchema } from "../validations/dashboard.validator";
 
 const getRequestUser = (req: Request) => {
   if (!req.user) {
@@ -96,6 +96,20 @@ export const getProviderEarnings = async (req: Request, res: Response, next: Nex
     const data = await dashboardService.getProviderEarnings(getRequestUser(req), query);
 
     return res.json({ success: true, data, message: "Get provider earning dashboard successfully" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateProviderAvailability = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const payload = providerAvailabilitySchema.parse(req.body);
+    const data = await dashboardService.updateProviderAvailability(
+      getRequestUser(req),
+      payload.availabilityStatus,
+    );
+
+    return res.json({ success: true, data, message: "Provider availability updated successfully" });
   } catch (error) {
     return next(error);
   }

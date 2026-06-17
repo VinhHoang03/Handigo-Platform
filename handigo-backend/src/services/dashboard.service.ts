@@ -484,8 +484,22 @@ export const getProviderOverview = async (user: RequestUser, query: DashboardQue
     monthlyEarnings,
     completedOrders,
     averageRating: provider.averageRating || 0,
+    availabilityStatus: provider.availabilityStatus || "offline",
     pendingWithdrawals: pendingWithdrawals[0]?.count || 0,
     pendingWithdrawalAmount: pendingWithdrawals[0]?.amount || 0,
+  };
+};
+
+export const updateProviderAvailability = async (
+  user: RequestUser,
+  availabilityStatus: "online" | "offline" | "busy",
+) => {
+  const provider = await getProviderForUser(user.id);
+  provider.availabilityStatus = availabilityStatus;
+  await provider.save();
+
+  return {
+    availabilityStatus: provider.availabilityStatus,
   };
 };
 

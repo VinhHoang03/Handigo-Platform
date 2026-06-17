@@ -17,6 +17,7 @@ import systemConfigRoutes from "./routes/systemConfig.route";
 // import analyticsRoutes from "./routes/analytics.route";
 // import "./jobs/autoSettlement.job";
 import addressRoutes from "./routes/address.routes";
+import vietnamAddressRoutes from "./routes/vietnamAddress.routes";
 import categoryRoutes from "./routes/category.routes";
 import serviceRoutes from "./routes/service.routes";
 import feedbackRoutes from "./routes/feedback.routes";
@@ -58,7 +59,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Fix COOP to allow Google OAuth popup
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   next();
 });
 
@@ -98,6 +99,7 @@ app.use("/provider-applications", providerApplicationRoutes);
 app.use("/admin", adminRoutes);
 // app.use("/service-requests", requestRoutes);
 app.use("/addresses", addressRoutes);
+app.use("/vietnam-addresses", vietnamAddressRoutes);
 app.use("/orders", orderRoutes);
 // app.use("/provider-requests", providerRequestRoutes);
 // app.use("/providers", providerRoutes);
@@ -106,24 +108,31 @@ app.use("/orders", orderRoutes);
 app.use("/chat", chatRoutes);
 // app.use("/ai", aiRoutes);
 
-app.use((err: Error & { statusCode?: number }, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  if (err instanceof ZodError) {
-    return res.status(400).json({
+app.use(
+  (
+    err: Error & { statusCode?: number },
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    console.error(err.stack);
+    if (err instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request data",
+        errors: err.issues,
+      });
+    }
+
+    const statusCode = err.statusCode || 500;
+
+    res.status(statusCode).json({
       success: false,
-      message: "Invalid request data",
-      errors: err.issues,
+      message: err.message || "Internal server error",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
-  }
-
-  const statusCode = err.statusCode || 500;
-
-  res.status(statusCode).json({
-    success: false,
-    message: err.message || "Internal server error",
-    error: process.env.NODE_ENV === "development" ? err.message : undefined,
-  });
-});
+  },
+);
 
 app.use((req, res) => {
   console.log(`404 - ${req.method} ${req.path} not found`);
