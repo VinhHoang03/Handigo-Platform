@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import logoImg from "../assets/logo.png";
 import { Navbar, type AppRole } from "./common/Navbar";
 import { useAuthStore } from "../features/auth/store/auth.store";
 import { isNavItemActive } from "@/config/sidebarNavigation";
@@ -36,21 +35,6 @@ export function Sidebar({
 
   return (
     <aside className="fixed bottom-6 left-4 top-28 z-40 hidden w-72 flex-col gap-5 rounded-2xl border border-outline-variant/30 bg-white/92 p-5 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl lg:flex xl:left-6">
-      <Link
-        to="/admin/users"
-        className="mb-1 flex items-center gap-3 rounded-xl px-1 py-2"
-      >
-        <img src={logoImg} alt="" className="h-9 w-9 object-contain" />
-        <div>
-          <h1 className="font-headline-md text-xl font-bold leading-none text-primary">
-            Handigo
-          </h1>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-on-surface-variant">
-            Quản trị hệ thống
-          </p>
-        </div>
-      </Link>
-
       <nav className="flex min-h-0 flex-grow flex-col gap-1.5 overflow-y-auto pr-1">
         {navItems.map((item) => {
           const active =

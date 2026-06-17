@@ -4,13 +4,146 @@ export interface Job {
   address: string;
   startTime: string;
   endTime: string;
-  status: 'Active' | 'Confirmed' | 'Pending' | 'Đang hoạt động' | 'Đã xác nhận' | 'Đang chờ';
+  status:
+    | 'Active'
+    | 'Confirmed'
+    | 'Pending'
+    | 'Đang hoạt động'
+    | 'Đã xác nhận'
+    | 'Đang chờ';
 }
 
 export interface ProviderStats {
   dailyEarnings: string;
   availableBalance: string;
   weeklyEarnings: string;
+}
+
+export type Gender = 'male' | 'female' | 'other';
+export type IdentityDocumentType = 'cccd' | 'passport';
+export type VerificationStatus =
+  | 'unsubmitted'
+  | 'pending'
+  | 'verified'
+  | 'rejected';
+export type IdentityVerificationProvider =
+  | 'manual'
+  | 'fpt'
+  | 'vnpt'
+  | 'viettel'
+  | 'didit';
+export type CertificateStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ProviderServiceArea {
+  province?: string;
+  ward?: string;
+}
+
+export interface ProviderServiceRef {
+  id: string;
+  name: string;
+  slug?: string;
+}
+
+export interface IdentityDocument {
+  type?: IdentityDocumentType;
+  documentNumber?: string;
+  numberLast4?: string;
+  fullName?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  frontImageUrl?: string;
+  backImageUrl?: string;
+  passportImageUrl?: string;
+  selfieImageUrl?: string;
+  verificationStatus: VerificationStatus;
+  provider?: IdentityVerificationProvider;
+  submittedAt?: string;
+  verifiedAt?: string;
+  rejectionReason?: string | null;
+}
+
+export interface SubmitIdentityPayload {
+  type: IdentityDocumentType;
+  documentNumber?: string;
+  numberLast4?: string;
+  fullName?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  frontImageUrl?: string;
+  backImageUrl?: string;
+  passportImageUrl?: string;
+  selfieImageUrl?: string;
+  consentAccepted: boolean;
+}
+
+export interface ProviderCertificate {
+  id: string;
+  title: string;
+  issuer?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  imageUrls: string[];
+  description?: string;
+  status: CertificateStatus;
+  reviewedAt?: string;
+  rejectionReason?: string | null;
+}
+
+export interface UpsertCertificatePayload {
+  title: string;
+  issuer?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  imageUrls: string[];
+  description?: string;
+}
+
+export interface UpdateProviderProfilePayload {
+  fullName?: string;
+  phone?: string;
+  avatar?: string | null;
+  birthday?: string | null;
+  gender?: Gender | null;
+  description?: string;
+  bio?: string;
+  mainServiceText?: string;
+  serviceArea?: ProviderServiceArea;
+}
+
+export interface ProviderProfileResponse {
+  user: {
+    id: string;
+    fullName: string;
+    email: string;
+    phone?: string;
+    avatar?: string | null;
+    birthday?: string | null;
+    gender?: Gender | null;
+    createdAt?: string;
+  };
+  provider: {
+    id: string;
+    description: string;
+    bio?: string;
+    mainServiceText?: string;
+    experienceYears: number;
+    availabilityStatus: 'online' | 'offline' | 'busy';
+    verified: boolean;
+    serviceIds: string[];
+    services?: ProviderServiceRef[];
+    workingAreas: string[];
+    serviceArea?: ProviderServiceArea;
+    averageRating: number;
+    totalFeedbacks: number;
+    totalCompletedOrders: number;
+    identityDocument?: IdentityDocument;
+    certificates: ProviderCertificate[];
+  };
 }
 
 export interface Certification {
@@ -23,8 +156,6 @@ export interface ProviderProfile {
   fullName: string;
   email: string;
   phone: string;
-  city: string;
-  address: string;
   gender: string;
   birthday: string;
   bio: string;
@@ -57,14 +188,13 @@ export interface PortfolioItem {
 export interface VerificationItem {
   label: string;
   status: string;
-  statusTone: 'approved' | 'pending';
+  statusTone: 'approved' | 'pending' | 'rejected';
 }
 
 export interface ServiceArea {
-  address: string;
-  radiusKm: number;
-  radiusPercent: number;
-  mapImageUrl: string;
+  province?: string;
+  ward?: string;
+  workingAreas?: string[];
 }
 
 export interface BankAccount {
