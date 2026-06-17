@@ -10,9 +10,13 @@ import {
 
 const router = Router();
 
+// Public / Authenticated GET routes
+router.get("/", authMiddleware, categoryController.listCategories);
+router.get("/active", authMiddleware, categoryController.getActiveCategories);
+router.get("/:id", authMiddleware, categoryController.getCategoryById);
+
+// Admin-only write routes
 router.use(authMiddleware, roleMiddleware("ADMIN"));
-router.get("/", categoryController.listCategories);
-router.get("/:id", categoryController.getCategoryById);
 router.post(
   "/",
   validate(createCategorySchema),
@@ -29,7 +33,5 @@ router.put(
   categoryController.updateCategory,
 );
 router.delete("/:id", categoryController.deleteCategory);
-
-router.get("/", categoryController.getActiveCategories);
 
 export default router;

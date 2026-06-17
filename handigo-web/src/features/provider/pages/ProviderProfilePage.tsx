@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DashboardLayout } from '../../../components/DashboardLayout';
+import { DashboardShell } from '@/components/common/DashboardShell';
 import {
   BankAccountPanel,
   DangerZone,
@@ -83,23 +82,11 @@ const bankAccount: BankAccount = {
 };
 
 const ProviderProfilePage: React.FC = () => {
-  const navigate = useNavigate();
   const [isOnline, setIsOnline] = useState(true);
 
-  const navItems = [
-    { icon: 'grid_view', label: 'Bảng điều khiển', path: '/provider' },
-    { icon: 'event_available', label: 'Đặt lịch', path: '#' },
-    { icon: 'mail', label: 'Tin nhắn', path: '#' },
-    { icon: 'payments', label: 'Thu nhập', path: '#' },
-    { icon: 'settings', label: 'Cài đặt', path: '/provider/profile' },
-  ];
-
   return (
-    <DashboardLayout
-      navItems={navItems}
-      switchLabel="Chuyển sang Khách hàng"
-      onSwitch={() => navigate('/customer')}
-      userAvatar={providerProfile.avatarUrl}
+    <DashboardShell
+      role="PROVIDER"
       showStatusToggle
       isOnline={isOnline}
       onStatusToggle={() => setIsOnline((current) => !current)}
@@ -165,7 +152,7 @@ const ProviderProfilePage: React.FC = () => {
           <DangerZone />
         </div>
       </div>
-    </DashboardLayout>
+    </DashboardShell>
   );
 };
 

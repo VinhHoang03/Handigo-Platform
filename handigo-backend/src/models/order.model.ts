@@ -17,7 +17,7 @@ export interface ISelectedOptionSnapshot {
 }
 
 export interface IOrderPricing {
-  bookingAmount : Money;
+  bookingAmount: Money;
   platformCommissionRate: number;
   platformCommissionAmount: Money;
   providerEarningAmount: Money;
@@ -60,6 +60,8 @@ export interface IOrder extends Document, IBaseDocument {
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | null;
   status: OrderStatusValue;
+  paymentMethod: "wallet" | "bank" | "cash";
+  paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
   inspectionRequired: boolean;
   depositAmount: Money;
   depositPaidAt?: Date | null;
@@ -93,7 +95,7 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
 
 const OrderPricingSchema = new Schema<IOrderPricing>(
   {
-    bookingAmount : { type: Number, required: true, min: 0 },
+    bookingAmount: { type: Number, required: true, min: 0 },
     platformCommissionRate: { type: Number, required: true, min: 0 },
     platformCommissionAmount: { type: Number, required: true, min: 0 },
     providerEarningAmount: { type: Number, required: true, min: 0 },
@@ -148,6 +150,16 @@ const OrderSchema = new Schema<IOrder>(
       type: String,
       enum: ["created", "accepted", "in_progress", "completed", "cancelled"],
       default: "created",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["wallet", "bank", "cash"],
+      required: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "partially_paid", "paid", "refunded"],
+      default: "unpaid",
     },
     inspectionRequired: { type: Boolean, default: false },
     depositAmount: { type: Number, default: 0, min: 0 },

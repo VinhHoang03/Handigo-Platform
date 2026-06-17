@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DashboardLayout } from '../../../components/DashboardLayout';
+import { DashboardShell } from '@/components/common/DashboardShell';
 import { FloatingInput, FloatingTextarea } from '@/components/common/FloatingField';
 import { Modal } from '@/components/common/Modal';
 import { AddressCard, ProfileSectionHeader, ToggleOption } from '../components/CustomerProfileComponents';
@@ -24,14 +24,6 @@ const EMPTY_ADDRESS_FORM: CreateAddressPayload = {
   note: '',
   isDefault: false,
 };
-
-const navItems = [
-  { icon: 'grid_view', label: 'Bảng điều khiển', path: '/customer' },
-  { icon: 'event_available', label: 'Đặt lịch', path: '#' },
-  { icon: 'mail', label: 'Tin nhắn', path: '#' },
-  { icon: 'payments', label: 'Ví', path: '#' },
-  { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
-];
 
 function ReadOnlyField({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -310,28 +302,16 @@ export default function CustomerProfilePage() {
 
   if (isLoading || !profile) {
     return (
-      <DashboardLayout
-        navItems={navItems}
-        switchLabel="Đăng ký thợ dịch vụ"
-        switchVariant="gradient"
-        onSwitch={() => navigate('/register-provider')}
-        userAvatar={DEFAULT_AVATAR}
-      >
+      <DashboardShell role="CUSTOMER">
         <div className="flex min-h-[400px] items-center justify-center text-on-surface-variant">
           Đang tải hồ sơ...
         </div>
-      </DashboardLayout>
+      </DashboardShell>
     );
   }
 
   return (
-    <DashboardLayout
-      navItems={navItems}
-      switchLabel="Đăng ký thợ dịch vụ"
-      switchVariant="gradient"
-      onSwitch={() => navigate('/register-provider')}
-      userAvatar={profile.avatarUrl || profile.avatar || DEFAULT_AVATAR}
-    >
+    <DashboardShell role="CUSTOMER">
       <div className="mx-auto max-w-5xl space-y-6">
         {errorMsg && (
           <div className="rounded-2xl bg-error/10 p-3 font-label-md text-error">
@@ -658,6 +638,6 @@ export default function CustomerProfilePage() {
           </div>
         </form>
       </Modal>
-    </DashboardLayout>
+    </DashboardShell>
   );
 }
