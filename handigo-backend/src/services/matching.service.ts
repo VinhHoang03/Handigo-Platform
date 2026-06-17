@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
+import { Service } from "../models/service.model";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -80,61 +81,77 @@ export const MatchingService = {
         .limit(limit * 5) // over-fetch to allow filtering by category/status
         .lean();
 
-      if (nearbyLocations.length === 0) return [];
-
-      // Build userId → { distance estimation } map (order from $near already sorted)
-      const userIdToIndex = new Map<string, number>(
-        nearbyLocations.map((loc, idx) => [loc.userId.toString(), idx]),
-      );
-      const nearbyUserIds = nearbyLocations.map((loc) => loc.userId);
-
-      // 2. Fetch matching providers
-      const providers = await Provider.find({
-        userId: { $in: nearbyUserIds },
-        serviceCategoryIds: categoryObjectId,
-        availabilityStatus: "online",
-        verified: true,
-        ...(excludeIds.length > 0 && {
-          _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
-        }),
-      })
-        .limit(limit)
-        .lean();
-
-      // 3. Sort by geo distance order (index in nearbyLocations)
-      const sorted = providers.sort((a, b) => {
-        const ai = userIdToIndex.get(a.userId.toString()) ?? Infinity;
-        const bi = userIdToIndex.get(b.userId.toString()) ?? Infinity;
-        return ai - bi;
-      });
-
-      // 4. Compute approximate distance using Haversine
-      return sorted.map((p) => {
-        const loc = nearbyLocations.find(
-          (l) => l.userId.toString() === p.userId.toString(),
+      if (nearbyLocations.length === 0) {
+        console.log("[MatchingService] No nearby locations found, falling back to simple filter.");
+      } else {
+        // Build userId → { distance estimation } map (order from $near already sorted)
+        const userIdToIndex = new Map<string, number>(
+          nearbyLocations.map((loc, idx) => [loc.userId.toString(), idx]),
         );
-        const dist = loc
-          ? haversineMeters(
-            latitude,
-            longitude,
-            loc.coordinates.coordinates[1],
-            loc.coordinates.coordinates[0],
-          )
-          : -1;
+        const nearbyUserIds = nearbyLocations.map((loc) => loc.userId);
 
-        return {
-          providerId: p._id as Types.ObjectId,
-          userId: p.userId as Types.ObjectId,
-          distanceMeters: dist,
-          averageRating: p.averageRating,
-          totalCompletedOrders: p.totalCompletedOrders,
-        };
-      });
+        // 2. Fetch matching providers
+        const servicesInCategory = await Service.find({
+          categoryId: categoryObjectId,
+          isActive: true,
+        }).select("_id").lean();
+        const serviceIdsInCategory = servicesInCategory.map((s: any) => s._id);
+
+        const providers = await Provider.find({
+          userId: { $in: nearbyUserIds },
+          serviceIds: { $in: serviceIdsInCategory },
+          availabilityStatus: "online",
+          verified: true,
+          ...(excludeIds.length > 0 && {
+            _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
+          }),
+        })
+          .limit(limit)
+          .lean();
+
+        if (providers.length > 0) {
+          // 3. Sort by geo distance order (index in nearbyLocations)
+          const sorted = providers.sort((a, b) => {
+            const ai = userIdToIndex.get(a.userId.toString()) ?? Infinity;
+            const bi = userIdToIndex.get(b.userId.toString()) ?? Infinity;
+            return ai - bi;
+          });
+
+          // 4. Compute approximate distance using Haversine
+          return sorted.map((p) => {
+            const loc = nearbyLocations.find(
+              (l) => l.userId.toString() === p.userId.toString(),
+            );
+            const dist = loc
+              ? haversineMeters(
+                latitude,
+                longitude,
+                loc.coordinates.coordinates[1],
+                loc.coordinates.coordinates[0],
+              )
+              : -1;
+
+            return {
+              providerId: p._id as Types.ObjectId,
+              userId: p.userId as Types.ObjectId,
+              distanceMeters: dist,
+              averageRating: p.averageRating,
+              totalCompletedOrders: p.totalCompletedOrders,
+            };
+          });
+        }
+      }
     }
 
-    // ── Path B: no coordinates → simple filter ─────────────────────────────
+    // ── Path B: no coordinates or no geo-matches found → simple filter ─────
+    const servicesInCategory = await Service.find({
+      categoryId: categoryObjectId,
+      isActive: true,
+    }).select("_id").lean();
+    const serviceIdsInCategory = servicesInCategory.map((s: any) => s._id);
+
     const providers = await Provider.find({
-      serviceCategoryIds: categoryObjectId,
+      serviceIds: { $in: serviceIdsInCategory },
       availabilityStatus: "online",
       verified: true,
       ...(excludeIds.length > 0 && {

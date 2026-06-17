@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
-import { BookingPageHeader, BookingShell, BookingStepper, OrderSummaryCard } from '../components/BookingComponents';
+import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { bookingApi } from '../../../api/booking';
 import { useBookingStore } from '../hooks/useBookingStore';
 import type { Category, Service, ServiceOption } from '../../../types/booking';
+
+const isImageUrl = (value?: string) => {
+  if (!value) return false;
+  return /^https?:\/\//i.test(value) || value.startsWith('/');
+};
 
 const CreateBookingStep1Page = () => {
   const { categoryId, setCategoryId, serviceId, setServiceId, toggleOption, selectedOptionIds } = useBookingStore();
@@ -42,12 +47,11 @@ const CreateBookingStep1Page = () => {
     return () => { isMounted = false; };
   }, [serviceId]);
 
+  const visibleCategories = categories.slice(0, 5);
+  const hasMoreCategories = categories.length > visibleCategories.length;
+
   return (
-    <BookingShell>
-      <BookingPageHeader
-        title="Đặt lịch dịch vụ"
-        description="Vui lòng hoàn thành các thông tin bên dưới để bắt đầu đặt dịch vụ."
-      />
+    <OrderCreationShell>
       <BookingStepper currentStep={1} />
 
       <div className="grid grid-cols-12 gap-gutter items-start">
@@ -57,20 +61,38 @@ const CreateBookingStep1Page = () => {
               <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">1</span>
               Chọn loại dịch vụ
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-sm">
-              {categories.map((cat) => (
+            <div className="grid grid-cols-6 gap-sm">
+              {visibleCategories.map((cat) => (
                 <button
                   key={cat._id}
                   onClick={() => setCategoryId(cat._id)}
-                  className={`group flex flex-col items-center p-md rounded-xl glass-card transition-all hover:scale-[1.02] border-2 ${categoryId === cat._id ? 'border-primary bg-surface-container-low' : 'border-transparent'
+                  className={`group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 bg-white px-2 py-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
                     }`}
                 >
-                  <div className="w-16 h-16 rounded-full bg-primary-container/10 flex items-center justify-center mb-3 group-hover:bg-primary-container/20 transition-colors">
-                    <span className="material-symbols-outlined text-primary text-3xl">{cat.icon || 'category'}</span>
+                  <div className="mb-2 flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-primary-container/10 transition-colors group-hover:bg-primary-container/20">
+                    {isImageUrl(cat.icon) ? (
+                      <img
+                        src={cat.icon}
+                        alt={cat.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-primary text-2xl">{cat.icon || 'category'}</span>
+                    )}
                   </div>
-                  <span className="font-label-md">{cat.name}</span>
+                  <span className="line-clamp-2 text-label-sm font-bold leading-snug text-on-surface">{cat.name}</span>
                 </button>
               ))}
+              <button
+                type="button"
+                disabled={!hasMoreCategories}
+                className="group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/60 bg-surface-container-low px-2 py-3 text-center text-on-surface-variant transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:text-primary disabled:cursor-default disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:border-outline-variant/60 disabled:hover:bg-surface-container-low disabled:hover:text-on-surface-variant"
+              >
+                <span className="material-symbols-outlined mb-2 text-3xl transition-transform group-hover:translate-x-0.5">
+                  arrow_forward
+                </span>
+                <span className="text-label-sm font-bold">Thêm</span>
+              </button>
             </div>
           </section>
 
@@ -85,23 +107,38 @@ const CreateBookingStep1Page = () => {
                   <button
                     key={service._id}
                     onClick={() => setServiceId(service._id)}
-                    className={`relative text-left p-md rounded-xl glass-card border-2 cursor-pointer group transition-all hover:border-outline-variant ${serviceId === service._id ? 'border-primary bg-primary-container/5' : 'border-transparent'
+                    className={`relative text-left overflow-hidden rounded-xl glass-card border-2 cursor-pointer group transition-all hover:border-outline-variant ${serviceId === service._id ? 'border-primary bg-primary-container/5' : 'border-transparent'
                       }`}
                   >
                     {serviceId === service._id ? (
-                      <span className="absolute top-3 right-3 text-primary material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      <span className="absolute top-3 right-3 z-10 text-primary material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
                         check_circle
                       </span>
                     ) : null}
-                    <h3 className="font-label-md mb-1">{service.name}</h3>
-                    <p className="text-xs text-on-surface-variant line-clamp-2">{service.description}</p>
-                    <p className="mt-4 font-bold text-primary">
+                    <div className="aspect-[5/3] w-full overflow-hidden bg-surface-container-low">
+                      {service.image ? (
+                        <img
+                          src={service.image}
+                          alt={service.name}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-primary">
+                          <span className="material-symbols-outlined text-4xl">home_repair_service</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-sm">
+                      <h3 className="font-label-md mb-1 pr-8 leading-snug line-clamp-1">{service.name}</h3>
+                    <p className="text-xs text-on-surface-variant line-clamp-2 leading-snug">{service.description}</p>
+                    <p className="mt-2 font-bold text-primary text-sm">
                       {service.fixedPrice
                         ? `${service.fixedPrice.toLocaleString()}đ`
                         : service.serviceType === 'variable_price'
                           ? `Phí dịch vụ: ${service.depositAmount?.toLocaleString() || 0}đ`
                           : '0đ'}
                     </p>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -136,7 +173,7 @@ const CreateBookingStep1Page = () => {
           <OrderSummaryCard step={1} actionLabel="Tiếp tục bước 2" actionTo="/customer/bookings/new/location" />
         </div>
       </div>
-    </BookingShell>
+    </OrderCreationShell>
   );
 };
 

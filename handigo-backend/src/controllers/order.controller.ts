@@ -65,6 +65,46 @@ export const getMyOrders = async (
 };
 
 /**
+ * GET /orders/provider/recent
+ */
+export const getProviderRecentOrders = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const limit = Number(req.query.limit) || 5;
+    const result = await OrderService.getRecentOrdersByProvider(uid(req), limit);
+    return ok(res, { items: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /orders/provider
+ */
+export const getProviderOrders = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const status = req.query.status as string;
+    const search = req.query.search as string;
+    const result = await OrderService.getOrdersByProvider(uid(req), page, limit, {
+      status,
+      search,
+    });
+    return ok(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * GET /orders/:orderId
  */
 export const getOrderById = async (
@@ -99,6 +139,40 @@ export const cancelOrder = async (
     const { reason } = req.body;
     if (!reason) throw new AppError("Vui lòng cung cấp lý do hủy.", 400);
     const order = await OrderService.cancelOrder(orderId, uid(req), role, reason);
+    return ok(res, order);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /orders/:orderId/start
+ */
+export const startOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const orderId = param(req, "orderId");
+    const order = await OrderService.startOrder(orderId, uid(req));
+    return ok(res, order);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /orders/:orderId/complete
+ */
+export const completeOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const orderId = param(req, "orderId");
+    const order = await OrderService.completeOrder(orderId, uid(req));
     return ok(res, order);
   } catch (err) {
     next(err);
@@ -225,6 +299,25 @@ export const createRepairQuotation = async (
 };
 
 /**
+ * GET /orders/:orderId/quotation
+ */
+export const getRepairQuotation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const orderId = param(req, "orderId");
+    const u = req.user as any;
+    const role = String(u?.role || "").toUpperCase() as "CUSTOMER" | "PROVIDER";
+    const data = await AssignmentService.getQuotationByOrder(orderId, uid(req), role);
+    return ok(res, data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * POST /orders/quotations/:quotationId/confirm
  */
 export const confirmRepairQuotation = async (
@@ -264,4 +357,11 @@ export const rejectRepairQuotation = async (
   } catch (err) {
     next(err);
   }
+};
+
+/**
+ * POST /orders/attachments
+ */
+export const uploadOrderAttachment = async (_req: Request, res: Response) => {
+  return ok(res, { url: res.locals.imageUrl }, 201);
 };

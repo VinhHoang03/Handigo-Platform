@@ -8,9 +8,10 @@ import ConfirmPaymentPage from "./features/booking/pages/ConfirmPaymentPage";
 import CreateBookingStep1Page from "./features/booking/pages/CreateBookingStep1Page";
 import CreateBookingStep2Page from "./features/booking/pages/CreateBookingStep2Page";
 import BookingSuccessPage from "./features/booking/pages/BookingSuccessPage";
-import CustomerHomePage from "./features/customer/pages/CustomerHomePage";
 import CustomerProfilePage from "./features/customer/pages/CustomerProfilePage";
 import ProviderHomePage from "./features/provider/pages/ProviderHomePage";
+import ProviderOrdersPage from "./features/provider/pages/ProviderOrdersPage";
+import ProviderOrderDetailPage from "./features/provider/pages/ProviderOrderDetailPage";
 import ProviderProfilePage from "./features/provider/pages/ProviderProfilePage";
 import CustomerFeedbackPage from "./features/feedback/pages/CustomerFeedbackPage";
 import ProviderFeedbackPage from "./features/feedback/pages/ProviderFeedbackPage";
@@ -38,7 +39,6 @@ function App() {
           <Route path="/profile" element={<ProfileRoute />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/customer" element={<CustomerHomePage />} />
           <Route path="/customer/bookings" element={<BookingHistoryPage />} />
           <Route
             path="/customer/bookings/new"
@@ -67,7 +67,7 @@ function App() {
             path="/customer"
             element={
               <RouteGuard roles={["CUSTOMER"]}>
-                <CustomerHomePage />
+                <HomeRoute />
               </RouteGuard>
             }
           />
@@ -92,6 +92,22 @@ function App() {
             element={
               <RouteGuard roles={["PROVIDER"]}>
                 <ProviderHomePage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/provider/orders"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <ProviderOrdersPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/provider/orders/:orderId"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <ProviderOrderDetailPage />
               </RouteGuard>
             }
           />
