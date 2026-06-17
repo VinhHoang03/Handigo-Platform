@@ -1,4 +1,5 @@
 import mongoose, { ClientSession, Types } from "mongoose";
+import { payos } from "../configs/payos.config";
 import { Provider } from "../models/provider.model";
 import User from "../models/user.model";
 import { Wallet } from "../models/wallet.model";
@@ -10,6 +11,7 @@ import { AppError } from "../utils/appError";
 import type {
   AdminWalletAdjustmentInput,
   AdminWalletListQuery,
+  WalletDepositInput,
   WalletTransactionQuery,
 } from "../validations/wallet.validator";
 
@@ -36,6 +38,14 @@ class WalletError extends AppError {
 
 const buildTransactionCode = (prefix: string) =>
   `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+
+const buildPayosOrderCode = () =>
+  Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-12));
+
+const DEFAULT_WALLET_DEPOSIT_RETURN_URL =
+  process.env.PAYOS_WALLET_DEPOSIT_RETURN_URL || "http://localhost:5173/wallet/deposit/success";
+const DEFAULT_WALLET_DEPOSIT_CANCEL_URL =
+  process.env.PAYOS_WALLET_DEPOSIT_CANCEL_URL || "http://localhost:5173/wallet/deposit/cancel";
 
 const assertPositiveAmount = (amount: number) => {
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -287,6 +297,161 @@ export const getWalletTransactionHistory = async (
       totalPages: Math.ceil(total / query.limit),
     },
   };
+};
+
+export const createWalletDeposit = async (user: RequestUser, input: WalletDepositInput) => {
+  if (user.role !== "PROVIDER") {
+    throw new WalletError("UNAUTHORIZED_ACCESS", "Ban khong co quyen nap vi nay", 403);
+  }
+
+  assertPositiveAmount(input.amount);
+
+  const provider = await getProviderByUserId(user.id);
+  await assertWalletOwnerActive(user.id);
+  const wallet = await getWalletByUserId(user.id, { createIfMissing: true });
+  const orderCode = buildPayosOrderCode();
+
+  const transaction = await WalletTransaction.create({
+    walletId: wallet._id,
+    userId: wallet.userId,
+    type: "deposit",
+    direction: "in",
+    amount: input.amount,
+    balanceAfter: wallet.balance,
+    status: "pending",
+    transactionCode: orderCode.toString(),
+    gatewayOrderCode: orderCode.toString(),
+    gatewayResponse: {
+      provider: "payos",
+      orderCode,
+    },
+    description: "Nap tien vao vi provider",
+    metadata: {
+      providerId: provider._id,
+    },
+  });
+
+  let paymentLink;
+
+  try {
+    paymentLink = await payos.paymentRequests.create({
+      orderCode,
+      amount: input.amount,
+      description: "Nap vi Handigo",
+      returnUrl: input.returnUrl || DEFAULT_WALLET_DEPOSIT_RETURN_URL,
+      cancelUrl: input.cancelUrl || DEFAULT_WALLET_DEPOSIT_CANCEL_URL,
+      items: [
+        {
+          name: "Nap tien vao vi Handigo",
+          quantity: 1,
+          price: input.amount,
+        },
+      ],
+    });
+
+    transaction.gatewayPaymentLinkId = paymentLink.paymentLinkId;
+    transaction.gatewayResponse = {
+      ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
+      paymentLink,
+    };
+    await transaction.save();
+  } catch (error: any) {
+    transaction.status = "failed";
+    transaction.gatewayResponse = {
+      ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
+      error: error.message || "Khong the tao lien ket nap vi PayOS",
+    };
+    await transaction.save();
+    throw new AppError("Khong the tao lien ket nap vi PayOS", 502);
+  }
+
+  return {
+    transaction,
+    checkoutUrl: paymentLink.checkoutUrl,
+    qrCode: paymentLink.qrCode,
+    amount: input.amount,
+  };
+};
+
+export const handleWalletDepositPayosWebhook = async (webhookData: any, payload: any) => {
+  const orderCode = webhookData.orderCode?.toString();
+
+  if (!orderCode) {
+    throw new AppError("Du lieu webhook PayOS khong hop le", 400);
+  }
+
+  const transaction = await WalletTransaction.findOne({
+    type: "deposit",
+    gatewayOrderCode: orderCode,
+  });
+
+  if (!transaction) {
+    throw new AppError("Khong tim thay giao dich nap vi PayOS", 404);
+  }
+
+  if (transaction.status === "success") {
+    return transaction;
+  }
+
+  const isSuccess = payload.success === true && webhookData.code === "00";
+  const gatewayPatch = {
+    gatewayTransactionId: webhookData.reference || null,
+    gatewayPaymentLinkId: webhookData.paymentLinkId || transaction.gatewayPaymentLinkId || null,
+    gatewayResponse: {
+      ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
+      webhook: payload,
+      verifiedData: webhookData,
+    },
+  };
+
+  if (!isSuccess) {
+    transaction.status = "failed";
+    transaction.gatewayTransactionId = gatewayPatch.gatewayTransactionId;
+    transaction.gatewayPaymentLinkId = gatewayPatch.gatewayPaymentLinkId;
+    transaction.gatewayResponse = gatewayPatch.gatewayResponse;
+    await transaction.save();
+    return transaction;
+  }
+
+  const session = await mongoose.startSession();
+  let updatedTransaction = transaction;
+
+  try {
+    await session.withTransaction(async () => {
+      const freshTransaction = await WalletTransaction.findById(transaction._id).session(session);
+
+      if (!freshTransaction) {
+        throw new AppError("Khong tim thay giao dich nap vi PayOS", 404);
+      }
+
+      if (freshTransaction.status === "success") {
+        updatedTransaction = freshTransaction;
+        return;
+      }
+
+      const wallet = await Wallet.findOneAndUpdate(
+        { _id: freshTransaction.walletId, isDeleted: false },
+        { $inc: { balance: freshTransaction.amount } },
+        { new: true, session },
+      );
+
+      if (!wallet) {
+        throw new WalletError("WALLET_NOT_FOUND", "Khong tim thay vi", 404);
+      }
+
+      freshTransaction.status = "success";
+      freshTransaction.balanceAfter = wallet.balance;
+      freshTransaction.gatewayTransactionId = gatewayPatch.gatewayTransactionId;
+      freshTransaction.gatewayPaymentLinkId = gatewayPatch.gatewayPaymentLinkId;
+      freshTransaction.gatewayResponse = gatewayPatch.gatewayResponse;
+      await freshTransaction.save({ session });
+      updatedTransaction = freshTransaction;
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return updatedTransaction;
 };
 
 export const checkSufficientBalance = async (

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   adjustAdminWallet,
+  createMyWalletDeposit,
   getAdminWalletByProviderId,
   getAdminWallets,
   getAdminWalletTransactions,
@@ -11,11 +12,18 @@ import {
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { adminWalletAdjustmentSchema } from "../validations/wallet.validator";
+import { adminWalletAdjustmentSchema, walletDepositSchema } from "../validations/wallet.validator";
 
 const router = Router();
 
 router.get("/me", authMiddleware, roleMiddleware("PROVIDER"), getMyWallet);
+router.post(
+  "/me/deposit",
+  authMiddleware,
+  roleMiddleware("PROVIDER"),
+  validate(walletDepositSchema),
+  createMyWalletDeposit,
+);
 router.get(
   "/me/transactions",
   authMiddleware,

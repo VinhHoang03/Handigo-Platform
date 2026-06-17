@@ -83,6 +83,20 @@ export const getMyWalletSummary = async (req: Request, res: Response) => {
   }
 };
 
+export const createMyWalletDeposit = async (req: Request, res: Response) => {
+  try {
+    const result = await walletService.createWalletDeposit(getRequestUser(req), req.body);
+
+    return res.status(201).json({
+      success: true,
+      data: result,
+      message: "Tao lien ket nap vi thanh cong",
+    });
+  } catch (error: any) {
+    return handleError(res, error);
+  }
+};
+
 export const getAdminWallets = async (req: Request, res: Response) => {
   try {
     const query = adminWalletListQuerySchema.parse(req.query);
