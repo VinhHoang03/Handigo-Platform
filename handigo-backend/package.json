@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "build": "tsc && tsc-alias",
     "seed:categories": "ts-node src/scripts/seedCategories.ts",
+    "migrate:provider-service-ids": "ts-node src/scripts/migrateProviderServiceIds.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

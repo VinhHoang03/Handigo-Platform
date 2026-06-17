@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   CategoriesSection,
   FeaturesSection,
   HeroSection,
   HomeFooter,
-  LandingNav,
   ProvidersSection,
   StatsSection,
   TestimonialsSection,
-} from '../components/home';
+} from "../components/home";
+import { Navbar } from "../components/common/Navbar";
 
 const LandingPage = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -16,13 +16,13 @@ const LandingPage = () => {
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <div className="bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container min-h-screen">
-      <LandingNav isScrolled={isScrolled} />
+      <Navbar isScrolled={isScrolled} />
       <main className="pt-32 pb-xl">
         <HeroSection />
         <CategoriesSection />

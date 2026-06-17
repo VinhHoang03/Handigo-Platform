@@ -383,7 +383,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
   } else {
     authenticatedUser.googleId = googleId;
     authenticatedUser.isEmailVerified = true;
-    if (!authenticatedUser.avatar && picture) {
+    if (picture) {
       authenticatedUser.avatar = picture;
     }
     await authenticatedUser.save();

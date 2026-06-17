@@ -6,7 +6,9 @@ interface BackendAddress {
   id?: string;
   fullAddress: string;
   province: string;
+  provinceCode?: number;
   ward: string;
+  wardCode?: number;
   latitude?: number;
   longitude?: number;
   placeId?: string;
@@ -18,7 +20,9 @@ const mapAddress = (address: BackendAddress): Address => ({
   id: address.id || address._id || '',
   fullAddress: address.fullAddress,
   province: address.province,
+  provinceCode: address.provinceCode,
   ward: address.ward,
+  wardCode: address.wardCode,
   latitude: address.latitude,
   longitude: address.longitude,
   placeId: address.placeId,
@@ -30,7 +34,9 @@ const mapAddress = (address: BackendAddress): Address => ({
 const sanitizeAddressPayload = (payload: CreateAddressPayload): CreateAddressPayload => ({
   fullAddress: payload.fullAddress.trim(),
   province: payload.province.trim(),
+  provinceCode: payload.provinceCode,
   ward: payload.ward.trim(),
+  wardCode: payload.wardCode,
   latitude: payload.latitude,
   longitude: payload.longitude,
   placeId: payload.placeId?.trim() || undefined,

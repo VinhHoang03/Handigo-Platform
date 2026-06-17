@@ -4,7 +4,9 @@ export interface IAddress extends Document {
   userId: Types.ObjectId;
   fullAddress: string;
   province: string;
+  provinceCode?: number;
   ward: string;
+  wardCode?: number;
   latitude?: number;
   longitude?: number;
   placeId?: string;
@@ -29,9 +31,15 @@ const addressSchema = new Schema<IAddress>(
       type: String,
       required: true,
     },
+    provinceCode: {
+      type: Number,
+    },
     ward: {
       type: String,
       required: true,
+    },
+    wardCode: {
+      type: Number,
     },
     latitude: {
       type: Number,

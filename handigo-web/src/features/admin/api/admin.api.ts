@@ -10,5 +10,5 @@ export const adminApi = {
   applications: async (query: AdminQuery) => data<ListResult<AdminApplication>>(await api.get('/admin/provider-applications', { params: query })),
   application: async (id: string) => data<AdminApplication>(await api.get(`/admin/provider-applications/${id}`)),
   review: async (id: string, status: 'approved' | 'rejected', rejectionReason?: string) => data<AdminApplication>(await api.patch(`/admin/provider-applications/${id}/review`, { status, rejectionReason })),
-  categories: async () => data<Category[]>(await api.get('/categories')),
+  categories: async () => data<Category[]>(await api.get('/categories/active')),
 };

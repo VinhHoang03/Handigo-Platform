@@ -4,7 +4,9 @@ import { Address } from "../models/address.model";
 type AddressPayload = {
   fullAddress?: string;
   province?: string;
+  provinceCode?: number;
   ward?: string;
+  wardCode?: number;
   latitude?: number;
   longitude?: number;
   placeId?: string;
@@ -17,7 +19,9 @@ const pickAddressPayload = (data: AddressPayload): AddressPayload => {
   const fields: (keyof AddressPayload)[] = [
     "fullAddress",
     "province",
+    "provinceCode",
     "ward",
+    "wardCode",
     "latitude",
     "longitude",
     "placeId",

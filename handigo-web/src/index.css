@@ -130,6 +130,11 @@
     font: inherit;
   }
 
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
+  }
+
   button,
   a,
   input,
@@ -140,7 +145,11 @@
 
   button,
   a {
-    @apply transition-colors duration-200;
+    @apply transition-all duration-200;
+  }
+
+  button:not(:disabled) {
+    @apply cursor-pointer hover:-translate-y-0.5 active:translate-y-0;
   }
 }
 
@@ -200,6 +209,14 @@
 
   .form-field__action {
     @apply absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-primary disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .google-place-autocomplete-shell {
+    @apply min-h-14 w-full rounded-lg border border-outline-variant bg-surface-container-lowest transition duration-200 hover:border-outline focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10;
+  }
+
+  .google-place-autocomplete {
+    @apply block min-h-14 w-full;
   }
 
   .form-select {

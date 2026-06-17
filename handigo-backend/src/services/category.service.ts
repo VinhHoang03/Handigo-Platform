@@ -147,6 +147,40 @@ export const getActiveCategories = async () => {
     .sort({ sortOrder: 1, name: 1 });
 };
 
+export const getActiveCategoriesWithServices = async () => {
+  const categories = await Category.find({
+    isActive: true,
+    isDeleted: false,
+  })
+    .select("name slug icon isActive sortOrder")
+    .sort({ sortOrder: 1, name: 1 })
+    .lean();
+
+  const services = await Service.find({
+    categoryId: { $in: categories.map((category) => category._id) },
+    isActive: true,
+    isDeleted: false,
+  })
+    .select("categoryId name slug serviceType fixedPrice depositAmount image")
+    .sort({ name: 1 })
+    .lean();
+
+  const servicesByCategory = services.reduce<Record<string, typeof services>>(
+    (groups, service) => {
+      const key = service.categoryId.toString();
+      groups[key] = groups[key] || [];
+      groups[key].push(service);
+      return groups;
+    },
+    {},
+  );
+
+  return categories.map((category) => ({
+    ...category,
+    services: servicesByCategory[category._id.toString()] || [],
+  }));
+};
+
 export const getCategories = async (query: CategoryQuery = {}) => {
   const page = Math.max(query.page || 1, 1);
   const limit = Math.min(Math.max(query.limit || 20, 1), 100);

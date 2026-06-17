@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import * as serviceService from "../services/service.service";
+import * as serviceOptionService from "../services/serviceOption.service";
 
 export const listServices = async (
   req: Request,
@@ -21,6 +22,21 @@ export const getServiceById = async (
 ) => {
   try {
     const data = await serviceService.getServiceById(req.params.id as string);
+    return res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getServiceOptions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const data = await serviceOptionService.getOptionsByServiceId(
+      req.params.id as string,
+    );
     return res.json({ success: true, data });
   } catch (error) {
     next(error);

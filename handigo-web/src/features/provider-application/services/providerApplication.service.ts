@@ -6,11 +6,12 @@ export const providerApplicationService = {
   submit: (payload: ProviderApplicationPayload) => {
     const clean = {
       ...payload,
+      serviceIds: [...new Set(payload.serviceIds)],
       description: payload.description.trim(),
       workingAreas: [...new Set(payload.workingAreas.map((area) => area.trim()).filter(Boolean))],
     };
-    if (!clean.serviceCategoryIds.length || !clean.workingAreas.length || !clean.description) {
-      throw new Error('Vui lòng hoàn thành tất cả thông tin bắt buộc.');
+    if (!clean.serviceIds.length || !clean.workingAreas.length || !clean.description) {
+      throw new Error('Vui long hoan thanh tat ca thong tin bat buoc.');
     }
     return providerApplicationApi.create(clean);
   },

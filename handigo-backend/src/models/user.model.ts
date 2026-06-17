@@ -55,7 +55,7 @@ const UserSchema = new Schema<IUser>(
       required: true,
     },
 
-    phone: { type: String, sparse: true },
+    phone: { type: String, unique: true, sparse: true },
     avatar: { type: String, default: null },
 
     role: {
@@ -97,7 +97,6 @@ const UserSchema = new Schema<IUser>(
   { timestamps: true },
 );
 
-UserSchema.index({ phone: 1 });
 UserSchema.index(
   { googleId: 1 },
   { unique: true, partialFilterExpression: { googleId: { $type: "string" } } },

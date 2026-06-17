@@ -29,8 +29,8 @@ export const SignInCard = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await authService.login({ email, password });
-      navigate(response.user.role === 'PROVIDER' ? '/provider' : '/customer');
+      await authService.login({ email, password });
+      navigate('/');
     } catch {
       setError('Đăng nhập thất bại. Vui lòng kiểm tra email và mật khẩu.');
     } finally {
