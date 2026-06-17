@@ -1,6 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DashboardLayout } from '../../../components/DashboardLayout';
+import { DashboardShell } from '@/components/common/DashboardShell';
 import {
   CategoriesGrid,
   CustomerHomeFooter,
@@ -13,29 +12,8 @@ import type { Booking, Category, Pro } from '../types/customer.types';
 const heroImageUrl =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuBsIKP1_Fy6o_EMzoFqhEtqOBvPjSb8sWjrVk0GTpbKqMiLk7kT5jhuYsjGU9pC5GsC6ea09Y1dw0J4KvYwwgVPA-kZIB0Z4zTuj1FTbXqggjT8hU-TsqUAiSU8Gs6zuFSp8J54mSn6zpqnePLsR3tcilXdg5KxNyAzG9_xPY3RovK2erHpgpPDJ0pEkK3LPE8u4MskH_XYLz23B_t5ibO5ELQIUY3xN0ZGCiFIC6g3I9NBgEJp95ZTKhVNaXRIBoffqynowhjtO2g';
 
-const userAvatarUrl =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuBtFhL746CMy6BngQ7WoUHkbjpoCJe8bSs0QPuzJw4OpnoWZ7lEI9yhhTfZOqhRBzbuSkPKN6fKsAgTKwXDlRwmPzQ3cmibGWgtEtAdM4NzEQgeK7igATVXFqpf2HHFgYzD6IGxuyDS3rQN45lCkmt10XelvJao1pj6w6HsdUWV1zr_kqFhm_1e-Ehd0jxGytxxnHnk_HLGn0YmWhY50MNEK3be30LAMTuKEJx_hdumXzHJdphqkwoD2qBq4afxqe1ZrYKJYW4TOVI';
-
 const providerAvatarUrl =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuC1--RFwuMPWQUCUsJqFJtDg21-HdcfnLdSf1OjFhMQ0j9NST24FjBaSM7JOtzszWmIErKqMQXkdmnqxR_utEHb4TNZqahM9yrFFqESI_-xXht1pg77JxyVFam1MDuZphna3Zzdr7cgqcFhy5reOFD_N9RLOTsh0qCOMK0fLTu__c6jZwBY_lwO3VqXa-2B31covAs8bzABVOXq1Y2B3ziI6r3itdM--XjKZCx2Wu68KLuxv31UO4Xc5ad40bz8dGGl-KYcUt6HNrc';
-
-const legacyCustomerNavItems = [
-  { icon: 'dashboard', label: 'Bảng điều khiển', path: '/customer' },
-  { icon: 'calendar_today', label: 'Lịch đặt chỗ', path: '#' },
-  { icon: 'mail', label: 'Hộp thư', path: '#' },
-  { icon: 'account_balance_wallet', label: 'Ví tiền', path: '#' },
-  { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
-];
-
-const customerNavItems = [
-  { icon: 'dashboard', label: 'Bảng điều khiển', path: '/customer' },
-  { icon: 'calendar_today', label: 'Lịch đặt chỗ', path: '/customer/bookings' },
-  { icon: 'mail', label: 'Hộp thư', path: '/customer/inbox' },
-  { icon: 'account_balance_wallet', label: 'Ví tiền', path: '/customer/wallet' },
-  { icon: 'settings', label: 'Cài đặt', path: '/customer/profile' },
-];
-
-void legacyCustomerNavItems;
 
 const categories: Category[] = [
   {
@@ -120,16 +98,8 @@ const topProviders: Pro[] = [
 ];
 
 const CustomerHomePage: React.FC = () => {
-  const navigate = useNavigate();
-
   return (
-    <DashboardLayout
-      navItems={customerNavItems}
-      switchLabel="Đăng tin dịch vụ"
-      switchVariant="gradient"
-      onSwitch={() => navigate('/register-provider')}
-      userAvatar={userAvatarUrl}
-    >
+    <DashboardShell role="CUSTOMER">
       <HeroOffer imageUrl={heroImageUrl} />
       <CategoriesGrid categories={categories} />
 
@@ -139,7 +109,7 @@ const CustomerHomePage: React.FC = () => {
       </section>
 
       <CustomerHomeFooter />
-    </DashboardLayout>
+    </DashboardShell>
   );
 };
 

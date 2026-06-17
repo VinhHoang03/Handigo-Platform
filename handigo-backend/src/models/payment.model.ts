@@ -1,7 +1,7 @@
 import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument, Money } from "./common";
 
-export type PaymentMethod = "payos" | "vnpay" | "cash";
+export type PaymentMethod = "payos" | "vnpay" | "cash" | "wallet" | "bank";
 export type PaymentType = "full" | "remaining" | "inspection_deposit";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
@@ -32,7 +32,7 @@ const PaymentSchema = new Schema<IPayment>(
     orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     amount: { type: Number, required: true, min: 0 },
-    method: { type: String, enum: ["payos", "vnpay", "cash"], required: true },
+    method: { type: String, enum: ["payos", "vnpay", "cash", "wallet", "bank"], required: true },
     paymentType: {
       type: String,
       enum: ["full", "remaining", "inspection_deposit"],

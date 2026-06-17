@@ -55,7 +55,9 @@ export const getMyOrders = async (
     const customerId = uid(req);
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
-    const result = await OrderService.getOrdersByCustomer(customerId, page, limit);
+    const status = req.query.status as string;
+    const search = req.query.search as string;
+    const result = await OrderService.getOrdersByCustomer(customerId, page, limit, { status, search });
     return ok(res, result);
   } catch (err) {
     next(err);

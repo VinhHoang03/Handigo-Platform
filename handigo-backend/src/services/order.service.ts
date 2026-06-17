@@ -29,6 +29,7 @@ export interface CreateOrderPayload {
   customerAttachments?: string[];
   promotionId?: string;
   voucherId?: string;
+  paymentMethod: "wallet" | "bank" | "cash";
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -77,20 +78,23 @@ export const OrderService = {
     }));
 
     // 4. Calculate pricing
-    let bookingAmount = 0;
+    let bookingBasePrice = 0;
     if (service.serviceType === "variable_price") {
-      // For repair/variable services, the initial bookingAmount is the deposit
-      bookingAmount = service.depositAmount ?? 0;
+      bookingBasePrice = service.depositAmount ?? 0;
     } else if (service.serviceType === "fixed_price" && service.fixedPrice) {
-      bookingAmount = service.fixedPrice;
-    } else {
-      bookingAmount = selectedOptionsSnapshot.reduce((sum, o) => sum + (o.fixedPrice ?? 0), 0);
+      bookingBasePrice = service.fixedPrice;
     }
 
-    const platformCommissionAmount = Math.round(
-      bookingAmount * PLATFORM_COMMISSION_RATE,
+    const optionsAmount = selectedOptionsSnapshot.reduce(
+      (sum, o) => sum + (o.fixedPrice ?? 0),
+      0,
     );
-    const providerEarningAmount = bookingAmount - platformCommissionAmount;
+    const totalAmount = bookingBasePrice + optionsAmount;
+
+    const platformCommissionAmount = Math.round(
+      totalAmount * PLATFORM_COMMISSION_RATE,
+    );
+    const providerEarningAmount = totalAmount - platformCommissionAmount;
 
     // 5. Determine if inspection is required (repair service)
     const inspectionRequired = service.serviceType === "variable_price";
@@ -109,18 +113,21 @@ export const OrderService = {
       orderType: payload.orderType ?? "normal",
       scheduledAt: payload.scheduledAt ?? null,
       status: "created",
+      paymentMethod: payload.paymentMethod,
+      paymentStatus: "unpaid",
+      depositAmount: service.serviceType === "variable_price" ? bookingBasePrice : 0,
       inspectionRequired,
       hasAdditionalQuotation: false,
       problemDescription: payload.problemDescription ?? null,
       customerAttachments: payload.customerAttachments ?? [],
       pricing: {
-        bookingAmount,
+        bookingAmount: totalAmount, // The amount including options for the current payment phase
         platformCommissionRate: PLATFORM_COMMISSION_RATE,
         platformCommissionAmount,
         providerEarningAmount,
         promotionDiscountAmount: 0,
         voucherDiscountAmount: 0,
-        totalPaidAmount: bookingAmount,
+        totalPaidAmount: totalAmount,
       },
       confirmation: {
         customerConfirmedAt: null,
@@ -147,18 +154,52 @@ export const OrderService = {
     customerId: string,
     page = 1,
     limit = 10,
-  ): Promise<{ data: IOrder[]; total: number }> {
+    filters: { status?: string; search?: string } = {},
+  ): Promise<{ items: IOrder[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const skip = (page - 1) * limit;
+    const conditions: any[] = [{ customerId: new Types.ObjectId(customerId) }];
+
+    if (filters.status && filters.status !== "all" && filters.status !== "Tất cả") {
+      conditions.push({ status: filters.status });
+    }
+
+    const search = filters.search?.trim();
+    if (search) {
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const matchedServices = await Service.find({
+        name: { $regex: escapedSearch, $options: "i" },
+      }).select("_id");
+      const serviceIds = matchedServices.map((s) => s._id);
+
+      conditions.push({
+        $or: [
+          { orderCode: { $regex: escapedSearch, $options: "i" } },
+          { problemDescription: { $regex: escapedSearch, $options: "i" } },
+          { serviceId: { $in: serviceIds } },
+        ],
+      });
+    }
+
+    const query = { $and: conditions };
     const [data, total] = await Promise.all([
-      Order.find({ customerId })
+      Order.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate("serviceId", "name image serviceType")
         .lean(),
-      Order.countDocuments({ customerId }),
+      Order.countDocuments(query),
     ]);
-    return { data: data as IOrder[], total };
+
+    return {
+      items: data as IOrder[],
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   },
 
   /**

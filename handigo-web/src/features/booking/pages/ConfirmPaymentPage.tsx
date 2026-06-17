@@ -1,88 +1,190 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BookingPageHeader, BookingShell, BookingStepper, OrderSummaryCard } from '../components/BookingComponents';
+import { useBookingStore } from '../hooks/useBookingStore';
+import { bookingApi, type CreateOrderPayload } from '../../../api/booking';
+import type { Address, Service, ServiceOption } from '../../../types/booking';
 
 const paymentMethods = [
   ['account_balance_wallet', 'Ví HandiGo', 'Số dư: 1.500.000đ', 'wallet'],
-  ['credit_card', 'Thẻ tín dụng/ghi nợ', 'Visa, Mastercard, JCB', 'card'],
   ['account_balance', 'Chuyển khoản ngân hàng', 'Quét mã VietQR hoặc Internet Banking', 'bank'],
   ['payments', 'Tiền mặt', 'Thanh toán trực tiếp cho nhân viên', 'cash'],
-];
+] as const;
 
-const detailItems = [
-  ['cleaning_services', 'Dịch vụ', 'Tổng vệ sinh nhà cửa'],
-  ['calendar_today', 'Thời gian', '09:00, Thứ 7 - 24/05/2024'],
-  ['location_on', 'Địa chỉ', '245 Lê Lợi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh'],
-];
+const ConfirmPaymentPage = () => {
+  const {
+    categoryId, serviceId, selectedOptionIds, addressId, orderType,
+    scheduledAt, problemDescription, customerAttachments, paymentMethod, setPaymentMethod, reset
+  } = useBookingStore();
 
-const ConfirmPaymentPage = () => (
-  <BookingShell>
-    <BookingPageHeader
-      title="Đặt lịch dịch vụ"
-      description="Vui lòng kiểm tra lại thông tin và chọn phương thức thanh toán."
-    />
-    <BookingStepper currentStep={3} />
+  const [service, setService] = useState<Service | null>(null);
+  const [address, setAddress] = useState<Address | null>(null);
+  const [options, setOptions] = useState<ServiceOption[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
-      <div className="lg:col-span-8 space-y-gutter">
-        <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
-          <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">receipt_long</span>
-            Chi tiết dịch vụ
-          </h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            {detailItems.map(([icon, label, value], index) => (
-              <div key={label} className={`flex items-start gap-4 ${index === 2 ? 'md:col-span-2' : ''}`}>
-                <div className="bg-primary-fixed-dim/30 p-3 rounded-lg text-primary">
-                  <span className="material-symbols-outlined">{icon}</span>
-                </div>
-                <div>
-                  <p className="font-label-md text-label-md text-on-surface-variant">{label}</p>
-                  <p className="font-body-md text-body-md font-semibold">{value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+  useEffect(() => {
+    let isMounted = true;
+    if (serviceId) {
+      bookingApi.getServiceById(serviceId).then(data => {
+        if (isMounted) setService(data);
+      });
+      bookingApi.getOptions(serviceId).then(data => {
+        if (isMounted) setOptions(data);
+      });
+    }
+    if (addressId) {
+      bookingApi.getAddresses().then(addresses => {
+        if (!isMounted) return;
+        const found = addresses.find(a => a._id === addressId);
+        if (found) setAddress(found);
+      });
+    }
+    return () => { isMounted = false; };
+  }, [serviceId, addressId, categoryId]);
 
-        <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
-          <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
-            Phương thức thanh toán
-          </h2>
-          <div className="space-y-3">
-            {paymentMethods.map(([icon, title, subtitle, value], index) => (
-              <label
-                key={value}
-                className="group relative flex items-center p-4 rounded-xl border border-outline-variant/50 hover:border-primary cursor-pointer transition-all bg-surface-container-low/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
-              >
-                <input defaultChecked={index === 0} className="hidden peer" name="payment" type="radio" value={value} />
-                <div className="flex-1 flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${index === 0 ? 'bg-primary-container text-white' : 'bg-on-surface/5 text-on-surface'}`}>
+  const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
+
+  const handleConfirm = async () => {
+    if (!serviceId) {
+      alert('Vui lòng chọn dịch vụ trước khi thanh toán.');
+      return;
+    }
+    if (!addressId) {
+      alert('Vui lòng chọn địa chỉ thực hiện.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload: CreateOrderPayload = {
+        serviceId,
+        selectedOptionIds,
+        addressId,
+        orderType,
+        scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+        problemDescription,
+        customerAttachments,
+        paymentMethod,
+      };
+
+      const order = await bookingApi.createOrder(payload);
+      reset();
+      navigate('/customer/bookings/success', { state: { order } });
+    } catch (error) {
+      console.error('Failed to create order:', error);
+      alert('Đã có lỗi xảy ra khi đặt lịch. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const detailItems = [
+    ['cleaning_services', 'Dịch vụ', service?.name || '...'],
+    ['calendar_today', 'Thời gian', scheduledAt ? new Date(scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất có thể'],
+    ['location_on', 'Địa chỉ', address ? `${address.detailAddress}, ${address.ward}, ${address.district}, ${address.province}` : '...'],
+  ];
+
+  return (
+    <BookingShell>
+      <BookingPageHeader
+        title="Đặt lịch dịch vụ"
+        description="Vui lòng kiểm tra lại thông tin và chọn phương thức thanh toán."
+      />
+      <BookingStepper currentStep={3} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
+        <div className="lg:col-span-8 space-y-gutter">
+          <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
+            <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">receipt_long</span>
+              Chi tiết dịch vụ
+            </h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              {detailItems.map(([icon, label, value], index) => (
+                <div key={label} className={`flex items-start gap-4 ${index === 2 ? 'md:col-span-2' : ''}`}>
+                  <div className="bg-primary-fixed-dim/30 p-3 rounded-lg text-primary">
                     <span className="material-symbols-outlined">{icon}</span>
                   </div>
                   <div>
-                    <p className="font-body-md text-body-md font-semibold">{title}</p>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant">{subtitle}</p>
+                    <p className="font-label-md text-label-md text-on-surface-variant">{label}</p>
+                    <p className="font-body-md text-body-md font-semibold">{value}</p>
                   </div>
                 </div>
-                <div className="w-6 h-6 border-2 border-outline-variant rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">
-                  <div className="w-2.5 h-2.5 bg-white rounded-full" />
-                </div>
-              </label>
-            ))}
-          </div>
-        </section>
-      </div>
+              ))}
+            </div>
 
-      <div className="lg:col-span-4">
-        <OrderSummaryCard
-          step={3}
-          actionLabel="Xác nhận & Thanh toán"
-          actionTo="/customer/bookings/success"
-          total="457.600đ"
-        />
+            {selectedOptions.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-outline-variant">
+                <p className="font-label-md text-on-surface-variant mb-3">Dịch vụ bổ sung:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedOptions.map(opt => (
+                    <span key={opt._id} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                      {opt.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
+            <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
+              Phương thức thanh toán
+            </h2>
+            <div className="space-y-3">
+              {paymentMethods
+                .filter(([, , , value]) => {
+                  if (service?.serviceType === 'variable_price') {
+                    // Variable price (repair): Wallet and QR/Bank only
+                    return value === 'wallet' || value === 'bank';
+                  }
+                  // Fixed price: All 3 methods (Wallet, Bank, Cash)
+                  return true;
+                })
+                .map(([icon, title, subtitle, value]) => (
+                  <label
+                    key={value}
+                    className="group relative flex items-center p-4 rounded-xl border border-outline-variant/50 hover:border-primary cursor-pointer transition-all bg-surface-container-low/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                  >
+                    <input
+                      checked={paymentMethod === value}
+                      onChange={() => setPaymentMethod(value)}
+                      className="hidden peer"
+                      name="payment"
+                      type="radio"
+                      value={value}
+                    />
+                    <div className="flex-1 flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${paymentMethod === value ? 'bg-primary text-white' : 'bg-on-surface/5 text-on-surface'}`}>
+                        <span className="material-symbols-outlined">{icon}</span>
+                      </div>
+                      <div>
+                        <p className="font-body-md text-body-md font-semibold">{title}</p>
+                        <p className="font-label-sm text-label-sm text-on-surface-variant">{subtitle}</p>
+                      </div>
+                    </div>
+                    <div className="w-6 h-6 border-2 border-outline-variant rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">
+                      <div className="w-2.5 h-2.5 bg-white rounded-full" />
+                    </div>
+                  </label>
+                ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="lg:col-span-4">
+          <OrderSummaryCard
+            step={3}
+            actionLabel="Xác nhận & Thanh toán"
+            onAction={handleConfirm}
+            isLoading={isSubmitting}
+          />
+        </div>
       </div>
-    </div>
-  </BookingShell>
-);
+    </BookingShell>
+  );
+};
 
 export default ConfirmPaymentPage;

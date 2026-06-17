@@ -30,14 +30,6 @@ export interface ServicePackage {
 export const userAvatar =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuARyCCp_DRCGkQD86OfC6uVpuF8fEBbXBt4HGN8QmYdL5UzG9_SqCwziPHJlA6sdnSMuuM0M4iPrj60PcbOf1Tay8zXYZ4f2Uu-n_wdO4q-vPoelLNHmMebsYSFMR4DmLvyx4EckHUwJ75M3e27ZQLoVG5O5dorIFpH9pmzWewWGvAXDD5raninyOCbDelMPkJ7VbxmR25BEJx3NxtjjR0W_wmbZNAE_yS7GTZDUH-7aKQX7QWevM_8Z9VQezxYcuFGLHLFjPczJvQ';
 
-export const bookingNavItems = [
-  { icon: 'dashboard', label: 'Bảng điều khiển', path: '/customer' },
-  { icon: 'calendar_today', label: 'Lịch đặt chỗ', path: '/customer/bookings' },
-  { icon: 'mail', label: 'Hộp thư', path: '/customer/inbox' },
-  { icon: 'account_balance_wallet', label: 'Ví tiền', path: '/customer/wallet' },
-  { icon: 'settings', label: 'Cài đặt', path: '/customer/settings' },
-];
-
 export const bookings: BookingListItem[] = [
   {
     id: 'HG-98231',
