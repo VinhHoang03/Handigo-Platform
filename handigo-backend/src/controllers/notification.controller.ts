@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import * as notificationService from "../services/notification.service";
 import { AppError } from "../utils/appError";
 import {
+  adminNotificationListQuerySchema,
   notificationIdParamSchema,
   notificationListQuerySchema,
   sendSystemNotificationSchema,
@@ -49,6 +50,28 @@ export const getUnreadCount = async (
       success: true,
       data: result,
       message: "Get unread notification count successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getAdminNotifications = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const query = adminNotificationListQuerySchema.parse(req.query);
+    const result = await notificationService.getAdminNotifications(
+      getRequestUser(req),
+      query,
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+      message: "Get admin notifications successfully",
     });
   } catch (error) {
     return next(error);

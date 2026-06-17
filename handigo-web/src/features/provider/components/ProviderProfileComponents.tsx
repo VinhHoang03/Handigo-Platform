@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import type {
   BankAccount,
   PerformanceStat,
@@ -6,18 +6,29 @@ import type {
   ProviderProfile,
   ServiceArea,
   VerificationItem,
-} from '../types/provider.types';
+} from "../types/provider.types";
+
+type VerificationPanelItem = VerificationItem & {
+  onClick?: () => void;
+};
 
 export const ProfileSection: React.FC<{
   title: string;
   actionLabel?: string;
+  onAction?: () => void;
   children: React.ReactNode;
-}> = ({ title, actionLabel, children }) => (
-  <section className="bg-white p-6 md:p-8 rounded-xl border border-outline-variant/20 shadow-sm">
-    <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-      <h3 className="font-headline-md text-headline-md text-on-surface">{title}</h3>
+}> = ({ title, actionLabel, onAction, children }) => (
+  <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <h3 className="font-headline-md text-headline-md text-on-surface">
+        {title}
+      </h3>
       {actionLabel && (
-        <button type="button" className="text-primary font-bold text-sm hover:underline">
+        <button
+          type="button"
+          className="text-sm font-bold text-primary hover:underline"
+          onClick={onAction}
+        >
           {actionLabel}
         </button>
       )}
@@ -26,59 +37,80 @@ export const ProfileSection: React.FC<{
   </section>
 );
 
-export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({ profile }) => (
-  <section className="glass-card rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
-    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-20 -mt-20" />
-    <div className="relative group shrink-0">
-      <img
-        alt={`${profile.fullName} profile`}
-        className="w-32 h-32 rounded-full object-cover ring-4 ring-primary-container/20"
-        src={profile.avatarUrl}
-      />
-      <button type="button" className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg hover:scale-110 transition-transform">
-        <span className="material-symbols-outlined text-sm">photo_camera</span>
-      </button>
-    </div>
+export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
+  profile,
+}) => (
+  <section className="glass-card flex flex-col items-center gap-8 overflow-hidden rounded-xl p-6 md:flex-row md:p-8">
+    <img
+      alt={`${profile.fullName} profile`}
+      className="h-32 w-32 shrink-0 rounded-full object-cover ring-4 ring-primary-container/20"
+      src={profile.avatarUrl}
+    />
 
-    <div className="flex-1 text-center md:text-left z-10">
-      <div className="flex flex-col md:flex-row md:items-center gap-2 mb-1">
-        <h2 className="font-headline-md text-headline-md">{profile.fullName}</h2>
+    <div className="flex-1 text-center md:text-left">
+      <div className="mb-1 flex flex-col gap-2 md:flex-row md:items-center">
+        <h2 className="font-headline-md text-headline-md">
+          {profile.fullName}
+        </h2>
         {profile.isVerified && (
-          <span className="inline-flex items-center gap-1 bg-secondary-container text-on-secondary-container text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-            <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-on-secondary-container">
+            <span
+              className="material-symbols-outlined text-[14px]"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              verified
+            </span>
             Xác thực
           </span>
         )}
       </div>
-      <p className="text-on-surface-variant font-label-md">ID: {profile.providerCode} • Thành viên từ {profile.joinDate}</p>
-      <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4">
-        <div className="flex items-center gap-2 bg-surface-container-high/50 px-3 py-1.5 rounded-lg border border-outline-variant/30">
-          <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+      <p className="font-label-md text-on-surface-variant">
+        ID: {profile.providerCode} • Thành viên từ {profile.joinDate}
+      </p>
+      <div className="mt-4 flex flex-wrap justify-center gap-4 md:justify-start">
+        <div className="flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-high/50 px-3 py-1.5">
+          <span
+            className="material-symbols-outlined text-primary"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
+            star
+          </span>
           <span className="font-bold">{profile.rating}</span>
-          <span className="text-xs text-on-surface-variant">({profile.reviewCount} đánh giá)</span>
+          <span className="text-xs text-on-surface-variant">
+            ({profile.reviewCount} đánh giá)
+          </span>
         </div>
-        <div className="flex items-center gap-2 bg-surface-container-high/50 px-3 py-1.5 rounded-lg border border-outline-variant/30">
-          <span className="material-symbols-outlined text-primary">task_alt</span>
+        <div className="flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-high/50 px-3 py-1.5">
+          <span className="material-symbols-outlined text-primary">
+            task_alt
+          </span>
           <span className="font-bold">{profile.totalBookings}+</span>
           <span className="text-xs text-on-surface-variant">Đã hoàn thành</span>
         </div>
       </div>
     </div>
-
-    <button type="button" className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all">
-      Chỉnh sửa hồ sơ
-    </button>
   </section>
 );
 
-export const PerformanceStats: React.FC<{ stats: PerformanceStat[] }> = ({ stats }) => (
-  <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+export const PerformanceStats: React.FC<{ stats: PerformanceStat[] }> = ({
+  stats,
+}) => (
+  <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
     {stats.map((stat) => (
-      <div key={stat.label} className="bg-white p-5 md:p-6 rounded-xl border border-outline-variant/20 shadow-sm hover:shadow-md transition-shadow">
-        <p className="text-xs text-on-surface-variant uppercase font-bold tracking-tight mb-2">{stat.label}</p>
+      <div
+        key={stat.label}
+        className="rounded-xl border border-outline-variant/20 bg-white p-5 shadow-sm transition-shadow hover:shadow-md md:p-6"
+      >
+        <p className="mb-2 text-xs font-bold uppercase tracking-tight text-on-surface-variant">
+          {stat.label}
+        </p>
         <div className="flex items-baseline gap-2">
           <h3 className="text-2xl font-bold text-primary">{stat.value}</h3>
-          <span className={`text-[10px] font-bold ${stat.tone === 'warning' ? 'text-tertiary' : 'text-secondary'}`}>
+          <span
+            className={`text-[10px] font-bold ${
+              stat.tone === "warning" ? "text-tertiary" : "text-secondary"
+            }`}
+          >
             {stat.meta}
           </span>
         </div>
@@ -87,138 +119,230 @@ export const PerformanceStats: React.FC<{ stats: PerformanceStat[] }> = ({ stats
   </section>
 );
 
-export const InfoField: React.FC<{ label: string; value: React.ReactNode; wide?: boolean }> = ({ label, value, wide }) => (
-  <div className={wide ? 'md:col-span-2' : undefined}>
-    <label className="block text-xs font-bold text-on-surface-variant uppercase mb-2">{label}</label>
+export const InfoField: React.FC<{
+  label: string;
+  value: React.ReactNode;
+  wide?: boolean;
+}> = ({ label, value, wide }) => (
+  <div className={wide ? "md:col-span-2" : undefined}>
+    <label className="mb-2 block text-xs font-bold uppercase text-on-surface-variant">
+      {label}
+    </label>
     <div className="font-body-md text-on-surface">{value}</div>
   </div>
 );
 
 export const SkillTags: React.FC<{ skills: string[] }> = ({ skills }) => (
   <div className="flex flex-wrap gap-2">
-    {skills.map((skill) => (
-      <span key={skill} className="bg-surface-container text-on-surface-variant px-3 py-1 rounded-lg text-sm font-medium">
-        {skill}
-      </span>
-    ))}
+    {skills.length > 0 ? (
+      skills.map((skill) => (
+        <span
+          key={skill}
+          className="rounded-lg bg-surface-container px-3 py-1 text-sm font-medium text-on-surface-variant"
+        >
+          {skill}
+        </span>
+      ))
+    ) : (
+      <span className="text-sm text-on-surface-variant">Chưa cập nhật</span>
+    )}
   </div>
 );
 
-export const PortfolioGrid: React.FC<{ items: PortfolioItem[] }> = ({ items }) => (
+export const PortfolioGrid: React.FC<{ items: PortfolioItem[] }> = ({
+  items,
+}) => (
   <div className="grid grid-cols-3 gap-4">
     {items.map((item) => (
-      <div key={item.id} className="aspect-square rounded-xl overflow-hidden group relative">
-        <img alt={item.alt} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" src={item.imageUrl} />
-        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <span className="material-symbols-outlined text-white">visibility</span>
+      <div
+        key={item.id}
+        className="group relative aspect-square overflow-hidden rounded-xl"
+      >
+        <img
+          alt={item.alt}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+          src={item.imageUrl}
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="material-symbols-outlined text-white">
+            visibility
+          </span>
         </div>
       </div>
     ))}
   </div>
 );
 
-export const VerificationPanel: React.FC<{ items: VerificationItem[] }> = ({ items }) => (
-  <aside className="bg-white p-6 rounded-xl border border-outline-variant/20 shadow-sm">
-    <h3 className="font-headline-md text-headline-md text-on-surface mb-6">Xác thực tài khoản</h3>
+function VerificationRow({ item }: { item: VerificationPanelItem }) {
+  const isRejected = item.statusTone === "rejected";
+  const isPending = item.statusTone === "pending";
+  const icon = isRejected ? "cancel" : isPending ? "pending" : "check_circle";
+  const iconClass = isRejected
+    ? "text-error"
+    : isPending
+      ? "text-primary"
+      : "text-secondary";
+  const content = (
+    <>
+      <span
+        className={`material-symbols-outlined ${iconClass}`}
+        style={{ fontVariationSettings: "'FILL' 1" }}
+      >
+        {icon}
+      </span>
+      <span className="flex-1">
+        <span className="block text-sm font-bold">{item.label}</span>
+        <span
+          className={`block text-[10px] uppercase ${
+            isRejected
+              ? "font-bold text-error"
+              : isPending
+                ? "font-bold text-primary"
+                : "text-on-surface-variant"
+          }`}
+        >
+          {item.status}
+        </span>
+      </span>
+      {item.onClick && (
+        <span className="material-symbols-outlined text-outline-variant">
+          chevron_right
+        </span>
+      )}
+    </>
+  );
+
+  const className = `flex w-full items-center gap-3 rounded-xl bg-surface-container-low p-3 text-left transition ${
+    isPending ? "border-2 border-primary/20" : "border border-transparent"
+  } ${item.onClick ? "hover:border-primary/30 hover:bg-surface-container" : ""}`;
+
+  if (item.onClick) {
+    return (
+      <button type="button" className={className} onClick={item.onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
+}
+
+export const VerificationPanel: React.FC<{ items: VerificationPanelItem[] }> = ({
+  items,
+}) => (
+  <aside className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
+    <h3 className="mb-6 font-headline-md text-headline-md text-on-surface">
+      Xác thực tài khoản
+    </h3>
     <div className="space-y-4">
       {items.map((item) => (
-        <div key={item.label} className={`flex items-center gap-3 p-3 bg-surface-container-low rounded-xl ${item.statusTone === 'pending' ? 'border-2 border-primary/20' : ''}`}>
-          <span className={`material-symbols-outlined ${item.statusTone === 'pending' ? 'text-primary' : 'text-secondary'}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-            {item.statusTone === 'pending' ? 'pending' : 'check_circle'}
-          </span>
-          <div className="flex-1">
-            <p className="text-sm font-bold">{item.label}</p>
-            <p className={`text-[10px] uppercase ${item.statusTone === 'pending' ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
-              {item.status}
-            </p>
-          </div>
-        </div>
+        <VerificationRow key={item.label} item={item} />
       ))}
     </div>
   </aside>
 );
 
 export const ServiceAreaPanel: React.FC<{ area: ServiceArea }> = ({ area }) => (
-  <aside className="bg-white p-6 rounded-xl border border-outline-variant/20 shadow-sm overflow-hidden">
-    <div className="flex justify-between items-center mb-4">
+  <aside className="overflow-hidden rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
+    <div className="mb-4 flex items-center justify-between">
       <h3 className="font-bold">Khu vực phục vụ</h3>
-      <button type="button" className="text-primary text-sm font-bold hover:underline">Cập nhật</button>
     </div>
     <div className="space-y-4">
       <div>
-        <p className="text-xs text-on-surface-variant font-bold uppercase mb-1">Địa chỉ chính</p>
-        <p className="text-sm">{area.address}</p>
+        <p className="mb-1 text-xs font-bold uppercase text-on-surface-variant">
+          Tỉnh/Thành phố
+        </p>
+        <p className="text-sm">{area.province || "Chưa cập nhật"}</p>
       </div>
       <div>
-        <p className="text-xs text-on-surface-variant font-bold uppercase mb-1">Bán kính hỗ trợ</p>
-        <div className="flex items-center gap-4">
-          <div className="flex-1 h-2 bg-surface-container rounded-full overflow-hidden">
-            <div className="h-full bg-primary" style={{ width: `${area.radiusPercent}%` }} />
-          </div>
-          <span className="text-sm font-bold">{area.radiusKm}km</span>
-        </div>
-      </div>
-      <div className="relative w-full h-40 rounded-xl overflow-hidden bg-surface-container-highest">
-        <img alt="Khu vực phục vụ trên bản đồ" className="w-full h-full object-cover grayscale opacity-60" src={area.mapImageUrl} />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="absolute w-24 h-24 rounded-full border-2 border-primary bg-primary/10 animate-pulse" />
-          <div className="absolute w-3 h-3 bg-primary rounded-full shadow-lg" />
-        </div>
+        <p className="mb-1 text-xs font-bold uppercase text-on-surface-variant">
+          Xã/Phường
+        </p>
+        <p className="text-sm">{area.ward || "Chưa cập nhật"}</p>
       </div>
     </div>
   </aside>
 );
 
-export const BankAccountPanel: React.FC<{ account: BankAccount }> = ({ account }) => (
-  <aside className="bg-white p-6 rounded-xl border border-outline-variant/20 shadow-sm">
-    <div className="flex justify-between items-center mb-4">
+export const BankAccountPanel: React.FC<{ account: BankAccount }> = ({
+  account,
+}) => (
+  <aside className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
+    <div className="mb-4 flex items-center justify-between">
       <h3 className="font-bold">Tài khoản ngân hàng</h3>
-      <button type="button" className="text-primary text-sm font-bold hover:underline">Cập nhật</button>
+      <button
+        type="button"
+        className="text-sm font-bold text-primary hover:underline"
+      >
+        Cập nhật
+      </button>
     </div>
-    <div className="flex items-center gap-4 p-4 rounded-xl border border-outline-variant/30 bg-gradient-to-br from-white to-surface-container-low">
-      <div className="w-12 h-12 bg-on-secondary rounded-lg flex items-center justify-center font-black text-primary shadow-sm border border-outline-variant/20">
+    <div className="flex items-center gap-4 rounded-xl border border-outline-variant/30 bg-surface-container-low p-4">
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-outline-variant/20 bg-on-secondary font-black text-primary shadow-sm">
         {account.shortName}
       </div>
       <div>
         <p className="text-sm font-bold">{account.bankName}</p>
-        <p className="text-sm text-on-surface-variant">{account.maskedNumber}</p>
+        <p className="text-sm text-on-surface-variant">
+          {account.maskedNumber}
+        </p>
       </div>
     </div>
   </aside>
 );
 
-export const SettingsMenu: React.FC = () => {
+export const AccountFunctionsPanel: React.FC<{
+  onPasswordClick: () => void;
+}> = ({ onPasswordClick }) => {
   const items = [
-    { icon: 'lock', label: 'Mật khẩu & Bảo mật' },
-    { icon: 'notifications', label: 'Cài đặt thông báo' },
-    { icon: 'shield', label: 'Quyền riêng tư' },
+    {
+      icon: "lock",
+      label: "Mật khẩu và bảo mật",
+      description: "Cập nhật mật khẩu đăng nhập.",
+      onClick: onPasswordClick,
+    },
+    {
+      icon: "shield",
+      label: "Quyền riêng tư",
+      description: "Tùy chọn quyền riêng tư sẽ được bổ sung.",
+    },
+    {
+      icon: "more_horiz",
+      label: "Các tùy chọn khác",
+      description: "Khu vực placeholder cho thiết lập tài khoản.",
+    },
   ];
 
   return (
-    <aside className="bg-white p-2 rounded-xl border border-outline-variant/20 shadow-sm">
-      {items.map((item) => (
-        <a key={item.label} className="flex items-center justify-between p-4 hover:bg-surface-container-low rounded-lg transition-all group" href="#">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">{item.icon}</span>
-            <span className="text-sm font-medium">{item.label}</span>
-          </div>
-          <span className="material-symbols-outlined text-outline-variant">chevron_right</span>
-        </a>
-      ))}
+    <aside className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
+      <h3 className="mb-4 font-headline-md text-headline-md text-on-surface">
+        Chức năng tài khoản
+      </h3>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className="group flex w-full items-center justify-between rounded-lg p-3 text-left transition-all hover:bg-surface-container-low"
+            onClick={item.onClick}
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="material-symbols-outlined text-on-surface-variant transition-colors group-hover:text-primary">
+                {item.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{item.label}</span>
+                <span className="mt-0.5 block text-xs text-on-surface-variant">
+                  {item.description}
+                </span>
+              </span>
+            </span>
+            <span className="material-symbols-outlined text-outline-variant">
+              chevron_right
+            </span>
+          </button>
+        ))}
+      </div>
     </aside>
   );
 };
-
-export const DangerZone: React.FC = () => (
-  <aside className="p-6 rounded-xl border-2 border-dashed border-error/30 bg-error-container/10">
-    <h3 className="font-bold text-error mb-4">Vùng nguy hiểm</h3>
-    <div className="space-y-3">
-      <button type="button" className="w-full py-2.5 rounded-lg border border-error/30 text-error font-bold text-sm hover:bg-error/5 transition-all">
-        Tạm ngừng nhận việc
-      </button>
-      <button type="button" className="w-full py-2.5 rounded-lg bg-error text-white font-bold text-sm hover:opacity-90 active:scale-95 transition-all">
-        Đăng xuất
-      </button>
-    </div>
-  </aside>
-);

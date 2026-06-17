@@ -10,6 +10,7 @@ import {
   resetPasswordApi,
   getMeApi,
 } from '../api/auth.api';
+import { refreshAccessToken } from '@/api/client';
 import type {
   LoginRequest,
   RegisterRequest,
@@ -36,8 +37,12 @@ export const authService = {
   restoreSession: async () => {
     const store = useAuthStore.getState();
     if (!store.token) {
-      store.finishInitialization();
-      return null;
+      try {
+        await refreshAccessToken();
+      } catch {
+        store.finishInitialization();
+        return null;
+      }
     }
 
     try {

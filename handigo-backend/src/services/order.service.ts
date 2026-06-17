@@ -91,23 +91,15 @@ export const OrderService = {
       optionId: opt._id as Types.ObjectId,
       name: opt.name,
       optionType: opt.optionType,
-      fixedPrice: opt.fixedPrice ?? 0,
-      isFixedPrice: opt.isFixedPrice,
+      price: opt.price,
     }));
 
-    // 4. Calculate pricing
-    let bookingBasePrice = 0;
-    if (service.serviceType === "variable_price") {
-      bookingBasePrice = service.depositAmount ?? 0;
-    } else if (service.serviceType === "fixed_price" && service.fixedPrice) {
-      bookingBasePrice = service.fixedPrice;
-    }
-
-    const optionsAmount = selectedOptionsSnapshot.reduce(
-      (sum, o) => sum + (o.fixedPrice ?? 0),
+    // 4. Calculate pricing — price comes entirely from selected ServiceOptions
+    const bookingBasePrice = selectedOptionsSnapshot.reduce(
+      (sum, o) => sum + (o.price ?? 0),
       0,
     );
-    const totalAmount = bookingBasePrice + optionsAmount;
+    const totalAmount = bookingBasePrice;
 
     const platformCommissionAmount = Math.round(
       totalAmount * PLATFORM_COMMISSION_RATE,

@@ -5,6 +5,7 @@ import { AppError } from "../utils/appError";
 import {
   adminWalletListQuerySchema,
   providerIdParamSchema,
+  walletDepositOrderCodeParamSchema,
   walletTransactionQuerySchema,
 } from "../validations/wallet.validator";
 
@@ -77,6 +78,38 @@ export const getMyWalletSummary = async (req: Request, res: Response) => {
       success: true,
       data: result,
       message: "Lấy tổng quan ví thành công",
+    });
+  } catch (error: any) {
+    return handleError(res, error);
+  }
+};
+
+export const createMyWalletDeposit = async (req: Request, res: Response) => {
+  try {
+    const result = await walletService.createWalletDeposit(getRequestUser(req), req.body);
+
+    return res.status(201).json({
+      success: true,
+      data: result,
+      message: "Tao lien ket nap vi thanh cong",
+    });
+  } catch (error: any) {
+    return handleError(res, error);
+  }
+};
+
+export const cancelMyWalletDeposit = async (req: Request, res: Response) => {
+  try {
+    const params = walletDepositOrderCodeParamSchema.parse(req.params);
+    const result = await walletService.cancelWalletDeposit(
+      getRequestUser(req),
+      params.orderCode,
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+      message: "Da huy giao dich nap vi",
     });
   } catch (error: any) {
     return handleError(res, error);

@@ -9,6 +9,7 @@ import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import type { CreatePaymentInput, PaymentHistoryQuery } from "../validations/payment.validation";
+import { handleWalletDepositPayosWebhook } from "./wallet.service";
 
 type RequestUser = {
   id: string;
@@ -41,8 +42,7 @@ const getPaymentAmount = async (order: any, paymentType: PaymentType) => {
     return Math.max(order.pricing?.totalPaidAmount || order.pricing?.bookingAmount || 0, 0);
   }
 
-  const service = await Service.findById(order.serviceId);
-  const depositAmount = service?.depositAmount || order.depositAmount || 0;
+  const depositAmount = order.depositAmount || 0;
 
   if (depositAmount <= 0) {
     throw new AppError("Dịch vụ khảo sát chưa cấu hình tiền đặt cọc", 400);
@@ -294,7 +294,7 @@ export const handlePayosWebhook = async (payload: any) => {
   const payment = await Payment.findOne({ gatewayOrderCode: orderCode, method: "payos" });
 
   if (!payment) {
-    throw new AppError("Không tìm thấy giao dịch PayOS", 404);
+    return handleWalletDepositPayosWebhook(webhookData, payload);
   }
 
   if (payment.status === "paid") {

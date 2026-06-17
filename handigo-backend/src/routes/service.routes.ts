@@ -7,6 +7,10 @@ import {
   createServiceSchema,
   updateServiceSchema,
 } from "../validations/service.validation";
+import {
+  createServiceOptionSchema,
+  updateServiceOptionSchema,
+} from "../validations/serviceOption.validation";
 
 const router = Router();
 
@@ -17,17 +21,29 @@ router.get("/:id/options", authMiddleware, serviceController.getServiceOptions);
 
 // Admin-only write routes
 router.use(authMiddleware, roleMiddleware("ADMIN"));
+
+// Service CRUD
 router.post("/", validate(createServiceSchema), serviceController.createService);
+router.patch("/:id", validate(updateServiceSchema), serviceController.updateService);
+router.put("/:id", validate(updateServiceSchema), serviceController.updateService);
+router.delete("/:id", serviceController.deleteService);
+
+// ServiceOption CRUD (nested under service)
+router.post(
+  "/:id/options",
+  validate(createServiceOptionSchema),
+  serviceController.createOption,
+);
 router.patch(
-  "/:id",
-  validate(updateServiceSchema),
-  serviceController.updateService,
+  "/options/:optionId",
+  validate(updateServiceOptionSchema),
+  serviceController.updateOption,
 );
 router.put(
-  "/:id",
-  validate(updateServiceSchema),
-  serviceController.updateService,
+  "/options/:optionId",
+  validate(updateServiceOptionSchema),
+  serviceController.updateOption,
 );
-router.delete("/:id", serviceController.deleteService);
+router.delete("/options/:optionId", serviceController.deleteOption);
 
 export default router;

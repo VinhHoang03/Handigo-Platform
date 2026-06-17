@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý dịch vụ - Handigo Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Hanken+Grotesk:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#0f0069",
+                        "surface-tint": "#5049d4",
+                        "surface-container": "#eaedff",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffdbcc",
+                        "tertiary-container": "#592000",
+                        "secondary-fixed": "#abedff",
+                        "surface-container-highest": "#dae2fc",
+                        "on-secondary-container": "#076a7c",
+                        "surface-container-low": "#f2f3ff",
+                        "primary-container": "#1e00a9",
+                        "on-error-container": "#93000a",
+                        "on-tertiary": "#ffffff",
+                        "on-background": "#131b2e",
+                        "on-surface": "#131b2e",
+                        "error": "#ba1a1a",
+                        "surface-glass": "rgba(255, 255, 255, 0.7)",
+                        "surface-bright": "#faf8ff",
+                        "secondary-fixed-dim": "#86d2e6",
+                        "on-secondary-fixed-variant": "#004e5c",
+                        "surface-dim": "#d2d9f4",
+                        "on-primary-container": "#908dff",
+                        "star-gold": "#facc15",
+                        "inverse-surface": "#283044",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "on-tertiary-fixed": "#351000",
+                        "tertiary-fixed-dim": "#ffb694",
+                        "on-tertiary-container": "#da845b",
+                        "surface": "#faf8ff",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#743411",
+                        "tertiary": "#371100",
+                        "inverse-primary": "#c3c0ff",
+                        "surface-container-high": "#e1e7ff",
+                        "secondary": "#00687a",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-fixed": "#001f26",
+                        "on-surface-variant": "#464555",
+                        "surface-variant": "#dae2fc",
+                        "background": "#faf8ff",
+                        "on-primary-fixed-variant": "#372cbc",
+                        "primary-fixed": "#e2dfff",
+                        "outline-variant": "#c7c4d7",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#eef0ff",
+                        "primary": "#0f006d",
+                        "secondary-container": "#9ce8fd",
+                        "outline": "#777586",
+                        "success-green": "#4ade80"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "12px",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "base": "8px",
+                        "xl": "80px",
+                        "md": "24px",
+                        "xs": "4px",
+                        "lg": "48px",
+                        "gutter": "24px",
+                        "container-max": "1280px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-xl": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Hanken Grotesk"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-pill { font-variation-settings: 'FILL' 1; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #dae2fc; border-radius: 10px; }
+        .glass-header { backdrop-filter: blur(12px); }
+    </style>
+</head>
+<body class="bg-surface-container-low font-body-md text-on-surface">
+<!-- Sidebar Wrapper -->
+<aside class="w-64 h-screen fixed left-0 top-0 bg-surface-container-lowest shadow-sm flex flex-col py-md px-sm border-r border-outline-variant/30 z-50">
+<div class="flex items-center gap-3 mb-lg px-2">
+<div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">handyman</span>
+</div>
+<div>
+<h1 class="text-headline-md font-headline-md font-bold text-primary leading-tight">Handigo Admin</h1>
+<p class="text-[10px] text-on-surface-variant font-medium tracking-wider uppercase">Quản lý dịch vụ tận tâm</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">dashboard</span>
+<span class="text-label-md">Bảng điều khiển</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">group</span>
+<span class="text-label-md">Người dùng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">category</span>
+<span class="text-label-md">Danh mục dịch vụ</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 bg-primary-container text-on-primary-container rounded-lg font-bold" href="#">
+<span class="material-symbols-outlined active-pill">construction</span>
+<span class="text-label-md">Dịch vụ</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">shopping_cart</span>
+<span class="text-label-md">Đơn hàng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">payments</span>
+<span class="text-label-md">Giao dịch</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">assessment</span>
+<span class="text-label-md">Báo cáo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-low hover:translate-x-1 transition-all rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">settings</span>
+<span class="text-label-md">Cài đặt</span>
+</a>
+</nav>
+<div class="mt-auto pt-md border-t border-outline-variant/20 space-y-2">
+<button class="w-full flex items-center gap-3 px-3 py-2.5 text-error hover:bg-error-container/20 rounded-lg transition-colors">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-label-md font-medium">Đăng xuất</span>
+</button>
+<div class="flex items-center gap-3 px-2 py-2">
+<img alt="Ảnh đại diện quản trị viên" class="w-8 h-8 rounded-full border border-outline-variant/30" data-alt="A professional headshot of a modern administrative professional with a friendly smile, wearing a sharp corporate blazer in a brightly lit minimalist office setting. The background is softly blurred with hints of glass partitions and indigo accents, maintaining a clean and high-authority executive aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVvXMv-GCLFxyIg208sZAyDGRuY_Sf3UPw747hDEmuIBGSDO3gT2wlvGYP394_lAcgtaIAitLdsap4pppE7z4SC6zU2yh3wNOnoQbdJKTxcTqtSGdWu75INRFpLNqpPTFrkf4kOqzE5knNVyFxuJVuUOFNUrfjhbKoh5epADPpkSGKoZenm9UN1WAjWUbkx-jvYZLTqwlQ8DZXWiek2UV9MH5gPsHuJQMW11ptYKRgIJNo-fOCHbXeGesd2N92zn1YkzFMRBo2bSki"/>
+<div class="overflow-hidden">
+<p class="text-label-md font-bold truncate">Admin Handigo</p>
+<p class="text-[10px] text-on-surface-variant truncate">admin@handigo.vn</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen">
+<!-- Top Sticky Header -->
+<header class="sticky top-0 z-40 glass-header bg-surface-glass/70 px-md h-16 flex items-center justify-between border-b border-transparent">
+<div class="flex flex-col">
+<h2 class="font-headline-md text-headline-md font-bold text-primary leading-none">Quản lý dịch vụ</h2>
+<p class="text-label-sm text-on-surface-variant mt-0.5">Quản lý dịch vụ và các tùy chọn dịch vụ trên nền tảng Handigo.</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-primary rounded-full transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:bg-surface-container hover:text-primary rounded-full transition-all">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+</div>
+<button class="bg-primary-container text-on-primary-container px-6 py-2.5 rounded-lg font-bold flex items-center gap-2 active:scale-95 transition-transform shadow-sm">
+<span class="material-symbols-outlined">add</span>
+<span>Thêm dịch vụ mới</span>
+</button>
+</div>
+</header>
+<!-- Search & Filter Bar -->
+<div class="p-md space-y-md">
+<div class="bg-surface-container-lowest p-4 rounded-lg shadow-sm border border-outline-variant/30 flex flex-wrap gap-4 items-center">
+<div class="flex-1 relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-primary/20 text-label-md" placeholder="Tìm kiếm dịch vụ..." type="text"/>
+</div>
+<select class="bg-surface-container-low border-none rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 text-label-md min-w-[160px]">
+<option>Tất cả danh mục</option>
+<option>Điện nước</option>
+<option>Vệ sinh</option>
+<option>Sửa chữa</option>
+</select>
+<select class="bg-surface-container-low border-none rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 text-label-md min-w-[160px]">
+<option>Trạng thái</option>
+<option>Hoạt động</option>
+<option>Tạm ngưng</option>
+</select>
+<button class="w-11 h-11 flex items-center justify-center bg-surface-container-low text-on-surface-variant rounded-lg hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+<!-- Master-Detail Layout -->
+<div class="flex gap-md h-[calc(100vh-210px)]">
+<!-- LEFT PANEL: List (35%) -->
+<section class="w-[35%] flex flex-col gap-sm overflow-y-auto pr-1">
+<!-- Service Card (Active) -->
+<div class="bg-surface-container-lowest p-3 rounded-lg shadow-sm border-2 border-primary-container ring-1 ring-primary/10 cursor-pointer relative overflow-hidden group">
+<div class="flex gap-3">
+<img alt="Thumbnail Vệ sinh chuyên sâu" class="w-20 h-20 rounded-lg object-cover flex-shrink-0" data-alt="A macro close-up of a modern cleaning professional using a high-tech steam cleaner on a pristine white tiled floor. The scene is bathed in natural morning light streaming through a window, creating a fresh and hygienic atmosphere. The color palette consists of soft blues, whites, and subtle indigo shadows, emphasizing extreme cleanliness and professionalism." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCee_M6EtFfLOf2D_8TGP05rbzNAqHlTarFj1nS0Dgr_psae2-y3cBo_fQZNH8eGcYZBVv7lnKAeA9gbvIOzMQyo86tY9A7-eOxIzVKX1PreJKp4TUp1TtIRI9JIy2CR7HCi2Z9FLJR7jKsy6HJIIpcmts79Pe5n-oS5zI2LOZYidBPxWWtaTCZior7EpWHmbRoLxwjtqT1_GZqFXZgu2ITwIvUw54fvq1xsZwwcqCCBD1YZnDI1IlI76GTC3QTMSWH1e3kc_XiWPJ_"/>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="text-label-md font-bold text-on-surface truncate">Vệ sinh chuyên sâu</h3>
+<span class="bg-success-green/10 text-success-green text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-success-green"></span>
+                                        Hoạt động
+                                    </span>
+</div>
+<p class="text-label-sm text-on-surface-variant mt-0.5">Vệ sinh</p>
+<p class="text-label-md font-bold text-primary mt-2">Từ 200.000 VNĐ</p>
+</div>
+</div>
+</div>
+<!-- Service Card -->
+<div class="bg-surface-container-lowest p-3 rounded-lg shadow-sm border border-outline-variant/30 hover:bg-surface-container-low hover:translate-x-1 transition-all cursor-pointer">
+<div class="flex gap-3">
+<img alt="Thumbnail Sửa đường ống" class="w-20 h-20 rounded-lg object-cover flex-shrink-0" data-alt="A focused close-up shot of a skilled plumber working on modern, high-quality copper pipes under a minimalist sink. The lighting is crisp and clear, highlighting the precision of the tools and the metallic textures. The overall aesthetic is clean and organized, with a background of white subway tiles and soft industrial indigo tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkmD6gFQHaSUmANiyQp-e6RTseWXJ-IH1q9rHedF9WLQnkd57sYCrGWl9bhx4V5istlqaflqIDmWk2gC7Rnw5sk_dxOpYZZKXuCNILNsvJxyHYU_fUda0SbM7-SYe3Hzc4CX0rX1ILWgQPfIyq6SUvnnkaWeMa9A2kA89LsTizaG18plMj5R66Z77s-wxUPJP8YGWuljclKhQpNfspuzsngwmfoUHeBCfa2b_OKYZmCtOX1Px9Br5VzTqmdG9WSVkfR1akzEKnMuGo"/>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="text-label-md font-bold text-on-surface truncate">Sửa đường ống</h3>
+<span class="bg-success-green/10 text-success-green text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-success-green"></span>
+                                        Hoạt động
+                                    </span>
+</div>
+<p class="text-label-sm text-on-surface-variant mt-0.5">Điện nước</p>
+<p class="text-label-md font-bold text-primary mt-2">Từ 150.000 VNĐ</p>
+</div>
+</div>
+</div>
+<!-- Service Card -->
+<div class="bg-surface-container-lowest p-3 rounded-lg shadow-sm border border-outline-variant/30 hover:bg-surface-container-low hover:translate-x-1 transition-all cursor-pointer">
+<div class="flex gap-3">
+<img alt="Thumbnail Sửa máy lạnh" class="w-20 h-20 rounded-lg object-cover flex-shrink-0" data-alt="A detailed shot of an HVAC technician inspecting a sleek, modern indoor air conditioning unit. The lighting is bright and technical, with high-key whites and soft blue secondary illumination. The scene conveys reliability and high-end technical service, framed within a contemporary minimalist interior." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFwZi7xZN_5jWL3RcraFHeUTtpwzoB8oSmyylEpHkNJ6IeckBtk4MY2VfSsjULtsJN96kvjnmSBDTFZ_EHDCf03J0H0Cul8ZJEO_b6ackXn51-BvXrm6y0F8ElWth5qQg6RVNX0H7dghMNx_7U-QyGpZVk5GPJtdPgnFFa6IFurWcSZkHzfxQllO2bDIJEAV-kiuVvAR241zhUvdgFoMX6_vpct4-P7ApzjGG2U-VFR8Uk6G_kQrJEuPg-HHmlH-aYkW6lsmntJjr5"/>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="text-label-md font-bold text-on-surface truncate">Sửa máy lạnh</h3>
+<span class="bg-success-green/10 text-success-green text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-success-green"></span>
+                                        Hoạt động
+                                    </span>
+</div>
+<p class="text-label-sm text-on-surface-variant mt-0.5">Điện lạnh</p>
+<p class="text-label-md font-bold text-primary mt-2">Từ 300.000 VNĐ</p>
+</div>
+</div>
+</div>
+<!-- Service Card (Inactive Example) -->
+<div class="bg-surface-container-lowest p-3 rounded-lg shadow-sm border border-outline-variant/30 hover:bg-surface-container-low hover:translate-x-1 transition-all cursor-pointer opacity-70">
+<div class="flex gap-3">
+<img alt="Thumbnail Lắp đặt camera" class="w-20 h-20 rounded-lg object-cover flex-shrink-0 grayscale" data-alt="A security technician holding a sleek, white 3D-styled security camera against a light grey wall. The lighting is even and sterile, highlighting the smooth plastic surfaces of the device. The composition is clean and technical, emphasizing security and surveillance in a modern home context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKVlHR2HcUPMXxJARM9oSal7H6nGx-c3OqtuCGK-mBc_EY3V8cfRn5Up98DIHMApzIudd0cETywyppwcmvUChk2eMCgqKxEAzbL-WeQPCmdQLyAjhKV1mIdpjt8ZwrVk06g1sv2jmLg-ko4zZul2VxjBRZhpPeoZYB8S-rlW1qSXBkPluCm6F4lJJOMSIhg-DVhYjbChovH0xG1OGMukAUr9KznxFkg2M_ILjThBn44dC2Z-0Hle2LHPXdubAg5sa9yw05BIdhOctq"/>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<h3 class="text-label-md font-bold text-on-surface truncate">Lắp đặt camera</h3>
+<span class="bg-on-surface-variant/10 text-on-surface-variant text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-on-surface-variant"></span>
+                                        Tạm ngưng
+                                    </span>
+</div>
+<p class="text-label-sm text-on-surface-variant mt-0.5">An ninh</p>
+<p class="text-label-md font-bold text-on-surface-variant mt-2">Đang cập nhật</p>
+</div>
+</div>
+</div>
+</section>
+<!-- RIGHT PANEL: Details (65%) -->
+<section class="w-[65%] overflow-y-auto bg-surface-container-lowest rounded-lg shadow-sm border border-outline-variant/30 flex flex-col">
+<!-- Detail Hero -->
+<div class="p-md border-b border-outline-variant/30">
+<div class="flex gap-lg">
+<div class="relative group">
+<img alt="Vệ sinh chuyên sâu lớn" class="w-48 h-48 rounded-lg object-cover shadow-md" data-alt="A wide-angle professional shot of a luxury modern living room being cleaned by a professional staff. The room features large windows, minimal furniture, and a bright, airy atmosphere. The light is soft and diffused, highlighting the clean textures of wood and fabric. The overall mood is premium, orderly, and deeply satisfying." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBj_-MfyfHf2n_3Je8Nw7Asl1O1XsqrLJdQ2B0jCwW71GRjhH1Hu8xa4KRlD8WkdvNYMFbtP9S1voxV_vOaR5leFWoxBs9VihTQpdeMC3DBKHbihKYp30Wb7gme72c_W46bjN6JUg1gm_iP2_VvoDoGKN_7Jl4S7S4yMlGLH_uXA0qXlBu0gwmCECxK8lCe5A6ldeg_gY_FcjG12Ms1llO_xqQ4tIms5AEWlxrFpg3eXxjGZwN2q7bA8r92cWVe8nQDM4WsZp2Ze9lc"/>
+<button class="absolute bottom-2 right-2 bg-surface-glass/80 backdrop-blur-sm p-1.5 rounded-md text-primary hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-sm">photo_camera</span>
+</button>
+</div>
+<div class="flex-1 space-y-4">
+<div class="flex justify-between items-start">
+<div>
+<h2 class="text-headline-md font-bold text-on-surface">Vệ sinh chuyên sâu</h2>
+<p class="text-label-md text-on-surface-variant font-medium">Danh mục: Vệ sinh</p>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 text-on-surface-variant border border-outline-variant/50 rounded-lg hover:bg-surface-container transition-colors flex items-center gap-2 text-label-md font-bold">
+<span class="material-symbols-outlined text-base">edit</span> Sửa
+                                        </button>
+<button class="px-4 py-2 text-error border border-error/30 rounded-lg hover:bg-error-container/20 transition-colors flex items-center gap-2 text-label-md font-bold">
+<span class="material-symbols-outlined text-base">delete</span> Xóa
+                                        </button>
+</div>
+</div>
+<p class="text-body-md text-on-surface-variant leading-relaxed max-w-xl">
+                                    Dịch vụ vệ sinh chuyên sâu toàn bộ ngôi nhà, tập trung vào từng chi tiết nhỏ nhất. Sử dụng thiết bị hiện đại và hóa chất thân thiện với môi trường để đảm bảo không gian sống trong lành.
+                                </p>
+<div class="flex flex-wrap gap-md">
+<div class="bg-surface-container-low px-4 py-3 rounded-lg border border-outline-variant/20 flex flex-col min-w-[100px]">
+<span class="text-label-sm text-on-surface-variant uppercase tracking-wider">Tùy chọn</span>
+<span class="text-headline-md font-bold text-primary">05</span>
+</div>
+<div class="bg-surface-container-low px-4 py-3 rounded-lg border border-outline-variant/20 flex flex-col min-w-[100px]">
+<span class="text-label-sm text-on-surface-variant uppercase tracking-wider">Nhà CC</span>
+<span class="text-headline-md font-bold text-primary">25</span>
+</div>
+<div class="bg-surface-container-low px-4 py-3 rounded-lg border border-outline-variant/20 flex flex-col min-w-[100px]">
+<span class="text-label-sm text-on-surface-variant uppercase tracking-wider">Đơn hàng</span>
+<span class="text-headline-md font-bold text-primary">450</span>
+</div>
+<div class="bg-surface-container-low px-4 py-3 rounded-lg border border-outline-variant/20 flex flex-col min-w-[100px]">
+<span class="text-label-sm text-on-surface-variant uppercase tracking-wider">Đánh giá</span>
+<div class="flex items-center gap-1">
+<span class="text-headline-md font-bold text-primary">4.8</span>
+<span class="material-symbols-outlined text-star-gold" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Options Table Section -->
+<div class="p-md flex-1">
+<div class="flex justify-between items-center mb-md">
+<h3 class="text-headline-md font-bold text-on-surface">Tùy chọn dịch vụ</h3>
+<button class="text-primary hover:bg-primary-container/10 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors active:scale-95">
+<span class="material-symbols-outlined">add_circle</span>
+<span>Thêm tùy chọn</span>
+</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-separate border-spacing-y-2">
+<thead>
+<tr class="text-label-sm text-on-surface-variant uppercase tracking-wider">
+<th class="px-4 py-2">Tên tùy chọn</th>
+<th class="px-4 py-2">Giá</th>
+<th class="px-4 py-2">Thời lượng</th>
+<th class="px-4 py-2">Trạng thái</th>
+<th class="px-4 py-2 text-right">Hành động</th>
+</tr>
+</thead>
+<tbody class="text-label-md">
+<tr class="bg-surface hover:bg-surface-container-low transition-colors rounded-lg group">
+<td class="px-4 py-4 font-bold rounded-l-lg border-y border-l border-outline-variant/30">Vệ sinh 1 phòng ngủ</td>
+<td class="px-4 py-4 text-primary font-bold border-y border-outline-variant/30">200.000 VNĐ</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">60 phút</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">
+<span class="bg-success-green/10 text-success-green px-2.5 py-1 rounded-full text-[12px] font-bold">Hoạt động</span>
+</td>
+<td class="px-4 py-4 text-right rounded-r-lg border-y border-r border-outline-variant/30">
+<div class="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">visibility</span></button>
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1.5 hover:bg-error/10 text-error rounded transition-colors"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+<tr class="bg-surface hover:bg-surface-container-low transition-colors rounded-lg group">
+<td class="px-4 py-4 font-bold rounded-l-lg border-y border-l border-outline-variant/30">Vệ sinh 2 phòng ngủ</td>
+<td class="px-4 py-4 text-primary font-bold border-y border-outline-variant/30">350.000 VNĐ</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">90 phút</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">
+<span class="bg-success-green/10 text-success-green px-2.5 py-1 rounded-full text-[12px] font-bold">Hoạt động</span>
+</td>
+<td class="px-4 py-4 text-right rounded-r-lg border-y border-r border-outline-variant/30">
+<div class="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">visibility</span></button>
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1.5 hover:bg-error/10 text-error rounded transition-colors"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+<tr class="bg-surface hover:bg-surface-container-low transition-colors rounded-lg group">
+<td class="px-4 py-4 font-bold rounded-l-lg border-y border-l border-outline-variant/30">Vệ sinh 3 phòng ngủ</td>
+<td class="px-4 py-4 text-primary font-bold border-y border-outline-variant/30">500.000 VNĐ</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">120 phút</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">
+<span class="bg-success-green/10 text-success-green px-2.5 py-1 rounded-full text-[12px] font-bold">Hoạt động</span>
+</td>
+<td class="px-4 py-4 text-right rounded-r-lg border-y border-r border-outline-variant/30">
+<div class="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">visibility</span></button>
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1.5 hover:bg-error/10 text-error rounded transition-colors"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+<tr class="bg-surface hover:bg-surface-container-low transition-colors rounded-lg group">
+<td class="px-4 py-4 font-bold rounded-l-lg border-y border-l border-outline-variant/30">Vệ sinh chuyên sâu Cao cấp</td>
+<td class="px-4 py-4 text-primary font-bold border-y border-outline-variant/30">800.000 VNĐ</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">180 phút</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">
+<span class="bg-success-green/10 text-success-green px-2.5 py-1 rounded-full text-[12px] font-bold">Hoạt động</span>
+</td>
+<td class="px-4 py-4 text-right rounded-r-lg border-y border-r border-outline-variant/30">
+<div class="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">visibility</span></button>
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1.5 hover:bg-error/10 text-error rounded transition-colors"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+<tr class="bg-surface hover:bg-surface-container-low transition-colors rounded-lg group border-none">
+<td class="px-4 py-4 font-bold rounded-l-lg border-y border-l border-outline-variant/30 opacity-50">Vệ sinh dọn nhà trống</td>
+<td class="px-4 py-4 text-primary font-bold border-y border-outline-variant/30 opacity-50">1.000.000 VNĐ</td>
+<td class="px-4 py-4 border-y border-outline-variant/30 opacity-50">240 phút</td>
+<td class="px-4 py-4 border-y border-outline-variant/30">
+<span class="bg-on-surface-variant/10 text-on-surface-variant px-2.5 py-1 rounded-full text-[12px] font-bold">Tạm ngưng</span>
+</td>
+<td class="px-4 py-4 text-right rounded-r-lg border-y border-r border-outline-variant/30">
+<div class="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">visibility</span></button>
+<button class="p-1.5 hover:bg-primary/10 text-primary rounded transition-colors"><span class="material-symbols-outlined text-sm">edit</span></button>
+<button class="p-1.5 hover:bg-error/10 text-error rounded transition-colors"><span class="material-symbols-outlined text-sm">delete</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<script>
+        // Simple micro-interaction for rows
+        document.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                console.log('Row clicked:', row.cells[0].innerText);
+            });
+        });
+
+        // Search highlight effect
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            document.querySelectorAll('section:first-of-type > div').forEach(card => {
+                const title = card.querySelector('h3').innerText.toLowerCase();
+                card.style.display = title.includes(val) ? 'block' : 'none';
+            });
+        });
+    </script>
+</body></html>

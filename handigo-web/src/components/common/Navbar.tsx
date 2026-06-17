@@ -44,6 +44,13 @@ const getWalletPath = (role?: AppRole) => {
   return "#";
 };
 
+const getNotificationPath = (role?: AppRole) => {
+  if (role === "PROVIDER") return "/provider/notifications";
+  if (role === "CUSTOMER") return "/customer/notifications";
+  if (role === "ADMIN") return "/admin/notifications";
+  return "#";
+};
+
 const getRoleLabel = (role?: AppRole) => {
   if (role === "CUSTOMER") return "Khách hàng";
   if (role === "PROVIDER") return "Nhà cung cấp";
@@ -202,13 +209,13 @@ export function Navbar({
                 </div>
               )}
 
-              <button
-                type="button"
+              <Link
+                to={getNotificationPath(currentRole)}
                 aria-label="Thông báo"
                 className="material-symbols-outlined hidden rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary sm:inline-flex"
               >
                 notifications
-              </button>
+              </Link>
               <button
                 type="button"
                 aria-label="Tin nhắn"

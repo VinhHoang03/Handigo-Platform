@@ -8,6 +8,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isInitializing: boolean;
   setAuth: (user: User, token: string, remember?: boolean) => void;
+  setToken: (token: string) => void;
   setUser: (user: User) => void;
   finishInitialization: () => void;
   logout: () => void;
@@ -24,6 +25,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('handigo:remember-login', String(remember));
     tokenStorage.set(token);
     set({ user, token, isAuthenticated: true, isInitializing: false });
+  },
+  setToken: (token) => {
+    tokenStorage.set(token);
+    set({ token, isAuthenticated: true });
   },
   setUser: (user) => {
     set({ user, isAuthenticated: true, isInitializing: false });

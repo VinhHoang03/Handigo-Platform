@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import logoImg from "../assets/logo.png";
 import { Navbar, type AppRole } from "./common/Navbar";
 import { useAuthStore } from "../features/auth/store/auth.store";
 import { isNavItemActive } from "@/config/sidebarNavigation";
@@ -15,10 +14,23 @@ interface NavItem {
 interface SidebarProps {
   navItems: NavItem[];
   role?: AppRole;
+  isProvider?: boolean;
   switchLabel?: string;
   onSwitch?: () => void;
   switchVariant?: "outline" | "gradient";
 }
+
+const sidebarHomePath: Record<AppRole, string> = {
+  CUSTOMER: "/customer",
+  PROVIDER: "/provider",
+  ADMIN: "/admin/users",
+};
+
+const sidebarSubtitle: Record<AppRole, string> = {
+  CUSTOMER: "Dịch vụ tại nhà",
+  PROVIDER: "Nhà cung cấp",
+  ADMIN: "Quản trị hệ thống",
+};
 
 const normalizeRole = (role?: string | null): AppRole | undefined => {
   const value = role?.toUpperCase();
@@ -31,12 +43,14 @@ const normalizeRole = (role?: string | null): AppRole | undefined => {
 export function Sidebar({
   navItems,
   role,
+  isProvider = false,
   switchLabel,
   onSwitch,
   switchVariant = "outline",
 }: SidebarProps) {
   const location = useLocation();
-  const isProvider = role === "PROVIDER";
+  const homePath = role ? sidebarHomePath[role] : "/";
+  const subtitle = role ? sidebarSubtitle[role] : "Dịch vụ tại nhà";
 
   return (
     <aside
@@ -44,16 +58,16 @@ export function Sidebar({
         }`}
     >
       <Link
-        to={isProvider ? "/provider" : "/admin/users"}
+        to={homePath}
         className="mb-1 flex items-center gap-3 rounded-xl px-1 py-2"
       >
-        <img src={logoImg} alt="" className="h-9 w-9 object-contain" />
+        {/* <img src={logoImg} alt="" className="h-9 w-9 object-contain" /> */}
         <div>
           <h1 className="font-headline-md text-xl font-bold leading-none text-primary">
             Handigo
           </h1>
           <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-on-surface-variant">
-            {isProvider ? "Kênh nhà cung cấp" : "Quản trị hệ thống"}
+            {subtitle}
           </p>
         </div>
       </Link>
@@ -235,6 +249,7 @@ export function DashboardLayout({
   const currentRole = role ?? normalizeRole(user?.role);
   const isAdmin = currentRole === "ADMIN";
   const isProvider = currentRole === "PROVIDER";
+  const hasSidebar = Boolean(currentRole && navItems.length);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background font-body-md text-body-md">
@@ -256,10 +271,11 @@ export function DashboardLayout({
         />
       )}
 
-      {(isAdmin || isProvider) && (
+      {hasSidebar && (
         <Sidebar
           navItems={navItems}
           role={currentRole}
+          isProvider={isProvider}
           switchLabel={switchLabel}
           onSwitch={onSwitch}
           switchVariant={switchVariant}
@@ -267,8 +283,7 @@ export function DashboardLayout({
       )}
 
       <main
-        className={`relative min-h-screen pb-24 pt-32 ${isAdmin || isProvider ? "lg:pl-80 xl:pl-[21rem]" : ""
-          }`}
+        className={`relative min-h-screen pb-12 pt-32 ${hasSidebar ? "lg:pl-80 xl:pl-[21rem]" : ""}`}
       >
         <div
           className={`mx-auto space-y-8 px-4 sm:px-5 ${isAdmin || isProvider
@@ -279,41 +294,43 @@ export function DashboardLayout({
           {children}
         </div>
 
-        <nav className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 border-t border-outline-variant/30 bg-white/92 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
-          {navItems.slice(0, 4).map((item) => {
-            const active = isNavItemActive(location.pathname, item);
-            const className = `flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-center ${active ? "bg-primary/10 text-primary" : "text-on-surface-variant"
-              }`;
+        {hasSidebar && (
+          <nav className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 border-t border-outline-variant/30 bg-white/92 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
+            {navItems.slice(0, 4).map((item) => {
+              const active = isNavItemActive(location.pathname, item);
+              const className = `flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-center ${active ? "bg-primary/10 text-primary" : "text-on-surface-variant"
+                }`;
 
-            if (item.path === "#") {
+              if (item.path === "#") {
+                return (
+                  <span
+                    key={item.label}
+                    className={`${className} cursor-not-allowed opacity-50`}
+                    aria-disabled="true"
+                  >
+                    <span className="material-symbols-outlined text-xl">
+                      {item.icon}
+                    </span>
+                    <span className="max-w-full truncate text-[10px] font-medium">
+                      {item.label}
+                    </span>
+                  </span>
+                );
+              }
+
               return (
-                <span
-                  key={item.label}
-                  className={`${className} cursor-not-allowed opacity-50`}
-                  aria-disabled="true"
-                >
+                <Link key={item.label} to={item.path} className={className}>
                   <span className="material-symbols-outlined text-xl">
                     {item.icon}
                   </span>
                   <span className="max-w-full truncate text-[10px] font-medium">
                     {item.label}
                   </span>
-                </span>
+                </Link>
               );
-            }
-
-            return (
-              <Link key={item.label} to={item.path} className={className}>
-                <span className="material-symbols-outlined text-xl">
-                  {item.icon}
-                </span>
-                <span className="max-w-full truncate text-[10px] font-medium">
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
+            })}
+          </nav>
+        )}
       </main>
     </div>
   );

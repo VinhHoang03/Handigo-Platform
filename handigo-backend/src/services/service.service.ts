@@ -63,18 +63,6 @@ const ensureUniqueSlug = async (
   }
 };
 
-const validatePricing = (
-  serviceType: "fixed_price" | "variable_price",
-  fixedPrice?: number | null,
-) => {
-  if (serviceType === "fixed_price" && fixedPrice == null) {
-    throw new AppError(
-      "Fixed price is required for fixed-price services",
-      400,
-    );
-  }
-};
-
 export const listServices = async (query: ListServicesQuery) => {
   const page = Math.max(Number(query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
@@ -130,7 +118,6 @@ export const createService = async (data: ServiceInput) => {
   await ensureCategoryExists(data.categoryId!);
   const slug = data.slug || slugify(data.name || "");
   if (!slug) throw new AppError("Unable to generate a valid slug", 400);
-  validatePricing(data.serviceType!, data.fixedPrice);
   await ensureUniqueSlug(data.categoryId!, slug);
 
   return Service.create({ ...data, slug });
@@ -145,11 +132,6 @@ export const updateService = async (id: string, data: ServiceInput) => {
   if (data.categoryId) await ensureCategoryExists(data.categoryId);
 
   const slug = data.slug || (data.name ? slugify(data.name) : service.slug);
-  const serviceType = data.serviceType || service.serviceType;
-  const fixedPrice =
-    data.fixedPrice !== undefined ? data.fixedPrice : service.fixedPrice;
-
-  validatePricing(serviceType, fixedPrice);
   await ensureUniqueSlug(categoryId, slug, id);
 
   Object.assign(service, { ...data, categoryId, slug });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, FileText, X } from 'lucide-react';
 import { AsyncState } from '@/components/common/AsyncState';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { FloatingTextarea } from '@/components/common/FloatingField';
@@ -10,7 +10,156 @@ import { adminApi } from '../api/admin.api';
 import { ApplicationFilters } from '../components/applications/ApplicationFilters';
 import { ApplicationList } from '../components/applications/ApplicationList';
 import { useAdminList } from '../hooks/useAdminList';
-import type { AdminApplication, AdminQuery } from '../types/admin.types';
+import type {
+  AdminApplication,
+  AdminQuery,
+  ApplicationCertificate,
+  ApplicationIdentityDocument,
+} from '../types/admin.types';
+
+const isImageUrl = (url: string) =>
+  /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) ||
+  url.includes('/image/upload/');
+
+const formatDate = (value?: string) => {
+  if (!value) return 'Chưa cập nhật';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa cập nhật';
+  return date.toLocaleDateString('vi-VN');
+};
+
+const documentTypeLabel = (type?: string) =>
+  type === 'passport' ? 'Hộ chiếu' : 'CCCD';
+
+function AssetPreview({ url, label }: { url: string; label: string }) {
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="block">
+      {isImageUrl(url) ? (
+        <img
+          src={url}
+          alt={label}
+          className="h-36 w-full rounded-lg border border-outline-variant/40 object-cover"
+        />
+      ) : (
+        <span className="flex h-36 items-center justify-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-low text-sm font-bold text-primary">
+          <FileText size={18} /> Xem tài liệu
+        </span>
+      )}
+      <span className="mt-1 block text-xs font-semibold text-on-surface-variant">
+        {label}
+      </span>
+    </a>
+  );
+}
+
+function IdentitySection({
+  identity,
+}: {
+  identity?: ApplicationIdentityDocument;
+}) {
+  if (!identity) {
+    return (
+      <div className="rounded-2xl border border-dashed border-outline-variant/60 p-4 text-sm text-on-surface-variant">
+        Hồ sơ chưa có giấy tờ định danh.
+      </div>
+    );
+  }
+
+  const assets = [
+    { label: 'Ảnh mặt trước', url: identity.frontImageUrl },
+    { label: 'Ảnh mặt sau', url: identity.backImageUrl },
+    { label: 'Ảnh hộ chiếu', url: identity.passportImageUrl },
+  ].filter((asset): asset is { label: string; url: string } =>
+    Boolean(asset.url),
+  );
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-outline-variant/50 p-4">
+      <h3 className="font-bold">Giấy tờ định danh</h3>
+      <div className="grid gap-2 text-sm md:grid-cols-2">
+        <p>
+          <b>Loại giấy tờ:</b> {documentTypeLabel(identity.type)}
+        </p>
+        <p>
+          <b>Số giấy tờ:</b> {identity.documentNumber || 'Chưa cập nhật'}
+        </p>
+        <p>
+          <b>Họ tên:</b> {identity.fullName || 'Chưa cập nhật'}
+        </p>
+        <p>
+          <b>Nơi cấp:</b> {identity.issuedPlace || 'Chưa cập nhật'}
+        </p>
+        <p>
+          <b>Nguồn xác thực:</b> {identity.provider || 'manual'}
+        </p>
+        <p>
+          <b>Ngày cấp:</b> {formatDate(identity.issuedAt)}
+        </p>
+        <p>
+          <b>Ngày hết hạn:</b> {formatDate(identity.expiresAt)}
+        </p>
+      </div>
+      {assets.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          {assets.map((asset) => (
+            <AssetPreview key={asset.url} url={asset.url} label={asset.label} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CertificateSection({
+  certificates = [],
+}: {
+  certificates?: ApplicationCertificate[];
+}) {
+  if (!certificates.length) {
+    return (
+      <div className="rounded-2xl border border-dashed border-outline-variant/60 p-4 text-sm text-on-surface-variant">
+        Hồ sơ chưa có chứng chỉ.
+      </div>
+    );
+  }
+
+  return (
+    <section className="space-y-3">
+      <h3 className="font-bold">Chứng chỉ nghề nghiệp</h3>
+      {certificates.map((certificate, index) => (
+        <div
+          key={certificate._id || certificate.id || index}
+          className="space-y-3 rounded-2xl border border-outline-variant/50 p-4"
+        >
+          <div>
+            <p className="font-bold">{certificate.title}</p>
+            <p className="text-sm text-on-surface-variant">
+              {certificate.issuer || 'Chưa cập nhật đơn vị cấp'} · Ngày cấp{' '}
+              {formatDate(certificate.issuedAt)} · Hết hạn{' '}
+              {formatDate(certificate.expiresAt)}
+            </p>
+          </div>
+          {certificate.description && (
+            <p className="rounded-lg bg-surface-container-low p-3 text-sm">
+              {certificate.description}
+            </p>
+          )}
+          {certificate.imageUrls.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {certificate.imageUrls.map((url) => (
+                <AssetPreview
+                  key={url}
+                  url={url}
+                  label={certificate.title}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
 
 export default function AdminProviderApplicationsPage() {
   const [query, setQuery] = useState<AdminQuery>({ page: 1, limit: 10 });
@@ -53,7 +202,11 @@ export default function AdminProviderApplicationsPage() {
         </p>
       </header>
 
-      <ApplicationFilters query={query} categories={categories} onChange={setQuery} />
+      <ApplicationFilters
+        query={query}
+        categories={categories}
+        onChange={setQuery}
+      />
 
       <AsyncState
         loading={loading}
@@ -71,24 +224,41 @@ export default function AdminProviderApplicationsPage() {
         onChange={(page) => setQuery({ ...query, page })}
       />
 
-      <Modal open={Boolean(selected)} title="Chi tiết hồ sơ thợ" onClose={closeModal} size="lg">
+      <Modal
+        open={Boolean(selected)}
+        title="Chi tiết hồ sơ thợ"
+        onClose={closeModal}
+        size="lg"
+      >
         {selected && (
           <div className="space-y-4">
             <div>
               <p className="font-bold">{selected.userId.fullName}</p>
               <p className="text-on-surface-variant">
-                {selected.userId.email} · {selected.userId.phone || 'Chưa có SĐT'}
+                {selected.userId.email} ·{' '}
+                {selected.userId.phone || 'Chưa có SĐT'}
               </p>
             </div>
-            <div><b>Dịch vụ:</b> {selected.serviceIds.map((item) => item.name).join(', ')}</div>
-            <div><b>Kinh nghiệm:</b> {selected.experienceYears} năm</div>
-            <div><b>Khu vực:</b> {selected.workingAreas.join(', ')}</div>
+            <div>
+              <b>Dịch vụ:</b>{' '}
+              {selected.serviceIds.map((item) => item.name).join(', ')}
+            </div>
+            <div>
+              <b>Kinh nghiệm:</b> {selected.experienceYears} năm
+            </div>
+            <div>
+              <b>Khu vực:</b> {selected.workingAreas.join(', ')}
+            </div>
             <div>
               <b>Giới thiệu:</b>
               <p className="mt-1 rounded-2xl bg-surface-container-low p-3 leading-relaxed">
                 {selected.description}
               </p>
             </div>
+
+            <IdentitySection identity={selected.identityDocument} />
+            <CertificateSection certificates={selected.certificates} />
+
             {selected.rejectionReason && (
               <p className="rounded-2xl bg-error/10 p-3 text-error">
                 Lý do từ chối: {selected.rejectionReason}
@@ -120,7 +290,12 @@ export default function AdminProviderApplicationsPage() {
                     disabled={busy || (rejecting && !reason.trim())}
                     className="btn-primary"
                   >
-                    <Check size={18} /> {busy ? 'Đang xử lý...' : rejecting ? 'Xác nhận từ chối' : 'Phê duyệt'}
+                    <Check size={18} />{' '}
+                    {busy
+                      ? 'Đang xử lý...'
+                      : rejecting
+                        ? 'Xác nhận từ chối'
+                        : 'Phê duyệt'}
                   </button>
                 </div>
               </div>

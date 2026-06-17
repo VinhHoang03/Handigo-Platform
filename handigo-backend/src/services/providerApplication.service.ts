@@ -1,15 +1,37 @@
 import { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import User from "../models/user.model";
-import { Provider } from "../models/provider.model";
+import { Provider, type IIdentityDocument, type IProviderCertificate } from "../models/provider.model";
 import { ProviderApplication } from "../models/providerApplication.model";
 import { Service } from "../models/service.model";
+
+type IdentityDocumentPayload = {
+  type: "cccd" | "passport";
+  documentNumber: string;
+  fullName: string;
+  issuedPlace?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  frontImageUrl?: string;
+  backImageUrl?: string;
+  passportImageUrl?: string;
+};
+
+type CertificatePayload = {
+  title: string;
+  issuer?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  imageUrls: string[];
+};
 
 interface CreateProviderApplicationPayload {
   description: string;
   experienceYears: number;
   serviceIds: string[];
   workingAreas: string[];
+  identityDocument: IdentityDocumentPayload;
+  certificates?: CertificatePayload[];
 }
 
 interface ReviewProviderApplicationPayload {
@@ -62,6 +84,104 @@ const assertServicesActive = async (serviceIds: string[]) => {
   return uniqueIds;
 };
 
+const toDate = (value?: string | Date) => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+};
+
+const toDocumentLast4 = (documentNumber?: string) => {
+  const digits = String(documentNumber || "").replace(/\D/g, "");
+  return digits.length >= 4 ? digits.slice(-4) : undefined;
+};
+
+const buildPendingIdentityDocument = (
+  payload: IdentityDocumentPayload,
+): IIdentityDocument => ({
+  type: payload.type,
+  documentNumber: payload.documentNumber,
+  numberLast4: toDocumentLast4(payload.documentNumber),
+  fullName: payload.fullName,
+  issuedPlace: payload.issuedPlace,
+  issuedAt: toDate(payload.issuedAt),
+  expiresAt: toDate(payload.expiresAt),
+  frontImageUrl: payload.type === "cccd" ? payload.frontImageUrl : undefined,
+  backImageUrl: payload.type === "cccd" ? payload.backImageUrl : undefined,
+  passportImageUrl:
+    payload.type === "passport" ? payload.passportImageUrl : undefined,
+  verificationStatus: "pending",
+  provider: "manual",
+  consentAcceptedAt: new Date(),
+  submittedAt: new Date(),
+  reviewedBy: null,
+  reviewedAt: null,
+  rejectionReason: null,
+});
+
+const buildPendingCertificates = (
+  certificates: CertificatePayload[] = [],
+): IProviderCertificate[] =>
+  certificates.map((certificate) => ({
+    title: certificate.title,
+    issuer: certificate.issuer,
+    issuedAt: toDate(certificate.issuedAt),
+    expiresAt: toDate(certificate.expiresAt),
+    imageUrls: certificate.imageUrls,
+    status: "pending",
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: null,
+  }));
+
+const approveIdentityDocument = (
+  identity: IIdentityDocument | undefined,
+  adminId: string,
+): IIdentityDocument | undefined => {
+  if (!identity) return undefined;
+
+  return {
+    type: identity.type,
+    documentNumber: identity.documentNumber,
+    numberLast4: identity.numberLast4,
+    fullName: identity.fullName,
+    issuedPlace: identity.issuedPlace,
+    issuedAt: identity.issuedAt,
+    expiresAt: identity.expiresAt,
+    dateOfBirth: identity.dateOfBirth,
+    gender: identity.gender,
+    frontImageUrl: identity.frontImageUrl,
+    backImageUrl: identity.backImageUrl,
+    passportImageUrl: identity.passportImageUrl,
+    selfieImageUrl: identity.selfieImageUrl,
+    verificationStatus: "verified",
+    provider: "manual",
+    providerReferenceId: identity.providerReferenceId,
+    ocrResult: identity.ocrResult,
+    consentAcceptedAt: identity.consentAcceptedAt,
+    submittedAt: identity.submittedAt,
+    verifiedAt: new Date(),
+    reviewedBy: new Types.ObjectId(adminId),
+    reviewedAt: new Date(),
+    rejectionReason: null,
+  };
+};
+
+const approveCertificates = (
+  certificates: IProviderCertificate[] = [],
+  adminId: string,
+): IProviderCertificate[] =>
+  certificates.map((certificate) => ({
+    title: certificate.title,
+    issuer: certificate.issuer,
+    issuedAt: certificate.issuedAt,
+    expiresAt: certificate.expiresAt,
+    imageUrls: certificate.imageUrls || [],
+    status: "approved",
+    reviewedBy: new Types.ObjectId(adminId),
+    reviewedAt: new Date(),
+    rejectionReason: null,
+  }));
+
 export const createApplication = async (
   userId: string,
   payload: CreateProviderApplicationPayload,
@@ -99,6 +219,8 @@ export const createApplication = async (
     experienceYears: payload.experienceYears,
     serviceIds,
     workingAreas: payload.workingAreas,
+    identityDocument: buildPendingIdentityDocument(payload.identityDocument),
+    certificates: buildPendingCertificates(payload.certificates),
     status: "pending",
   });
 };
@@ -212,6 +334,11 @@ export const reviewApplication = async (
   }
 
   application.rejectionReason = null;
+  const identityDocument = approveIdentityDocument(
+    application.identityDocument,
+    adminId,
+  );
+  const certificates = approveCertificates(application.certificates, adminId);
 
   await Promise.all([
     Provider.findOneAndUpdate(
@@ -222,6 +349,8 @@ export const reviewApplication = async (
         experienceYears: application.experienceYears,
         serviceIds: application.serviceIds,
         workingAreas: application.workingAreas,
+        identityDocument,
+        certificates,
         availabilityStatus: "offline",
         verified: true,
         isDeleted: false,

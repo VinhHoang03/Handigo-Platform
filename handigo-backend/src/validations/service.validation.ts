@@ -16,23 +16,13 @@ const serviceFields = {
   slug: slugSchema.optional(),
   description: z.string().trim().max(5000).nullable().optional(),
   serviceType: z.enum(["fixed_price", "variable_price"]),
-  fixedPrice: z.number().nonnegative().nullable().optional(),
-  depositAmount: z.number().nonnegative().nullable().optional(),
+  fixedPrice: z.number().min(0).nullable().optional(),
+  depositAmount: z.number().min(0).nullable().optional(),
   image: z.string().trim().max(500).nullable().optional(),
   isActive: z.boolean().optional(),
 };
 
-export const createServiceSchema = z
-  .object(serviceFields)
-  .superRefine((data, ctx) => {
-    if (data.serviceType === "fixed_price" && data.fixedPrice == null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["fixedPrice"],
-        message: "Fixed price is required for fixed-price services",
-      });
-    }
-  });
+export const createServiceSchema = z.object(serviceFields);
 
 export const updateServiceSchema = z
   .object(serviceFields)

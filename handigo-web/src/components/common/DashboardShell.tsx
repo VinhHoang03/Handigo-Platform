@@ -47,10 +47,11 @@ export function DashboardShell({
       path: "/admin/provider-applications",
     },
     { icon: "reviews", label: "Đánh giá", path: "/admin/feedbacks" },
-    { icon: "category", label: "Danh mục & Dịch vụ", path: "/admin/services" },
-    { icon: "local_offer", label: "Khuyến mãi", path: "#" },
+    { icon: "category", label: "Danh mục dịch vụ", path: "/admin/categories" },
+    { icon: "construction", label: "Dịch vụ", path: "/admin/services" },
+    { icon: "local_offer", label: "Khuyến mãi", path: "/admin/promotions" },
     { icon: "support_agent", label: "Yêu cầu hỗ trợ", path: "#" },
-    { icon: "notifications", label: "Thông báo", path: "#" },
+    { icon: "notifications", label: "Thông báo", path: "/admin/notifications" },
     { icon: "payments", label: "Doanh thu hệ thống", path: "#" },
     { icon: "settings", label: "Cấu hình hệ thống", path: "#" },
   ];
@@ -58,7 +59,13 @@ export function DashboardShell({
   return (
     <DashboardLayout
       role={role}
-      navItems={role === "ADMIN" ? adminNavItems : getNavItemsForRole(role)}
+      navItems={
+        role === "CUSTOMER"
+          ? []
+          : role === "ADMIN"
+            ? adminNavItems
+            : getNavItemsForRole(role)
+      }
       switchLabel={role !== "PROVIDER" ? (switchLabel ?? switchConfig.label) : undefined}
       onSwitch={role !== "PROVIDER" ? (onSwitch ?? (() => navigate(switchConfig.path))) : undefined}
       switchVariant={role !== "PROVIDER" ? (switchVariant ?? switchConfig.variant) : undefined}
