@@ -2,10 +2,14 @@ import api from '@/api/client';
 import type { UserProfile } from '../types/customer.types';
 
 interface BackendUser {
+  _id?: string;
+  id?: string;
   fullName: string;
   email: string;
-  phone?: string;
+  phone?: string | null;
   avatar?: string | null;
+  birthday?: string | null;
+  gender?: UserProfile['gender'];
   role?: string;
   status?: string;
   isEmailVerified?: boolean;
@@ -30,6 +34,8 @@ export const updateCustomerProfile = async (data: Partial<UserProfile>): Promise
   if (data.fullName !== undefined) payload.fullName = data.fullName;
   if (data.phone !== undefined) payload.phone = data.phone;
   if (data.avatar !== undefined) payload.avatar = data.avatar;
+  if (data.birthday !== undefined) payload.birthday = data.birthday;
+  if (data.gender !== undefined) payload.gender = data.gender;
   const response = await api.put<{ message: string; data: BackendUser }>('/users/profile', payload);
   return mapUser(response.data.data);
 };

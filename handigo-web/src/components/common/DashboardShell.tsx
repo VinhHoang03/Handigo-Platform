@@ -48,9 +48,9 @@ export function DashboardShell({
     { icon: "reviews", label: "Đánh giá", path: "/admin/feedbacks" },
     { icon: "category", label: "Danh mục dịch vụ", path: "/admin/categories" },
     { icon: "construction", label: "Dịch vụ", path: "/admin/services" },
-    { icon: "local_offer", label: "Khuyến mãi", path: "#" },
+    { icon: "local_offer", label: "Khuyến mãi", path: "/admin/promotions" },
     { icon: "support_agent", label: "Yêu cầu hỗ trợ", path: "#" },
-    { icon: "notifications", label: "Thông báo", path: "#" },
+    { icon: "notifications", label: "Thông báo", path: "/admin/notifications" },
     { icon: "payments", label: "Doanh thu hệ thống", path: "#" },
     { icon: "settings", label: "Cấu hình hệ thống", path: "#" },
   ];

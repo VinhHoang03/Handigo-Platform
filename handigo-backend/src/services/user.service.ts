@@ -4,6 +4,8 @@ interface UpdateProfileInput {
   fullName?: string;
   phone?: string;
   avatar?: string;
+  birthday?: string | Date | null;
+  gender?: "male" | "female" | "other" | null;
 }
 
 export const getProfileService = async (userId: string) => {
@@ -24,6 +26,10 @@ export const updateProfileService = async (
   if (data.fullName !== undefined) updateData.fullName = data.fullName;
   if (data.phone !== undefined) updateData.phone = data.phone;
   if (data.avatar !== undefined) updateData.avatar = data.avatar;
+  if (data.birthday !== undefined) {
+    updateData.birthday = data.birthday ? new Date(data.birthday) : null;
+  }
+  if (data.gender !== undefined) updateData.gender = data.gender;
 
   const user = await User.findByIdAndUpdate(
     userId,

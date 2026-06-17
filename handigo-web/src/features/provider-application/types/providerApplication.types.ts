@@ -17,11 +17,58 @@ export interface Category {
   services?: Service[];
 }
 
+export type IdentityDocumentType = 'cccd' | 'passport';
+export type IdentityVerificationStatus =
+  | 'unsubmitted'
+  | 'pending'
+  | 'verified'
+  | 'rejected';
+export type IdentityVerificationProvider =
+  | 'manual'
+  | 'fpt'
+  | 'vnpt'
+  | 'viettel'
+  | 'didit';
+export type CertificateStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ProviderApplicationIdentityDocument {
+  type: IdentityDocumentType;
+  documentNumber: string;
+  numberLast4?: string;
+  fullName: string;
+  issuedPlace?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  frontImageUrl?: string;
+  backImageUrl?: string;
+  passportImageUrl?: string;
+  verificationStatus?: IdentityVerificationStatus;
+  provider?: IdentityVerificationProvider;
+  submittedAt?: string;
+  verifiedAt?: string;
+  rejectionReason?: string | null;
+}
+
+export interface ProviderApplicationCertificate {
+  _id?: string;
+  id?: string;
+  title: string;
+  issuer?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  imageUrls: string[];
+  status?: CertificateStatus;
+  reviewedAt?: string;
+  rejectionReason?: string | null;
+}
+
 export interface ProviderApplicationPayload {
   description: string;
   experienceYears: number;
   serviceIds: string[];
   workingAreas: string[];
+  identityDocument: ProviderApplicationIdentityDocument;
+  certificates: ProviderApplicationCertificate[];
 }
 
 export interface ProviderApplication extends ProviderApplicationPayload {

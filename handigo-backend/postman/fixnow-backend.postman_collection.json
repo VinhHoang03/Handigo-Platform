@@ -73,6 +73,18 @@
       "value": "000000000000000000000000"
     },
     {
+      "key": "walletDepositTransactionId",
+      "value": "000000000000000000000000"
+    },
+    {
+      "key": "payosOrderCode",
+      "value": "123456789"
+    },
+    {
+      "key": "payosPaymentLinkId",
+      "value": "sample-payment-link-id"
+    },
+    {
       "key": "notificationId",
       "value": "000000000000000000000000"
     },
@@ -423,6 +435,39 @@
         {
           "name": "Provider Get My Wallet",
           "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/wallets/me", "host": ["{{baseUrl}}"], "path": ["wallets", "me"] } }
+        },
+        {
+          "name": "Provider Create Wallet Deposit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.data && json.data.transaction && json.data.transaction._id) {",
+                  "  pm.collectionVariables.set('walletDepositTransactionId', json.data.transaction._id);",
+                  "}",
+                  "if (json && json.data && json.data.transaction && json.data.transaction.gatewayOrderCode) {",
+                  "  pm.collectionVariables.set('payosOrderCode', json.data.transaction.gatewayOrderCode);",
+                  "}",
+                  "if (json && json.data && json.data.transaction && json.data.transaction.gatewayPaymentLinkId) {",
+                  "  pm.collectionVariables.set('payosPaymentLinkId', json.data.transaction.gatewayPaymentLinkId);",
+                  "}",
+                  "pm.test('wallet deposit link created', function () {",
+                  "  pm.expect(json).to.have.property('success', true);",
+                  "  pm.expect(json.data).to.have.property('checkoutUrl');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 100000,\n  \"returnUrl\": \"http://localhost:5173/wallet/deposit/success\",\n  \"cancelUrl\": \"http://localhost:5173/wallet/deposit/cancel\"\n}" },
+            "url": { "raw": "{{baseUrl}}/wallets/me/deposit", "host": ["{{baseUrl}}"], "path": ["wallets", "me", "deposit"] }
+          }
         },
         {
           "name": "Provider Get My Wallet Transactions",

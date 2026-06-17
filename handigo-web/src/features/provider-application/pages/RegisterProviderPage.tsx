@@ -15,7 +15,22 @@ const initial: ProviderApplicationPayload = {
   experienceYears: 2,
   serviceIds: [],
   workingAreas: [],
+  identityDocument: {
+    type: 'cccd',
+    documentNumber: '',
+    fullName: '',
+    issuedPlace: '',
+    frontImageUrl: '',
+    backImageUrl: '',
+    passportImageUrl: '',
+  },
+  certificates: [],
 };
+
+const hasRequiredIdentityImage = (form: ProviderApplicationPayload) =>
+  form.identityDocument.type === 'cccd'
+    ? Boolean(form.identityDocument.frontImageUrl)
+    : Boolean(form.identityDocument.passportImageUrl);
 
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
@@ -24,23 +39,36 @@ export default function RegisterProviderPage() {
   const [form, setForm] = useState(initial);
   const [success, setSuccess] = useState('');
 
-  const toggleService = (id: string) => setForm((value) => ({
-    ...value,
-    serviceIds: value.serviceIds.includes(id)
-      ? value.serviceIds.filter((item) => item !== id)
-      : [...value.serviceIds, id],
-  }));
+  const toggleService = (id: string) =>
+    setForm((value) => ({
+      ...value,
+      serviceIds: value.serviceIds.includes(id)
+        ? value.serviceIds.filter((item) => item !== id)
+        : [...value.serviceIds, id],
+    }));
 
   const addArea = (area: string) => {
     const value = area.trim();
     if (value && !form.workingAreas.includes(value)) {
-      setForm((current) => ({ ...current, workingAreas: [...current.workingAreas, value] }));
+      setForm((current) => ({
+        ...current,
+        workingAreas: [...current.workingAreas, value],
+      }));
     }
   };
 
-  const canContinue = step === 1
-    ? providerApplication.categories.some((category) => (category.services || []).length > 0) && form.serviceIds.length > 0
-    : form.workingAreas.length > 0;
+  const canContinue =
+    step === 1
+      ? providerApplication.categories.some(
+          (category) => (category.services || []).length > 0,
+        ) && form.serviceIds.length > 0
+      : form.workingAreas.length > 0;
+
+  const canSubmit =
+    Boolean(form.description.trim()) &&
+    Boolean(form.identityDocument.documentNumber.trim()) &&
+    Boolean(form.identityDocument.fullName.trim()) &&
+    hasRequiredIdentityImage(form);
 
   const send = async () => {
     try {
@@ -56,8 +84,12 @@ export default function RegisterProviderPage() {
     <DashboardShell role="CUSTOMER">
       <div className="mx-auto max-w-4xl space-y-6">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Đăng ký thợ</p>
-          <h1 className="mt-2 text-headline-lg font-bold">Trở thành thợ dịch vụ</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+            Đăng ký thợ
+          </p>
+          <h1 className="mt-2 text-headline-lg font-bold">
+            Trở thành thợ dịch vụ
+          </h1>
           <p className="mt-1 text-on-surface-variant">
             Hoàn thành 3 bước để gửi hồ sơ chuyên môn.
           </p>
@@ -77,29 +109,48 @@ export default function RegisterProviderPage() {
                 selectedIds={form.serviceIds}
                 experienceYears={form.experienceYears}
                 onToggle={toggleService}
-                onExperienceChange={(experienceYears) => setForm({ ...form, experienceYears })}
+                onExperienceChange={(experienceYears) =>
+                  setForm({ ...form, experienceYears })
+                }
               />
             )}
             {step === 2 && (
               <WorkingAreasStep
                 areas={form.workingAreas}
                 onAdd={addArea}
-                onRemove={(value) => setForm({
-                  ...form,
-                  workingAreas: form.workingAreas.filter((item) => item !== value),
-                })}
+                onRemove={(value) =>
+                  setForm({
+                    ...form,
+                    workingAreas: form.workingAreas.filter(
+                      (item) => item !== value,
+                    ),
+                  })
+                }
               />
             )}
             {step === 3 && (
               <ProviderDescriptionStep
                 form={form}
                 categories={providerApplication.categories}
-                onChange={(description) => setForm({ ...form, description })}
+                onChange={setForm}
+                onUploadAsset={async (file, purpose) => {
+                  const uploaded = await providerApplication.uploadImage(
+                    file,
+                    purpose,
+                  );
+                  return uploaded.url;
+                }}
               />
             )}
 
             {(providerApplication.submitError || success) && (
-              <p className={`mt-5 rounded-2xl p-3 ${success ? 'bg-emerald-100 text-emerald-700' : 'bg-error/10 text-error'}`}>
+              <p
+                className={`mt-5 rounded-2xl p-3 ${
+                  success
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-error/10 text-error'
+                }`}
+              >
                 {success || providerApplication.submitError}
               </p>
             )}
@@ -107,7 +158,7 @@ export default function RegisterProviderPage() {
             <div className="mt-8 flex flex-col-reverse justify-between gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => step === 1 ? navigate(-1) : setStep(step - 1)}
+                onClick={() => (step === 1 ? navigate(-1) : setStep(step - 1))}
                 className="btn-secondary"
               >
                 <ArrowLeft size={18} /> {step === 1 ? 'Hủy' : 'Quay lại'}
@@ -125,10 +176,11 @@ export default function RegisterProviderPage() {
                 <button
                   type="button"
                   onClick={send}
-                  disabled={providerApplication.submitting || !form.description.trim()}
+                  disabled={providerApplication.submitting || !canSubmit}
                   className="btn-primary"
                 >
-                  <Send size={18} /> {providerApplication.submitting ? 'Đang gửi...' : 'Gửi hồ sơ'}
+                  <Send size={18} />{' '}
+                  {providerApplication.submitting ? 'Đang gửi...' : 'Gửi hồ sơ'}
                 </button>
               )}
             </div>

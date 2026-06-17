@@ -12,6 +12,8 @@ import CustomerHomePage from "./features/customer/pages/CustomerHomePage";
 import CustomerProfilePage from "./features/customer/pages/CustomerProfilePage";
 import ProviderHomePage from "./features/provider/pages/ProviderHomePage";
 import ProviderProfilePage from "./features/provider/pages/ProviderProfilePage";
+import ProviderBankAccountsPage from "./features/bank-account/pages/ProviderBankAccountsPage";
+import NotificationsPage from "./features/notification/pages/NotificationsPage";
 import CustomerFeedbackPage from "./features/feedback/pages/CustomerFeedbackPage";
 import ProviderFeedbackPage from "./features/feedback/pages/ProviderFeedbackPage";
 import AdminFeedbackPage from "./features/feedback/pages/AdminFeedbackPage";
@@ -21,6 +23,7 @@ import AdminProviderApplicationsPage from "./features/admin/pages/AdminProviderA
 import { WalletPage } from "./features/wallet/pages/WalletPage";
 import AdminCategoriesPage from "./features/admin/pages/AdminCategoriesPage";
 import AdminServicesPage from "./features/admin/pages/AdminServicesPage";
+import AdminPromotionsPage from "./features/admin/pages/AdminPromotionsPage";
 import { RouteGuard } from "./components/common/RouteGuard";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { HomeRoute } from "./components/auth/HomeRoute";
@@ -89,6 +92,14 @@ function App() {
             }
           />
           <Route
+            path="/customer/notifications"
+            element={
+              <RouteGuard roles={["CUSTOMER"]}>
+                <NotificationsPage role="CUSTOMER" />
+              </RouteGuard>
+            }
+          />
+          <Route
             path="/provider"
             element={
               <RouteGuard roles={["PROVIDER"]}>
@@ -109,6 +120,22 @@ function App() {
             element={
               <RouteGuard roles={["PROVIDER"]}>
                 <WalletPage role="PROVIDER" />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/provider/bank-accounts"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <ProviderBankAccountsPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/provider/notifications"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <NotificationsPage role="PROVIDER" />
               </RouteGuard>
             }
           />
@@ -173,6 +200,22 @@ function App() {
             element={
               <RouteGuard roles={["ADMIN"]}>
                 <AdminFeedbackPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/admin/promotions"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminPromotionsPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/admin/notifications"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <NotificationsPage role="ADMIN" />
               </RouteGuard>
             }
           />
