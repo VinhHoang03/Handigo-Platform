@@ -201,9 +201,11 @@ export const OrderSummaryCard: React.FC<{
     } else if (service?.serviceType === 'variable_price') {
       total = service?.depositAmount || 0;
     }
-    selectedOptions.forEach(opt => {
-      total += getOptionPrice(opt);
-    });
+    if (service?.serviceType !== 'variable_price') {
+      selectedOptions.forEach(opt => {
+        total += getOptionPrice(opt);
+      });
+    }
     return total;
   };
 
@@ -258,7 +260,9 @@ export const OrderSummaryCard: React.FC<{
             {selectedOptions.map(opt => (
               <div key={opt._id} className="flex justify-between">
                 <span className="text-on-surface-variant">{opt.name}</span>
-                <span className="font-medium">+{getOptionPrice(opt).toLocaleString()}đ</span>
+                {service?.serviceType !== 'variable_price' && (
+                  <span className="font-medium">+{getOptionPrice(opt).toLocaleString()}đ</span>
+                )}
               </div>
             ))}
           </div>

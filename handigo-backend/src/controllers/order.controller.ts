@@ -172,7 +172,18 @@ export const completeOrder = async (
 ) => {
   try {
     const orderId = param(req, "orderId");
-    const order = await OrderService.completeOrder(orderId, uid(req));
+    const { completionEvidenceImages, completionNote } = req.body;
+    const evidenceImages = Array.isArray(completionEvidenceImages)
+      ? completionEvidenceImages.filter(
+          (url): url is string => typeof url === "string",
+        )
+      : [];
+    const order = await OrderService.completeOrder(
+      orderId,
+      uid(req),
+      evidenceImages,
+      typeof completionNote === "string" ? completionNote : undefined,
+    );
     return ok(res, order);
   } catch (err) {
     next(err);

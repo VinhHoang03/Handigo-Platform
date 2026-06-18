@@ -111,10 +111,16 @@ export default function ProviderOrderDetailPage() {
     }, 'Không thể bắt đầu đơn.');
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (files: File[], completionNote: string) => {
     if (!order) return;
     await runAction(async () => {
-      await providerOrderApi.completeOrder(order._id);
+      const completionEvidenceImages = await Promise.all(
+        files.map((file) => bookingApi.uploadOrderAttachment(file)),
+      );
+      await providerOrderApi.completeOrder(order._id, {
+        completionEvidenceImages,
+        completionNote,
+      });
     }, 'Không thể hoàn thành đơn.');
   };
 
@@ -316,29 +322,6 @@ export default function ProviderOrderDetailPage() {
                       </span>
                     </div>
 
-                    {/* Add actions for Repair Order when quotation exists */}
-                    <div className="space-y-sm pt-md">
-                      {order.status === 'accepted' && (
-                        <button type="button" disabled={busy} onClick={handleStart} className="btn-primary w-full py-3">
-                          Bắt đầu thực hiện
-                        </button>
-                      )}
-                      {order.status === 'in_progress' && (
-                        <button type="button" disabled={busy} onClick={handleComplete} className="btn-primary w-full py-3">
-                          Hoàn thành đơn
-                        </button>
-                      )}
-                      {['accepted', 'in_progress'].includes(order.status) && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setCancelOpen(true)}
-                          className="w-full py-2 text-sm text-error hover:bg-error/5 rounded-xl"
-                        >
-                          Hủy đơn
-                        </button>
-                      )}
-                    </div>
                   </section>
                 )}
 
@@ -361,6 +344,16 @@ export default function ProviderOrderDetailPage() {
                     <span className="material-symbols-outlined text-4xl mb-2">hourglass_empty</span>
                     <p>Chờ khách hàng hoặc bước tiếp theo</p>
                   </div>
+                )}
+
+                {(quotation || order.status === 'completed') && (
+                  <FixedPriceActionForm
+                    order={order}
+                    onStart={handleStart}
+                    onComplete={handleComplete}
+                    onCancel={() => setCancelOpen(true)}
+                    busy={busy}
+                  />
                 )}
               </>
             ) : (

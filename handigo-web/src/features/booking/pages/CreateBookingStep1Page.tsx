@@ -51,6 +51,8 @@ const CreateBookingStep1Page = () => {
 
   const visibleCategories = categories.slice(0, 5);
   const hasMoreCategories = categories.length > visibleCategories.length;
+  const selectedService = services.find((service) => service._id === serviceId);
+  const isVariablePrice = selectedService?.serviceType === 'variable_price';
 
   return (
     <OrderCreationShell>
@@ -154,7 +156,10 @@ const CreateBookingStep1Page = () => {
                           checked={selectedOptionIds.includes(option._id)}
                           onChange={() => toggleOption(option._id)}
                         />
-                        <span className="text-label-md">{option.name} (+{getOptionPrice(option).toLocaleString()}đ)</span>
+                        <span className="text-label-md">
+                          {option.name}
+                          {!isVariablePrice && ` (+${getOptionPrice(option).toLocaleString()}đ)`}
+                        </span>
                       </label>
                     ))}
                   </div>

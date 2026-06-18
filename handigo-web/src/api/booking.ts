@@ -12,6 +12,14 @@ export interface CreateOrderPayload {
   customerAttachments?: string[];
 }
 
+export interface CreateAddressPayload {
+  fullAddress: string;
+  province: string;
+  ward: string;
+  isDefault?: boolean;
+  note?: string | null;
+}
+
 export const bookingApi = {
   getCategories: async () => {
     const response = await api.get<{ success: boolean; data: Category[] }>('/categories/active');
@@ -31,6 +39,10 @@ export const bookingApi = {
   },
   getAddresses: async () => {
     const response = await api.get<{ success: boolean; data: Address[] }>('/addresses');
+    return response.data.data;
+  },
+  createAddress: async (payload: CreateAddressPayload) => {
+    const response = await api.post<{ success: boolean; data: Address }>('/addresses', payload);
     return response.data.data;
   },
   uploadOrderAttachment: async (file: File) => {

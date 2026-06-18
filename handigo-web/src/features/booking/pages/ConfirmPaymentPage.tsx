@@ -142,7 +142,8 @@ const ConfirmPaymentPage = () => {
                 <div className="flex flex-wrap gap-2">
                   {selectedOptions.map(opt => (
                     <span key={opt._id} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                      {opt.name} (+{getOptionPrice(opt).toLocaleString()}đ)
+                      {opt.name}
+                      {service?.serviceType !== 'variable_price' && ` (+${getOptionPrice(opt).toLocaleString()}đ)`}
                     </span>
                   ))}
                 </div>
