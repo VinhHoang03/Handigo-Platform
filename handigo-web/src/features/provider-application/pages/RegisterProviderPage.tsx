@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AsyncState } from '@/components/common/AsyncState';
@@ -8,7 +8,11 @@ import { ProviderApplicationStepper } from '../components/ProviderApplicationSte
 import { ProviderDescriptionStep } from '../components/ProviderDescriptionStep';
 import { WorkingAreasStep } from '../components/WorkingAreasStep';
 import { useProviderApplication } from '../hooks/useProviderApplication';
-import type { ProviderApplicationPayload } from '../types/providerApplication.types';
+import type {
+  ProviderApplication,
+  ProviderApplicationPayload,
+  Service,
+} from '../types/providerApplication.types';
 
 const initial: ProviderApplicationPayload = {
   description: '',
@@ -32,12 +36,79 @@ const hasRequiredIdentityImage = (form: ProviderApplicationPayload) =>
     ? Boolean(form.identityDocument.frontImageUrl)
     : Boolean(form.identityDocument.passportImageUrl);
 
+const serviceId = (service: string | Service) =>
+  typeof service === 'string' ? service : service._id;
+
+const applicationToForm = (
+  application: ProviderApplication,
+): ProviderApplicationPayload => ({
+  description: application.description || '',
+  experienceYears: application.experienceYears || 0,
+  serviceIds: (application.serviceIds || []).map(serviceId).filter(Boolean),
+  workingAreas: application.workingAreas || [],
+  identityDocument: {
+    type: application.identityDocument?.type || 'cccd',
+    documentNumber: application.identityDocument?.documentNumber || '',
+    fullName: application.identityDocument?.fullName || '',
+    issuedPlace: application.identityDocument?.issuedPlace || '',
+    issuedAt: application.identityDocument?.issuedAt?.slice(0, 10) || '',
+    expiresAt: application.identityDocument?.expiresAt?.slice(0, 10) || '',
+    frontImageUrl: application.identityDocument?.frontImageUrl || '',
+    backImageUrl: application.identityDocument?.backImageUrl || '',
+    passportImageUrl: application.identityDocument?.passportImageUrl || '',
+  },
+  certificates: (application.certificates || []).map((certificate) => ({
+    title: certificate.title || '',
+    issuer: certificate.issuer || '',
+    issuedAt: certificate.issuedAt?.slice(0, 10) || '',
+    expiresAt: certificate.expiresAt?.slice(0, 10) || '',
+    imageUrls: certificate.imageUrls || [],
+  })),
+});
+
+const hasUploadedAsset = (form: ProviderApplicationPayload) =>
+  Boolean(
+    form.identityDocument.frontImageUrl ||
+      form.identityDocument.backImageUrl ||
+      form.identityDocument.passportImageUrl ||
+      form.certificates.some((certificate) => certificate.imageUrls.length),
+  );
+
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
   const providerApplication = useProviderApplication();
+  const saveDraft = providerApplication.saveDraft;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(initial);
   const [success, setSuccess] = useState('');
+  const hydratedApplicationIdRef = useRef<string | null>(null);
+  const didHydrateRef = useRef(false);
+
+  useEffect(() => {
+    const application = providerApplication.application;
+    if (!application || hydratedApplicationIdRef.current === application._id) {
+      if (!providerApplication.loading) didHydrateRef.current = true;
+      return;
+    }
+
+    setForm(applicationToForm(application));
+    hydratedApplicationIdRef.current = application._id;
+    didHydrateRef.current = true;
+  }, [providerApplication.application, providerApplication.loading]);
+
+  useEffect(() => {
+    if (!didHydrateRef.current || step !== 3 || !hasUploadedAsset(form)) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void saveDraft(form).catch(() => {
+        // The hook exposes the draft error for rendering.
+      });
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [form, saveDraft, step]);
 
   const toggleService = (id: string) =>
     setForm((value) => ({
@@ -143,7 +214,13 @@ export default function RegisterProviderPage() {
               />
             )}
 
-            {(providerApplication.submitError || success) && (
+            {providerApplication.savingDraft && step === 3 && (
+              <p className="mt-5 rounded-2xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
+                Đang lưu ảnh và hồ sơ xác thực...
+              </p>
+            )}
+
+            {(providerApplication.submitError || providerApplication.draftError || success) && (
               <p
                 className={`mt-5 rounded-2xl p-3 ${
                   success
@@ -151,7 +228,7 @@ export default function RegisterProviderPage() {
                     : 'bg-error/10 text-error'
                 }`}
               >
-                {success || providerApplication.submitError}
+                {success || providerApplication.submitError || providerApplication.draftError}
               </p>
             )}
 

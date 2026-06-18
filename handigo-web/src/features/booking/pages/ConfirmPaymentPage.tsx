@@ -11,6 +11,8 @@ const paymentMethods = [
   ['payments', 'Tiền mặt', 'Thanh toán trực tiếp cho nhân viên', 'cash'],
 ] as const;
 
+const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
+
 const ConfirmPaymentPage = () => {
   const {
     categoryId, serviceId, selectedOptionIds, addressId, orderType,
@@ -21,6 +23,7 @@ const ConfirmPaymentPage = () => {
   const [address, setAddress] = useState<Address | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,6 +46,7 @@ const ConfirmPaymentPage = () => {
     return () => { isMounted = false; };
   }, [serviceId, addressId, categoryId]);
 
+
   const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
 
   const handleConfirm = async () => {
@@ -56,6 +60,7 @@ const ConfirmPaymentPage = () => {
     }
 
     setIsSubmitting(true);
+    setPaymentError('');
     try {
       const payload: CreateOrderPayload = {
         serviceId,
@@ -69,10 +74,31 @@ const ConfirmPaymentPage = () => {
       };
 
       const order = await bookingApi.createOrder(payload);
+      const orderDetail = await bookingApi.getOrderById(order._id);
+
+      if (paymentMethod === 'bank') {
+        const payment = await bookingApi.createPayment({
+          orderId: order._id,
+          method: 'PAYOS',
+          paymentType: service?.serviceType === 'variable_price' ? 'INSPECTION_DEPOSIT' : 'FULL',
+          returnUrl: `${window.location.origin}/customer/bookings/success?orderId=${order._id}`,
+          cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
+        });
+
+        if (!payment.checkoutUrl) {
+          throw new Error('PayOS checkoutUrl is missing');
+        }
+
+        sessionStorage.setItem('latestBookingOrderId', orderDetail._id);
+        window.location.href = payment.checkoutUrl;
+        return;
+      }
+
       reset();
-      navigate('/customer/bookings/success', { state: { order } });
+      navigate('/customer/bookings/success', { state: { order: orderDetail } });
     } catch (error) {
       console.error('Failed to create order:', error);
+      setPaymentError('Khong the tao lien ket thanh toan PayOS. Vui long thu lai hoac chon phuong thuc khac.');
       alert('Đã có lỗi xảy ra khi đặt lịch. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
@@ -116,7 +142,7 @@ const ConfirmPaymentPage = () => {
                 <div className="flex flex-wrap gap-2">
                   {selectedOptions.map(opt => (
                     <span key={opt._id} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                      {opt.name}
+                      {opt.name} (+{getOptionPrice(opt).toLocaleString()}đ)
                     </span>
                   ))}
                 </div>
@@ -167,6 +193,13 @@ const ConfirmPaymentPage = () => {
                   </label>
                 ))}
             </div>
+
+            {paymentError && (
+              <div className="mt-4 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
+                {paymentError}
+              </div>
+            )}
+
           </section>
         </div>
 

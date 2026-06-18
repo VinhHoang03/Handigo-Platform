@@ -168,7 +168,6 @@ export interface ProviderProfile {
   rating: number;
   reviewCount: number;
   totalBookings: number;
-  providerCode: string;
   isVerified: boolean;
   joinDate: string;
   avatarUrl: string;

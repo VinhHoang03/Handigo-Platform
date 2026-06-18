@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Navbar, type AppRole } from "./common/Navbar";
 import { useAuthStore } from "../features/auth/store/auth.store";
 import { isNavItemActive } from "@/config/sidebarNavigation";
+import { authService } from "@/features/auth/services/auth.service";
 
 interface NavItem {
   icon: string;
@@ -134,10 +135,33 @@ function ProviderTopbar({
   onSwitch,
 }: ProviderTopbarProps) {
   const user = useAuthStore((state) => state.user);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   const avatar =
     userAvatar ||
     user?.avatar ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || "Handigo")}&background=4f46e5&color=fff`;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        accountRef.current &&
+        !accountRef.current.contains(event.target as Node)
+      ) {
+        setIsAccountOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    setIsAccountOpen(false);
+    await authService.logout();
+    navigate("/", { replace: true });
+  };
 
   return (
     <header className="fixed left-4 right-4 top-6 z-30 rounded-2xl border border-outline-variant/30 bg-white/92 px-4 py-3 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl lg:left-80 xl:left-[21rem]">
@@ -203,16 +227,67 @@ function ProviderTopbar({
           >
             chat_bubble
           </button>
-          <Link
-            to="/provider/profile"
-            className="h-10 w-10 overflow-hidden rounded-full border border-outline-variant bg-surface-container-highest transition-all hover:border-primary focus:ring-4 focus:ring-primary/15"
-          >
-            <img
-              alt="Ảnh đại diện"
-              src={avatar}
-              className="h-full w-full object-cover"
-            />
-          </Link>
+          <div ref={accountRef} className="relative">
+            <button
+              type="button"
+              aria-label="Tài khoản"
+              aria-expanded={isAccountOpen}
+              onClick={() => setIsAccountOpen((open) => !open)}
+              className="h-10 w-10 overflow-hidden rounded-full border border-outline-variant bg-surface-container-highest transition-all hover:border-primary focus:ring-4 focus:ring-primary/15"
+            >
+              <img
+                alt="Ảnh đại diện"
+                src={avatar}
+                className="h-full w-full object-cover"
+              />
+            </button>
+
+            {isAccountOpen && (
+              <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-outline-variant/40 bg-white shadow-[0_18px_45px_rgba(19,27,46,0.16)]">
+                <div className="border-b border-outline-variant/30 px-4 py-3">
+                  <p className="truncate text-sm font-semibold text-on-surface">
+                    {user?.fullName || "Nhà cung cấp"}
+                  </p>
+                  <p className="truncate text-xs text-on-surface-variant">
+                    {user?.email || "Kênh của provider"}
+                  </p>
+                </div>
+
+                <div className="py-2">
+                  <Link
+                    to="/provider/profile"
+                    onClick={() => setIsAccountOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+                  >
+                    <span className="material-symbols-outlined !text-[20px]">
+                      person
+                    </span>
+                    Hồ sơ cá nhân
+                  </Link>
+                  <Link
+                    to="/provider/wallet"
+                    onClick={() => setIsAccountOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+                  >
+                    <span className="material-symbols-outlined !text-[20px]">
+                      account_balance_wallet
+                    </span>
+                    Ví
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-error transition hover:bg-error/10"
+                  >
+                    <span className="material-symbols-outlined !text-[20px]">
+                      logout
+                    </span>
+                    Đăng xuất
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -71,9 +71,11 @@ export interface ProviderApplicationPayload {
   certificates: ProviderApplicationCertificate[];
 }
 
-export interface ProviderApplication extends ProviderApplicationPayload {
+export interface ProviderApplication
+  extends Omit<ProviderApplicationPayload, 'serviceIds'> {
   _id: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  serviceIds: Array<string | Service>;
   rejectionReason?: string | null;
   createdAt: string;
 }

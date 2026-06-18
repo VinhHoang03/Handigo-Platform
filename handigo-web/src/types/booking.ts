@@ -25,10 +25,30 @@ export interface ServiceOption {
   serviceId: string;
   name: string;
   description?: string;
-  optionType: 'inspection' | 'cleaning' | 'installation' | 'repair' | 'other';
-  fixedPrice: number;
-  isFixedPrice: boolean;
+  optionType: 'room_count' | 'area_size' | 'package' | 'add_on' | 'other' | 'inspection' | 'cleaning' | 'installation' | 'repair';
+  price: number;
+  fixedPrice?: number;
+  isFixedPrice?: boolean;
   isActive: boolean;
+}
+
+export interface Payment {
+  _id: string;
+  orderId: string;
+  amount: number;
+  method: 'payos' | 'vnpay' | 'cash' | 'wallet' | 'bank';
+  paymentType: 'full' | 'remaining' | 'inspection_deposit';
+  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  transactionCode?: string | null;
+}
+
+export interface CreatePaymentResult {
+  payment: Payment;
+  method?: 'CASH';
+  amount?: number;
+  checkoutUrl?: string;
+  qrCode?: string;
+  paymentType: Payment['paymentType'];
 }
 
 export interface Address {

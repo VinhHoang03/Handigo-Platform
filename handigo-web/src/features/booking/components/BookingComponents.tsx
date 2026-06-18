@@ -11,6 +11,8 @@ import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi } from '../../../api/booking';
 import type { Service, ServiceOption } from '../../../types/booking';
 
+const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
+
 interface BookingShellProps {
   children: ReactNode;
 }
@@ -200,7 +202,7 @@ export const OrderSummaryCard: React.FC<{
       total = service?.depositAmount || 0;
     }
     selectedOptions.forEach(opt => {
-      total += opt.fixedPrice;
+      total += getOptionPrice(opt);
     });
     return total;
   };
@@ -256,7 +258,7 @@ export const OrderSummaryCard: React.FC<{
             {selectedOptions.map(opt => (
               <div key={opt._id} className="flex justify-between">
                 <span className="text-on-surface-variant">{opt.name}</span>
-                <span className="font-medium">+{opt.fixedPrice.toLocaleString()}đ</span>
+                <span className="font-medium">+{getOptionPrice(opt).toLocaleString()}đ</span>
               </div>
             ))}
           </div>
@@ -303,3 +305,4 @@ export const OrderSummaryCard: React.FC<{
     </aside>
   );
 };
+

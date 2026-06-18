@@ -81,9 +81,44 @@ const cleanCertificates = (
     return clean;
   });
 
+const cleanDraft = (payload: ProviderApplicationPayload): ProviderApplicationPayload => ({
+  ...payload,
+  serviceIds: [...new Set(payload.serviceIds)],
+  description: payload.description.trim(),
+  workingAreas: [
+    ...new Set(
+      payload.workingAreas.map((area) => area.trim()).filter(Boolean),
+    ),
+  ],
+  identityDocument: {
+    type: payload.identityDocument.type,
+    documentNumber: payload.identityDocument.documentNumber.trim(),
+    fullName: payload.identityDocument.fullName.trim(),
+    issuedPlace: optional(payload.identityDocument.issuedPlace),
+    issuedAt: optional(payload.identityDocument.issuedAt),
+    expiresAt: optional(payload.identityDocument.expiresAt),
+    frontImageUrl: optional(payload.identityDocument.frontImageUrl),
+    backImageUrl: optional(payload.identityDocument.backImageUrl),
+    passportImageUrl: optional(payload.identityDocument.passportImageUrl),
+  },
+  certificates: payload.certificates
+    .filter(hasCertificateDraftData)
+    .map((certificate) => ({
+      ...certificate,
+      title: certificate.title.trim(),
+      issuer: optional(certificate.issuer),
+      issuedAt: optional(certificate.issuedAt),
+      expiresAt: optional(certificate.expiresAt),
+      imageUrls: certificate.imageUrls.filter(Boolean),
+    })),
+});
+
 export const providerApplicationService = {
   loadCategories: providerApplicationApi.categories,
+  loadMine: providerApplicationApi.mine,
   uploadImage: providerApplicationApi.uploadImage,
+  saveDraft: (payload: ProviderApplicationPayload) =>
+    providerApplicationApi.saveDraft(cleanDraft(payload)),
   submit: (payload: ProviderApplicationPayload) => {
     const clean = {
       ...payload,

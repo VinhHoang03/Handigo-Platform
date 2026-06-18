@@ -9,6 +9,8 @@ const isImageUrl = (value?: string) => {
   return /^https?:\/\//i.test(value) || value.startsWith('/');
 };
 
+const getOptionPrice = (option: ServiceOption): number => option.price ?? option.fixedPrice ?? 0;
+
 const CreateBookingStep1Page = () => {
   const { categoryId, setCategoryId, serviceId, setServiceId, toggleOption, selectedOptionIds } = useBookingStore();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -102,7 +104,7 @@ const CreateBookingStep1Page = () => {
               Chọn dịch vụ cụ thể
             </h2>
             <div className="space-y-md">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-sm">
                 {services.map((service) => (
                   <button
                     key={service._id}
@@ -159,7 +161,7 @@ const CreateBookingStep1Page = () => {
                           checked={selectedOptionIds.includes(option._id)}
                           onChange={() => toggleOption(option._id)}
                         />
-                        <span className="text-label-md">{option.name} (+{option.fixedPrice.toLocaleString()}đ)</span>
+                        <span className="text-label-md">{option.name} (+{getOptionPrice(option).toLocaleString()}đ)</span>
                       </label>
                     ))}
                   </div>
@@ -178,3 +180,4 @@ const CreateBookingStep1Page = () => {
 };
 
 export default CreateBookingStep1Page;
+
