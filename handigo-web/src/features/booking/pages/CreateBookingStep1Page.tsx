@@ -132,14 +132,7 @@ const CreateBookingStep1Page = () => {
                     </div>
                     <div className="p-sm">
                       <h3 className="font-label-md mb-1 pr-8 leading-snug line-clamp-1">{service.name}</h3>
-                    <p className="text-xs text-on-surface-variant line-clamp-2 leading-snug">{service.description}</p>
-                    <p className="mt-2 font-bold text-primary text-sm">
-                      {service.fixedPrice
-                        ? `${service.fixedPrice.toLocaleString()}đ`
-                        : service.serviceType === 'variable_price'
-                          ? `Phí dịch vụ: ${service.depositAmount?.toLocaleString() || 0}đ`
-                          : '0đ'}
-                    </p>
+                      <p className="text-xs text-on-surface-variant line-clamp-2 leading-snug">{service.description}</p>
                     </div>
                   </button>
                 ))}

@@ -14,7 +14,9 @@ export const providerApplicationApi = {
     formData.append('purpose', purpose);
 
     return data<{ url: string }>(
-      await api.post('/provider-application-assets/images', formData),
+      await api.post('/provider-application-assets/images', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }),
     );
   },
 };
