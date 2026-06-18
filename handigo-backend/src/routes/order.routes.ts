@@ -49,7 +49,7 @@ router.get("/provider", roleMiddleware("PROVIDER"), getProviderOrders);
 // GET    /orders/:orderId      → Customer / Provider: view order detail
 router.post(
   "/attachments",
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   uploadOrderAttachmentImage,
   uploadOrderAttachment,
 );

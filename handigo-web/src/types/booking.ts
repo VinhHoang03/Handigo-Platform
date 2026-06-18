@@ -89,6 +89,8 @@ export interface Order {
   customerId: string | OrderCustomer;
   problemDescription?: string;
   customerAttachments?: string[];
+  completionEvidenceImages?: string[];
+  completionNote?: string | null;
   providerId?: {
     _id: string;
     name: string;

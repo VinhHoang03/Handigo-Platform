@@ -45,9 +45,13 @@ export const providerOrderApi = {
     return response.data.data;
   },
 
-  completeOrder: async (orderId: string) => {
+  completeOrder: async (
+    orderId: string,
+    payload: { completionEvidenceImages: string[]; completionNote?: string },
+  ) => {
     const response = await api.post<{ success: boolean; data: Order }>(
       `/orders/${orderId}/complete`,
+      payload,
     );
     return response.data.data;
   },

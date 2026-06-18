@@ -70,6 +70,8 @@ export interface IOrder extends Document, IBaseDocument {
   currentQuotationId?: Types.ObjectId | null;
   problemDescription?: string | null;
   customerAttachments?: string[];
+  completionEvidenceImages?: string[];
+  completionNote?: string | null;
   pricing: IOrderPricing;
   promotionSnapshot?: IDiscountSnapshot | null;
   voucherSnapshot?: IDiscountSnapshot | null;
@@ -172,6 +174,8 @@ const OrderSchema = new Schema<IOrder>(
     },
     problemDescription: { type: String, default: null, trim: true },
     customerAttachments: { type: [String], default: [] },
+    completionEvidenceImages: { type: [String], default: [] },
+    completionNote: { type: String, default: null, trim: true },
     pricing: { type: OrderPricingSchema, required: true },
     promotionSnapshot: { type: DiscountSnapshotSchema, default: null },
     voucherSnapshot: { type: DiscountSnapshotSchema, default: null },
