@@ -780,7 +780,6 @@ export default function ProviderProfilePage() {
       rating: profile.provider.averageRating || 0,
       reviewCount: profile.provider.totalFeedbacks || 0,
       totalBookings: profile.provider.totalCompletedOrders || 0,
-      providerCode: profile.provider.id,
       isVerified: profile.provider.verified,
       joinDate: profile.user.createdAt
         ? String(new Date(profile.user.createdAt).getFullYear())

@@ -10,7 +10,7 @@ export interface IProviderApplication extends Document, IBaseDocument {
   workingAreas: string[];
   identityDocument?: IIdentityDocument;
   certificates: IProviderCertificate[];
-  status: "pending" | "approved" | "rejected";
+  status: "draft" | "pending" | "approved" | "rejected";
   rejectionReason?: string | null;
   reviewedBy?: Types.ObjectId | null;
   reviewedAt?: Date | null;
@@ -55,7 +55,7 @@ const IdentityDocumentSchema = new Schema<IIdentityDocument>(
 
 const ProviderCertificateSchema = new Schema<IProviderCertificate>(
   {
-    title: { type: String, required: true, trim: true, maxlength: 200 },
+    title: { type: String, trim: true, maxlength: 200 },
     issuer: { type: String, trim: true, maxlength: 200 },
     issuedAt: { type: Date },
     expiresAt: { type: Date },
@@ -76,13 +76,13 @@ const ProviderCertificateSchema = new Schema<IProviderCertificate>(
 const ProviderApplicationSchema = new Schema<IProviderApplication>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    description: { type: String, required: true },
+    description: { type: String, default: "" },
     experienceYears: { type: Number, required: true, min: 0, default: 0 },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: "Service" }],
     workingAreas: { type: [String], default: [] },
     identityDocument: { type: IdentityDocumentSchema, default: undefined },
     certificates: { type: [ProviderCertificateSchema], default: [] },
-    status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    status: { type: String, enum: ["draft", "pending", "approved", "rejected"], default: "pending" },
     rejectionReason: { type: String, default: null },
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reviewedAt: { type: Date, default: null },

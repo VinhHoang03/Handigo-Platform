@@ -198,6 +198,35 @@ const BookingDetailPage = () => {
 
   const formatCurrency = (amount?: number | null) => `${(amount ?? 0).toLocaleString('vi-VN')}đ`;
 
+  const getPaymentStatusDisplay = (currentOrder: Order) => {
+    const isFlexiblePrice = currentOrder.serviceId?.serviceType !== 'fixed_price';
+
+    if (isFlexiblePrice) {
+      return {
+        label: 'Chờ báo giá',
+        className: 'text-amber-600',
+      };
+    }
+
+    if (currentOrder.paymentMethod === 'cash') {
+      return {
+        label: 'Thanh toán sau khi hoàn thành',
+        className: 'text-on-surface-variant',
+      };
+    }
+
+    if (currentOrder.paymentMethod === 'bank' || currentOrder.paymentMethod === 'wallet') {
+      return {
+        label: 'Đã thanh toán',
+        className: 'text-emerald-600',
+      };
+    }
+
+    return currentOrder.paymentStatus === 'paid'
+      ? { label: 'Đã thanh toán', className: 'text-emerald-600' }
+      : { label: 'Chờ thanh toán', className: 'text-primary' };
+  };
+
   const getQuotationStatusLabel = (status: OrderQuotation['quotation']['status']) => {
     switch (status) {
       case 'pending': return 'Chờ xác nhận';
@@ -258,6 +287,7 @@ const BookingDetailPage = () => {
   };
 
   const providerInfo = getProviderInfo();
+  const paymentStatusDisplay = getPaymentStatusDisplay(order);
 
   return (
     <BookingShell>
@@ -331,8 +361,8 @@ const BookingDetailPage = () => {
                     <h4 className="text-label-sm font-label-sm text-on-surface-variant uppercase">Thanh toán</h4>
                     <p className="font-medium text-on-surface mt-1">
                       {getPaymentMethodLabel(order.paymentMethod)} -
-                      <span className={order.paymentStatus === 'paid' ? 'text-emerald-600 ml-1' : 'text-primary ml-1'}>
-                        {order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                      <span className={`${paymentStatusDisplay.className} ml-1`}>
+                        {paymentStatusDisplay.label}
                       </span>
                     </p>
                   </div>
@@ -366,12 +396,12 @@ const BookingDetailPage = () => {
               <div className="mt-lg pt-lg border-t-4 border-primary/20 w-full overflow-hidden">
                 {quotation ? (
                   <>
-                    <div className="flex items-center justify-between mb-lg">
-                      <h3 className="font-headline-md text-headline-md text-primary flex items-center gap-2">
+                    <div className="flex flex-col gap-3 mb-lg sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="font-headline-md text-headline-md text-primary flex min-w-0 items-center gap-2">
                         <span className="material-symbols-outlined">request_quote</span>
                         Báo giá sửa chữa
                       </h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getQuotationStatusClass(quotation.quotation.status)}`}>
+                      <span className={`inline-flex max-w-full whitespace-normal break-words px-3 py-1 rounded-full text-xs font-bold uppercase leading-snug ${getQuotationStatusClass(quotation.quotation.status)}`}>
                         {getQuotationStatusLabel(quotation.quotation.status)}
                       </span>
                     </div>
@@ -463,16 +493,35 @@ const BookingDetailPage = () => {
                     )}
                   </>
                 ) : (
-                  <div className="py-xl text-center bg-surface-container-low rounded-3xl border border-dashed border-outline-variant/50 w-full px-4">
-                    <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-md">
-                      <span className="material-symbols-outlined text-3xl animate-bounce">request_quote</span>
+                  <div className="w-full overflow-hidden rounded-3xl border border-dashed border-amber-300/70 bg-amber-50/70 p-4 sm:p-5">
+                    <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
+                      <div className="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 sm:mx-0">
+                        <span className="material-symbols-outlined text-2xl">request_quote</span>
+                      </div>
+
+                      <div className="min-w-0 flex-1 text-center sm:text-left">
+                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <h3 className="min-w-0 whitespace-normal break-words text-base font-bold leading-snug text-on-surface sm:text-lg">
+                            Đang chờ chuyên gia báo giá
+                          </h3>
+                          <span className="mx-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700 sm:mx-0">
+                            <span className="h-2 w-2 rounded-full bg-amber-500" />
+                            Chờ báo giá
+                          </span>
+                        </div>
+
+                        <div className="mt-3 space-y-2 text-sm leading-relaxed text-on-surface-variant">
+                          <p className="whitespace-normal break-words">
+                            {order.status === 'created'
+                              ? 'Đơn của bạn đã được ghi nhận. Sau khi chuyên gia nhận đơn, họ sẽ khảo sát và gửi báo giá chi tiết.'
+                              : 'Chuyên gia đang kiểm tra thông tin và lập báo giá chi tiết cho đơn này.'}
+                          </p>
+                          <p className="whitespace-normal break-words">
+                            Khi có báo giá, bạn sẽ nhận được thông báo để xem chi phí và xác nhận trước khi tiếp tục.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="font-headline-sm text-on-surface mb-xs">Đang chờ chuyên gia báo giá</h3>
-                    <p className="text-on-surface-variant max-w-md mx-auto text-sm leading-relaxed">
-                      {order.status === 'created'
-                        ? 'Sau khi chuyên gia nhận đơn, họ sẽ đến khảo sát và gửi báo giá cho bạn.'
-                        : 'Chuyên gia đang kiểm tra và lập báo giá chi tiết. Bạn sẽ nhận được thông báo khi có báo giá.'}
-                    </p>
                   </div>
                 )}
               </div>

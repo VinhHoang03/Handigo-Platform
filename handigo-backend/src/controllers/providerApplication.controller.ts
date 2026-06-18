@@ -39,3 +39,23 @@ export const getMyApplication = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const saveDraftApplication = async (req: Request, res: Response) => {
+  try {
+    const application = await providerApplicationService.saveDraftApplication(
+      req.user!.id,
+      req.body,
+    );
+
+    return res.json({
+      success: true,
+      data: application,
+      message: "Provider application draft saved successfully",
+    });
+  } catch (error: any) {
+    return res.status(getStatusCode(error)).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

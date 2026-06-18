@@ -65,7 +65,7 @@ export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
         )}
       </div>
       <p className="font-label-md text-on-surface-variant">
-        ID: {profile.providerCode} • Thành viên từ {profile.joinDate}
+        Thành viên từ {profile.joinDate}
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-4 md:justify-start">
         <div className="flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-high/50 px-3 py-1.5">

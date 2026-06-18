@@ -34,6 +34,15 @@ interface CreateProviderApplicationPayload {
   certificates?: CertificatePayload[];
 }
 
+interface SaveProviderApplicationDraftPayload {
+  description?: string;
+  experienceYears?: number;
+  serviceIds?: string[];
+  workingAreas?: string[];
+  identityDocument?: Partial<IdentityDocumentPayload>;
+  certificates?: Array<Partial<CertificatePayload>>;
+}
+
 interface ReviewProviderApplicationPayload {
   status: "approved" | "rejected";
   rejectionReason?: string;
@@ -133,6 +142,55 @@ const buildPendingCertificates = (
     rejectionReason: null,
   }));
 
+const buildDraftIdentityDocument = (
+  payload?: Partial<IdentityDocumentPayload>,
+): Partial<IIdentityDocument> | undefined => {
+  if (!payload) return undefined;
+
+  return {
+    type: payload.type || "cccd",
+    documentNumber: payload.documentNumber,
+    numberLast4: toDocumentLast4(payload.documentNumber),
+    fullName: payload.fullName,
+    issuedPlace: payload.issuedPlace,
+    issuedAt: toDate(payload.issuedAt),
+    expiresAt: toDate(payload.expiresAt),
+    frontImageUrl: payload.frontImageUrl,
+    backImageUrl: payload.backImageUrl,
+    passportImageUrl: payload.passportImageUrl,
+    verificationStatus: "unsubmitted",
+    provider: "manual",
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: null,
+  };
+};
+
+const buildDraftCertificates = (
+  certificates: Array<Partial<CertificatePayload>> = [],
+): Partial<IProviderCertificate>[] =>
+  certificates
+    .filter((certificate) =>
+      Boolean(
+        certificate.title ||
+          certificate.issuer ||
+          certificate.issuedAt ||
+          certificate.expiresAt ||
+          certificate.imageUrls?.length,
+      ),
+    )
+    .map((certificate) => ({
+      title: certificate.title || "",
+      issuer: certificate.issuer,
+      issuedAt: toDate(certificate.issuedAt),
+      expiresAt: toDate(certificate.expiresAt),
+      imageUrls: certificate.imageUrls || [],
+      status: "pending",
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectionReason: null,
+    }));
+
 const approveIdentityDocument = (
   identity: IIdentityDocument | undefined,
   adminId: string,
@@ -213,6 +271,26 @@ export const createApplication = async (
     throw new AppError("You already have a pending provider application", 400);
   }
 
+  const draftApplication = await ProviderApplication.findOne({
+    userId,
+    status: "draft",
+    isDeleted: false,
+  });
+
+  if (draftApplication) {
+    draftApplication.description = payload.description;
+    draftApplication.experienceYears = payload.experienceYears;
+    draftApplication.serviceIds = serviceIds.map((id) => new Types.ObjectId(id));
+    draftApplication.workingAreas = payload.workingAreas;
+    draftApplication.identityDocument = buildPendingIdentityDocument(payload.identityDocument);
+    draftApplication.certificates = buildPendingCertificates(payload.certificates);
+    draftApplication.status = "pending";
+    draftApplication.rejectionReason = null;
+    draftApplication.reviewedBy = null;
+    draftApplication.reviewedAt = null;
+    return draftApplication.save();
+  }
+
   return ProviderApplication.create({
     userId,
     description: payload.description,
@@ -223,6 +301,63 @@ export const createApplication = async (
     certificates: buildPendingCertificates(payload.certificates),
     status: "pending",
   });
+};
+
+export const saveDraftApplication = async (
+  userId: string,
+  payload: SaveProviderApplicationDraftPayload,
+) => {
+  assertObjectId(userId, "user id");
+
+  const user = await User.findOne({ _id: userId, isDeleted: false });
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  if (user.status !== "active") {
+    throw new AppError("Account is not active", 403);
+  }
+
+  if (user.role !== "CUSTOMER") {
+    throw new AppError("Only customers can apply to become providers", 403);
+  }
+
+  const pendingApplication = await ProviderApplication.findOne({
+    userId,
+    status: "pending",
+    isDeleted: false,
+  });
+
+  if (pendingApplication) {
+    throw new AppError("You already have a pending provider application", 400);
+  }
+
+  const serviceIds = payload.serviceIds?.length
+    ? await assertServicesActive(payload.serviceIds)
+    : [];
+
+  const application = await ProviderApplication.findOneAndUpdate(
+    { userId, status: "draft", isDeleted: false },
+    {
+      userId,
+      description: payload.description || "",
+      experienceYears: payload.experienceYears ?? 0,
+      serviceIds: serviceIds.map((id) => new Types.ObjectId(id)),
+      workingAreas: payload.workingAreas || [],
+      identityDocument: buildDraftIdentityDocument(payload.identityDocument),
+      certificates: buildDraftCertificates(payload.certificates),
+      status: "draft",
+      rejectionReason: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      isDeleted: false,
+      deletedAt: null,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+
+  return getMyApplication(String(application.userId));
 };
 
 export const getMyApplication = async (userId: string) => {
@@ -238,8 +373,10 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
   const { page, limit, skip } = getPagination(query);
   const filter: Record<string, unknown> = { isDeleted: false };
 
-  if (query.status && ["pending", "approved", "rejected"].includes(query.status)) {
+  if (query.status && ["draft", "pending", "approved", "rejected"].includes(query.status)) {
     filter.status = query.status;
+  } else {
+    filter.status = { $ne: "draft" };
   }
 
   if (query.keyword) {

@@ -53,6 +53,26 @@ const certificateSchema = z.object({
   imageUrls: z.array(imageUrlSchema).min(1),
 });
 
+const draftIdentityDocumentSchema = z.object({
+  type: z.enum(["cccd", "passport"]).default("cccd"),
+  documentNumber: z.string().trim().max(50).optional(),
+  fullName: z.string().trim().max(120).optional(),
+  issuedPlace: optionalText(200),
+  issuedAt: dateStringSchema.optional(),
+  expiresAt: dateStringSchema.optional(),
+  frontImageUrl: imageUrlSchema.optional(),
+  backImageUrl: imageUrlSchema.optional(),
+  passportImageUrl: imageUrlSchema.optional(),
+});
+
+const draftCertificateSchema = z.object({
+  title: z.string().trim().max(200).optional(),
+  issuer: optionalText(200),
+  issuedAt: dateStringSchema.optional(),
+  expiresAt: dateStringSchema.optional(),
+  imageUrls: z.array(imageUrlSchema).default([]),
+});
+
 export const createProviderApplicationSchema = z.object({
   description: z.string().trim().min(1).max(2000),
   experienceYears: z.number().int().min(0),
@@ -60,6 +80,15 @@ export const createProviderApplicationSchema = z.object({
   workingAreas: z.array(z.string().trim().min(1).max(120)).min(1),
   identityDocument: identityDocumentSchema,
   certificates: z.array(certificateSchema).default([]),
+});
+
+export const saveProviderApplicationDraftSchema = z.object({
+  description: z.string().trim().max(2000).optional(),
+  experienceYears: z.number().int().min(0).optional(),
+  serviceIds: z.array(objectIdSchema).optional(),
+  workingAreas: z.array(z.string().trim().min(1).max(120)).optional(),
+  identityDocument: draftIdentityDocumentSchema.optional(),
+  certificates: z.array(draftCertificateSchema).optional(),
 });
 
 export const reviewProviderApplicationSchema = z

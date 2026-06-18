@@ -3,7 +3,10 @@ import * as providerApplicationController from "../controllers/providerApplicati
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createProviderApplicationSchema } from "../validations/providerApplication.validator";
+import {
+  createProviderApplicationSchema,
+  saveProviderApplicationDraftSchema,
+} from "../validations/providerApplication.validator";
 
 const router = Router();
 
@@ -20,6 +23,14 @@ router.get(
   authMiddleware,
   roleMiddleware("CUSTOMER", "PROVIDER"),
   providerApplicationController.getMyApplication,
+);
+
+router.patch(
+  "/me/draft",
+  authMiddleware,
+  roleMiddleware("CUSTOMER"),
+  validate(saveProviderApplicationDraftSchema),
+  providerApplicationController.saveDraftApplication,
 );
 
 export default router;
