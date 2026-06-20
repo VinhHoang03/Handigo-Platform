@@ -25,6 +25,11 @@ export interface ApplicationIdentityDocument {
   issuedPlace?: string;
   issuedAt?: string;
   expiresAt?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
   frontImageUrl?: string;
   backImageUrl?: string;
   passportImageUrl?: string;
@@ -38,6 +43,7 @@ export interface ApplicationCertificate {
   _id?: string;
   id?: string;
   title: string;
+  certificateNumber?: string;
   issuer?: string;
   issuedAt?: string;
   expiresAt?: string;
@@ -52,7 +58,24 @@ export interface AdminApplication {
   serviceIds: ServiceRef[]; workingAreas: string[];
   identityDocument?: ApplicationIdentityDocument;
   certificates?: ApplicationCertificate[];
-  status: 'pending' | 'approved' | 'rejected'; rejectionReason?: string | null; createdAt: string;
+  status: 'pending' | 'resubmitted' | 'approved' | 'rejected';
+  rejectionReason?: string | null;
+  rejectionNotes?: string | null;
+  reviewedBy?: ApplicationUser | null;
+  reviewedAt?: string | null;
+  submittedAt?: string | null;
+  resubmittedAt?: string | null;
+  reviewHistory?: Array<{
+    action: 'submitted' | 'rejected' | 'resubmitted' | 'approved';
+    status: 'pending' | 'resubmitted' | 'approved' | 'rejected';
+    actorId: ApplicationUser | string;
+    actorRole: 'CUSTOMER' | 'ADMIN';
+    occurredAt: string;
+    rejectionReason?: string | null;
+    notes?: string | null;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface ListResult<T> { items: T[]; pagination: Pagination }
 export interface AdminQuery { page?: number; limit?: number; keyword?: string; role?: string; status?: string; categoryId?: string }

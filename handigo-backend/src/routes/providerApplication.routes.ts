@@ -25,6 +25,28 @@ router.get(
   providerApplicationController.getMyApplication,
 );
 
+router.get(
+  "/me/history",
+  authMiddleware,
+  roleMiddleware("CUSTOMER", "PROVIDER"),
+  providerApplicationController.getMyApplications,
+);
+
+router.get(
+  "/:id",
+  authMiddleware,
+  roleMiddleware("CUSTOMER", "PROVIDER"),
+  providerApplicationController.getMyApplicationById,
+);
+
+router.patch(
+  "/:id/resubmit",
+  authMiddleware,
+  roleMiddleware("CUSTOMER"),
+  validate(createProviderApplicationSchema),
+  providerApplicationController.resubmitApplication,
+);
+
 router.patch(
   "/me/draft",
   authMiddleware,

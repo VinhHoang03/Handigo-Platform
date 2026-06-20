@@ -1,4 +1,4 @@
-export interface NavItem {
+﻿export interface NavItem {
   icon: string;
   label: string;
   path: string;
@@ -22,6 +22,7 @@ export const providerNavItems: NavItem[] = [
   { icon: 'payments', label: 'Ví', path: '/provider/wallet' },
   { icon: 'account_balance', label: 'Tài khoản ngân hàng', path: '/provider/bank-accounts' },
   { icon: 'reviews', label: 'Đánh giá', path: '/provider/feedbacks' },
+  { icon: 'lightbulb', label: 'Đề xuất dịch vụ', path: '/provider/service-suggestions' },
   { icon: 'mail', label: 'Tin nhắn', path: '#' },
   { icon: 'settings', label: 'Hồ sơ dịch vụ', path: '/provider/profile' },
 ];

@@ -25,6 +25,8 @@ interface UserProfileSectionProps {
   defaultAvatar?: string;
   showAvatar?: boolean;
   highlightPhone?: boolean;
+  showProfile?: boolean;
+  showAddresses?: boolean;
   onSaveProfile: (payload: UserProfileFormValue) => Promise<void> | void;
   onAddAddress?: () => void;
   onEditAddress?: (address: UserAddress) => void;
@@ -112,6 +114,7 @@ function TextField({
   type = "text",
   required,
   highlighted,
+  error,
   onChange,
 }: {
   id: string;
@@ -120,6 +123,7 @@ function TextField({
   type?: string;
   required?: boolean;
   highlighted?: boolean;
+  error?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -135,11 +139,14 @@ function TextField({
         onChange={(event) => onChange(event.target.value)}
         className={[
           "min-h-11 w-full rounded-lg border bg-white px-3 py-2 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15",
-          highlighted
+          error
+            ? "border-error focus:border-error focus:ring-error/15"
+            : highlighted
             ? "border-primary shadow-[0_0_0_4px_rgba(79,70,229,0.14)]"
             : "border-outline-variant/40",
         ].join(" ")}
       />
+      {error && <span className="block text-xs font-medium text-error">{error}</span>}
     </label>
   );
 }
@@ -178,6 +185,12 @@ function AddressRow({
           <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
             {address.fullAddress}
           </p>
+          {(address.recipientName || address.recipientPhone) && (
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Người nhận: {address.recipientName || "Chưa cập nhật"}
+              {address.recipientPhone ? ` • ${address.recipientPhone}` : ""}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex shrink-0 gap-1">
@@ -221,6 +234,8 @@ export function UserProfileSection({
   defaultAvatar = DEFAULT_AVATAR,
   showAvatar = true,
   highlightPhone,
+  showProfile = true,
+  showAddresses = true,
   onSaveProfile,
   onAddAddress,
   onEditAddress,
@@ -232,6 +247,10 @@ export function UserProfileSection({
     toProfileForm(user),
   );
   const [localProfileError, setLocalProfileError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{
+    fullName?: string;
+    phone?: string;
+  }>({});
 
   const avatarSrc = isEditing
     ? profileForm.avatar || user.avatar || user.avatarUrl || defaultAvatar
@@ -240,25 +259,53 @@ export function UserProfileSection({
   const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLocalProfileError("");
+    setFieldErrors({});
 
-    if (!profileForm.fullName.trim()) {
-      setLocalProfileError("Vui lòng nhập họ và tên.");
+    const normalizedName = profileForm.fullName.trim().replace(/\s+/g, " ");
+    const compactPhone = profileForm.phone?.trim().replace(/[\s.-]/g, "") || "";
+    const normalizedPhone = compactPhone.startsWith("+84")
+      ? compactPhone
+      : compactPhone.startsWith("84")
+        ? `+${compactPhone}`
+        : compactPhone.startsWith("0")
+          ? `+84${compactPhone.slice(1)}`
+          : compactPhone;
+    const nextFieldErrors: { fullName?: string; phone?: string } = {};
+
+    if (!normalizedName) {
+      nextFieldErrors.fullName = "Vui lòng nhập họ và tên.";
+    } else if (!/^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u.test(normalizedName)) {
+      nextFieldErrors.fullName = "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
+    }
+
+    if (normalizedPhone && !/^\+84(?:3|5|7|8|9)\d{8}$/.test(normalizedPhone)) {
+      nextFieldErrors.phone = "Số điện thoại Việt Nam không hợp lệ.";
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
       return;
     }
 
     try {
       await onSaveProfile({
-        fullName: profileForm.fullName.trim(),
-        phone: profileForm.phone?.trim() || undefined,
+        fullName: normalizedName,
+        phone: normalizedPhone || undefined,
         avatar: showAvatar ? profileForm.avatar?.trim() || null : user.avatar || null,
         birthday: profileForm.birthday || null,
         gender: profileForm.gender || null,
       });
       setIsEditing(false);
     } catch (saveError) {
-      setLocalProfileError(
-        getErrorMessage(saveError, "Không thể cập nhật hồ sơ. Vui lòng thử lại."),
+      const message = getErrorMessage(
+        saveError,
+        "Không thể cập nhật hồ sơ. Vui lòng thử lại.",
       );
+      if (message.toLowerCase().includes("số điện thoại")) {
+        setFieldErrors((current) => ({ ...current, phone: message }));
+      } else {
+        setLocalProfileError(message);
+      }
     }
   };
 
@@ -285,15 +332,16 @@ export function UserProfileSection({
     <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-headline-md text-headline-md text-on-surface">
-          Thông tin cá nhân
+          {showProfile ? "Thông tin cá nhân" : "Địa chỉ đã lưu"}
         </h3>
-        {!isEditing && (
+        {showProfile && !isEditing && (
           <button
             type="button"
             className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"
             onClick={() => {
               setProfileForm(toProfileForm(user));
               setLocalProfileError("");
+              setFieldErrors({});
               setIsEditing(true);
             }}
           >
@@ -309,8 +357,8 @@ export function UserProfileSection({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-7 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]">
-        <form onSubmit={handleProfileSubmit} className="min-w-0 space-y-5">
+      <div className={showProfile && showAddresses ? "grid grid-cols-1 gap-7 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]" : "grid grid-cols-1 gap-7"}>
+        {showProfile && <form onSubmit={handleProfileSubmit} className="min-w-0 space-y-5">
           {showAvatar && (
             <div className="flex items-center gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-low p-4">
               <div className="relative shrink-0">
@@ -362,11 +410,15 @@ export function UserProfileSection({
                   label="Họ và tên"
                   value={profileForm.fullName}
                   required
+                  error={fieldErrors.fullName}
                   onChange={(value) =>
-                    setProfileForm((current) => ({
-                      ...current,
-                      fullName: value,
-                    }))
+                    {
+                      setProfileForm((current) => ({
+                        ...current,
+                        fullName: value,
+                      }));
+                      setFieldErrors((current) => ({ ...current, fullName: undefined }));
+                    }
                   }
                 />
                 <TextField
@@ -375,8 +427,12 @@ export function UserProfileSection({
                   type="tel"
                   value={profileForm.phone || ""}
                   highlighted={highlightPhone}
+                  error={fieldErrors.phone}
                   onChange={(value) =>
-                    setProfileForm((current) => ({ ...current, phone: value }))
+                    {
+                      setProfileForm((current) => ({ ...current, phone: value }));
+                      setFieldErrors((current) => ({ ...current, phone: undefined }));
+                    }
                   }
                 />
                 <label className="block space-y-2">
@@ -457,6 +513,7 @@ export function UserProfileSection({
                 onClick={() => {
                   setProfileForm(toProfileForm(user));
                   setLocalProfileError("");
+                  setFieldErrors({});
                   setIsEditing(false);
                 }}
               >
@@ -469,9 +526,9 @@ export function UserProfileSection({
               </button>
             </div>
           )}
-        </form>
+        </form>}
 
-        <div className="min-w-0 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5">
+        {showAddresses && <div className="min-w-0 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h4 className="font-headline-sm text-headline-sm text-on-surface">
@@ -526,7 +583,7 @@ export function UserProfileSection({
               Chưa có địa chỉ đã lưu.
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </section>
   );

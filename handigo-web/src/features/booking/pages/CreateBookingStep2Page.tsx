@@ -4,10 +4,13 @@ import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../compone
 import { bookingApi } from '../../../api/booking';
 import { useBookingStore } from '../hooks/useBookingStore';
 import type { Address } from '../../../types/booking';
+import { useAuthStore } from '@/features/auth/store/auth.store';
 
 const timeSlots = ['08:00 - 10:00', '10:00 - 12:00', '14:00 - 16:00', '16:00 - 18:00'];
 
 const emptyAddressForm = {
+  recipientName: '',
+  recipientPhone: '',
   fullAddress: '',
   ward: '',
   province: '',
@@ -16,6 +19,7 @@ const emptyAddressForm = {
 };
 
 const CreateBookingStep2Page = () => {
+  const user = useAuthStore((state) => state.user);
   const {
     addressId, setAddressId, orderType, setOrderType,
     scheduledAt, setScheduledAt, problemDescription, setProblemDescription,
@@ -25,7 +29,11 @@ const CreateBookingStep2Page = () => {
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [addressForm, setAddressForm] = useState(emptyAddressForm);
+  const [addressForm, setAddressForm] = useState(() => ({
+    ...emptyAddressForm,
+    recipientName: user?.fullName || '',
+    recipientPhone: user?.phone || '',
+  }));
   const [isCreatingAddress, setIsCreatingAddress] = useState(false);
   const [addressError, setAddressError] = useState('');
 
@@ -47,6 +55,8 @@ const CreateBookingStep2Page = () => {
 
     try {
       const createdAddress = await bookingApi.createAddress({
+        recipientName: addressForm.recipientName.trim(),
+        recipientPhone: addressForm.recipientPhone.trim(),
         fullAddress: addressForm.fullAddress.trim(),
         ward: addressForm.ward.trim(),
         province: addressForm.province.trim(),
@@ -59,7 +69,11 @@ const CreateBookingStep2Page = () => {
         ...current.filter((address) => address._id !== createdAddress._id),
       ]);
       setAddressId(createdAddress._id);
-      setAddressForm(emptyAddressForm);
+      setAddressForm({
+        ...emptyAddressForm,
+        recipientName: user?.fullName || '',
+        recipientPhone: user?.phone || '',
+      });
       setIsAddressModalOpen(false);
     } catch (error) {
       if (typeof error === 'object' && error && 'response' in error) {
@@ -171,6 +185,12 @@ const CreateBookingStep2Page = () => {
                             <p className="text-xs text-on-surface-variant leading-snug mt-0.5 line-clamp-2">
                               {addr.fullAddress || addr.detailAddress}, {addr.ward}
                             </p>
+                            {(addr.recipientName || addr.recipientPhone) && (
+                              <p className="mt-1 truncate text-[11px] text-on-surface-variant">
+                                Người nhận: {addr.recipientName || "Chưa cập nhật"}
+                                {addr.recipientPhone ? ` • ${addr.recipientPhone}` : ""}
+                              </p>
+                            )}
                             <p className="text-[10px] text-on-surface-variant/70 uppercase font-medium mt-1 truncate">
                               {[addr.district, addr.province].filter(Boolean).join(', ')}
                             </p>
@@ -313,6 +333,29 @@ const CreateBookingStep2Page = () => {
         }}
       >
         <form onSubmit={handleCreateAddress} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold">Tên người nhận</span>
+              <input
+                required
+                value={addressForm.recipientName}
+                placeholder="Nhập tên người nhận"
+                className="form-field__input pb-2 pt-2"
+                onChange={(event) => setAddressForm({ ...addressForm, recipientName: event.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold">Số điện thoại người nhận</span>
+              <input
+                required
+                type="tel"
+                value={addressForm.recipientPhone}
+                placeholder="Nhập số điện thoại"
+                className="form-field__input pb-2 pt-2"
+                onChange={(event) => setAddressForm({ ...addressForm, recipientPhone: event.target.value })}
+              />
+            </label>
+          </div>
           <AddressInput
             label="Địa chỉ chi tiết"
             placeholder="Số nhà, tên đường"

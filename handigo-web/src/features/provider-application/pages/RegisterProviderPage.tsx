@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AsyncState } from '@/components/common/AsyncState';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { CategorySelectionStep } from '../components/CategorySelectionStep';
@@ -13,6 +13,7 @@ import type {
   ProviderApplicationPayload,
   Service,
 } from '../types/providerApplication.types';
+import { hasProviderApplicationDateErrors } from '../utils/providerApplicationValidation';
 
 const initial: ProviderApplicationPayload = {
   description: '',
@@ -27,6 +28,11 @@ const initial: ProviderApplicationPayload = {
     frontImageUrl: '',
     backImageUrl: '',
     passportImageUrl: '',
+    dateOfBirth: '',
+    gender: undefined,
+    nationality: '',
+    placeOfOrigin: '',
+    placeOfResidence: '',
   },
   certificates: [],
 };
@@ -56,9 +62,15 @@ const applicationToForm = (
     frontImageUrl: application.identityDocument?.frontImageUrl || '',
     backImageUrl: application.identityDocument?.backImageUrl || '',
     passportImageUrl: application.identityDocument?.passportImageUrl || '',
+    dateOfBirth: application.identityDocument?.dateOfBirth?.slice(0, 10) || '',
+    gender: application.identityDocument?.gender,
+    nationality: application.identityDocument?.nationality || '',
+    placeOfOrigin: application.identityDocument?.placeOfOrigin || '',
+    placeOfResidence: application.identityDocument?.placeOfResidence || '',
   },
   certificates: (application.certificates || []).map((certificate) => ({
     title: certificate.title || '',
+    certificateNumber: certificate.certificateNumber || '',
     issuer: certificate.issuer || '',
     issuedAt: certificate.issuedAt?.slice(0, 10) || '',
     expiresAt: certificate.expiresAt?.slice(0, 10) || '',
@@ -76,7 +88,9 @@ const hasUploadedAsset = (form: ProviderApplicationPayload) =>
 
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
-  const providerApplication = useProviderApplication();
+  const [searchParams] = useSearchParams();
+  const applicationId = searchParams.get('applicationId');
+  const providerApplication = useProviderApplication(applicationId);
   const saveDraft = providerApplication.saveDraft;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(initial);
@@ -97,7 +111,12 @@ export default function RegisterProviderPage() {
   }, [providerApplication.application, providerApplication.loading]);
 
   useEffect(() => {
-    if (!didHydrateRef.current || step !== 3 || !hasUploadedAsset(form)) {
+    if (
+      applicationId ||
+      !didHydrateRef.current ||
+      step !== 3 ||
+      !hasUploadedAsset(form)
+    ) {
       return;
     }
 
@@ -108,7 +127,7 @@ export default function RegisterProviderPage() {
     }, 700);
 
     return () => window.clearTimeout(timeout);
-  }, [form, saveDraft, step]);
+  }, [applicationId, form, saveDraft, step]);
 
   const toggleService = (id: string) =>
     setForm((value) => ({
@@ -139,12 +158,17 @@ export default function RegisterProviderPage() {
     Boolean(form.description.trim()) &&
     Boolean(form.identityDocument.documentNumber.trim()) &&
     Boolean(form.identityDocument.fullName.trim()) &&
-    hasRequiredIdentityImage(form);
+    hasRequiredIdentityImage(form) &&
+    !hasProviderApplicationDateErrors(form);
 
   const send = async () => {
     try {
       await providerApplication.submit(form);
-      setSuccess('Hồ sơ đã được gửi và đang chờ quản trị viên xét duyệt.');
+      setSuccess(
+        applicationId
+          ? 'Hồ sơ đã được gửi lại và đang chờ quản trị viên xét duyệt.'
+          : 'Hồ sơ đã được gửi và đang chờ quản trị viên xét duyệt.',
+      );
       window.setTimeout(() => navigate('/customer/profile'), 1500);
     } catch {
       // The hook exposes the request error for rendering.
@@ -167,6 +191,14 @@ export default function RegisterProviderPage() {
         </div>
 
         <ProviderApplicationStepper step={step} />
+
+        {applicationId && providerApplication.application?.rejectionReason && (
+          <section className="rounded-2xl border border-error/20 bg-error-container/30 p-4 text-on-error-container">
+            <h2 className="font-bold">Nội dung cần chỉnh sửa</h2>
+            <p className="mt-2"><b>Lý do:</b> {providerApplication.application.rejectionReason}</p>
+            <p className="mt-1"><b>Ghi chú của quản trị viên:</b> {providerApplication.application.rejectionNotes || 'Chưa cập nhật'}</p>
+          </section>
+        )}
 
         <AsyncState
           loading={providerApplication.loading}
@@ -204,13 +236,7 @@ export default function RegisterProviderPage() {
                 form={form}
                 categories={providerApplication.categories}
                 onChange={setForm}
-                onUploadAsset={async (file, purpose) => {
-                  const uploaded = await providerApplication.uploadImage(
-                    file,
-                    purpose,
-                  );
-                  return uploaded.url;
-                }}
+                onUploadAsset={providerApplication.uploadImage}
               />
             )}
 

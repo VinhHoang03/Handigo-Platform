@@ -4,6 +4,8 @@ import type { Address, CreateAddressPayload } from '../types/customer.types';
 interface BackendAddress {
   _id?: string;
   id?: string;
+  recipientName?: string;
+  recipientPhone?: string;
   fullAddress: string;
   province: string;
   provinceCode?: number;
@@ -18,6 +20,8 @@ interface BackendAddress {
 
 const mapAddress = (address: BackendAddress): Address => ({
   id: address.id || address._id || '',
+  recipientName: address.recipientName,
+  recipientPhone: address.recipientPhone,
   fullAddress: address.fullAddress,
   province: address.province,
   provinceCode: address.provinceCode,
@@ -32,6 +36,8 @@ const mapAddress = (address: BackendAddress): Address => ({
 });
 
 const sanitizeAddressPayload = (payload: CreateAddressPayload): CreateAddressPayload => ({
+  recipientName: payload.recipientName.trim(),
+  recipientPhone: payload.recipientPhone.trim(),
   fullAddress: payload.fullAddress.trim(),
   province: payload.province.trim(),
   provinceCode: payload.provinceCode,

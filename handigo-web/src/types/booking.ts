@@ -54,6 +54,8 @@ export interface CreatePaymentResult {
 export interface Address {
   _id: string;
   userId: string;
+  recipientName?: string;
+  recipientPhone?: string;
   label?: string;
   fullAddress?: string;
   detailAddress?: string;
@@ -164,6 +166,7 @@ export interface BookingState {
   // Helpers
   setCategoryId: (id: string) => void;
   setServiceId: (id: string) => void;
+  selectService: (categoryId: string, serviceId: string) => void;
   toggleOption: (id: string) => void;
   setAddressId: (id: string) => void;
   setOrderType: (type: BookingState['orderType']) => void;

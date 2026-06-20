@@ -13,6 +13,8 @@ export interface CreateOrderPayload {
 }
 
 export interface CreateAddressPayload {
+  recipientName: string;
+  recipientPhone: string;
   fullAddress: string;
   province: string;
   ward: string;

@@ -1,6 +1,10 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary from "../configs/cloudinary";
+import {
+  extractDocumentSuggestion,
+} from "../modules/ocr/ocr.service";
+import { OcrDocumentKind } from "../modules/ocr/ocr.types";
 
 const allowedMimeTypes = new Set([
   "image/jpeg",
@@ -17,12 +21,19 @@ const folderByPurpose: Record<string, string> = {
   certificate: "certificates",
 };
 
+const ocrKinds = new Set<OcrDocumentKind>([
+  "cccd_front",
+  "cccd_back",
+  "passport",
+  "certificate",
+]);
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
     if (!allowedMimeTypes.has(file.mimetype)) {
-      callback(new Error("Only images, PDF, DOC, and DOCX files are allowed"));
+      callback(new Error("Chỉ chấp nhận ảnh, PDF, DOC và DOCX"));
       return;
     }
 
@@ -70,21 +81,64 @@ export const uploadProviderApplicationAsset = (
     if (!folder) {
       return res.status(400).json({
         success: false,
-        message: "Invalid upload purpose",
+        message: "Mục đích tải tệp không hợp lệ",
       });
     }
 
     try {
+      const requestedKind = String(req.body?.documentKind || "");
+      const kind = ocrKinds.has(requestedKind as OcrDocumentKind)
+        ? (requestedKind as OcrDocumentKind)
+        : undefined;
+      const kindMatchesPurpose =
+        !kind ||
+        (purpose === "certificate" && kind === "certificate") ||
+        (purpose === "identity" && kind !== "certificate");
+      if (!kindMatchesPurpose) {
+        return res.status(400).json({
+          success: false,
+          message: "Loại tài liệu OCR không phù hợp với mục đích tải tệp",
+        });
+      }
+
       const userId = req.user!.id;
       res.locals.imageUrl = await uploadBuffer(
         req.file.buffer,
         `handigo/provider-applications/${userId}/${folder}`,
       );
+
+      const supportsOcr = req.file.mimetype.startsWith("image/") || req.file.mimetype === "application/pdf";
+
+      if (kind && supportsOcr) {
+        try {
+          res.locals.ocrSuggestion = await extractDocumentSuggestion(
+            req.file.buffer,
+            req.file.mimetype,
+            kind,
+          );
+          if (process.env.NODE_ENV !== "production") {
+            console.info(
+              `Google Cloud Vision OCR thành công: loại=${kind}, định dạng=${req.file.mimetype}`,
+            );
+          }
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Lỗi OCR không xác định";
+          console.error(`Google Cloud Vision OCR thất bại: ${message}`);
+          res.locals.ocrSuggestion = {
+            warnings: ["Không thể đọc tài liệu bằng OCR. Vui lòng nhập thông tin thủ công."],
+          };
+        }
+      } else if (kind) {
+        res.locals.ocrSuggestion = {
+          warnings: ["Định dạng này không hỗ trợ OCR. Vui lòng nhập thông tin thủ công."],
+        };
+      }
       next();
     } catch {
       return res.status(502).json({
         success: false,
-        message: "Could not upload file",
+        message: "Không thể tải tệp lên",
       });
     }
   });
