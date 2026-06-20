@@ -34,6 +34,9 @@ export const walletApi = {
   cancelDeposit: async (orderCode: string) =>
     unwrap<WalletTransaction>(await api.patch(`/wallets/me/deposit/${orderCode}/cancel`)),
 
+  syncDeposit: async (orderCode: string) =>
+    unwrap<WalletTransaction>(await api.patch(`/wallets/me/deposit/${orderCode}/sync`)),
+
   listWithdrawals: async (query: WithdrawalQuery) =>
     unwrap<ListResult<WithdrawalRequest>>(await api.get('/withdrawals/me', { params: query })),
 

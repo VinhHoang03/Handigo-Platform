@@ -14,6 +14,10 @@ const REFRESH_TOKEN_PATH = "/auth/refresh-token";
 const REFRESH_THRESHOLD_MS = 60_000;
 let refreshPromise: Promise<string> | null = null;
 
+const isNetworkError = (error: unknown) => {
+  return axios.isAxiosError(error) && !error.response;
+};
+
 const getTokenExpiresAt = (token: string) => {
   try {
     const [, payload] = token.split(".");
@@ -54,7 +58,9 @@ export const refreshAccessToken = async () => {
         return token;
       })
       .catch((error) => {
-        useAuthStore.getState().logout();
+        if (!isNetworkError(error)) {
+          useAuthStore.getState().logout();
+        }
         throw error;
       })
       .finally(() => {

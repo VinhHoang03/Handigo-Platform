@@ -116,6 +116,24 @@ export const cancelMyWalletDeposit = async (req: Request, res: Response) => {
   }
 };
 
+export const syncMyWalletDeposit = async (req: Request, res: Response) => {
+  try {
+    const params = walletDepositOrderCodeParamSchema.parse(req.params);
+    const result = await walletService.syncWalletDeposit(
+      getRequestUser(req),
+      params.orderCode,
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+      message: "Đồng bộ giao dịch nạp ví thành công",
+    });
+  } catch (error: any) {
+    return handleError(res, error);
+  }
+};
+
 export const getAdminWallets = async (req: Request, res: Response) => {
   try {
     const query = adminWalletListQuerySchema.parse(req.query);

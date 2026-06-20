@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Notification, INotification } from "../models/notification.model";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
+import { emitToUser } from "../sockets/socketServer";
 import type {
   AdminNotificationListQuery,
   NotificationListQuery,
@@ -34,6 +35,14 @@ const toNotificationResponse = (notification: INotification) => ({
   createdAt: notification.createdAt,
   updatedAt: notification.updatedAt,
 });
+
+const emitRealtimeNotification = (notification: INotification) => {
+  emitToUser(
+    notification.userId.toString(),
+    "notification:new",
+    toNotificationResponse(notification),
+  );
+};
 
 const toAdminNotificationResponse = (notification: INotification) => {
   const base = toNotificationResponse(notification);
@@ -239,7 +248,8 @@ export const sendSystemNotification = async (
     data: input.data ?? null,
   }));
 
-  await Notification.insertMany(notifications, { ordered: false });
+  const createdNotifications = await Notification.insertMany(notifications, { ordered: false });
+  createdNotifications.forEach(emitRealtimeNotification);
 
   return {
     targetRole: input.targetRole,

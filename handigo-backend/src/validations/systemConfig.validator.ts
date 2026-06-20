@@ -22,9 +22,9 @@ export const createSystemConfigSchema = z.object({
   key: z
     .string()
     .trim()
-    .min(1, "Config key is required")
+    .min(1, "Key cấu hình là bắt buộc")
     .max(120)
-    .regex(/^[A-Z0-9_]+$/, "Config key must use uppercase letters, numbers, and underscores"),
+    .regex(/^[A-Z0-9_]+$/, "Key cấu hình chỉ được dùng chữ in hoa, số và dấu gạch dưới"),
   value: z.unknown(),
   type: systemConfigTypeSchema,
   description: z.string().trim().max(1000).nullable().optional(),

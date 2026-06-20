@@ -10,7 +10,7 @@ import {
 
 const getRequestUser = (req: Request) => {
   if (!req.user) {
-    throw new AppError("Authentication is required", 401);
+    throw new AppError("Vui lòng đăng nhập để tiếp tục", 401);
   }
 
   return {
@@ -25,7 +25,7 @@ export const getPublicConfigs = async (req: Request, res: Response, next: NextFu
 
     return res.json({
       success: true,
-      message: "Get public system configs successfully",
+      message: "Lấy cấu hình hệ thống công khai thành công",
       data,
     });
   } catch (error) {
@@ -40,7 +40,7 @@ export const getAllConfigs = async (req: Request, res: Response, next: NextFunct
 
     return res.json({
       success: true,
-      message: "Get system configs successfully",
+      message: "Lấy danh sách cấu hình hệ thống thành công",
       data,
     });
   } catch (error) {
@@ -55,7 +55,7 @@ export const getConfigByKey = async (req: Request, res: Response, next: NextFunc
 
     return res.json({
       success: true,
-      message: "Get system config successfully",
+      message: "Lấy cấu hình hệ thống thành công",
       data,
     });
   } catch (error) {
@@ -70,7 +70,7 @@ export const createConfig = async (req: Request, res: Response, next: NextFuncti
 
     return res.status(201).json({
       success: true,
-      message: "Create system config successfully",
+      message: "Tạo cấu hình hệ thống thành công",
       data,
     });
   } catch (error) {
@@ -86,7 +86,7 @@ export const updateConfig = async (req: Request, res: Response, next: NextFuncti
 
     return res.json({
       success: true,
-      message: "Update system config successfully",
+      message: "Cập nhật cấu hình hệ thống thành công",
       data,
     });
   } catch (error) {
