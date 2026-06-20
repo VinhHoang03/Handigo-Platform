@@ -55,6 +55,9 @@ export interface IdentityDocument {
   expiresAt?: string;
   dateOfBirth?: string;
   gender?: Gender;
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
   frontImageUrl?: string;
   backImageUrl?: string;
   passportImageUrl?: string;
@@ -76,6 +79,9 @@ export interface SubmitIdentityPayload {
   expiresAt?: string;
   dateOfBirth?: string;
   gender?: Gender;
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
   frontImageUrl?: string;
   backImageUrl?: string;
   passportImageUrl?: string;
@@ -86,6 +92,7 @@ export interface SubmitIdentityPayload {
 export interface ProviderCertificate {
   id: string;
   title: string;
+  certificateNumber?: string;
   issuer?: string;
   issuedAt?: string;
   expiresAt?: string;
@@ -98,6 +105,7 @@ export interface ProviderCertificate {
 
 export interface UpsertCertificatePayload {
   title: string;
+  certificateNumber?: string;
   issuer?: string;
   issuedAt?: string;
   expiresAt?: string;

@@ -227,9 +227,9 @@ function VerificationRow({ item }: { item: VerificationPanelItem }) {
   return <div className={className}>{content}</div>;
 }
 
-export const VerificationPanel: React.FC<{ items: VerificationPanelItem[] }> = ({
-  items,
-}) => (
+export const VerificationPanel: React.FC<{
+  items: VerificationPanelItem[];
+}> = ({ items }) => (
   <aside className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
     <h3 className="mb-6 font-headline-md text-headline-md text-on-surface">
       Xác thực tài khoản
@@ -309,7 +309,7 @@ export const AccountFunctionsPanel: React.FC<{
     {
       icon: "more_horiz",
       label: "Các tùy chọn khác",
-      description: "Khu vực placeholder cho thiết lập tài khoản.",
+      description: "Khu vực cho thiết lập tài khoản.",
     },
   ];
 

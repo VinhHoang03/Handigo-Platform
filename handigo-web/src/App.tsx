@@ -68,9 +68,6 @@ function App() {
             path="/customer/bookings/:bookingId"
             element={<BookingDetailPage />}
           />
-          <Route path="/customer/profile" element={<CustomerProfilePage />} />
-          <Route path="/provider" element={<ProviderHomePage />} />
-          <Route path="/provider/profile" element={<ProviderProfilePage />} />
           <Route
             path="/customer"
             element={

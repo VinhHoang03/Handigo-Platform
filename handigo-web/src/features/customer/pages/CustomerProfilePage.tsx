@@ -7,6 +7,9 @@ import { UserProfileSection } from "@/components/profile/UserProfileSection";
 import { changePasswordApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { ToggleOption } from "@/features/customer/components/CustomerProfileComponents";
+import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
+import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
+import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import {
   createUserAddress,
   deleteUserAddress,
@@ -31,6 +34,18 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   const err = error as { response?: { data?: { message?: string } } };
   return err?.response?.data?.message || fallback;
 };
+
+const WAITING_PROVIDER_STATUSES: ProviderApplication["status"][] = [
+  "pending",
+  "resubmitted",
+];
+
+const getProviderBannerMode = (
+  application: ProviderApplication | null,
+): "waiting" | "cta" =>
+  application && WAITING_PROVIDER_STATUSES.includes(application.status)
+    ? "waiting"
+    : "cta";
 
 function AccountActionRow({
   icon,
@@ -71,9 +86,16 @@ function AccountActionRow({
 
 export default function CustomerProfilePage() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<
+    "profile" | "security" | "applications"
+  >("profile");
 
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
+  const [providerApplication, setProviderApplication] =
+    useState<ProviderApplication | null>(null);
+  const [isProviderApplicationLoading, setIsProviderApplicationLoading] =
+    useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddressLoading, setIsAddressLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -82,11 +104,17 @@ export default function CustomerProfilePage() {
   const [addressError, setAddressError] = useState("");
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
+  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(
+    null,
+  );
 
   const [isPwdConfirmOpen, setIsPwdConfirmOpen] = useState(false);
   const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
-  const [pwdData, setPwdData] = useState({ current: "", next: "", confirm: "" });
+  const [pwdData, setPwdData] = useState({
+    current: "",
+    next: "",
+    confirm: "",
+  });
   const [pwdError, setPwdError] = useState("");
   const [pwdMsg, setPwdMsg] = useState("");
   const [isUpdatingPwd, setIsUpdatingPwd] = useState(false);
@@ -142,12 +170,23 @@ export default function CustomerProfilePage() {
     }
   }, [syncAuthUser]);
 
+  const loadProviderApplication = useCallback(async () => {
+    try {
+      setProviderApplication(await providerApplicationApi.mine());
+    } catch {
+      setProviderApplication(null);
+    } finally {
+      setIsProviderApplicationLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     // Initial remote loads are intentionally started from this effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadProfile();
     void loadAddresses();
-  }, [loadAddresses, loadProfile]);
+    void loadProviderApplication();
+  }, [loadAddresses, loadProfile, loadProviderApplication]);
 
   const handleSaveProfile = async (payload: UserProfileFormValue) => {
     setIsSaving(true);
@@ -301,7 +340,9 @@ export default function CustomerProfilePage() {
     );
   }
 
-  const canRegisterProvider = String(profile.role || "").toUpperCase() === "CUSTOMER";
+  const canRegisterProvider =
+    String(profile.role || "").toUpperCase() === "CUSTOMER";
+  const providerBannerMode = getProviderBannerMode(providerApplication);
 
   return (
     <DashboardShell
@@ -309,96 +350,175 @@ export default function CustomerProfilePage() {
       userAvatar={profile.avatar || profile.avatarUrl || DEFAULT_AVATAR}
     >
       <div className="mx-auto max-w-6xl space-y-6">
-        {canRegisterProvider && (
-          <section className="flex flex-col justify-between gap-4 rounded-xl border border-primary/15 bg-primary p-5 text-on-primary md:flex-row md:items-center">
-            <div className="flex items-center gap-4">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15">
-                <span className="material-symbols-outlined text-2xl">
-                  engineering
-                </span>
-              </div>
-              <div>
-                <p className="font-headline-sm font-bold">
-                  Trở thành thợ dịch vụ
+        {canRegisterProvider &&
+          !isProviderApplicationLoading &&
+          providerBannerMode === "waiting" && (
+            <section className="flex min-h-14 items-center gap-3 overflow-hidden rounded-xl border border-primary/15 bg-primary px-4 py-3 text-on-primary">
+              <span className="material-symbols-outlined shrink-0 text-xl">
+                pending_actions
+              </span>
+              <div
+                className="min-w-0 flex-1 overflow-hidden"
+                aria-live="polite"
+              >
+                <p className="provider-status-marquee w-max whitespace-nowrap text-sm font-medium">
+                  Đơn đăng ký trở thành thợ cung cấp dịch vụ của bạn đã được gửi
+                  thành công. Chúng tôi đang tiến hành xem xét hồ sơ và sẽ phản
+                  hồi trong thời gian sớm nhất.
                 </p>
-                <p className="mt-1 text-sm text-on-primary/80">
-                  Gửi hồ sơ để mở rộng vai trò provider trên cùng tài khoản.
-                </p>
               </div>
-            </div>
+            </section>
+          )}
+
+        {canRegisterProvider &&
+          !isProviderApplicationLoading &&
+          providerBannerMode === "cta" && (
+            <section className="flex flex-col justify-between gap-4 rounded-xl border border-primary/15 bg-primary p-5 text-on-primary md:flex-row md:items-center">
+              <div className="flex items-center gap-4">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15">
+                  <span className="material-symbols-outlined text-2xl">
+                    engineering
+                  </span>
+                </div>
+                <div>
+                  <p className="font-headline-sm font-bold">
+                    Trở thành thợ dịch vụ
+                  </p>
+                  <p className="mt-1 text-sm text-on-primary/80">
+                    Gửi hồ sơ để mở rộng vai trò provider trên cùng tài khoản.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/register-provider")}
+                className="rounded-lg bg-white px-5 py-2.5 font-bold text-primary shadow-sm transition hover:bg-white/90"
+              >
+                Đăng ký ngay
+              </button>
+            </section>
+          )}
+
+        <div
+          role="tablist"
+          aria-label="Các mục hồ sơ khách hàng"
+          className="flex gap-2 overflow-x-auto rounded-xl border border-outline-variant/20 bg-white p-2 shadow-sm"
+        >
+          {[
+            ["profile", "Hồ sơ"],
+            ["security", "Bảo mật"],
+            ["applications", "Hồ sơ Provider"],
+          ].map(([value, label]) => (
             <button
+              key={value}
               type="button"
-              onClick={() => navigate("/register-provider")}
-              className="rounded-lg bg-white px-5 py-2.5 font-bold text-primary shadow-sm transition hover:bg-white/90"
+              role="tab"
+              aria-selected={activeTab === value}
+              className={`min-h-11 shrink-0 rounded-lg px-4 py-2 text-sm font-bold transition ${
+                activeTab === value
+                  ? "bg-primary text-on-primary"
+                  : "text-on-surface-variant hover:bg-surface-container-low"
+              }`}
+              onClick={() => setActiveTab(value as typeof activeTab)}
             >
-              Đăng ký ngay
+              {label}
             </button>
+          ))}
+        </div>
+
+        {activeTab === "profile" && (
+          <UserProfileSection
+            user={profile}
+            addresses={addresses}
+            isSaving={isSaving}
+            isAddressLoading={isAddressLoading}
+            isAddressSaving={isAddressSaving}
+            error={errorMsg}
+            addressError={addressError}
+            defaultAvatar={DEFAULT_AVATAR}
+            onSaveProfile={handleSaveProfile}
+            onAddAddress={openCreateAddressModal}
+            onEditAddress={openEditAddressModal}
+            onDeleteAddress={handleDeleteAddress}
+          />
+        )}
+
+        {activeTab === "security" && (
+          <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+            <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
+              Chức năng tài khoản
+            </h3>
+            <div className="space-y-3">
+              <AccountActionRow
+                icon="lock"
+                title="Mật khẩu và bảo mật"
+                description="Cập nhật mật khẩu để bảo vệ tài khoản."
+                onClick={() => setIsPwdConfirmOpen(true)}
+              />
+              <AccountActionRow
+                icon="shield"
+                title="Quyền riêng tư"
+                description="Các tùy chọn quyền riêng tư sẽ được bổ sung."
+              />
+              <AccountActionRow
+                icon="more_horiz"
+                title="Các tùy chọn khác"
+                description="Khu vực cho các thiết lập tài khoản khác."
+              />
+            </div>
           </section>
         )}
 
-        <UserProfileSection
-          user={profile}
-          addresses={addresses}
-          isSaving={isSaving}
-          isAddressLoading={isAddressLoading}
-          isAddressSaving={isAddressSaving}
-          error={errorMsg}
-          addressError={addressError}
-          defaultAvatar={DEFAULT_AVATAR}
-          onSaveProfile={handleSaveProfile}
-          onAddAddress={openCreateAddressModal}
-          onEditAddress={openEditAddressModal}
-          onDeleteAddress={handleDeleteAddress}
-        />
+        {activeTab === "profile" && (
+          <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+            <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
+              Cài đặt thông báo
+            </h3>
+            <div className="space-y-5">
+              <ToggleOption
+                label="Cập nhật đặt lịch"
+                desc="Nhận thông báo khi lịch đặt được xác nhận hoặc thay đổi."
+                icon="event_available"
+                checked
+              />
+              <ToggleOption
+                label="Tiếp thị và khuyến mãi"
+                desc="Nhận các ưu đãi và cập nhật từ Handigo."
+                icon="campaign"
+              />
+              <ToggleOption
+                label="Tin nhắn SMS trực tiếp"
+                desc="Nhận thông báo qua SMS."
+                icon="sms"
+                checked
+              />
+            </div>
+          </section>
+        )}
 
-        <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
-          <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
-            Chức năng tài khoản
-          </h3>
-          <div className="space-y-3">
-            <AccountActionRow
-              icon="lock"
-              title="Mật khẩu và bảo mật"
-              description="Cập nhật mật khẩu để bảo vệ tài khoản."
-              onClick={() => setIsPwdConfirmOpen(true)}
+        {activeTab === "applications" && (
+          <section className="rounded-xl border border-outline-variant/20 bg-white p-4 shadow-sm sm:p-6 md:p-8">
+            <div className="mb-5">
+              <h3 className="font-headline-md text-headline-md text-on-surface">
+                Hồ sơ đăng ký Provider
+              </h3>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Theo dõi trạng thái, phản hồi xét duyệt và gửi lại hồ sơ bị từ
+                chối.
+              </p>
+            </div>
+            <ProviderApplicationHistory
+              canEditRejected
+              onEdit={(application) =>
+                navigate(
+                  application.status === "draft"
+                    ? "/register-provider"
+                    : `/register-provider?applicationId=${application._id}`,
+                )
+              }
             />
-            <AccountActionRow
-              icon="shield"
-              title="Quyền riêng tư"
-              description="Các tùy chọn quyền riêng tư sẽ được bổ sung."
-            />
-            <AccountActionRow
-              icon="more_horiz"
-              title="Các tùy chọn khác"
-              description="Khu vực placeholder cho các thiết lập tài khoản khác."
-            />
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
-          <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
-            Cài đặt thông báo
-          </h3>
-          <div className="space-y-5">
-            <ToggleOption
-              label="Cập nhật đặt lịch"
-              desc="Nhận thông báo khi lịch đặt được xác nhận hoặc thay đổi."
-              icon="event_available"
-              checked
-            />
-            <ToggleOption
-              label="Tiếp thị và khuyến mãi"
-              desc="Nhận các ưu đãi và cập nhật từ Handigo."
-              icon="campaign"
-            />
-            <ToggleOption
-              label="Tin nhắn SMS trực tiếp"
-              desc="Nhận thông báo qua SMS."
-              icon="sms"
-              checked
-            />
-          </div>
-        </section>
+          </section>
+        )}
       </div>
 
       {isAddressModalOpen && (
@@ -408,6 +528,10 @@ export default function CustomerProfilePage() {
           address={editingAddress}
           addressCount={addresses.length}
           isSaving={isAddressSaving}
+          defaultRecipient={{
+            name: profile.fullName,
+            phone: profile.phone || "",
+          }}
           onClose={closeAddressModal}
           onSubmit={handleSubmitAddress}
         />
@@ -455,7 +579,9 @@ export default function CustomerProfilePage() {
           {(pwdError || pwdMsg) && (
             <div
               className={`rounded-lg p-4 text-sm ${
-                pwdError ? "bg-error/10 text-error" : "bg-primary/10 text-primary"
+                pwdError
+                  ? "bg-error/10 text-error"
+                  : "bg-primary/10 text-primary"
               }`}
             >
               {pwdError || pwdMsg}
@@ -491,7 +617,10 @@ export default function CustomerProfilePage() {
               minLength={8}
               required
               onChange={(event) =>
-                setPwdData((current) => ({ ...current, next: event.target.value }))
+                setPwdData((current) => ({
+                  ...current,
+                  next: event.target.value,
+                }))
               }
               className="min-h-12 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
             />

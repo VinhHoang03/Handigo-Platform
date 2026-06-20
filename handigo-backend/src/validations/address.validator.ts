@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { personNameSchema, vietnamesePhoneSchema } from "./user.validator";
 
 const latitudeSchema = z.number().min(-90).max(90);
 const longitudeSchema = z.number().min(-180).max(180);
 const administrativeCodeSchema = z.number().int().positive();
 
 export const createAddressSchema = z.object({
+  recipientName: personNameSchema,
+  recipientPhone: vietnamesePhoneSchema,
   fullAddress: z
     .string()
     .trim()
@@ -31,6 +34,8 @@ export const createAddressSchema = z.object({
 });
 
 export const updateAddressSchema = z.object({
+  recipientName: personNameSchema.optional(),
+  recipientPhone: vietnamesePhoneSchema.optional(),
   fullAddress: z
     .string()
     .trim()

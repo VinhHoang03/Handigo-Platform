@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, FileText, X } from 'lucide-react';
+import { Check, Download, FileText, X } from 'lucide-react';
 import { AsyncState } from '@/components/common/AsyncState';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { FloatingTextarea } from '@/components/common/FloatingField';
@@ -21,6 +21,11 @@ const isImageUrl = (url: string) =>
   /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) ||
   url.includes('/image/upload/');
 
+const downloadUrl = (url: string) =>
+  url.includes('/upload/')
+    ? url.replace('/upload/', '/upload/fl_attachment/')
+    : url;
+
 const formatDate = (value?: string) => {
   if (!value) return 'Chưa cập nhật';
   const date = new Date(value);
@@ -31,24 +36,43 @@ const formatDate = (value?: string) => {
 const documentTypeLabel = (type?: string) =>
   type === 'passport' ? 'Hộ chiếu' : 'CCCD';
 
+const rejectionReasons = [
+  'Giấy tờ định danh không hợp lệ',
+  'Không thể xác minh chứng chỉ',
+  'Kinh nghiệm chưa đáp ứng',
+  'Thiếu thông tin bắt buộc',
+  'Khác',
+];
+
 function AssetPreview({ url, label }: { url: string; label: string }) {
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="block">
-      {isImageUrl(url) ? (
-        <img
-          src={url}
-          alt={label}
-          className="h-36 w-full rounded-lg border border-outline-variant/40 object-cover"
-        />
-      ) : (
-        <span className="flex h-36 items-center justify-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-low text-sm font-bold text-primary">
-          <FileText size={18} /> Xem tài liệu
-        </span>
-      )}
+    <div>
+      <a href={url} target="_blank" rel="noreferrer" className="block">
+        {isImageUrl(url) ? (
+          <img
+            src={url}
+            alt={label}
+            className="h-36 w-full rounded-lg border border-outline-variant/40 object-cover"
+          />
+        ) : (
+          <span className="flex h-36 items-center justify-center gap-2 rounded-lg border border-outline-variant/40 bg-surface-container-low text-sm font-bold text-primary">
+            <FileText size={18} /> Xem tài liệu
+          </span>
+        )}
+      </a>
       <span className="mt-1 block text-xs font-semibold text-on-surface-variant">
         {label}
       </span>
-    </a>
+      <a
+        href={downloadUrl(url)}
+        download
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+      >
+        <Download size={14} /> Tải xuống
+      </a>
+    </div>
   );
 }
 
@@ -98,6 +122,11 @@ function IdentitySection({
         <p>
           <b>Ngày hết hạn:</b> {formatDate(identity.expiresAt)}
         </p>
+        <p><b>Ngày sinh:</b> {formatDate(identity.dateOfBirth)}</p>
+        <p><b>Giới tính:</b> {identity.gender === 'male' ? 'Nam' : identity.gender === 'female' ? 'Nữ' : identity.gender === 'other' ? 'Khác' : 'Chưa cập nhật'}</p>
+        <p><b>Quốc tịch:</b> {identity.nationality || 'Chưa cập nhật'}</p>
+        <p><b>Quê quán/Nơi sinh:</b> {identity.placeOfOrigin || 'Chưa cập nhật'}</p>
+        <p><b>Nơi thường trú:</b> {identity.placeOfResidence || 'Chưa cập nhật'}</p>
       </div>
       {assets.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
@@ -134,6 +163,7 @@ function CertificateSection({
           <div>
             <p className="font-bold">{certificate.title}</p>
             <p className="text-sm text-on-surface-variant">
+              {certificate.certificateNumber ? `Số ${certificate.certificateNumber} · ` : ''}
               {certificate.issuer || 'Chưa cập nhật đơn vị cấp'} · Ngày cấp{' '}
               {formatDate(certificate.issuedAt)} · Hết hạn{' '}
               {formatDate(certificate.expiresAt)}
@@ -169,6 +199,8 @@ export default function AdminProviderApplicationsPage() {
   const [selected, setSelected] = useState<AdminApplication | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -179,13 +211,21 @@ export default function AdminProviderApplicationsPage() {
     setSelected(null);
     setRejecting(false);
     setReason('');
+    setCustomReason('');
+    setNotes('');
   };
 
   const review = async (status: 'approved' | 'rejected') => {
-    if (!selected || (status === 'rejected' && !reason.trim())) return;
+    const finalReason = reason === 'Khác' ? customReason.trim() : reason.trim();
+    if (!selected || (status === 'rejected' && (!finalReason || !notes.trim()))) return;
     try {
       setBusy(true);
-      await adminApi.review(selected._id, status, reason.trim() || undefined);
+      await adminApi.review(
+        selected._id,
+        status,
+        finalReason || undefined,
+        notes.trim() || undefined,
+      );
       closeModal();
       await load();
     } finally {
@@ -260,20 +300,56 @@ export default function AdminProviderApplicationsPage() {
             <CertificateSection certificates={selected.certificates} />
 
             {selected.rejectionReason && (
-              <p className="rounded-2xl bg-error/10 p-3 text-error">
-                Lý do từ chối: {selected.rejectionReason}
-              </p>
+              <section className="rounded-2xl border border-error/20 bg-error-container/30 p-4 text-on-error-container">
+                <h3 className="font-bold">Thông tin từ chối gần nhất</h3>
+                <p className="mt-2"><b>Lý do:</b> {selected.rejectionReason}</p>
+                <p className="mt-1"><b>Ghi chú:</b> {selected.rejectionNotes || 'Chưa cập nhật'}</p>
+                <p className="mt-1"><b>Ngày duyệt:</b> {formatDate(selected.reviewedAt || undefined)}</p>
+                <p className="mt-1"><b>Người duyệt:</b> {selected.reviewedBy?.fullName || 'Quản trị viên'}</p>
+              </section>
             )}
-            {selected.status === 'pending' && (
+            {Boolean(selected.reviewHistory?.length) && (
+              <section className="space-y-3 rounded-2xl border border-outline-variant/40 p-4">
+                <h3 className="font-bold">Lịch sử xét duyệt</h3>
+                <ol className="space-y-3">
+                  {selected.reviewHistory?.map((event, index) => {
+                    const actor = typeof event.actorId === 'string'
+                      ? 'Người dùng hệ thống'
+                      : event.actorId.fullName;
+                    return (
+                      <li key={`${event.action}-${event.occurredAt}-${index}`} className="rounded-xl bg-surface-container-low p-3 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-bold">{event.action === 'submitted' ? 'Đã gửi hồ sơ' : event.action === 'resubmitted' ? 'Đã gửi lại' : event.action === 'approved' ? 'Đã phê duyệt' : 'Đã từ chối'}</p>
+                          <span className="text-on-surface-variant">{formatDate(event.occurredAt)}</span>
+                        </div>
+                        <p className="mt-1 text-on-surface-variant">Người thực hiện: {actor}</p>
+                        {event.rejectionReason && <p className="mt-1"><b>Lý do:</b> {event.rejectionReason}</p>}
+                        {event.notes && <p className="mt-1"><b>Ghi chú:</b> {event.notes}</p>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
+            )}
+            {(selected.status === 'pending' || selected.status === 'resubmitted') && (
               <div className="space-y-3">
                 {rejecting && (
-                  <FloatingTextarea
-                    id="application-rejection-reason"
-                    label="Lý do từ chối (bắt buộc)"
-                    value={reason}
-                    rows={4}
-                    onValueChange={setReason}
-                  />
+                  <div className="space-y-3 rounded-2xl bg-surface-container-low p-4">
+                    <label className="form-select">
+                      <span className="form-select__label">Lý do từ chối</span>
+                      <select className="form-select__control" value={reason} onChange={(event) => setReason(event.target.value)}>
+                        <option value="">Chọn lý do</option>
+                        {rejectionReasons.map((item) => <option key={item} value={item}>{item}</option>)}
+                      </select>
+                    </label>
+                    {reason === 'Khác' && (
+                      <label className="block space-y-2">
+                        <span className="text-sm font-bold">Lý do khác</span>
+                        <input value={customReason} maxLength={200} onChange={(event) => setCustomReason(event.target.value)} className="min-h-11 w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 outline-none focus:border-primary" />
+                      </label>
+                    )}
+                    <FloatingTextarea id="application-rejection-notes" label="Ghi chú chi tiết (bắt buộc)" value={notes} rows={4} maxLength={2000} onValueChange={setNotes} />
+                  </div>
                 )}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <button
@@ -287,7 +363,7 @@ export default function AdminProviderApplicationsPage() {
                   <button
                     type="button"
                     onClick={() => review(rejecting ? 'rejected' : 'approved')}
-                    disabled={busy || (rejecting && !reason.trim())}
+                    disabled={busy || (rejecting && (!(reason === 'Khác' ? customReason.trim() : reason.trim()) || !notes.trim()))}
                     className="btn-primary"
                   >
                     <Check size={18} />{' '}

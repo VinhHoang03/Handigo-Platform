@@ -5,7 +5,8 @@ export const uploadImage = async (_req: Request, res: Response) => {
     success: true,
     data: {
       url: res.locals.imageUrl,
+      ocrSuggestion: res.locals.ocrSuggestion,
     },
-    message: "Image uploaded successfully",
+    message: "Tải tệp lên thành công",
   });
 };
