@@ -3,6 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import type { User } from "@/features/auth/types/auth.types";
+import { customerServiceApi } from "@/features/customer-service/api/customerService.api";
+import { getServiceImage } from "@/features/customer-service/utils/serviceDisplay";
+import type { Service } from "@/types/booking";
 import { BrandLogo } from "./BrandLogo";
 
 export type AppRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
@@ -61,7 +64,7 @@ const getRoleLabel = (role?: AppRole) => {
 const createNavbarItems = (role?: AppRole): NavbarItem[] => {
   const items: NavbarItem[] = [
     { label: "Trang chủ", path: "/" },
-    { label: "Dịch vụ", path: "#" },
+    { label: "Dịch vụ", path: "/customer/services", activePrefix: "/customer/services" },
     { label: "Giới thiệu", path: "#" },
     { label: "Tin tức", path: "#" },
     { label: "Hỗ trợ", path: "#" },
@@ -102,6 +105,7 @@ export function Navbar({
 }: NavbarProps) {
   const [internalScrolled, setInternalScrolled] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -120,6 +124,22 @@ export function Navbar({
     handleScroll();
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const loadServices = async () => {
+      try {
+        const serviceData = await customerServiceApi.services({
+          limit: 6,
+          bookedOnly: "true",
+        });
+        setServices(serviceData.items);
+      } catch {
+        setServices([]);
+      }
+    };
+
+    void loadServices();
   }, []);
 
   useEffect(() => {
@@ -159,6 +179,68 @@ export function Navbar({
         <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 xl:flex">
           {navItems.map((item) => {
             const active = isActive(item);
+            const isServiceItem = item.activePrefix === "/customer/services";
+
+            if (isServiceItem) {
+              return (
+                <div key={item.label} className="group relative">
+                  <Link
+                    to={item.path}
+                    className={`flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold transition-colors ${
+                      active
+                        ? "bg-primary text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)]"
+                        : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
+                    }`}
+                  >
+                    {item.label}
+                    <span className="material-symbols-outlined text-[18px] transition-transform group-hover:rotate-180">
+                      expand_more
+                    </span>
+                  </Link>
+
+                  <div className="invisible absolute left-1/2 top-full z-50 w-[520px] -translate-x-1/2 translate-y-2 pt-3 opacity-0 transition-all duration-300 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                    <div className="rounded-2xl border border-outline-variant/30 bg-white p-3 shadow-[0_18px_46px_rgba(19,27,46,0.16)]">
+                      <Link
+                        to="/customer/services"
+                        className="mb-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+                      >
+                        <span className="material-symbols-outlined text-xl">
+                          apps
+                        </span>
+                        Tất cả dịch vụ
+                      </Link>
+                      {services.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-3">
+                          {services.map((service, index) => (
+                            <Link
+                              key={service._id}
+                              to={`/customer/services/${service._id}`}
+                              className="group/card overflow-hidden rounded-xl border border-outline-variant/20 bg-white transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                            >
+                              <img
+                                src={getServiceImage(service, index)}
+                                alt={service.name}
+                                className="h-20 w-full object-cover transition duration-300 group-hover/card:scale-105"
+                              />
+                              <div className="px-3 py-2">
+                                <p className="line-clamp-2 min-h-10 text-xs font-semibold leading-5 text-on-surface group-hover/card:text-primary">
+                                  {service.name}
+                                </p>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl px-3 py-3 text-sm text-on-surface-variant">
+                          Chưa có dịch vụ khả dụng.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.label}

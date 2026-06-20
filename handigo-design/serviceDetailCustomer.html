@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vệ sinh chuyên sâu | Handigo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#351000",
+                        "surface": "#faf8ff",
+                        "on-secondary-container": "#076a7c",
+                        "surface-dim": "#d2d9f4",
+                        "outline": "#777586",
+                        "on-surface-variant": "#464555",
+                        "secondary-fixed-dim": "#86d2e6",
+                        "secondary": "#00687a",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed-variant": "#372cbc",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#e2dfff",
+                        "on-tertiary-fixed-variant": "#743411",
+                        "star-gold": "#facc15",
+                        "tertiary-fixed-dim": "#ffb694",
+                        "success-green": "#4ade80",
+                        "inverse-primary": "#c3c0ff",
+                        "on-secondary-fixed-variant": "#004e5c",
+                        "primary-container": "#1e00a9",
+                        "tertiary": "#371100",
+                        "background": "#faf8ff",
+                        "on-error": "#ffffff",
+                        "surface-glass": "rgba(255, 255, 255, 0.7)",
+                        "on-primary-fixed": "#0f0069",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#592000",
+                        "surface-variant": "#dae2fc",
+                        "on-background": "#131b2e",
+                        "on-primary-container": "#908dff",
+                        "on-error-container": "#93000a",
+                        "primary": "#0f006d",
+                        "on-tertiary-container": "#da845b",
+                        "surface-container": "#eaedff",
+                        "on-secondary-fixed": "#001f26",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "secondary-container": "#9ce8fd",
+                        "secondary-fixed": "#abedff",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#c7c4d8",
+                        "surface-container-highest": "#dae2fc",
+                        "surface-tint": "#5049d4",
+                        "surface-container-low": "#f2f3ff",
+                        "surface-bright": "#faf8ff",
+                        "inverse-surface": "#283044",
+                        "surface-container-high": "#e1e7ff",
+                        "tertiary-fixed": "#ffdbcc",
+                        "on-surface": "#131b2e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "48px",
+                        "base": "8px",
+                        "sm": "12px",
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "xl": "80px",
+                        "md": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #f2f3ff; }
+        .glass-header { backdrop-filter: blur(12px); border-bottom: 1px solid rgba(218, 226, 252, 0.5); }
+        .service-card-active { border-color: #0f006d; background-color: #f2f3ff; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c7c4d8; border-radius: 10px; }
+    </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- TopNavBar -->
+<header class="sticky top-0 z-50 bg-surface-glass backdrop-blur-md shadow-sm">
+<div class="flex justify-between items-center px-gutter py-sm max-w-container-max mx-auto w-full h-16">
+<div class="flex items-center gap-lg">
+<span class="font-headline-md text-headline-md font-bold text-primary">Handigo</span>
+<nav class="hidden md:flex gap-md">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md" href="#">Find Services</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200 font-body-md" href="#">Top Rated</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200 font-body-md" href="#">Support</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-200 font-body-md" href="#">My Bookings</a>
+</nav>
+</div>
+<div class="flex items-center gap-sm">
+<button class="px-md py-xs text-primary font-bold hover:bg-surface-container-low rounded-lg transition-colors">Sign In</button>
+<button class="px-md py-sm bg-primary text-on-primary font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all">Join as Pro</button>
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-gutter py-md">
+<!-- Breadcrumb -->
+<nav class="flex items-center gap-xs text-on-surface-variant font-label-md mb-md">
+<a class="hover:text-primary" href="#">Trang chủ</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<a class="hover:text-primary" href="#">Vệ sinh</a>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-on-surface font-semibold">Vệ sinh chuyên sâu (Deep Cleaning)</span>
+</nav>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-lg items-start">
+<!-- Left Column -->
+<div class="lg:col-span-8 space-y-lg">
+<!-- Gallery & Hero Info -->
+<section class="bg-surface-container-lowest rounded-xl p-md shadow-sm overflow-hidden">
+<div class="grid grid-cols-4 grid-rows-2 gap-sm h-[400px] mb-md">
+<div class="col-span-3 row-span-2 rounded-lg overflow-hidden group">
+<div class="bg-cover bg-center w-full h-full group-hover:scale-105 transition-transform duration-500" data-alt="A professional deep cleaning service in progress, showing a specialist using high-tech steaming equipment on a pristine modern kitchen countertop. The lighting is bright and airy, reflecting a clean and sterile environment. The color palette consists of soft whites and deep indigo accents, maintaining a high-fidelity SaaS marketplace aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDiwaVvZjOxLzP8m8ZmNoTo0cBfY6p5IexCnl-4F3Cz1DL0GDYws9DpHNPo0lRjYIcULEHwXm8QKdPSA03DeJnzpW1jFT9-5_vhgFKtGajNMibAhEkhjJGTJBNa6xp7EeDyQkLA_yJGWrS9L9AG-pvlqac4VrZNQvd7VGJooYbef-3cMIauSiXFKAOb6Wzd7q7Jgc5U6b-Pnw8UIk5kP0AybSCBpGIs7HD9lOhrjv-2atxrAUmuwvQ5wGlVhUSaEYO3PMOCabK6w04k')"></div>
+</div>
+<div class="rounded-lg overflow-hidden">
+<div class="bg-cover bg-center w-full h-full" data-alt="Close-up shot of a meticulously cleaned bathroom sink with polished chrome fixtures shining under soft, natural light. The background is slightly blurred to emphasize the sparkling cleanliness. The overall mood is fresh and professional, utilizing a palette of light lavender and crisp whites." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAYAn2tXDZjI_DdrTrXWvijuRGwFbkiRrgM9q-qBUYRN2rVGRrQUhoG2XUXIGXjzHzMEOiuat7BXBMKL-nXHaIKrj2pJxfMRffiBGp_tNwPw12k13Y0uYS78blKPebG_BqWA1VDD0Jt1fTg6JylDBAExKkNzIkihIK0Vkd-0I0XWoloUR4X90s_-YHioeo0Nuf39V3G0iZLqSZf7BcmBo9LVprgjAx6BCDougmpjH-HUA7T9X85o6ifn7eF6FiZLN6W98K6Q_tcgxV-')"></div>
+</div>
+<div class="rounded-lg overflow-hidden relative">
+<div class="bg-cover bg-center w-full h-full" data-alt="A worker deep cleaning a luxury sofa with professional vacuum tools. The setting is a modern living room with soft daylight streaming through large windows. The visual style is clean, organized, and focused on precision and efficiency." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC2HLR6eCrJ2-VvHaKFAD8vCz74zv-_W0TBw1oDK12yPq1l0RXny7qViEF3w7WKjZLidP2fs3IFJBqvrS1jNaIo3NrzzOJUeP0__oL6dDIVha6r9xztuYT224S1irtYctneDrTa-zvY_tVyVW03rxjWleMKoooeGjw-qwaVdR_pD6od9ofILCcoGq7sGLLuZfcIz8JW3G4m2Bpcq3EoVG5bnYv5Z8wcyn2RKZbITtHJ_3mtpFfJjOXhzrU-OGzT1hVcXh7f79zdjVXo')"></div>
+<div class="absolute inset-0 bg-primary/40 flex items-center justify-center text-on-primary font-bold cursor-pointer">+12 Ảnh</div>
+</div>
+</div>
+<div class="flex flex-col md:flex-row md:justify-between md:items-end gap-sm">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-background">Vệ sinh chuyên sâu</h1>
+<div class="flex items-center gap-md mt-xs">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-star-gold" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-bold text-on-surface">4.8</span>
+<span class="text-on-surface-variant text-label-md">(1,250 đánh giá)</span>
+</div>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">verified_user</span>
+<span class="text-on-surface-variant text-label-md">3,450 đơn hàng thành công</span>
+</div>
+</div>
+</div>
+<div class="flex gap-sm">
+<button class="p-base rounded-full border border-outline-variant hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined">share</span></button>
+<button class="p-base rounded-full border border-outline-variant hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined">favorite</span></button>
+</div>
+</div>
+</section>
+<!-- Service Options -->
+<section>
+<h2 class="font-headline-md text-headline-md mb-sm">Gói dịch vụ</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-sm">
+<div class="service-card p-md border-2 border-outline-variant rounded-xl bg-surface-container-lowest cursor-pointer hover:border-primary/50 transition-all active:scale-[0.98]">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-bold text-primary">1 Phòng ngủ</h3>
+<span class="font-bold text-headline-md">200k</span>
+</div>
+<p class="text-on-surface-variant text-label-md">Dành cho căn hộ Studio hoặc 1 phòng ngủ nhỏ.</p>
+</div>
+<div class="service-card p-md border-2 service-card-active rounded-xl bg-surface-container-lowest cursor-pointer shadow-sm">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-bold text-primary">2 Phòng ngủ</h3>
+<span class="font-bold text-headline-md">350k</span>
+</div>
+<p class="text-on-surface-variant text-label-md">Phù hợp cho gia đình nhỏ, vệ sinh kỹ lưỡng.</p>
+</div>
+<div class="service-card p-md border-2 border-outline-variant rounded-xl bg-surface-container-lowest cursor-pointer hover:border-primary/50 transition-all">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-bold text-primary">3 Phòng ngủ</h3>
+<span class="font-bold text-headline-md">500k</span>
+</div>
+<p class="text-on-surface-variant text-label-md">Dành cho căn hộ lớn hoặc nhà phố diện tích vừa.</p>
+</div>
+<div class="service-card p-md border-2 border-outline-variant rounded-xl bg-surface-container-lowest cursor-pointer hover:border-primary/50 transition-all">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-bold text-primary">Deep Cleaning Premium</h3>
+<span class="font-bold text-headline-md">800k</span>
+</div>
+<p class="text-on-surface-variant text-label-md">Bao gồm khử khuẩn tia UV và làm sạch rèm thảm.</p>
+</div>
+</div>
+</section>
+<!-- Checklist -->
+<section class="bg-surface-container-lowest rounded-xl p-md shadow-sm">
+<h2 class="font-headline-md text-headline-md mb-md">Danh mục công việc</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-md">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</div>
+<span class="font-label-md">Lau sàn</span>
+</div>
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</div>
+<span class="font-label-md">Vệ sinh kính</span>
+</div>
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</div>
+<span class="font-label-md">Vệ sinh nhà tắm</span>
+</div>
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</div>
+<span class="font-label-md">Vệ sinh nhà bếp</span>
+</div>
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</div>
+<span class="font-label-md">Hút bụi</span>
+</div>
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container/10 flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</div>
+<span class="font-label-md">Khử mùi</span>
+</div>
+</div>
+</section>
+<!-- Reviews -->
+<section>
+<div class="flex justify-between items-center mb-md">
+<h2 class="font-headline-md text-headline-md">Đánh giá khách hàng</h2>
+<button class="text-primary font-bold text-label-md">Xem tất cả</button>
+</div>
+<div class="space-y-sm">
+<div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant/30 flex gap-md">
+<img class="w-12 h-12 rounded-full object-cover shrink-0" data-alt="A portrait of a satisfied middle-aged woman customer, looking into the camera with a warm smile. She is in a brightly lit modern living room, representing a happy Handigo user. High-end photography style with soft focus background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuApjrzVAumirrrx56FqYw2DWRBjFeT-LaYhT1UGI_VlPRcBoM83mHkLlKWv0f1nwNWPL4R8242q7KpbNWnOjelIHpbQlyff6kIjJgh1AukBm8-FsnW55RXiA65LJ_lDTzVOnRSepCE0QCuPIgfHYwxZMjuDc4xQCloaB5F3BmGxBvxpYlT19T0uj7TlXdsqZhieMvFW5PCcmbZT69Hotva9WEDiMJ23VSExIt5OPpPFzX_BvvhcYqSUuaWRuXvA8W6CsWk1kD_iu-6o"/>
+<div class="flex-1">
+<div class="flex justify-between mb-xs">
+<h4 class="font-bold">Lê Minh Tâm</h4>
+<span class="text-on-surface-variant text-label-sm italic">2 ngày trước</span>
+</div>
+<div class="flex items-center gap-xs mb-sm">
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<p class="text-on-surface-variant text-body-md leading-relaxed">Dịch vụ tuyệt vời, các bạn nhân viên rất nhiệt tình và làm sạch những ngóc ngách mà mình không để ý tới. Sẽ tiếp tục ủng hộ!</p>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant/30 flex gap-md">
+<img class="w-12 h-12 rounded-full object-cover shrink-0" data-alt="Profile photo of a young professional man in his 30s, smiling friendly. The photo has a clean, minimalist white background with professional studio lighting, ensuring a trustworthy and approachable look for a service review." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3G80HBpg__iJ-T310JjOcpaaK9omo07lhFTGLnjPfe6_tw12Gq1cU4nb3HYCOi7tHHjBIZvNALJne2TZOF1xD_BH_W-W8wVjvNaBAM7Yf2RETpg8NzwPoOv0xfLV7WjI7OEpk5p92iOrOYqBNDuGVAAssWQFBfpu0h7JzDjJXqWnWKJMFuRDJbgDMam2tpQJv1u3UMOGAYCjaQ2RCzlLf7bEwZe0V3ZaQQDyi4gEnsOfpLJSfKGkEEgflvbqaa31p0q3NyjEYzCwt"/>
+<div class="flex-1">
+<div class="flex justify-between mb-xs">
+<h4 class="font-bold">Trần Hoàng Nam</h4>
+<span class="text-on-surface-variant text-label-sm italic">1 tuần trước</span>
+</div>
+<div class="flex items-center gap-xs mb-sm">
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-outline-variant text-[16px]">star</span>
+</div>
+<p class="text-on-surface-variant text-body-md leading-relaxed">Vệ sinh sạch sẽ, đúng giờ. Tuy nhiên phần vệ sinh kính cần kỹ hơn một chút. Tổng quan là hài lòng.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Related Services -->
+<section>
+<h2 class="font-headline-md text-headline-md mb-md">Dịch vụ liên quan</h2>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-sm">
+<a class="group bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/30 hover:shadow-md transition-shadow" href="#">
+<div class="h-32 bg-surface-container">
+<div class="w-full h-full bg-cover bg-center" data-alt="Interior of a modern high-end office space with large windows and clean desks, representing professional office cleaning services. The lighting is crisp and the aesthetic is corporate and modern." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBb0mRIy4UPvR8xFjfxu0EnBquLLZ3tUwx3qKetlt5gWjD3LYTuvNSvFsNssda3FsMUus_g8NDjMEoo1vtJMmJWn4jGnWtdDNCkTgCGjh5F2q5p2QKBfzJQcW7UsI9SY8QlG_wT6PUs6IaR2k4l15kxAdgifPfK_7Nb2JFhQpAjPHHzvoaf659M6sxkXP3i-VufVq3A9XFhSiKllu8F3jsZ4XP_sGZVME8MXXRI0x5EC0k2j123hOQyMsTz6V5t5_6rfL2UVPGbyOy8')"></div>
+</div>
+<div class="p-sm">
+<h5 class="font-bold text-on-surface group-hover:text-primary transition-colors">Vệ sinh văn phòng</h5>
+<p class="text-primary font-bold text-label-md mt-xs">Từ 500.000 VNĐ</p>
+</div>
+</a>
+<a class="group bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/30 hover:shadow-md transition-shadow" href="#">
+<div class="h-32 bg-surface-container">
+<div class="w-full h-full bg-cover bg-center" data-alt="A macro shot of professional deep cleaning equipment being used on a luxury gray velvet sofa. The textures are rich and the lighting is cinematic, showcasing high-quality service." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuApkTnrVf0DXI3rEus8H9tui4EzWfjzAda0EUO5u56ZFodV1mwpeioI8s7cJW8CO2R5cXMDQ0Owkfq5fjSZl15Z3cdG8CAzeTYFZ87a5CPnf-gMDn0tIencckUOdRUAcMqiUZEs_ZzEuf1WQVkh8Gv9N0VwbXH5lVGbVv_BboNQn8JGYIqgTmCFoUoGYY-x1DLzSE9SStM_VFeSgbN-kK2kHHMqEVfJntMyng7Rl48k9L_5aJVtBKUujp0LJzm8wRySAjb9swP9tc8Z')"></div>
+</div>
+<div class="p-sm">
+<h5 class="font-bold text-on-surface group-hover:text-primary transition-colors">Vệ sinh Sofa/Nệm</h5>
+<p class="text-primary font-bold text-label-md mt-xs">Từ 300.000 VNĐ</p>
+</div>
+</a>
+<a class="group bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/30 hover:shadow-md transition-shadow" href="#">
+<div class="h-32 bg-surface-container">
+<div class="w-full h-full bg-cover bg-center" data-alt="A graphic illustration of a recurring cleaning schedule on a digital interface, using soft indigo and white colors. The vibe is organized, reliable, and modern." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBxJiDEomZlpyJ4b-8pRusn4YFa2vaJ4JU04MYorekrlx32c5T7AN6S9F7BXgSiwj-Bly_-Wkb8hM36KXc3ZxliCX0ntufij-7EtuJMIDL47HfpRqvctk6_wF8AHKK4_tb0aqPXnePgabzXFzl9wylXyP5EIOLO6xGemTmmVUOYlYYn87I2qmBBK0xmE_COSmZ5b28G9XbRlORiV91_McLjjV4qo1J520eOWmkgQyK3h8mIxCNyMii3MWfUbYaiJ8I9w8f5PAQL_i9F')"></div>
+</div>
+<div class="p-sm">
+<h5 class="font-bold text-on-surface group-hover:text-primary transition-colors">Vệ sinh định kỳ</h5>
+<p class="text-primary font-bold text-label-md mt-xs">Từ 150.000 VNĐ</p>
+</div>
+</a>
+</div>
+</section>
+</div>
+<!-- Right Column (Sticky) -->
+<div class="lg:col-span-4 lg:sticky lg:top-24 space-y-md">
+<!-- Booking Widget -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-lg border border-outline-variant/20">
+<div class="flex justify-between items-center mb-md">
+<span class="text-on-surface-variant font-label-md">Giá tạm tính:</span>
+<span class="text-headline-md font-bold text-primary">500.000 VNĐ</span>
+</div>
+<div class="space-y-sm mb-md">
+<div>
+<label class="block text-label-sm font-bold text-on-surface-variant mb-xs">Ngày thực hiện</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary py-sm px-md" type="date" value="2024-05-20"/>
+</div>
+</div>
+<div>
+<label class="block text-label-sm font-bold text-on-surface-variant mb-xs">Thời gian bắt đầu</label>
+<select class="w-full bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary py-sm px-md">
+<option>08:00 AM</option>
+<option>10:00 AM</option>
+<option>02:00 PM</option>
+<option>04:00 PM</option>
+</select>
+</div>
+<div>
+<label class="block text-label-sm font-bold text-on-surface-variant mb-xs">Địa chỉ dịch vụ</label>
+<div class="flex gap-xs items-center p-sm bg-surface-container-low rounded-lg cursor-pointer hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-primary">location_on</span>
+<span class="text-label-md truncate">Vinhomes Central Park, Bình Thạnh...</span>
+</div>
+</div>
+</div>
+<button class="w-full py-md bg-primary text-on-primary font-bold rounded-xl shadow-md hover:opacity-90 active:scale-95 transition-all text-body-lg flex items-center justify-center gap-sm">
+                        Đặt lịch ngay
+                        <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<div class="mt-md flex flex-col gap-sm">
+<div class="flex items-center gap-sm p-sm rounded-lg bg-success-green/10 border border-success-green/20">
+<span class="material-symbols-outlined text-success-green">verified_user</span>
+<span class="text-label-sm font-bold text-on-surface">Đã xác minh 100%</span>
+</div>
+<div class="flex items-center gap-sm p-sm rounded-lg bg-primary-container/5">
+<span class="material-symbols-outlined text-primary">security</span>
+<span class="text-label-sm text-on-surface">Thanh toán an toàn bảo mật</span>
+</div>
+<div class="flex items-center gap-sm p-sm rounded-lg bg-primary-container/5">
+<span class="material-symbols-outlined text-primary">currency_exchange</span>
+<span class="text-label-sm text-on-surface">Hoàn tiền theo chính sách</span>
+</div>
+</div>
+</div>
+<!-- Provider Profile -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-sm border border-outline-variant/20">
+<h4 class="text-label-sm font-bold text-on-surface-variant uppercase tracking-wider mb-sm">Chuyên gia phụ trách</h4>
+<div class="flex items-center gap-md">
+<div class="relative">
+<img class="w-16 h-16 rounded-full object-cover" data-alt="A professional male cleaner in his late 20s wearing a branded Handigo polo shirt, smiling confidently at the camera. He looks professional and capable. The lighting is studio-style, emphasizing reliability and trustworthiness." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDI53ArqAI_bDl4lAcUSEV5UXEFa1REPL_Muvc6gJAEHRAb20woxcPkVK79NrQPDje98pLKTM05ttTIcVHmi67ZbaEbdglkSaK7UqoiLO6BVxkYGfIr34i6paTPhx95MRaYbEYXRrt7LeUnjqM8oL0QaM6ofAJcTW_S0DDGwKMSYXVROu4TEfNCrQ3As7bSl41bLPiO95WpCWTpX24IQRqb3jul0hJUzescqOd9MGuRQsF-0ewW37m1-pfKFKjzF4yIyMyAlrQT0zby"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-success-green border-2 border-white rounded-full"></div>
+</div>
+<div class="flex-1">
+<h3 class="font-bold text-on-surface">Nguyễn Văn An</h3>
+<div class="flex items-center gap-xs mt-xs">
+<span class="material-symbols-outlined text-star-gold text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-bold text-label-md">4.9</span>
+<span class="text-on-surface-variant text-label-sm">| 500+ jobs</span>
+</div>
+</div>
+<button class="p-base rounded-full bg-primary-container/10 text-primary hover:bg-primary-container/20 transition-colors">
+<span class="material-symbols-outlined">chat</span>
+</button>
+</div>
+<button class="w-full mt-md py-sm border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-colors text-label-md">
+                        Xem hồ sơ chi tiết
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-low w-full mt-xl">
+<div class="w-full px-gutter py-lg flex flex-col md:flex-row justify-between items-center max-w-container-max mx-auto border-t border-outline-variant/30">
+<div class="flex flex-col gap-sm items-center md:items-start mb-md md:mb-0">
+<span class="font-headline-md text-headline-md font-bold text-primary">Handigo</span>
+<p class="text-on-surface-variant font-label-md text-center md:text-left">© 2024 Handigo. Precision in every service.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-md">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md" href="#">Terms of Service</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md" href="#">Become a Partner</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md" href="#">Contact Us</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md" href="#">Help Center</a>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interactions
+        document.querySelectorAll('.service-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.service-card').forEach(c => c.classList.remove('service-card-active', 'shadow-sm'));
+                document.querySelectorAll('.service-card').forEach(c => c.classList.add('border-outline-variant'));
+                
+                this.classList.add('service-card-active', 'shadow-sm');
+                this.classList.remove('border-outline-variant');
+            });
+        });
+    </script>
+</body></html>

@@ -166,6 +166,7 @@ export interface BookingState {
   // Helpers
   setCategoryId: (id: string) => void;
   setServiceId: (id: string) => void;
+  selectService: (categoryId: string, serviceId: string) => void;
   toggleOption: (id: string) => void;
   setAddressId: (id: string) => void;
   setOrderType: (type: BookingState['orderType']) => void;

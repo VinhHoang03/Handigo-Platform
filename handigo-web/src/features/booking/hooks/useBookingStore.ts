@@ -14,6 +14,7 @@ export const useBookingStore = create<BookingState>((set) => ({
 
   setCategoryId: (id) => set({ categoryId: id, serviceId: undefined, selectedOptionIds: [] }),
   setServiceId: (id) => set({ serviceId: id, selectedOptionIds: [] }),
+  selectService: (categoryId, serviceId) => set({ categoryId, serviceId, selectedOptionIds: [] }),
   toggleOption: (id) =>
     set((state) => ({
       selectedOptionIds: state.selectedOptionIds.includes(id)

@@ -1,5 +1,6 @@
 import { QueryFilter, Types } from "mongoose";
 import { Category } from "../models/category.model";
+import { Order } from "../models/order.model";
 import { IService, Service } from "../models/service.model";
 import { AppError } from "../utils/appError";
 
@@ -22,6 +23,7 @@ interface ListServicesQuery {
   categoryId?: string;
   serviceType?: string;
   isActive?: string;
+  bookedOnly?: string;
 }
 
 const slugify = (value: string) =>
@@ -87,6 +89,12 @@ export const listServices = async (query: ListServicesQuery) => {
   }
   if (query.isActive === "true" || query.isActive === "false") {
     filter.isActive = query.isActive === "true";
+  }
+  if (query.bookedOnly === "true") {
+    const bookedServiceIds = await Order.distinct("serviceId", {
+      isDeleted: false,
+    });
+    filter._id = { $in: bookedServiceIds };
   }
 
   const [items, total] = await Promise.all([

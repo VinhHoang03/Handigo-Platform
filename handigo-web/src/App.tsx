@@ -9,6 +9,8 @@ import CreateBookingStep1Page from "./features/booking/pages/CreateBookingStep1P
 import CreateBookingStep2Page from "./features/booking/pages/CreateBookingStep2Page";
 import BookingSuccessPage from "./features/booking/pages/BookingSuccessPage";
 import CustomerProfilePage from "./features/customer/pages/CustomerProfilePage";
+import CustomerServiceDetailPage from "./features/customer-service/pages/CustomerServiceDetailPage";
+import CustomerServiceListPage from "./features/customer-service/pages/CustomerServiceListPage";
 import ProviderHomePage from "./features/provider/pages/ProviderHomePage";
 import ProviderOrdersPage from "./features/provider/pages/ProviderOrdersPage";
 import ProviderOrderDetailPage from "./features/provider/pages/ProviderOrderDetailPage";
@@ -25,6 +27,8 @@ import { WalletPage } from "./features/wallet/pages/WalletPage";
 import AdminCategoriesPage from "./features/admin/pages/AdminCategoriesPage";
 import AdminServicesPage from "./features/admin/pages/AdminServicesPage";
 import AdminPromotionsPage from "./features/admin/pages/AdminPromotionsPage";
+import AdminServiceSuggestionsPage from "./features/service-suggestion/pages/AdminServiceSuggestionsPage";
+import ProviderServiceSuggestionPage from "./features/service-suggestion/pages/ProviderServiceSuggestionPage";
 import { RouteGuard } from "./components/common/RouteGuard";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { HomeRoute } from "./components/auth/HomeRoute";
@@ -77,6 +81,22 @@ function App() {
             element={
               <RouteGuard roles={["CUSTOMER"]}>
                 <CustomerProfilePage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/customer/services"
+            element={
+              <RouteGuard roles={["CUSTOMER"]}>
+                <CustomerServiceListPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/customer/services/:serviceId"
+            element={
+              <RouteGuard roles={["CUSTOMER"]}>
+                <CustomerServiceDetailPage />
               </RouteGuard>
             }
           />
@@ -169,6 +189,14 @@ function App() {
             }
           />
           <Route
+            path="/provider/service-suggestions"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <ProviderServiceSuggestionPage />
+              </RouteGuard>
+            }
+          />
+          <Route
             path="/register-provider"
             element={
               <RouteGuard roles={["CUSTOMER"]}>
@@ -205,6 +233,14 @@ function App() {
             element={
               <RouteGuard roles={["ADMIN"]}>
                 <AdminServicesPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/admin/service-suggestions"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminServiceSuggestionsPage />
               </RouteGuard>
             }
           />
