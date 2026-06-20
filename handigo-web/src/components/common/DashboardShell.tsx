@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useAuthStore } from "@/features/auth/store/auth.store";
@@ -49,6 +49,7 @@ export function DashboardShell({
     { icon: "reviews", label: "Đánh giá", path: "/admin/feedbacks" },
     { icon: "category", label: "Danh mục dịch vụ", path: "/admin/categories" },
     { icon: "construction", label: "Dịch vụ", path: "/admin/services" },
+    { icon: "lightbulb", label: "Đề xuất dịch vụ", path: "/admin/service-suggestions" },
     { icon: "local_offer", label: "Khuyến mãi", path: "/admin/promotions" },
     { icon: "support_agent", label: "Yêu cầu hỗ trợ", path: "#" },
     { icon: "notifications", label: "Thông báo", path: "/admin/notifications" },
@@ -61,7 +62,7 @@ export function DashboardShell({
       role={role}
       navItems={
         role === "CUSTOMER"
-          ? []
+          ? getNavItemsForRole(role)
           : role === "ADMIN"
             ? adminNavItems
             : getNavItemsForRole(role)

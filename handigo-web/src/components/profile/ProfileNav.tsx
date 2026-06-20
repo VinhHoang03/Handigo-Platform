@@ -15,7 +15,7 @@ export const ProfileTopNav = ({ user, onLogout }: ProfileNavProps) => (
       <BrandLogo compact />
       <div className="hidden md:flex items-center ml-lg gap-gutter">
         <Link className="text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 px-3 py-1 rounded-lg text-label-md font-label-md" to="/">Khám phá</Link>
-        <Link className="text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 px-3 py-1 rounded-lg text-label-md font-label-md" to="#">Dịch vụ</Link>
+        <Link className="text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 px-3 py-1 rounded-lg text-label-md font-label-md" to="/customer/services">Dịch vụ</Link>
         <Link className="text-primary font-bold text-label-md font-label-md" to="/profile">Hồ sơ</Link>
       </div>
     </div>
