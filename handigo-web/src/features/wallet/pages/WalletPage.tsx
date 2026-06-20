@@ -21,6 +21,7 @@ type WithdrawForm = { amount: string };
 
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 const dateTime = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+const PENDING_DEPOSIT_ORDER_CODE_KEY = 'handigo:pending-wallet-deposit-order-code';
 
 const transactionLabels: Record<WalletTransactionType, string> = {
   deposit: 'Nạp ví',
@@ -92,7 +93,7 @@ export function WalletPage({ role }: { role: WalletRole }) {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [depositForm, setDepositForm] = useState<DepositForm>({ amount: '' });
   const [withdrawForm, setWithdrawForm] = useState<WithdrawForm>({ amount: '' });
-  const handledDepositCancelRef = useRef(false);
+  const handledDepositReturnRef = useRef(false);
 
   const isProvider = role === 'PROVIDER';
 
@@ -192,30 +193,43 @@ export function WalletPage({ role }: { role: WalletRole }) {
   }, [loadOverview, loadTransactions, loadWithdrawals]);
 
   useEffect(() => {
-    if (!isProvider || handledDepositCancelRef.current) return;
+    if (!isProvider || handledDepositReturnRef.current) return;
 
     const params = new URLSearchParams(window.location.search);
-    const isCancelledDeposit = params.get('walletDeposit') === 'cancelled';
-    const orderCode = params.get('orderCode');
+    const walletDepositStatus = params.get('walletDeposit');
+    const storedOrderCode = sessionStorage.getItem(PENDING_DEPOSIT_ORDER_CODE_KEY);
+    const orderCode = params.get('orderCode') || storedOrderCode;
 
-    if (!isCancelledDeposit || !orderCode) return;
+    if (!orderCode || (!walletDepositStatus && !storedOrderCode)) return;
 
-    handledDepositCancelRef.current = true;
-    window.history.replaceState({}, '', window.location.pathname);
+    handledDepositReturnRef.current = true;
+    if (walletDepositStatus) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
-    const markDepositCancelled = async () => {
+    const syncDepositStatus = async () => {
       setError('');
       setNotice('');
       try {
-        await walletApi.cancelDeposit(orderCode);
-        setNotice('Đã hủy giao dịch nạp ví.');
+        if (walletDepositStatus === 'cancelled') {
+          await walletApi.cancelDeposit(orderCode);
+          setNotice('Đã hủy giao dịch nạp ví.');
+        } else {
+          const transaction = await walletApi.syncDeposit(orderCode);
+          if (transaction.status === 'success') {
+            setNotice('Nạp ví thành công. Số dư đã được cập nhật.');
+          } else {
+            setNotice('Giao dịch nạp ví chưa được PayOS xác nhận, vui lòng kiểm tra lại sau.');
+          }
+        }
+        sessionStorage.removeItem(PENDING_DEPOSIT_ORDER_CODE_KEY);
         await refreshAll();
       } catch (err) {
         setError(getErrorMessage(err));
       }
     };
 
-    void markDepositCancelled();
+    void syncDepositStatus();
   }, [isProvider, refreshAll]);
 
   const submitDeposit = async (event: FormEvent) => {
@@ -234,6 +248,10 @@ export function WalletPage({ role }: { role: WalletRole }) {
         returnUrl: `${window.location.origin}/provider/wallet`,
         cancelUrl: `${window.location.origin}/provider/wallet`,
       });
+      const orderCode = result.transaction.gatewayOrderCode || result.transaction.transactionCode;
+      if (orderCode) {
+        sessionStorage.setItem(PENDING_DEPOSIT_ORDER_CODE_KEY, orderCode);
+      }
       setDepositOpen(false);
       setDepositForm({ amount: '' });
       setNotice('Đã tạo liên kết nạp ví. Bạn sẽ được chuyển sang cổng thanh toán.');

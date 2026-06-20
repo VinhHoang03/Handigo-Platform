@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Navbar, type AppRole } from "./common/Navbar";
+import { NotificationBell } from "./common/NotificationBell";
 import { useAuthStore } from "../features/auth/store/auth.store";
 import { isNavItemActive } from "@/config/sidebarNavigation";
 import { authService } from "@/features/auth/services/auth.service";
@@ -75,10 +76,7 @@ export function Sidebar({
 
       <nav className="flex min-h-0 flex-grow flex-col gap-1.5 overflow-y-auto pr-1">
         {navItems.map((item) => {
-          const active =
-            item.path !== "#" &&
-            (location.pathname === item.path ||
-              location.pathname.startsWith(`${item.path}/`));
+          const active = isNavItemActive(location.pathname, item);
           return (
             <Link
               key={item.label}
@@ -213,13 +211,7 @@ function ProviderTopbar({
             </button>
           )}
 
-          <button
-            type="button"
-            aria-label="Thông báo"
-            className="material-symbols-outlined rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary"
-          >
-            notifications
-          </button>
+          <NotificationBell role="PROVIDER" />
           <button
             type="button"
             aria-label="Tin nhắn"

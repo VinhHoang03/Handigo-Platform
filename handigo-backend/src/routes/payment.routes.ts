@@ -13,7 +13,7 @@ import { createPaymentSchema } from "../validations/payment.validation";
 const router = Router();
 
 router.post("/create", authMiddleware, validate(createPaymentSchema), createPayment);
-router.post("/payos-webhook", payosWebhook);
+router.post("/webhook", payosWebhook);
 router.get("/history", authMiddleware, getPaymentHistory);
 router.get("/order/:orderId", authMiddleware, getPaymentsByOrder);
 router.get("/:id", authMiddleware, getPaymentById);

@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
 import { Service } from "../models/service.model";
+import { getNumberConfigValue } from "./systemConfig.service";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -47,11 +48,12 @@ export const MatchingService = {
   async findNearestProviders(
     options: FindNearestProvidersOptions,
   ): Promise<ProviderCandidate[]> {
+    const configuredRadiusKm = await getNumberConfigValue("MAX_PROVIDER_RADIUS_KM", 10);
     const {
       latitude,
       longitude,
       serviceCategoryId,
-      maxDistanceMeters = 10_000,
+      maxDistanceMeters = Math.max(configuredRadiusKm, 0) * 1000,
       limit = 10,
       excludeProviderIds = [],
     } = options;

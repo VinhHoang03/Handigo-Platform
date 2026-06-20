@@ -7,6 +7,7 @@ import { customerServiceApi } from "@/features/customer-service/api/customerServ
 import { getServiceImage } from "@/features/customer-service/utils/serviceDisplay";
 import type { Service } from "@/types/booking";
 import { BrandLogo } from "./BrandLogo";
+import { NotificationBell } from "./NotificationBell";
 
 export type AppRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
@@ -44,13 +45,6 @@ const getProfilePath = (role?: AppRole) => {
 const getWalletPath = (role?: AppRole) => {
   if (role === "PROVIDER") return "/provider/wallet";
   if (role === "CUSTOMER") return "/customer/wallet";
-  return "#";
-};
-
-const getNotificationPath = (role?: AppRole) => {
-  if (role === "PROVIDER") return "/provider/notifications";
-  if (role === "CUSTOMER") return "/customer/notifications";
-  if (role === "ADMIN") return "/admin/notifications";
   return "#";
 };
 
@@ -291,13 +285,7 @@ export function Navbar({
                 </div>
               )}
 
-              <Link
-                to={getNotificationPath(currentRole)}
-                aria-label="Thông báo"
-                className="material-symbols-outlined hidden rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary sm:inline-flex"
-              >
-                notifications
-              </Link>
+              <NotificationBell role={currentRole} />
               <button
                 type="button"
                 aria-label="Tin nhắn"

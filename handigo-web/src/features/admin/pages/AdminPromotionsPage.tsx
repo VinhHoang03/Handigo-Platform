@@ -308,41 +308,38 @@ function VoucherTable({
   onToggle: (voucher: Voucher) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[980px] text-left">
+    <div>
+      <table className="w-full table-auto text-left">
         <thead className="border-b border-outline-variant/20 text-sm uppercase tracking-wide text-on-surface-variant">
           <tr>
-            <th className="pb-4 font-semibold">Voucher</th>
-            <th className="pb-4 font-semibold">Giảm giá</th>
-            <th className="pb-4 font-semibold">Đơn tối thiểu</th>
-            <th className="pb-4 font-semibold">Sử dụng</th>
-            <th className="pb-4 font-semibold">Thời gian</th>
-            <th className="pb-4 font-semibold">Trạng thái</th>
-            <th className="pb-4 text-right" />
+            <th className="w-[52%] pb-4 pr-4 font-semibold">Voucher</th>
+            <th className="w-[20%] pb-4 font-semibold">Ưu đãi</th>
+            <th className="w-[16%] pb-4 font-semibold">Trạng thái</th>
+            <th className="w-[12%] pb-4 text-right" />
           </tr>
         </thead>
         <tbody className="divide-y divide-outline-variant/10">
           {items.map((voucher) => (
             <tr key={voucher.id} className="hover:bg-surface-container-low">
-              <td className="py-4">
-                <div>
+              <td className="py-4 pr-4 align-top">
+                <div className="min-w-0">
                   <p className="font-semibold text-on-surface">{voucher.name}</p>
                   <p className="mt-1 inline-flex rounded-lg bg-primary/10 px-2 py-1 font-mono text-sm font-semibold text-primary">{voucher.code}</p>
-                  {voucher.description && <p className="mt-2 max-w-sm truncate text-sm text-on-surface-variant">{voucher.description}</p>}
+                  {voucher.description && (
+                    <p className="mt-2 whitespace-normal break-words text-sm leading-5 text-on-surface-variant">
+                      {voucher.description}
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant">
+                    <span>Đơn tối thiểu: <b>{voucher.minOrderAmount == null ? '-' : money.format(voucher.minOrderAmount)}</b></span>
+                    <span>Sử dụng: <b>{voucher.usedCount}{voucher.usageLimit == null ? '' : `/${voucher.usageLimit}`}</b></span>
+                    <span>Hạn: <b>{dateTime.format(new Date(voucher.startAt))} - {dateTime.format(new Date(voucher.endAt))}</b></span>
+                  </div>
                 </div>
               </td>
-              <td className="py-4 font-medium">{discountText(voucher)}</td>
-              <td className="py-4">{voucher.minOrderAmount == null ? '-' : money.format(voucher.minOrderAmount)}</td>
-              <td className="py-4">
-                {voucher.usedCount}
-                {voucher.usageLimit == null ? '' : `/${voucher.usageLimit}`}
-              </td>
-              <td className="py-4 text-sm text-on-surface-variant">
-                <p>{dateTime.format(new Date(voucher.startAt))}</p>
-                <p>{dateTime.format(new Date(voucher.endAt))}</p>
-              </td>
-              <td className="py-4"><StatusBadge value={statusValue(voucher)} /></td>
-              <td className="py-4 text-right">
+              <td className="py-4 align-top font-medium">{discountText(voucher)}</td>
+              <td className="py-4 align-top"><StatusBadge value={statusValue(voucher)} /></td>
+              <td className="py-4 align-top text-right">
                 <div className="flex justify-end gap-1">
                   <button onClick={() => onEdit(voucher)} className="rounded-lg p-2 text-primary hover:bg-primary/10" aria-label="Sửa voucher">
                     <span className="material-symbols-outlined text-[20px]">edit</span>

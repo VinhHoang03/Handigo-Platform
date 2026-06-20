@@ -33,6 +33,10 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const isNetworkError = (error: unknown) => {
+  return axios.isAxiosError(error) && !error.response;
+};
+
 export const authService = {
   restoreSession: async () => {
     const store = useAuthStore.getState();
@@ -49,7 +53,12 @@ export const authService = {
       const user = await getMeApi();
       useAuthStore.getState().setUser(user);
       return user;
-    } catch {
+    } catch (error) {
+      if (isNetworkError(error)) {
+        useAuthStore.getState().finishInitialization();
+        return store.user;
+      }
+
       useAuthStore.getState().logout();
       return null;
     }

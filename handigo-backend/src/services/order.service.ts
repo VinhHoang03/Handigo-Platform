@@ -8,10 +8,13 @@ import { ServiceOption } from "../models/serviceOption.model";
 import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import { DispatchService } from "./dispatch.service";
+import { getNumberConfigValue } from "./systemConfig.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const PLATFORM_COMMISSION_RATE = 0.15; // 15 %
+const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
+const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
+const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY = "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -94,10 +97,20 @@ export const OrderService = {
       price: opt.price,
     }));
 
+    const platformCommissionPercent = await getNumberConfigValue(
+      PLATFORM_FEE_PERCENT_CONFIG_KEY,
+      DEFAULT_PLATFORM_COMMISSION_PERCENT,
+    );
+    const platformCommissionRate = Math.max(platformCommissionPercent, 0) / 100;
+    const quotationDepositAmount = await getNumberConfigValue(
+      QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY,
+      service.depositAmount ?? 0,
+    );
+
     // 4. Dịch vụ giá linh hoạt chỉ thu tiền cọc; dịch vụ cố định giữ cách tính hiện có.
     const bookingBasePrice =
       service.serviceType === "variable_price"
-        ? (service.depositAmount ?? 0)
+        ? quotationDepositAmount
         : selectedOptionsSnapshot.reduce(
             (sum, o) => sum + (o.price ?? 0),
             0,
@@ -105,7 +118,7 @@ export const OrderService = {
     const totalAmount = bookingBasePrice;
 
     const platformCommissionAmount = Math.round(
-      totalAmount * PLATFORM_COMMISSION_RATE,
+      totalAmount * platformCommissionRate,
     );
     const providerEarningAmount = totalAmount - platformCommissionAmount;
 
@@ -135,7 +148,7 @@ export const OrderService = {
       customerAttachments: payload.customerAttachments ?? [],
       pricing: {
         bookingAmount: totalAmount, // The amount including options for the current payment phase
-        platformCommissionRate: PLATFORM_COMMISSION_RATE,
+        platformCommissionRate,
         platformCommissionAmount,
         providerEarningAmount,
         promotionDiscountAmount: 0,

@@ -1,5 +1,5 @@
 import api from '@/api/client';
-import type { AdminApplication, AdminQuery, AdminUser, ListResult } from '../types/admin.types';
+import type { AdminApplication, AdminQuery, AdminUser, AdminWithdrawal, ListResult } from '../types/admin.types';
 import type { Category } from '@/features/provider-application/types/providerApplication.types';
 
 const data = <T>(response: { data: { data: T } }) => response.data.data;
@@ -20,4 +20,7 @@ export const adminApi = {
     rejectionNotes,
   })),
   categories: async () => data<Category[]>(await api.get('/categories/active')),
+  withdrawals: async (query: AdminQuery) => data<ListResult<AdminWithdrawal>>(await api.get('/withdrawals/admin', { params: query })),
+  approveWithdrawal: async (id: string, adminNote?: string) => data<AdminWithdrawal>(await api.patch(`/withdrawals/admin/${id}/approve`, { adminNote })),
+  rejectWithdrawal: async (id: string, adminNote?: string) => data<AdminWithdrawal>(await api.patch(`/withdrawals/admin/${id}/reject`, { adminNote })),
 };

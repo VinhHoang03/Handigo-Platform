@@ -51,10 +51,11 @@ export function DashboardShell({
     { icon: "construction", label: "Dịch vụ", path: "/admin/services" },
     { icon: "lightbulb", label: "Đề xuất dịch vụ", path: "/admin/service-suggestions" },
     { icon: "local_offer", label: "Khuyến mãi", path: "/admin/promotions" },
+    { icon: "account_balance_wallet", label: "Rút tiền", path: "/admin/withdrawals" },
     { icon: "support_agent", label: "Yêu cầu hỗ trợ", path: "#" },
     { icon: "notifications", label: "Thông báo", path: "/admin/notifications" },
     { icon: "payments", label: "Doanh thu hệ thống", path: "#" },
-    { icon: "settings", label: "Cấu hình hệ thống", path: "#" },
+    { icon: "settings", label: "Cấu hình hệ thống", path: "/admin/system-configs" },
   ];
 
   return (
