@@ -26,6 +26,8 @@ export interface UserProfileFormValue {
 
 export interface UserAddress {
   id: string;
+  recipientName?: string;
+  recipientPhone?: string;
   fullAddress: string;
   province: string;
   provinceCode?: number;
@@ -39,6 +41,8 @@ export interface UserAddress {
 }
 
 export interface UserAddressPayload {
+  recipientName: string;
+  recipientPhone: string;
   fullAddress: string;
   province: string;
   provinceCode?: number;

@@ -54,6 +54,8 @@ export interface CreatePaymentResult {
 export interface Address {
   _id: string;
   userId: string;
+  recipientName?: string;
+  recipientPhone?: string;
   label?: string;
   fullAddress?: string;
   detailAddress?: string;

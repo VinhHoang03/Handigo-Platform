@@ -1,9 +1,14 @@
 import User from "../models/user.model";
+import { AppError } from "../utils/appError";
+import {
+  normalizePersonName,
+  normalizeVietnamesePhone,
+} from "../utils/profileValidation";
 
-interface UpdateProfileInput {
+export interface UpdateProfileInput {
   fullName?: string;
   phone?: string;
-  avatar?: string;
+  avatar?: string | null;
   birthday?: string | Date | null;
   gender?: "male" | "female" | "other" | null;
 }
@@ -20,28 +25,46 @@ export const updateProfileService = async (
   userId: string,
   data: UpdateProfileInput
 ) => {
-
   const updateData: any = {};
 
-  if (data.fullName !== undefined) updateData.fullName = data.fullName;
-  if (data.phone !== undefined) updateData.phone = data.phone;
+  if (data.fullName !== undefined) {
+    updateData.fullName = normalizePersonName(data.fullName);
+  }
+  if (data.phone !== undefined) {
+    updateData.phone = normalizeVietnamesePhone(data.phone);
+    const existingUser = await User.exists({
+      _id: { $ne: userId },
+      phone: updateData.phone,
+    });
+    if (existingUser) {
+      throw new AppError("Số điện thoại đã được sử dụng", 409);
+    }
+  }
   if (data.avatar !== undefined) updateData.avatar = data.avatar;
   if (data.birthday !== undefined) {
     updateData.birthday = data.birthday ? new Date(data.birthday) : null;
   }
   if (data.gender !== undefined) updateData.gender = data.gender;
 
-  const user = await User.findByIdAndUpdate(
-    userId,
-    updateData,
-    {
-      new: true,
-      runValidators: true,
-    },
-  ).select("-passwordHash -registerOtp -registerOtpExpire -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
+  let user;
+  try {
+    user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      {
+        new: true,
+        runValidators: true,
+      },
+    ).select("-passwordHash -registerOtp -registerOtpExpire -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
+  } catch (error: any) {
+    if (error?.code === 11000 && error?.keyPattern?.phone) {
+      throw new AppError("Số điện thoại đã được sử dụng", 409);
+    }
+    throw error;
+  }
 
   if (!user) {
-    throw new Error("User not found");
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   return user;

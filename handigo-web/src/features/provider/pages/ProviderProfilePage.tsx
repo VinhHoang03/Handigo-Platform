@@ -19,6 +19,7 @@ import {
   updateUserAddress,
 } from "@/features/profile/api/addressBook.api";
 import { updateUserProfile } from "@/features/profile/api/userProfile.api";
+import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
 import type {
   UserAddress,
   UserAddressPayload,
@@ -593,8 +594,10 @@ function CertificateInlineForm({
             Ảnh hoặc tài liệu chứng chỉ
           </p>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90">
-            <span className="material-symbols-outlined text-[18px]">upload</span>
-            {uploading ? "Đang tải..." : "Tải lên Cloudinary"}
+            <span className="material-symbols-outlined text-[18px]">
+              upload
+            </span>
+            {uploading ? "Đang tải..." : "Tải lên"}
             <input
               type="file"
               accept="image/*,.pdf,.doc,.docx"
@@ -672,14 +675,17 @@ export default function ProviderProfilePage() {
   const [isEditingProfessional, setIsEditingProfessional] = useState(false);
   const [isCertificateFormOpen, setIsCertificateFormOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
+  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(
+    null,
+  );
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const [phoneHighlighted, setPhoneHighlighted] = useState(false);
   const [uploadingAsset, setUploadingAsset] = useState<string | null>(null);
   const [identityError, setIdentityError] = useState("");
   const [certificateError, setCertificateError] = useState("");
-  const [professionalForm, setProfessionalForm] =
-    useState<ProfessionalForm>(emptyProfessionalForm);
+  const [professionalForm, setProfessionalForm] = useState<ProfessionalForm>(
+    emptyProfessionalForm,
+  );
   const [identityForm, setIdentityForm] =
     useState<IdentityForm>(emptyIdentityForm);
   const [certificateForm, setCertificateForm] =
@@ -687,7 +693,11 @@ export default function ProviderProfilePage() {
 
   const [isPwdConfirmOpen, setIsPwdConfirmOpen] = useState(false);
   const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
-  const [pwdData, setPwdData] = useState({ current: "", next: "", confirm: "" });
+  const [pwdData, setPwdData] = useState({
+    current: "",
+    next: "",
+    confirm: "",
+  });
   const [pwdError, setPwdError] = useState("");
   const [pwdMsg, setPwdMsg] = useState("");
   const [isUpdatingPwd, setIsUpdatingPwd] = useState(false);
@@ -897,7 +907,10 @@ export default function ProviderProfilePage() {
       await refreshAddresses();
     } catch (deleteError) {
       setAddressError(
-        getErrorMessage(deleteError, "Không thể xóa địa chỉ. Vui lòng thử lại."),
+        getErrorMessage(
+          deleteError,
+          "Không thể xóa địa chỉ. Vui lòng thử lại.",
+        ),
       );
       throw deleteError;
     } finally {
@@ -905,7 +918,9 @@ export default function ProviderProfilePage() {
     }
   };
 
-  const handleProfessionalSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleProfessionalSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
 
     setIsSaving(true);
@@ -962,7 +977,10 @@ export default function ProviderProfilePage() {
     setUploadingAsset("certificate");
     setCertificateError("");
     try {
-      const uploaded = await providerProfileApi.uploadImage(file, "certificate");
+      const uploaded = await providerProfileApi.uploadImage(
+        file,
+        "certificate",
+      );
       setCertificateForm((current) => ({
         ...current,
         imageUrls: [...current.imageUrls, uploaded.url],
@@ -1059,7 +1077,9 @@ export default function ProviderProfilePage() {
     }
 
     if (certificateForm.imageUrls.length === 0) {
-      setCertificateError("Vui lòng upload ít nhất một ảnh hoặc tài liệu chứng chỉ.");
+      setCertificateError(
+        "Vui lòng upload ít nhất một ảnh hoặc tài liệu chứng chỉ.",
+      );
       return;
     }
 
@@ -1247,25 +1267,26 @@ export default function ProviderProfilePage() {
 
   const identityDocument = profile.provider.identityDocument;
   const identityStatus = identityDocument?.verificationStatus || "unsubmitted";
-  const verificationItems: Array<VerificationItem & { onClick?: () => void }> = [
-    {
-      label: "Email",
-      status: profile.user.email ? "Đã cập nhật" : "Chưa cập nhật",
-      statusTone: profile.user.email ? "approved" : "pending",
-    },
-    {
-      label: "Số điện thoại",
-      status: profile.user.phone ? "Đã cập nhật" : "Cần bổ sung",
-      statusTone: profile.user.phone ? "approved" : "pending",
-      onClick: handlePhoneVerificationClick,
-    },
-    {
-      label: "CCCD/Hộ chiếu",
-      status: identityStatusLabel[identityStatus],
-      statusTone: statusTone(identityStatus),
-      onClick: openIdentityModal,
-    },
-  ];
+  const verificationItems: Array<VerificationItem & { onClick?: () => void }> =
+    [
+      {
+        label: "Email",
+        status: profile.user.email ? "Đã cập nhật" : "Chưa cập nhật",
+        statusTone: profile.user.email ? "approved" : "pending",
+      },
+      {
+        label: "Số điện thoại",
+        status: profile.user.phone ? "Đã cập nhật" : "Cần bổ sung",
+        statusTone: profile.user.phone ? "approved" : "pending",
+        onClick: handlePhoneVerificationClick,
+      },
+      {
+        label: "CCCD/Hộ chiếu",
+        status: identityStatusLabel[identityStatus],
+        statusTone: statusTone(identityStatus),
+        onClick: openIdentityModal,
+      },
+    ];
 
   return (
     <DashboardShell
@@ -1491,6 +1512,12 @@ export default function ProviderProfilePage() {
           />
           <ServiceAreaPanel area={serviceArea} />
         </div>
+
+        <div className="col-span-12">
+          <ProfileSection title="Lịch sử hồ sơ đăng ký">
+            <ProviderApplicationHistory canEditRejected={false} />
+          </ProfileSection>
+        </div>
       </div>
 
       {isAddressModalOpen && (
@@ -1500,6 +1527,10 @@ export default function ProviderProfilePage() {
           address={editingAddress}
           addressCount={addresses.length}
           isSaving={isAddressSaving}
+          defaultRecipient={{
+            name: profile.user.fullName,
+            phone: profile.user.phone || "",
+          }}
           onClose={closeAddressModal}
           onSubmit={handleSubmitAddress}
         />
@@ -1564,7 +1595,9 @@ export default function ProviderProfilePage() {
           {(pwdError || pwdMsg) && (
             <div
               className={`rounded-lg p-4 text-sm ${
-                pwdError ? "bg-error/10 text-error" : "bg-primary/10 text-primary"
+                pwdError
+                  ? "bg-error/10 text-error"
+                  : "bg-primary/10 text-primary"
               }`}
             >
               {pwdError || pwdMsg}

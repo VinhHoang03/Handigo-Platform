@@ -33,6 +33,8 @@ export interface Category {
 
 export interface Address {
   id: string;
+  recipientName?: string;
+  recipientPhone?: string;
   fullAddress: string;
   province: string;
   provinceCode?: number;
@@ -47,6 +49,8 @@ export interface Address {
 }
 
 export interface CreateAddressPayload {
+  recipientName: string;
+  recipientPhone: string;
   fullAddress: string;
   province: string;
   provinceCode?: number;

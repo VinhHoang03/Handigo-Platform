@@ -27,9 +27,9 @@ export const updateProfile = async (req: Request, res: Response) => {
       message: "Profile updated successfully",
       data: user,
     });
-  } catch (error) {
-    res.status(500).json({
-      message: "Update profile failed",
+  } catch (error: any) {
+    res.status(error?.statusCode || 500).json({
+      message: error?.message || "Cập nhật hồ sơ thất bại",
     });
   }
 };

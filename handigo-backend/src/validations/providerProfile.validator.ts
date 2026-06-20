@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { personNameSchema, vietnamesePhoneSchema } from "./user.validator";
 
 const dateStringSchema = z
   .string()
@@ -18,8 +19,8 @@ export const providerServiceAreaSchema = z.object({
 });
 
 export const updateProviderProfileSchema = z.object({
-  fullName: optionalText(120),
-  phone: optionalText(30),
+  fullName: personNameSchema.optional(),
+  phone: vietnamesePhoneSchema.optional(),
   avatar: z.string().trim().url().max(2000).nullable().optional(),
   birthday: dateStringSchema.nullable().optional(),
   gender: z.enum(["male", "female", "other"]).nullable().optional(),
@@ -40,6 +41,9 @@ export const submitIdentitySchema = z
     expiresAt: dateStringSchema.optional(),
     dateOfBirth: dateStringSchema.optional(),
     gender: z.enum(["male", "female", "other"]).optional(),
+    nationality: optionalText(120),
+    placeOfOrigin: optionalText(300),
+    placeOfResidence: optionalText(300),
     frontImageUrl: imageUrlSchema.optional(),
     backImageUrl: imageUrlSchema.optional(),
     passportImageUrl: imageUrlSchema.optional(),
@@ -66,6 +70,7 @@ export const submitIdentitySchema = z
 
 export const createCertificateSchema = z.object({
   title: z.string().trim().min(1).max(200),
+  certificateNumber: optionalText(100),
   issuer: optionalText(200),
   issuedAt: dateStringSchema.optional(),
   expiresAt: dateStringSchema.optional(),

@@ -4,6 +4,8 @@ import type { UserAddress, UserAddressPayload } from "../types/profile.types";
 interface BackendAddress {
   _id?: string;
   id?: string;
+  recipientName?: string;
+  recipientPhone?: string;
   fullAddress: string;
   province: string;
   provinceCode?: number;
@@ -18,6 +20,8 @@ interface BackendAddress {
 
 const mapAddress = (address: BackendAddress): UserAddress => ({
   id: address.id || address._id || "",
+  recipientName: address.recipientName,
+  recipientPhone: address.recipientPhone,
   fullAddress: address.fullAddress,
   province: address.province,
   provinceCode: address.provinceCode,
@@ -31,6 +35,8 @@ const mapAddress = (address: BackendAddress): UserAddress => ({
 });
 
 const sanitizeAddressPayload = (payload: UserAddressPayload): UserAddressPayload => ({
+  recipientName: payload.recipientName.trim(),
+  recipientPhone: payload.recipientPhone.trim(),
   fullAddress: payload.fullAddress.trim(),
   province: payload.province.trim(),
   provinceCode: payload.provinceCode,
