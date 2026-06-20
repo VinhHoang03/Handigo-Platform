@@ -28,7 +28,6 @@ export const connectDB = async (): Promise<void> => {
     await mongoose.connect(MONGO_URI);
     console.log("MongoDB connected successfully!");
 
-    await dropLegacyIndex("users", "phone_1");
     await dropLegacyIndex("sessions", "refreshToken_1");
   } catch (error) {
     console.error("MongoDB connection failed:", error);

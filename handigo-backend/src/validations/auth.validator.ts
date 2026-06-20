@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { personNameSchema, vietnamesePhoneSchema } from "./user.validator";
 
 const passwordSchema = z
   .string()
@@ -7,8 +8,11 @@ const passwordSchema = z
 export const registerSchema = z.object({
   email: z.email().trim().toLowerCase(),
   password: passwordSchema,
-  fullName: z.string().trim().min(2, "Full name is required"),
-  phone: z.string().trim().optional(),
+  fullName: personNameSchema,
+  phone: z.preprocess(
+    (value) => typeof value === "string" && !value.trim() ? undefined : value,
+    vietnamesePhoneSchema.optional(),
+  ),
 });
 
 export const verifyRegisterOtpSchema = z.object({

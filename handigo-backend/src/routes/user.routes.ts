@@ -1,5 +1,7 @@
 import express from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { validate } from "../middlewares/validate.middleware";
+import { updateUserProfileSchema } from "../validations/user.validator";
 import {
   getProfile,
   updateProfile,
@@ -13,7 +15,12 @@ const router = express.Router();
 
 // Profile endpoints
 router.get("/me", authMiddleware, getProfile);
-router.put("/profile", authMiddleware, updateProfile);
+router.put(
+  "/profile",
+  authMiddleware,
+  validate(updateUserProfileSchema),
+  updateProfile,
+);
 
 // Standard CRUD endpoints
 // Notice: In a real app, these should ideally be protected by admin roles using `roleMiddleware` or similar.

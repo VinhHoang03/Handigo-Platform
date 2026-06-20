@@ -1,6 +1,10 @@
 import { Types } from "mongoose";
 import User from "../models/user.model";
 import {
+  updateProfileService,
+  type UpdateProfileInput,
+} from "./user.service";
+import {
   IIdentityDocument,
   IProvider,
   IProviderCertificate,
@@ -90,6 +94,9 @@ const formatIdentityDocument = (identity?: IIdentityDocument) => {
     expiresAt: identity.expiresAt,
     dateOfBirth: identity.dateOfBirth,
     gender: identity.gender,
+    nationality: identity.nationality,
+    placeOfOrigin: identity.placeOfOrigin,
+    placeOfResidence: identity.placeOfResidence,
     frontImageUrl: identity.frontImageUrl,
     backImageUrl: identity.backImageUrl,
     passportImageUrl: identity.passportImageUrl,
@@ -105,6 +112,7 @@ const formatIdentityDocument = (identity?: IIdentityDocument) => {
 const formatCertificate = (certificate: IProviderCertificate) => ({
   id: certificate._id?.toString() || "",
   title: certificate.title,
+  certificateNumber: certificate.certificateNumber,
   issuer: certificate.issuer,
   issuedAt: certificate.issuedAt,
   expiresAt: certificate.expiresAt,
@@ -165,7 +173,7 @@ export const updateMyProviderProfile = async (
 ) => {
   const provider = await getProviderForUser(userId);
 
-  const userUpdate: Record<string, unknown> = {};
+  const userUpdate: UpdateProfileInput = {};
   if (payload.fullName !== undefined) userUpdate.fullName = payload.fullName;
   if (payload.phone !== undefined) userUpdate.phone = payload.phone;
   if (payload.avatar !== undefined) userUpdate.avatar = payload.avatar;
@@ -175,9 +183,7 @@ export const updateMyProviderProfile = async (
   if (payload.gender !== undefined) userUpdate.gender = payload.gender;
 
   if (Object.keys(userUpdate).length) {
-    await User.findByIdAndUpdate(userId, userUpdate, {
-      runValidators: true,
-    });
+    await updateProfileService(userId, userUpdate);
   }
 
   if (payload.description !== undefined) provider.description = payload.description;
@@ -203,6 +209,7 @@ export const submitMyIdentityDocument = async (
   payload: SubmitIdentityPayload,
 ) => {
   const provider = await getProviderForUser(userId);
+  const currentIdentity = provider.identityDocument;
 
   provider.identityDocument = {
     type: payload.type,
@@ -214,6 +221,10 @@ export const submitMyIdentityDocument = async (
     expiresAt: toDate(payload.expiresAt),
     dateOfBirth: toDate(payload.dateOfBirth),
     gender: payload.gender,
+    nationality: payload.nationality ?? currentIdentity?.nationality,
+    placeOfOrigin: payload.placeOfOrigin ?? currentIdentity?.placeOfOrigin,
+    placeOfResidence:
+      payload.placeOfResidence ?? currentIdentity?.placeOfResidence,
     frontImageUrl: payload.frontImageUrl,
     backImageUrl: payload.backImageUrl,
     passportImageUrl: payload.passportImageUrl,
@@ -242,6 +253,7 @@ export const createMyCertificate = async (
 
   provider.certificates.push({
     title: payload.title,
+    certificateNumber: payload.certificateNumber,
     issuer: payload.issuer,
     issuedAt: toDate(payload.issuedAt),
     expiresAt: toDate(payload.expiresAt),
@@ -273,6 +285,9 @@ export const updateMyCertificate = async (
   }
 
   if (payload.title !== undefined) certificate.title = payload.title;
+  if (payload.certificateNumber !== undefined) {
+    certificate.certificateNumber = payload.certificateNumber;
+  }
   if (payload.issuer !== undefined) certificate.issuer = payload.issuer;
   if (payload.issuedAt !== undefined) certificate.issuedAt = toDate(payload.issuedAt);
   if (payload.expiresAt !== undefined) certificate.expiresAt = toDate(payload.expiresAt);

@@ -159,6 +159,16 @@ export const register = async (payload: {
     throw new AppError("Email is already registered", 409);
   }
 
+  if (payload.phone) {
+    const phoneOwner = await User.exists({
+      ...(existingUser ? { _id: { $ne: existingUser._id } } : {}),
+      phone: payload.phone,
+    });
+    if (phoneOwner) {
+      throw new AppError("Số điện thoại đã được sử dụng", 409);
+    }
+  }
+
   const passwordHash = await bcrypt.hash(payload.password, SALT_ROUNDS);
 
   if (existingUser) {
@@ -166,19 +176,34 @@ export const register = async (payload: {
     existingUser.fullName = payload.fullName;
     existingUser.phone = payload.phone;
     existingUser.status = "active";
-    await createAndSendRegisterOtp(existingUser);
+    try {
+      await createAndSendRegisterOtp(existingUser);
+    } catch (error: any) {
+      if (error?.code === 11000 && error?.keyPattern?.phone) {
+        throw new AppError("Số điện thoại đã được sử dụng", 409);
+      }
+      throw error;
+    }
     return;
   }
 
-  const user = await User.create({
-    email: payload.email,
-    passwordHash,
-    fullName: payload.fullName,
-    phone: payload.phone,
-    role: "CUSTOMER",
-    status: "active",
-    isEmailVerified: false,
-  });
+  let user;
+  try {
+    user = await User.create({
+      email: payload.email,
+      passwordHash,
+      fullName: payload.fullName,
+      phone: payload.phone,
+      role: "CUSTOMER",
+      status: "active",
+      isEmailVerified: false,
+    });
+  } catch (error: any) {
+    if (error?.code === 11000 && error?.keyPattern?.phone) {
+      throw new AppError("Số điện thoại đã được sử dụng", 409);
+    }
+    throw error;
+  }
 
   await createAndSendRegisterOtp(user);
 };

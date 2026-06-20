@@ -31,6 +31,9 @@ export interface IIdentityDocument {
   expiresAt?: Date;
   dateOfBirth?: Date;
   gender?: Gender;
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
   frontImageUrl?: string;
   backImageUrl?: string;
   passportImageUrl?: string;
@@ -50,6 +53,7 @@ export interface IIdentityDocument {
 export interface IProviderCertificate {
   _id?: Types.ObjectId;
   title: string;
+  certificateNumber?: string;
   issuer?: string;
   issuedAt?: Date;
   expiresAt?: Date;
@@ -98,6 +102,9 @@ const IdentityDocumentSchema = new Schema<IIdentityDocument>(
     expiresAt: { type: Date },
     dateOfBirth: { type: Date },
     gender: { type: String, enum: ["male", "female", "other"] },
+    nationality: { type: String, trim: true, maxlength: 120 },
+    placeOfOrigin: { type: String, trim: true, maxlength: 300 },
+    placeOfResidence: { type: String, trim: true, maxlength: 300 },
     frontImageUrl: { type: String, trim: true },
     backImageUrl: { type: String, trim: true },
     passportImageUrl: { type: String, trim: true },
@@ -127,6 +134,7 @@ const IdentityDocumentSchema = new Schema<IIdentityDocument>(
 const ProviderCertificateSchema = new Schema<IProviderCertificate>(
   {
     title: { type: String, required: true, trim: true, maxlength: 200 },
+    certificateNumber: { type: String, trim: true, maxlength: 100 },
     issuer: { type: String, trim: true, maxlength: 200 },
     issuedAt: { type: Date },
     expiresAt: { type: Date },

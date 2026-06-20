@@ -6,7 +6,7 @@ import type {
   ProviderApplicationPayload,
 } from '../types/providerApplication.types';
 
-export function useProviderApplication() {
+export function useProviderApplication(applicationId?: string | null) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [application, setApplication] = useState<ProviderApplication | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,9 @@ export function useProviderApplication() {
     let active = true;
     Promise.all([
       providerApplicationService.loadCategories(),
-      providerApplicationService.loadMine(),
+      applicationId
+        ? providerApplicationService.loadDetail(applicationId)
+        : providerApplicationService.loadMine(),
     ])
       .then(([categoryValue, applicationValue]) => {
         if (!active) return;
@@ -51,13 +53,15 @@ export function useProviderApplication() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [applicationId]);
 
   const submit = async (payload: ProviderApplicationPayload) => {
     try {
       setSubmitting(true);
       setSubmitError('');
-      return await providerApplicationService.submit(payload);
+      return await (applicationId
+        ? providerApplicationService.resubmit(applicationId, payload)
+        : providerApplicationService.submit(payload));
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : 'Không thể gửi hồ sơ.',

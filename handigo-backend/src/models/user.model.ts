@@ -1,4 +1,10 @@
 import mongoose, { Document, Schema } from "mongoose";
+import {
+  isValidPersonName,
+  isValidVietnamesePhone,
+  normalizePersonName,
+  normalizeVietnamesePhone,
+} from "../utils/profileValidation";
 
 export type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 export type UserStatus = "active" | "locked";
@@ -57,9 +63,21 @@ const UserSchema = new Schema<IUser>(
     fullName: {
       type: String,
       required: true,
+      set: normalizePersonName,
+      validate: {
+        validator: isValidPersonName,
+        message: "Họ và tên chỉ được chứa chữ cái và khoảng trắng",
+      },
     },
 
-    phone: { type: String, unique: true, sparse: true },
+    phone: {
+      type: String,
+      set: normalizeVietnamesePhone,
+      validate: {
+        validator: isValidVietnamesePhone,
+        message: "Số điện thoại Việt Nam không hợp lệ",
+      },
+    },
     avatar: { type: String, default: null },
     birthday: { type: Date, default: null },
     gender: {
@@ -107,6 +125,10 @@ const UserSchema = new Schema<IUser>(
   { timestamps: true },
 );
 
+UserSchema.index(
+  { phone: 1 },
+  { unique: true, partialFilterExpression: { phone: { $type: "string" } } },
+);
 UserSchema.index(
   { googleId: 1 },
   { unique: true, partialFilterExpression: { googleId: { $type: "string" } } },
