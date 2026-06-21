@@ -13,6 +13,7 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 const REFRESH_TOKEN_PATH = "/auth/refresh-token";
 const REFRESH_THRESHOLD_MS = 60_000;
 let refreshPromise: Promise<string> | null = null;
+const REFRESH_LOCK_NAME = "handigo-refresh-token";
 
 const isNetworkError = (error: unknown) => {
   return axios.isAxiosError(error) && !error.response;
@@ -48,15 +49,24 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const requestNewAccessToken = async () => {
+  const response = await api.post<RefreshTokenResponse>(REFRESH_TOKEN_PATH);
+  const token = response.data.token;
+  useAuthStore.getState().setToken(token);
+  return token;
+};
+
+const refreshAcrossTabs = async () => {
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    return navigator.locks.request(REFRESH_LOCK_NAME, requestNewAccessToken);
+  }
+
+  return requestNewAccessToken();
+};
+
 export const refreshAccessToken = async () => {
   if (!refreshPromise) {
-    refreshPromise = api
-      .post<RefreshTokenResponse>(REFRESH_TOKEN_PATH)
-      .then((response) => {
-        const token = response.data.token;
-        useAuthStore.getState().setToken(token);
-        return token;
-      })
+    refreshPromise = refreshAcrossTabs()
       .catch((error) => {
         if (!isNetworkError(error)) {
           useAuthStore.getState().logout();

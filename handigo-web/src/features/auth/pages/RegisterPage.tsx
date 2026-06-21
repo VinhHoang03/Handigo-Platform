@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { FloatingInput } from '@/components/common/FloatingField';
 import { authService } from '../services/auth.service';
+import { isValidVietnamesePhone, normalizeVietnamesePhone } from '@/utils/phoneValidation';
 
 type RegisterStep = 'form' | 'otp';
 
@@ -30,13 +31,18 @@ export default function RegisterPage() {
       setError('Mật khẩu xác nhận không khớp.');
       return;
     }
+    const normalizedPhone = normalizeVietnamesePhone(phone);
+    if (normalizedPhone && !isValidVietnamesePhone(normalizedPhone)) {
+      setError('Số điện thoại phải bắt đầu bằng 0 và dùng đầu số di động Việt Nam hợp lệ.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       await authService.register({
         fullName: fullName.trim(),
         email: normalizedEmail,
-        phone: phone.trim() || undefined,
+        phone: normalizedPhone || undefined,
         password,
       });
       setStep('otp');

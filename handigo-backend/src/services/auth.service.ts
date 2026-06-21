@@ -15,6 +15,7 @@ import {
   signRefreshToken,
 } from "../utils/token";
 import { AppError } from "../utils/appError";
+import { getVietnamesePhoneLookupValues } from "../utils/profileValidation";
 
 const SALT_ROUNDS = 10;
 
@@ -162,7 +163,7 @@ export const register = async (payload: {
   if (payload.phone) {
     const phoneOwner = await User.exists({
       ...(existingUser ? { _id: { $ne: existingUser._id } } : {}),
-      phone: payload.phone,
+      phone: { $in: getVietnamesePhoneLookupValues(payload.phone) },
     });
     if (phoneOwner) {
       throw new AppError("Số điện thoại đã được sử dụng", 409);

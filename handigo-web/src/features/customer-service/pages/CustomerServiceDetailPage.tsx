@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { bookingApi } from "@/api/booking";
-import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { Address, Category, Service, ServiceOption } from "@/types/booking";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
@@ -11,10 +10,10 @@ import {
   getCategoryName,
   getOptionPrice,
   getServiceImage,
-  setServiceImageFallback,
   getServicePrice,
   money,
 } from "../utils/serviceDisplay";
+import { ReliableImage } from "@/components/common/ReliableImage";
 
 const checklist = [
   "Tư vấn phạm vi công việc",
@@ -29,8 +28,6 @@ const getErrorMessage = (error: unknown) => {
   const err = error as { response?: { data?: { message?: string } } };
   return err?.response?.data?.message || "Không thể tải chi tiết dịch vụ.";
 };
-
-const CURRENT_LOCATION_VALUE = "__current_location__";
 
 const formatAddressLabel = (address: Address) =>
   address.fullAddress ||
@@ -52,7 +49,6 @@ const getProviderAvatar = (provider: NearbyProvider) =>
 export default function CustomerServiceDetailPage() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
   const {
     addressId,
     preferredProviderId,
@@ -70,7 +66,6 @@ export default function CustomerServiceDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState("");
   const [addressSelectionError, setAddressSelectionError] = useState("");
   const [providerListError, setProviderListError] = useState("");
@@ -204,64 +199,7 @@ export default function CustomerServiceDetailPage() {
     );
   };
 
-  const handleUseCurrentLocation = () => {
-    setAddressSelectionError("");
-
-    if (!navigator.geolocation) {
-      setAddressSelectionError("Trình duyệt không hỗ trợ định vị hiện tại.");
-      return;
-    }
-
-    if (!user?.phone) {
-      setAddressSelectionError("Vui lòng cập nhật số điện thoại trong hồ sơ trước khi dùng vị trí hiện tại.");
-      return;
-    }
-
-    const recipientName = user.fullName || "Khách hàng";
-    const recipientPhone = user.phone;
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          const createdAddress = await bookingApi.createAddress({
-            recipientName,
-            recipientPhone,
-            fullAddress: `Vị trí hiện tại (${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)})`,
-            ward: "Vị trí hiện tại",
-            province: "Vị trí hiện tại",
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            note: "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.",
-            isDefault: false,
-          });
-
-          setAddresses((current) => [
-            createdAddress,
-            ...current.filter((address) => address._id !== createdAddress._id),
-          ]);
-          setAddressId(createdAddress._id);
-        } catch (createError) {
-          const err = createError as { response?: { data?: { message?: string } } };
-          setAddressSelectionError(err?.response?.data?.message || "Không thể lưu vị trí hiện tại. Vui lòng thử lại.");
-        } finally {
-          setIsLocating(false);
-        }
-      },
-      () => {
-        setAddressSelectionError("Không thể lấy vị trí hiện tại. Vui lòng kiểm tra quyền định vị.");
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
-    );
-  };
-
   const handleAddressChange = (value: string) => {
-    if (value === CURRENT_LOCATION_VALUE) {
-      handleUseCurrentLocation();
-      return;
-    }
-
     setAddressSelectionError("");
     setAddressId(value);
     setPreferredProviderId(undefined);
@@ -319,9 +257,8 @@ export default function CustomerServiceDetailPage() {
           <section className="overflow-hidden rounded-xl bg-white p-5 shadow-sm">
             <div className="mb-5 grid h-[360px] grid-cols-4 grid-rows-2 gap-3">
               <div className="col-span-4 row-span-2 overflow-hidden rounded-lg md:col-span-3">
-                <img
+                <ReliableImage
                   src={getServiceImage(service)}
-                  onError={(event) => setServiceImageFallback(event.currentTarget)}
                   alt={service.name}
                   className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                 />
@@ -331,9 +268,8 @@ export default function CustomerServiceDetailPage() {
                   key={item}
                   className="hidden overflow-hidden rounded-lg bg-surface-container md:block"
                 >
-                  <img
+                  <ReliableImage
                     src={getServiceImage(service, item)}
-                    onError={(event) => setServiceImageFallback(event.currentTarget, item)}
                     alt={`${service.name} ${item}`}
                     className="h-full w-full object-cover"
                   />
@@ -452,9 +388,8 @@ export default function CustomerServiceDetailPage() {
                     to={`/customer/services/${item._id}`}
                     className="group overflow-hidden rounded-xl border border-outline-variant/30 bg-white transition hover:shadow-md"
                   >
-                    <img
+                    <ReliableImage
                       src={getServiceImage(item, index + 1)}
-                      onError={(event) => setServiceImageFallback(event.currentTarget, index + 1)}
                       alt={item.name}
                       className="h-32 w-full object-cover"
                     />
@@ -520,15 +455,12 @@ export default function CustomerServiceDetailPage() {
                 <select
                   id="service-detail-address"
                   value={addressId || ""}
-                  disabled={isLoadingAddresses || isLocating}
+                  disabled={isLoadingAddresses}
                   onChange={(event) => handleAddressChange(event.target.value)}
                   className="w-full appearance-none rounded-lg border border-outline-variant bg-surface-container-low px-3 py-3 pr-10 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="" disabled>
                     {isLoadingAddresses ? "Đang tải địa chỉ..." : "Chọn địa chỉ"}
-                  </option>
-                  <option value={CURRENT_LOCATION_VALUE}>
-                    {isLocating ? "Đang lấy vị trí hiện tại..." : "Vị trí hiện tại"}
                   </option>
                   {addresses.map((address) => (
                     <option key={address._id} value={address._id}>

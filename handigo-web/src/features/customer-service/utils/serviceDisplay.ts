@@ -40,11 +40,6 @@ export const normalizeServiceImageUrl = (value?: string | null) => {
 export const getServiceImage = (service?: Service | null, index = 0) =>
   normalizeServiceImageUrl(service?.image) || fallbackServiceImages[index % fallbackServiceImages.length];
 
-export const setServiceImageFallback = (image: HTMLImageElement, index = 0) => {
-  const fallback = fallbackServiceImages[index % fallbackServiceImages.length];
-  if (image.src !== fallback) image.src = fallback;
-};
-
 export const getOptionPrice = (option: ServiceOption) =>
   option.price ?? option.fixedPrice ?? 0;
 

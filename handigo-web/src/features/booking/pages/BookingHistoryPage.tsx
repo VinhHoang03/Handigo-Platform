@@ -19,6 +19,8 @@ const BookingHistoryPage = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   // Handle debouncing search term to avoid too many API calls
   useEffect(() => {
@@ -28,14 +30,16 @@ const BookingHistoryPage = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  const fetchOrders = useCallback(async (filter: string, search: string) => {
+  const fetchOrders = useCallback(async (filter: string, search: string, targetPage: number, append = false) => {
     // Avoid synchronous setState warning in build
     setTimeout(() => setLoading(true), 0);
     try {
       // Map 'all' to undefined for the API
       const statusParam = filter === 'all' ? undefined : filter;
-      const data = await bookingApi.getMyOrders(1, 10, statusParam, search);
-      setOrders(data.items);
+      const data = await bookingApi.getMyOrders(targetPage, 10, statusParam, search);
+      setOrders((current) => append ? [...current, ...data.items] : data.items);
+      setTotal(data.pagination.total);
+      setPage(targetPage);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     } finally {
@@ -45,7 +49,7 @@ const BookingHistoryPage = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchOrders(activeFilter, debouncedSearch);
+      fetchOrders(activeFilter, debouncedSearch, 1);
     }, 0);
     return () => clearTimeout(timer);
   }, [activeFilter, debouncedSearch, fetchOrders]);
@@ -78,10 +82,11 @@ const BookingHistoryPage = () => {
     serviceName: order?.serviceId?.name || 'Dịch vụ',
     statusLabel: mapStatusToLabel(order?.status || 'created'),
     statusTone: mapStatusToTone(order?.status || 'created'),
+    status: order?.status || 'created',
     schedule: order?.scheduledAt ? new Date(order.scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất',
     meta: order?.providerId ? `Chuyên gia: ${order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
     price: `${order?.pricing?.totalPaidAmount?.toLocaleString() || '0'}đ`,
-    imageUrl: order?.serviceId?.image || 'https://via.placeholder.com/150',
+    imageUrl: order?.serviceId?.image,
     primaryAction: order?.status === 'completed' ? 'Đánh giá' : 'Xem chi tiết',
   }));
 
@@ -148,7 +153,7 @@ const BookingHistoryPage = () => {
               <BookingHistoryCard key={booking.id !== 'unknown' ? booking.id : `booking-${index}`} booking={booking} />
             ))}
             {formattedBookings.length === 0 && (
-              <div className="text-center py-xl bg-surface-container-low rounded-3xl border-2 border-dashed border-outline-variant">
+              <div className="py-xl text-center">
                 <span className="material-symbols-outlined text-6xl text-on-surface-variant/30 mb-2">assignment_late</span>
                 <p className="text-on-surface-variant font-medium">
                   {debouncedSearch ? `Không tìm thấy kết quả cho "${debouncedSearch}"` : 'Bạn chưa có đơn đặt lịch nào.'}
@@ -167,9 +172,9 @@ const BookingHistoryPage = () => {
         )}
       </div>
 
-      {!loading && formattedBookings.length > 0 && (
+      {!loading && total > 5 && formattedBookings.length < total && (
         <div className="pt-lg flex justify-center">
-          <button className="px-lg py-3 border-2 border-primary/20 text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-all flex items-center gap-2 group">
+          <button type="button" onClick={() => void fetchOrders(activeFilter, debouncedSearch, page + 1, true)} className="px-lg py-3 border-2 border-primary/20 text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-all flex items-center gap-2 group">
             Xem thêm lịch sử
             <span className="material-symbols-outlined group-hover:translate-y-1 transition-transform">expand_more</span>
           </button>

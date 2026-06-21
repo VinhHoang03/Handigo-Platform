@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { Order } from '@/types/booking';
-import { formatMoney } from '../utils/providerOrder.utils';
+import { ReliableImage } from '@/components/common/ReliableImage';
 
 interface FixedPriceActionFormProps {
   order: Order;
@@ -34,8 +34,6 @@ export function FixedPriceActionForm({
   const showStart = order.status === 'accepted' && !order.inspectionRequired;
   const showComplete = order.status === 'in_progress';
   const showCancel = ['accepted', 'in_progress'].includes(order.status);
-  const currentStep =
-    order.status === 'completed' ? 3 : order.status === 'in_progress' ? 2 : 1;
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -53,51 +51,16 @@ export function FixedPriceActionForm({
   };
 
   return (
-    <div className="glass-card flex h-full flex-col space-y-md rounded-3xl p-md">
+    <div className="glass-card flex h-full flex-col space-y-md rounded-3xl border border-outline-variant/30 p-md sm:p-lg">
       <div>
-        <h3 className="font-headline-md text-on-surface">Tiến độ thực hiện</h3>
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary">task_alt</span>
+          <h3 className="font-headline-md text-on-surface">Thao tác đơn hàng</h3>
+        </div>
         <p className="mt-1 text-sm text-on-surface-variant">
-          Cập nhật đúng từng bước để khách hàng theo dõi trạng thái đơn.
+          Cập nhật trạng thái và bằng chứng thực hiện dịch vụ.
         </p>
       </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {['Đã nhận đơn', 'Đang thực hiện', 'Đã hoàn thành'].map((label, index) => {
-          const step = index + 1;
-          const isDone = step <= currentStep;
-          return (
-            <div key={label} className="text-center">
-              <div
-                className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${
-                  isDone
-                    ? 'bg-primary text-white'
-                    : 'bg-surface-container-high text-on-surface-variant'
-                }`}
-              >
-                {step < currentStep ? (
-                  <span className="material-symbols-outlined text-lg">check</span>
-                ) : (
-                  step
-                )}
-              </div>
-              <p className={`mt-2 text-xs font-medium ${isDone ? 'text-primary' : 'text-on-surface-variant'}`}>
-                {label}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {!order.inspectionRequired && (
-        <div className="rounded-2xl bg-primary/5 p-md">
-          <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-            Giá dịch vụ
-          </p>
-          <p className="text-headline-md font-bold text-primary">
-            {formatMoney(order.pricing.totalPaidAmount)}
-          </p>
-        </div>
-      )}
 
       {showComplete && (
         <div className="space-y-md">
@@ -127,7 +90,7 @@ export function FixedPriceActionForm({
               <div className="mt-sm grid grid-cols-3 gap-sm">
                 {previews.map((url, index) => (
                   <div key={url} className="relative aspect-square overflow-hidden rounded-xl">
-                    <img src={url} alt={`Bằng chứng ${index + 1}`} className="h-full w-full object-cover" />
+                    <ReliableImage src={url} alt={`Bằng chứng ${index + 1}`} className="h-full w-full object-cover" />
                     <button
                       type="button"
                       disabled={busy}
@@ -149,7 +112,7 @@ export function FixedPriceActionForm({
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              rows={3}
+              rows={4}
               disabled={busy}
               className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
               placeholder="Mô tả công việc đã thực hiện..."
@@ -164,7 +127,7 @@ export function FixedPriceActionForm({
           <div className="grid grid-cols-3 gap-sm">
             {order.completionEvidenceImages.map((url, index) => (
               <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="aspect-square overflow-hidden rounded-xl">
-                <img src={url} alt={`Bằng chứng hoàn thành ${index + 1}`} className="h-full w-full object-cover" />
+                <ReliableImage src={url} alt={`Bằng chứng hoàn thành ${index + 1}`} className="h-full w-full object-cover" />
               </a>
             ))}
           </div>
@@ -187,7 +150,7 @@ export function FixedPriceActionForm({
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="w-full rounded-xl py-2 text-sm font-medium text-error transition-colors hover:bg-error/5"
+            className="w-full rounded-xl border border-error/30 py-2.5 text-sm font-bold text-error transition-colors hover:bg-error/5"
           >
             Hủy đơn dịch vụ
           </button>

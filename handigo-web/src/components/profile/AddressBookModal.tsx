@@ -18,6 +18,10 @@ import type {
   UserAddress,
   UserAddressPayload,
 } from "@/features/profile/types/profile.types";
+import {
+  isValidVietnamesePhone,
+  normalizeVietnamesePhone,
+} from "@/utils/phoneValidation";
 
 type AddressFormState = UserAddressPayload & {
   addressLine: string;
@@ -270,6 +274,10 @@ export function AddressBookModal({
         : "Nhập số nhà, tên đường",
       onInput: handlePlaceInput,
       onPlaceSelect: handlePlaceSelect,
+      onError: (message) =>
+        setAddressAutocompleteError(
+          `${message} Bạn vẫn có thể nhập địa chỉ thủ công.`,
+        ),
     })
       .then((detach) => {
         if (cancelled) {
@@ -278,10 +286,10 @@ export function AddressBookModal({
           detachAutocomplete = detach;
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
           setAddressAutocompleteError(
-            "Google Places chưa sẵn sàng. Bạn vẫn có thể nhập địa chỉ thủ công.",
+            `${error instanceof Error ? error.message : "Google Places chưa sẵn sàng."} Bạn vẫn có thể nhập địa chỉ thủ công.`,
           );
         }
       });
@@ -359,23 +367,16 @@ export function AddressBookModal({
       return;
     }
 
-    const compactRecipientPhone = addressForm.recipientPhone
-      .trim()
-      .replace(/[\s.-]/g, "");
-    const normalizedRecipientPhone = compactRecipientPhone.startsWith("+84")
-      ? compactRecipientPhone
-      : compactRecipientPhone.startsWith("84")
-        ? `+${compactRecipientPhone}`
-        : compactRecipientPhone.startsWith("0")
-          ? `+84${compactRecipientPhone.slice(1)}`
-          : compactRecipientPhone;
+    const normalizedRecipientPhone = normalizeVietnamesePhone(
+      addressForm.recipientPhone,
+    );
 
     if (!/^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u.test(addressForm.recipientName.trim().replace(/\s+/g, " "))) {
       setAddressFormError("Tên người nhận chỉ được chứa chữ cái và khoảng trắng.");
       return;
     }
 
-    if (!/^\+84(?:3|5|7|8|9)\d{8}$/.test(normalizedRecipientPhone)) {
+    if (!isValidVietnamesePhone(normalizedRecipientPhone)) {
       setAddressFormError("Số điện thoại người nhận không hợp lệ.");
       return;
     }

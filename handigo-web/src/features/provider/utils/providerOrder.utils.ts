@@ -24,18 +24,20 @@ export const providerStatusStyles: Record<Order['status'], string> = {
 };
 
 export function formatMoney(value?: number) {
-  return currencyFormatter.format(value ?? 0);
+  return currencyFormatter.format(typeof value === 'number' && Number.isFinite(value) ? value : 0);
 }
 
 export function formatDateTime(value?: string | null) {
   if (!value) return 'Chưa chọn thời gian';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa chọn thời gian';
   return new Intl.DateTimeFormat('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }).format(new Date(value));
+  }).format(date);
 }
 
 export function getCustomer(order: Order): OrderCustomer | null {

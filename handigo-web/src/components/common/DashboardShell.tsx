@@ -77,7 +77,7 @@ export function DashboardShell({
       showStatusToggle={showStatusToggle}
       isOnline={isOnline}
       onStatusToggle={onStatusToggle}
-      hideSidebar={hideSidebar}
+      hideSidebar={role === "CUSTOMER" || hideSidebar}
     >
       {children}
       {role === "PROVIDER" && (

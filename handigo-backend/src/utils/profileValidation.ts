@@ -1,4 +1,5 @@
-export const VIETNAMESE_PHONE_PATTERN = /^\+84(?:3|5|7|8|9)\d{8}$/;
+export const VIETNAMESE_PHONE_PATTERN =
+  /^0(?:3[2-9]|5[25689]|7[06789]|8[1-9]|9[0-46-9])\d{7}$/;
 export const PERSON_NAME_PATTERN = /^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u;
 
 export const normalizePersonName = (value: string) =>
@@ -6,11 +7,6 @@ export const normalizePersonName = (value: string) =>
 
 export const normalizeVietnamesePhone = (value: string) => {
   const compactValue = value.trim().replace(/[\s.-]/g, "");
-
-  if (compactValue.startsWith("+84")) return compactValue;
-  if (compactValue.startsWith("84")) return `+${compactValue}`;
-  if (compactValue.startsWith("0")) return `+84${compactValue.slice(1)}`;
-
   return compactValue;
 };
 
@@ -19,3 +15,8 @@ export const isValidPersonName = (value: string) =>
 
 export const isValidVietnamesePhone = (value: string) =>
   VIETNAMESE_PHONE_PATTERN.test(normalizeVietnamesePhone(value));
+
+export const getVietnamesePhoneLookupValues = (value: string) => {
+  const normalized = normalizeVietnamesePhone(value);
+  return [normalized, `+84${normalized.slice(1)}`];
+};
