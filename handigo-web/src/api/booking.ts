@@ -5,6 +5,7 @@ export interface CreateOrderPayload {
   serviceId: string;
   selectedOptionIds?: string[];
   addressId: string;
+  preferredProviderId?: string;
   orderType?: 'normal' | 'urgent' | 'scheduled' | 'recurring';
   scheduledAt?: string;
   problemDescription?: string;
@@ -18,6 +19,8 @@ export interface CreateAddressPayload {
   fullAddress: string;
   province: string;
   ward: string;
+  latitude?: number;
+  longitude?: number;
   isDefault?: boolean;
   note?: string | null;
 }
