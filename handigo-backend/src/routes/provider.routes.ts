@@ -4,6 +4,8 @@ import {
   deleteCertificate,
   getMyProfile,
   getFeaturedProviders,
+  getNearbyProviders,
+  getPublicProviderProfile,
   submitIdentity,
   updateCertificate,
   updateMyProfile,
@@ -14,6 +16,8 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 const router = Router();
 
 router.get("/featured", getFeaturedProviders);
+router.get("/nearby", authMiddleware, roleMiddleware("CUSTOMER"), getNearbyProviders);
+router.get("/:providerId/public", getPublicProviderProfile);
 router.use(authMiddleware, roleMiddleware("PROVIDER"));
 
 router.get("/me", getMyProfile);

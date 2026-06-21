@@ -11,6 +11,7 @@ import BookingSuccessPage from "./features/booking/pages/BookingSuccessPage";
 import CustomerProfilePage from "./features/customer/pages/CustomerProfilePage";
 import CustomerServiceDetailPage from "./features/customer-service/pages/CustomerServiceDetailPage";
 import CustomerServiceListPage from "./features/customer-service/pages/CustomerServiceListPage";
+import PublicProviderProfilePage from "./features/customer-service/pages/PublicProviderProfilePage";
 import ProviderHomePage from "./features/provider/pages/ProviderHomePage";
 import ProviderOrdersPage from "./features/provider/pages/ProviderOrdersPage";
 import ProviderOrderDetailPage from "./features/provider/pages/ProviderOrderDetailPage";
@@ -100,6 +101,14 @@ function App() {
             element={
               <RouteGuard roles={["CUSTOMER"]}>
                 <CustomerServiceDetailPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/customer/providers/:providerId"
+            element={
+              <RouteGuard roles={["CUSTOMER"]}>
+                <PublicProviderProfilePage />
               </RouteGuard>
             }
           />

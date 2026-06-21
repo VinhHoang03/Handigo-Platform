@@ -168,10 +168,10 @@ export const AssignmentService = {
     if (!order || order.status !== "created") return;
 
     const address = await (
-      await import("../models/address.model")
+      await import("../models/address.model.js")
     ).Address.findById(order.addressId);
     const service = await (
-      await import("../models/service.model")
+      await import("../models/service.model.js")
     ).Service.findById(order.serviceId);
 
     // Collect all tried providers from existing assignment history
@@ -181,7 +181,7 @@ export const AssignmentService = {
     }).lean();
     const triedProviderIds = triedAssignments.map((a) => a.providerId);
 
-    const { DispatchService } = await import("./dispatch.service");
+    const { DispatchService } = await import("./dispatch.service.js");
     await DispatchService.dispatchOrder(
       order._id.toString(),
       {

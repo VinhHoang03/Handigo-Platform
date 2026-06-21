@@ -24,7 +24,7 @@ const formatAddress = (address: Address | null) => {
 const ConfirmPaymentPage = () => {
   const {
     categoryId, serviceId, selectedOptionIds, addressId, orderType,
-    scheduledAt, problemDescription, customerAttachments, paymentMethod, setPaymentMethod, reset
+    preferredProviderId, scheduledAt, problemDescription, customerAttachments, paymentMethod, setPaymentMethod, reset
   } = useBookingStore();
 
   const [service, setService] = useState<Service | null>(null);
@@ -74,6 +74,7 @@ const ConfirmPaymentPage = () => {
         serviceId,
         selectedOptionIds,
         addressId,
+        preferredProviderId,
         orderType,
         scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         problemDescription,

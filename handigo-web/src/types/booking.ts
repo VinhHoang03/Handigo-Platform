@@ -14,7 +14,7 @@ export interface Service {
   name: string;
   slug: string;
   description?: string;
-  serviceType: 'fixed_price' | 'variable_price';
+  serviceType: "fixed_price" | "variable_price";
   fixedPrice?: number;
   depositAmount?: number;
   image?: string;
@@ -26,7 +26,16 @@ export interface ServiceOption {
   serviceId: string;
   name: string;
   description?: string | null;
-  optionType: 'room_count' | 'area_size' | 'package' | 'add_on' | 'other' | 'inspection' | 'cleaning' | 'installation' | 'repair';
+  optionType:
+    | "room_count"
+    | "area_size"
+    | "package"
+    | "add_on"
+    | "other"
+    | "inspection"
+    | "cleaning"
+    | "installation"
+    | "repair";
   price: number;
   fixedPrice?: number;
   isFixedPrice?: boolean;
@@ -37,19 +46,19 @@ export interface Payment {
   _id: string;
   orderId: string;
   amount: number;
-  method: 'payos' | 'vnpay' | 'cash' | 'wallet' | 'bank';
-  paymentType: 'full' | 'remaining' | 'inspection_deposit';
-  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  method: "payos" | "vnpay" | "cash" | "wallet" | "bank";
+  paymentType: "full" | "remaining" | "inspection_deposit";
+  status: "pending" | "paid" | "failed" | "refunded";
   transactionCode?: string | null;
 }
 
 export interface CreatePaymentResult {
   payment: Payment;
-  method?: 'CASH';
+  method?: "CASH";
   amount?: number;
   checkoutUrl?: string;
   qrCode?: string;
-  paymentType: Payment['paymentType'];
+  paymentType: Payment["paymentType"];
 }
 
 export interface Address {
@@ -89,7 +98,7 @@ export interface OrderPricing {
 export interface OrderDiscountSnapshot {
   name?: string;
   code?: string;
-  discountType: 'fixed' | 'percentage';
+  discountType: "fixed" | "percentage";
   discountValue: number;
   discountAmount: number;
 }
@@ -130,11 +139,11 @@ export interface Order {
     price: number;
   }>;
   addressId: Address;
-  orderType: 'normal' | 'urgent' | 'scheduled' | 'recurring';
+  orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string | null;
-  status: 'created' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
-  paymentMethod: 'wallet' | 'bank' | 'cash';
-  paymentStatus: 'unpaid' | 'partially_paid' | 'paid' | 'refunded';
+  status: "created" | "accepted" | "in_progress" | "completed" | "cancelled";
+  paymentMethod: "wallet" | "bank" | "cash";
+  paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
   inspectionRequired?: boolean;
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
@@ -157,7 +166,7 @@ export interface QuotationItem {
   quotationId?: string;
   title: string;
   description?: string | null;
-  itemType?: 'labor' | 'material' | 'replacement_part' | 'other';
+  itemType?: "labor" | "material" | "replacement_part" | "other";
   quantity: number;
   unitPrice: number;
   totalPrice: number;
@@ -168,7 +177,7 @@ export interface OrderQuotation {
   quotation: {
     _id: string;
     quotationCode?: string;
-    status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+    status: "pending" | "approved" | "rejected" | "expired" | "cancelled";
     subtotalAmount?: number;
     discountAmount?: number;
     finalAmount: number;
@@ -187,22 +196,28 @@ export interface BookingState {
   serviceId?: string;
   selectedOptionIds: string[];
   addressId?: string;
-  orderType: 'normal' | 'urgent' | 'scheduled' | 'recurring';
+  preferredProviderId?: string;
+  orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
   problemDescription?: string;
   customerAttachments: string[];
-  paymentMethod: 'wallet' | 'bank' | 'cash';
+  paymentMethod: "wallet" | "bank" | "cash";
 
   // Helpers
   setCategoryId: (id: string) => void;
   setServiceId: (id: string) => void;
-  selectService: (categoryId: string, serviceId: string) => void;
+  selectService: (
+    categoryId: string,
+    serviceId: string,
+    selectedOptionIds?: string[],
+  ) => void;
   toggleOption: (id: string) => void;
-  setAddressId: (id?: string) => void;
-  setOrderType: (type: BookingState['orderType']) => void;
+  setAddressId: (id: string) => void;
+  setPreferredProviderId: (id?: string) => void;
+  setOrderType: (type: BookingState["orderType"]) => void;
   setScheduledAt: (date: string) => void;
   setProblemDescription: (desc: string) => void;
   setCustomerAttachments: (attachments: string[]) => void;
-  setPaymentMethod: (method: BookingState['paymentMethod']) => void;
+  setPaymentMethod: (method: BookingState["paymentMethod"]) => void;
   reset: () => void;
 }
