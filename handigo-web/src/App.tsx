@@ -14,6 +14,7 @@ import CustomerServiceListPage from "./features/customer-service/pages/CustomerS
 import ProviderHomePage from "./features/provider/pages/ProviderHomePage";
 import ProviderOrdersPage from "./features/provider/pages/ProviderOrdersPage";
 import ProviderOrderDetailPage from "./features/provider/pages/ProviderOrderDetailPage";
+import ProviderSchedulePage from "./features/provider/pages/ProviderSchedulePage";
 import ProviderProfilePage from "./features/provider/pages/ProviderProfilePage";
 import ProviderBankAccountsPage from "./features/bank-account/pages/ProviderBankAccountsPage";
 import NotificationsPage from "./features/notification/pages/NotificationsPage";
@@ -131,6 +132,14 @@ function App() {
             element={
               <RouteGuard roles={["PROVIDER"]}>
                 <ProviderOrderDetailPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/provider/schedule"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <ProviderSchedulePage />
               </RouteGuard>
             }
           />

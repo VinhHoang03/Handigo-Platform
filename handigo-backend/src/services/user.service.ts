@@ -3,6 +3,7 @@ import { AppError } from "../utils/appError";
 import {
   normalizePersonName,
   normalizeVietnamesePhone,
+  getVietnamesePhoneLookupValues,
 } from "../utils/profileValidation";
 
 export interface UpdateProfileInput {
@@ -34,7 +35,7 @@ export const updateProfileService = async (
     updateData.phone = normalizeVietnamesePhone(data.phone);
     const existingUser = await User.exists({
       _id: { $ne: userId },
-      phone: updateData.phone,
+      phone: { $in: getVietnamesePhoneLookupValues(updateData.phone) },
     });
     if (existingUser) {
       throw new AppError("Số điện thoại đã được sử dụng", 409);

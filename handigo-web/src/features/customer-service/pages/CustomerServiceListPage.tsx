@@ -8,8 +8,8 @@ import {
   getServiceImage,
   getServicePrice,
   money,
-  setServiceImageFallback,
 } from "../utils/serviceDisplay";
+import { ReliableImage } from "@/components/common/ReliableImage";
 import type { Category, Service, ServiceOption } from "@/types/booking";
 
 const getErrorMessage = (error: unknown) => {
@@ -224,26 +224,14 @@ export default function CustomerServiceListPage() {
                     className="group overflow-hidden rounded-2xl border border-outline-variant/20 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     <div className="relative h-48 overflow-hidden">
-                      <img
+                      <ReliableImage
                         src={getServiceImage(service, index)}
-                        onError={(event) => setServiceImageFallback(event.currentTarget, index)}
                         alt={service.name}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       <span className="absolute left-4 top-4 rounded-full bg-primary-container/90 px-3 py-1 text-xs font-bold uppercase text-white">
                         {getCategoryName(service, categories)}
                       </span>
-                      <div className="absolute right-4 top-4 flex items-center rounded-full bg-white/90 px-2 py-1 shadow-sm">
-                        <span
-                          className="material-symbols-outlined text-[16px] text-star-gold"
-                          style={{ fontVariationSettings: "'FILL' 1" }}
-                        >
-                          star
-                        </span>
-                        <span className="ml-1 text-xs font-bold text-on-surface">
-                          4.{8 - (index % 3)}
-                        </span>
-                      </div>
                     </div>
                     <div className="p-5">
                       <h3 className="line-clamp-2 text-xl font-bold leading-tight text-on-surface transition-colors group-hover:text-primary">
@@ -252,15 +240,7 @@ export default function CustomerServiceListPage() {
                       <p className="mt-2 line-clamp-2 min-h-10 text-sm text-on-surface-variant">
                         {service.description || "Dịch vụ tại nhà được kiểm duyệt bởi Handigo."}
                       </p>
-                      <div className="my-4 flex items-center justify-between border-y border-outline-variant/30 py-2 text-xs text-on-surface-variant">
-                        <span>
-                          <b className="text-on-surface">{120 + index * 37}</b> lượt đặt
-                        </span>
-                        <span>
-                          <b className="text-on-surface">{8 + index * 3}</b> provider
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
                         <div>
                           <span className="block text-xs text-outline">
                             {service.serviceType === "fixed_price" ? "Giá" : "Từ"}

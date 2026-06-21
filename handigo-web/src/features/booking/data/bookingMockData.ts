@@ -5,10 +5,11 @@ export interface BookingListItem {
   serviceName: string;
   statusLabel: string;
   statusTone: BookingStatusTone;
+  status?: string;
   schedule: string;
   meta: string;
   price: string;
-  imageUrl: string;
+  imageUrl?: string;
   primaryAction: string;
   secondaryAction?: string;
   rating?: string;

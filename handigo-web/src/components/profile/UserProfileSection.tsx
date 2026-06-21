@@ -10,6 +10,10 @@ import type {
   UserProfileData,
   UserProfileFormValue,
 } from "@/features/profile/types/profile.types";
+import {
+  isValidVietnamesePhone,
+  normalizeVietnamesePhone,
+} from "@/utils/phoneValidation";
 
 const DEFAULT_AVATAR =
   "https://ui-avatars.com/api/?name=Handigo&background=4f46e5&color=fff";
@@ -27,6 +31,7 @@ interface UserProfileSectionProps {
   highlightPhone?: boolean;
   showProfile?: boolean;
   showAddresses?: boolean;
+  addressManager?: ReactNode;
   onSaveProfile: (payload: UserProfileFormValue) => Promise<void> | void;
   onAddAddress?: () => void;
   onEditAddress?: (address: UserAddress) => void;
@@ -236,6 +241,7 @@ export function UserProfileSection({
   highlightPhone,
   showProfile = true,
   showAddresses = true,
+  addressManager,
   onSaveProfile,
   onAddAddress,
   onEditAddress,
@@ -262,14 +268,7 @@ export function UserProfileSection({
     setFieldErrors({});
 
     const normalizedName = profileForm.fullName.trim().replace(/\s+/g, " ");
-    const compactPhone = profileForm.phone?.trim().replace(/[\s.-]/g, "") || "";
-    const normalizedPhone = compactPhone.startsWith("+84")
-      ? compactPhone
-      : compactPhone.startsWith("84")
-        ? `+${compactPhone}`
-        : compactPhone.startsWith("0")
-          ? `+84${compactPhone.slice(1)}`
-          : compactPhone;
+    const normalizedPhone = normalizeVietnamesePhone(profileForm.phone || "");
     const nextFieldErrors: { fullName?: string; phone?: string } = {};
 
     if (!normalizedName) {
@@ -278,7 +277,7 @@ export function UserProfileSection({
       nextFieldErrors.fullName = "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
     }
 
-    if (normalizedPhone && !/^\+84(?:3|5|7|8|9)\d{8}$/.test(normalizedPhone)) {
+    if (normalizedPhone && !isValidVietnamesePhone(normalizedPhone)) {
       nextFieldErrors.phone = "Số điện thoại Việt Nam không hợp lệ.";
     }
 
@@ -528,7 +527,7 @@ export function UserProfileSection({
           )}
         </form>}
 
-        {showAddresses && <div className="min-w-0 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5">
+        {showAddresses && (addressManager || <div className="min-w-0 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h4 className="font-headline-sm text-headline-sm text-on-surface">
@@ -583,7 +582,7 @@ export function UserProfileSection({
               Chưa có địa chỉ đã lưu.
             </div>
           )}
-        </div>}
+        </div>)}
       </div>
     </section>
   );

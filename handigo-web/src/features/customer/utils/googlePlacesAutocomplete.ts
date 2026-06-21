@@ -10,8 +10,6 @@ export interface ParsedPlaceAddress {
 interface GoogleAddressComponent {
   longText?: string;
   shortText?: string;
-  long_name?: string;
-  short_name?: string;
   types: string[];
 }
 
@@ -22,39 +20,37 @@ interface GoogleLatLng {
 
 interface GooglePlace {
   id?: string;
-  place_id?: string;
   formattedAddress?: string;
-  formatted_address?: string;
   displayName?: string | { text?: string };
-  name?: string;
   addressComponents?: GoogleAddressComponent[];
-  address_components?: GoogleAddressComponent[];
   location?: GoogleLatLng;
-  geometry?: {
-    location?: GoogleLatLng;
-  };
   fetchFields?: (options: { fields: string[] }) => Promise<void>;
 }
 
-interface GooglePlacePrediction {
+interface PlacePrediction {
+  text?: { text?: string } | string;
+  structuredFormat?: {
+    mainText?: { text?: string };
+    secondaryText?: { text?: string };
+  };
   toPlace: () => GooglePlace;
 }
 
-interface PlacePredictionSelectEvent extends Event {
-  placePrediction?: GooglePlacePrediction;
-  detail?: {
-    placePrediction?: GooglePlacePrediction;
-  };
-}
-
-interface PlaceAutocompleteElement extends HTMLElement {
-  includedRegionCodes?: string[];
-  placeholder?: string;
-  value?: string;
+interface AutocompleteSuggestion {
+  placePrediction?: PlacePrediction;
 }
 
 interface PlacesLibrary {
-  PlaceAutocompleteElement?: new () => PlaceAutocompleteElement;
+  AutocompleteSuggestion?: {
+    fetchAutocompleteSuggestions: (request: {
+      input: string;
+      includedRegionCodes: string[];
+      language: string;
+      region: string;
+      sessionToken?: unknown;
+    }) => Promise<{ suggestions: AutocompleteSuggestion[] }>;
+  };
+  AutocompleteSessionToken?: new () => unknown;
 }
 
 interface GoogleMapsNamespace {
@@ -76,6 +72,7 @@ interface MountPlaceAutocompleteOptions {
   placeholder?: string;
   onInput?: (value: string) => void;
   onPlaceSelect: (address: ParsedPlaceAddress) => void;
+  onError?: (message: string) => void;
 }
 
 const scriptId = "google-maps-js-sdk";
@@ -83,55 +80,48 @@ let mapsApiPromise: Promise<void> | null = null;
 let placesLibraryPromise: Promise<PlacesLibrary> | null = null;
 
 const readText = (component: GoogleAddressComponent) =>
-  component.longText || component.long_name || component.shortText || component.short_name || "";
+  component.longText || component.shortText || "";
 
 const getComponent = (
   components: GoogleAddressComponent[] | undefined,
   acceptedTypes: string[],
-) =>
-  components?.find((component) =>
-    acceptedTypes.some((type) => component.types.includes(type)),
-  )
-    ? readText(
-        components.find((component) =>
-          acceptedTypes.some((type) => component.types.includes(type)),
-        ) as GoogleAddressComponent,
-      )
-    : "";
-
-const readLatLng = (value: GoogleLatLng | undefined) => {
-  if (!value) return {};
-
-  const lat = typeof value.lat === "function" ? value.lat() : value.lat;
-  const lng = typeof value.lng === "function" ? value.lng() : value.lng;
-
-  return { latitude: lat, longitude: lng };
+) => {
+  const component = components?.find((item) =>
+    acceptedTypes.some((type) => item.types.includes(type)),
+  );
+  return component ? readText(component) : "";
 };
 
-const readDisplayName = (displayName: GooglePlace["displayName"]) =>
-  typeof displayName === "string" ? displayName : displayName?.text;
+const readLatLng = (value: GoogleLatLng | undefined) => {
+  const latitude = typeof value?.lat === "function" ? value.lat() : value?.lat;
+  const longitude = typeof value?.lng === "function" ? value.lng() : value?.lng;
+  return { latitude, longitude };
+};
+
+const readDisplayName = (value: GooglePlace["displayName"]) =>
+  typeof value === "string" ? value : value?.text;
+
+const readPredictionText = (prediction: PlacePrediction) =>
+  typeof prediction.text === "string"
+    ? prediction.text
+    : prediction.text?.text || prediction.structuredFormat?.mainText?.text || "";
 
 export const parseGooglePlace = (place: GooglePlace): ParsedPlaceAddress => {
-  const components = place.addressComponents || place.address_components;
-  const location = place.location || place.geometry?.location;
-  const { latitude, longitude } = readLatLng(location);
-
+  const { latitude, longitude } = readLatLng(place.location);
   return {
     fullAddress:
-      place.formattedAddress ||
-      place.formatted_address ||
-      readDisplayName(place.displayName) ||
-      place.name ||
-      "",
-    province: getComponent(components, ["administrative_area_level_1"]),
-    ward: getComponent(components, [
+      place.formattedAddress || readDisplayName(place.displayName) || "",
+    province: getComponent(place.addressComponents, [
+      "administrative_area_level_1",
+    ]),
+    ward: getComponent(place.addressComponents, [
       "sublocality_level_1",
       "administrative_area_level_3",
       "locality",
     ]),
     latitude,
     longitude,
-    placeId: place.id || place.place_id,
+    placeId: place.id,
   };
 };
 
@@ -141,21 +131,19 @@ export const loadGoogleMapsApi = () => {
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
-    return Promise.reject(new Error("Missing VITE_GOOGLE_MAPS_API_KEY"));
+    return Promise.reject(
+      new Error("Chưa cấu hình khóa Google Maps cho ứng dụng."),
+    );
   }
 
   mapsApiPromise = new Promise<void>((resolve, reject) => {
     const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
     if (existingScript) {
-      if (window.google?.maps?.importLibrary) {
-        resolve();
-        return;
-      }
-
+      if (window.google?.maps?.importLibrary) return resolve();
       existingScript.addEventListener("load", () => resolve(), { once: true });
       existingScript.addEventListener(
         "error",
-        () => reject(new Error("Google Maps script failed to load")),
+        () => reject(new Error("Không tải được Google Maps.")),
         { once: true },
       );
       return;
@@ -174,7 +162,6 @@ export const loadGoogleMapsApi = () => {
       region: "VN",
       callback: "__handigoGoogleMapsLoaded",
     });
-
     const script = document.createElement("script");
     script.id = scriptId;
     script.async = true;
@@ -183,7 +170,7 @@ export const loadGoogleMapsApi = () => {
     script.onerror = () => {
       mapsApiPromise = null;
       delete window.__handigoGoogleMapsLoaded;
-      reject(new Error("Google Maps script failed to load"));
+      reject(new Error("Không tải được Google Maps."));
     };
     document.head.appendChild(script);
   });
@@ -193,94 +180,171 @@ export const loadGoogleMapsApi = () => {
 
 export const loadPlacesNewLibrary = async () => {
   if (placesLibraryPromise) return placesLibraryPromise;
-
   placesLibraryPromise = loadGoogleMapsApi().then(async () => {
     const importLibrary = window.google?.maps?.importLibrary;
-    if (!importLibrary) {
-      throw new Error("Google Maps importLibrary is unavailable");
+    if (!importLibrary) throw new Error("Google Maps chưa sẵn sàng.");
+    const library = await importLibrary("places");
+    if (!library.AutocompleteSuggestion) {
+      throw new Error(
+        "Places API (New) chưa được bật hoặc khóa API chưa có quyền sử dụng.",
+      );
     }
-
-    const placesLibrary = await importLibrary("places");
-    if (!placesLibrary.PlaceAutocompleteElement) {
-      throw new Error("Google PlaceAutocompleteElement is unavailable");
-    }
-
-    return placesLibrary;
+    return library;
   });
-
   return placesLibraryPromise;
-};
-
-const getAutocompleteValue = (
-  autocomplete: PlaceAutocompleteElement,
-  event?: Event,
-) => {
-  const targetValue = (event?.target as { value?: string } | null)?.value;
-  const pathValue = (event?.composedPath?.()[0] as { value?: string } | undefined)
-    ?.value;
-
-  return targetValue ?? pathValue ?? autocomplete.value ?? "";
 };
 
 export const mountPlaceAutocompleteElement = async ({
   container,
-  value,
-  placeholder = "Nhập địa chỉ cụ thể",
+  value = "",
+  placeholder = "Nhập số nhà, tên đường",
   onInput,
   onPlaceSelect,
+  onError,
 }: MountPlaceAutocompleteOptions) => {
-  const { PlaceAutocompleteElement } = await loadPlacesNewLibrary();
-  if (!PlaceAutocompleteElement) {
-    throw new Error("Google PlaceAutocompleteElement is unavailable");
-  }
+  const library = await loadPlacesNewLibrary();
+  const suggestionApi = library.AutocompleteSuggestion;
+  if (!suggestionApi) throw new Error("Places API (New) chưa sẵn sàng.");
 
-  const autocomplete = new PlaceAutocompleteElement();
-  autocomplete.id = "address-line-google-places";
-  autocomplete.className = "google-place-autocomplete";
-  autocomplete.includedRegionCodes = ["vn"];
-  autocomplete.placeholder = placeholder;
+  const wrapper = document.createElement("div");
+  wrapper.className = "places-address-field";
+  const icon = document.createElement("span");
+  icon.className = "material-symbols-outlined places-address-field__icon";
+  icon.textContent = "location_on";
+  const input = document.createElement("input");
+  input.id = "address-line-google-places";
+  input.className = "google-place-autocomplete places-address-field__input";
+  input.type = "text";
+  input.autocomplete = "street-address";
+  input.placeholder = placeholder;
+  input.value = value;
+  const loading = document.createElement("span");
+  loading.className = "material-symbols-outlined places-address-field__loading";
+  loading.textContent = "progress_activity";
+  loading.hidden = true;
+  const dropdown = document.createElement("div");
+  dropdown.className = "places-address-dropdown";
+  dropdown.hidden = true;
+  wrapper.append(icon, input, loading, dropdown);
+  container.replaceChildren(wrapper);
 
-  if (value) {
-    autocomplete.value = value;
-  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let requestSequence = 0;
+  let sessionToken = library.AutocompleteSessionToken
+    ? new library.AutocompleteSessionToken()
+    : undefined;
 
-  container.replaceChildren(autocomplete);
-
-  const handleInput = (event: Event) => {
-    onInput?.(getAutocompleteValue(autocomplete, event));
+  const closeDropdown = () => {
+    dropdown.hidden = true;
+    dropdown.replaceChildren();
   };
 
-  const handleSelect = async (event: Event) => {
-    const selectEvent = event as PlacePredictionSelectEvent;
-    const prediction =
-      selectEvent.placePrediction || selectEvent.detail?.placePrediction;
-    const place = prediction?.toPlace();
-
-    if (!place) return;
-
-    await place.fetchFields?.({
-      fields: [
-        "id",
-        "displayName",
-        "formattedAddress",
-        "location",
-        "addressComponents",
-      ],
-    });
-
-    const parsedPlace = parseGooglePlace(place);
-    autocomplete.value = parsedPlace.fullAddress || getAutocompleteValue(autocomplete);
-    onPlaceSelect(parsedPlace);
+  const selectPrediction = async (prediction: PlacePrediction) => {
+    closeDropdown();
+    loading.hidden = false;
+    try {
+      const place = prediction.toPlace();
+      await place.fetchFields?.({
+        fields: [
+          "id",
+          "displayName",
+          "formattedAddress",
+          "location",
+          "addressComponents",
+        ],
+      });
+      const parsed = parseGooglePlace(place);
+      input.value = parsed.fullAddress || readPredictionText(prediction);
+      onInput?.(input.value);
+      onPlaceSelect(parsed);
+      sessionToken = library.AutocompleteSessionToken
+        ? new library.AutocompleteSessionToken()
+        : undefined;
+    } catch (error) {
+      onError?.(
+        error instanceof Error
+          ? error.message
+          : "Không thể lấy thông tin địa điểm đã chọn.",
+      );
+    } finally {
+      loading.hidden = true;
+    }
   };
 
-  autocomplete.addEventListener("input", handleInput);
-  autocomplete.addEventListener("change", handleInput);
-  autocomplete.addEventListener("gmp-select", handleSelect);
+  const renderSuggestions = (suggestions: AutocompleteSuggestion[]) => {
+    dropdown.replaceChildren();
+    for (const suggestion of suggestions) {
+      const prediction = suggestion.placePrediction;
+      if (!prediction) continue;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "places-address-option";
+      const optionIcon = document.createElement("span");
+      optionIcon.className = "material-symbols-outlined places-address-option__icon";
+      optionIcon.textContent = "location_on";
+      const content = document.createElement("span");
+      content.className = "places-address-option__content";
+      const main = document.createElement("strong");
+      main.textContent =
+        prediction.structuredFormat?.mainText?.text || readPredictionText(prediction);
+      const secondary = document.createElement("small");
+      secondary.textContent = prediction.structuredFormat?.secondaryText?.text || "";
+      content.append(main, secondary);
+      button.append(optionIcon, content);
+      button.addEventListener("mousedown", (event) => event.preventDefault());
+      button.addEventListener("click", () => void selectPrediction(prediction));
+      dropdown.appendChild(button);
+    }
+    dropdown.hidden = dropdown.childElementCount === 0;
+  };
+
+  const fetchSuggestions = async () => {
+    const inputValue = input.value.trim();
+    const currentSequence = ++requestSequence;
+    if (inputValue.length < 2) return closeDropdown();
+    loading.hidden = false;
+    try {
+      const response = await suggestionApi.fetchAutocompleteSuggestions({
+        input: inputValue,
+        includedRegionCodes: ["vn"],
+        language: "vi",
+        region: "vn",
+        sessionToken,
+      });
+      if (currentSequence === requestSequence) {
+        renderSuggestions(response.suggestions);
+      }
+    } catch (error) {
+      if (currentSequence === requestSequence) closeDropdown();
+      console.error("Không thể tải gợi ý địa chỉ từ Places New.", error);
+      onError?.(
+        "Không tải được gợi ý địa chỉ. Hãy kiểm tra Places API (New), thanh toán và quyền của khóa Google Maps.",
+      );
+    } finally {
+      if (currentSequence === requestSequence) loading.hidden = true;
+    }
+  };
+
+  const handleInput = () => {
+    onInput?.(input.value);
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => void fetchSuggestions(), 280);
+  };
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape") closeDropdown();
+  };
+  const handleBlur = () => setTimeout(closeDropdown, 150);
+
+  input.addEventListener("input", handleInput);
+  input.addEventListener("keydown", handleKeyDown);
+  input.addEventListener("blur", handleBlur);
 
   return () => {
-    autocomplete.removeEventListener("input", handleInput);
-    autocomplete.removeEventListener("change", handleInput);
-    autocomplete.removeEventListener("gmp-select", handleSelect);
-    autocomplete.remove();
+    requestSequence += 1;
+    if (timer) clearTimeout(timer);
+    input.removeEventListener("input", handleInput);
+    input.removeEventListener("keydown", handleKeyDown);
+    input.removeEventListener("blur", handleBlur);
+    wrapper.remove();
   };
 };

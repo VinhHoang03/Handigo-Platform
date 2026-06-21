@@ -13,6 +13,14 @@ const paymentMethods = [
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
+const formatAddress = (address: Address | null) => {
+  if (!address) return '';
+  return [address.detailAddress, address.ward, address.district, address.province]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(', ');
+};
+
 const ConfirmPaymentPage = () => {
   const {
     categoryId, serviceId, selectedOptionIds, addressId, orderType,
@@ -97,19 +105,22 @@ const ConfirmPaymentPage = () => {
       reset();
       navigate('/customer/bookings/success', { state: { order: orderDetail } });
     } catch (error) {
-      console.error('Failed to create order:', error);
-      setPaymentError('Khong the tao lien ket thanh toan PayOS. Vui long thu lai hoac chon phuong thuc khac.');
-      alert('Đã có lỗi xảy ra khi đặt lịch. Vui lòng thử lại.');
+      const requestError = error as { response?: { data?: { message?: string } } };
+      const message = requestError.response?.data?.message ||
+        'Không thể tạo đơn đặt lịch. Vui lòng thử lại hoặc chọn địa chỉ khác.';
+      console.error('Không thể tạo đơn đặt lịch.', error);
+      setPaymentError(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const addressText = formatAddress(address);
   const detailItems = [
     ['cleaning_services', 'Dịch vụ', service?.name || '...'],
     ['calendar_today', 'Thời gian', scheduledAt ? new Date(scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất có thể'],
-    ['location_on', 'Địa chỉ', address ? `${address.detailAddress}, ${address.ward}, ${address.district}, ${address.province}` : '...'],
-  ];
+    ...(addressText ? [['location_on', 'Địa chỉ', addressText]] : []),
+  ] as string[][];
 
   return (
     <OrderCreationShell>

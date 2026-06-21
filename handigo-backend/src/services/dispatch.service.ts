@@ -19,7 +19,9 @@ const DEFAULT_MAX_MATCHING_ATTEMPTS = 5;
 interface DispatchContext {
   latitude?: number;
   longitude?: number;
-  serviceCategoryId: string;
+  serviceId: string;
+  province: string;
+  ward: string;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -70,7 +72,9 @@ export const DispatchService = {
       await MatchingService.findNearestProviders({
         latitude: ctx.latitude,
         longitude: ctx.longitude,
-        serviceCategoryId: ctx.serviceCategoryId,
+        serviceId: ctx.serviceId,
+        province: ctx.province,
+        ward: ctx.ward,
         excludeProviderIds: triedProviderIds,
         limit: 1, // take only the best candidate per round
       });
@@ -193,7 +197,9 @@ export const DispatchService = {
     await DispatchService.dispatchOrder(order._id.toString(), {
       latitude: address?.latitude,
       longitude: address?.longitude,
-      serviceCategoryId: (service as any)?.categoryId?.toString() ?? "",
+      serviceId: service?._id?.toString() || order.serviceId.toString(),
+      province: address?.province || "",
+      ward: address?.ward || "",
     });
   },
 };

@@ -220,6 +220,35 @@ export const getFeedbackByOrder = async (userId: string, orderId: string) => {
     .populate("providerReply.repliedBy", "fullName avatar");
 };
 
+export const getProviderFeedbackByOrder = async (userId: string, orderId: string) => {
+  assertObjectId(userId, "user id");
+  assertObjectId(orderId, "order id");
+
+  const provider = await Provider.findOne({ userId, isDeleted: false }).select("_id");
+  if (!provider) {
+    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
+  }
+
+  const order = await Order.findOne({
+    _id: orderId,
+    providerId: provider._id,
+    isDeleted: false,
+  }).select("_id");
+  if (!order) {
+    throw new AppError("Không tìm thấy đơn dịch vụ", 404);
+  }
+
+  return Feedback.findOne({
+    orderId,
+    providerId: provider._id,
+    isDeleted: false,
+  })
+    .populate("customerId", "fullName avatar")
+    .populate("orderId", "orderCode status")
+    .populate("serviceId", "name image")
+    .populate("providerReply.repliedBy", "fullName avatar");
+};
+
 export const getOrderFeedbackContext = async (userId: string, orderId: string) => {
   assertObjectId(userId, "user id");
   assertObjectId(orderId, "order id");
@@ -430,6 +459,7 @@ export const upsertProviderReply = async (
   userId: string,
   feedbackId: string,
   content: string,
+  images?: string[],
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(feedbackId, "feedback id");
@@ -451,6 +481,7 @@ export const upsertProviderReply = async (
   const now = new Date();
   feedback.providerReply = {
     content,
+    images: images ?? feedback.providerReply?.images ?? [],
     repliedBy: new Types.ObjectId(userId),
     repliedAt: feedback.providerReply?.repliedAt || now,
     updatedAt: now,

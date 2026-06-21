@@ -13,3 +13,11 @@ export const sendMessageSchema = z
     },
     "Message content or image URL is required",
   );
+
+export const reportConversationSchema = z.object({
+  description: z.string().trim().min(10).max(1000),
+});
+
+export const updateMessageSchema = z.object({
+  content: z.string().trim().min(1).max(2000),
+});

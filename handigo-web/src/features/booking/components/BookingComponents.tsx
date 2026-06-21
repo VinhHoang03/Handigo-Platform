@@ -10,6 +10,7 @@ import {
 import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi } from '../../../api/booking';
 import type { Service, ServiceOption } from '../../../types/booking';
+import { ReliableImage } from '@/components/common/ReliableImage';
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
@@ -18,10 +19,18 @@ interface BookingShellProps {
 }
 
 const statusToneClass: Record<BookingStatusTone, string> = {
-  completed: 'bg-primary/10 text-primary',
-  pending: 'bg-tertiary/10 text-tertiary',
-  cancelled: 'bg-on-surface-variant/10 text-on-surface-variant',
-  active: 'bg-primary/10 text-primary',
+  completed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  pending: 'border-amber-200 bg-amber-50 text-amber-700',
+  cancelled: 'border-red-200 bg-red-50 text-red-700',
+  active: 'border-blue-200 bg-blue-50 text-blue-700',
+};
+
+const orderStatusClass: Record<string, string> = {
+  created: 'border-amber-200 bg-amber-50 text-amber-700',
+  accepted: 'border-violet-200 bg-violet-50 text-violet-700',
+  in_progress: 'border-blue-200 bg-blue-50 text-blue-700',
+  completed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  cancelled: 'border-red-200 bg-red-50 text-red-700',
 };
 
 export const BookingShell: React.FC<BookingShellProps> = ({ children }) => (
@@ -92,26 +101,36 @@ export const BookingStepper: React.FC<{ currentStep: 1 | 2 | 3 }> = ({ currentSt
   );
 };
 
-export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ booking }) => (
+export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ booking }) => {
+  const navigate = useNavigate();
+  const detailUrl = `/customer/bookings/${booking.id}`;
+  const isCompleted = booking.status === 'completed' || booking.statusTone === 'completed';
+
+  const openDetail = () => navigate(detailUrl);
+
+  return (
   <article
-    className={`glass-card rounded-2xl p-md flex flex-col md:flex-row gap-md items-start md:items-center hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group ${booking?.statusTone === 'pending' ? 'border-l-4 border-l-tertiary' : ''
-      } ${booking?.statusTone === 'cancelled' ? 'opacity-75' : ''}`}
+    role="link"
+    tabIndex={0}
+    aria-label={`Xem chi tiết đơn ${booking.serviceName}`}
+    onClick={openDetail}
+    onKeyDown={(event) => {
+      if (event.target !== event.currentTarget || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
+      openDetail();
+    }}
+    className={`group flex cursor-pointer flex-col items-stretch gap-md rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-primary/15 sm:flex-row sm:items-center ${booking?.statusTone === 'cancelled' ? 'opacity-80' : ''}`}
   >
-    <div className={`w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 ${booking?.statusTone === 'cancelled' ? 'grayscale' : ''}`}>
-      <img
+    <div className={`h-44 w-full rounded-xl overflow-hidden flex-shrink-0 sm:h-28 sm:w-28 ${booking?.statusTone === 'cancelled' ? 'grayscale' : ''}`}>
+      <ReliableImage
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-        src={booking?.imageUrl || 'https://via.placeholder.com/150'}
+        src={booking?.imageUrl}
         alt={booking?.serviceName || 'Dịch vụ'}
       />
     </div>
 
-    <div className="flex-1 min-w-0 w-full">
-      <div className="flex flex-col sm:flex-row sm:justify-between gap-2 mb-1">
-        <h3 className="font-headline-md text-headline-md text-on-surface truncate">{booking?.serviceName || 'Dịch vụ'}</h3>
-        <span className={`px-3 py-1 rounded-full text-label-sm font-label-sm w-fit ${booking?.statusTone ? statusToneClass[booking.statusTone] : ''}`}>
-          {booking?.statusLabel || 'Đang xử lý'}
-        </span>
-      </div>
+    <div className="min-w-0 w-full flex-1">
+      <h3 className="min-w-0 break-words font-headline-md text-headline-md text-on-surface">{booking?.serviceName || 'Dịch vụ'}</h3>
       <div className="flex flex-wrap gap-x-md gap-y-1 text-on-surface-variant text-label-md mb-2">
         <span className="flex items-center gap-1">
           <span className="material-symbols-outlined text-[18px]">calendar_today</span>
@@ -127,37 +146,38 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
       </p>
     </div>
 
-    <div className="flex gap-sm w-full md:w-auto mt-2 md:mt-0">
+    <div className="flex w-full shrink-0 flex-col gap-sm sm:w-auto sm:min-w-52 sm:items-end sm:self-stretch sm:justify-between">
+      <span className={`inline-flex h-8 w-fit min-w-28 items-center justify-center self-end rounded-full border px-3 text-center text-xs font-bold leading-none ${orderStatusClass[booking.status || ''] || (booking?.statusTone ? statusToneClass[booking.statusTone] : statusToneClass.pending)}`}>
+        {booking?.statusLabel || 'Đang xử lý'}
+      </span>
       {booking?.rating ? (
-        <div className="flex items-center gap-1 text-tertiary px-2">
+        <div className="flex items-center gap-1 px-2 text-amber-500">
           <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
             star
           </span>
           <span className="font-label-md text-label-md">{booking.rating}</span>
         </div>
       ) : null}
-      <Link
-        to={booking?.statusTone === 'completed'
-          ? `/customer/orders/${booking?.id || ''}/feedback`
-          : `/customer/bookings/${booking?.id || ''}`}
-        className={`flex-1 md:flex-none px-md py-2 rounded-xl font-label-md text-label-md text-center transition-all active:scale-95 ${booking?.statusTone === 'pending'
-          ? 'bg-primary text-on-primary shadow-sm hover:shadow-md'
-          : 'border border-primary text-primary hover:bg-primary/5'
-          }`}
-      >
-        {booking?.primaryAction || 'Xem chi tiết'}
-      </Link>
-      {booking?.secondaryAction ? (
+      <div className="flex w-full flex-wrap items-center justify-end gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
         <Link
-          to={`/customer/bookings/${booking.id}`}
-          className="flex-1 md:flex-none px-md py-2 bg-surface-container-high text-on-surface-variant rounded-xl font-label-md text-label-md text-center hover:bg-surface-container-highest transition-all active:scale-95"
+          to={detailUrl}
+          className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-primary/40 px-4 py-2 text-center font-label-md text-label-md font-bold text-primary transition-all hover:border-primary hover:bg-primary/5 active:scale-95 sm:flex-none"
         >
-          {booking.secondaryAction}
+          Chi tiết
         </Link>
-      ) : null}
+        {isCompleted && (
+          <Link
+            to={`/customer/orders/${booking.id}/feedback`}
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl bg-primary px-4 py-2 text-center font-label-md text-label-md font-bold text-on-primary shadow-sm transition-all hover:shadow-md active:scale-95 sm:flex-none"
+          >
+            Đánh giá
+          </Link>
+        )}
+      </div>
     </div>
   </article>
-);
+  );
+};
 
 export const OrderSummaryCard: React.FC<{
   step: 1 | 2 | 3;

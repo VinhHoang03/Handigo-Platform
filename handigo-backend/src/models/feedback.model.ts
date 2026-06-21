@@ -12,6 +12,7 @@ export interface IFeedback extends Document, IBaseDocument {
   isVisible: boolean;
   providerReply?: {
     content: string;
+    images: string[];
     repliedBy: Types.ObjectId;
     repliedAt: Date;
     updatedAt: Date;
@@ -21,6 +22,7 @@ export interface IFeedback extends Document, IBaseDocument {
 const ProviderReplySchema = new Schema(
   {
     content: { type: String, required: true, trim: true, maxlength: 1000 },
+    images: { type: [String], default: [] },
     repliedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     repliedAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },

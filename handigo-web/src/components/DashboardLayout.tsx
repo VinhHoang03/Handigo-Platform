@@ -358,7 +358,7 @@ export function DashboardLayout({
           className={`mx-auto space-y-8 px-4 sm:px-5 ${isAdmin
               ? "max-w-none lg:px-5 xl:px-6"
               : isProvider
-                ? "max-w-6xl lg:px-3 xl:px-4"
+                ? "max-w-[1600px] lg:px-6 xl:px-8"
               : "max-w-container-max lg:px-8"
             }`}
         >

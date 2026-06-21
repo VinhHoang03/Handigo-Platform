@@ -233,11 +233,47 @@
   }
 
   .google-place-autocomplete-shell {
-    @apply min-h-14 w-full rounded-lg border border-outline-variant bg-surface-container-lowest transition duration-200 hover:border-outline focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10;
+    @apply relative min-h-14 w-full;
   }
 
-  .google-place-autocomplete {
-    @apply block min-h-14 w-full;
+  .places-address-field {
+    @apply relative w-full;
+  }
+
+  .places-address-field__input {
+    @apply min-h-14 w-full rounded-lg border border-outline-variant bg-surface-container-lowest py-3 pl-12 pr-12 text-sm text-on-surface outline-none transition duration-200 placeholder:text-on-surface-variant/70 hover:border-outline focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-surface-container disabled:text-on-surface-variant;
+  }
+
+  .places-address-field__icon {
+    @apply pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-[21px] text-primary;
+  }
+
+  .places-address-field__loading {
+    @apply pointer-events-none absolute right-4 top-1/2 z-10 -translate-y-1/2 animate-spin text-[20px] text-primary;
+  }
+
+  .places-address-dropdown {
+    @apply absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-72 overflow-y-auto rounded-xl border border-outline-variant/50 bg-surface-container-lowest p-2 shadow-[0_16px_40px_rgba(19,27,46,0.16)];
+  }
+
+  .places-address-option {
+    @apply flex min-h-14 w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left text-on-surface transition hover:bg-primary/5 focus:bg-primary/5 focus:ring-2 focus:ring-primary/15;
+  }
+
+  .places-address-option__icon {
+    @apply mt-0.5 text-[20px] text-primary;
+  }
+
+  .places-address-option__content {
+    @apply min-w-0 flex-1;
+  }
+
+  .places-address-option__content strong {
+    @apply block truncate text-sm font-semibold;
+  }
+
+  .places-address-option__content small {
+    @apply mt-0.5 block truncate text-xs text-on-surface-variant;
   }
 
   .form-select {

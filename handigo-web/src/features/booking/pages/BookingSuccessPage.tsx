@@ -5,6 +5,17 @@ import { mapImage } from '../data/bookingMockData';
 import type { Order } from '../../../types/booking';
 import { bookingApi } from '../../../api/booking';
 import { useBookingStore } from '../hooks/useBookingStore';
+import { ReliableImage } from '@/components/common/ReliableImage';
+
+const formatAddress = (order: Order) => {
+  const address = order.addressId;
+  if (!address || typeof address === 'string') return '';
+  const addressLine = [address.detailAddress, address.ward, address.district, address.province]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(', ');
+  return [address.label?.trim(), addressLine].filter(Boolean).join(': ');
+};
 
 const BookingSuccessPage = () => {
   const location = useLocation();
@@ -62,6 +73,8 @@ const BookingSuccessPage = () => {
     return <Navigate to="/customer" replace />;
   }
 
+  const addressText = formatAddress(order);
+
   return (
     <BookingShell>
       <main className="flex flex-col items-center justify-center py-lg">
@@ -93,9 +106,9 @@ const BookingSuccessPage = () => {
 
             <div className="space-y-md">
               <div className="flex gap-md">
-                <img
+                <ReliableImage
                   className="w-24 h-24 rounded-2xl object-cover shadow-sm"
-                  src={order.serviceId.image || 'https://via.placeholder.com/150'}
+                  src={order.serviceId.image}
                   alt={order.serviceId.name}
                 />
                 <div className="flex flex-col justify-center">
@@ -118,17 +131,17 @@ const BookingSuccessPage = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-sm">
-                  <div className="p-2 bg-surface-container rounded-lg text-primary">
-                    <span className="material-symbols-outlined">location_on</span>
+                {addressText && (
+                  <div className="flex items-start gap-sm">
+                    <div className="p-2 bg-surface-container rounded-lg text-primary">
+                      <span className="material-symbols-outlined">location_on</span>
+                    </div>
+                    <div>
+                      <p className="font-label-sm text-on-surface-variant">Địa chỉ</p>
+                      <p className="font-label-md text-on-surface">{addressText}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-label-sm text-on-surface-variant">Địa chỉ</p>
-                    <p className="font-label-md text-on-surface">
-                      {order.addressId.label}: {order.addressId.detailAddress}, {order.addressId.ward}, {order.addressId.district}, {order.addressId.province}
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </section>

@@ -9,3 +9,7 @@ export const setSocketServer = (io: Server) => {
 export const emitToUser = (userId: string, event: string, payload: unknown) => {
   socketServer?.to(`user:${userId}`).emit(event, payload);
 };
+
+export const emitToConversation = (conversationId: string, event: string, payload: unknown) => {
+  socketServer?.to(`conversation:${conversationId}`).emit(event, payload);
+};

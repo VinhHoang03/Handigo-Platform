@@ -185,6 +185,7 @@ export const upsertProviderReply = async (req: Request, res: Response) => {
       req.user!.id,
       req.params.id as string,
       req.body.content,
+      req.body.images,
     );
     return res.json({
       success: true,
@@ -196,10 +197,22 @@ export const upsertProviderReply = async (req: Request, res: Response) => {
   }
 };
 
+export const getProviderFeedbackByOrder = async (req: Request, res: Response) => {
+  try {
+    const feedback = await feedbackService.getProviderFeedbackByOrder(
+      req.user!.id,
+      req.params.orderId as string,
+    );
+    return res.json({ success: true, data: feedback, message: "Success" });
+  } catch (error: any) {
+    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  }
+};
+
 export const uploadFeedbackImages = async (_req: Request, res: Response) => {
   return res.status(201).json({
     success: true,
     data: res.locals.imageUrls,
-    message: "Feedback images uploaded successfully",
+    message: "Đã tải ảnh đánh giá thành công.",
   });
 };

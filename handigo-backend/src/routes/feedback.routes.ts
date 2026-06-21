@@ -67,6 +67,21 @@ router.get(
   feedbackController.getMyProviderFeedbacks,
 );
 
+router.get(
+  "/provider/orders/:orderId",
+  authMiddleware,
+  roleMiddleware("PROVIDER"),
+  feedbackController.getProviderFeedbackByOrder,
+);
+
+router.post(
+  "/provider/images",
+  authMiddleware,
+  roleMiddleware("PROVIDER"),
+  uploadFeedbackImages,
+  feedbackController.uploadFeedbackImages,
+);
+
 router.put(
   "/:id/reply",
   authMiddleware,

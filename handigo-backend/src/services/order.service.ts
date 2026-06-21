@@ -9,6 +9,7 @@ import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import { DispatchService } from "./dispatch.service";
 import { getNumberConfigValue } from "./systemConfig.service";
+import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,23 @@ export const OrderService = {
     });
     if (!address) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
+    }
+
+    const providersForService = await Provider.find({
+      serviceIds: service._id,
+      verified: true,
+      isDeleted: false,
+    })
+      .select("workingAreas")
+      .lean();
+    const hasProviderInArea = providersForService.some((provider) =>
+      isAddressInProviderWorkingAreas(provider.workingAreas, address),
+    );
+    if (!hasProviderInArea) {
+      throw new AppError(
+        "Hiện chưa có Provider phục vụ dịch vụ này tại địa chỉ đã chọn.",
+        422,
+      );
     }
 
     // 3. Validate & snapshot selected options
@@ -165,7 +183,9 @@ export const OrderService = {
     DispatchService.dispatchOrder(order._id.toString(), {
       latitude: address.latitude,
       longitude: address.longitude,
-      serviceCategoryId: service.categoryId.toString(),
+      serviceId: service._id.toString(),
+      province: address.province,
+      ward: address.ward,
     }).catch((err: unknown) =>
       console.error(`[OrderService] Dispatch failed for order ${order.orderCode}:`, err),
     );
@@ -327,7 +347,10 @@ export const OrderService = {
       .populate("customerId", "fullName avatar phone email")
       .populate("serviceId", "name image serviceType categoryId depositAmount fixedPrice")
       .populate("addressId")
-      .populate("providerId")
+      .populate({
+        path: "providerId",
+        populate: { path: "userId", select: "fullName phone avatar" },
+      })
       .lean();
 
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);

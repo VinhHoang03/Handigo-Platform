@@ -1476,9 +1476,6 @@ export default function ProviderProfilePage() {
             onPasswordClick={() => setIsPwdConfirmOpen(true)}
           />
           <ServiceAreaPanel area={serviceArea} onEdit={openServiceAreaEdit} />
-        </div>
-
-        <div className="col-span-12">
           <ProfileSection title="Lịch sử hồ sơ đăng ký">
             <ProviderApplicationHistory canEditRejected={false} />
           </ProfileSection>

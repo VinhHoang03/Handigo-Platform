@@ -86,6 +86,14 @@ export interface OrderPricing {
   totalPaidAmount: number;
 }
 
+export interface OrderDiscountSnapshot {
+  name?: string;
+  code?: string;
+  discountType: 'fixed' | 'percentage';
+  discountValue: number;
+  discountAmount: number;
+}
+
 export interface Order {
   _id: string;
   orderCode: string;
@@ -96,12 +104,31 @@ export interface Order {
   completionNote?: string | null;
   providerId?: {
     _id: string;
-    name: string;
+    userId?: {
+      _id: string;
+      fullName: string;
+      phone?: string;
+      avatar?: string | null;
+    };
+    name?: string;
     completedOrders?: number;
-    avatar?: string;
+    totalCompletedOrders?: number;
+    avatar?: string | null;
+    serviceArea?: { province?: string; ward?: string };
+    workingAreas?: string[];
+    averageRating?: number;
+    totalFeedbacks?: number;
+    experienceYears?: number;
+    verified?: boolean;
   } | null;
   serviceId: Service;
   selectedOptionIds: string[];
+  selectedOptionsSnapshot?: Array<{
+    optionId: string;
+    name: string;
+    optionType: string;
+    price: number;
+  }>;
   addressId: Address;
   orderType: 'normal' | 'urgent' | 'scheduled' | 'recurring';
   scheduledAt?: string | null;
@@ -112,6 +139,8 @@ export interface Order {
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
   pricing: OrderPricing;
+  promotionSnapshot?: OrderDiscountSnapshot | null;
+  voucherSnapshot?: OrderDiscountSnapshot | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,7 +198,7 @@ export interface BookingState {
   setServiceId: (id: string) => void;
   selectService: (categoryId: string, serviceId: string) => void;
   toggleOption: (id: string) => void;
-  setAddressId: (id: string) => void;
+  setAddressId: (id?: string) => void;
   setOrderType: (type: BookingState['orderType']) => void;
   setScheduledAt: (date: string) => void;
   setProblemDescription: (desc: string) => void;

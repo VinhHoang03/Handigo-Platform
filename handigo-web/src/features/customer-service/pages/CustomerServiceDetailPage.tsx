@@ -9,10 +9,10 @@ import {
   getCategoryName,
   getOptionPrice,
   getServiceImage,
-  setServiceImageFallback,
   getServicePrice,
   money,
 } from "../utils/serviceDisplay";
+import { ReliableImage } from "@/components/common/ReliableImage";
 
 const checklist = [
   "Tư vấn phạm vi công việc",
@@ -148,9 +148,8 @@ export default function CustomerServiceDetailPage() {
           <section className="overflow-hidden rounded-xl bg-white p-5 shadow-sm">
             <div className="mb-5 grid h-[360px] grid-cols-4 grid-rows-2 gap-3">
               <div className="col-span-4 row-span-2 overflow-hidden rounded-lg md:col-span-3">
-                <img
+                <ReliableImage
                   src={getServiceImage(service)}
-                  onError={(event) => setServiceImageFallback(event.currentTarget)}
                   alt={service.name}
                   className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                 />
@@ -160,9 +159,8 @@ export default function CustomerServiceDetailPage() {
                   key={item}
                   className="hidden overflow-hidden rounded-lg bg-surface-container md:block"
                 >
-                  <img
+                  <ReliableImage
                     src={getServiceImage(service, item)}
-                    onError={(event) => setServiceImageFallback(event.currentTarget, item)}
                     alt={`${service.name} ${item}`}
                     className="h-full w-full object-cover"
                   />
@@ -281,9 +279,8 @@ export default function CustomerServiceDetailPage() {
                     to={`/customer/services/${item._id}`}
                     className="group overflow-hidden rounded-xl border border-outline-variant/30 bg-white transition hover:shadow-md"
                   >
-                    <img
+                    <ReliableImage
                       src={getServiceImage(item, index + 1)}
-                      onError={(event) => setServiceImageFallback(event.currentTarget, index + 1)}
                       alt={item.name}
                       className="h-32 w-full object-cover"
                     />
