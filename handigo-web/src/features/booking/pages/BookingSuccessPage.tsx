@@ -1,11 +1,62 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation, Navigate } from 'react-router-dom';
 import { BookingShell } from '../components/BookingComponents';
 import { mapImage } from '../data/bookingMockData';
 import type { Order } from '../../../types/booking';
+import { bookingApi } from '../../../api/booking';
+import { useBookingStore } from '../hooks/useBookingStore';
 
 const BookingSuccessPage = () => {
   const location = useLocation();
-  const order = location.state?.order as Order;
+  const stateOrder = location.state?.order as Order | undefined;
+  const fallbackOrderId = new URLSearchParams(location.search).get('orderId') || sessionStorage.getItem('latestBookingOrderId');
+  const [order, setOrder] = useState<Order | null>(stateOrder ?? null);
+  const [isLoading, setIsLoading] = useState(!stateOrder && Boolean(fallbackOrderId));
+  const reset = useBookingStore(state => state.reset);
+
+  useEffect(() => {
+    if (stateOrder) {
+      sessionStorage.removeItem('latestBookingOrderId');
+      reset();
+      return;
+    }
+
+    const orderId = fallbackOrderId;
+
+    if (!orderId) return;
+
+    let isMounted = true;
+    bookingApi.getOrderById(orderId)
+      .then(data => {
+        if (!isMounted) return;
+        setOrder(data);
+        sessionStorage.removeItem('latestBookingOrderId');
+        reset();
+      })
+      .catch(error => {
+        console.error('Failed to load paid order:', error);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackOrderId, reset, stateOrder]);
+
+  if (isLoading) {
+    return (
+      <BookingShell>
+        <main className="flex min-h-[60vh] items-center justify-center">
+          <div className="text-center">
+            <span className="material-symbols-outlined text-5xl text-primary animate-spin">progress_activity</span>
+            <p className="mt-4 font-body-md text-on-surface-variant">Dang tai thong tin don hang...</p>
+          </div>
+        </main>
+      </BookingShell>
+    );
+  }
 
   if (!order) {
     return <Navigate to="/customer" replace />;

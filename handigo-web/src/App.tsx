@@ -9,6 +9,8 @@ import CreateBookingStep1Page from "./features/booking/pages/CreateBookingStep1P
 import CreateBookingStep2Page from "./features/booking/pages/CreateBookingStep2Page";
 import BookingSuccessPage from "./features/booking/pages/BookingSuccessPage";
 import CustomerProfilePage from "./features/customer/pages/CustomerProfilePage";
+import CustomerServiceDetailPage from "./features/customer-service/pages/CustomerServiceDetailPage";
+import CustomerServiceListPage from "./features/customer-service/pages/CustomerServiceListPage";
 import ProviderHomePage from "./features/provider/pages/ProviderHomePage";
 import ProviderOrdersPage from "./features/provider/pages/ProviderOrdersPage";
 import ProviderOrderDetailPage from "./features/provider/pages/ProviderOrderDetailPage";
@@ -25,6 +27,10 @@ import { WalletPage } from "./features/wallet/pages/WalletPage";
 import AdminCategoriesPage from "./features/admin/pages/AdminCategoriesPage";
 import AdminServicesPage from "./features/admin/pages/AdminServicesPage";
 import AdminPromotionsPage from "./features/admin/pages/AdminPromotionsPage";
+import AdminWithdrawalsPage from "./features/admin/pages/AdminWithdrawalsPage";
+import AdminSystemConfigsPage from "./features/admin/pages/AdminSystemConfigsPage";
+import AdminServiceSuggestionsPage from "./features/service-suggestion/pages/AdminServiceSuggestionsPage";
+import ProviderServiceSuggestionPage from "./features/service-suggestion/pages/ProviderServiceSuggestionPage";
 import { RouteGuard } from "./components/common/RouteGuard";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { HomeRoute } from "./components/auth/HomeRoute";
@@ -64,9 +70,6 @@ function App() {
             path="/customer/bookings/:bookingId"
             element={<BookingDetailPage />}
           />
-          <Route path="/customer/profile" element={<CustomerProfilePage />} />
-          <Route path="/provider" element={<ProviderHomePage />} />
-          <Route path="/provider/profile" element={<ProviderProfilePage />} />
           <Route
             path="/customer"
             element={
@@ -84,18 +87,26 @@ function App() {
             }
           />
           <Route
-            path="/customer/wallet"
+            path="/customer/services"
             element={
               <RouteGuard roles={["CUSTOMER"]}>
-                <WalletPage role="CUSTOMER" />
+                <CustomerServiceListPage />
               </RouteGuard>
             }
           />
           <Route
-            path="/customer/notifications"
+            path="/customer/services/:serviceId"
             element={
               <RouteGuard roles={["CUSTOMER"]}>
-                <NotificationsPage role="CUSTOMER" />
+                <CustomerServiceDetailPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/customer/wallet"
+            element={
+              <RouteGuard roles={["CUSTOMER"]}>
+                <WalletPage role="CUSTOMER" />
               </RouteGuard>
             }
           />
@@ -148,14 +159,6 @@ function App() {
             }
           />
           <Route
-            path="/provider/notifications"
-            element={
-              <RouteGuard roles={["PROVIDER"]}>
-                <NotificationsPage role="PROVIDER" />
-              </RouteGuard>
-            }
-          />
-          <Route
             path="/customer/orders/:orderId/feedback"
             element={
               <RouteGuard roles={["CUSTOMER"]}>
@@ -168,6 +171,14 @@ function App() {
             element={
               <RouteGuard roles={["PROVIDER"]}>
                 <ProviderFeedbackPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/provider/service-suggestions"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <ProviderServiceSuggestionPage />
               </RouteGuard>
             }
           />
@@ -212,6 +223,14 @@ function App() {
             }
           />
           <Route
+            path="/admin/service-suggestions"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminServiceSuggestionsPage />
+              </RouteGuard>
+            }
+          />
+          <Route
             path="/admin/feedbacks"
             element={
               <RouteGuard roles={["ADMIN"]}>
@@ -228,10 +247,26 @@ function App() {
             }
           />
           <Route
+            path="/admin/withdrawals"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminWithdrawalsPage />
+              </RouteGuard>
+            }
+          />
+          <Route
             path="/admin/notifications"
             element={
               <RouteGuard roles={["ADMIN"]}>
                 <NotificationsPage role="ADMIN" />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/admin/system-configs"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminSystemConfigsPage />
               </RouteGuard>
             }
           />

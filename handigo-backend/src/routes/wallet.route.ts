@@ -9,6 +9,7 @@ import {
   getMyWallet,
   getMyWalletSummary,
   getMyWalletTransactions,
+  syncMyWalletDeposit,
 } from "../controllers/wallet.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
@@ -30,6 +31,12 @@ router.patch(
   authMiddleware,
   roleMiddleware("PROVIDER"),
   cancelMyWalletDeposit,
+);
+router.patch(
+  "/me/deposit/:orderCode/sync",
+  authMiddleware,
+  roleMiddleware("PROVIDER"),
+  syncMyWalletDeposit,
 );
 router.get(
   "/me/transactions",

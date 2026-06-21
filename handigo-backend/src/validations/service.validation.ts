@@ -18,7 +18,7 @@ const serviceFields = {
   serviceType: z.enum(["fixed_price", "variable_price"]),
   fixedPrice: z.number().min(0).nullable().optional(),
   depositAmount: z.number().min(0).nullable().optional(),
-  image: z.string().trim().max(500).nullable().optional(),
+  image: z.string().trim().url("Ảnh dịch vụ phải là một đường dẫn hợp lệ").max(2000).nullable().optional(),
   isActive: z.boolean().optional(),
 };
 

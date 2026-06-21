@@ -1,12 +1,17 @@
 import { Types } from "mongoose";
 import User from "../models/user.model";
 import {
+  updateProfileService,
+  type UpdateProfileInput,
+} from "./user.service";
+import {
   IIdentityDocument,
   IProvider,
   IProviderCertificate,
   Provider,
 } from "../models/provider.model";
 import { AppError } from "../utils/appError";
+import { Service } from "../models/service.model";
 import {
   CreateCertificatePayload,
   SubmitIdentityPayload,
@@ -51,6 +56,21 @@ const getProviderForUser = async (userId: string) => {
   return provider;
 };
 
+const getActiveServiceIds = async (serviceIds: string[]) => {
+  const uniqueIds = [...new Set(serviceIds)];
+  const services = await Service.find({
+    _id: { $in: uniqueIds },
+    isActive: true,
+    isDeleted: false,
+  }).select("_id");
+
+  if (services.length !== uniqueIds.length) {
+    throw new AppError("Một hoặc nhiều dịch vụ không còn hoạt động", 400);
+  }
+
+  return uniqueIds.map((id) => new Types.ObjectId(id));
+};
+
 const toIdString = (value: unknown) => {
   const candidate = value as { _id?: Types.ObjectId };
   if (candidate?._id) return candidate._id.toString();
@@ -90,6 +110,9 @@ const formatIdentityDocument = (identity?: IIdentityDocument) => {
     expiresAt: identity.expiresAt,
     dateOfBirth: identity.dateOfBirth,
     gender: identity.gender,
+    nationality: identity.nationality,
+    placeOfOrigin: identity.placeOfOrigin,
+    placeOfResidence: identity.placeOfResidence,
     frontImageUrl: identity.frontImageUrl,
     backImageUrl: identity.backImageUrl,
     passportImageUrl: identity.passportImageUrl,
@@ -105,6 +128,7 @@ const formatIdentityDocument = (identity?: IIdentityDocument) => {
 const formatCertificate = (certificate: IProviderCertificate) => ({
   id: certificate._id?.toString() || "",
   title: certificate.title,
+  certificateNumber: certificate.certificateNumber,
   issuer: certificate.issuer,
   issuedAt: certificate.issuedAt,
   expiresAt: certificate.expiresAt,
@@ -154,6 +178,47 @@ const formatProviderProfile = async (provider: IProvider) => {
   };
 };
 
+export const getFeaturedProviders = async () => {
+  const activeUserIds = await User.distinct("_id", {
+    status: "active",
+    isDeleted: false,
+  });
+  const providers = await Provider.find({
+    verified: true,
+    isDeleted: false,
+    userId: { $in: activeUserIds },
+    "serviceIds.0": { $exists: true },
+  })
+    .sort({ averageRating: -1, totalFeedbacks: -1, createdAt: -1 })
+    .limit(12)
+    .populate({ path: "userId", select: "fullName avatar" })
+    .populate(servicePopulate)
+    .lean();
+
+  return providers
+    .filter((provider) => provider.userId)
+    .map((provider) => {
+      const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string };
+      const services = provider.serviceIds as unknown as Array<{ _id: Types.ObjectId; name?: string }>;
+      return {
+        id: provider._id.toString(),
+        user: {
+          id: user._id.toString(),
+          fullName: user.fullName,
+          avatar: user.avatar,
+        },
+        workingAreas: provider.workingAreas || [],
+        serviceArea: provider.serviceArea,
+        services: services.map((service) => ({
+          id: service._id.toString(),
+          name: service.name || "",
+        })),
+        averageRating: provider.averageRating,
+        totalFeedbacks: provider.totalFeedbacks,
+      };
+    });
+};
+
 export const getMyProviderProfile = async (userId: string) => {
   const provider = await getProviderForUser(userId);
   return formatProviderProfile(provider);
@@ -165,7 +230,7 @@ export const updateMyProviderProfile = async (
 ) => {
   const provider = await getProviderForUser(userId);
 
-  const userUpdate: Record<string, unknown> = {};
+  const userUpdate: UpdateProfileInput = {};
   if (payload.fullName !== undefined) userUpdate.fullName = payload.fullName;
   if (payload.phone !== undefined) userUpdate.phone = payload.phone;
   if (payload.avatar !== undefined) userUpdate.avatar = payload.avatar;
@@ -175,9 +240,7 @@ export const updateMyProviderProfile = async (
   if (payload.gender !== undefined) userUpdate.gender = payload.gender;
 
   if (Object.keys(userUpdate).length) {
-    await User.findByIdAndUpdate(userId, userUpdate, {
-      runValidators: true,
-    });
+    await updateProfileService(userId, userUpdate);
   }
 
   if (payload.description !== undefined) provider.description = payload.description;
@@ -191,6 +254,12 @@ export const updateMyProviderProfile = async (
       ward: payload.serviceArea.ward,
     };
   }
+  if (payload.serviceIds !== undefined) {
+    provider.serviceIds = await getActiveServiceIds(payload.serviceIds);
+  }
+  if (payload.workingAreas !== undefined) {
+    provider.workingAreas = [...new Set(payload.workingAreas)];
+  }
 
   await provider.save();
   await provider.populate(servicePopulate);
@@ -203,6 +272,7 @@ export const submitMyIdentityDocument = async (
   payload: SubmitIdentityPayload,
 ) => {
   const provider = await getProviderForUser(userId);
+  const currentIdentity = provider.identityDocument;
 
   provider.identityDocument = {
     type: payload.type,
@@ -214,6 +284,10 @@ export const submitMyIdentityDocument = async (
     expiresAt: toDate(payload.expiresAt),
     dateOfBirth: toDate(payload.dateOfBirth),
     gender: payload.gender,
+    nationality: payload.nationality ?? currentIdentity?.nationality,
+    placeOfOrigin: payload.placeOfOrigin ?? currentIdentity?.placeOfOrigin,
+    placeOfResidence:
+      payload.placeOfResidence ?? currentIdentity?.placeOfResidence,
     frontImageUrl: payload.frontImageUrl,
     backImageUrl: payload.backImageUrl,
     passportImageUrl: payload.passportImageUrl,
@@ -242,6 +316,7 @@ export const createMyCertificate = async (
 
   provider.certificates.push({
     title: payload.title,
+    certificateNumber: payload.certificateNumber,
     issuer: payload.issuer,
     issuedAt: toDate(payload.issuedAt),
     expiresAt: toDate(payload.expiresAt),
@@ -273,6 +348,9 @@ export const updateMyCertificate = async (
   }
 
   if (payload.title !== undefined) certificate.title = payload.title;
+  if (payload.certificateNumber !== undefined) {
+    certificate.certificateNumber = payload.certificateNumber;
+  }
   if (payload.issuer !== undefined) certificate.issuer = payload.issuer;
   if (payload.issuedAt !== undefined) certificate.issuedAt = toDate(payload.issuedAt);
   if (payload.expiresAt !== undefined) certificate.expiresAt = toDate(payload.expiresAt);

@@ -30,6 +30,34 @@ export type IdentityVerificationProvider =
   | 'viettel'
   | 'didit';
 export type CertificateStatus = 'pending' | 'approved' | 'rejected';
+export type OcrDocumentKind =
+  | 'cccd_front'
+  | 'cccd_back'
+  | 'passport'
+  | 'certificate';
+
+export interface ProviderApplicationOcrSuggestion {
+  documentNumber?: string;
+  fullName?: string;
+  issuedPlace?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
+  title?: string;
+  certificateNumber?: string;
+  issuer?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  confidence?: number;
+  warnings: string[];
+}
+
+export interface ProviderApplicationAssetUpload {
+  url: string;
+  ocrSuggestion?: ProviderApplicationOcrSuggestion;
+}
 
 export interface ProviderApplicationIdentityDocument {
   type: IdentityDocumentType;
@@ -39,6 +67,11 @@ export interface ProviderApplicationIdentityDocument {
   issuedPlace?: string;
   issuedAt?: string;
   expiresAt?: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
   frontImageUrl?: string;
   backImageUrl?: string;
   passportImageUrl?: string;
@@ -53,6 +86,7 @@ export interface ProviderApplicationCertificate {
   _id?: string;
   id?: string;
   title: string;
+  certificateNumber?: string;
   issuer?: string;
   issuedAt?: string;
   expiresAt?: string;
@@ -71,9 +105,45 @@ export interface ProviderApplicationPayload {
   certificates: ProviderApplicationCertificate[];
 }
 
-export interface ProviderApplication extends ProviderApplicationPayload {
+export interface ProviderApplication
+  extends Omit<ProviderApplicationPayload, 'serviceIds'> {
   _id: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'draft' | 'pending' | 'resubmitted' | 'approved' | 'rejected';
+  serviceIds: Array<string | Service>;
   rejectionReason?: string | null;
+  rejectionNotes?: string | null;
+  reviewedBy?: ApplicationActor | null;
+  reviewedAt?: string | null;
+  submittedAt?: string | null;
+  resubmittedAt?: string | null;
+  updatedAt: string;
+  reviewHistory?: ProviderApplicationReviewHistory[];
   createdAt: string;
+}
+
+export interface ApplicationActor {
+  _id: string;
+  fullName: string;
+  email?: string;
+  role?: 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
+}
+
+export interface ProviderApplicationReviewHistory {
+  action: 'submitted' | 'rejected' | 'resubmitted' | 'approved';
+  status: ProviderApplication['status'];
+  actorId: ApplicationActor | string;
+  actorRole: 'CUSTOMER' | 'ADMIN';
+  occurredAt: string;
+  rejectionReason?: string | null;
+  notes?: string | null;
+}
+
+export interface ProviderApplicationListResult {
+  items: ProviderApplication[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AsyncState } from '@/components/common/AsyncState';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { CategorySelectionStep } from '../components/CategorySelectionStep';
@@ -8,7 +8,12 @@ import { ProviderApplicationStepper } from '../components/ProviderApplicationSte
 import { ProviderDescriptionStep } from '../components/ProviderDescriptionStep';
 import { WorkingAreasStep } from '../components/WorkingAreasStep';
 import { useProviderApplication } from '../hooks/useProviderApplication';
-import type { ProviderApplicationPayload } from '../types/providerApplication.types';
+import type {
+  ProviderApplication,
+  ProviderApplicationPayload,
+  Service,
+} from '../types/providerApplication.types';
+import { hasProviderApplicationDateErrors } from '../utils/providerApplicationValidation';
 
 const initial: ProviderApplicationPayload = {
   description: '',
@@ -23,6 +28,11 @@ const initial: ProviderApplicationPayload = {
     frontImageUrl: '',
     backImageUrl: '',
     passportImageUrl: '',
+    dateOfBirth: '',
+    gender: undefined,
+    nationality: '',
+    placeOfOrigin: '',
+    placeOfResidence: '',
   },
   certificates: [],
 };
@@ -32,12 +42,92 @@ const hasRequiredIdentityImage = (form: ProviderApplicationPayload) =>
     ? Boolean(form.identityDocument.frontImageUrl)
     : Boolean(form.identityDocument.passportImageUrl);
 
+const serviceId = (service: string | Service) =>
+  typeof service === 'string' ? service : service._id;
+
+const applicationToForm = (
+  application: ProviderApplication,
+): ProviderApplicationPayload => ({
+  description: application.description || '',
+  experienceYears: application.experienceYears || 0,
+  serviceIds: (application.serviceIds || []).map(serviceId).filter(Boolean),
+  workingAreas: application.workingAreas || [],
+  identityDocument: {
+    type: application.identityDocument?.type || 'cccd',
+    documentNumber: application.identityDocument?.documentNumber || '',
+    fullName: application.identityDocument?.fullName || '',
+    issuedPlace: application.identityDocument?.issuedPlace || '',
+    issuedAt: application.identityDocument?.issuedAt?.slice(0, 10) || '',
+    expiresAt: application.identityDocument?.expiresAt?.slice(0, 10) || '',
+    frontImageUrl: application.identityDocument?.frontImageUrl || '',
+    backImageUrl: application.identityDocument?.backImageUrl || '',
+    passportImageUrl: application.identityDocument?.passportImageUrl || '',
+    dateOfBirth: application.identityDocument?.dateOfBirth?.slice(0, 10) || '',
+    gender: application.identityDocument?.gender,
+    nationality: application.identityDocument?.nationality || '',
+    placeOfOrigin: application.identityDocument?.placeOfOrigin || '',
+    placeOfResidence: application.identityDocument?.placeOfResidence || '',
+  },
+  certificates: (application.certificates || []).map((certificate) => ({
+    title: certificate.title || '',
+    certificateNumber: certificate.certificateNumber || '',
+    issuer: certificate.issuer || '',
+    issuedAt: certificate.issuedAt?.slice(0, 10) || '',
+    expiresAt: certificate.expiresAt?.slice(0, 10) || '',
+    imageUrls: certificate.imageUrls || [],
+  })),
+});
+
+const hasUploadedAsset = (form: ProviderApplicationPayload) =>
+  Boolean(
+    form.identityDocument.frontImageUrl ||
+      form.identityDocument.backImageUrl ||
+      form.identityDocument.passportImageUrl ||
+      form.certificates.some((certificate) => certificate.imageUrls.length),
+  );
+
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
-  const providerApplication = useProviderApplication();
+  const [searchParams] = useSearchParams();
+  const applicationId = searchParams.get('applicationId');
+  const providerApplication = useProviderApplication(applicationId);
+  const saveDraft = providerApplication.saveDraft;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(initial);
   const [success, setSuccess] = useState('');
+  const hydratedApplicationIdRef = useRef<string | null>(null);
+  const didHydrateRef = useRef(false);
+
+  useEffect(() => {
+    const application = providerApplication.application;
+    if (!application || hydratedApplicationIdRef.current === application._id) {
+      if (!providerApplication.loading) didHydrateRef.current = true;
+      return;
+    }
+
+    setForm(applicationToForm(application));
+    hydratedApplicationIdRef.current = application._id;
+    didHydrateRef.current = true;
+  }, [providerApplication.application, providerApplication.loading]);
+
+  useEffect(() => {
+    if (
+      applicationId ||
+      !didHydrateRef.current ||
+      step !== 3 ||
+      !hasUploadedAsset(form)
+    ) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void saveDraft(form).catch(() => {
+        // The hook exposes the draft error for rendering.
+      });
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [applicationId, form, saveDraft, step]);
 
   const toggleService = (id: string) =>
     setForm((value) => ({
@@ -68,12 +158,17 @@ export default function RegisterProviderPage() {
     Boolean(form.description.trim()) &&
     Boolean(form.identityDocument.documentNumber.trim()) &&
     Boolean(form.identityDocument.fullName.trim()) &&
-    hasRequiredIdentityImage(form);
+    hasRequiredIdentityImage(form) &&
+    !hasProviderApplicationDateErrors(form);
 
   const send = async () => {
     try {
       await providerApplication.submit(form);
-      setSuccess('Hồ sơ đã được gửi và đang chờ quản trị viên xét duyệt.');
+      setSuccess(
+        applicationId
+          ? 'Hồ sơ đã được gửi lại và đang chờ quản trị viên xét duyệt.'
+          : 'Hồ sơ đã được gửi và đang chờ quản trị viên xét duyệt.',
+      );
       window.setTimeout(() => navigate('/customer/profile'), 1500);
     } catch {
       // The hook exposes the request error for rendering.
@@ -96,6 +191,14 @@ export default function RegisterProviderPage() {
         </div>
 
         <ProviderApplicationStepper step={step} />
+
+        {applicationId && providerApplication.application?.rejectionReason && (
+          <section className="rounded-2xl border border-error/20 bg-error-container/30 p-4 text-on-error-container">
+            <h2 className="font-bold">Nội dung cần chỉnh sửa</h2>
+            <p className="mt-2"><b>Lý do:</b> {providerApplication.application.rejectionReason}</p>
+            <p className="mt-1"><b>Ghi chú của quản trị viên:</b> {providerApplication.application.rejectionNotes || 'Chưa cập nhật'}</p>
+          </section>
+        )}
 
         <AsyncState
           loading={providerApplication.loading}
@@ -133,17 +236,17 @@ export default function RegisterProviderPage() {
                 form={form}
                 categories={providerApplication.categories}
                 onChange={setForm}
-                onUploadAsset={async (file, purpose) => {
-                  const uploaded = await providerApplication.uploadImage(
-                    file,
-                    purpose,
-                  );
-                  return uploaded.url;
-                }}
+                onUploadAsset={providerApplication.uploadImage}
               />
             )}
 
-            {(providerApplication.submitError || success) && (
+            {providerApplication.savingDraft && step === 3 && (
+              <p className="mt-5 rounded-2xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
+                Đang lưu ảnh và hồ sơ xác thực...
+              </p>
+            )}
+
+            {(providerApplication.submitError || providerApplication.draftError || success) && (
               <p
                 className={`mt-5 rounded-2xl p-3 ${
                   success
@@ -151,7 +254,7 @@ export default function RegisterProviderPage() {
                     : 'bg-error/10 text-error'
                 }`}
               >
-                {success || providerApplication.submitError}
+                {success || providerApplication.submitError || providerApplication.draftError}
               </p>
             )}
 

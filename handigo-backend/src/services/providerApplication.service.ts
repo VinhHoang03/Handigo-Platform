@@ -12,6 +12,11 @@ type IdentityDocumentPayload = {
   issuedPlace?: string;
   issuedAt?: string;
   expiresAt?: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other";
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
   frontImageUrl?: string;
   backImageUrl?: string;
   passportImageUrl?: string;
@@ -19,6 +24,7 @@ type IdentityDocumentPayload = {
 
 type CertificatePayload = {
   title: string;
+  certificateNumber?: string;
   issuer?: string;
   issuedAt?: string;
   expiresAt?: string;
@@ -34,9 +40,19 @@ interface CreateProviderApplicationPayload {
   certificates?: CertificatePayload[];
 }
 
+interface SaveProviderApplicationDraftPayload {
+  description?: string;
+  experienceYears?: number;
+  serviceIds?: string[];
+  workingAreas?: string[];
+  identityDocument?: Partial<IdentityDocumentPayload>;
+  certificates?: Array<Partial<CertificatePayload>>;
+}
+
 interface ReviewProviderApplicationPayload {
   status: "approved" | "rejected";
   rejectionReason?: string;
+  rejectionNotes?: string;
 }
 
 interface ApplicationQuery {
@@ -105,6 +121,11 @@ const buildPendingIdentityDocument = (
   issuedPlace: payload.issuedPlace,
   issuedAt: toDate(payload.issuedAt),
   expiresAt: toDate(payload.expiresAt),
+  dateOfBirth: toDate(payload.dateOfBirth),
+  gender: payload.gender,
+  nationality: payload.nationality,
+  placeOfOrigin: payload.placeOfOrigin,
+  placeOfResidence: payload.placeOfResidence,
   frontImageUrl: payload.type === "cccd" ? payload.frontImageUrl : undefined,
   backImageUrl: payload.type === "cccd" ? payload.backImageUrl : undefined,
   passportImageUrl:
@@ -123,6 +144,7 @@ const buildPendingCertificates = (
 ): IProviderCertificate[] =>
   certificates.map((certificate) => ({
     title: certificate.title,
+    certificateNumber: certificate.certificateNumber,
     issuer: certificate.issuer,
     issuedAt: toDate(certificate.issuedAt),
     expiresAt: toDate(certificate.expiresAt),
@@ -132,6 +154,62 @@ const buildPendingCertificates = (
     reviewedAt: null,
     rejectionReason: null,
   }));
+
+const buildDraftIdentityDocument = (
+  payload?: Partial<IdentityDocumentPayload>,
+): Partial<IIdentityDocument> | undefined => {
+  if (!payload) return undefined;
+
+  return {
+    type: payload.type || "cccd",
+    documentNumber: payload.documentNumber,
+    numberLast4: toDocumentLast4(payload.documentNumber),
+    fullName: payload.fullName,
+    issuedPlace: payload.issuedPlace,
+    issuedAt: toDate(payload.issuedAt),
+    expiresAt: toDate(payload.expiresAt),
+    dateOfBirth: toDate(payload.dateOfBirth),
+    gender: payload.gender,
+    nationality: payload.nationality,
+    placeOfOrigin: payload.placeOfOrigin,
+    placeOfResidence: payload.placeOfResidence,
+    frontImageUrl: payload.frontImageUrl,
+    backImageUrl: payload.backImageUrl,
+    passportImageUrl: payload.passportImageUrl,
+    verificationStatus: "unsubmitted",
+    provider: "manual",
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: null,
+  };
+};
+
+const buildDraftCertificates = (
+  certificates: Array<Partial<CertificatePayload>> = [],
+): Partial<IProviderCertificate>[] =>
+  certificates
+    .filter((certificate) =>
+      Boolean(
+        certificate.title ||
+          certificate.certificateNumber ||
+          certificate.issuer ||
+          certificate.issuedAt ||
+          certificate.expiresAt ||
+          certificate.imageUrls?.length,
+      ),
+    )
+    .map((certificate) => ({
+      title: certificate.title || "",
+      certificateNumber: certificate.certificateNumber,
+      issuer: certificate.issuer,
+      issuedAt: toDate(certificate.issuedAt),
+      expiresAt: toDate(certificate.expiresAt),
+      imageUrls: certificate.imageUrls || [],
+      status: "pending",
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectionReason: null,
+    }));
 
 const approveIdentityDocument = (
   identity: IIdentityDocument | undefined,
@@ -149,6 +227,9 @@ const approveIdentityDocument = (
     expiresAt: identity.expiresAt,
     dateOfBirth: identity.dateOfBirth,
     gender: identity.gender,
+    nationality: identity.nationality,
+    placeOfOrigin: identity.placeOfOrigin,
+    placeOfResidence: identity.placeOfResidence,
     frontImageUrl: identity.frontImageUrl,
     backImageUrl: identity.backImageUrl,
     passportImageUrl: identity.passportImageUrl,
@@ -172,6 +253,7 @@ const approveCertificates = (
 ): IProviderCertificate[] =>
   certificates.map((certificate) => ({
     title: certificate.title,
+    certificateNumber: certificate.certificateNumber,
     issuer: certificate.issuer,
     issuedAt: certificate.issuedAt,
     expiresAt: certificate.expiresAt,
@@ -205,14 +287,58 @@ export const createApplication = async (
 
   const pendingApplication = await ProviderApplication.findOne({
     userId,
-    status: "pending",
+    status: { $in: ["pending", "resubmitted"] },
     isDeleted: false,
   });
 
   if (pendingApplication) {
-    throw new AppError("You already have a pending provider application", 400);
+    throw new AppError("Bạn đã có hồ sơ đang chờ xét duyệt", 400);
   }
 
+  const rejectedApplication = await ProviderApplication.findOne({
+    userId,
+    status: "rejected",
+    isDeleted: false,
+  });
+
+  if (rejectedApplication) {
+    throw new AppError(
+      "Vui lòng chỉnh sửa và gửi lại hồ sơ đã bị từ chối",
+      409,
+    );
+  }
+
+  const draftApplication = await ProviderApplication.findOne({
+    userId,
+    status: "draft",
+    isDeleted: false,
+  });
+
+  if (draftApplication) {
+    const submittedAt = new Date();
+    draftApplication.description = payload.description;
+    draftApplication.experienceYears = payload.experienceYears;
+    draftApplication.serviceIds = serviceIds.map((id) => new Types.ObjectId(id));
+    draftApplication.workingAreas = payload.workingAreas;
+    draftApplication.identityDocument = buildPendingIdentityDocument(payload.identityDocument);
+    draftApplication.certificates = buildPendingCertificates(payload.certificates);
+    draftApplication.status = "pending";
+    draftApplication.submittedAt = submittedAt;
+    draftApplication.rejectionReason = null;
+    draftApplication.rejectionNotes = null;
+    draftApplication.reviewedBy = null;
+    draftApplication.reviewedAt = null;
+    draftApplication.reviewHistory.push({
+      action: "submitted",
+      status: "pending",
+      actorId: new Types.ObjectId(userId),
+      actorRole: "CUSTOMER",
+      occurredAt: submittedAt,
+    });
+    return draftApplication.save();
+  }
+
+  const submittedAt = new Date();
   return ProviderApplication.create({
     userId,
     description: payload.description,
@@ -222,24 +348,220 @@ export const createApplication = async (
     identityDocument: buildPendingIdentityDocument(payload.identityDocument),
     certificates: buildPendingCertificates(payload.certificates),
     status: "pending",
+    submittedAt,
+    reviewHistory: [
+      {
+        action: "submitted",
+        status: "pending",
+        actorId: new Types.ObjectId(userId),
+        actorRole: "CUSTOMER",
+        occurredAt: submittedAt,
+      },
+    ],
   });
+};
+
+export const saveDraftApplication = async (
+  userId: string,
+  payload: SaveProviderApplicationDraftPayload,
+) => {
+  assertObjectId(userId, "user id");
+
+  const user = await User.findOne({ _id: userId, isDeleted: false });
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  if (user.status !== "active") {
+    throw new AppError("Account is not active", 403);
+  }
+
+  if (user.role !== "CUSTOMER") {
+    throw new AppError("Only customers can apply to become providers", 403);
+  }
+
+  const pendingApplication = await ProviderApplication.findOne({
+    userId,
+    status: { $in: ["pending", "resubmitted"] },
+    isDeleted: false,
+  });
+
+  if (pendingApplication) {
+    throw new AppError("Bạn đã có hồ sơ đang chờ xét duyệt", 400);
+  }
+
+  const rejectedApplication = await ProviderApplication.exists({
+    userId,
+    status: "rejected",
+    isDeleted: false,
+  });
+  if (rejectedApplication) {
+    throw new AppError(
+      "Hồ sơ bị từ chối phải được sửa bằng chức năng gửi lại",
+      409,
+    );
+  }
+
+  const serviceIds = payload.serviceIds?.length
+    ? await assertServicesActive(payload.serviceIds)
+    : [];
+
+  const application = await ProviderApplication.findOneAndUpdate(
+    { userId, status: "draft", isDeleted: false },
+    {
+      userId,
+      description: payload.description || "",
+      experienceYears: payload.experienceYears ?? 0,
+      serviceIds: serviceIds.map((id) => new Types.ObjectId(id)),
+      workingAreas: payload.workingAreas || [],
+      identityDocument: buildDraftIdentityDocument(payload.identityDocument),
+      certificates: buildDraftCertificates(payload.certificates),
+      status: "draft",
+      rejectionReason: null,
+      rejectionNotes: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      isDeleted: false,
+      deletedAt: null,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
+
+  return getMyApplication(String(application.userId));
 };
 
 export const getMyApplication = async (userId: string) => {
   assertObjectId(userId, "user id");
 
-  return ProviderApplication.findOne({ userId, isDeleted: false })
-    .sort({ createdAt: -1 })
+  const activeApplication = await ProviderApplication.findOne({
+    userId,
+    status: { $in: ["draft", "pending", "resubmitted"] },
+    isDeleted: false,
+  })
+    .sort({ updatedAt: -1 })
     .populate(servicePopulate)
-    .populate("reviewedBy", "fullName email");
+    .populate("reviewedBy", "fullName email")
+    .populate("reviewHistory.actorId", "fullName email role");
+
+  if (activeApplication) return activeApplication;
+
+  return ProviderApplication.findOne({ userId, isDeleted: false })
+    .sort({ updatedAt: -1 })
+    .populate(servicePopulate)
+    .populate("reviewedBy", "fullName email")
+    .populate("reviewHistory.actorId", "fullName email role");
+};
+
+export const getMyApplications = async (
+  userId: string,
+  query: ApplicationQuery = {},
+) => {
+  assertObjectId(userId, "user id");
+  const { page, limit, skip } = getPagination(query);
+  const filter = { userId, isDeleted: false };
+  const [items, total] = await Promise.all([
+    ProviderApplication.find(filter)
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate(servicePopulate)
+      .populate("reviewedBy", "fullName email")
+      .populate("reviewHistory.actorId", "fullName email role"),
+    ProviderApplication.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+export const getMyApplicationById = async (
+  userId: string,
+  applicationId: string,
+) => {
+  assertObjectId(userId, "user id");
+  assertObjectId(applicationId, "application id");
+
+  const application = await ProviderApplication.findOne({
+    _id: applicationId,
+    userId,
+    isDeleted: false,
+  })
+    .populate(servicePopulate)
+    .populate("reviewedBy", "fullName email")
+    .populate("reviewHistory.actorId", "fullName email role");
+
+  if (!application) {
+    throw new AppError("Không tìm thấy hồ sơ Provider", 404);
+  }
+  return application;
+};
+
+export const resubmitApplication = async (
+  userId: string,
+  applicationId: string,
+  payload: CreateProviderApplicationPayload,
+) => {
+  assertObjectId(userId, "user id");
+  assertObjectId(applicationId, "application id");
+  const serviceIds = await assertServicesActive(payload.serviceIds);
+
+  const activeApplication = await ProviderApplication.exists({
+    userId,
+    _id: { $ne: applicationId },
+    status: { $in: ["pending", "resubmitted"] },
+    isDeleted: false,
+  });
+  if (activeApplication) {
+    throw new AppError("Bạn đã có hồ sơ khác đang chờ xét duyệt", 409);
+  }
+
+  const resubmittedAt = new Date();
+  const application = await ProviderApplication.findOne({
+    _id: applicationId,
+    userId,
+    status: "rejected",
+    isDeleted: false,
+  });
+  if (!application) {
+    throw new AppError("Chỉ hồ sơ bị từ chối mới có thể gửi lại", 400);
+  }
+
+  application.description = payload.description;
+  application.experienceYears = payload.experienceYears;
+  application.serviceIds = serviceIds.map((id) => new Types.ObjectId(id));
+  application.workingAreas = payload.workingAreas;
+  application.identityDocument = buildPendingIdentityDocument(payload.identityDocument);
+  application.certificates = buildPendingCertificates(payload.certificates);
+  application.status = "resubmitted";
+  application.resubmittedAt = resubmittedAt;
+  application.reviewHistory.push({
+    action: "resubmitted",
+    status: "resubmitted",
+    actorId: new Types.ObjectId(userId),
+    actorRole: "CUSTOMER",
+    occurredAt: resubmittedAt,
+  });
+
+  await application.save();
+  return getMyApplicationById(userId, applicationId);
 };
 
 export const getApplications = async (query: ApplicationQuery = {}) => {
   const { page, limit, skip } = getPagination(query);
   const filter: Record<string, unknown> = { isDeleted: false };
 
-  if (query.status && ["pending", "approved", "rejected"].includes(query.status)) {
+  if (
+    query.status &&
+    ["draft", "pending", "resubmitted", "approved", "rejected"].includes(
+      query.status,
+    )
+  ) {
     filter.status = query.status;
+  } else {
+    filter.status = { $ne: "draft" };
   }
 
   if (query.keyword) {
@@ -269,7 +591,8 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
       .limit(limit)
       .populate("userId", "fullName email phone avatar role status")
       .populate(servicePopulate)
-      .populate("reviewedBy", "fullName email"),
+      .populate("reviewedBy", "fullName email")
+      .populate("reviewHistory.actorId", "fullName email role"),
     ProviderApplication.countDocuments(filter),
   ]);
 
@@ -293,7 +616,8 @@ export const getApplicationById = async (applicationId: string) => {
   })
     .populate("userId", "fullName email phone avatar role status")
     .populate(servicePopulate)
-    .populate("reviewedBy", "fullName email");
+    .populate("reviewedBy", "fullName email")
+    .populate("reviewHistory.actorId", "fullName email role");
 
   if (!application) {
     throw new AppError("Provider application not found", 404);
@@ -319,21 +643,40 @@ export const reviewApplication = async (
     throw new AppError("Provider application not found", 404);
   }
 
-  if (application.status !== "pending") {
-    throw new AppError("Only pending applications can be reviewed", 400);
+  if (!["pending", "resubmitted"].includes(application.status)) {
+    throw new AppError("Chỉ hồ sơ đang chờ duyệt mới có thể xét duyệt", 400);
   }
 
+  const reviewedAt = new Date();
   application.status = payload.status;
   application.reviewedBy = new Types.ObjectId(adminId);
-  application.reviewedAt = new Date();
+  application.reviewedAt = reviewedAt;
 
   if (payload.status === "rejected") {
     application.rejectionReason = payload.rejectionReason || null;
+    application.rejectionNotes = payload.rejectionNotes || null;
+    application.reviewHistory.push({
+      action: "rejected",
+      status: "rejected",
+      actorId: new Types.ObjectId(adminId),
+      actorRole: "ADMIN",
+      occurredAt: reviewedAt,
+      rejectionReason: payload.rejectionReason || null,
+      notes: payload.rejectionNotes || null,
+    });
     await application.save();
     return getApplicationById(applicationId);
   }
 
   application.rejectionReason = null;
+  application.rejectionNotes = null;
+  application.reviewHistory.push({
+    action: "approved",
+    status: "approved",
+    actorId: new Types.ObjectId(adminId),
+    actorRole: "ADMIN",
+    occurredAt: reviewedAt,
+  });
   const identityDocument = approveIdentityDocument(
     application.identityDocument,
     adminId,

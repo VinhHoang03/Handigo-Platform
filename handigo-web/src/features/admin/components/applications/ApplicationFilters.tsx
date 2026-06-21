@@ -28,6 +28,7 @@ export function ApplicationFilters({
       >
         <option value="">Tất cả trạng thái</option>
         <option value="pending">Chờ duyệt</option>
+        <option value="resubmitted">Đã gửi lại</option>
         <option value="approved">Đã duyệt</option>
         <option value="rejected">Từ chối</option>
       </FormSelect>

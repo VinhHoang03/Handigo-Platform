@@ -178,6 +178,27 @@
     100% { transform: translateY(0px); }
   }
 
+  @keyframes provider-status-marquee {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+
+  .provider-status-marquee {
+    animation: provider-status-marquee 18s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .provider-status-marquee {
+      animation: none;
+      width: auto;
+      white-space: normal !important;
+    }
+  }
+
   .form-field__control {
     @apply relative;
   }

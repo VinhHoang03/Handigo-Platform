@@ -1,5 +1,5 @@
 import api from './client';
-import type { Category, Service, ServiceOption, Address, Order, Pagination, OrderQuotation } from '../types/booking';
+import type { Category, Service, ServiceOption, Address, Order, Pagination, OrderQuotation, CreatePaymentResult, Payment } from '../types/booking';
 
 export interface CreateOrderPayload {
   serviceId: string;
@@ -10,6 +10,16 @@ export interface CreateOrderPayload {
   problemDescription?: string;
   paymentMethod: 'wallet' | 'bank' | 'cash';
   customerAttachments?: string[];
+}
+
+export interface CreateAddressPayload {
+  recipientName: string;
+  recipientPhone: string;
+  fullAddress: string;
+  province: string;
+  ward: string;
+  isDefault?: boolean;
+  note?: string | null;
 }
 
 export const bookingApi = {
@@ -33,6 +43,10 @@ export const bookingApi = {
     const response = await api.get<{ success: boolean; data: Address[] }>('/addresses');
     return response.data.data;
   },
+  createAddress: async (payload: CreateAddressPayload) => {
+    const response = await api.post<{ success: boolean; data: Address }>('/addresses', payload);
+    return response.data.data;
+  },
   uploadOrderAttachment: async (file: File) => {
     const formData = new FormData();
     formData.append('image', file);
@@ -45,6 +59,20 @@ export const bookingApi = {
   },
   createOrder: async (payload: CreateOrderPayload) => {
     const response = await api.post<{ success: boolean; data: Order }>('/orders', payload);
+    return response.data.data;
+  },
+  createPayment: async (payload: {
+    orderId: string;
+    method: 'PAYOS' | 'CASH';
+    paymentType?: 'INSPECTION_DEPOSIT' | 'FULL' | 'REMAINING';
+    returnUrl?: string;
+    cancelUrl?: string;
+  }) => {
+    const response = await api.post<{ success: boolean; data: CreatePaymentResult }>('/payments/create', payload);
+    return response.data.data;
+  },
+  getPaymentById: async (paymentId: string) => {
+    const response = await api.get<{ success: boolean; data: Payment }>(`/payments/${paymentId}`);
     return response.data.data;
   },
   getMyOrders: async (page = 1, limit = 10, status?: string, search?: string) => {

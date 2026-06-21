@@ -4,14 +4,15 @@ import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
 import { MatchingService, ProviderCandidate } from "./matching.service";
 import { AppError } from "../utils/appError";
+import { getNumberConfigValue } from "./systemConfig.service";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Seconds a provider has to accept before the next one is tried. */
-const ASSIGNMENT_TIMEOUT_SECONDS = 30;
+const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 30;
 
 /** Maximum number of providers to try before giving up. */
-const MAX_DISPATCH_ATTEMPTS = 5;
+const DEFAULT_MAX_MATCHING_ATTEMPTS = 5;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,16 @@ export const DispatchService = {
     triedProviderIds: Types.ObjectId[] = [],
     attemptNumber = 1,
   ): Promise<void> {
-    if (attemptNumber > MAX_DISPATCH_ATTEMPTS) {
+    const maxMatchingAttempts = Math.max(
+      Math.floor(await getNumberConfigValue("MAX_MATCHING_ATTEMPTS", DEFAULT_MAX_MATCHING_ATTEMPTS)),
+      1,
+    );
+    const matchingProviderTimeoutSeconds = Math.max(
+      await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS),
+      1,
+    );
+
+    if (attemptNumber > maxMatchingAttempts) {
       // All candidates exhausted – cancel the order
       await Order.findByIdAndUpdate(orderId, {
         status: "cancelled",
@@ -50,7 +60,7 @@ export const DispatchService = {
         "cancellation.cancelledAt": new Date(),
       });
       console.warn(
-        `[DispatchService] No provider found for order ${orderId} after ${MAX_DISPATCH_ATTEMPTS} attempts.`,
+        `[DispatchService] No provider found for order ${orderId} after ${maxMatchingAttempts} attempts.`,
       );
       return;
     }
@@ -80,7 +90,7 @@ export const DispatchService = {
 
     const candidate = candidates[0];
     const deadline = new Date(
-      Date.now() + ASSIGNMENT_TIMEOUT_SECONDS * 1000,
+      Date.now() + matchingProviderTimeoutSeconds * 1000,
     );
 
     // 2. Create assignment record
@@ -110,7 +120,7 @@ export const DispatchService = {
         triedProviderIds,
         attemptNumber,
       );
-    }, ASSIGNMENT_TIMEOUT_SECONDS * 1000);
+    }, matchingProviderTimeoutSeconds * 1000);
   },
 
   /**

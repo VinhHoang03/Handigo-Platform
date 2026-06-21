@@ -42,26 +42,29 @@ const OPTION_TYPE_LABELS: Record<ServiceOptionType, string> = {
 type ServiceForm = {
   name: string; slug: string; image: string; description: string;
   serviceType: 'fixed_price' | 'variable_price';
+  depositAmount: string;
   isActive: boolean;
 };
 
 const emptyServiceForm: ServiceForm = {
   name: '', slug: '', image: '', description: '',
-  serviceType: 'fixed_price', isActive: true,
+  serviceType: 'fixed_price', depositAmount: '', isActive: true,
 };
 type OptionForm = {
   name: string;
+  description: string;
   optionType: ServiceOptionType;
   price: string;
   isActive: boolean;
 };
 
 const emptyOptionForm: OptionForm = {
-  name: '', optionType: 'other', price: '', isActive: true,
+  name: '', description: '', optionType: 'other', price: '', isActive: true,
 };
 
 const toOptionPayload = (f: OptionForm): ServiceOptionPayload => ({
   name: f.name.trim(),
+  description: f.description.trim() || undefined,
   optionType: f.optionType,
   price: Number(f.price) || 0,
   isActive: f.isActive,
@@ -74,6 +77,7 @@ const toServicePayload = (f: ServiceForm, categoryId: string): ServicePayload =>
   image: f.image.trim() || undefined,
   description: f.description.trim() || undefined,
   serviceType: f.serviceType,
+  depositAmount: f.serviceType === 'variable_price' ? Number(f.depositAmount) : null,
   isActive: f.isActive,
 });
 
@@ -259,6 +263,7 @@ export default function AdminServicesPage() {
     setServiceForm({
       name: s.name, slug: s.slug, image: s.image || '',
       description: s.description || '', serviceType: s.serviceType,
+      depositAmount: s.depositAmount == null ? '' : String(s.depositAmount),
       isActive: s.isActive,
     });
     setServiceModal('edit');
@@ -298,6 +303,7 @@ export default function AdminServicesPage() {
     setEditingOption(opt);
     setOptionForm({
       name: opt.name,
+      description: opt.description || '',
       optionType: opt.optionType,
       price: String(opt.price),
       isActive: opt.isActive,
@@ -487,6 +493,9 @@ export default function AdminServicesPage() {
                         {[
                           { label: 'Tùy chọn', value: String(options.length) },
                           { label: 'Loại giá', value: selectedService.serviceType === 'fixed_price' ? 'Cố định' : 'Linh hoạt' },
+                          ...(selectedService.serviceType === 'variable_price'
+                            ? [{ label: 'Tiền đặt cọc', value: money.format(selectedService.depositAmount || 0) }]
+                            : []),
                         ].map(({ label, value }) => (
                           <div key={label} className="flex flex-col rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3">
                             <span className="text-label-sm uppercase tracking-wider text-on-surface-variant">{label}</span>
@@ -516,7 +525,7 @@ export default function AdminServicesPage() {
                           <tr className="text-label-sm uppercase tracking-wider text-on-surface-variant">
                             <th className="px-4 py-2">Tên tùy chọn</th>
                             <th className="px-4 py-2">Loại</th>
-                            <th className="px-4 py-2">{selectedService.serviceType === 'variable_price' ? 'Tiền cọc' : 'Giá'}</th>
+                            <th className="px-4 py-2">Giá</th>
                             <th className="px-4 py-2">Trạng thái</th>
                             <th className="px-4 py-2 text-right">Hành động</th>
                           </tr>
@@ -584,6 +593,20 @@ export default function AdminServicesPage() {
               <option value="variable_price">Giá linh hoạt</option>
             </select>
           </label>
+          {serviceForm.serviceType === 'variable_price' && (
+            <>
+              <FormInput
+                label="Tiền đặt cọc (VNĐ)"
+                type="number"
+                required
+                value={serviceForm.depositAmount}
+                onChange={(v) => setServiceForm({ ...serviceForm, depositAmount: v })}
+              />
+              <p className="rounded-lg bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
+                Khoản cọc này được hiển thị trong phần tóm tắt đơn hàng và thu khi khách đặt dịch vụ giá linh hoạt.
+              </p>
+            </>
+          )}
           <FormTextArea label="Mô tả" value={serviceForm.description} onChange={(v) => setServiceForm({ ...serviceForm, description: v })} />
           <ToggleRow checked={serviceForm.isActive} onChange={(v) => setServiceForm({ ...serviceForm, isActive: v })} label="Hiển thị dịch vụ" />
           <FormActions busy={busy} onCancel={() => setServiceModal(null)} />
@@ -594,6 +617,7 @@ export default function AdminServicesPage() {
       <Modal open={Boolean(optionModal)} title={optionModal === 'edit' ? 'Sửa tùy chọn' : 'Thêm tùy chọn dịch vụ'} onClose={() => setOptionModal(null)}>
         <form onSubmit={saveOption} className="space-y-4">
           <FormInput label="Tên tùy chọn" required value={optionForm.name} onChange={(v) => setOptionForm({ ...optionForm, name: v })} />
+          <FormTextArea label="Mô tả" value={optionForm.description} onChange={(v) => setOptionForm({ ...optionForm, description: v })} />
           <label className="block">
             <span className="mb-1 block text-sm font-semibold">Loại tùy chọn</span>
             <select value={optionForm.optionType} onChange={(e) => setOptionForm({ ...optionForm, optionType: e.target.value as ServiceOptionType })}
@@ -601,12 +625,7 @@ export default function AdminServicesPage() {
               {Object.entries(OPTION_TYPE_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
             </select>
           </label>
-          <FormInput label={serviceModal !== null && selectedService?.serviceType === 'variable_price' ? 'Tiền cọc (VNĐ)' : 'Giá (VNĐ)'} type="number" required value={optionForm.price} onChange={(v) => setOptionForm({ ...optionForm, price: v })} />
-          {selectedService?.serviceType === 'variable_price' && (
-            <p className="rounded-lg bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
-              Dịch vụ giá linh hoạt — nhập tiền cọc khảo sát ban đầu. Giá thực sẽ được báo sau khi thợ khảo sát xong.
-            </p>
-          )}
+          <FormInput label="Giá (VNĐ)" type="number" required value={optionForm.price} onChange={(v) => setOptionForm({ ...optionForm, price: v })} />
           <ToggleRow checked={optionForm.isActive} onChange={(v) => setOptionForm({ ...optionForm, isActive: v })} label="Hiển thị tùy chọn" />
           <FormActions busy={busy} onCancel={() => setOptionModal(null)} />
         </form>

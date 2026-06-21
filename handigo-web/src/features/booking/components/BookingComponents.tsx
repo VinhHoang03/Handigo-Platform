@@ -11,6 +11,8 @@ import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi } from '../../../api/booking';
 import type { Service, ServiceOption } from '../../../types/booking';
 
+const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
+
 interface BookingShellProps {
   children: ReactNode;
 }
@@ -135,7 +137,9 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
         </div>
       ) : null}
       <Link
-        to={`/customer/bookings/${booking?.id || ''}`}
+        to={booking?.statusTone === 'completed'
+          ? `/customer/orders/${booking?.id || ''}/feedback`
+          : `/customer/bookings/${booking?.id || ''}`}
         className={`flex-1 md:flex-none px-md py-2 rounded-xl font-label-md text-label-md text-center transition-all active:scale-95 ${booking?.statusTone === 'pending'
           ? 'bg-primary text-on-primary shadow-sm hover:shadow-md'
           : 'border border-primary text-primary hover:bg-primary/5'
@@ -199,9 +203,11 @@ export const OrderSummaryCard: React.FC<{
     } else if (service?.serviceType === 'variable_price') {
       total = service?.depositAmount || 0;
     }
-    selectedOptions.forEach(opt => {
-      total += opt.fixedPrice;
-    });
+    if (service?.serviceType !== 'variable_price') {
+      selectedOptions.forEach(opt => {
+        total += getOptionPrice(opt);
+      });
+    }
     return total;
   };
 
@@ -256,7 +262,9 @@ export const OrderSummaryCard: React.FC<{
             {selectedOptions.map(opt => (
               <div key={opt._id} className="flex justify-between">
                 <span className="text-on-surface-variant">{opt.name}</span>
-                <span className="font-medium">+{opt.fixedPrice.toLocaleString()}đ</span>
+                {service?.serviceType !== 'variable_price' && (
+                  <span className="font-medium">+{getOptionPrice(opt).toLocaleString()}đ</span>
+                )}
               </div>
             ))}
           </div>
@@ -303,3 +311,4 @@ export const OrderSummaryCard: React.FC<{
     </aside>
   );
 };
+

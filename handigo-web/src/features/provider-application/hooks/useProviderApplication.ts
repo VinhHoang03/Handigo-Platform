@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { providerApplicationService } from '../services/providerApplication.service';
-import type { Category, ProviderApplicationPayload } from '../types/providerApplication.types';
+import type {
+  Category,
+  ProviderApplication,
+  ProviderApplicationPayload,
+} from '../types/providerApplication.types';
 
-export function useProviderApplication() {
+export function useProviderApplication(applicationId?: string | null) {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [application, setApplication] = useState<ProviderApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [draftError, setDraftError] = useState('');
 
   const loadCategories = () => {
     setLoading(true);
@@ -23,10 +30,16 @@ export function useProviderApplication() {
 
   useEffect(() => {
     let active = true;
-    providerApplicationService
-      .loadCategories()
-      .then((value) => {
-        if (active) setCategories(value);
+    Promise.all([
+      providerApplicationService.loadCategories(),
+      applicationId
+        ? providerApplicationService.loadDetail(applicationId)
+        : providerApplicationService.loadMine(),
+    ])
+      .then(([categoryValue, applicationValue]) => {
+        if (!active) return;
+        setCategories(categoryValue);
+        setApplication(applicationValue);
       })
       .catch(() => {
         if (active) {
@@ -40,13 +53,15 @@ export function useProviderApplication() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [applicationId]);
 
   const submit = async (payload: ProviderApplicationPayload) => {
     try {
       setSubmitting(true);
       setSubmitError('');
-      return await providerApplicationService.submit(payload);
+      return await (applicationId
+        ? providerApplicationService.resubmit(applicationId, payload)
+        : providerApplicationService.submit(payload));
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : 'Không thể gửi hồ sơ.',
@@ -57,14 +72,35 @@ export function useProviderApplication() {
     }
   };
 
+  const saveDraft = useCallback(async (payload: ProviderApplicationPayload) => {
+    try {
+      setSavingDraft(true);
+      setDraftError('');
+      const draft = await providerApplicationService.saveDraft(payload);
+      setApplication(draft);
+      return draft;
+    } catch (error) {
+      setDraftError(
+        error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ lÆ°u nhÃ¡p há»“ sÆ¡.',
+      );
+      throw error;
+    } finally {
+      setSavingDraft(false);
+    }
+  }, []);
+
   return {
     categories,
+    application,
     loading,
     submitting,
+    savingDraft,
     loadError,
     submitError,
+    draftError,
     loadCategories,
     submit,
+    saveDraft,
     uploadImage: providerApplicationService.uploadImage,
   };
 }

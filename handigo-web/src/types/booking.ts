@@ -4,6 +4,7 @@ export interface Category {
   slug: string;
   description?: string;
   icon?: string;
+  image?: string;
   isActive: boolean;
 }
 
@@ -24,16 +25,38 @@ export interface ServiceOption {
   _id: string;
   serviceId: string;
   name: string;
-  description?: string;
-  optionType: 'inspection' | 'cleaning' | 'installation' | 'repair' | 'other';
-  fixedPrice: number;
-  isFixedPrice: boolean;
+  description?: string | null;
+  optionType: 'room_count' | 'area_size' | 'package' | 'add_on' | 'other' | 'inspection' | 'cleaning' | 'installation' | 'repair';
+  price: number;
+  fixedPrice?: number;
+  isFixedPrice?: boolean;
   isActive: boolean;
+}
+
+export interface Payment {
+  _id: string;
+  orderId: string;
+  amount: number;
+  method: 'payos' | 'vnpay' | 'cash' | 'wallet' | 'bank';
+  paymentType: 'full' | 'remaining' | 'inspection_deposit';
+  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  transactionCode?: string | null;
+}
+
+export interface CreatePaymentResult {
+  payment: Payment;
+  method?: 'CASH';
+  amount?: number;
+  checkoutUrl?: string;
+  qrCode?: string;
+  paymentType: Payment['paymentType'];
 }
 
 export interface Address {
   _id: string;
   userId: string;
+  recipientName?: string;
+  recipientPhone?: string;
   label?: string;
   fullAddress?: string;
   detailAddress?: string;
@@ -69,6 +92,8 @@ export interface Order {
   customerId: string | OrderCustomer;
   problemDescription?: string;
   customerAttachments?: string[];
+  completionEvidenceImages?: string[];
+  completionNote?: string | null;
   providerId?: {
     _id: string;
     name: string;
@@ -142,6 +167,7 @@ export interface BookingState {
   // Helpers
   setCategoryId: (id: string) => void;
   setServiceId: (id: string) => void;
+  selectService: (categoryId: string, serviceId: string) => void;
   toggleOption: (id: string) => void;
   setAddressId: (id: string) => void;
   setOrderType: (type: BookingState['orderType']) => void;

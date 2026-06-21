@@ -33,6 +33,19 @@ export const getMyProfile = async (
   }
 };
 
+export const getFeaturedProviders = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const data = await providerProfileService.getFeaturedProviders();
+    return res.json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const updateMyProfile = async (
   req: Request,
   res: Response,

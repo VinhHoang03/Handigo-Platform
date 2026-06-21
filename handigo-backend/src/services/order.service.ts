@@ -8,10 +8,13 @@ import { ServiceOption } from "../models/serviceOption.model";
 import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import { DispatchService } from "./dispatch.service";
+import { getNumberConfigValue } from "./systemConfig.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const PLATFORM_COMMISSION_RATE = 0.15; // 15 %
+const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
+const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
+const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY = "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -94,15 +97,28 @@ export const OrderService = {
       price: opt.price,
     }));
 
-    // 4. Calculate pricing — price comes entirely from selected ServiceOptions
-    const bookingBasePrice = selectedOptionsSnapshot.reduce(
-      (sum, o) => sum + (o.price ?? 0),
-      0,
+    const platformCommissionPercent = await getNumberConfigValue(
+      PLATFORM_FEE_PERCENT_CONFIG_KEY,
+      DEFAULT_PLATFORM_COMMISSION_PERCENT,
     );
+    const platformCommissionRate = Math.max(platformCommissionPercent, 0) / 100;
+    const quotationDepositAmount = await getNumberConfigValue(
+      QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY,
+      service.depositAmount ?? 0,
+    );
+
+    // 4. Dịch vụ giá linh hoạt chỉ thu tiền cọc; dịch vụ cố định giữ cách tính hiện có.
+    const bookingBasePrice =
+      service.serviceType === "variable_price"
+        ? quotationDepositAmount
+        : selectedOptionsSnapshot.reduce(
+            (sum, o) => sum + (o.price ?? 0),
+            0,
+          );
     const totalAmount = bookingBasePrice;
 
     const platformCommissionAmount = Math.round(
-      totalAmount * PLATFORM_COMMISSION_RATE,
+      totalAmount * platformCommissionRate,
     );
     const providerEarningAmount = totalAmount - platformCommissionAmount;
 
@@ -132,7 +148,7 @@ export const OrderService = {
       customerAttachments: payload.customerAttachments ?? [],
       pricing: {
         bookingAmount: totalAmount, // The amount including options for the current payment phase
-        platformCommissionRate: PLATFORM_COMMISSION_RATE,
+        platformCommissionRate,
         platformCommissionAmount,
         providerEarningAmount,
         promotionDiscountAmount: 0,
@@ -376,7 +392,12 @@ export const OrderService = {
   /**
    * Provider marks an in-progress order as completed.
    */
-  async completeOrder(orderId: string, providerUserId: string): Promise<IOrder> {
+  async completeOrder(
+    orderId: string,
+    providerUserId: string,
+    completionEvidenceImages: string[],
+    completionNote?: string,
+  ): Promise<IOrder> {
     const provider = await getProviderByUserId(providerUserId);
     const order = await Order.findById(orderId);
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
@@ -392,7 +413,25 @@ export const OrderService = {
       );
     }
 
+    const evidenceImages = completionEvidenceImages
+      .map((url) => url.trim())
+      .filter(Boolean);
+    if (evidenceImages.length === 0) {
+      throw new AppError(
+        "Vui lòng tải lên ít nhất một ảnh bằng chứng hoàn thành.",
+        400,
+      );
+    }
+    if (evidenceImages.length > 5) {
+      throw new AppError(
+        "Chỉ được tải lên tối đa 5 ảnh bằng chứng hoàn thành.",
+        400,
+      );
+    }
+
     order.status = "completed";
+    order.completionEvidenceImages = evidenceImages;
+    order.completionNote = completionNote?.trim() || null;
     order.confirmation.providerConfirmedAt = new Date();
     if (order.paymentStatus === "unpaid" || order.paymentStatus === "partially_paid") {
       order.paymentStatus = "paid";

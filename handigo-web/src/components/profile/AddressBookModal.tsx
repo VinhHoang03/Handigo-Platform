@@ -28,6 +28,10 @@ interface AddressBookModalProps {
   address?: UserAddress | null;
   addressCount: number;
   isSaving?: boolean;
+  defaultRecipient: {
+    name: string;
+    phone: string;
+  };
   onClose: () => void;
   onSubmit: (
     payload: UserAddressPayload,
@@ -36,6 +40,8 @@ interface AddressBookModalProps {
 }
 
 const EMPTY_ADDRESS_FORM: AddressFormState = {
+  recipientName: "",
+  recipientPhone: "",
   addressLine: "",
   fullAddress: "",
   province: "",
@@ -85,15 +91,20 @@ const extractAddressLine = (
 const toAddressForm = (
   address: UserAddress | null | undefined,
   addressCount: number,
+  defaultRecipient: AddressBookModalProps["defaultRecipient"],
 ): AddressFormState => {
   if (!address) {
     return {
       ...EMPTY_ADDRESS_FORM,
+      recipientName: defaultRecipient.name,
+      recipientPhone: defaultRecipient.phone,
       isDefault: addressCount === 0,
     };
   }
 
   return {
+    recipientName: address.recipientName || defaultRecipient.name,
+    recipientPhone: address.recipientPhone || defaultRecipient.phone,
     addressLine: extractAddressLine(
       address.fullAddress,
       address.ward,
@@ -122,11 +133,12 @@ export function AddressBookModal({
   address = null,
   addressCount,
   isSaving,
+  defaultRecipient,
   onClose,
   onSubmit,
 }: AddressBookModalProps) {
   const [addressForm, setAddressForm] = useState<AddressFormState>(() =>
-    toAddressForm(address, addressCount),
+    toAddressForm(address, addressCount, defaultRecipient),
   );
   const [addressFormError, setAddressFormError] = useState("");
   const [addressAutocompleteError, setAddressAutocompleteError] = useState("");
@@ -335,17 +347,42 @@ export function AddressBookModal({
       );
 
     if (
+      !addressForm.recipientName.trim() ||
+      !addressForm.recipientPhone.trim() ||
       !currentAddressLine ||
       !addressForm.province.trim() ||
       !addressForm.ward.trim()
     ) {
       setAddressFormError(
-        "Vui lòng nhập đầy đủ địa chỉ cụ thể, tỉnh/thành và phường/xã.",
+        "Vui lòng nhập đầy đủ người nhận, số điện thoại và thông tin địa chỉ.",
       );
       return;
     }
 
+    const compactRecipientPhone = addressForm.recipientPhone
+      .trim()
+      .replace(/[\s.-]/g, "");
+    const normalizedRecipientPhone = compactRecipientPhone.startsWith("+84")
+      ? compactRecipientPhone
+      : compactRecipientPhone.startsWith("84")
+        ? `+${compactRecipientPhone}`
+        : compactRecipientPhone.startsWith("0")
+          ? `+84${compactRecipientPhone.slice(1)}`
+          : compactRecipientPhone;
+
+    if (!/^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u.test(addressForm.recipientName.trim().replace(/\s+/g, " "))) {
+      setAddressFormError("Tên người nhận chỉ được chứa chữ cái và khoảng trắng.");
+      return;
+    }
+
+    if (!/^\+84(?:3|5|7|8|9)\d{8}$/.test(normalizedRecipientPhone)) {
+      setAddressFormError("Số điện thoại người nhận không hợp lệ.");
+      return;
+    }
+
     const payload: UserAddressPayload = {
+      recipientName: addressForm.recipientName.trim().replace(/\s+/g, " "),
+      recipientPhone: normalizedRecipientPhone,
       fullAddress: composeFullAddress(
         currentAddressLine,
         addressForm.ward,
@@ -390,6 +427,35 @@ export function AddressBookModal({
         )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <label className="order-1 block space-y-2">
+            <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
+              Tên người nhận
+            </span>
+            <input
+              type="text"
+              value={addressForm.recipientName}
+              required
+              maxLength={120}
+              className="form-field__input pb-2 pt-2"
+              onChange={(event) =>
+                handleAddressInputChange("recipientName", event.target.value)
+              }
+            />
+          </label>
+          <label className="order-2 block space-y-2">
+            <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
+              Số điện thoại người nhận
+            </span>
+            <input
+              type="tel"
+              value={addressForm.recipientPhone}
+              required
+              className="form-field__input pb-2 pt-2"
+              onChange={(event) =>
+                handleAddressInputChange("recipientPhone", event.target.value)
+              }
+            />
+          </label>
           <SearchableSelect
             id="address-province"
             label="Tỉnh /Thành phố"
@@ -398,7 +464,7 @@ export function AddressBookModal({
             loading={isProvinceLoading}
             placeholder="Nhập để tìm kiếm tỉnh/thành"
             emptyText="Không tìm thấy tỉnh/thành."
-            containerClassName="order-1"
+            containerClassName="order-3"
             onChange={handleProvinceChange}
           />
           <SearchableSelect
@@ -410,11 +476,11 @@ export function AddressBookModal({
             disabled={!addressForm.provinceCode}
             placeholder="Nhập để tìm kiếm phường/xã"
             emptyText="Không tìm thấy phường/xã."
-            containerClassName="order-2"
+            containerClassName="order-4"
             onChange={handleWardChange}
           />
 
-          <div className="order-3 space-y-2 md:col-span-2">
+          <div className="order-5 space-y-2 md:col-span-2">
             <label
               htmlFor="address-line-google-places"
               className="ml-1 block text-label-sm font-medium text-on-surface-variant"
@@ -458,7 +524,7 @@ export function AddressBookModal({
             value={addressForm.note || ""}
             rows={3}
             maxLength={200}
-            containerClassName="order-4 md:col-span-2"
+            containerClassName="order-6 md:col-span-2"
             onValueChange={(value) => handleAddressInputChange("note", value)}
           />
         </div>

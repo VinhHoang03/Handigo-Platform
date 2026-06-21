@@ -9,6 +9,8 @@ const isImageUrl = (value?: string) => {
   return /^https?:\/\//i.test(value) || value.startsWith('/');
 };
 
+const getOptionPrice = (option: ServiceOption): number => option.price ?? option.fixedPrice ?? 0;
+
 const CreateBookingStep1Page = () => {
   const { categoryId, setCategoryId, serviceId, setServiceId, toggleOption, selectedOptionIds } = useBookingStore();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -49,6 +51,8 @@ const CreateBookingStep1Page = () => {
 
   const visibleCategories = categories.slice(0, 5);
   const hasMoreCategories = categories.length > visibleCategories.length;
+  const selectedService = services.find((service) => service._id === serviceId);
+  const isVariablePrice = selectedService?.serviceType === 'variable_price';
 
   return (
     <OrderCreationShell>
@@ -102,7 +106,7 @@ const CreateBookingStep1Page = () => {
               Chọn dịch vụ cụ thể
             </h2>
             <div className="space-y-md">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-sm">
                 {services.map((service) => (
                   <button
                     key={service._id}
@@ -130,14 +134,7 @@ const CreateBookingStep1Page = () => {
                     </div>
                     <div className="p-sm">
                       <h3 className="font-label-md mb-1 pr-8 leading-snug line-clamp-1">{service.name}</h3>
-                    <p className="text-xs text-on-surface-variant line-clamp-2 leading-snug">{service.description}</p>
-                    <p className="mt-2 font-bold text-primary text-sm">
-                      {service.fixedPrice
-                        ? `${service.fixedPrice.toLocaleString()}đ`
-                        : service.serviceType === 'variable_price'
-                          ? `Phí dịch vụ: ${service.depositAmount?.toLocaleString() || 0}đ`
-                          : '0đ'}
-                    </p>
+                      <p className="text-xs text-on-surface-variant line-clamp-2 leading-snug">{service.description}</p>
                     </div>
                   </button>
                 ))}
@@ -159,7 +156,10 @@ const CreateBookingStep1Page = () => {
                           checked={selectedOptionIds.includes(option._id)}
                           onChange={() => toggleOption(option._id)}
                         />
-                        <span className="text-label-md">{option.name} (+{option.fixedPrice.toLocaleString()}đ)</span>
+                        <span className="text-label-md">
+                          {option.name}
+                          {!isVariablePrice && ` (+${getOptionPrice(option).toLocaleString()}đ)`}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -178,3 +178,4 @@ const CreateBookingStep1Page = () => {
 };
 
 export default CreateBookingStep1Page;
+

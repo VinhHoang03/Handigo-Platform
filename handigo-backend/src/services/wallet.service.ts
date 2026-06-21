@@ -346,6 +346,10 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
   let paymentLink;
 
   try {
+    const returnUrl = appendQueryParams(input.returnUrl || DEFAULT_WALLET_DEPOSIT_RETURN_URL, {
+      walletDeposit: "success",
+      orderCode: orderCode.toString(),
+    });
     const cancelUrl = appendQueryParams(input.cancelUrl || DEFAULT_WALLET_DEPOSIT_CANCEL_URL, {
       walletDeposit: "cancelled",
       orderCode: orderCode.toString(),
@@ -355,7 +359,7 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
       orderCode,
       amount: input.amount,
       description: "Nap vi Handigo",
-      returnUrl: input.returnUrl || DEFAULT_WALLET_DEPOSIT_RETURN_URL,
+      returnUrl,
       cancelUrl,
       items: [
         {
@@ -427,6 +431,103 @@ export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) 
   return transaction;
 };
 
+const markWalletDepositSuccess = async (
+  transaction: any,
+  gatewayPatch: {
+    gatewayTransactionId?: string | null;
+    gatewayPaymentLinkId?: string | null;
+    gatewayResponse: Record<string, unknown>;
+  },
+) => {
+  const session = await mongoose.startSession();
+  let updatedTransaction = transaction;
+
+  try {
+    await session.withTransaction(async () => {
+      const freshTransaction = await WalletTransaction.findById(transaction._id).session(session);
+
+      if (!freshTransaction) {
+        throw new AppError("Không tìm thấy giao dịch nạp ví PayOS", 404);
+      }
+
+      if (freshTransaction.status === "success") {
+        updatedTransaction = freshTransaction;
+        return;
+      }
+
+      const wallet = await Wallet.findOneAndUpdate(
+        { _id: freshTransaction.walletId, isDeleted: false },
+        { $inc: { balance: freshTransaction.amount } },
+        { new: true, session },
+      );
+
+      if (!wallet) {
+        throw new WalletError("WALLET_NOT_FOUND", "Không tìm thấy ví", 404);
+      }
+
+      freshTransaction.status = "success";
+      freshTransaction.balanceAfter = wallet.balance;
+      freshTransaction.gatewayTransactionId = gatewayPatch.gatewayTransactionId || null;
+      freshTransaction.gatewayPaymentLinkId = gatewayPatch.gatewayPaymentLinkId || null;
+      freshTransaction.gatewayResponse = gatewayPatch.gatewayResponse;
+      await freshTransaction.save({ session });
+      updatedTransaction = freshTransaction;
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return updatedTransaction;
+};
+
+export const syncWalletDeposit = async (user: RequestUser, orderCode: string) => {
+  if (user.role !== "PROVIDER") {
+    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền đồng bộ giao dịch này", 403);
+  }
+
+  await getProviderByUserId(user.id);
+
+  const transaction = await WalletTransaction.findOne({
+    userId: user.id,
+    type: "deposit",
+    gatewayOrderCode: orderCode,
+    isDeleted: false,
+  });
+
+  if (!transaction) {
+    throw new AppError("Không tìm thấy giao dịch nạp ví", 404);
+  }
+
+  if (transaction.status === "success" || transaction.status === "cancelled") {
+    return transaction;
+  }
+
+  const paymentLink = await payos.paymentRequests.get(Number(orderCode));
+  const gatewayPatch = {
+    gatewayTransactionId: paymentLink.transactions?.[0]?.reference || transaction.gatewayTransactionId || null,
+    gatewayPaymentLinkId: paymentLink.id || transaction.gatewayPaymentLinkId || null,
+    gatewayResponse: {
+      ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
+      syncedAt: new Date(),
+      paymentLink,
+    },
+  };
+
+  if (paymentLink.status === "PAID" && paymentLink.amountPaid >= transaction.amount) {
+    return markWalletDepositSuccess(transaction, gatewayPatch);
+  }
+
+  if (["CANCELLED", "EXPIRED", "FAILED"].includes(paymentLink.status)) {
+    transaction.status = paymentLink.status === "CANCELLED" ? "cancelled" : "failed";
+    transaction.gatewayTransactionId = gatewayPatch.gatewayTransactionId;
+    transaction.gatewayPaymentLinkId = gatewayPatch.gatewayPaymentLinkId;
+    transaction.gatewayResponse = gatewayPatch.gatewayResponse;
+    await transaction.save();
+  }
+
+  return transaction;
+};
+
 export const handleWalletDepositPayosWebhook = async (webhookData: any, payload: any) => {
   const orderCode = webhookData.orderCode?.toString();
 
@@ -471,45 +572,7 @@ export const handleWalletDepositPayosWebhook = async (webhookData: any, payload:
     return transaction;
   }
 
-  const session = await mongoose.startSession();
-  let updatedTransaction = transaction;
-
-  try {
-    await session.withTransaction(async () => {
-      const freshTransaction = await WalletTransaction.findById(transaction._id).session(session);
-
-      if (!freshTransaction) {
-        throw new AppError("Khong tim thay giao dich nap vi PayOS", 404);
-      }
-
-      if (freshTransaction.status === "success") {
-        updatedTransaction = freshTransaction;
-        return;
-      }
-
-      const wallet = await Wallet.findOneAndUpdate(
-        { _id: freshTransaction.walletId, isDeleted: false },
-        { $inc: { balance: freshTransaction.amount } },
-        { new: true, session },
-      );
-
-      if (!wallet) {
-        throw new WalletError("WALLET_NOT_FOUND", "Khong tim thay vi", 404);
-      }
-
-      freshTransaction.status = "success";
-      freshTransaction.balanceAfter = wallet.balance;
-      freshTransaction.gatewayTransactionId = gatewayPatch.gatewayTransactionId;
-      freshTransaction.gatewayPaymentLinkId = gatewayPatch.gatewayPaymentLinkId;
-      freshTransaction.gatewayResponse = gatewayPatch.gatewayResponse;
-      await freshTransaction.save({ session });
-      updatedTransaction = freshTransaction;
-    });
-  } finally {
-    await session.endSession();
-  }
-
-  return updatedTransaction;
+  return markWalletDepositSuccess(transaction, gatewayPatch);
 };
 
 export const checkSufficientBalance = async (

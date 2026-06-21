@@ -11,6 +11,7 @@ export type ServiceOptionType =
 export interface IServiceOption extends Document, IBaseDocument {
   serviceId: Types.ObjectId;
   name: string;
+  description?: string | null;
   optionType: ServiceOptionType;
   price: Money;
   isActive: boolean;
@@ -20,6 +21,7 @@ const ServiceOptionSchema = new Schema<IServiceOption>(
   {
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
     name: { type: String, required: true, trim: true },
+    description: { type: String, default: null, trim: true },
     optionType: {
       type: String,
       enum: ["room_count", "area_size", "package", "add_on", "other"],

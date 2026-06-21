@@ -65,7 +65,7 @@ export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
         )}
       </div>
       <p className="font-label-md text-on-surface-variant">
-        ID: {profile.providerCode} • Thành viên từ {profile.joinDate}
+        Thành viên từ {profile.joinDate}
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-4 md:justify-start">
         <div className="flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-high/50 px-3 py-1.5">
@@ -227,9 +227,9 @@ function VerificationRow({ item }: { item: VerificationPanelItem }) {
   return <div className={className}>{content}</div>;
 }
 
-export const VerificationPanel: React.FC<{ items: VerificationPanelItem[] }> = ({
-  items,
-}) => (
+export const VerificationPanel: React.FC<{
+  items: VerificationPanelItem[];
+}> = ({ items }) => (
   <aside className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
     <h3 className="mb-6 font-headline-md text-headline-md text-on-surface">
       Xác thực tài khoản
@@ -242,12 +242,17 @@ export const VerificationPanel: React.FC<{ items: VerificationPanelItem[] }> = (
   </aside>
 );
 
-export const ServiceAreaPanel: React.FC<{ area: ServiceArea }> = ({ area }) => (
+export const ServiceAreaPanel: React.FC<{ area: ServiceArea; onEdit?: () => void }> = ({ area, onEdit }) => (
   <aside className="overflow-hidden rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
     <div className="mb-4 flex items-center justify-between">
       <h3 className="font-bold">Khu vực phục vụ</h3>
+      {onEdit && <button type="button" className="text-sm font-bold text-primary hover:underline" onClick={onEdit}>Chỉnh sửa</button>}
     </div>
-    <div className="space-y-4">
+    {area.workingAreas?.length ? (
+      <div className="flex flex-wrap gap-2">
+        {area.workingAreas.map((item) => <span key={item} className="rounded-full bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">{item}</span>)}
+      </div>
+    ) : <div className="space-y-4">
       <div>
         <p className="mb-1 text-xs font-bold uppercase text-on-surface-variant">
           Tỉnh/Thành phố
@@ -260,7 +265,7 @@ export const ServiceAreaPanel: React.FC<{ area: ServiceArea }> = ({ area }) => (
         </p>
         <p className="text-sm">{area.ward || "Chưa cập nhật"}</p>
       </div>
-    </div>
+    </div>}
   </aside>
 );
 
@@ -309,7 +314,7 @@ export const AccountFunctionsPanel: React.FC<{
     {
       icon: "more_horiz",
       label: "Các tùy chọn khác",
-      description: "Khu vực placeholder cho thiết lập tài khoản.",
+      description: "Khu vực cho thiết lập tài khoản.",
     },
   ];
 
