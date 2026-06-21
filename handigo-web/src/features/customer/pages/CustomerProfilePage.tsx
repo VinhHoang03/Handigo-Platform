@@ -315,7 +315,7 @@ export default function CustomerProfilePage() {
 
   if (isLoading) {
     return (
-      <DashboardShell role="CUSTOMER" userAvatar={DEFAULT_AVATAR}>
+      <DashboardShell role="CUSTOMER" userAvatar={DEFAULT_AVATAR} hideSidebar>
         <div className="rounded-xl bg-white p-8 text-center text-on-surface-variant">
           Đang tải hồ sơ...
         </div>
@@ -325,7 +325,7 @@ export default function CustomerProfilePage() {
 
   if (!profile) {
     return (
-      <DashboardShell role="CUSTOMER" userAvatar={DEFAULT_AVATAR}>
+      <DashboardShell role="CUSTOMER" userAvatar={DEFAULT_AVATAR} hideSidebar>
         <div className="rounded-xl border border-error/20 bg-error/10 p-8 text-center text-error">
           <p>{errorMsg || "Không thể mở hồ sơ."}</p>
           <button
@@ -348,8 +348,9 @@ export default function CustomerProfilePage() {
     <DashboardShell
       role="CUSTOMER"
       userAvatar={profile.avatar || profile.avatarUrl || DEFAULT_AVATAR}
+      hideSidebar
     >
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         {canRegisterProvider &&
           !isProviderApplicationLoading &&
           providerBannerMode === "waiting" && (

@@ -4,7 +4,9 @@ import {
   createAddress,
   updateAddress,
   deleteAddress,
-  getServiceHistory
+  getServiceHistory,
+  checkAddressUpdate,
+  confirmAddressUpdate,
 } from "../controllers/address.controller";
 
 import { authMiddleware } from "../middlewares/auth.middleware";
@@ -12,6 +14,7 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   createAddressSchema,
   updateAddressSchema,
+  mapAddressCandidateSchema,
 } from "../validations/address.validator";
 
 const router = Router();
@@ -38,6 +41,20 @@ router.put(
   authMiddleware,
   validate(updateAddressSchema),
   updateAddress
+);
+
+router.post(
+  "/:id/verification",
+  authMiddleware,
+  validate(mapAddressCandidateSchema),
+  checkAddressUpdate,
+);
+
+router.patch(
+  "/:id/verification",
+  authMiddleware,
+  validate(mapAddressCandidateSchema),
+  confirmAddressUpdate,
 );
 
 router.delete(

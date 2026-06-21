@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Navbar, type AppRole } from "./common/Navbar";
+import { NotificationBell } from "./common/NotificationBell";
 import { useAuthStore } from "../features/auth/store/auth.store";
 import { isNavItemActive } from "@/config/sidebarNavigation";
 import { authService } from "@/features/auth/services/auth.service";
@@ -75,10 +76,7 @@ export function Sidebar({
 
       <nav className="flex min-h-0 flex-grow flex-col gap-1.5 overflow-y-auto pr-1">
         {navItems.map((item) => {
-          const active =
-            item.path !== "#" &&
-            (location.pathname === item.path ||
-              location.pathname.startsWith(`${item.path}/`));
+          const active = isNavItemActive(location.pathname, item);
           return (
             <Link
               key={item.label}
@@ -213,13 +211,7 @@ function ProviderTopbar({
             </button>
           )}
 
-          <button
-            type="button"
-            aria-label="Thông báo"
-            className="material-symbols-outlined rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary"
-          >
-            notifications
-          </button>
+          <NotificationBell role="PROVIDER" />
           <button
             type="button"
             aria-label="Tin nhắn"
@@ -305,6 +297,7 @@ interface DashboardLayoutProps {
   showStatusToggle?: boolean;
   isOnline?: boolean;
   onStatusToggle?: () => void;
+  hideSidebar?: boolean;
 }
 
 export function DashboardLayout({
@@ -318,13 +311,14 @@ export function DashboardLayout({
   showStatusToggle,
   isOnline,
   onStatusToggle,
+  hideSidebar = false,
 }: DashboardLayoutProps) {
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
   const currentRole = role ?? normalizeRole(user?.role);
   const isAdmin = currentRole === "ADMIN";
   const isProvider = currentRole === "PROVIDER";
-  const hasSidebar = Boolean(currentRole && navItems.length);
+  const hasSidebar = Boolean(!hideSidebar && currentRole && navItems.length);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background font-body-md text-body-md">
@@ -361,8 +355,10 @@ export function DashboardLayout({
         className={`relative min-h-screen pb-12 pt-32 ${hasSidebar ? "lg:pl-80 xl:pl-[21rem]" : ""}`}
       >
         <div
-          className={`mx-auto space-y-8 px-4 sm:px-5 ${isAdmin || isProvider
-              ? "max-w-6xl lg:px-3 xl:px-4"
+          className={`mx-auto space-y-8 px-4 sm:px-5 ${isAdmin
+              ? "max-w-none lg:px-5 xl:px-6"
+              : isProvider
+                ? "max-w-6xl lg:px-3 xl:px-4"
               : "max-w-container-max lg:px-8"
             }`}
         >

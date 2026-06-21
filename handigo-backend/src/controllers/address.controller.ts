@@ -149,3 +149,35 @@ export const getServiceHistory = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const checkAddressUpdate = async (req: Request, res: Response) => {
+  try {
+    const data = await addressService.checkAddressUpdate(
+      String(req.params.id),
+      req.user!.id,
+      req.body,
+    );
+    return res.json({ success: true, data });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({ success: false, message: error.message });
+  }
+};
+
+export const confirmAddressUpdate = async (req: Request, res: Response) => {
+  try {
+    const data = await addressService.confirmAddressUpdate(
+      String(req.params.id),
+      req.user!.id,
+      req.body,
+    );
+    return res.json({
+      success: true,
+      data,
+      message: "Đã cập nhật địa chỉ mới",
+    });
+  } catch (error: any) {
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({ success: false, message: error.message });
+  }
+};

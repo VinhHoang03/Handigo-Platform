@@ -37,6 +37,13 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+const normalizeImageUrl = (value?: string | null) => {
+  if (!value) return value;
+  return value
+    .trim()
+    .replace(/^http:\/\/res\.cloudinary\.com/i, "https://res.cloudinary.com");
+};
+
 const ensureValidId = (id: string, field = "service") => {
   if (!Types.ObjectId.isValid(id)) {
     throw new AppError(`Invalid ${field} id`, 400);
@@ -128,7 +135,7 @@ export const createService = async (data: ServiceInput) => {
   if (!slug) throw new AppError("Unable to generate a valid slug", 400);
   await ensureUniqueSlug(data.categoryId!, slug);
 
-  return Service.create({ ...data, slug });
+  return Service.create({ ...data, slug, image: normalizeImageUrl(data.image) });
 };
 
 export const updateService = async (id: string, data: ServiceInput) => {
@@ -142,7 +149,12 @@ export const updateService = async (id: string, data: ServiceInput) => {
   const slug = data.slug || (data.name ? slugify(data.name) : service.slug);
   await ensureUniqueSlug(categoryId, slug, id);
 
-  Object.assign(service, { ...data, categoryId, slug });
+  Object.assign(service, {
+    ...data,
+    categoryId,
+    slug,
+    ...(data.image !== undefined ? { image: normalizeImageUrl(data.image) } : {}),
+  });
   return service.save();
 };
 

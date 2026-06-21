@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
-import cloudinary from "../configs/cloudinary";
+import cloudinary, { isCloudinaryConfigured } from "../configs/cloudinary";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -30,6 +30,13 @@ export const uploadAdminAssetImage = (
   res: Response,
   next: NextFunction,
 ) => {
+  if (!isCloudinaryConfigured) {
+    return res.status(503).json({
+      success: false,
+      message: "Dịch vụ lưu trữ ảnh chưa được cấu hình đầy đủ",
+    });
+  }
+
   upload(req, res, async (error) => {
     if (error) {
       return res.status(400).json({ success: false, message: error.message });
@@ -38,7 +45,7 @@ export const uploadAdminAssetImage = (
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Image is required",
+        message: "Vui lòng chọn một tệp ảnh hợp lệ",
       });
     }
 
@@ -48,7 +55,7 @@ export const uploadAdminAssetImage = (
     } catch {
       return res.status(502).json({
         success: false,
-        message: "Could not upload image",
+        message: "Không thể tải ảnh lên dịch vụ lưu trữ",
       });
     }
   });

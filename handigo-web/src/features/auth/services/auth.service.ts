@@ -33,6 +33,10 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const isNetworkError = (error: unknown) => {
+  return axios.isAxiosError(error) && !error.response;
+};
+
 export const authService = {
   restoreSession: async () => {
     const store = useAuthStore.getState();
@@ -49,7 +53,12 @@ export const authService = {
       const user = await getMeApi();
       useAuthStore.getState().setUser(user);
       return user;
-    } catch {
+    } catch (error) {
+      if (isNetworkError(error)) {
+        useAuthStore.getState().finishInitialization();
+        return store.user;
+      }
+
       useAuthStore.getState().logout();
       return null;
     }
@@ -57,12 +66,12 @@ export const authService = {
 
   login: async (credentials: LoginRequest, remember = true) => {
     try {
-      const response = await loginApi(credentials);
+      const response = await loginApi({ ...credentials, remember });
       const { user, token } = response;
       useAuthStore.getState().setAuth(user, token, remember);
       return response;
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to login');
+      const message = getErrorMessage(error, 'Không thể đăng nhập');
       throw new Error(message, { cause: error });
     }
   },
@@ -71,7 +80,7 @@ export const authService = {
     try {
       return await registerApi(payload);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to register');
+      const message = getErrorMessage(error, 'Không thể đăng ký');
       throw new Error(message, { cause: error });
     }
   },
@@ -80,7 +89,7 @@ export const authService = {
     try {
       return await verifyRegisterOtpApi(payload);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to verify OTP');
+      const message = getErrorMessage(error, 'Không thể xác thực mã OTP');
       throw new Error(message, { cause: error });
     }
   },
@@ -89,7 +98,7 @@ export const authService = {
     try {
       return await resendRegisterOtpApi(email);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to resend OTP');
+      const message = getErrorMessage(error, 'Không thể gửi lại mã OTP');
       throw new Error(message, { cause: error });
     }
   },
@@ -98,7 +107,7 @@ export const authService = {
     try {
       return await forgotPasswordApi(payload);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to send reset OTP');
+      const message = getErrorMessage(error, 'Không thể gửi mã khôi phục');
       throw new Error(message, { cause: error });
     }
   },
@@ -107,7 +116,7 @@ export const authService = {
     try {
       return await resetPasswordApi(payload);
     } catch (error) {
-      const message = getErrorMessage(error, 'Failed to reset password');
+      const message = getErrorMessage(error, 'Không thể đặt lại mật khẩu');
       throw new Error(message, { cause: error });
     }
   },
@@ -120,26 +129,26 @@ export const authService = {
     try {
       const response = await googleLoginApi(
         tokenType === 'accessToken'
-          ? { accessToken: googleToken }
-          : { credential: googleToken },
+          ? { accessToken: googleToken, remember }
+          : { credential: googleToken, remember },
       );
       const { user, token } = response;
       useAuthStore.getState().setAuth(user, token, remember);
       return response;
     } catch (error) {
-      const message = getErrorMessage(error, 'Google login failed');
+      const message = getErrorMessage(error, 'Không thể đăng nhập bằng Google');
       throw new Error(message, { cause: error });
     }
   },
 
   facebookLogin: async (accessToken: string, remember = true) => {
     try {
-      const response = await facebookLoginApi(accessToken);
+      const response = await facebookLoginApi(accessToken, remember);
       const { user, token } = response;
       useAuthStore.getState().setAuth(user, token, remember);
       return response;
     } catch (error) {
-      const message = getErrorMessage(error, 'Facebook login failed');
+      const message = getErrorMessage(error, 'Không thể đăng nhập bằng Facebook');
       throw new Error(message, { cause: error });
     }
   },

@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { Server, Socket } from "socket.io";
 import User from "../models/user.model";
 import * as chatService from "../services/chat.service";
+import { setSocketServer } from "./socketServer";
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -31,6 +32,7 @@ export const initSocket = (server: HttpServer) => {
       credentials: true,
     },
   });
+  setSocketServer(io);
 
   io.use(async (socket: AuthedSocket, next) => {
     try {
@@ -59,6 +61,8 @@ export const initSocket = (server: HttpServer) => {
   });
 
   io.on("connection", (socket: AuthedSocket) => {
+    socket.join(`user:${socket.user!.id}`);
+
     socket.on("conversation:join", async (payload, callback) => {
       try {
         const conversationId = payload?.conversationId;

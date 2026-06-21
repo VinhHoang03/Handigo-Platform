@@ -1,5 +1,6 @@
 import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument } from "./common";
+import { emitToUser } from "../sockets/socketServer";
 
 export interface INotification extends Document, IBaseDocument {
   userId: Types.ObjectId;
@@ -26,5 +27,36 @@ const NotificationSchema = new Schema<INotification>(
 );
 
 NotificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+
+const toRealtimeNotification = (notification: INotification) => ({
+  id: notification._id,
+  userId: notification.userId,
+  type: notification.type,
+  title: notification.title,
+  content: notification.content,
+  data: notification.data ?? null,
+  isRead: notification.isRead,
+  readAt: notification.readAt ?? null,
+  createdAt: notification.createdAt,
+  updatedAt: notification.updatedAt,
+});
+
+const emitRealtimeNotification = (notification: INotification) => {
+  emitToUser(
+    notification.userId.toString(),
+    "notification:new",
+    toRealtimeNotification(notification),
+  );
+};
+
+NotificationSchema.pre("save", function () {
+  this.$locals.wasNew = this.isNew;
+});
+
+NotificationSchema.post("save", (notification: INotification) => {
+  if (notification.$locals.wasNew) {
+    emitRealtimeNotification(notification);
+  }
+});
 
 export const Notification = model<INotification>("Notification", NotificationSchema, "notifications");

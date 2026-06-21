@@ -12,6 +12,7 @@ const optionalText = (max: number) =>
   z.string().trim().max(max).optional();
 
 const imageUrlSchema = z.string().trim().url().max(2000);
+const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Invalid object id");
 
 export const providerServiceAreaSchema = z.object({
   province: optionalText(120),
@@ -28,6 +29,8 @@ export const updateProviderProfileSchema = z.object({
   bio: optionalText(2000),
   mainServiceText: optionalText(200),
   serviceArea: providerServiceAreaSchema.optional(),
+  serviceIds: z.array(objectIdSchema).min(1).optional(),
+  workingAreas: z.array(z.string().trim().min(1).max(120)).min(1).optional(),
 });
 
 export const submitIdentitySchema = z

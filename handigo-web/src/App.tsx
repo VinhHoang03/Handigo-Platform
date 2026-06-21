@@ -27,6 +27,8 @@ import { WalletPage } from "./features/wallet/pages/WalletPage";
 import AdminCategoriesPage from "./features/admin/pages/AdminCategoriesPage";
 import AdminServicesPage from "./features/admin/pages/AdminServicesPage";
 import AdminPromotionsPage from "./features/admin/pages/AdminPromotionsPage";
+import AdminWithdrawalsPage from "./features/admin/pages/AdminWithdrawalsPage";
+import AdminSystemConfigsPage from "./features/admin/pages/AdminSystemConfigsPage";
 import AdminServiceSuggestionsPage from "./features/service-suggestion/pages/AdminServiceSuggestionsPage";
 import ProviderServiceSuggestionPage from "./features/service-suggestion/pages/ProviderServiceSuggestionPage";
 import { RouteGuard } from "./components/common/RouteGuard";
@@ -109,14 +111,6 @@ function App() {
             }
           />
           <Route
-            path="/customer/notifications"
-            element={
-              <RouteGuard roles={["CUSTOMER"]}>
-                <NotificationsPage role="CUSTOMER" />
-              </RouteGuard>
-            }
-          />
-          <Route
             path="/provider"
             element={
               <RouteGuard roles={["PROVIDER"]}>
@@ -161,14 +155,6 @@ function App() {
             element={
               <RouteGuard roles={["PROVIDER"]}>
                 <ProviderBankAccountsPage />
-              </RouteGuard>
-            }
-          />
-          <Route
-            path="/provider/notifications"
-            element={
-              <RouteGuard roles={["PROVIDER"]}>
-                <NotificationsPage role="PROVIDER" />
               </RouteGuard>
             }
           />
@@ -261,10 +247,26 @@ function App() {
             }
           />
           <Route
+            path="/admin/withdrawals"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminWithdrawalsPage />
+              </RouteGuard>
+            }
+          />
+          <Route
             path="/admin/notifications"
             element={
               <RouteGuard roles={["ADMIN"]}>
                 <NotificationsPage role="ADMIN" />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/admin/system-configs"
+            element={
+              <RouteGuard roles={["ADMIN"]}>
+                <AdminSystemConfigsPage />
               </RouteGuard>
             }
           />

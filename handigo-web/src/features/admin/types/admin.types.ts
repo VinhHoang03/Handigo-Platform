@@ -79,3 +79,24 @@ export interface AdminApplication {
 }
 export interface ListResult<T> { items: T[]; pagination: Pagination }
 export interface AdminQuery { page?: number; limit?: number; keyword?: string; role?: string; status?: string; categoryId?: string }
+export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
+export interface AdminWithdrawalUser { _id: string; fullName: string; email: string; phone?: string }
+export interface AdminWithdrawalBankAccount {
+  _id: string;
+  bankName: string;
+  bankCode: string;
+  accountNumber: string;
+  accountHolderName: string;
+}
+export interface AdminWithdrawal {
+  _id: string;
+  userId: AdminWithdrawalUser;
+  amount: number;
+  status: WithdrawalStatus;
+  bankAccountId?: AdminWithdrawalBankAccount | string;
+  adminNote?: string | null;
+  reviewedBy?: AdminWithdrawalUser | string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

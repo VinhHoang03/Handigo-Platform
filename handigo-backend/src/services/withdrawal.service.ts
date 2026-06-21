@@ -6,6 +6,7 @@ import { Provider } from "../models/provider.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
+import { getNumberConfigValue } from "./systemConfig.service";
 import type {
   CreateWithdrawalInput,
   WithdrawalListQuery,
@@ -111,6 +112,23 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
 
   if (input.amount <= 0) {
     throw new AppError("Số tiền rút phải lớn hơn 0", 400);
+  }
+
+  const minWithdrawAmount = await getNumberConfigValue("MIN_WITHDRAW_AMOUNT", 0);
+  const maxWithdrawAmount = await getNumberConfigValue("MAX_WITHDRAW_AMOUNT", 50_000_000);
+
+  if (input.amount < minWithdrawAmount) {
+    throw new AppError(
+      `Số tiền rút tối thiểu là ${minWithdrawAmount.toLocaleString("vi-VN")} VND`,
+      400,
+    );
+  }
+
+  if (maxWithdrawAmount > 0 && input.amount > maxWithdrawAmount) {
+    throw new AppError(
+      `Số tiền rút tối đa là ${maxWithdrawAmount.toLocaleString("vi-VN")} VND`,
+      400,
+    );
   }
 
   const provider = await getProviderByUserId(user.id);

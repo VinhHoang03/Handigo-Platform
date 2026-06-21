@@ -63,3 +63,14 @@ export const updateAddressSchema = z.object({
   isDefault: z.boolean().optional(),
   note: z.string().trim().nullable().optional(),
 });
+
+export const mapAddressCandidateSchema = z.object({
+  fullAddress: z.string().trim().min(5, "Địa chỉ phải có ít nhất 5 ký tự"),
+  province: z.string().trim().min(1, "Vui lòng chọn tỉnh hoặc thành phố"),
+  provinceCode: administrativeCodeSchema.optional(),
+  ward: z.string().trim().min(1, "Vui lòng chọn phường hoặc xã"),
+  wardCode: administrativeCodeSchema.optional(),
+  latitude: latitudeSchema.optional(),
+  longitude: longitudeSchema.optional(),
+  placeId: z.string().trim().max(255).optional(),
+});

@@ -52,17 +52,19 @@ const emptyServiceForm: ServiceForm = {
 };
 type OptionForm = {
   name: string;
+  description: string;
   optionType: ServiceOptionType;
   price: string;
   isActive: boolean;
 };
 
 const emptyOptionForm: OptionForm = {
-  name: '', optionType: 'other', price: '', isActive: true,
+  name: '', description: '', optionType: 'other', price: '', isActive: true,
 };
 
 const toOptionPayload = (f: OptionForm): ServiceOptionPayload => ({
   name: f.name.trim(),
+  description: f.description.trim() || undefined,
   optionType: f.optionType,
   price: Number(f.price) || 0,
   isActive: f.isActive,
@@ -301,6 +303,7 @@ export default function AdminServicesPage() {
     setEditingOption(opt);
     setOptionForm({
       name: opt.name,
+      description: opt.description || '',
       optionType: opt.optionType,
       price: String(opt.price),
       isActive: opt.isActive,
@@ -614,6 +617,7 @@ export default function AdminServicesPage() {
       <Modal open={Boolean(optionModal)} title={optionModal === 'edit' ? 'Sửa tùy chọn' : 'Thêm tùy chọn dịch vụ'} onClose={() => setOptionModal(null)}>
         <form onSubmit={saveOption} className="space-y-4">
           <FormInput label="Tên tùy chọn" required value={optionForm.name} onChange={(v) => setOptionForm({ ...optionForm, name: v })} />
+          <FormTextArea label="Mô tả" value={optionForm.description} onChange={(v) => setOptionForm({ ...optionForm, description: v })} />
           <label className="block">
             <span className="mb-1 block text-sm font-semibold">Loại tùy chọn</span>
             <select value={optionForm.optionType} onChange={(e) => setOptionForm({ ...optionForm, optionType: e.target.value as ServiceOptionType })}

@@ -1,5 +1,6 @@
 import { Address } from "../models/address.model";
 import User from "../models/user.model";
+import { AppError } from "../utils/appError";
 // import ServiceRequest from "../models/request.model";
 
 type AddressPayload = {
@@ -126,4 +127,61 @@ export const setDefaultAddress = async (userId: string, addressId: string) => {
 
 export const getServiceHistory = async (_userId: string) => {
   return [];
+};
+
+const normalizeAddressPart = (value?: string) =>
+  value?.trim().toLocaleLowerCase("vi-VN").replace(/\s+/g, " ") || "";
+
+export const checkAddressUpdate = async (
+  addressId: string,
+  userId: string,
+  candidate: AddressPayload,
+) => {
+  const current = await Address.findOne({ _id: addressId, userId }).lean();
+  if (!current) {
+    throw new AppError("Không tìm thấy địa chỉ", 404);
+  }
+
+  const nextAddress = pickAddressPayload(candidate);
+  const comparableFields: (keyof AddressPayload)[] = [
+    "fullAddress",
+    "province",
+    "provinceCode",
+    "ward",
+    "wardCode",
+    "latitude",
+    "longitude",
+    "placeId",
+  ];
+  const hasChanges = comparableFields.some((field) => {
+    const oldValue = current[field as keyof typeof current];
+    const newValue = nextAddress[field];
+    if (typeof oldValue === "string" || typeof newValue === "string") {
+      return normalizeAddressPart(String(oldValue || "")) !== normalizeAddressPart(String(newValue || ""));
+    }
+    return oldValue !== newValue;
+  });
+
+  return {
+    hasChanges,
+    oldAddress: current,
+    newAddress: { ...current, ...nextAddress },
+    source: "map_candidate",
+  };
+};
+
+export const confirmAddressUpdate = async (
+  addressId: string,
+  userId: string,
+  candidate: AddressPayload,
+) => {
+  const address = await Address.findOneAndUpdate(
+    { _id: addressId, userId },
+    pickAddressPayload(candidate),
+    { new: true, runValidators: true },
+  );
+  if (!address) {
+    throw new AppError("Không tìm thấy địa chỉ", 404);
+  }
+  return address;
 };

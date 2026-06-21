@@ -5,6 +5,7 @@ import { providerAvatar } from '../data/bookingMockData';
 import { bookingApi } from '../../../api/booking';
 import { Modal } from '../../../components/common/Modal';
 import type { Order, OrderQuotation } from '../../../types/booking';
+import { OrderChatButton } from '@/features/chat/components/OrderChatButton';
 
 type PendingAction = {
   type: 'confirmQuotation' | 'rejectQuotation' | 'cancelOrder';
@@ -638,6 +639,10 @@ const BookingDetailPage = () => {
           </button>
         </aside>
       </main>
+
+      {order.providerId && ['accepted', 'in_progress'].includes(order.status) && (
+        <OrderChatButton orderId={order._id} floating />
+      )}
 
       {pendingAction && actionDialogConfig && (
         <Modal

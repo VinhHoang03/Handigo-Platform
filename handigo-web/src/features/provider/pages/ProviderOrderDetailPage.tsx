@@ -17,6 +17,7 @@ import {
   providerStatusStyles,
 } from '../utils/providerOrder.utils';
 import { FixedPriceActionForm } from '../components/FixedPriceActionForm';
+import { OrderChatButton } from '@/features/chat/components/OrderChatButton';
 
 export default function ProviderOrderDetailPage() {
   const { orderId } = useParams();
@@ -377,6 +378,9 @@ export default function ProviderOrderDetailPage() {
         onCancel={() => setCancelOpen(false)}
         onConfirm={handleCancel}
       />
+      {['accepted', 'in_progress'].includes(order.status) && (
+        <OrderChatButton orderId={order._id} floating />
+      )}
     </DashboardShell>
   );
 }

@@ -51,38 +51,38 @@ const serializeConfig = (config: SystemConfigDocument) => ({
 
 const assertAdmin = (user: RequestUser) => {
   if (user.role !== "ADMIN") {
-    throw new AppError("Only admin can manage system configs", 403);
+    throw new AppError("Chỉ quản trị viên được quản lý cấu hình hệ thống", 403);
   }
 };
 
 const assertConfigValueMatchesType = (value: unknown, type: SystemConfigType) => {
   if (value === undefined || value === null) {
-    throw new AppError("Config value is required", 400);
+    throw new AppError("Giá trị cấu hình là bắt buộc", 400);
   }
 
   if (type === "STRING" && typeof value !== "string") {
-    throw new AppError("Config value must be a string", 400);
+    throw new AppError("Giá trị cấu hình phải là chuỗi", 400);
   }
 
   if (type === "NUMBER" && (typeof value !== "number" || !Number.isFinite(value))) {
-    throw new AppError("Config value must be a finite number", 400);
+    throw new AppError("Giá trị cấu hình phải là số hợp lệ", 400);
   }
 
   if (type === "BOOLEAN" && typeof value !== "boolean") {
-    throw new AppError("Config value must be a boolean", 400);
+    throw new AppError("Giá trị cấu hình phải là đúng/sai", 400);
   }
 
   if (type === "JSON") {
     const isJsonObject = typeof value === "object";
 
     if (!isJsonObject) {
-      throw new AppError("Config value must be a JSON object or array", 400);
+      throw new AppError("Giá trị cấu hình phải là object hoặc array JSON", 400);
     }
 
     try {
       JSON.stringify(value);
     } catch {
-      throw new AppError("Config value must be JSON serializable", 400);
+      throw new AppError("Giá trị cấu hình phải có thể chuyển đổi sang JSON", 400);
     }
   }
 };
@@ -157,7 +157,7 @@ export const getConfigByKey = async (admin: RequestUser, key: string) => {
   const config = await collection().findOne({ key });
 
   if (!config) {
-    throw new AppError("System config not found", 404);
+    throw new AppError("Không tìm thấy cấu hình hệ thống", 404);
   }
 
   return serializeConfig(config);
@@ -193,7 +193,7 @@ export const createConfig = async (admin: RequestUser, input: CreateSystemConfig
     return response;
   } catch (error: any) {
     if (error?.code === 11000) {
-      throw new AppError("System config key already exists", 409);
+      throw new AppError("Key cấu hình hệ thống đã tồn tại", 409);
     }
 
     throw error;
@@ -211,7 +211,7 @@ export const updateConfig = async (
   const existing = await collection().findOne({ key });
 
   if (!existing) {
-    throw new AppError("System config not found", 404);
+    throw new AppError("Không tìm thấy cấu hình hệ thống", 404);
   }
 
   const nextType = input.type ?? existing.type;
@@ -239,4 +239,16 @@ export const updateConfig = async (
   await createAuditLog(admin, "UPDATE_SYSTEM_CONFIG", existing._id, before, after);
 
   return after;
+};
+
+export const getNumberConfigValue = async (key: string, fallbackValue: number) => {
+  await ensureIndexes();
+
+  const config = await collection().findOne({ key });
+  if (!config || config.type !== "NUMBER") {
+    return fallbackValue;
+  }
+
+  const value = Number(config.value);
+  return Number.isFinite(value) ? value : fallbackValue;
 };

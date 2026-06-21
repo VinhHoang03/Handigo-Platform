@@ -59,6 +59,7 @@ const getErrorMessage = (error: unknown) => {
 export default function NotificationsPage({ role }: { role: NotificationRole }) {
   const [query, setQuery] = useState<NotificationQuery>({ page: 1, limit: 8, type: '', isRead: '', targetRole: '' });
   const [items, setItems] = useState<AppNotification[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -90,10 +91,56 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
     }
   }, [isAdmin, query]);
 
+  const loadUserNotifications = useCallback(async (nextQuery: NotificationQuery, append = false) => {
+    if (isAdmin) return;
+
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    setError('');
+
+    try {
+      const [listResult, countResult] = await Promise.all([
+        notificationApi.list(nextQuery),
+        notificationApi.unreadCount(),
+      ]);
+
+      setItems((current) => (append ? [...current, ...listResult.items] : listResult.items));
+      setTotalPages(listResult.pagination.totalPages || 1);
+      setUnreadCount(countResult.count);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
+    if (!isAdmin) return undefined;
+
     const timer = window.setTimeout(() => void load(), 150);
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [isAdmin, load]);
+
+  useEffect(() => {
+    if (isAdmin) return undefined;
+
+    const nextQuery: NotificationQuery = {
+      page: 1,
+      limit: query.limit,
+      type: query.type,
+      isRead: query.isRead,
+      targetRole: query.targetRole,
+    };
+    const timer = window.setTimeout(() => {
+      setQuery(nextQuery);
+      void loadUserNotifications(nextQuery, false);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [isAdmin, loadUserNotifications, query.isRead, query.limit, query.targetRole, query.type]);
 
   const stats = useMemo(() => {
     const readOnPage = items.filter((item) => item.isRead).length;
@@ -105,7 +152,22 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
   }, [items, unreadCount]);
 
   const refresh = async () => {
-    await load();
+    if (isAdmin) {
+      await load();
+      return;
+    }
+
+    const nextQuery = { ...query, page: 1 };
+    setQuery(nextQuery);
+    await loadUserNotifications(nextQuery, false);
+  };
+
+  const loadMore = async () => {
+    if (isAdmin || (query.page || 1) >= totalPages) return;
+
+    const nextQuery = { ...query, page: (query.page || 1) + 1 };
+    setQuery(nextQuery);
+    await loadUserNotifications(nextQuery, true);
   };
 
   const markOne = async (notification: AppNotification) => {
@@ -116,7 +178,7 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
     try {
       await notificationApi.markAsRead(notification.id);
       setNotice('Đã đánh dấu thông báo là đã đọc.');
-      await load();
+      await refresh();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -131,7 +193,7 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
     try {
       const result = await notificationApi.markAllAsRead();
       setNotice(`Đã đánh dấu ${result.modifiedCount} thông báo là đã đọc.`);
-      await load();
+      await refresh();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -219,7 +281,9 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-title-lg font-bold text-on-surface">Danh sách thông báo</h2>
-              <p className="text-sm text-on-surface-variant">Sắp xếp theo thời gian mới nhất.</p>
+              <p className="text-sm text-on-surface-variant">
+                {isAdmin ? 'Sắp xếp theo thời gian mới nhất.' : 'Thông báo mới nhất hiển thị trước, có thể tải thêm thông báo cũ hơn.'}
+              </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               {isAdmin && (
@@ -258,6 +322,29 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
             </div>
           </div>
 
+          {!isAdmin && (
+            <div className="mb-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setQuery({ ...query, isRead: '', page: 1 })}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  query.isRead === '' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:text-primary'
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuery({ ...query, isRead: false, page: 1 })}
+                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  query.isRead === false ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:text-primary'
+                }`}
+              >
+                Chưa đọc ({unreadCount})
+              </button>
+            </div>
+          )}
+
           <AsyncState
             loading={loading}
             error={error && !items.length ? error : ''}
@@ -267,7 +354,25 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
           >
             <NotificationList items={items} busy={busy} showRecipient={isAdmin} onMarkRead={markOne} />
           </AsyncState>
-          <Pagination page={query.page || 1} totalPages={totalPages} onChange={(page) => setQuery({ ...query, page })} />
+          {isAdmin ? (
+            <Pagination page={query.page || 1} totalPages={totalPages} onChange={(page) => setQuery({ ...query, page })} />
+          ) : (
+            <div className="mt-5 flex justify-center">
+              {(query.page || 1) < totalPages ? (
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[20px]">expand_more</span>
+                  {loadingMore ? 'Đang tải...' : 'Xem thông báo trước đó'}
+                </button>
+              ) : items.length > 0 ? (
+                <p className="text-sm text-on-surface-variant">Đã hiển thị toàn bộ thông báo.</p>
+              ) : null}
+            </div>
+          )}
         </section>
       </div>
 
