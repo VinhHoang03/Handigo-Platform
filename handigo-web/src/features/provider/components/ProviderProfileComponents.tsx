@@ -242,12 +242,17 @@ export const VerificationPanel: React.FC<{
   </aside>
 );
 
-export const ServiceAreaPanel: React.FC<{ area: ServiceArea }> = ({ area }) => (
+export const ServiceAreaPanel: React.FC<{ area: ServiceArea; onEdit?: () => void }> = ({ area, onEdit }) => (
   <aside className="overflow-hidden rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
     <div className="mb-4 flex items-center justify-between">
       <h3 className="font-bold">Khu vực phục vụ</h3>
+      {onEdit && <button type="button" className="text-sm font-bold text-primary hover:underline" onClick={onEdit}>Chỉnh sửa</button>}
     </div>
-    <div className="space-y-4">
+    {area.workingAreas?.length ? (
+      <div className="flex flex-wrap gap-2">
+        {area.workingAreas.map((item) => <span key={item} className="rounded-full bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">{item}</span>)}
+      </div>
+    ) : <div className="space-y-4">
       <div>
         <p className="mb-1 text-xs font-bold uppercase text-on-surface-variant">
           Tỉnh/Thành phố
@@ -260,7 +265,7 @@ export const ServiceAreaPanel: React.FC<{ area: ServiceArea }> = ({ area }) => (
         </p>
         <p className="text-sm">{area.ward || "Chưa cập nhật"}</p>
       </div>
-    </div>
+    </div>}
   </aside>
 );
 

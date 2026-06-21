@@ -13,6 +13,8 @@ import { uploadFeedbackImages } from "../middlewares/feedbackUpload.middleware";
 
 const router = Router();
 
+router.get("/latest", feedbackController.getLatestPublicFeedbacks);
+
 router.post(
   "/",
   authMiddleware,

@@ -9,6 +9,7 @@ import {
   getCategoryName,
   getOptionPrice,
   getServiceImage,
+  setServiceImageFallback,
   getServicePrice,
   money,
 } from "../utils/serviceDisplay";
@@ -149,6 +150,7 @@ export default function CustomerServiceDetailPage() {
               <div className="col-span-4 row-span-2 overflow-hidden rounded-lg md:col-span-3">
                 <img
                   src={getServiceImage(service)}
+                  onError={(event) => setServiceImageFallback(event.currentTarget)}
                   alt={service.name}
                   className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                 />
@@ -160,6 +162,7 @@ export default function CustomerServiceDetailPage() {
                 >
                   <img
                     src={getServiceImage(service, item)}
+                    onError={(event) => setServiceImageFallback(event.currentTarget, item)}
                     alt={`${service.name} ${item}`}
                     className="h-full w-full object-cover"
                   />
@@ -280,6 +283,7 @@ export default function CustomerServiceDetailPage() {
                   >
                     <img
                       src={getServiceImage(item, index + 1)}
+                      onError={(event) => setServiceImageFallback(event.currentTarget, index + 1)}
                       alt={item.name}
                       className="h-32 w-full object-cover"
                     />

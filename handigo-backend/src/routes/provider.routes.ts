@@ -3,6 +3,7 @@ import {
   createCertificate,
   deleteCertificate,
   getMyProfile,
+  getFeaturedProviders,
   submitIdentity,
   updateCertificate,
   updateMyProfile,
@@ -12,6 +13,7 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 
 const router = Router();
 
+router.get("/featured", getFeaturedProviders);
 router.use(authMiddleware, roleMiddleware("PROVIDER"));
 
 router.get("/me", getMyProfile);

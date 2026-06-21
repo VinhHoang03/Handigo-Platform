@@ -10,6 +10,7 @@ const optionTypeEnum = z.enum([
 
 const serviceOptionFields = {
   name: z.string().trim().min(1, "Name is required").max(200),
+  description: z.string().trim().max(1000).nullable().optional(),
   optionType: optionTypeEnum,
   price: z.number().nonnegative("Price must be >= 0"),
   isActive: z.boolean().optional(),

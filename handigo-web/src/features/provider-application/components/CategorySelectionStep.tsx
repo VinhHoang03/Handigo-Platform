@@ -7,6 +7,7 @@ interface Props {
   experienceYears: number;
   onToggle: (id: string) => void;
   onExperienceChange: (value: number) => void;
+  showExperience?: boolean;
 }
 
 const EXPERIENCE_OPTIONS = [
@@ -53,6 +54,7 @@ export function CategorySelectionStep({
   experienceYears,
   onToggle,
   onExperienceChange,
+  showExperience = true,
 }: Props) {
   const hasServices = categories.some(
     (category) => (category.services || []).length > 0,
@@ -137,7 +139,7 @@ export function CategorySelectionStep({
         </div>
       )}
 
-      <div className="space-y-3">
+      {showExperience && <div className="space-y-3">
         <div>
           <h3 className="font-bold text-on-surface">Số năm kinh nghiệm</h3>
           <p className="mt-1 text-sm text-on-surface-variant">
@@ -177,7 +179,7 @@ export function CategorySelectionStep({
             );
           })}
         </div>
-      </div>
+      </div>}
     </section>
   );
 }

@@ -74,8 +74,6 @@ export const categoryServiceApi = {
   uploadImage: async (file: File) => {
     const form = new FormData();
     form.append('image', file);
-    return unwrap<UploadedImage>(await api.post('/admin/assets/images', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }));
+    return unwrap<UploadedImage>(await api.post('/admin/assets/images', form));
   },
 };

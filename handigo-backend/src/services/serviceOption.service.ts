@@ -16,6 +16,7 @@ export const getOptionsByServiceId = async (serviceId: string) => {
 
 interface ServiceOptionInput {
   name?: string;
+  description?: string | null;
   optionType?: "room_count" | "area_size" | "package" | "add_on" | "other";
   price?: number;
   isActive?: boolean;

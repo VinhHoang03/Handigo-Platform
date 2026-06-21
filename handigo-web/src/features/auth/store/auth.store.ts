@@ -6,7 +6,7 @@ const USER_STORAGE_KEY = "handigo:user";
 
 const getStoredUser = (): User | null => {
   try {
-    const rawUser = localStorage.getItem(USER_STORAGE_KEY);
+    const rawUser = sessionStorage.getItem(USER_STORAGE_KEY) || localStorage.getItem(USER_STORAGE_KEY);
     return rawUser ? (JSON.parse(rawUser) as User) : null;
   } catch {
     localStorage.removeItem(USER_STORAGE_KEY);
@@ -14,12 +14,16 @@ const getStoredUser = (): User | null => {
   }
 };
 
-const setStoredUser = (user: User) => {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+const setStoredUser = (user: User, remember = localStorage.getItem('handigo:remember-login') !== 'false') => {
+  const target = remember ? localStorage : sessionStorage;
+  const other = remember ? sessionStorage : localStorage;
+  target.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  other.removeItem(USER_STORAGE_KEY);
 };
 
 const clearStoredUser = () => {
   localStorage.removeItem(USER_STORAGE_KEY);
+  sessionStorage.removeItem(USER_STORAGE_KEY);
 };
 
 interface AuthState {
@@ -44,8 +48,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   isInitializing: true,
   setAuth: (user, token, remember = true) => {
     localStorage.setItem('handigo:remember-login', String(remember));
-    tokenStorage.set(token);
-    setStoredUser(user);
+    tokenStorage.set(token, remember);
+    setStoredUser(user, remember);
     set({ user, token, isAuthenticated: true, isInitializing: false });
   },
   setToken: (token) => {

@@ -29,8 +29,21 @@ export const getCategoryName = (service: Service, categories: Category[]) => {
   return categories.find((item) => item._id === getCategoryId(service))?.name || "Dịch vụ";
 };
 
+export const normalizeServiceImageUrl = (value?: string | null) => {
+  const url = value?.trim();
+  if (!url) return null;
+  if (/^\/\/res\.cloudinary\.com/i.test(url)) return `https:${url}`;
+  if (/^res\.cloudinary\.com/i.test(url)) return `https://${url}`;
+  return url.replace(/^http:\/\/res\.cloudinary\.com/i, "https://res.cloudinary.com");
+};
+
 export const getServiceImage = (service?: Service | null, index = 0) =>
-  service?.image || fallbackServiceImages[index % fallbackServiceImages.length];
+  normalizeServiceImageUrl(service?.image) || fallbackServiceImages[index % fallbackServiceImages.length];
+
+export const setServiceImageFallback = (image: HTMLImageElement, index = 0) => {
+  const fallback = fallbackServiceImages[index % fallbackServiceImages.length];
+  if (image.src !== fallback) image.src = fallback;
+};
 
 export const getOptionPrice = (option: ServiceOption) =>
   option.price ?? option.fixedPrice ?? 0;

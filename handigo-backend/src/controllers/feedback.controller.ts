@@ -99,6 +99,15 @@ export const getProviderFeedbacks = async (req: Request, res: Response) => {
   }
 };
 
+export const getLatestPublicFeedbacks = async (_req: Request, res: Response) => {
+  try {
+    const data = await feedbackService.getLatestPublicFeedbacks();
+    return res.json({ success: true, data });
+  } catch (error: any) {
+    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  }
+};
+
 export const getMyProviderFeedbacks = async (req: Request, res: Response) => {
   try {
     if (!req.user) {
