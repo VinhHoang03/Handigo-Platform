@@ -4,6 +4,7 @@ export interface Category {
   slug: string;
   description?: string;
   icon?: string;
+  image?: string;
   isActive: boolean;
 }
 
@@ -24,7 +25,7 @@ export interface ServiceOption {
   _id: string;
   serviceId: string;
   name: string;
-  description?: string;
+  description?: string | null;
   optionType: 'room_count' | 'area_size' | 'package' | 'add_on' | 'other' | 'inspection' | 'cleaning' | 'installation' | 'repair';
   price: number;
   fixedPrice?: number;

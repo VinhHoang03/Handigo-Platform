@@ -57,8 +57,8 @@ export const googleLoginApi = async (data: GoogleLoginRequest): Promise<AuthResp
   return response.data;
 };
 
-export const facebookLoginApi = async (accessToken: string): Promise<AuthResponse> => {
-  const response = await api.post<AuthResponse>('/auth/facebook-login', { accessToken });
+export const facebookLoginApi = async (accessToken: string, remember = true): Promise<AuthResponse> => {
+  const response = await api.post<AuthResponse>('/auth/facebook-login', { accessToken, remember });
   return response.data;
 };
 

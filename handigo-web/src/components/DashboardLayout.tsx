@@ -297,6 +297,7 @@ interface DashboardLayoutProps {
   showStatusToggle?: boolean;
   isOnline?: boolean;
   onStatusToggle?: () => void;
+  hideSidebar?: boolean;
 }
 
 export function DashboardLayout({
@@ -310,13 +311,14 @@ export function DashboardLayout({
   showStatusToggle,
   isOnline,
   onStatusToggle,
+  hideSidebar = false,
 }: DashboardLayoutProps) {
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
   const currentRole = role ?? normalizeRole(user?.role);
   const isAdmin = currentRole === "ADMIN";
   const isProvider = currentRole === "PROVIDER";
-  const hasSidebar = Boolean(currentRole && navItems.length);
+  const hasSidebar = Boolean(!hideSidebar && currentRole && navItems.length);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background font-body-md text-body-md">
@@ -353,8 +355,10 @@ export function DashboardLayout({
         className={`relative min-h-screen pb-12 pt-32 ${hasSidebar ? "lg:pl-80 xl:pl-[21rem]" : ""}`}
       >
         <div
-          className={`mx-auto space-y-8 px-4 sm:px-5 ${isAdmin || isProvider
-              ? "max-w-6xl lg:px-3 xl:px-4"
+          className={`mx-auto space-y-8 px-4 sm:px-5 ${isAdmin
+              ? "max-w-none lg:px-5 xl:px-6"
+              : isProvider
+                ? "max-w-6xl lg:px-3 xl:px-4"
               : "max-w-container-max lg:px-8"
             }`}
         >

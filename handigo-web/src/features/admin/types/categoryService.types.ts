@@ -78,6 +78,7 @@ export interface ServiceOption {
   _id: string;
   serviceId: string;
   name: string;
+  description?: string | null;
   optionType: ServiceOptionType;
   price: number;
   isActive: boolean;
@@ -87,6 +88,7 @@ export interface ServiceOption {
 
 export interface ServiceOptionPayload {
   name: string;
+  description?: string | null;
   optionType: ServiceOptionType;
   price: number;
   isActive?: boolean;

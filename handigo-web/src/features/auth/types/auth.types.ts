@@ -20,11 +20,12 @@ export interface AuthResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  remember?: boolean;
 }
 
 export type GoogleLoginRequest =
-  | { credential: string }
-  | { accessToken: string };
+  | { credential: string; remember?: boolean }
+  | { accessToken: string; remember?: boolean };
 
 export interface RegisterRequest {
   email: string;

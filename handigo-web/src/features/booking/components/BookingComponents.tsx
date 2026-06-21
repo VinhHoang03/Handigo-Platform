@@ -137,7 +137,9 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
         </div>
       ) : null}
       <Link
-        to={`/customer/bookings/${booking?.id || ''}`}
+        to={booking?.statusTone === 'completed'
+          ? `/customer/orders/${booking?.id || ''}/feedback`
+          : `/customer/bookings/${booking?.id || ''}`}
         className={`flex-1 md:flex-none px-md py-2 rounded-xl font-label-md text-label-md text-center transition-all active:scale-95 ${booking?.statusTone === 'pending'
           ? 'bg-primary text-on-primary shadow-sm hover:shadow-md'
           : 'border border-primary text-primary hover:bg-primary/5'

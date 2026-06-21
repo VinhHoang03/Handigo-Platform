@@ -19,6 +19,7 @@ interface DashboardShellProps {
   showStatusToggle?: boolean;
   isOnline?: boolean;
   onStatusToggle?: () => void;
+  hideSidebar?: boolean;
 }
 
 export function DashboardShell({
@@ -31,6 +32,7 @@ export function DashboardShell({
   showStatusToggle,
   isOnline,
   onStatusToggle,
+  hideSidebar,
 }: DashboardShellProps) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
@@ -75,6 +77,7 @@ export function DashboardShell({
       showStatusToggle={showStatusToggle}
       isOnline={isOnline}
       onStatusToggle={onStatusToggle}
+      hideSidebar={hideSidebar}
     >
       {children}
       {role === "PROVIDER" && (

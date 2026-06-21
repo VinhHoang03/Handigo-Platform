@@ -28,9 +28,11 @@ import providerAssetRoutes from "./routes/providerAsset.routes";
 import providerRoutes from "./routes/provider.routes";
 import adminRoutes from "./routes/admin.routes";
 import chatRoutes from "./routes/chat.routes";
+import locationRoutes from "./routes/location.routes";
 import orderRoutes from "./routes/order.routes";
 import adminAssetRoutes from "./routes/adminAsset.routes";
 import serviceSuggestionRoutes from "./routes/serviceSuggestion.routes";
+import searchRoutes from "./routes/search.routes";
 import ocrRoutes from "./modules/ocr/ocr.routes";
 // import providerRequestRoutes from "./routes/providerRequest.routes";
 // import serviceRoutes from "./routes/service.routes";
@@ -47,6 +49,7 @@ const allowedOrigins = [
   "https://localhost:5173",
   "http://localhost:8081",
   "http://localhost:19006",
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
 app.use(
@@ -101,6 +104,7 @@ app.use("/users", userRoutes);
 app.use("/categories", categoryRoutes);
 app.use("/services", serviceRoutes);
 app.use("/service-suggestions", serviceSuggestionRoutes);
+app.use("/search", searchRoutes);
 app.use("/admin/assets", adminAssetRoutes);
 app.use("/api/ocr", ocrRoutes);
 app.use("/provider-applications", providerApplicationRoutes);
@@ -116,6 +120,7 @@ app.use("/orders", orderRoutes);
 // app.use("/withdraw", withdrawRoutes);
 // app.use("/finance", financeRoutes);
 app.use("/chat", chatRoutes);
+app.use("/locations", locationRoutes);
 // app.use("/ai", aiRoutes);
 
 app.use(

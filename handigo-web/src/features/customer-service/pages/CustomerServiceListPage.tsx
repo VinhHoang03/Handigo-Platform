@@ -8,6 +8,7 @@ import {
   getServiceImage,
   getServicePrice,
   money,
+  setServiceImageFallback,
 } from "../utils/serviceDisplay";
 import type { Category, Service, ServiceOption } from "@/types/booking";
 
@@ -22,7 +23,7 @@ export default function CustomerServiceListPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [optionMap, setOptionMap] = useState<Record<string, ServiceOption[]>>({});
   const selectedCategoryId = searchParams.get("categoryId") || "";
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
   const [sortBy, setSortBy] = useState("popular");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,14 +69,28 @@ export default function CustomerServiceListPage() {
   };
 
   const visibleServices = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+    const normalizeText = (value?: string | null) =>
+      (value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " ");
+    const keyword = normalizeText(search);
     const filtered = services.filter((service) => {
       const matchCategory =
         !selectedCategoryId || getCategoryId(service) === selectedCategoryId;
-      const matchSearch =
-        !keyword ||
-        service.name.toLowerCase().includes(keyword) ||
-        service.description?.toLowerCase().includes(keyword);
+      const category = categories.find((item) => item._id === getCategoryId(service));
+      const searchableText = [
+        service.name,
+        service.description,
+        category?.name,
+        category?.description,
+        ...(optionMap[service._id] || []).flatMap((option) => [option.name, option.description]),
+      ].map(normalizeText).join(" ");
+      const matchSearch = !keyword || searchableText.includes(keyword);
       return matchCategory && matchSearch;
     });
 
@@ -89,7 +104,7 @@ export default function CustomerServiceListPage() {
       if (sortBy === "name") return left.name.localeCompare(right.name, "vi");
       return 0;
     });
-  }, [optionMap, search, selectedCategoryId, services, sortBy]);
+  }, [categories, optionMap, search, selectedCategoryId, services, sortBy]);
 
   const selectedCategory = categories.find(
     (category) => category._id === selectedCategoryId,
@@ -211,6 +226,7 @@ export default function CustomerServiceListPage() {
                     <div className="relative h-48 overflow-hidden">
                       <img
                         src={getServiceImage(service, index)}
+                        onError={(event) => setServiceImageFallback(event.currentTarget, index)}
                         alt={service.name}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />

@@ -357,7 +357,7 @@ export function UserProfileSection({
         </div>
       )}
 
-      <div className={showProfile && showAddresses ? "grid grid-cols-1 gap-7 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]" : "grid grid-cols-1 gap-7"}>
+      <div className={showProfile && showAddresses ? "grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]" : "grid grid-cols-1 gap-7"}>
         {showProfile && <form onSubmit={handleProfileSubmit} className="min-w-0 space-y-5">
           {showAvatar && (
             <div className="flex items-center gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-low p-4">

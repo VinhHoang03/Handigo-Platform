@@ -20,6 +20,8 @@ import {
 } from "@/features/profile/api/addressBook.api";
 import { updateUserProfile } from "@/features/profile/api/userProfile.api";
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
+import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
+import type { Category } from "@/features/provider-application/types/providerApplication.types";
 import type {
   UserAddress,
   UserAddressPayload,
@@ -38,6 +40,8 @@ import {
 } from "../components/ProviderProfileComponents";
 import { providerProfileApi } from "../api/providerProfile.api";
 import { useProviderAvailability } from "../hooks/useProviderAvailability";
+import { ProfessionalProfileDialog, ServiceAreaDialog } from "../components/ProviderProfileDialogs";
+import { ProviderFeedbackSection } from "../components/ProviderFeedbackSection";
 import type {
   CertificateStatus,
   IdentityDocument,
@@ -57,8 +61,7 @@ const DEFAULT_AVATAR =
 
 type ProfessionalForm = {
   bio: string;
-  province: string;
-  ward: string;
+  serviceIds: string[];
 };
 
 type IdentityForm = {
@@ -86,8 +89,7 @@ type CertificateForm = {
 
 const emptyProfessionalForm: ProfessionalForm = {
   bio: "",
-  province: "",
-  ward: "",
+  serviceIds: [],
 };
 
 const emptyIdentityForm: IdentityForm = {
@@ -161,8 +163,7 @@ const toProfessionalForm = (
   profile: ProviderProfileResponse,
 ): ProfessionalForm => ({
   bio: profile.provider.bio || profile.provider.description || "",
-  province: profile.provider.serviceArea?.province || "",
-  ward: profile.provider.serviceArea?.ward || "",
+  serviceIds: profile.provider.serviceIds || [],
 });
 
 const toIdentityForm = (identity?: IdentityDocument): IdentityForm => ({
@@ -661,7 +662,7 @@ function CertificateInlineForm({
 }
 
 export default function ProviderProfilePage() {
-  const { isOnline, toggleAvailability } = useProviderAvailability();
+  const { availabilityStatus, isOnline, toggleAvailability } = useProviderAvailability();
   const userProfileSectionRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState<ProviderProfileResponse | null>(null);
@@ -673,6 +674,11 @@ export default function ProviderProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isAddressSaving, setIsAddressSaving] = useState(false);
   const [isEditingProfessional, setIsEditingProfessional] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
+  const [isServiceAreaModalOpen, setIsServiceAreaModalOpen] = useState(false);
+  const [workingAreasForm, setWorkingAreasForm] = useState<string[]>([]);
+  const [serviceAreaError, setServiceAreaError] = useState("");
   const [isCertificateFormOpen, setIsCertificateFormOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<UserAddress | null>(
@@ -814,10 +820,10 @@ export default function ProviderProfilePage() {
       },
       {
         label: "Trạng thái",
-        value: profile.provider.availabilityStatus,
+        value: availabilityStatus,
         meta: "Hiện tại",
         tone:
-          profile.provider.availabilityStatus === "online"
+          availabilityStatus === "online"
             ? "success"
             : "warning",
       },
@@ -827,12 +833,13 @@ export default function ProviderProfilePage() {
         meta: "Đã khai báo",
       },
     ];
-  }, [profile]);
+  }, [availabilityStatus, profile]);
 
   const serviceArea = useMemo<ServiceArea>(
     () => ({
       province: profile?.provider.serviceArea?.province,
       ward: profile?.provider.serviceArea?.ward,
+      workingAreas: profile?.provider.workingAreas,
     }),
     [profile],
   );
@@ -928,10 +935,7 @@ export default function ProviderProfilePage() {
     try {
       const nextProfile = await providerProfileApi.updateProfile({
         bio: optional(professionalForm.bio),
-        serviceArea: {
-          province: optional(professionalForm.province),
-          ward: optional(professionalForm.ward),
-        },
+        serviceIds: professionalForm.serviceIds,
       });
 
       setProfile(nextProfile);
@@ -1133,6 +1137,40 @@ export default function ProviderProfilePage() {
   const openProfessionalEdit = () => {
     if (profile) setProfessionalForm(toProfessionalForm(profile));
     setIsEditingProfessional(true);
+    setIsLoadingServices(true);
+    providerApplicationApi.categories()
+      .then(setCategories)
+      .catch(() => setError("Không thể tải danh sách dịch vụ."))
+      .finally(() => setIsLoadingServices(false));
+  };
+
+  const openServiceAreaEdit = () => {
+    if (!profile) return;
+    const legacyArea = [profile.provider.serviceArea?.ward, profile.provider.serviceArea?.province]
+      .filter(Boolean)
+      .join(", ");
+    setWorkingAreasForm(profile.provider.workingAreas?.length ? profile.provider.workingAreas : legacyArea ? [legacyArea] : []);
+    setServiceAreaError("");
+    setIsServiceAreaModalOpen(true);
+  };
+
+  const handleServiceAreaSave = async () => {
+    const [firstArea = ""] = workingAreasForm;
+    const parts = firstArea.split(", ").map((item) => item.trim()).filter(Boolean);
+    setIsSaving(true);
+    setServiceAreaError("");
+    try {
+      const nextProfile = await providerProfileApi.updateProfile({
+        workingAreas: workingAreasForm,
+        serviceArea: { ward: parts[0], province: parts.slice(1).join(", ") || undefined },
+      });
+      setProfile(nextProfile);
+      setIsServiceAreaModalOpen(false);
+    } catch (saveError) {
+      setServiceAreaError(getErrorMessage(saveError, "Không thể cập nhật khu vực phục vụ."));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const openCreateAddressModal = () => {
@@ -1326,87 +1364,14 @@ export default function ProviderProfilePage() {
 
           <ProfileSection
             title="Thông tin nghề nghiệp"
-            actionLabel={
-              isEditingProfessional ? undefined : "Chỉnh sửa nghề nghiệp"
-            }
+            actionLabel="Chỉnh sửa nghề nghiệp"
             onAction={openProfessionalEdit}
           >
-            {isEditingProfessional ? (
-              <form
-                className="grid grid-cols-1 gap-4 md:grid-cols-2"
-                onSubmit={handleProfessionalSubmit}
-              >
-                <TextInput
-                  id="provider-province"
-                  label="Tỉnh/Thành phố phục vụ"
-                  value={professionalForm.province}
-                  onChange={(value) =>
-                    setProfessionalForm((current) => ({
-                      ...current,
-                      province: value,
-                    }))
-                  }
-                />
-                <TextInput
-                  id="provider-ward"
-                  label="Xã/Phường phục vụ"
-                  value={professionalForm.ward}
-                  onChange={(value) =>
-                    setProfessionalForm((current) => ({
-                      ...current,
-                      ward: value,
-                    }))
-                  }
-                />
-                <TextArea
-                  id="provider-bio"
-                  label="Giới thiệu chuyên môn"
-                  value={professionalForm.bio}
-                  onChange={(value) =>
-                    setProfessionalForm((current) => ({
-                      ...current,
-                      bio: value,
-                    }))
-                  }
-                />
-                <div className="flex justify-end gap-3 md:col-span-2">
-                  <button
-                    type="button"
-                    className="rounded-lg bg-surface-container px-4 py-2 font-bold"
-                    disabled={isSaving}
-                    onClick={() => {
-                      setProfessionalForm(toProfessionalForm(profile));
-                      setIsEditingProfessional(false);
-                    }}
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-primary px-4 py-2 font-bold text-on-primary"
-                    disabled={isSaving}
-                  >
-                    {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-6">
-                <InfoField
-                  label="Giới thiệu chuyên môn"
-                  value={
-                    <p className="leading-relaxed text-on-surface-variant">
-                      {profileView.bio}
-                    </p>
-                  }
-                />
-                <InfoField label="Kinh nghiệm" value={profileView.experience} />
-                <InfoField
-                  label="Các dịch vụ"
-                  value={<SkillTags skills={profileView.skills} />}
-                />
-              </div>
-            )}
+            <div className="space-y-6">
+              <InfoField label="Giới thiệu chuyên môn" value={<p className="leading-relaxed text-on-surface-variant">{profileView.bio}</p>} />
+              <InfoField label="Kinh nghiệm" value={profileView.experience} />
+              <InfoField label="Các dịch vụ" value={<SkillTags skills={profileView.skills} />} />
+            </div>
           </ProfileSection>
 
           <ProfileSection
@@ -1510,7 +1475,7 @@ export default function ProviderProfilePage() {
           <AccountFunctionsPanel
             onPasswordClick={() => setIsPwdConfirmOpen(true)}
           />
-          <ServiceAreaPanel area={serviceArea} />
+          <ServiceAreaPanel area={serviceArea} onEdit={openServiceAreaEdit} />
         </div>
 
         <div className="col-span-12">
@@ -1518,7 +1483,36 @@ export default function ProviderProfilePage() {
             <ProviderApplicationHistory canEditRejected={false} />
           </ProfileSection>
         </div>
+
+        <div className="col-span-12">
+          <ProviderFeedbackSection />
+        </div>
       </div>
+
+      <ProfessionalProfileDialog
+        open={isEditingProfessional}
+        bio={professionalForm.bio}
+        selectedServiceIds={professionalForm.serviceIds}
+        categories={categories}
+        experienceYears={profile.provider.experienceYears}
+        loadingServices={isLoadingServices}
+        error={error || undefined}
+        saving={isSaving}
+        onBioChange={(bio) => setProfessionalForm((current) => ({ ...current, bio }))}
+        onSelectedServiceIdsChange={(serviceIds) => setProfessionalForm((current) => ({ ...current, serviceIds }))}
+        onClose={() => setIsEditingProfessional(false)}
+        onSubmit={handleProfessionalSubmit}
+      />
+
+      <ServiceAreaDialog
+        open={isServiceAreaModalOpen}
+        areas={workingAreasForm}
+        saving={isSaving}
+        error={serviceAreaError}
+        onChange={setWorkingAreasForm}
+        onClose={() => setIsServiceAreaModalOpen(false)}
+        onSave={() => void handleServiceAreaSave()}
+      />
 
       {isAddressModalOpen && (
         <AddressBookModal

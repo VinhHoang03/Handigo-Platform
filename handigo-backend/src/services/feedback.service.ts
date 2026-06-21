@@ -3,6 +3,7 @@ import { AppError } from "../utils/appError";
 import { Feedback } from "../models/feedback.model";
 import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
+import { OrderStatus } from "../models/orderStatus.model";
 
 interface FeedbackPayload {
   orderId: string;
@@ -84,19 +85,19 @@ export const createFeedback = async (userId: string, payload: FeedbackPayload) =
   });
 
   if (!order) {
-    throw new AppError("Order not found", 404);
+    throw new AppError("Không tìm thấy đơn dịch vụ", 404);
   }
 
   if (order.customerId.toString() !== userId) {
-    throw new AppError("You can only feedback your own order", 403);
+    throw new AppError("Bạn chỉ có thể đánh giá đơn dịch vụ của mình", 403);
   }
 
   if (order.status !== "completed") {
-    throw new AppError("Only completed orders can be reviewed", 400);
+    throw new AppError("Chỉ có thể đánh giá đơn dịch vụ đã hoàn thành", 400);
   }
 
   if (!order.providerId) {
-    throw new AppError("Order does not have a provider", 400);
+    throw new AppError("Đơn dịch vụ chưa có thợ thực hiện", 400);
   }
 
   const existingFeedback = await Feedback.findOne({
@@ -105,7 +106,7 @@ export const createFeedback = async (userId: string, payload: FeedbackPayload) =
   });
 
   if (existingFeedback) {
-    throw new AppError("Feedback already exists for this order", 400);
+    throw new AppError("Đơn dịch vụ này đã được đánh giá", 400);
   }
 
   const feedback = await Feedback.create({
@@ -138,7 +139,7 @@ export const updateMyFeedback = async (
   });
 
   if (!feedback) {
-    throw new AppError("Feedback not found", 404);
+    throw new AppError("Không tìm thấy đánh giá", 404);
   }
 
   if (payload.rating !== undefined) {
@@ -176,6 +177,20 @@ export const getMyFeedbacks = async (userId: string) => {
     .populate("serviceId", "name image");
 };
 
+export const getLatestPublicFeedbacks = async () => {
+  return Feedback.find({
+    isVisible: true,
+    isDeleted: false,
+    comment: { $nin: [null, ""] },
+  })
+    .sort({ createdAt: -1 })
+    .limit(3)
+    .populate("customerId", "fullName avatar")
+    .populate("serviceId", "name")
+    .populate("providerReply.repliedBy", "fullName avatar")
+    .lean();
+};
+
 export const getFeedbackByOrder = async (userId: string, orderId: string) => {
   assertObjectId(userId, "user id");
   assertObjectId(orderId, "order id");
@@ -187,7 +202,7 @@ export const getFeedbackByOrder = async (userId: string, orderId: string) => {
   });
 
   if (!order) {
-    throw new AppError("Order not found", 404);
+    throw new AppError("Không tìm thấy đơn dịch vụ", 404);
   }
 
   return Feedback.findOne({
@@ -223,7 +238,7 @@ export const getOrderFeedbackContext = async (userId: string, orderId: string) =
     });
 
   if (!order) {
-    throw new AppError("Order not found", 404);
+    throw new AppError("Không tìm thấy đơn dịch vụ", 404);
   }
 
   const feedback = await Feedback.findOne({
@@ -305,7 +320,7 @@ export const getProviderFeedbacks = async (
   });
 
   if (!provider) {
-    throw new AppError("Provider not found", 404);
+    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   }
 
   const { page, limit, skip } = getPagination(query);
@@ -322,15 +337,39 @@ export const getProviderFeedbacks = async (
       .skip(skip)
       .limit(limit)
       .populate("customerId", "fullName avatar")
-      .populate("orderId", "orderCode status")
+      .populate("orderId", "orderCode status scheduledAt createdAt")
       .populate("serviceId", "name image")
       .populate("providerReply.repliedBy", "fullName avatar"),
     Feedback.countDocuments(filter),
     getRatingSummary(summaryFilter),
   ]);
 
+  const orderIds = items.map((item) => item.orderId?._id).filter(Boolean);
+  const startStatuses = await OrderStatus.find({
+    orderId: { $in: orderIds },
+    status: "in_progress",
+    isDeleted: false,
+  })
+    .sort({ createdAt: 1 })
+    .select("orderId createdAt")
+    .lean();
+  const startedAtByOrder = new Map(
+    startStatuses.map((status) => [status.orderId.toString(), status.createdAt]),
+  );
+  const feedbackItems = items.map((item) => {
+    const value = item.toObject() as any;
+    const order = value.orderId;
+    if (order?._id) {
+      order.performedAt =
+        startedAtByOrder.get(order._id.toString()) ||
+        order.scheduledAt ||
+        order.createdAt;
+    }
+    return value;
+  });
+
   return {
-    items,
+    items: feedbackItems,
     pagination: {
       page,
       limit,
@@ -357,7 +396,7 @@ export const getMyProviderFeedbacks = async (
   });
 
   if (!provider) {
-    throw new AppError("Provider profile not found", 404);
+    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   }
 
   return getProviderFeedbacks(provider.id, query);
@@ -379,7 +418,7 @@ export const setFeedbackVisibility = async (
   );
 
   if (!feedback) {
-    throw new AppError("Feedback not found", 404);
+    throw new AppError("Không tìm thấy đánh giá", 404);
   }
 
   await recalculateProviderRating(feedback.providerId);
@@ -397,7 +436,7 @@ export const upsertProviderReply = async (
 
   const provider = await Provider.findOne({ userId, isDeleted: false });
   if (!provider) {
-    throw new AppError("Provider profile not found", 404);
+    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   }
 
   const feedback = await Feedback.findOne({
@@ -406,7 +445,7 @@ export const upsertProviderReply = async (
     isDeleted: false,
   });
   if (!feedback) {
-    throw new AppError("Feedback not found", 404);
+    throw new AppError("Không tìm thấy đánh giá", 404);
   }
 
   const now = new Date();

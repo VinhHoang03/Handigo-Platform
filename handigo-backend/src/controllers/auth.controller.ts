@@ -3,18 +3,19 @@ import * as authService from "../services/auth.service";
 import { AppError } from "../utils/appError";
 
 const REFRESH_TOKEN_COOKIE = "refreshToken";
+const REMEMBER_LOGIN_COOKIE = "rememberLogin";
 
-const getRefreshTokenCookieOptions = (expires: Date): CookieOptions => ({
+const getRefreshTokenCookieOptions = (expires: Date, remember = true): CookieOptions => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
-  expires,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  ...(remember ? { expires } : {}),
 });
 
 const clearRefreshTokenCookieOptions: CookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
 };
 
 export const register = async (
@@ -64,12 +65,14 @@ export const login = async (
   next: NextFunction,
 ) => {
   try {
+    const remember = req.body.remember !== false;
     const result = await authService.login(req.body.email, req.body.password);
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       result.refreshToken,
-      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt),
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember),
     );
+    res.cookie(REMEMBER_LOGIN_COOKIE, String(remember), getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember));
     res.json({
       message: "Login successful",
       token: result.token,
@@ -93,10 +96,11 @@ export const refreshToken = async (
     }
 
     const result = await authService.refreshToken(refreshToken);
+    const remember = req.cookies?.[REMEMBER_LOGIN_COOKIE] === "true";
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       result.refreshToken,
-      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt),
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember),
     );
     res.json({
       message: "Token refreshed successfully",
@@ -109,7 +113,7 @@ export const refreshToken = async (
 
 export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { credential, accessToken } = req.body;
+    const { credential, accessToken, remember } = req.body;
     if (!credential && !accessToken) {
       throw new AppError("Google credential or access token is required", 400);
     }
@@ -119,8 +123,9 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       result.refreshToken,
-      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt),
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false),
     );
+    res.cookie(REMEMBER_LOGIN_COOKIE, String(remember !== false), getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false));
     res.status(200).json({
       message: "Google login success",
       token: result.token,
@@ -133,7 +138,7 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
 
 export const facebookLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { accessToken } = req.body;
+    const { accessToken, remember } = req.body;
     if (!accessToken) throw new AppError("Facebook access token is required", 400);
 
     const result = await authService.facebookLogin(accessToken);
@@ -141,8 +146,9 @@ export const facebookLogin = async (req: Request, res: Response, next: NextFunct
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       result.refreshToken,
-      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt),
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false),
     );
+    res.cookie(REMEMBER_LOGIN_COOKIE, String(remember !== false), getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false));
     res.status(200).json({
       message: "Facebook login success",
       token: result.token,
@@ -206,6 +212,7 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
   try {
     await authService.logout(req.cookies?.[REFRESH_TOKEN_COOKIE]);
     res.clearCookie(REFRESH_TOKEN_COOKIE, clearRefreshTokenCookieOptions);
+    res.clearCookie(REMEMBER_LOGIN_COOKIE, clearRefreshTokenCookieOptions);
     res.clearCookie("token");
     res.json({ message: "Logout successful" });
   } catch (error) {

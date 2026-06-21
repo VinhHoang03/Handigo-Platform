@@ -11,6 +11,7 @@ import {
   Provider,
 } from "../models/provider.model";
 import { AppError } from "../utils/appError";
+import { Service } from "../models/service.model";
 import {
   CreateCertificatePayload,
   SubmitIdentityPayload,
@@ -53,6 +54,21 @@ const getProviderForUser = async (userId: string) => {
   }
 
   return provider;
+};
+
+const getActiveServiceIds = async (serviceIds: string[]) => {
+  const uniqueIds = [...new Set(serviceIds)];
+  const services = await Service.find({
+    _id: { $in: uniqueIds },
+    isActive: true,
+    isDeleted: false,
+  }).select("_id");
+
+  if (services.length !== uniqueIds.length) {
+    throw new AppError("Một hoặc nhiều dịch vụ không còn hoạt động", 400);
+  }
+
+  return uniqueIds.map((id) => new Types.ObjectId(id));
 };
 
 const toIdString = (value: unknown) => {
@@ -162,6 +178,47 @@ const formatProviderProfile = async (provider: IProvider) => {
   };
 };
 
+export const getFeaturedProviders = async () => {
+  const activeUserIds = await User.distinct("_id", {
+    status: "active",
+    isDeleted: false,
+  });
+  const providers = await Provider.find({
+    verified: true,
+    isDeleted: false,
+    userId: { $in: activeUserIds },
+    "serviceIds.0": { $exists: true },
+  })
+    .sort({ averageRating: -1, totalFeedbacks: -1, createdAt: -1 })
+    .limit(12)
+    .populate({ path: "userId", select: "fullName avatar" })
+    .populate(servicePopulate)
+    .lean();
+
+  return providers
+    .filter((provider) => provider.userId)
+    .map((provider) => {
+      const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string };
+      const services = provider.serviceIds as unknown as Array<{ _id: Types.ObjectId; name?: string }>;
+      return {
+        id: provider._id.toString(),
+        user: {
+          id: user._id.toString(),
+          fullName: user.fullName,
+          avatar: user.avatar,
+        },
+        workingAreas: provider.workingAreas || [],
+        serviceArea: provider.serviceArea,
+        services: services.map((service) => ({
+          id: service._id.toString(),
+          name: service.name || "",
+        })),
+        averageRating: provider.averageRating,
+        totalFeedbacks: provider.totalFeedbacks,
+      };
+    });
+};
+
 export const getMyProviderProfile = async (userId: string) => {
   const provider = await getProviderForUser(userId);
   return formatProviderProfile(provider);
@@ -196,6 +253,12 @@ export const updateMyProviderProfile = async (
       province: payload.serviceArea.province,
       ward: payload.serviceArea.ward,
     };
+  }
+  if (payload.serviceIds !== undefined) {
+    provider.serviceIds = await getActiveServiceIds(payload.serviceIds);
+  }
+  if (payload.workingAreas !== undefined) {
+    provider.workingAreas = [...new Set(payload.workingAreas)];
   }
 
   await provider.save();
