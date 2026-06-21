@@ -1,19 +1,22 @@
 import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   closeOnOverlayClick?: boolean;
   closeOnEsc?: boolean;
+  danger?: boolean;
 }
 
 const sizeClass: Record<NonNullable<ModalProps['size']>, string> = {
-  sm: 'sm:max-w-[500px]',
-  md: 'sm:max-w-[640px]',
-  lg: 'sm:max-w-[800px]',
+  sm: 'sm:max-w-[560px]',
+  md: 'sm:max-w-[720px]',
+  lg: 'sm:max-w-[960px]',
+  xl: 'sm:max-w-[1120px]',
 };
 
 const focusableSelector = [
@@ -33,6 +36,7 @@ export function Modal({
   size = 'md',
   closeOnOverlayClick = true,
   closeOnEsc = true,
+  danger = false,
 }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -108,9 +112,9 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 sm:p-6"
+      className="fixed inset-0 z-[200] flex min-h-0 min-w-0 items-end justify-center overflow-hidden bg-on-surface/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
       onMouseDown={handleOverlayClick}
     >
       <div
@@ -119,25 +123,26 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`flex max-h-[calc(100dvh-32px)] w-[calc(100vw-32px)] min-w-0 flex-col overflow-hidden rounded-3xl bg-surface shadow-2xl sm:w-[90vw] ${sizeClass[size]}`}
+        className={`flex max-h-[calc(100dvh-8px)] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-t-3xl border border-outline-variant/30 bg-surface shadow-2xl sm:max-h-[calc(100dvh-48px)] sm:w-[calc(100vw-48px)] sm:rounded-3xl ${sizeClass[size]}`}
       >
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-outline-variant/40 px-5 py-4 sm:px-6">
-          <h2 id={titleId} className="min-w-0 text-headline-md font-bold">
+        <div className={`flex shrink-0 items-center justify-between gap-4 border-b px-4 py-4 sm:px-8 ${danger ? 'border-error/20 bg-error/5' : 'border-outline-variant/40'}`}>
+          <h2 id={titleId} className={`min-w-0 text-xl font-bold sm:text-headline-md ${danger ? 'text-error' : 'text-on-surface'}`}>
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-            aria-label="Dong"
+            aria-label="Đóng"
           >
             x
           </button>
         </div>
-        <div className="min-w-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 sm:px-8 sm:py-6">
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

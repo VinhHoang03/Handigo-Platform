@@ -10,7 +10,7 @@ export interface Feedback {
   comment?: string | null;
   images: string[];
   isVisible: boolean;
-  providerReply?: { content: string; repliedAt: string; updatedAt: string; repliedBy?: PersonRef } | null;
+  providerReply?: { content: string; images?: string[]; repliedAt: string; updatedAt: string; repliedBy?: PersonRef } | null;
   createdAt: string;
 }
 export interface Pagination { page: number; limit: number; total: number; totalPages: number }

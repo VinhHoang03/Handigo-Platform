@@ -9,19 +9,23 @@ import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import { DispatchService } from "./dispatch.service";
 import { getNumberConfigValue } from "./systemConfig.service";
+import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
 const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
-const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY = "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
+const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
+  "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
 }
 
 async function getProviderByUserId(providerUserId: string) {
-  const provider = await Provider.findOne({ userId: providerUserId }).select("_id");
+  const provider = await Provider.findOne({ userId: providerUserId }).select(
+    "_id",
+  );
   if (!provider) {
     throw new AppError("Provider không tồn tại.", 404);
   }
@@ -50,7 +54,40 @@ export interface CreateOrderPayload {
   customerAttachments?: string[];
   promotionId?: string;
   voucherId?: string;
+  preferredProviderId?: string;
   paymentMethod: "wallet" | "bank" | "cash";
+}
+
+async function validatePreferredProvider(
+  providerId: string,
+  serviceId: Types.ObjectId,
+) {
+  if (!Types.ObjectId.isValid(providerId)) {
+    throw new AppError("Chuyên gia được chọn không hợp lệ.", 400);
+  }
+
+  const provider = await Provider.findOne({
+    _id: providerId,
+    serviceIds: serviceId,
+    verified: true,
+    isDeleted: false,
+  }).select("_id availabilityStatus");
+
+  if (!provider) {
+    throw new AppError(
+      "Chuyên gia được chọn không phù hợp với dịch vụ này.",
+      400,
+    );
+  }
+
+  if (provider.availabilityStatus !== "online") {
+    throw new AppError(
+      "Chuyên gia được chọn hiện không sẵn sàng nhận đơn.",
+      400,
+    );
+  }
+
+  return provider;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -79,6 +116,23 @@ export const OrderService = {
     });
     if (!address) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
+    }
+
+    const providersForService = await Provider.find({
+      serviceIds: service._id,
+      verified: true,
+      isDeleted: false,
+    })
+      .select("workingAreas")
+      .lean();
+    const hasProviderInArea = providersForService.some((provider) =>
+      isAddressInProviderWorkingAreas(provider.workingAreas, address),
+    );
+    if (!hasProviderInArea) {
+      throw new AppError(
+        "Hiện chưa có Provider phục vụ dịch vụ này tại địa chỉ đã chọn.",
+        422,
+      );
     }
 
     // 3. Validate & snapshot selected options
@@ -111,10 +165,7 @@ export const OrderService = {
     const bookingBasePrice =
       service.serviceType === "variable_price"
         ? quotationDepositAmount
-        : selectedOptionsSnapshot.reduce(
-            (sum, o) => sum + (o.price ?? 0),
-            0,
-          );
+        : selectedOptionsSnapshot.reduce((sum, o) => sum + (o.price ?? 0), 0);
     const totalAmount = bookingBasePrice;
 
     const platformCommissionAmount = Math.round(
@@ -124,6 +175,12 @@ export const OrderService = {
 
     // 5. Determine if inspection is required (repair service)
     const inspectionRequired = service.serviceType === "variable_price";
+    const preferredProvider = payload.preferredProviderId
+      ? await validatePreferredProvider(
+          payload.preferredProviderId,
+          service._id as Types.ObjectId,
+        )
+      : null;
 
     // 6. Persist order
     const order = await Order.create({
@@ -141,7 +198,8 @@ export const OrderService = {
       status: "created",
       paymentMethod: payload.paymentMethod,
       paymentStatus: "unpaid",
-      depositAmount: service.serviceType === "variable_price" ? bookingBasePrice : 0,
+      depositAmount:
+        service.serviceType === "variable_price" ? bookingBasePrice : 0,
       inspectionRequired,
       hasAdditionalQuotation: false,
       problemDescription: payload.problemDescription ?? null,
@@ -162,13 +220,50 @@ export const OrderService = {
     });
 
     // 7. Trigger async dispatch (non-blocking – failures are logged, not thrown)
-    DispatchService.dispatchOrder(order._id.toString(), {
-      latitude: address.latitude,
-      longitude: address.longitude,
-      serviceCategoryId: service.categoryId.toString(),
-    }).catch((err: unknown) =>
-      console.error(`[OrderService] Dispatch failed for order ${order.orderCode}:`, err),
-    );
+    if (preferredProvider) {
+      const matchingProviderTimeoutSeconds = Math.max(
+        await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", 30),
+        1,
+      );
+      const assignment = await OrderAssignment.create({
+        orderId: order._id,
+        providerId: preferredProvider._id,
+        status: "pending",
+        assignedAt: new Date(),
+        responseDeadline: new Date(
+          Date.now() + matchingProviderTimeoutSeconds * 1000,
+        ),
+      });
+      setTimeout(async () => {
+        await DispatchService._onAssignmentTimeout(
+          order._id.toString(),
+          assignment._id.toString(),
+          preferredProvider._id as Types.ObjectId,
+          {
+            latitude: address.latitude,
+            longitude: address.longitude,
+            serviceId: service._id.toString(),
+            province: address.province,
+            ward: address.ward,
+          },
+          [],
+          1,
+        );
+      }, matchingProviderTimeoutSeconds * 1000);
+    } else {
+      DispatchService.dispatchOrder(order._id.toString(), {
+        latitude: address.latitude,
+        longitude: address.longitude,
+        serviceId: service._id.toString(),
+        province: address.province,
+        ward: address.ward,
+      }).catch((err: unknown) =>
+        console.error(
+          `[OrderService] Dispatch failed for order ${order.orderCode}:`,
+          err,
+        ),
+      );
+    }
 
     return order;
   },
@@ -181,11 +276,23 @@ export const OrderService = {
     page = 1,
     limit = 10,
     filters: { status?: string; search?: string } = {},
-  ): Promise<{ items: IOrder[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+  ): Promise<{
+    items: IOrder[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }> {
     const skip = (page - 1) * limit;
     const conditions: any[] = [{ customerId: new Types.ObjectId(customerId) }];
 
-    if (filters.status && filters.status !== "all" && filters.status !== "Tất cả") {
+    if (
+      filters.status &&
+      filters.status !== "all" &&
+      filters.status !== "Tất cả"
+    ) {
       conditions.push({ status: filters.status });
     }
 
@@ -242,13 +349,12 @@ export const OrderService = {
       providerId: provider._id,
       status: "pending",
     }).select("orderId");
-    const pendingOrderIds = pendingAssignments.map((assignment) => assignment.orderId);
+    const pendingOrderIds = pendingAssignments.map(
+      (assignment) => assignment.orderId,
+    );
 
     return Order.find({
-      $or: [
-        { providerId: provider._id },
-        { _id: { $in: pendingOrderIds } },
-      ],
+      $or: [{ providerId: provider._id }, { _id: { $in: pendingOrderIds } }],
     })
       .sort({ createdAt: -1 })
       .limit(safeLimit)
@@ -268,13 +374,24 @@ export const OrderService = {
     filters: { status?: string; search?: string } = {},
   ): Promise<{
     items: IOrder[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
   }> {
     const provider = await getProviderByUserId(providerUserId);
     const skip = (page - 1) * limit;
-    const conditions: Record<string, unknown>[] = [{ providerId: provider._id }];
+    const conditions: Record<string, unknown>[] = [
+      { providerId: provider._id },
+    ];
 
-    if (filters.status && filters.status !== "all" && filters.status !== "Tất cả") {
+    if (
+      filters.status &&
+      filters.status !== "all" &&
+      filters.status !== "Tất cả"
+    ) {
       conditions.push({ status: filters.status });
     }
 
@@ -325,9 +442,15 @@ export const OrderService = {
   async getOrderById(orderId: string, userId: string): Promise<IOrder> {
     const order = await Order.findById(orderId)
       .populate("customerId", "fullName avatar phone email")
-      .populate("serviceId", "name image serviceType categoryId depositAmount fixedPrice")
+      .populate(
+        "serviceId",
+        "name image serviceType categoryId depositAmount fixedPrice",
+      )
       .populate("addressId")
-      .populate("providerId")
+      .populate({
+        path: "providerId",
+        populate: { path: "userId", select: "fullName phone avatar" },
+      })
       .lean();
 
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
@@ -366,7 +489,10 @@ export const OrderService = {
     const order = await Order.findById(orderId);
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
 
-    if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
+    if (
+      !order.providerId ||
+      order.providerId.toString() !== provider._id.toString()
+    ) {
       throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
     }
 
@@ -402,7 +528,10 @@ export const OrderService = {
     const order = await Order.findById(orderId);
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
 
-    if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
+    if (
+      !order.providerId ||
+      order.providerId.toString() !== provider._id.toString()
+    ) {
       throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
     }
 
@@ -433,7 +562,10 @@ export const OrderService = {
     order.completionEvidenceImages = evidenceImages;
     order.completionNote = completionNote?.trim() || null;
     order.confirmation.providerConfirmedAt = new Date();
-    if (order.paymentStatus === "unpaid" || order.paymentStatus === "partially_paid") {
+    if (
+      order.paymentStatus === "unpaid" ||
+      order.paymentStatus === "partially_paid"
+    ) {
       order.paymentStatus = "paid";
     }
     await order.save();
@@ -472,7 +604,10 @@ export const OrderService = {
 
     if (role === "provider") {
       const provider = await getProviderByUserId(userId);
-      if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
+      if (
+        !order.providerId ||
+        order.providerId.toString() !== provider._id.toString()
+      ) {
         throw new AppError("Bạn không có quyền hủy đơn hàng này.", 403);
       }
     }

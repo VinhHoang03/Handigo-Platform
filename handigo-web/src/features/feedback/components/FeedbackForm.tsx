@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { ImagePlus, Send, X } from 'lucide-react';
 import { FloatingTextarea } from '@/components/common/FloatingField';
 import { RatingStars } from '@/components/common/RatingStars';
@@ -18,6 +18,32 @@ export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
   const [existingImages, setExistingImages] = useState<string[]>(feedback?.images || []);
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState('');
+  const previews = useMemo(
+    () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
+    [files],
+  );
+
+  useEffect(
+    () => () => previews.forEach((preview) => URL.revokeObjectURL(preview.url)),
+    [previews],
+  );
+
+  const selectFiles = (selectedFiles: File[]) => {
+    const remaining = 5 - existingImages.length;
+    const invalidFile = selectedFiles.find(
+      (file) => !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024,
+    );
+    if (invalidFile) {
+      setMessage('Mỗi tệp phải là hình ảnh và có dung lượng không quá 5 MB.');
+      return;
+    }
+    if (selectedFiles.length > remaining) {
+      setMessage(`Bạn chỉ có thể chọn thêm tối đa ${remaining} ảnh.`);
+    } else {
+      setMessage('');
+    }
+    setFiles(selectedFiles.slice(0, remaining));
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -75,7 +101,10 @@ export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
           accept="image/*"
           className="sr-only"
           disabled={existingImages.length + files.length >= 5}
-          onChange={(event) => setFiles(Array.from(event.target.files || []).slice(0, 5 - existingImages.length))}
+          onChange={(event) => {
+            selectFiles(Array.from(event.target.files || []));
+            event.target.value = '';
+          }}
         />
         <div className="mt-3 flex flex-wrap gap-2">
           {existingImages.map((image) => (
@@ -92,13 +121,19 @@ export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
               </span>
             </button>
           ))}
-          {files.map((file) => (
-            <div
-              key={`${file.name}-${file.size}`}
-              className="flex h-20 w-20 items-center justify-center rounded-xl bg-surface-container-low p-2 text-center text-xs text-on-surface-variant"
+          {previews.map(({ file, url }) => (
+            <button
+              type="button"
+              key={`${file.name}-${file.size}-${file.lastModified}`}
+              onClick={() => setFiles((items) => items.filter((item) => item !== file))}
+              className="group relative"
+              aria-label={`Bỏ ảnh ${file.name}`}
             >
-              {file.name}
-            </div>
+              <img src={url} alt={`Ảnh xem trước ${file.name}`} className="h-20 w-20 rounded-xl object-cover" />
+              <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/65 text-white opacity-0 transition group-hover:opacity-100 group-focus:opacity-100">
+                <X size={13} />
+              </span>
+            </button>
           ))}
         </div>
       </div>

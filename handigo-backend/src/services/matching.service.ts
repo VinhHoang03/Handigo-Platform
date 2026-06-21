@@ -1,8 +1,8 @@
 import { Types } from "mongoose";
 import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
-import { Service } from "../models/service.model";
 import { getNumberConfigValue } from "./systemConfig.service";
+import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,7 +17,9 @@ export interface ProviderCandidate {
 export interface FindNearestProvidersOptions {
   latitude?: number;
   longitude?: number;
-  serviceCategoryId: string;
+  serviceId: string;
+  province: string;
+  ward: string;
   /** Max search radius in meters. Default: 10 000 m (10 km) */
   maxDistanceMeters?: number;
   /** How many candidates to fetch at most. Default: 10 */
@@ -52,13 +54,15 @@ export const MatchingService = {
     const {
       latitude,
       longitude,
-      serviceCategoryId,
+      serviceId,
+      province,
+      ward,
       maxDistanceMeters = Math.max(configuredRadiusKm, 0) * 1000,
       limit = 10,
       excludeProviderIds = [],
     } = options;
 
-    const categoryObjectId = new Types.ObjectId(serviceCategoryId);
+    const serviceObjectId = new Types.ObjectId(serviceId);
     const excludeIds = excludeProviderIds.map((id) => id.toString());
 
     // ── Path A: geo-sorted lookup ──────────────────────────────────────────
@@ -93,27 +97,27 @@ export const MatchingService = {
         const nearbyUserIds = nearbyLocations.map((loc) => loc.userId);
 
         // 2. Fetch matching providers
-        const servicesInCategory = await Service.find({
-          categoryId: categoryObjectId,
-          isActive: true,
-        }).select("_id").lean();
-        const serviceIdsInCategory = servicesInCategory.map((s: any) => s._id);
-
         const providers = await Provider.find({
           userId: { $in: nearbyUserIds },
-          serviceIds: { $in: serviceIdsInCategory },
+          serviceIds: serviceObjectId,
           availabilityStatus: "online",
           verified: true,
           ...(excludeIds.length > 0 && {
             _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
           }),
         })
-          .limit(limit)
+          .limit(limit * 5)
           .lean();
 
-        if (providers.length > 0) {
+        const providersInArea = providers
+          .filter((provider) =>
+            isAddressInProviderWorkingAreas(provider.workingAreas, { province, ward }),
+          )
+          .slice(0, limit);
+
+        if (providersInArea.length > 0) {
           // 3. Sort by geo distance order (index in nearbyLocations)
-          const sorted = providers.sort((a, b) => {
+          const sorted = providersInArea.sort((a, b) => {
             const ai = userIdToIndex.get(a.userId.toString()) ?? Infinity;
             const bi = userIdToIndex.get(b.userId.toString()) ?? Infinity;
             return ai - bi;
@@ -146,14 +150,8 @@ export const MatchingService = {
     }
 
     // ── Path B: no coordinates or no geo-matches found → simple filter ─────
-    const servicesInCategory = await Service.find({
-      categoryId: categoryObjectId,
-      isActive: true,
-    }).select("_id").lean();
-    const serviceIdsInCategory = servicesInCategory.map((s: any) => s._id);
-
     const providers = await Provider.find({
-      serviceIds: { $in: serviceIdsInCategory },
+      serviceIds: serviceObjectId,
       availabilityStatus: "online",
       verified: true,
       ...(excludeIds.length > 0 && {
@@ -161,16 +159,21 @@ export const MatchingService = {
       }),
     })
       .sort({ averageRating: -1, totalCompletedOrders: -1 })
-      .limit(limit)
+      .limit(limit * 5)
       .lean();
 
-    return providers.map((p) => ({
+    return providers
+      .filter((provider) =>
+        isAddressInProviderWorkingAreas(provider.workingAreas, { province, ward }),
+      )
+      .slice(0, limit)
+      .map((p) => ({
       providerId: p._id as Types.ObjectId,
       userId: p.userId as Types.ObjectId,
       distanceMeters: -1,
       averageRating: p.averageRating,
       totalCompletedOrders: p.totalCompletedOrders,
-    }));
+      }));
   },
 };
 

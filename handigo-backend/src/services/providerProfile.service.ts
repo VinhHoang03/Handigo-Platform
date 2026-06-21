@@ -12,6 +12,9 @@ import {
 } from "../models/provider.model";
 import { AppError } from "../utils/appError";
 import { Service } from "../models/service.model";
+import { Address } from "../models/address.model";
+import { Feedback } from "../models/feedback.model";
+import { MatchingService } from "./matching.service";
 import {
   CreateCertificatePayload,
   SubmitIdentityPayload,
@@ -217,6 +220,203 @@ export const getFeaturedProviders = async () => {
         totalFeedbacks: provider.totalFeedbacks,
       };
     });
+};
+
+export const getNearbyProvidersForCustomer = async (
+  userId: string,
+  serviceId: string,
+  addressId: string,
+) => {
+  assertObjectId(userId, "user id");
+  assertObjectId(serviceId, "service id");
+  assertObjectId(addressId, "address id");
+
+  const [service, address] = await Promise.all([
+    Service.findOne({
+      _id: serviceId,
+      isActive: true,
+      isDeleted: false,
+    }).lean(),
+    Address.findOne({
+      _id: addressId,
+      userId: new Types.ObjectId(userId),
+    }).lean(),
+  ]);
+
+  if (!service) {
+    throw new AppError("Không tìm thấy dịch vụ phù hợp.", 404);
+  }
+
+  if (!address) {
+    throw new AppError("Không tìm thấy địa chỉ của bạn.", 404);
+  }
+
+  const candidates = await MatchingService.findNearestProviders({
+    latitude: address.latitude,
+    longitude: address.longitude,
+    serviceId: service._id.toString(),
+    province: address.province,
+    ward: address.ward,
+    limit: 5,
+  });
+
+  if (candidates.length === 0) return [];
+
+  const candidateByProviderId = new Map(
+    candidates.map((candidate) => [candidate.providerId.toString(), candidate]),
+  );
+  const providerIds = candidates.map((candidate) => candidate.providerId);
+  const providers = await Provider.find({
+    _id: { $in: providerIds },
+    isDeleted: false,
+  })
+    .populate({ path: "userId", select: "fullName avatar" })
+    .populate(servicePopulate)
+    .lean();
+
+  return providers
+    .map((provider) => {
+      const candidate = candidateByProviderId.get(provider._id.toString());
+      const user = provider.userId as unknown as {
+        _id: Types.ObjectId;
+        fullName?: string;
+        avatar?: string | null;
+      };
+      const services = provider.serviceIds as unknown as Array<{
+        _id: Types.ObjectId;
+        name?: string;
+      }>;
+
+      return {
+        id: provider._id.toString(),
+        user: {
+          id: user?._id?.toString() || "",
+          fullName: user?.fullName || "Chuyên gia Handigo",
+          avatar: user?.avatar || null,
+        },
+        services: services.map((item) => ({
+          id: item._id.toString(),
+          name: item.name || "",
+        })),
+        workingAreas: provider.workingAreas || [],
+        serviceArea: provider.serviceArea,
+        availabilityStatus: provider.availabilityStatus,
+        averageRating: provider.averageRating,
+        totalFeedbacks: provider.totalFeedbacks,
+        totalCompletedOrders: provider.totalCompletedOrders,
+        distanceMeters: candidate?.distanceMeters ?? -1,
+      };
+    })
+    .sort((a, b) => {
+      const aIndex = providerIds.findIndex((id) => id.toString() === a.id);
+      const bIndex = providerIds.findIndex((id) => id.toString() === b.id);
+      return aIndex - bIndex;
+    });
+};
+
+export const getPublicProviderProfile = async (providerId: string) => {
+  assertObjectId(providerId, "provider id");
+
+  const provider = await Provider.findOne({
+    _id: providerId,
+    isDeleted: false,
+    verified: true,
+  })
+    .populate({ path: "userId", select: "fullName avatar createdAt" })
+    .populate(servicePopulate)
+    .lean();
+
+  if (!provider || !provider.userId) {
+    throw new AppError("Không tìm thấy hồ sơ chuyên gia.", 404);
+  }
+
+  const user = provider.userId as unknown as {
+    _id: Types.ObjectId;
+    fullName?: string;
+    avatar?: string | null;
+    createdAt?: Date;
+  };
+  const services = provider.serviceIds as unknown as Array<{
+    _id: Types.ObjectId;
+    name?: string;
+    slug?: string;
+  }>;
+
+  const latestFeedbacks = await Feedback.find({
+    providerId: provider._id,
+    isVisible: true,
+    isDeleted: false,
+  })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .populate("customerId", "fullName avatar")
+    .populate("serviceId", "name image")
+    .lean();
+
+  return {
+    user: {
+      id: user._id.toString(),
+      fullName: user.fullName || "Chuyên gia Handigo",
+      avatar: user.avatar || null,
+      joinedAt: user.createdAt,
+    },
+    provider: {
+      id: provider._id.toString(),
+      description: provider.description,
+      bio: provider.bio,
+      mainServiceText: provider.mainServiceText,
+      experienceYears: provider.experienceYears,
+      availabilityStatus: provider.availabilityStatus,
+      verified: provider.verified,
+      services: services.map((service) => ({
+        id: service._id.toString(),
+        name: service.name || "",
+        slug: service.slug || "",
+      })),
+      workingAreas: provider.workingAreas || [],
+      serviceArea: provider.serviceArea,
+      averageRating: provider.averageRating,
+      totalFeedbacks: provider.totalFeedbacks,
+      totalCompletedOrders: provider.totalCompletedOrders,
+      identityVerified:
+        provider.identityDocument?.verificationStatus === "verified",
+      certificates: (provider.certificates || [])
+        .filter((certificate) => certificate.status === "approved")
+        .map(formatCertificate),
+    },
+    feedbacks: latestFeedbacks.map((feedback) => {
+      const customer = feedback.customerId as unknown as {
+        fullName?: string;
+        avatar?: string | null;
+      };
+      const service = feedback.serviceId as unknown as {
+        name?: string;
+        image?: string | null;
+      };
+
+      return {
+        id: feedback._id.toString(),
+        rating: feedback.rating,
+        comment: feedback.comment,
+        images: feedback.images || [],
+        createdAt: feedback.createdAt,
+        customer: {
+          fullName: customer?.fullName || "Khách hàng Handigo",
+          avatar: customer?.avatar || null,
+        },
+        service: {
+          name: service?.name || "Dịch vụ",
+          image: service?.image || null,
+        },
+        providerReply: feedback.providerReply
+          ? {
+              content: feedback.providerReply.content,
+              repliedAt: feedback.providerReply.repliedAt,
+            }
+          : null,
+      };
+    }),
+  };
 };
 
 export const getMyProviderProfile = async (userId: string) => {

@@ -8,6 +8,7 @@ import { getServiceImage } from "@/features/customer-service/utils/serviceDispla
 import type { Service } from "@/types/booking";
 import { BrandLogo } from "./BrandLogo";
 import { NotificationBell } from "./NotificationBell";
+import { MessageCenter } from "@/features/chat/components/MessageCenter";
 
 export type AppRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
@@ -286,13 +287,9 @@ export function Navbar({
               )}
 
               <NotificationBell role={currentRole} />
-              <button
-                type="button"
-                aria-label="Tin nhắn"
-                className="material-symbols-outlined hidden rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary sm:inline-flex"
-              >
-                chat_bubble
-              </button>
+              {(currentRole === "CUSTOMER" || currentRole === "PROVIDER") && (
+                <MessageCenter />
+              )}
 
               <div ref={accountRef} className="relative">
                 <button

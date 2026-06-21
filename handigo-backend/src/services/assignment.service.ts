@@ -6,6 +6,8 @@ import { Provider } from "../models/provider.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AppError } from "../utils/appError";
+import { Address } from "../models/address.model";
+import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,6 +73,20 @@ export const AssignmentService = {
       await assignment.save();
       throw new AppError(
         "Thời gian phản hồi đã hết hạn (timeout). Đơn hàng đã được chuyển sang provider khác.",
+        400,
+      );
+    }
+
+    const assignedOrder = await Order.findById(assignment.orderId).select("addressId");
+    const assignedAddress = assignedOrder
+      ? await Address.findById(assignedOrder.addressId).select("ward province")
+      : null;
+    if (
+      !assignedAddress ||
+      !isAddressInProviderWorkingAreas(provider.workingAreas, assignedAddress)
+    ) {
+      throw new AppError(
+        "Địa chỉ thực hiện không thuộc khu vực phục vụ đã đăng ký của bạn.",
         400,
       );
     }
@@ -171,7 +187,9 @@ export const AssignmentService = {
       {
         latitude: address?.latitude,
         longitude: address?.longitude,
-        serviceCategoryId: (service as any)?.categoryId?.toString() ?? "",
+        serviceId: service?._id?.toString() || order.serviceId.toString(),
+        province: address?.province || "",
+        ward: address?.ward || "",
       },
       triedProviderIds,
       triedAssignments.length + 1,

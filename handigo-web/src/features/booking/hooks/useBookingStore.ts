@@ -6,6 +6,7 @@ export const useBookingStore = create<BookingState>((set) => ({
   serviceId: undefined,
   selectedOptionIds: [],
   addressId: undefined,
+  preferredProviderId: undefined,
   orderType: 'scheduled',
   scheduledAt: undefined,
   problemDescription: undefined,
@@ -14,7 +15,7 @@ export const useBookingStore = create<BookingState>((set) => ({
 
   setCategoryId: (id) => set({ categoryId: id, serviceId: undefined, selectedOptionIds: [] }),
   setServiceId: (id) => set({ serviceId: id, selectedOptionIds: [] }),
-  selectService: (categoryId, serviceId) => set({ categoryId, serviceId, selectedOptionIds: [] }),
+  selectService: (categoryId, serviceId, selectedOptionIds = []) => set({ categoryId, serviceId, selectedOptionIds }),
   toggleOption: (id) =>
     set((state) => ({
       selectedOptionIds: state.selectedOptionIds.includes(id)
@@ -22,6 +23,7 @@ export const useBookingStore = create<BookingState>((set) => ({
         : [...state.selectedOptionIds, id],
     })),
   setAddressId: (id) => set({ addressId: id }),
+  setPreferredProviderId: (id) => set({ preferredProviderId: id }),
   setOrderType: (type) => set({ orderType: type }),
   setScheduledAt: (date) => set({ scheduledAt: date }),
   setProblemDescription: (desc) => set({ problemDescription: desc }),
@@ -33,6 +35,7 @@ export const useBookingStore = create<BookingState>((set) => ({
       serviceId: undefined,
       selectedOptionIds: [],
       addressId: undefined,
+      preferredProviderId: undefined,
       orderType: 'scheduled',
       scheduledAt: undefined,
       problemDescription: undefined,

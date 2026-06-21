@@ -43,6 +43,25 @@ const actionLabel: Record<string, string> = {
   approved: "Hồ sơ được phê duyệt",
 };
 
+const applicationName = (application: ProviderApplication) => {
+  const serviceNames = application.serviceIds
+    .map((service) => typeof service === "string" ? "" : service.name)
+    .filter(Boolean);
+  return serviceNames.length
+    ? `Hồ sơ ${serviceNames.slice(0, 2).join(", ")}`
+    : "Hồ sơ đăng ký nhà cung cấp";
+};
+
+const submittedDate = (application: ProviderApplication) => {
+  const firstSubmission = application.reviewHistory?.find((event) =>
+    ["submitted", "resubmitted"].includes(event.action),
+  )?.occurredAt;
+  if (application.status === "draft" && !application.submittedAt && !firstSubmission) {
+    return null;
+  }
+  return application.submittedAt || firstSubmission || application.createdAt;
+};
+
 function DownloadButton({ url, label }: { url: string; label: string }) {
   return (
     <a
@@ -153,8 +172,8 @@ function ApplicationDetail({ application }: { application: ProviderApplication }
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-on-surface-variant">Application ID</p>
-          <p className="break-all font-mono text-sm font-bold">{application._id}</p>
+          <p className="text-sm text-on-surface-variant">Tên hồ sơ đăng ký</p>
+          <p className="font-bold">{applicationName(application)}</p>
         </div>
         <StatusBadge value={application.status} />
       </div>
@@ -264,14 +283,14 @@ export function ProviderApplicationHistory({
 
   return (
     <div className="space-y-4">
-      <div className="hidden overflow-hidden rounded-xl border border-outline-variant/30 md:block">
+      <div className={canEditRejected ? "hidden overflow-hidden rounded-xl border border-outline-variant/30 md:block" : "hidden"}>
         <table className="w-full text-left text-sm">
-          <thead className="bg-surface-container text-on-surface-variant"><tr><th className="p-3">Application ID</th><th className="p-3">Ngày gửi</th><th className="p-3">Cập nhật</th><th className="p-3">Trạng thái</th><th className="p-3 text-right">Thao tác</th></tr></thead>
+          <thead className="bg-surface-container text-on-surface-variant"><tr><th className="p-3">Tên hồ sơ đăng ký</th><th className="p-3">Ngày gửi</th><th className="p-3">Cập nhật gần nhất</th><th className="p-3">Trạng thái</th><th className="p-3 text-right">Thao tác</th></tr></thead>
           <tbody>
             {items.map((application) => (
               <tr key={application._id} className="border-t border-outline-variant/30">
-                <td className="max-w-40 truncate p-3 font-mono">{application._id}</td>
-                <td className="p-3">{formatDate(application.submittedAt)}</td>
+                <td className="max-w-64 p-3 font-semibold">{applicationName(application)}</td>
+                <td className="p-3">{submittedDate(application) ? formatDate(submittedDate(application)) : "Chưa gửi"}</td>
                 <td className="p-3">{formatDate(application.updatedAt)}</td>
                 <td className="p-3"><StatusBadge value={application.status} /></td>
                 <td className="p-3">
@@ -291,11 +310,14 @@ export function ProviderApplicationHistory({
         </table>
       </div>
 
-      <div className="space-y-3 md:hidden">
+      <div className={`space-y-3 ${canEditRejected ? "md:hidden" : ""}`}>
         {items.map((application) => (
           <article key={application._id} className="space-y-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4">
-            <div className="flex items-start justify-between gap-2"><p className="break-all font-mono text-xs font-bold">{application._id}</p><StatusBadge value={application.status} /></div>
-            <p className="text-sm text-on-surface-variant">Gửi: {formatDate(application.submittedAt)} · Cập nhật: {formatDate(application.updatedAt)}</p>
+            <div className="flex items-start justify-between gap-2"><p className="font-bold text-on-surface">{applicationName(application)}</p><StatusBadge value={application.status} /></div>
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-container-low p-3 text-sm">
+              <div><p className="text-xs text-on-surface-variant">Ngày gửi</p><p className="mt-1 font-medium">{submittedDate(application) ? formatDate(submittedDate(application)) : "Chưa gửi"}</p></div>
+              <div><p className="text-xs text-on-surface-variant">Cập nhật gần nhất</p><p className="mt-1 font-medium">{formatDate(application.updatedAt)}</p></div>
+            </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <button type="button" className="btn-secondary flex-1" onClick={() => void openDetail(application)}><Eye size={16} /> Xem chi tiết</button>
               {application.status === "rejected" && <button type="button" className="btn-secondary flex-1" onClick={() => void openDetail(application)}>Xem lý do</button>}

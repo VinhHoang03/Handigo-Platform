@@ -4,6 +4,7 @@ import { Conversation } from "../models/conversation.model";
 import { Message } from "../models/message.model";
 import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
+import { Report } from "../models/report.model";
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 type SenderRole = "customer" | "provider";
@@ -186,9 +187,9 @@ export const getMessages = async (
   await getConversationForParticipant(userId, role, conversationId);
   const { page, limit, skip } = getPagination(query);
 
-  const [items, total] = await Promise.all([
+  const [messageDocuments, total] = await Promise.all([
     Message.find({ conversationId, isDeleted: false })
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .populate("senderId", "fullName avatar role"),
@@ -196,7 +197,7 @@ export const getMessages = async (
   ]);
 
   return {
-    items,
+    items: messageDocuments.reverse(),
     pagination: {
       page,
       limit,
@@ -281,4 +282,106 @@ export const markConversationSeen = async (
   ]);
 
   return { conversationId: conversation._id, seenAt };
+};
+
+export const updateMessage = async (
+  userId: string,
+  role: UserRole,
+  messageId: string,
+  content: string,
+) => {
+  assertObjectId(messageId, "message id");
+  const message = await Message.findOne({ _id: messageId, isDeleted: false });
+  if (!message) throw new AppError("Không tìm thấy tin nhắn.", 404);
+
+  const { conversation } = await getConversationForParticipant(
+    userId,
+    role,
+    message.conversationId.toString(),
+  );
+  if (message.senderId.toString() !== userId) {
+    throw new AppError("Bạn chỉ có thể chỉnh sửa tin nhắn của mình.", 403);
+  }
+  if (message.messageType !== "text") {
+    throw new AppError("Chỉ có thể chỉnh sửa tin nhắn văn bản.", 400);
+  }
+
+  message.content = content.trim();
+  await message.save();
+  if (conversation.lastMessage?.messageId.toString() === messageId) {
+    conversation.lastMessage.content = message.content;
+    await conversation.save();
+  }
+  return Message.findById(message._id).populate("senderId", "fullName avatar role");
+};
+
+export const deleteMessage = async (
+  userId: string,
+  role: UserRole,
+  messageId: string,
+) => {
+  assertObjectId(messageId, "message id");
+  const message = await Message.findOne({ _id: messageId, isDeleted: false });
+  if (!message) throw new AppError("Không tìm thấy tin nhắn.", 404);
+
+  const { conversation } = await getConversationForParticipant(
+    userId,
+    role,
+    message.conversationId.toString(),
+  );
+  if (message.senderId.toString() !== userId) {
+    throw new AppError("Bạn chỉ có thể xóa tin nhắn của mình.", 403);
+  }
+
+  message.isDeleted = true;
+  message.deletedAt = new Date();
+  await message.save();
+
+  if (conversation.lastMessage?.messageId.toString() === messageId) {
+    const latestMessage = await Message.findOne({
+      conversationId: conversation._id,
+      isDeleted: false,
+    }).sort({ createdAt: -1, _id: -1 });
+    conversation.lastMessage = latestMessage ? {
+      messageId: latestMessage._id as Types.ObjectId,
+      senderId: latestMessage.senderId,
+      messageType: latestMessage.messageType as "text" | "image",
+      content: latestMessage.content || latestMessage.imageUrl || "",
+      sentAt: latestMessage.createdAt,
+    } : null;
+    await conversation.save();
+  }
+
+  return { _id: message._id, conversationId: message.conversationId };
+};
+
+export const reportConversation = async (
+  userId: string,
+  role: UserRole,
+  conversationId: string,
+  description: string,
+) => {
+  const { conversation, participant } = await getConversationForParticipant(
+    userId,
+    role,
+    conversationId,
+  );
+
+  let targetUserId = conversation.customerId;
+  if (participant.senderRole === "customer") {
+    const provider = await Provider.findById(conversation.providerId).select("userId");
+    if (!provider) throw new AppError("Không tìm thấy nhà cung cấp.", 404);
+    targetUserId = provider.userId;
+  }
+
+  return Report.create({
+    reporterId: userId,
+    targetType: "user",
+    targetUserId,
+    orderId: conversation.orderId,
+    reportType: "user_behavior",
+    title: "Báo cáo cuộc trò chuyện",
+    description: description.trim(),
+    evidenceImages: [],
+  });
 };

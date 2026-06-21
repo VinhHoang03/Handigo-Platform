@@ -11,9 +11,11 @@ import BookingSuccessPage from "./features/booking/pages/BookingSuccessPage";
 import CustomerProfilePage from "./features/customer/pages/CustomerProfilePage";
 import CustomerServiceDetailPage from "./features/customer-service/pages/CustomerServiceDetailPage";
 import CustomerServiceListPage from "./features/customer-service/pages/CustomerServiceListPage";
+import PublicProviderProfilePage from "./features/customer-service/pages/PublicProviderProfilePage";
 import ProviderHomePage from "./features/provider/pages/ProviderHomePage";
 import ProviderOrdersPage from "./features/provider/pages/ProviderOrdersPage";
 import ProviderOrderDetailPage from "./features/provider/pages/ProviderOrderDetailPage";
+import ProviderSchedulePage from "./features/provider/pages/ProviderSchedulePage";
 import ProviderProfilePage from "./features/provider/pages/ProviderProfilePage";
 import ProviderBankAccountsPage from "./features/bank-account/pages/ProviderBankAccountsPage";
 import NotificationsPage from "./features/notification/pages/NotificationsPage";
@@ -103,6 +105,14 @@ function App() {
             }
           />
           <Route
+            path="/customer/providers/:providerId"
+            element={
+              <RouteGuard roles={["CUSTOMER"]}>
+                <PublicProviderProfilePage />
+              </RouteGuard>
+            }
+          />
+          <Route
             path="/customer/wallet"
             element={
               <RouteGuard roles={["CUSTOMER"]}>
@@ -131,6 +141,14 @@ function App() {
             element={
               <RouteGuard roles={["PROVIDER"]}>
                 <ProviderOrderDetailPage />
+              </RouteGuard>
+            }
+          />
+          <Route
+            path="/provider/schedule"
+            element={
+              <RouteGuard roles={["PROVIDER"]}>
+                <ProviderSchedulePage />
               </RouteGuard>
             }
           />

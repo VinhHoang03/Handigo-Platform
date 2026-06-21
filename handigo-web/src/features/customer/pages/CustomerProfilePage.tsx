@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Modal } from "@/components/common/Modal";
-import { AddressBookModal } from "@/components/profile/AddressBookModal";
+import { AddressBookManager } from "@/components/profile/AddressBookManager";
 import { UserProfileSection } from "@/components/profile/UserProfileSection";
 import { changePasswordApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
@@ -11,18 +11,10 @@ import { ProviderApplicationHistory } from "@/features/provider-application/comp
 import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import {
-  createUserAddress,
-  deleteUserAddress,
-  getUserAddresses,
-  updateUserAddress,
-} from "@/features/profile/api/addressBook.api";
-import {
   getUserProfile,
   updateUserProfile,
 } from "@/features/profile/api/userProfile.api";
 import type {
-  UserAddress,
-  UserAddressPayload,
   UserProfileData,
   UserProfileFormValue,
 } from "@/features/profile/types/profile.types";
@@ -91,22 +83,13 @@ export default function CustomerProfilePage() {
   >("profile");
 
   const [profile, setProfile] = useState<UserProfileData | null>(null);
-  const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [providerApplication, setProviderApplication] =
     useState<ProviderApplication | null>(null);
   const [isProviderApplicationLoading, setIsProviderApplicationLoading] =
     useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAddressLoading, setIsAddressLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAddressSaving, setIsAddressSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [addressError, setAddressError] = useState("");
-
-  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(
-    null,
-  );
 
   const [isPwdConfirmOpen, setIsPwdConfirmOpen] = useState(false);
   const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
@@ -142,19 +125,6 @@ export default function CustomerProfilePage() {
     if (hasChanged) setUser(nextUser);
   }, []);
 
-  const loadAddresses = useCallback(async () => {
-    setIsAddressLoading(true);
-    try {
-      const nextAddresses = await getUserAddresses();
-      setAddresses(nextAddresses);
-      setAddressError("");
-    } catch {
-      setAddressError("Không tải được địa chỉ đã lưu.");
-    } finally {
-      setIsAddressLoading(false);
-    }
-  }, []);
-
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg("");
@@ -184,9 +154,8 @@ export default function CustomerProfilePage() {
     // Initial remote loads are intentionally started from this effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadProfile();
-    void loadAddresses();
     void loadProviderApplication();
-  }, [loadAddresses, loadProfile, loadProviderApplication]);
+  }, [loadProfile, loadProviderApplication]);
 
   const handleSaveProfile = async (payload: UserProfileFormValue) => {
     setIsSaving(true);
@@ -204,66 +173,6 @@ export default function CustomerProfilePage() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const refreshAddresses = async () => {
-    const nextAddresses = await getUserAddresses();
-    setAddresses(nextAddresses);
-    setAddressError("");
-  };
-
-  const handleSubmitAddress = async (
-    payload: UserAddressPayload,
-    address: UserAddress | null,
-  ) => {
-    setIsAddressSaving(true);
-    try {
-      if (address) {
-        await updateUserAddress(address.id, payload);
-      } else {
-        await createUserAddress(payload);
-      }
-      await refreshAddresses();
-    } catch (error) {
-      setAddressError(
-        getErrorMessage(error, "Không thể lưu địa chỉ. Vui lòng thử lại."),
-      );
-      throw error;
-    } finally {
-      setIsAddressSaving(false);
-    }
-  };
-
-  const handleDeleteAddress = async (address: UserAddress) => {
-    setIsAddressSaving(true);
-    try {
-      await deleteUserAddress(address.id);
-      await refreshAddresses();
-    } catch (error) {
-      setAddressError(
-        getErrorMessage(error, "Không thể xóa địa chỉ. Vui lòng thử lại."),
-      );
-      throw error;
-    } finally {
-      setIsAddressSaving(false);
-    }
-  };
-
-  const openCreateAddressModal = () => {
-    setEditingAddress(null);
-    setAddressError("");
-    setIsAddressModalOpen(true);
-  };
-
-  const openEditAddressModal = (address: UserAddress) => {
-    setEditingAddress(address);
-    setAddressError("");
-    setIsAddressModalOpen(true);
-  };
-
-  const closeAddressModal = () => {
-    setIsAddressModalOpen(false);
-    setEditingAddress(null);
   };
 
   const closePasswordModal = () => {
@@ -430,17 +339,19 @@ export default function CustomerProfilePage() {
         {activeTab === "profile" && (
           <UserProfileSection
             user={profile}
-            addresses={addresses}
+            addresses={[]}
             isSaving={isSaving}
-            isAddressLoading={isAddressLoading}
-            isAddressSaving={isAddressSaving}
             error={errorMsg}
-            addressError={addressError}
             defaultAvatar={DEFAULT_AVATAR}
             onSaveProfile={handleSaveProfile}
-            onAddAddress={openCreateAddressModal}
-            onEditAddress={openEditAddressModal}
-            onDeleteAddress={handleDeleteAddress}
+            addressManager={
+              <AddressBookManager
+                defaultRecipient={{
+                  name: profile.fullName,
+                  phone: profile.phone || "",
+                }}
+              />
+            }
           />
         )}
 
@@ -521,22 +432,6 @@ export default function CustomerProfilePage() {
           </section>
         )}
       </div>
-
-      {isAddressModalOpen && (
-        <AddressBookModal
-          key={editingAddress?.id || "new-address"}
-          open={isAddressModalOpen}
-          address={editingAddress}
-          addressCount={addresses.length}
-          isSaving={isAddressSaving}
-          defaultRecipient={{
-            name: profile.fullName,
-            phone: profile.phone || "",
-          }}
-          onClose={closeAddressModal}
-          onSubmit={handleSubmitAddress}
-        />
-      )}
 
       <Modal
         open={isPwdConfirmOpen}

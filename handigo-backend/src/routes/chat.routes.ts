@@ -2,7 +2,7 @@ import { Router } from "express";
 import * as chatController from "../controllers/chat.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { sendMessageSchema } from "../validations/chat.validator";
+import { reportConversationSchema, sendMessageSchema, updateMessageSchema } from "../validations/chat.validator";
 
 const router = Router();
 
@@ -17,5 +17,16 @@ router.post(
   chatController.sendMessage,
 );
 router.patch("/conversations/:conversationId/seen", chatController.markConversationSeen);
+router.post(
+  "/conversations/:conversationId/report",
+  validate(reportConversationSchema),
+  chatController.reportConversation,
+);
+router.patch(
+  "/messages/:messageId",
+  validate(updateMessageSchema),
+  chatController.updateMessage,
+);
+router.delete("/messages/:messageId", chatController.deleteMessage);
 
 export default router;

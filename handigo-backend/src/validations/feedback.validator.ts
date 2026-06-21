@@ -31,4 +31,5 @@ export const visibilitySchema = z.object({
 
 export const providerReplySchema = z.object({
   content: z.string().trim().min(1).max(1000),
+  images: z.array(imageUrlSchema).max(5).optional(),
 });
