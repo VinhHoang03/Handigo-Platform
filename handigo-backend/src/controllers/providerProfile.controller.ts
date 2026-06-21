@@ -46,6 +46,48 @@ export const getFeaturedProviders = async (
   }
 };
 
+export const getNearbyProviders = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = getUserId(req);
+    const serviceId = String(req.query.serviceId || "");
+    const addressId = String(req.query.addressId || "");
+
+    if (!serviceId || !addressId) {
+      throw new AppError("Vui lòng chọn dịch vụ và địa chỉ.", 400);
+    }
+
+    const data = await providerProfileService.getNearbyProvidersForCustomer(
+      userId,
+      serviceId,
+      addressId,
+    );
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getPublicProviderProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const data = await providerProfileService.getPublicProviderProfile(
+      String(req.params.providerId || ""),
+    );
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const updateMyProfile = async (
   req: Request,
   res: Response,

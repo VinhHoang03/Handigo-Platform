@@ -158,6 +158,7 @@ export interface BookingState {
   serviceId?: string;
   selectedOptionIds: string[];
   addressId?: string;
+  preferredProviderId?: string;
   orderType: 'normal' | 'urgent' | 'scheduled' | 'recurring';
   scheduledAt?: string;
   problemDescription?: string;
@@ -167,9 +168,10 @@ export interface BookingState {
   // Helpers
   setCategoryId: (id: string) => void;
   setServiceId: (id: string) => void;
-  selectService: (categoryId: string, serviceId: string) => void;
+  selectService: (categoryId: string, serviceId: string, selectedOptionIds?: string[]) => void;
   toggleOption: (id: string) => void;
   setAddressId: (id: string) => void;
+  setPreferredProviderId: (id?: string) => void;
   setOrderType: (type: BookingState['orderType']) => void;
   setScheduledAt: (date: string) => void;
   setProblemDescription: (desc: string) => void;

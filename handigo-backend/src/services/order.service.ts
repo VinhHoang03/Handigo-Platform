@@ -50,7 +50,34 @@ export interface CreateOrderPayload {
   customerAttachments?: string[];
   promotionId?: string;
   voucherId?: string;
+  preferredProviderId?: string;
   paymentMethod: "wallet" | "bank" | "cash";
+}
+
+async function validatePreferredProvider(
+  providerId: string,
+  serviceId: Types.ObjectId,
+) {
+  if (!Types.ObjectId.isValid(providerId)) {
+    throw new AppError("Chuyên gia được chọn không hợp lệ.", 400);
+  }
+
+  const provider = await Provider.findOne({
+    _id: providerId,
+    serviceIds: serviceId,
+    verified: true,
+    isDeleted: false,
+  }).select("_id availabilityStatus");
+
+  if (!provider) {
+    throw new AppError("Chuyên gia được chọn không phù hợp với dịch vụ này.", 400);
+  }
+
+  if (provider.availabilityStatus !== "online") {
+    throw new AppError("Chuyên gia được chọn hiện không sẵn sàng nhận đơn.", 400);
+  }
+
+  return provider;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -124,6 +151,12 @@ export const OrderService = {
 
     // 5. Determine if inspection is required (repair service)
     const inspectionRequired = service.serviceType === "variable_price";
+    const preferredProvider = payload.preferredProviderId
+      ? await validatePreferredProvider(
+          payload.preferredProviderId,
+          service._id as Types.ObjectId,
+        )
+      : null;
 
     // 6. Persist order
     const order = await Order.create({
@@ -162,13 +195,41 @@ export const OrderService = {
     });
 
     // 7. Trigger async dispatch (non-blocking – failures are logged, not thrown)
-    DispatchService.dispatchOrder(order._id.toString(), {
-      latitude: address.latitude,
-      longitude: address.longitude,
-      serviceCategoryId: service.categoryId.toString(),
-    }).catch((err: unknown) =>
-      console.error(`[OrderService] Dispatch failed for order ${order.orderCode}:`, err),
-    );
+    if (preferredProvider) {
+      const matchingProviderTimeoutSeconds = Math.max(
+        await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", 30),
+        1,
+      );
+      const assignment = await OrderAssignment.create({
+        orderId: order._id,
+        providerId: preferredProvider._id,
+        status: "pending",
+        assignedAt: new Date(),
+        responseDeadline: new Date(Date.now() + matchingProviderTimeoutSeconds * 1000),
+      });
+      setTimeout(async () => {
+        await DispatchService._onAssignmentTimeout(
+          order._id.toString(),
+          assignment._id.toString(),
+          preferredProvider._id as Types.ObjectId,
+          {
+            latitude: address.latitude,
+            longitude: address.longitude,
+            serviceCategoryId: service.categoryId.toString(),
+          },
+          [],
+          1,
+        );
+      }, matchingProviderTimeoutSeconds * 1000);
+    } else {
+      DispatchService.dispatchOrder(order._id.toString(), {
+        latitude: address.latitude,
+        longitude: address.longitude,
+        serviceCategoryId: service.categoryId.toString(),
+      }).catch((err: unknown) =>
+        console.error(`[OrderService] Dispatch failed for order ${order.orderCode}:`, err),
+      );
+    }
 
     return order;
   },
