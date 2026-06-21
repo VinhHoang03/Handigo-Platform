@@ -254,7 +254,9 @@ export const getNearbyProvidersForCustomer = async (
   const candidates = await MatchingService.findNearestProviders({
     latitude: address.latitude,
     longitude: address.longitude,
-    serviceCategoryId: service.categoryId.toString(),
+    serviceId: service._id.toString(),
+    province: address.province,
+    ward: address.ward,
     limit: 5,
   });
 

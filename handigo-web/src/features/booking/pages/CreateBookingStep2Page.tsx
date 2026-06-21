@@ -18,7 +18,7 @@ const CreateBookingStep2Page = () => {
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const handleSelectAddress = useCallback(
-    (address: UserAddress | null) => setAddressId(address?.id),
+    (address: UserAddress | null) => setAddressId(address?.id || ''),
     [setAddressId],
   );
 
