@@ -183,11 +183,11 @@ export const DispatchService = {
     }
 
     const address = await (
-      await import("../models/address.model")
+      await import("../models/address.model.js")
     ).Address.findById(order.addressId);
 
     const service = await (
-      await import("../models/service.model")
+      await import("../models/service.model.js")
     ).Service.findById(order.serviceId);
 
     await DispatchService.dispatchOrder(order._id.toString(), {
