@@ -80,7 +80,7 @@ const configDefinitions: ConfigDefinition[] = [
     label: 'Thời gian chờ provider nhận đơn',
     group: 'booking',
     type: 'NUMBER',
-    defaultValue: 1,
+    defaultValue: 60,
     unit: 'giây',
     isPublic: false,
     description: 'Số giây hệ thống chờ provider phản hồi trước khi thử provider tiếp theo.',

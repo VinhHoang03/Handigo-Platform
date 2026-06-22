@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import { Modal } from '@/components/common/Modal';
+import { tokenStorage } from '@/api/tokenStorage';
+import { useAuthStore } from '@/features/auth/store/auth.store';
 import { providerOrderApi } from '../api/providerOrder.api';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import {
@@ -12,12 +15,16 @@ import {
   shortAddress,
 } from '../utils/providerOrder.utils';
 
-interface ProviderAssignmentModalProps {
-  enabled: boolean;
+interface AssignmentRealtimePayload {
+  assignment?: OrderAssignment | null;
+  assignmentId?: string;
 }
 
-export function ProviderAssignmentModal({ enabled }: ProviderAssignmentModalProps) {
+export function ProviderAssignmentModal() {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [assignment, setAssignment] = useState<OrderAssignment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,9 +33,10 @@ export function ProviderAssignmentModal({ enabled }: ProviderAssignmentModalProp
   const order = assignment ? getOrderFromAssignment(assignment) : null;
   const customer = order ? getCustomer(order) : null;
   const isExpired = countdown === 'Hết hạn';
+  const enabled = isAuthenticated && user?.role === 'PROVIDER' && Boolean(token);
 
   const loadPendingAssignment = useCallback(async () => {
-    if (!enabled || busy) return;
+    if (!enabled) return;
 
     try {
       const assignments = await providerOrderApi.getPendingAssignments();
@@ -42,7 +50,7 @@ export function ProviderAssignmentModal({ enabled }: ProviderAssignmentModalProp
     } catch {
       setAssignment(null);
     }
-  }, [busy, enabled]);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) {
@@ -51,12 +59,45 @@ export function ProviderAssignmentModal({ enabled }: ProviderAssignmentModalProp
     }
 
     void Promise.resolve().then(loadPendingAssignment);
-    const poller = window.setInterval(() => {
-      void loadPendingAssignment();
-    }, 5000);
 
-    return () => window.clearInterval(poller);
-  }, [enabled, loadPendingAssignment]);
+    const socketToken = token || tokenStorage.get();
+    if (!socketToken) return undefined;
+    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
+      auth: { token: socketToken },
+    });
+
+    const handleNewAssignment = (payload: AssignmentRealtimePayload) => {
+      const nextAssignment = payload?.assignment;
+      if (
+        nextAssignment &&
+        nextAssignment.status === 'pending' &&
+        new Date(nextAssignment.responseDeadline).getTime() > Date.now()
+      ) {
+        setError(null);
+        setAssignment(nextAssignment);
+        return;
+      }
+
+      void loadPendingAssignment();
+    };
+    const handleClosedAssignment = (payload: { assignmentId?: string }) => {
+      setAssignment((current) =>
+        current?._id === payload.assignmentId ? null : current,
+      );
+      void loadPendingAssignment();
+    };
+
+    socket.on('assignment:new', handleNewAssignment);
+    socket.on('assignment:closed', handleClosedAssignment);
+    socket.on('connect', loadPendingAssignment);
+
+    return () => {
+      socket.off('assignment:new', handleNewAssignment);
+      socket.off('assignment:closed', handleClosedAssignment);
+      socket.off('connect', loadPendingAssignment);
+      socket.disconnect();
+    };
+  }, [enabled, loadPendingAssignment, token]);
 
   useEffect(() => {
     if (!assignment) {

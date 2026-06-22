@@ -1,20 +1,28 @@
 import { Types } from "mongoose";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
+import { Notification } from "../models/notification.model";
+import { Address } from "../models/address.model";
 import { Provider } from "../models/provider.model";
 import { MatchingService, ProviderCandidate } from "./matching.service";
 import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
+import { emitToUser } from "../sockets/socketServer";
+import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+/** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
+const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
 
-/** Seconds a provider has to accept before the next one is tried. */
-const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 30;
-
-/** Maximum number of providers to try before giving up. */
+/** Số lượt matching tối đa trước khi hủy đơn. */
 const DEFAULT_MAX_MATCHING_ATTEMPTS = 5;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+/** Tổng thời gian matching tối đa trước khi hủy đơn. */
+const DEFAULT_MAX_MATCHING_DURATION_SECONDS = 5 * 60;
+
+/** Chu kỳ quét để khôi phục timeout sau khi backend restart. */
+const MATCHING_TIMEOUT_SCAN_INTERVAL_MS = 10_000;
+
+let timeoutMonitor: NodeJS.Timeout | null = null;
 
 interface DispatchContext {
   latitude?: number;
@@ -24,18 +32,127 @@ interface DispatchContext {
   ward: string;
 }
 
-// ─── Service ──────────────────────────────────────────────────────────────────
+async function getMatchingConfig() {
+  const [
+    maxMatchingAttemptsValue,
+    matchingProviderTimeoutSecondsValue,
+    maxMatchingDurationSecondsValue,
+  ] = await Promise.all([
+    getNumberConfigValue(
+      "MAX_MATCHING_ATTEMPTS",
+      DEFAULT_MAX_MATCHING_ATTEMPTS,
+    ),
+    getNumberConfigValue(
+      "MATCHING_PROVIDER_TIMEOUT_SECONDS",
+      DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
+    ),
+    getNumberConfigValue(
+      "MAX_MATCHING_DURATION_SECONDS",
+      DEFAULT_MAX_MATCHING_DURATION_SECONDS,
+    ),
+  ]);
+
+  return {
+    maxMatchingAttempts: Math.max(Math.floor(maxMatchingAttemptsValue), 1),
+    matchingProviderTimeoutSeconds: Math.max(
+      matchingProviderTimeoutSecondsValue,
+      DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
+    ),
+    maxMatchingDurationSeconds: Math.max(
+      maxMatchingDurationSecondsValue,
+      1,
+    ),
+  };
+}
+
+async function cancelUnmatchedOrder(orderId: string, reason: string) {
+  const order = await Order.findOneAndUpdate(
+    { _id: orderId, status: "created" },
+    {
+      $set: {
+        status: "cancelled",
+        cancellation: {
+          cancelledByRole: "admin",
+          reason,
+          cancelledAt: new Date(),
+        },
+      },
+    },
+    { returnDocument: "after" },
+  );
+
+  if (!order) return false;
+
+  await OrderAssignment.updateMany(
+    { orderId: order._id, status: "pending" },
+    {
+      $set: {
+        status: "cancelled",
+        respondedAt: new Date(),
+      },
+    },
+  );
+
+  await Notification.create({
+    userId: order.customerId,
+    type: "ORDER",
+    title: "Đơn hàng đã được hủy",
+    content: `Đơn ${order.orderCode} đã được hủy vì hệ thống chưa tìm được provider nhận đơn trong thời gian quy định.`,
+    data: {
+      orderId: order._id.toString(),
+      orderCode: order.orderCode,
+      status: "cancelled",
+      reason,
+    },
+  });
+
+  return true;
+}
+
+async function getDispatchContext(
+  orderId: string,
+): Promise<DispatchContext | null> {
+  const order = await Order.findById(orderId).select("serviceId addressId");
+  if (!order) return null;
+
+  const address = await Address.findById(order.addressId).select(
+    "latitude longitude province ward",
+  );
+  if (!address) return null;
+
+  return {
+    latitude: address.latitude,
+    longitude: address.longitude,
+    serviceId: order.serviceId.toString(),
+    province: address.province,
+    ward: address.ward,
+  };
+}
+
+async function getTriedProviderState(orderId: Types.ObjectId | string) {
+  const triedAssignments = await OrderAssignment.find({
+    orderId,
+    status: { $in: ["rejected", "timeout"] },
+  })
+    .select("providerId")
+    .lean();
+
+  return {
+    triedProviderIds: [
+      ...new Map(
+        triedAssignments.map((item) => [
+          item.providerId.toString(),
+          item.providerId,
+        ]),
+      ).values(),
+    ],
+    attemptNumber: triedAssignments.length + 1,
+  };
+}
 
 export const DispatchService = {
   /**
-   * Step 3 – Dispatch order to nearest available provider.
-   *
-   * This is designed to run asynchronously (fire-and-forget from OrderService).
-   * It:
-   *  1. Finds nearest providers via MatchingService.
-   *  2. Creates an OrderAssignment record for the first candidate.
-   *  3. Schedules a 30-second timeout callback (Step 5) that auto-advances to
-   *     the next provider if the current one hasn't responded.
+   * Tìm provider phù hợp và lần lượt gửi assignment cho từng provider.
    */
   async dispatchOrder(
     orderId: string,
@@ -43,31 +160,36 @@ export const DispatchService = {
     triedProviderIds: Types.ObjectId[] = [],
     attemptNumber = 1,
   ): Promise<void> {
-    const maxMatchingAttempts = Math.max(
-      Math.floor(await getNumberConfigValue("MAX_MATCHING_ATTEMPTS", DEFAULT_MAX_MATCHING_ATTEMPTS)),
-      1,
+    const {
+      maxMatchingAttempts,
+      matchingProviderTimeoutSeconds,
+      maxMatchingDurationSeconds,
+    } = await getMatchingConfig();
+    const order = await Order.findById(orderId).select("status createdAt");
+    if (!order || order.status !== "created") return;
+
+    const matchingDeadline = new Date(
+      order.createdAt.getTime() + maxMatchingDurationSeconds * 1000,
     );
-    const matchingProviderTimeoutSeconds = Math.max(
-      await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS),
-      1,
-    );
+    if (matchingDeadline <= new Date()) {
+      await cancelUnmatchedOrder(
+        orderId,
+        "Không có provider nhận đơn trong vòng 5 phút.",
+      );
+      return;
+    }
 
     if (attemptNumber > maxMatchingAttempts) {
-      // All candidates exhausted – cancel the order
-      await Order.findByIdAndUpdate(orderId, {
-        status: "cancelled",
-        "cancellation.cancelledByRole": "admin",
-        "cancellation.reason":
-          "Không tìm được provider phù hợp sau nhiều lần thử.",
-        "cancellation.cancelledAt": new Date(),
-      });
+      await cancelUnmatchedOrder(
+        orderId,
+        `Không có provider nhận đơn sau ${maxMatchingAttempts} lượt matching.`,
+      );
       console.warn(
         `[DispatchService] No provider found for order ${orderId} after ${maxMatchingAttempts} attempts.`,
       );
       return;
     }
 
-    // 1. Find nearest providers (excluding already-tried ones)
     const candidates: ProviderCandidate[] =
       await MatchingService.findNearestProviders({
         latitude: ctx.latitude,
@@ -76,28 +198,43 @@ export const DispatchService = {
         province: ctx.province,
         ward: ctx.ward,
         excludeProviderIds: triedProviderIds,
-        limit: 1, // take only the best candidate per round
+        limit: 1,
       });
 
     if (candidates.length === 0) {
-      await Order.findByIdAndUpdate(orderId, {
-        status: "cancelled",
-        "cancellation.cancelledByRole": "admin",
-        "cancellation.reason": "Không có provider khả dụng trong khu vực.",
-        "cancellation.cancelledAt": new Date(),
-      });
       console.warn(
-        `[DispatchService] No available provider found for order ${orderId}.`,
+        `[DispatchService] No available provider found for order ${orderId}. Retrying until matching deadline.`,
       );
+
+      const retryDelayMs = Math.min(
+        matchingProviderTimeoutSeconds * 1000,
+        Math.max(matchingDeadline.getTime() - Date.now(), 1),
+      );
+      const retryTimer = setTimeout(() => {
+        DispatchService.dispatchOrder(
+          orderId,
+          ctx,
+          triedProviderIds,
+          attemptNumber,
+        ).catch((error: unknown) =>
+          console.error(
+            `[DispatchService] Retry failed for order ${orderId}:`,
+            error,
+          ),
+        );
+      }, retryDelayMs);
+      retryTimer.unref();
       return;
     }
 
     const candidate = candidates[0];
     const deadline = new Date(
-      Date.now() + matchingProviderTimeoutSeconds * 1000,
+      Math.min(
+        Date.now() + matchingProviderTimeoutSeconds * 1000,
+        matchingDeadline.getTime(),
+      ),
     );
 
-    // 2. Create assignment record
     const assignment = await OrderAssignment.create({
       orderId: new Types.ObjectId(orderId),
       providerId: candidate.providerId,
@@ -106,32 +243,42 @@ export const DispatchService = {
       responseDeadline: deadline,
     });
 
+    const realtimeAssignment = await getAssignmentRealtimePayload(
+      assignment._id.toString(),
+    );
+    emitToUser(candidate.userId.toString(), "assignment:new", {
+      assignmentId: assignment._id.toString(),
+      orderId,
+      responseDeadline: deadline,
+      assignment: realtimeAssignment,
+    });
+
     console.log(
       `[DispatchService] Order ${orderId} assigned to provider ${candidate.providerId} ` +
-      `(attempt #${attemptNumber}, dist: ${candidate.distanceMeters}m). ` +
-      `Deadline: ${deadline.toISOString()}`,
+        `(attempt #${attemptNumber}, dist: ${candidate.distanceMeters}m). ` +
+        `Deadline: ${deadline.toISOString()}`,
     );
 
-    // 3. TODO: emit real-time push / socket event to provider here
-
-    // 4. Schedule timeout retry (Step 5)
-    setTimeout(async () => {
-      await DispatchService._onAssignmentTimeout(
+    const assignmentTimer = setTimeout(() => {
+      DispatchService._onAssignmentTimeout(
         orderId,
         assignment._id.toString(),
         candidate.providerId,
         ctx,
         triedProviderIds,
         attemptNumber,
+      ).catch((error: unknown) =>
+        console.error(
+          `[DispatchService] Timeout handling failed for assignment ${assignment._id}:`,
+          error,
+        ),
       );
-    }, matchingProviderTimeoutSeconds * 1000);
+    }, Math.max(deadline.getTime() - Date.now(), 1));
+    assignmentTimer.unref();
   },
 
   /**
-   * Step 5 – Timeout retry matching.
-   *
-   * Called automatically after ASSIGNMENT_TIMEOUT_SECONDS if the provider
-   * hasn't accepted or rejected yet.
+   * Đánh dấu assignment timeout và chuyển sang provider chưa được thử.
    */
   async _onAssignmentTimeout(
     orderId: string,
@@ -141,43 +288,156 @@ export const DispatchService = {
     triedProviderIds: Types.ObjectId[],
     attemptNumber: number,
   ): Promise<void> {
-    // Re-read assignment to check if it was already responded to
-    const assignment = await OrderAssignment.findById(assignmentId);
-    if (!assignment || assignment.status !== "pending") {
-      // Provider already accepted or rejected – nothing to do
-      return;
+    const assignment = await OrderAssignment.findOneAndUpdate(
+      { _id: assignmentId, status: "pending" },
+      {
+        $set: {
+          status: "timeout",
+          respondedAt: new Date(),
+        },
+      },
+      { returnDocument: "after" },
+    );
+    if (!assignment) return;
+
+    const provider = await Provider.findById(timedOutProviderId)
+      .select("userId")
+      .lean();
+    if (provider) {
+      emitToUser(provider.userId.toString(), "assignment:closed", {
+        assignmentId,
+        reason: "timeout",
+      });
     }
 
-    // Mark as timed out
-    assignment.status = "timeout";
-    await assignment.save();
     console.log(
       `[DispatchService] Assignment ${assignmentId} timed out. Retrying next provider...`,
     );
 
-    // Re-check order status
     const order = await Order.findById(orderId);
-    if (!order || order.status !== "created") {
-      return; // Order was already handled (e.g. customer cancelled)
-    }
+    if (!order || order.status !== "created") return;
 
-    // Recurse with this provider excluded
+    const triedState = await getTriedProviderState(assignment.orderId);
+
     await DispatchService.dispatchOrder(
       orderId,
       ctx,
-      [...triedProviderIds, timedOutProviderId],
-      attemptNumber + 1,
+      triedState.triedProviderIds,
+      triedState.attemptNumber,
     );
   },
 
   /**
-   * Re-dispatch an already existing order manually (admin / retry endpoint).
+   * Khôi phục timeout bị bỏ lỡ khi process restart và hủy đơn quá thời hạn.
+   */
+  startTimeoutMonitor(): void {
+    if (timeoutMonitor) return;
+
+    const scan = async (recoverStalledOrders = false) => {
+      const { maxMatchingDurationSeconds } = await getMatchingConfig();
+      const now = new Date();
+      const expiredAssignments = await OrderAssignment.find({
+        status: "pending",
+        responseDeadline: { $lte: now },
+      })
+        .sort({ responseDeadline: 1 })
+        .limit(100)
+        .lean();
+
+      for (const assignment of expiredAssignments) {
+        const ctx = await getDispatchContext(assignment.orderId.toString());
+        if (!ctx) continue;
+
+        const triedAssignments = await OrderAssignment.find({
+          orderId: assignment.orderId,
+          _id: { $ne: assignment._id },
+          status: { $in: ["rejected", "timeout"] },
+        })
+          .select("providerId")
+          .lean();
+
+        await DispatchService._onAssignmentTimeout(
+          assignment.orderId.toString(),
+          assignment._id.toString(),
+          assignment.providerId,
+          ctx,
+          triedAssignments.map((item) => item.providerId),
+          triedAssignments.length + 1,
+        );
+      }
+
+      const expiredOrders = await Order.find({
+        status: "created",
+        createdAt: {
+          $lte: new Date(
+            now.getTime() - maxMatchingDurationSeconds * 1000,
+          ),
+        },
+      })
+        .select("_id")
+        .limit(100)
+        .lean();
+
+      for (const order of expiredOrders) {
+        await cancelUnmatchedOrder(
+          order._id.toString(),
+          "Không có provider nhận đơn trong vòng 5 phút.",
+        );
+      }
+
+      if (recoverStalledOrders) {
+        const activeOrders = await Order.find({
+          status: "created",
+          createdAt: {
+            $gt: new Date(
+              now.getTime() - maxMatchingDurationSeconds * 1000,
+            ),
+          },
+        })
+          .select("_id")
+          .limit(100)
+          .lean();
+
+        for (const order of activeOrders) {
+          const hasPendingAssignment = await OrderAssignment.exists({
+            orderId: order._id,
+            status: "pending",
+          });
+          if (hasPendingAssignment) continue;
+
+          const ctx = await getDispatchContext(order._id.toString());
+          if (!ctx) continue;
+
+          const triedState = await getTriedProviderState(order._id);
+          console.log(
+            `[DispatchService] Khôi phục matching cho đơn ${order._id} từ lượt ${triedState.attemptNumber}.`,
+          );
+          await DispatchService.dispatchOrder(
+            order._id.toString(),
+            ctx,
+            triedState.triedProviderIds,
+            triedState.attemptNumber,
+          );
+        }
+      }
+    };
+
+    scan(true).catch((error: unknown) =>
+      console.error("[DispatchService] Initial timeout scan failed:", error),
+    );
+    timeoutMonitor = setInterval(() => {
+      scan().catch((error: unknown) =>
+        console.error("[DispatchService] Timeout scan failed:", error),
+      );
+    }, MATCHING_TIMEOUT_SCAN_INTERVAL_MS);
+    timeoutMonitor.unref();
+  },
+
+  /**
+   * Chạy lại matching thủ công cho đơn đang ở trạng thái created.
    */
   async redispatch(orderId: string): Promise<void> {
-    const order = await Order.findById(orderId).populate(
-      "serviceId",
-      "categoryId",
-    );
+    const order = await Order.findById(orderId);
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
     if (order.status !== "created") {
       throw new AppError(
@@ -186,20 +446,20 @@ export const DispatchService = {
       );
     }
 
-    const address = await (
-      await import("../models/address.model.js")
-    ).Address.findById(order.addressId);
+    const address = await Address.findById(order.addressId);
+    const triedState = await getTriedProviderState(order._id);
 
-    const service = await (
-      await import("../models/service.model.js")
-    ).Service.findById(order.serviceId);
-
-    await DispatchService.dispatchOrder(order._id.toString(), {
-      latitude: address?.latitude,
-      longitude: address?.longitude,
-      serviceId: service?._id?.toString() || order.serviceId.toString(),
-      province: address?.province || "",
-      ward: address?.ward || "",
-    });
+    await DispatchService.dispatchOrder(
+      order._id.toString(),
+      {
+        latitude: address?.latitude,
+        longitude: address?.longitude,
+        serviceId: order.serviceId.toString(),
+        province: address?.province || "",
+        ward: address?.ward || "",
+      },
+      triedState.triedProviderIds,
+      triedState.attemptNumber,
+    );
   },
 };

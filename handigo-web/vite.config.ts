@@ -5,10 +5,10 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 import path from 'path'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
-    basicSsl(),
+    ...(command === 'serve' ? [basicSsl()] : []),
     checker({
       typescript: true,
       eslint: {
@@ -25,4 +25,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
+}))

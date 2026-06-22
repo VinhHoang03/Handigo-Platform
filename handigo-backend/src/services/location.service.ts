@@ -29,6 +29,11 @@ export const updateCurrentLocation = async (
       isActive: true,
       lastUpdatedAt: new Date(),
     },
-    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
+    {
+      returnDocument: "after",
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true,
+    },
   ).lean();
 };

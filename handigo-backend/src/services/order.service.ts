@@ -9,7 +9,8 @@ import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import { DispatchService } from "./dispatch.service";
 import { getNumberConfigValue } from "./systemConfig.service";
-import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
+import { emitToUser } from "../sockets/socketServer";
+import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ async function validatePreferredProvider(
     serviceIds: serviceId,
     verified: true,
     isDeleted: false,
-  }).select("_id availabilityStatus");
+  }).select("_id userId availabilityStatus");
 
   if (!provider) {
     throw new AppError(
@@ -116,23 +117,6 @@ export const OrderService = {
     });
     if (!address) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
-    }
-
-    const providersForService = await Provider.find({
-      serviceIds: service._id,
-      verified: true,
-      isDeleted: false,
-    })
-      .select("workingAreas")
-      .lean();
-    const hasProviderInArea = providersForService.some((provider) =>
-      isAddressInProviderWorkingAreas(provider.workingAreas, address),
-    );
-    if (!hasProviderInArea) {
-      throw new AppError(
-        "Hiện chưa có Provider phục vụ dịch vụ này tại địa chỉ đã chọn.",
-        422,
-      );
     }
 
     // 3. Validate & snapshot selected options
@@ -222,8 +206,8 @@ export const OrderService = {
     // 7. Trigger async dispatch (non-blocking – failures are logged, not thrown)
     if (preferredProvider) {
       const matchingProviderTimeoutSeconds = Math.max(
-        await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", 30),
-        1,
+        await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", 60),
+        60,
       );
       const assignment = await OrderAssignment.create({
         orderId: order._id,
@@ -234,8 +218,17 @@ export const OrderService = {
           Date.now() + matchingProviderTimeoutSeconds * 1000,
         ),
       });
-      setTimeout(async () => {
-        await DispatchService._onAssignmentTimeout(
+      const realtimeAssignment = await getAssignmentRealtimePayload(
+        assignment._id.toString(),
+      );
+      emitToUser(preferredProvider.userId.toString(), "assignment:new", {
+        assignmentId: assignment._id.toString(),
+        orderId: order._id.toString(),
+        responseDeadline: assignment.responseDeadline,
+        assignment: realtimeAssignment,
+      });
+      const assignmentTimer = setTimeout(() => {
+        DispatchService._onAssignmentTimeout(
           order._id.toString(),
           assignment._id.toString(),
           preferredProvider._id as Types.ObjectId,
@@ -248,8 +241,14 @@ export const OrderService = {
           },
           [],
           1,
+        ).catch((error: unknown) =>
+          console.error(
+            `[OrderService] Timeout handling failed for assignment ${assignment._id}:`,
+            error,
+          ),
         );
       }, matchingProviderTimeoutSeconds * 1000);
+      assignmentTimer.unref();
     } else {
       DispatchService.dispatchOrder(order._id.toString(), {
         latitude: address.latitude,
