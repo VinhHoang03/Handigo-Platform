@@ -1,5 +1,6 @@
 import api from "@/api/client";
 import type { UserAddress, UserAddressPayload } from "../types/profile.types";
+import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutocomplete";
 
 interface BackendAddress {
   _id?: string;
@@ -53,7 +54,28 @@ export const getUserAddresses = async (): Promise<UserAddress[]> => {
   const response = await api.get<{ success: boolean; data: BackendAddress[] }>(
     "/addresses",
   );
-  return response.data.data.map(mapAddress);
+  const addresses = await Promise.all(
+    response.data.data.map(async (address) => {
+      if (
+        Number.isFinite(address.latitude) &&
+        Number.isFinite(address.longitude)
+      ) {
+        return address;
+      }
+
+      try {
+        const coordinates = await geocodeSavedAddress(address.fullAddress);
+        const id = address.id || address._id;
+        if (id) {
+          await api.put(`/addresses/${id}`, coordinates);
+        }
+        return { ...address, ...coordinates };
+      } catch {
+        return address;
+      }
+    }),
+  );
+  return addresses.map(mapAddress);
 };
 
 export const createUserAddress = async (

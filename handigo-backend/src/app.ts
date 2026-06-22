@@ -34,6 +34,7 @@ import adminAssetRoutes from "./routes/adminAsset.routes";
 import serviceSuggestionRoutes from "./routes/serviceSuggestion.routes";
 import searchRoutes from "./routes/search.routes";
 import ocrRoutes from "./modules/ocr/ocr.routes";
+import { isAllowedOrigin } from "./configs/cors";
 // import providerRequestRoutes from "./routes/providerRequest.routes";
 // import serviceRoutes from "./routes/service.routes";
 // import feedbackRoutes from "./routes/feedback.routes";
@@ -44,17 +45,16 @@ import ocrRoutes from "./modules/ocr/ocr.routes";
 
 const app: Application = express();
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://localhost:5173",
-  "http://localhost:8081",
-  "http://localhost:19006",
-  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
-];
+app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: process.env.NODE_ENV === "production" ? allowedOrigins : true,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Nguồn truy cập không được phép."));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -64,6 +64,14 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Fix COOP to allow Google OAuth popup
 app.use((req, res, next) => {

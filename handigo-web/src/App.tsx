@@ -37,6 +37,7 @@ import { RouteGuard } from "./components/common/RouteGuard";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { HomeRoute } from "./components/auth/HomeRoute";
 import { ProfileRoute } from "./components/auth/ProfileRoute";
+import { ProviderAssignmentModal } from "./features/provider/components/ProviderAssignmentModal";
 import NotFoundPage from "./pages/NotFoundPage";
 import "./App.css";
 
@@ -290,6 +291,7 @@ function App() {
           />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        <ProviderAssignmentModal />
       </AuthBootstrap>
     </Router>
   );

@@ -3,7 +3,9 @@ import jwt from "jsonwebtoken";
 import { Server, Socket } from "socket.io";
 import User from "../models/user.model";
 import * as chatService from "../services/chat.service";
+import * as orderTrackingService from "../services/orderTracking.service";
 import { setSocketServer } from "./socketServer";
+import { isAllowedOrigin } from "../configs/cors";
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -28,7 +30,12 @@ type AuthedSocket = Socket & {
 export const initSocket = (server: HttpServer) => {
   const io = new Server(server, {
     cors: {
-      origin: process.env.NODE_ENV === "production" ? undefined : true,
+      origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error("Nguồn kết nối socket không được phép."));
+      },
       credentials: true,
     },
   });
@@ -101,6 +108,40 @@ export const initSocket = (server: HttpServer) => {
         );
         io.to(`conversation:${payload.conversationId}`).emit("message:seen", result);
         callback?.({ success: true, data: result });
+      } catch (error: any) {
+        callback?.({ success: false, message: error.message });
+      }
+    });
+
+    socket.on("order:tracking:join", async (payload, callback) => {
+      try {
+        const orderId = String(payload?.orderId || "");
+        const trackingState = await orderTrackingService.getOrderTrackingState(
+          orderId,
+          socket.user!.id,
+          socket.user!.role as "CUSTOMER" | "PROVIDER",
+        );
+        socket.join(`order:${orderId}`);
+        callback?.({ success: true, data: trackingState });
+      } catch (error: any) {
+        callback?.({ success: false, message: error.message });
+      }
+    });
+
+    socket.on("order:location:update", async (payload, callback) => {
+      try {
+        const orderId = String(payload?.orderId || "");
+        const location = await orderTrackingService.updateOrderTrackingLocation(
+          orderId,
+          socket.user!.id,
+          socket.user!.role as "CUSTOMER" | "PROVIDER",
+          {
+            latitude: Number(payload?.latitude),
+            longitude: Number(payload?.longitude),
+          },
+        );
+        io.to(`order:${orderId}`).emit("order:location", location);
+        callback?.({ success: true, data: location });
       } catch (error: any) {
         callback?.({ success: false, message: error.message });
       }

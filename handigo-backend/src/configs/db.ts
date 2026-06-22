@@ -1,10 +1,4 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const MONGO_URI = process.env.MONGO_URI!;
-
 const dropLegacyIndex = async (
   collectionName: string,
   indexName: string,
@@ -21,16 +15,17 @@ const dropLegacyIndex = async (
 
 export const connectDB = async (): Promise<void> => {
   try {
-    if (!MONGO_URI) {
-      throw new Error("MONGO_URI is not defined in .env file");
+    const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error("Chưa cấu hình MONGO_URI hoặc MONGODB_URI.");
     }
 
-    await mongoose.connect(MONGO_URI);
-    console.log("MongoDB connected successfully!");
+    await mongoose.connect(mongoUri);
+    console.log("Đã kết nối MongoDB.");
 
     await dropLegacyIndex("sessions", "refreshToken_1");
   } catch (error) {
-    console.error("MongoDB connection failed:", error);
+    console.error("Kết nối MongoDB thất bại:", error);
     process.exit(1);
   }
 
