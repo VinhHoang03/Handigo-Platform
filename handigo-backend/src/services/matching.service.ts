@@ -102,6 +102,7 @@ export const MatchingService = {
           serviceIds: serviceObjectId,
           availabilityStatus: "online",
           verified: true,
+          isDeleted: false,
           ...(excludeIds.length > 0 && {
             _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
           }),
@@ -111,7 +112,11 @@ export const MatchingService = {
 
         const providersInArea = providers
           .filter((provider) =>
-            isAddressInProviderWorkingAreas(provider.workingAreas, { province, ward }),
+            isAddressInProviderWorkingAreas(
+              provider.workingAreas,
+              { province, ward },
+              provider.serviceArea,
+            ),
           )
           .slice(0, limit);
 
@@ -154,6 +159,7 @@ export const MatchingService = {
       serviceIds: serviceObjectId,
       availabilityStatus: "online",
       verified: true,
+      isDeleted: false,
       ...(excludeIds.length > 0 && {
         _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
       }),
@@ -162,10 +168,36 @@ export const MatchingService = {
       .limit(limit * 5)
       .lean();
 
-    return providers
-      .filter((provider) =>
-        isAddressInProviderWorkingAreas(provider.workingAreas, { province, ward }),
-      )
+    const providersInArea = providers.filter((provider) =>
+        isAddressInProviderWorkingAreas(
+          provider.workingAreas,
+          { province, ward },
+          provider.serviceArea,
+        ),
+      );
+
+    if (providers.length === 0) {
+      console.warn(
+        `[MatchingService] Không có provider hợp lệ cho service ${serviceId}: ` +
+          `cần verified=true, availabilityStatus=online, isDeleted=false và chưa được thử. ` +
+          `Số provider đã loại: ${excludeIds.length}.`,
+      );
+    } else if (providersInArea.length === 0) {
+      console.warn(
+        `[MatchingService] Có ${providers.length} provider đúng dịch vụ và đang online nhưng ` +
+          `workingAreas không khớp "${ward}, ${province}".`,
+      );
+      console.warn(
+        "[MatchingService] Khu vực của các provider bị loại:",
+        providers.map((provider) => ({
+          providerId: provider._id.toString(),
+          workingAreas: provider.workingAreas,
+          serviceArea: provider.serviceArea,
+        })),
+      );
+    }
+
+    return providersInArea
       .slice(0, limit)
       .map((p) => ({
       providerId: p._id as Types.ObjectId,

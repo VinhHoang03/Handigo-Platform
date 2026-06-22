@@ -7,7 +7,6 @@ import {
   roleSwitchConfig,
   type DashboardRole,
 } from "@/config/sidebarNavigation";
-import { ProviderAssignmentModal } from "@/features/provider/components/ProviderAssignmentModal";
 
 interface DashboardShellProps {
   role: DashboardRole;
@@ -80,9 +79,6 @@ export function DashboardShell({
       hideSidebar={role === "CUSTOMER" || hideSidebar}
     >
       {children}
-      {role === "PROVIDER" && (
-        <ProviderAssignmentModal enabled={Boolean(isOnline)} />
-      )}
     </DashboardLayout>
   );
 }

@@ -11,9 +11,21 @@ const normalizeAreaPart = (value?: string) =>
 export const isAddressInProviderWorkingAreas = (
   workingAreas: string[] | undefined,
   address: { ward?: string; province?: string },
+  legacyServiceArea?: { ward?: string; province?: string },
 ) => {
-  if (!workingAreas?.length || !address.ward || !address.province) return false;
+  if (!address.ward || !address.province) return false;
+
+  const legacyArea = [legacyServiceArea?.ward, legacyServiceArea?.province]
+    .filter(Boolean)
+    .join(", ");
+  const areas =
+    workingAreas?.length
+      ? workingAreas
+      : legacyArea
+        ? [legacyArea]
+        : [];
+  if (areas.length === 0) return false;
 
   const expectedArea = normalizeAreaPart(`${address.ward}, ${address.province}`);
-  return workingAreas.some((area) => normalizeAreaPart(area) === expectedArea);
+  return areas.some((area) => normalizeAreaPart(area) === expectedArea);
 };

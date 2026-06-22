@@ -22,6 +22,7 @@ import { ReliableImage } from '@/components/common/ReliableImage';
 import { Modal } from '@/components/common/Modal';
 import { normalizeImageUrl } from '@/utils/imageUrl';
 import { ProviderOrderFeedbackThread } from '../components/ProviderOrderFeedbackThread';
+import { OrderTrackingMap } from '@/features/tracking/components/OrderTrackingMap';
 
 export default function ProviderOrderDetailPage() {
   const { orderId } = useParams();
@@ -281,6 +282,8 @@ export default function ProviderOrderDetailPage() {
           />
           <OrderProgressCard order={order} />
         </div>
+
+        <OrderTrackingMap order={order} viewerRole="PROVIDER" />
 
         <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-2">
             {order.inspectionRequired ? (

@@ -3,7 +3,14 @@ import { PDFDocument } from "pdf-lib";
 import { OcrDocumentKind, OcrResult, OcrSuggestion } from "./ocr.types";
 
 // Vision client tự tìm thông tin xác thực theo chuỗi Application Default Credentials.
-const client = new vision.ImageAnnotatorClient();
+let visionClient: InstanceType<typeof vision.ImageAnnotatorClient> | null = null;
+
+const getVisionClient = () => {
+  if (!visionClient) {
+    visionClient = new vision.ImageAnnotatorClient();
+  }
+  return visionClient;
+};
 
 const removeDiacritics = (value: string) =>
   value
@@ -115,6 +122,7 @@ export const extractText = async (
   buffer: Buffer,
   mimeType: string,
 ): Promise<OcrResult> => {
+  const client = getVisionClient();
   let annotationResponses: any[];
 
   if (mimeType === "application/pdf") {

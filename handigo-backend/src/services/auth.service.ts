@@ -15,7 +15,11 @@ import {
   signRefreshToken,
 } from "../utils/token";
 import { AppError } from "../utils/appError";
-import { getVietnamesePhoneLookupValues } from "../utils/profileValidation";
+import {
+  getVietnamesePhoneLookupValues,
+  isValidPersonName,
+  normalizeExternalPersonName,
+} from "../utils/profileValidation";
 
 const SALT_ROUNDS = 10;
 
@@ -399,7 +403,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
     authenticatedUser = await User.create({
       email: normalizedEmail,
       googleId,
-      fullName: name || normalizedEmail.split("@")[0],
+      fullName: normalizeExternalPersonName(name),
       passwordHash,
       avatar: picture,
       role: "CUSTOMER",
@@ -409,6 +413,11 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
   } else {
     authenticatedUser.googleId = googleId;
     authenticatedUser.isEmailVerified = true;
+    if (!isValidPersonName(authenticatedUser.fullName)) {
+      authenticatedUser.fullName = normalizeExternalPersonName(
+        authenticatedUser.fullName || name,
+      );
+    }
     if (picture) {
       authenticatedUser.avatar = picture;
     }
@@ -485,16 +494,28 @@ export const facebookLogin = async (accessToken: string) => {
 
     authenticatedUser = await User.create({
       email,
-      fullName: name || email.split("@")[0],
+      fullName: normalizeExternalPersonName(name),
       passwordHash,
       avatar: picture?.data?.url ?? null,
       role: "CUSTOMER",
       status: "active",
       isEmailVerified: true,
     });
-  } else if (!authenticatedUser.isEmailVerified) {
-    authenticatedUser.isEmailVerified = true;
-    await authenticatedUser.save();
+  } else {
+    let shouldSave = false;
+    if (!authenticatedUser.isEmailVerified) {
+      authenticatedUser.isEmailVerified = true;
+      shouldSave = true;
+    }
+    if (!isValidPersonName(authenticatedUser.fullName)) {
+      authenticatedUser.fullName = normalizeExternalPersonName(
+        authenticatedUser.fullName || name,
+      );
+      shouldSave = true;
+    }
+    if (shouldSave) {
+      await authenticatedUser.save();
+    }
   }
 
   const tokens = await issueSessionTokens(authenticatedUser);

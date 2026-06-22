@@ -10,6 +10,7 @@ import type {
   CreatePaymentResult,
   Payment,
 } from "../types/booking";
+import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutocomplete";
 
 export interface CreateOrderPayload {
   serviceId: string;
@@ -65,7 +66,26 @@ export const bookingApi = {
     const response = await api.get<{ success: boolean; data: Address[] }>(
       "/addresses",
     );
-    return response.data.data;
+    const addresses = response.data.data;
+    const normalized = await Promise.all(
+      addresses.map(async (address) => {
+        if (
+          Number.isFinite(address.latitude) &&
+          Number.isFinite(address.longitude)
+        ) {
+          return address;
+        }
+
+        try {
+          const coordinates = await geocodeSavedAddress(address.fullAddress || "");
+          await api.put(`/addresses/${address._id}`, coordinates);
+          return { ...address, ...coordinates };
+        } catch {
+          return address;
+        }
+      }),
+    );
+    return normalized;
   },
   uploadOrderAttachment: async (file: File) => {
     const formData = new FormData();

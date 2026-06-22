@@ -8,6 +8,7 @@ import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AppError } from "../utils/appError";
 import { Address } from "../models/address.model";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
+import { emitToUser } from "../sockets/socketServer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +84,11 @@ export const AssignmentService = {
       : null;
     if (
       !assignedAddress ||
-      !isAddressInProviderWorkingAreas(provider.workingAreas, assignedAddress)
+      !isAddressInProviderWorkingAreas(
+        provider.workingAreas,
+        assignedAddress,
+        provider.serviceArea,
+      )
     ) {
       throw new AppError(
         "Địa chỉ thực hiện không thuộc khu vực phục vụ đã đăng ký của bạn.",
@@ -121,6 +126,11 @@ export const AssignmentService = {
       },
       { status: "cancelled" },
     );
+
+    emitToUser(providerUserId, "assignment:closed", {
+      assignmentId: assignment._id.toString(),
+      reason: "accepted",
+    });
 
     return {
       assignment: assignment as any,
@@ -162,6 +172,11 @@ export const AssignmentService = {
     assignment.rejectReason = rejectReason ?? null;
     assignment.respondedAt = new Date();
     await assignment.save();
+
+    emitToUser(providerUserId, "assignment:closed", {
+      assignmentId: assignment._id.toString(),
+      reason: "rejected",
+    });
 
     // 4. Re-dispatch to next provider (import lazily to avoid circular dep)
     const order = await Order.findById(assignment.orderId);
