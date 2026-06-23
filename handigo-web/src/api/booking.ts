@@ -43,6 +43,7 @@ export const bookingApi = {
     );
     return response.data.data;
   },
+
   getServices: async (categoryId: string) => {
     const response = await api.get<{
       success: boolean;
@@ -50,18 +51,21 @@ export const bookingApi = {
     }>(`/services?categoryId=${categoryId}&isActive=true`);
     return response.data.data.items;
   },
+
   getServiceById: async (serviceId: string) => {
     const response = await api.get<{ success: boolean; data: Service }>(
       `/services/${serviceId}`,
     );
     return response.data.data;
   },
+
   getOptions: async (serviceId: string) => {
     const response = await api.get<{ success: boolean; data: ServiceOption[] }>(
       `/services/${serviceId}/options`,
     );
     return response.data.data;
   },
+
   getAddresses: async () => {
     const response = await api.get<{ success: boolean; data: Address[] }>(
       "/addresses",
@@ -77,7 +81,9 @@ export const bookingApi = {
         }
 
         try {
-          const coordinates = await geocodeSavedAddress(address.fullAddress || "");
+          const coordinates = await geocodeSavedAddress(
+            address.fullAddress || "",
+          );
           await api.put(`/addresses/${address._id}`, coordinates);
           return { ...address, ...coordinates };
         } catch {
@@ -87,6 +93,12 @@ export const bookingApi = {
     );
     return normalized;
   },
+
+  createAddress: async (payload: CreateAddressPayload) => {
+    const response = await api.post<{ success: boolean; data: Address }>('/addresses', payload);
+    return response.data.data;
+  },
+
   uploadOrderAttachment: async (file: File) => {
     const formData = new FormData();
     formData.append("image", file);
@@ -98,6 +110,7 @@ export const bookingApi = {
     });
     return response.data.data.url;
   },
+
   createOrder: async (payload: CreateOrderPayload) => {
     const response = await api.post<{ success: boolean; data: Order }>(
       "/orders",
@@ -105,6 +118,7 @@ export const bookingApi = {
     );
     return response.data.data;
   },
+
   createPayment: async (payload: {
     orderId: string;
     method: "PAYOS" | "CASH";
@@ -118,12 +132,14 @@ export const bookingApi = {
     }>("/payments/create", payload);
     return response.data.data;
   },
+
   getPaymentById: async (paymentId: string) => {
     const response = await api.get<{ success: boolean; data: Payment }>(
       `/payments/${paymentId}`,
     );
     return response.data.data;
   },
+
   getMyOrders: async (
     page = 1,
     limit = 10,
@@ -139,6 +155,7 @@ export const bookingApi = {
     }>(url);
     return response.data.data;
   },
+
   getProviderRecentOrders: async (limit = 5) => {
     const response = await api.get<{
       success: boolean;
@@ -146,12 +163,14 @@ export const bookingApi = {
     }>(`/orders/provider/recent?limit=${limit}`);
     return response.data.data.items;
   },
+
   getOrderById: async (orderId: string) => {
     const response = await api.get<{ success: boolean; data: Order }>(
       `/orders/${orderId}`,
     );
     return response.data.data;
   },
+
   cancelOrder: async (orderId: string, reason: string) => {
     const response = await api.patch<{ success: boolean; data: Order }>(
       `/orders/${orderId}/cancel`,
@@ -159,6 +178,7 @@ export const bookingApi = {
     );
     return response.data.data;
   },
+
   getQuotation: async (orderId: string) => {
     const response = await api.get<{
       success: boolean;
@@ -172,6 +192,7 @@ export const bookingApi = {
     );
     return response.data.data;
   },
+  
   rejectQuotation: async (quotationId: string, reason?: string) => {
     const response = await api.post<{ success: boolean; data: OrderQuotation }>(
       `/orders/quotations/${quotationId}/reject`,
