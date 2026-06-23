@@ -114,7 +114,7 @@ export const StatItem = ({ val, label }: { val: string; label: string }) => (
 );
 
 interface TestimonialCardProps {
-  quote: string;
+  quote?: string;
   name: string;
   loc: string;
   img: string;
@@ -123,19 +123,20 @@ interface TestimonialCardProps {
   service?: string;
   performedAt?: string;
   providerReply?: string;
+  hideAuthor?: boolean;
 }
 
-export const TestimonialCard = ({ quote, name, loc, img, hasQuoteIcon, rating = 5, service, performedAt, providerReply }: TestimonialCardProps) => (
+export const TestimonialCard = ({ quote, name, loc, img, hasQuoteIcon, rating = 5, service, performedAt, providerReply, hideAuthor }: TestimonialCardProps) => (
   <div className="glass-card relative rounded-3xl border border-outline-variant/30 p-8 shadow-lg">
     {hasQuoteIcon && <div className="absolute -left-4 -top-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white"><MaterialIcon>format_quote</MaterialIcon></div>}
     <div className="mb-4 flex gap-1 text-tertiary">
       {[0, 1, 2, 3, 4].map((star) => <MaterialIcon key={star} className={`text-sm ${star < rating ? 'text-tertiary' : 'text-outline-variant'}`} filled={star < rating}>star</MaterialIcon>)}
     </div>
-    <p className="mb-6 font-body-md text-body-md italic text-on-surface-variant">&quot;{quote}&quot;</p>
+    {quote && <p className="mb-6 font-body-md text-body-md italic text-on-surface-variant">&quot;{quote}&quot;</p>}
     <div className="flex items-center gap-4">
-      <img alt={name} className="h-12 w-12 rounded-full object-cover" src={img} />
+      {!hideAuthor && <img alt={name} className="h-12 w-12 rounded-full object-cover" src={img} />}
       <div>
-        <h4 className="font-label-md text-label-md font-bold text-on-surface">{name}</h4>
+        {!hideAuthor && <h4 className="font-label-md text-label-md font-bold text-on-surface">{name}</h4>}
         <p className="font-label-sm text-label-sm text-on-surface-variant">{loc}</p>
         {(service || performedAt) && <p className="mt-1 text-xs text-on-surface-variant">{[service, performedAt].filter(Boolean).join(' · ')}</p>}
       </div>

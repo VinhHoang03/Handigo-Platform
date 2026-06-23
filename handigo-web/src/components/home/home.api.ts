@@ -15,7 +15,7 @@ export interface LatestFeedback {
   customerId: { fullName?: string; avatar?: string };
   serviceId: { name?: string };
   rating: number;
-  comment?: string;
+  comment?: string | null;
   providerReply?: { content: string } | null;
 }
 
@@ -37,7 +37,11 @@ export const homeApi = {
     api.put('/locations/me', { latitude, longitude }),
   latestFeedbacks: async () => {
     const response = await api.get<{ success: boolean; data: LatestFeedback[] }>('/feedback/latest');
-    return response.data.data;
+    return response.data.data.map((feedback) => ({
+      ...feedback,
+      customerId: feedback.customerId || { fullName: 'Khách hàng' },
+      serviceId: feedback.serviceId || { name: 'Dịch vụ tại nhà' },
+    }));
   },
   searchCatalog: async (query: string) => {
     const response = await api.get<{ success: boolean; data: CatalogSearchResult[] }>('/search', {

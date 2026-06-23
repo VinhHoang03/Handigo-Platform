@@ -34,10 +34,13 @@ const WAITING_PROVIDER_STATUSES: ProviderApplication["status"][] = [
 
 const getProviderBannerMode = (
   application: ProviderApplication | null,
-): "waiting" | "cta" =>
-  application && WAITING_PROVIDER_STATUSES.includes(application.status)
-    ? "waiting"
-    : "cta";
+): "rejected" | "waiting" | "cta" => {
+  if (application?.status === "rejected") return "rejected";
+  if (application && WAITING_PROVIDER_STATUSES.includes(application.status)) {
+    return "waiting";
+  }
+  return "cta";
+};
 
 function AccountActionRow({
   icon,
@@ -260,6 +263,33 @@ export default function CustomerProfilePage() {
       hideSidebar
     >
       <div className="mx-auto w-full max-w-7xl space-y-6">
+        {canRegisterProvider &&
+          !isProviderApplicationLoading &&
+          providerBannerMode === "rejected" &&
+          providerApplication && (
+            <section className="flex flex-col justify-between gap-4 rounded-xl border border-error/25 bg-error-container p-5 text-on-error-container md:flex-row md:items-center">
+              <div className="flex items-start gap-4">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-error/10 text-error">
+                  <span className="material-symbols-outlined text-2xl">
+                    warning
+                  </span>
+                </div>
+                <p className="text-sm font-semibold leading-6">
+                  Hồ sơ đăng ký Provider của bạn đã bị từ chối. Vui lòng xem chi tiết hồ sơ để biết lý do và thực hiện chỉnh sửa trước khi gửi lại.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(`/register-provider?applicationId=${providerApplication._id}`)
+                }
+                className="rounded-lg bg-error px-5 py-2.5 font-bold text-on-error shadow-sm transition hover:bg-error/90"
+              >
+                Xem hồ sơ
+              </button>
+            </section>
+          )}
+
         {canRegisterProvider &&
           !isProviderApplicationLoading &&
           providerBannerMode === "waiting" && (

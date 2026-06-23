@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Handigo - Chi tiết bài viết</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Hanken+Grotesk:wght@600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-effect {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .content-body h2 {
+            font-family: 'Hanken Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 40px;
+            margin-bottom: 16px;
+            color: #131b2e;
+        }
+        .content-body p {
+            margin-bottom: 24px;
+            line-height: 1.8;
+            color: #464555;
+        }
+        .content-body ul {
+            margin-bottom: 24px;
+            list-style-type: disc;
+            padding-left: 24px;
+        }
+        .content-body li {
+            margin-bottom: 12px;
+            color: #464555;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f2f3ff;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c7c4d8;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777587;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#faf8ff",
+                        "inverse-on-surface": "#eef0ff",
+                        "surface-tint": "#4d44e3",
+                        "secondary-fixed-dim": "#86d2e6",
+                        "on-surface": "#131b2e",
+                        "on-primary-container": "#b1afff",
+                        "tertiary-fixed": "#ffdbcc",
+                        "on-tertiary-container": "#ff9f72",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#592000",
+                        "outline": "#777587",
+                        "primary": "#1e00a9",
+                        "inverse-primary": "#c3c0ff",
+                        "on-tertiary-fixed": "#351000",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "on-secondary-fixed-variant": "#004e5c",
+                        "star-gold": "#facc15",
+                        "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+                        "surface-container-low": "#f2f3ff",
+                        "surface-variant": "#dae2fc",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "tertiary-container": "#7d3000",
+                        "surface-glass": "rgba(255, 255, 255, 0.7)",
+                        "surface-container": "#eaedff",
+                        "on-background": "#131b2e",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#dae2fc",
+                        "secondary-container": "#9ce8fd",
+                        "on-error-container": "#93000a",
+                        "on-primary-fixed": "#0f0069",
+                        "on-secondary-container": "#076a7c",
+                        "tertiary-fixed-dim": "#ffb694",
+                        "on-tertiary": "#ffffff",
+                        "surface-bright": "#faf8ff",
+                        "surface-dim": "#d2d9f4",
+                        "primary-container": "#3525cd",
+                        "inverse-surface": "#283044",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed": "#e2dfff",
+                        "error": "#ba1a1a",
+                        "secondary": "#00687a",
+                        "on-surface-variant": "#464555",
+                        "surface": "#faf8ff",
+                        "secondary-fixed": "#abedff",
+                        "outline-variant": "#c7c4d8",
+                        "surface-container-high": "#e1e7ff",
+                        "on-secondary-fixed": "#001f26",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "success-green": "#4ade80"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "base": "8px",
+                        "sm": "12px",
+                        "lg": "48px",
+                        "container-max": "1280px",
+                        "md": "24px",
+                        "gutter": "24px",
+                        "xl": "80px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-xl": ["Hanken Grotesk"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-xl": ["56px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-primary-container selection:text-white">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter h-16 max-w-container-max mx-auto backdrop-blur-md bg-surface-glass/70 shadow-lg">
+<div class="flex items-center gap-8">
+<span class="font-headline-md text-headline-md font-bold text-primary">Handigo</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Dịch vụ</a>
+<a class="font-body-md text-body-md text-primary border-b-2 border-primary pb-1" href="#">Tin tức</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Đơn hàng</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Trợ giúp</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary p-2 active:scale-95 transition-transform" data-icon="search">search</button>
+<button class="material-symbols-outlined text-primary p-2 active:scale-95 transition-transform" data-icon="notifications">notifications</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="account_circle">account_circle</span>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-xl px-4 md:px-gutter max-w-container-max mx-auto">
+<!-- Breadcrumb / Back Button -->
+<div class="mb-8 flex items-center gap-2">
+<button class="flex items-center gap-2 text-primary font-label-md transition-all hover:-translate-x-1 group">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+<span>Quay lại Tin tức</span>
+</button>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-xl">
+<!-- Article Content Column -->
+<article class="lg:col-span-8">
+<!-- Category & Title -->
+<div class="mb-6">
+<span class="inline-block px-3 py-1 rounded-full bg-primary-container text-white text-label-sm font-label-sm mb-4 uppercase tracking-wider">Mẹo vặt gia đình</span>
+<h1 class="font-headline-xl text-headline-lg-mobile md:text-headline-xl text-on-surface leading-tight">Bí quyết bảo dưỡng điều hòa tại nhà hiệu quả và tiết kiệm điện</h1>
+</div>
+<!-- Meta Info & Social Share -->
+<div class="flex flex-col md:flex-row md:items-center justify-between border-y border-outline-variant py-4 mb-8 gap-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-surface-dim">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a friendly Vietnamese home maintenance expert, smiling, against a clean white and blue studio background. The lighting is soft and professional, evoking trust and reliability in a high-end service context. The overall style is clean, modern, and aligned with a premium utility brand aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyP8BzwvqoNCwyGVGsLjg47RU0Vu_Jk___94eQkNqvLqgJ0R9-aVuycgRSvp7Jc0f3wMu92VBeeq-8lK5iKUlmXbimEF2FfZ1lnj7YriuBY8ioE3ULr3CUHTLLhzlGWFOA24VZNQ07xmqoFgAStEztYskcmowviH7PF15PQynyCDJWTn9v2KZOMlN-rCqNZEkmJzQy-4KWQGX_spwFeRlCOI86QvgW1LtWoAaGPRkAtB9Z7tYs7zOQeYAvR9HXqOeBhooKj27xdPA3"/>
+</div>
+<div>
+<p class="font-label-md text-on-surface">Nguyễn Minh Tuấn</p>
+<p class="text-label-sm text-on-surface-variant">Đăng ngày 15/10/2023 • 5 phút đọc</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-label-sm text-on-surface-variant">Chia sẻ:</span>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface-variant hover:bg-primary-container hover:text-white hover:border-primary-container transition-all">
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"></path></svg>
+</button>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface-variant hover:bg-primary-container hover:text-white hover:border-primary-container transition-all">
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.84 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"></path></svg>
+</button>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface-variant hover:bg-primary-container hover:text-white hover:border-primary-container transition-all">
+<span class="material-symbols-outlined" data-icon="link">link</span>
+</button>
+</div>
+</div>
+<!-- Cover Image -->
+<div class="relative w-full rounded-2xl overflow-hidden mb-12 shadow-xl aspect-video">
+<img class="w-full h-full object-cover" data-alt="A clean, high-angle shot of a modern white air conditioning unit being cleaned by a professional technician wearing a subtle Handigo-branded blue polo shirt. The setting is a minimalist, brightly lit urban apartment with soft natural light coming through sheer curtains. The aesthetic is crisp, professional, and emphasizes clean air and home comfort, using a palette of blues, whites, and soft grays." src="https://lh3.googleusercontent.com/aida-public/AB6AXuApTWKCLRA9GfoY3JJgnDQw4T4PThmhb4Jwm4k8EQ9xSWlxmy7k6VMNGlVM0HemUpcZeyUzt5PWCGG822byqENES4l8NSeA8qn3xy5bEtmTUeSzhfLfRilVzAXmtYKq_i8iM3yclOlds4hueR3PH1Y1HyyDbf62y7FzvZ11i_s6Nygyu1xIoQfMuNQP6GzfGmdsixjj36eQJl7UUedqEZrn4FEVmxE4N21fMfYuiLPS4KQgXO1Es2Klv87-9cFRTvJboXGMF8Zme7JP"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+</div>
+<!-- Main Text Content -->
+<div class="content-body text-body-lg font-body-lg">
+<p class="font-medium text-on-surface text-xl italic mb-8">
+                        Việc bảo dưỡng điều hòa định kỳ không chỉ giúp kéo dài tuổi thọ thiết bị mà còn tiết kiệm đáng kể chi phí điện năng hàng tháng. Dưới đây là những bước đơn giản bạn có thể tự thực hiện tại nhà.
+                    </p>
+<p>
+                        Điều hòa là thiết bị không thể thiếu trong mỗi gia đình hiện đại, đặc biệt là vào mùa hè oi bức. Tuy nhiên, nhiều người dùng thường bỏ qua việc vệ sinh, dẫn đến tình trạng máy chạy yếu, tiêu tốn nhiều điện năng hoặc phát sinh mùi hôi khó chịu.
+                    </p>
+<h2>Tại sao cần vệ sinh điều hòa thường xuyên?</h2>
+<p>
+                        Sau một thời gian sử dụng, các màng lọc không khí bên trong dàn lạnh sẽ bị bám đầy bụi bẩn. Điều này không chỉ cản trở luồng gió lạnh tỏa ra mà còn là nơi trú ngụ lý tưởng của vi khuẩn và nấm mốc, gây ảnh hưởng trực tiếp đến sức khỏe hô hấp của cả gia đình.
+                    </p>
+<ul>
+<li>Giảm tiêu thụ điện năng từ 5-15%.</li>
+<li>Tăng hiệu suất làm lạnh nhanh và sâu hơn.</li>
+<li>Tránh các hư hỏng nặng về block máy và rò rỉ gas.</li>
+<li>Đảm bảo bầu không khí trong lành, sạch khuẩn.</li>
+</ul>
+<h2>Các bước bảo dưỡng đơn giản tại nhà</h2>
+<p>
+                        Trước khi bắt đầu, hãy đảm bảo rằng bạn đã ngắt hoàn toàn nguồn điện để đảm bảo an toàn tuyệt đối.
+                    </p>
+<div class="my-10 p-8 bg-surface-container-low border border-outline-variant rounded-2xl">
+<h3 class="font-headline-md text-headline-md mb-4 text-primary">Lưu ý quan trọng:</h3>
+<p class="mb-0 italic text-body-md">Nếu bạn không có đủ dụng cụ chuyên dụng hoặc máy có dấu hiệu hư hỏng về linh kiện, đừng ngần ngại gọi kỹ thuật viên chuyên nghiệp từ Handigo để được hỗ trợ tốt nhất.</p>
+</div>
+<p>
+                        Bước 1: Vệ sinh mặt nạ và lưới lọc bụi. Đây là bước quan trọng nhất mà bất kỳ ai cũng có thể thực hiện. Bạn chỉ cần mở lớp vỏ nhựa bên ngoài, tháo các tấm lưới lọc và rửa sạch dưới vòi nước mạnh.
+                    </p>
+<p>
+                        Bước 2: Kiểm tra dàn nóng bên ngoài. Hãy loại bỏ các vật cản (lá cây, rác bụi) xung quanh cục nóng để đảm bảo khả năng thoát nhiệt tốt nhất.
+                    </p>
+<h2>Khi nào cần gọi thợ chuyên nghiệp?</h2>
+<p>
+                        Dù việc tự vệ sinh lưới lọc là rất tốt, nhưng định kỳ 6 tháng một lần, bạn vẫn cần một đợt bảo dưỡng chuyên sâu bao gồm kiểm tra lượng gas, vệ sinh dàn đồng bằng bơm áp lực và kiểm tra các kết nối điện.
+                    </p>
+</div>
+<!-- Tags -->
+<div class="mt-12 flex flex-wrap gap-3">
+<span class="px-4 py-2 bg-surface-container rounded-lg text-label-md text-on-surface-variant">#DieuHoa</span>
+<span class="px-4 py-2 bg-surface-container rounded-lg text-label-md text-on-surface-variant">#MeoVat</span>
+<span class="px-4 py-2 bg-surface-container rounded-lg text-label-md text-on-surface-variant">#TietKiemDien</span>
+<span class="px-4 py-2 bg-surface-container rounded-lg text-label-md text-on-surface-variant">#Handigo</span>
+</div>
+</article>
+<!-- Sidebar / Related Articles -->
+<aside class="lg:col-span-4 space-y-10">
+<!-- CTA Card -->
+<div class="bg-primary-container p-8 rounded-3xl text-white shadow-xl relative overflow-hidden group">
+
+<div class="relative z-10">
+<h3 class="font-headline-md text-headline-md mb-4 leading-tight">Bạn cần bảo trì điều hòa chuyên nghiệp?</h3>
+<p class="text-body-md mb-6 text-on-primary-container">Đội ngũ kỹ thuật viên Handigo sẵn sàng phục vụ chỉ sau 30 phút đặt lịch.</p>
+<button class="w-full bg-white text-primary font-bold py-4 rounded-xl active:scale-95 transition-all shadow-lg hover:shadow-primary/30">Đặt dịch vụ ngay</button>
+</div>
+</div>
+<!-- Related Content -->
+<div>
+<h3 class="font-headline-md text-headline-md mb-6 border-l-4 border-primary pl-4">Bài viết liên quan</h3>
+<div class="space-y-6">
+<!-- Mini Card 1 -->
+<a class="flex gap-4 group" href="#">
+<div class="w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden shadow-md">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A macro shot of a sleek modern lighting fixture being installed in a luxury living room. The focus is on the intricate design of the lamp and the precision of the installation process. High-end interior design aesthetic, soft warm lighting, professional service atmosphere. Clean, minimalist look with blue and gold accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYn9SCYxJnabpBsT9psS6i2BqPAMBpCtNabd1DwrAOd8kJYIn69LeN7TIgB5WYKqNFUhW1Jd_d9T9hGk1uSaOkhTRe-V53Z3vCWVzz5rcPEDW2C4ljD93uHbspDXM-4Kt6w6hTiFksbnxWS5EH9JjOdOnAKxoCik-2Bs5NEbumdlMSUajfLv44ViMNKVio17k-v5lt1Z1P6RxsJvpEsBm8Bq7zP2CiAaBwnjdR7-PVRaXDzhgpZudZ6OzmBbeoWcwbo3OCDwURPIjc"/>
+</div>
+<div class="flex flex-col justify-center">
+<h4 class="font-label-md text-on-surface line-clamp-2 group-hover:text-primary transition-colors">Cách lắp đặt hệ thống đèn Led âm trần thẩm mỹ</h4>
+<span class="text-label-sm text-on-surface-variant mt-1">12/10/2023</span>
+</div>
+</a>
+<!-- Mini Card 2 -->
+<a class="flex gap-4 group" href="#">
+<div class="w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden shadow-md">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A clean, minimalist kitchen setting with a focus on a stainless steel sink and a modern faucet. The water is running clearly, suggesting a perfectly functioning plumbing system. The aesthetic is bright and airy, using high-key lighting and a palette of whites and soft metallic tones. A hand in a professional blue glove is subtly visible adjusting the tap." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1cokm7pm0o8McV2fBI-9Or7umUlK8X2wgkVzaPGki5xzogADvalEo03MyFZ_4C6K6txH2fU6I14yuOfTWCb4mtmGhaxaVQ9kVsV-arDmIcBbT3Ej43awNxPIAwNR0s_Nh3l4q815uy24J8Z_APVRSrUZpHv3emVCF3kCekv-T-339aTfc5rfRxZ0pA2WxBKSChhrj24CwXgLnK4lwXa6OYnp3JvYPGWgD73fPFOKP4Y5SF-J_gT0-taYEtYtkKdPWkHr4tlIzBQqI"/>
+</div>
+<div class="flex flex-col justify-center">
+<h4 class="font-label-md text-on-surface line-clamp-2 group-hover:text-primary transition-colors">Mẹo xử lý nhanh khi vòi nước bị rò rỉ</h4>
+<span class="text-label-sm text-on-surface-variant mt-1">08/10/2023</span>
+</div>
+</a>
+<!-- Mini Card 3 -->
+<a class="flex gap-4 group" href="#">
+<div class="w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden shadow-md">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A professional house cleaning service scene, showing a wide shot of a pristine, modern living room with a large window and natural light. All surfaces are polished and gleaming. A set of high-end eco-friendly cleaning supplies is neatly arranged in the foreground. The mood is serene, clean, and refreshing, emphasizing quality and order." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqVKiqYQ_c_IvktDVOFY7McPkhpcwQsKkskx2ga1lYyN8ALsPCzQqhpi-PLN2Itx6nJGgKEQm-roIAF7_cOzAFF3lgFnpH2vg8z_WQ9oh-lWctGz-OItk9c44S2-JcSXsVL8J1AoAF1kE9MCdoEcqNvwnidMhradCg3hc6OwmZl4iowBF5ZBK5TVhVgZgfCO0mppsjj7jfyaXodfL_SL_LaZQOtYHh3PpbBB9FEK0m8LOP10hgPh4ch0HRlMaYc9NO9sZHc8dVnmKo"/>
+</div>
+<div class="flex flex-col justify-center">
+<h4 class="font-label-md text-on-surface line-clamp-2 group-hover:text-primary transition-colors">Quy trình vệ sinh nhà cửa chuẩn 5 sao</h4>
+<span class="text-label-sm text-on-surface-variant mt-1">05/10/2023</span>
+</div>
+</a>
+</div>
+<button class="w-full mt-8 py-3 border border-outline text-on-surface-variant rounded-xl font-label-md hover:bg-surface-container transition-colors">Xem tất cả tin tức</button>
+</div>
+<!-- Newsletter -->
+<div class="bg-surface-container-high p-8 rounded-3xl">
+<h3 class="font-headline-md text-headline-md mb-2 text-on-surface">Đăng ký nhận tin</h3>
+<p class="text-label-sm text-on-surface-variant mb-6">Nhận các mẹo chăm sóc nhà cửa và ưu đãi mới nhất từ Handigo.</p>
+<div class="space-y-3">
+<input class="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Email của bạn..." type="email"/>
+<button class="w-full bg-primary text-white font-bold py-3 rounded-xl active:scale-95 transition-all">Đăng ký</button>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Footer Space for BottomNavBar on Mobile -->
+<div class="h-20 md:hidden"></div>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-2 pt-2 md:hidden backdrop-blur-md bg-surface-glass/70 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] rounded-t-xl">
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-90 duration-150 p-2">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-[10px]">Trang chủ</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1.5 active:scale-90 duration-150">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-label-sm text-[10px]">Hoạt động</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-90 duration-150 p-2">
+<span class="material-symbols-outlined" data-icon="star_rate">star_rate</span>
+<span class="font-label-sm text-[10px]">Đánh giá</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-90 duration-150 p-2">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-[10px]">Hồ sơ</span>
+</button>
+</nav>
+<script>
+        // Progress Bar Logic
+        const progressBar = document.createElement('div');
+        progressBar.className = 'fixed top-16 left-0 h-1 bg-primary z-[60] transition-all duration-100 ease-out';
+        progressBar.style.width = '0%';
+        document.body.appendChild(progressBar);
+
+        window.addEventListener('scroll', () => {
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            const scrollTop = window.scrollY;
+            const scrollPercent = (scrollTop / (documentHeight - windowHeight)) * 100;
+            progressBar.style.width = scrollPercent + '%';
+        });
+
+        // Simple Smooth Scroll for internal links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body></html>

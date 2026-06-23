@@ -181,10 +181,9 @@ export const getLatestPublicFeedbacks = async () => {
   return Feedback.find({
     isVisible: true,
     isDeleted: false,
-    comment: { $nin: [null, ""] },
+    rating: { $gte: 4 },
   })
-    .sort({ createdAt: -1 })
-    .limit(3)
+    .sort({ rating: -1, createdAt: -1 })
     .populate("customerId", "fullName avatar")
     .populate("serviceId", "name")
     .populate("providerReply.repliedBy", "fullName avatar")

@@ -14,10 +14,10 @@ import {
 
 const router = Router();
 
-// Public / Authenticated GET routes
-router.get("/", authMiddleware, serviceController.listServices);
-router.get("/:id", authMiddleware, serviceController.getServiceById);
-router.get("/:id/options", authMiddleware, serviceController.getServiceOptions);
+// Public GET routes
+router.get("/", serviceController.listServices);
+router.get("/:id", serviceController.getServiceById);
+router.get("/:id/options", serviceController.getServiceOptions);
 
 // Admin-only write routes
 router.use(authMiddleware, roleMiddleware("ADMIN"));
