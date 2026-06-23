@@ -30,6 +30,8 @@ const getErrorMessage = (error: unknown) => {
   return err?.response?.data?.message || "Không thể tải chi tiết dịch vụ.";
 };
 
+const CURRENT_LOCATION_VALUE = "__current_location__";
+
 const formatAddressLabel = (address: Address) =>
   address.fullAddress ||
   [address.detailAddress, address.ward, address.district, address.province]
@@ -50,6 +52,7 @@ const getProviderAvatar = (provider: NearbyProvider) =>
 export default function CustomerServiceDetailPage() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user); 
   const {
     addressId,
     preferredProviderId,
@@ -69,6 +72,7 @@ export default function CustomerServiceDetailPage() {
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [error, setError] = useState("");
   const [addressSelectionError, setAddressSelectionError] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
   const [providerListError, setProviderListError] = useState("");
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -201,7 +205,63 @@ export default function CustomerServiceDetailPage() {
     );
   };
 
+   const handleUseCurrentLocation = () => {
+    setAddressSelectionError("");
+
+    if (!navigator.geolocation) {
+      setAddressSelectionError("Trình duyệt không hỗ trợ định vị hiện tại.");
+      return;
+    }
+
+     if (!isAuthenticated) {
+      navigate("/login", { state: { from: `/customer/services/${service._id}` } });
+      return;
+    }
+
+    const recipientName = user.fullName || "Khách hàng";
+    const recipientPhone = user.phone;
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const createdAddress = await bookingApi.createAddress({
+            recipientName,
+            recipientPhone,
+            fullAddress: `Vị trí hiện tại (${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)})`,
+            ward: "Vị trí hiện tại",
+            province: "Vị trí hiện tại",
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            note: "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.",
+            isDefault: false,
+          });
+
+          setAddresses((current) => [
+            createdAddress,
+            ...current.filter((address) => address._id !== createdAddress._id),
+          ]);
+          setAddressId(createdAddress._id);
+        } catch (createError) {
+          const err = createError as { response?: { data?: { message?: string } } };
+          setAddressSelectionError(err?.response?.data?.message || "Không thể lưu vị trí hiện tại. Vui lòng thử lại.");
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      () => {
+        setAddressSelectionError("Không thể lấy vị trí hiện tại. Vui lòng kiểm tra quyền định vị.");
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    );
+  };
+
   const handleAddressChange = (value: string) => {
+        if (value === CURRENT_LOCATION_VALUE) {
+      handleUseCurrentLocation();
+      return;
+    }
     setAddressSelectionError("");
     setAddressId(value);
     setPreferredProviderId(undefined);
@@ -461,12 +521,15 @@ export default function CustomerServiceDetailPage() {
                 <select
                   id="service-detail-address"
                   value={addressId || ""}
-                  disabled={isLoadingAddresses}
+                  disabled={isLoadingAddresses || isLocating}
                   onChange={(event) => handleAddressChange(event.target.value)}
                   className="w-full appearance-none rounded-lg border border-outline-variant bg-surface-container-low px-3 py-3 pr-10 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="" disabled>
                     {isLoadingAddresses ? "Đang tải địa chỉ..." : "Chọn địa chỉ"}
+                  </option>
+                                    <option value={CURRENT_LOCATION_VALUE}>
+                    {isLocating ? "Đang lấy vị trí hiện tại..." : "Vị trí hiện tại"}
                   </option>
                   {addresses.map((address) => (
                     <option key={address._id} value={address._id}>
