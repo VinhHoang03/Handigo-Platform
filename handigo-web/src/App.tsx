@@ -38,6 +38,10 @@ import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { HomeRoute } from "./components/auth/HomeRoute";
 import { ProfileRoute } from "./components/auth/ProfileRoute";
 import NotFoundPage from "./pages/NotFoundPage";
+import AboutPage from "./features/content/pages/AboutPage";
+import NewsPage from "./features/content/pages/NewsPage";
+import NewsDetailPage from "./features/content/pages/NewsDetailPage";
+import SupportPage from "./features/content/pages/SupportPage";
 import "./App.css";
 
 function App() {
@@ -51,6 +55,10 @@ function App() {
           <Route path="/profile" element={<ProfileRoute />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/gioi-thieu" element={<AboutPage />} />
+          <Route path="/tin-tuc" element={<NewsPage />} />
+          <Route path="/tin-tuc/:articleId" element={<NewsDetailPage />} />
+          <Route path="/ho-tro" element={<SupportPage />} />
           <Route path="/customer/bookings" element={<BookingHistoryPage />} />
           <Route
             path="/customer/bookings/new"
