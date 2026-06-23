@@ -90,20 +90,19 @@ export function CategorySelectionStep({
                       const checked = selectedIds.includes(service._id);
 
                       return (
-                        <label
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={checked}
                           key={service._id}
-                          className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition duration-200 ${
+                          className={`flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition duration-200 ${
                             checked
                               ? "border-primary bg-primary/5 shadow-[0_10px_24px_rgba(53,37,205,0.08)]"
                               : "border-outline-variant bg-surface hover:border-primary/50"
                           }`}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => onToggle(service._id)}
                         >
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={checked}
-                            onChange={() => onToggle(service._id)}
-                          />
                           <span
                             className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition ${
                               checked
@@ -116,7 +115,7 @@ export function CategorySelectionStep({
                           <span className="font-semibold text-on-surface">
                             {service.name}
                           </span>
-                        </label>
+                        </button>
                       );
                     })}
                   </div>

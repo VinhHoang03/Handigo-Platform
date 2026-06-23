@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tin tức &amp; Thông báo | Handigo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Hanken+Grotesk:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .text-balance {
+            text-wrap: balance;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c3c0ff;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4d44e3;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "background": "#faf8ff",
+                      "inverse-on-surface": "#eef0ff",
+                      "surface-tint": "#4d44e3",
+                      "secondary-fixed-dim": "#86d2e6",
+                      "on-surface": "#131b2e",
+                      "on-primary-container": "#b1afff",
+                      "tertiary-fixed": "#ffdbcc",
+                      "on-tertiary-container": "#ff9f72",
+                      "on-error": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#592000",
+                      "outline": "#777587",
+                      "primary": "#1e00a9",
+                      "inverse-primary": "#c3c0ff",
+                      "on-tertiary-fixed": "#351000",
+                      "on-tertiary-fixed-variant": "#7b2f00",
+                      "on-secondary-fixed-variant": "#004e5c",
+                      "star-gold": "#facc15",
+                      "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+                      "surface-container-low": "#f2f3ff",
+                      "surface-variant": "#dae2fc",
+                      "primary-fixed-dim": "#c3c0ff",
+                      "tertiary-container": "#7d3000",
+                      "surface-glass": "rgba(255, 255, 255, 0.7)",
+                      "surface-container": "#eaedff",
+                      "on-background": "#131b2e",
+                      "on-primary": "#ffffff",
+                      "surface-container-highest": "#dae2fc",
+                      "secondary-container": "#9ce8fd",
+                      "on-error-container": "#93000a",
+                      "on-primary-fixed": "#0f0069",
+                      "on-secondary-container": "#076a7c",
+                      "tertiary-fixed-dim": "#ffb694",
+                      "on-tertiary": "#ffffff",
+                      "surface-bright": "#faf8ff",
+                      "surface-dim": "#d2d9f4",
+                      "primary-container": "#3525cd",
+                      "inverse-surface": "#283044",
+                      "surface-container-lowest": "#ffffff",
+                      "primary-fixed": "#e2dfff",
+                      "error": "#ba1a1a",
+                      "secondary": "#00687a",
+                      "on-surface-variant": "#464555",
+                      "surface": "#faf8ff",
+                      "secondary-fixed": "#abedff",
+                      "outline-variant": "#c7c4d8",
+                      "surface-container-high": "#e1e7ff",
+                      "on-secondary-fixed": "#001f26",
+                      "on-primary-fixed-variant": "#3323cc",
+                      "success-green": "#4ade80"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xs": "4px",
+                      "base": "8px",
+                      "sm": "12px",
+                      "lg": "48px",
+                      "container-max": "1280px",
+                      "md": "24px",
+                      "gutter": "24px",
+                      "xl": "80px"
+              },
+              "fontFamily": {
+                      "label-md": ["Inter"],
+                      "headline-md": ["Hanken Grotesk"],
+                      "headline-lg-mobile": ["Hanken Grotesk"],
+                      "label-sm": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "headline-lg": ["Hanken Grotesk"],
+                      "headline-xl": ["Hanken Grotesk"],
+                      "body-md": ["Inter"]
+              },
+              "fontSize": {
+                      "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "label-sm": ["12px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "headline-xl": ["56px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter h-16 max-w-container-max mx-auto backdrop-blur-md bg-surface-glass/70 shadow-lg">
+<div class="flex items-center gap-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Handigo</h1>
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Dịch vụ</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Đơn hàng</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Tin nhắn</a>
+<a class="font-body-md text-body-md text-primary border-b-2 border-primary pb-1" href="#">Trợ giúp</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary active:scale-95 transition-transform" data-icon="search">search</button>
+<button class="material-symbols-outlined text-on-surface-variant active:scale-95 transition-transform" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant active:scale-95 transition-transform" data-icon="account_circle">account_circle</button>
+</div>
+</header>
+<main class="pt-16 pb-24 md:pb-0">
+<!-- Hero Section: Featured News -->
+<section class="relative w-full overflow-hidden bg-primary py-xl md:py-24">
+
+<div class="container max-w-container-max mx-auto px-gutter relative z-10 grid md:grid-cols-2 gap-md items-center">
+<div class="text-white space-y-6">
+<span class="inline-block px-4 py-1.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider">Tin nổi bật</span>
+<h2 class="font-headline-xl text-headline-xl text-white leading-tight text-balance">Cập Nhật Hệ Thống Handigo v3.0: Trải Nghiệm Mượt Mà Hơn</h2>
+<p class="font-body-lg text-body-lg text-inverse-on-surface max-w-lg opacity-90">Chúng tôi vừa ra mắt phiên bản mới nhất với các tính năng theo dõi kỹ thuật viên theo thời gian thực và thanh toán một chạm. Khám phá ngay những cải tiến dành riêng cho bạn.</p>
+<div class="flex flex-wrap gap-4 pt-4">
+<button class="px-8 py-3 bg-white text-primary font-label-md text-label-md rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95">Đọc chi tiết</button>
+<button class="px-8 py-3 bg-primary-container text-white font-label-md text-label-md rounded-xl border border-white/20 backdrop-blur-sm hover:bg-primary-container/80 transition-all active:scale-95">Xem thay đổi</button>
+</div>
+</div>
+<div class="hidden md:block relative">
+<div class="aspect-video rounded-3xl overflow-hidden shadow-2xl border-4 border-white/10 group">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="A clean, cinematic photograph of a modern home interior with soft natural lighting coming through large windows. On a sleek coffee table, a high-end smartphone displays the Handigo app interface with vibrant indigo accents and service icons. The background is slightly blurred to emphasize the premium technology feel, featuring minimalist furniture and a warm, inviting urban living room atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNSD3sJjPDG33cX1UXkz312S6NixBf7UvcIm6ngsXMowwqApf2o1kPN1CFI86ohn5c-bZDiiMI82AFF5rtmVN5_oowL7FyiRKD7jC3PWBZSPgSxHn7MxEyHyoQlXZwBkS5l9ZvNJ3M_PKu5t--SFmhooK43aUWHCnuwVI_15nSvkOpMVqHt1t9wxrf9__zqrcduuwdKA9xrbamu6hMwXXcarsV6avCk_y3SaN32gPjUcGT2xRqXOPSybYQVOB-0eGns3Wx48Xz8mby"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<div class="absolute bottom-6 left-6 flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+<span class="material-symbols-outlined text-white" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+<span class="text-white font-label-md text-label-md">Video hướng dẫn cập nhật</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Category Filters -->
+<section class="sticky top-16 z-40 bg-surface/80 backdrop-blur-md py-6 border-b border-outline-variant/30">
+<div class="container max-w-container-max mx-auto px-gutter flex items-center gap-4 overflow-x-auto no-scrollbar scroll-smooth">
+<button class="px-6 py-2 rounded-full bg-primary text-white font-label-md text-label-md whitespace-nowrap shadow-md">Tất cả</button>
+<button class="px-6 py-2 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md whitespace-nowrap hover:bg-surface-container-high transition-colors">Thông báo hệ thống</button>
+<button class="px-6 py-2 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md whitespace-nowrap hover:bg-surface-container-high transition-colors">Mẹo sửa chữa</button>
+<button class="px-6 py-2 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md whitespace-nowrap hover:bg-surface-container-high transition-colors">Khuyến mãi</button>
+<button class="px-6 py-2 rounded-full bg-surface-container text-on-surface-variant font-label-md text-label-md whitespace-nowrap hover:bg-surface-container-high transition-colors">Tin tức cộng đồng</button>
+</div>
+</section>
+<!-- Main News Grid -->
+<section class="py-lg container max-w-container-max mx-auto px-gutter">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<!-- News Card 1 -->
+<div class="group flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+<div class="relative h-56 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A professional electrician with a friendly expression, wearing a clean blue uniform, working on a modern electrical panel in a well-lit contemporary kitchen. The lighting is soft and focused, emphasizing safety and expertise. The overall aesthetic is professional and clean, using a palette of blues, whites, and warm wooden textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4YRwvqWIgklYySJBYBhj_o5OkKU8dVoL-9ErRQrkBV07RUs2Z1rPBzCy6H6tB8IB2Jty55dakrsYOPR9DTq733tWBp2Xx_pJGS7mvP00q_r1gO4rdFVZWPIL-HpxFsjBU-SeWR7XzN3h1Wnj3G6rZLHc4uzaC7ptWkFIYevWc7CJwq9lUMOYmyBZyUaXg4SdK9EReXgrQJnemJ3aG78xIxM_T6SGYiG14rdiUvk9n44ebRBR2BuNq-_Me9810fPZv_s0LNuCXAYBT"/>
+<span class="absolute top-4 left-4 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Mẹo sửa chữa</span>
+</div>
+<div class="p-6 flex flex-col flex-grow">
+<span class="text-on-surface-variant text-label-sm font-label-sm mb-2">12 tháng 10, 2023</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-3 group-hover:text-primary transition-colors">5 Cách Kiểm Tra Hệ Thống Điện Trước Khi Vào Mùa Mưa</h3>
+<p class="text-on-surface-variant text-body-md line-clamp-3 mb-6">Đảm bảo an toàn cho gia đình bạn bằng những bước kiểm tra hệ thống điện cơ bản nhưng cực kỳ quan trọng trước mùa bão lũ...</p>
+<a class="mt-auto flex items-center text-primary font-label-md text-label-md hover:gap-2 transition-all" href="#">
+                            Xem thêm <span class="material-symbols-outlined ml-1" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- News Card 2 -->
+<div class="group flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+<div class="relative h-56 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="A high-end lifestyle image featuring a young, happy family playing in a brightly lit, modern living room with a beautiful garden visible through large glass doors. The lighting is bright and airy, typical of a professional real estate photograph. Soft morning sunlight creates a feeling of peace and safety, aligning with the brand's premium utility and comfort identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQdKKUq19ese2tfPugQDH9fmL-yNvX5OrbmsCsnFv-6dnGY5BT9Hf-1fNEEt_YxMLEknTmL8szSnzbfIxkrA0tYPAgsoF3WNuWYrOqWlGfkhngYUhOyHxYMvvpHfft1N_7zOVgan63QLH-s4JDka4DJH4jE-9aQe6t9ED2qoQyuDuKGJlV4Y6uHcF7QZaCimzV2EJm40Ip5Tv-P7681uVDVyWqmvLZWC1QI_tt72RJanDjrZd-1JCOnh6fl3VOxeMFRd5qgmHeLZFb"/>
+<span class="absolute top-4 left-4 bg-tertiary-container text-on-tertiary-container text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Khuyến mãi</span>
+</div>
+<div class="p-6 flex flex-col flex-grow">
+<span class="text-on-surface-variant text-label-sm font-label-sm mb-2">10 tháng 10, 2023</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-3 group-hover:text-primary transition-colors">Siêu Deal Tháng 10: Giảm 20% Dịch Vụ Vệ Sinh Máy Lạnh</h3>
+<p class="text-on-surface-variant text-body-md line-clamp-3 mb-6">Ưu đãi độc quyền dành cho khách hàng thân thiết của Handigo. Đặt lịch ngay hôm nay để tận hưởng không gian sống trong lành với chi phí tiết kiệm...</p>
+<a class="mt-auto flex items-center text-primary font-label-md text-label-md hover:gap-2 transition-all" href="#">
+                            Xem thêm <span class="material-symbols-outlined ml-1" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- News Card 3 -->
+<div class="group flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+<div class="relative h-56 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="An abstract, high-tech background featuring glowing lines of code and digital data nodes in a deep indigo and electric blue color palette. The aesthetic is clean and futuristic, representing system updates and cybersecurity. Subtle lens flares and bokeh effects add a premium, professional tech atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVmg8mHTTOoF2XlHC7gir_ejjWmM6SUx1r_E7jUm13lyHkOPN-KcKAcboky4xDW69fpCFjbsQEpxaGYoB-oXKZvPjAr8mtqJSMMf0QltSwpPHmWNhSxv_36t3VcIls4Dv4Z-hvLV0Lc0VwBRbE3FqXb1gxeYorb8nvQDwL7Zfjm2v8AKfcFy4HX4cGoTMdYOfePnGaqlOmD5pZe7SrhTbMYVdRYWbTiQSZgfOkMZ8fQeIWzw9dqPN1aTZTTJjXsJ2FjtsHsC3yGzP7"/>
+<span class="absolute top-4 left-4 bg-success-green/20 text-success-green text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-success-green/30">Hệ thống</span>
+</div>
+<div class="p-6 flex flex-col flex-grow">
+<span class="text-on-surface-variant text-label-sm font-label-sm mb-2">08 tháng 10, 2023</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-3 group-hover:text-primary transition-colors">Nâng Cấp Bảo Mật Tài Khoản Người Dùng</h3>
+<p class="text-on-surface-variant text-body-md line-clamp-3 mb-6">Chúng tôi vừa triển khai xác thực 2 lớp (2FA) nhằm tăng cường bảo vệ thông tin cá nhân và lịch sử giao dịch của bạn tại Handigo...</p>
+<a class="mt-auto flex items-center text-primary font-label-md text-label-md hover:gap-2 transition-all" href="#">
+                            Xem thêm <span class="material-symbols-outlined ml-1" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Bento Style Card (Wide) -->
+<div class="md:col-span-2 group relative overflow-hidden rounded-3xl h-80 flex items-center bg-inverse-surface text-white">
+<div class="absolute inset-0 w-full h-full opacity-30">
+<img class="w-full h-full object-cover" data-alt="A birds-eye view of a modern urban city at sunset, with golden lights starting to twinkle in the windows of sleek skyscrapers. The sky is a deep purple and orange. This symbolizes the community and widespread service area of the brand. High resolution, professional architectural photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsXNvlFFe_FGXfoOIzLtPAzBlw_UL_zM8Y8iPwW7uWQycABTwqf2lKuFN8Fu8sO9Y6bVAHqKXgbHZP0OwiF0sEZdp_cnb7eiHR2F01yShAYdnYSc_Z1M9oIyzgbzvaYPMhqk8wHCwRMalI1sqnfNxd7L3oetrLPoJmxfqFU0RiW-wUVZLQukat0YtF5PAYUrkAYpF058N3TtOTWvcUOXWhnZm3zRplIGeJogsBad2XS80OPuqJpEFUkaKd3bNgRWNCMBmAsMR6y3M6"/>
+</div>
+<div class="relative z-10 p-12 max-w-lg">
+<span class="text-tertiary-fixed text-label-sm font-label-sm mb-2 block uppercase tracking-widest">Cộng đồng</span>
+<h3 class="font-headline-lg text-headline-lg mb-4">Handigo Đồng Hành Cùng Dự Án 'Nhà Sạch - Phố Xanh'</h3>
+<p class="text-body-md opacity-80 mb-6">Hơn 500 kỹ thuật viên của chúng tôi đã tham gia vào chiến dịch dọn dẹp và bảo trì miễn phí cho các khu chung cư cũ tại khu vực trung tâm thành phố...</p>
+<button class="bg-primary text-white px-6 py-2 rounded-xl font-label-md text-label-md hover:bg-primary-container transition-colors">Tìm hiểu thêm</button>
+</div>
+<div class="hidden lg:block absolute right-12 top-1/2 -translate-y-1/2 w-48 h-48">
+
+</div>
+</div>
+<!-- News Card 4 -->
+<div class="group flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+<div class="relative h-56 overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" data-alt="Close-up of a professional repairman's tool belt with high-quality, well-maintained tools like a multimeter, specialized screwdrivers, and pliers. The lighting is crisp and detailed, highlighting the textures of leather and steel. The background is a blurred workshop interior, emphasizing craftsmanship and preparedness." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe683X5LRJ_LQ85u3q-rBCC9tvgVy5GvNzPrkq4CH4iBPLBQV1bT0xJRtxMkvAbNoBdC1_m0bUmtRjK3iuw9Ey_YdiMz_vG_YRKOqSFTd7nJziZKOg1hsMvJxI_mxoKZSZrWsSn6rDQlTb2tL5fkt-JwUVKozN1_5WNscqyByEmVVRW-Hrwv2j00I938pgQPV8Im2C9ZQhsKNCrUo-rM_8Ls6xzIffEJ5wDfoJ89vEh9rnBHm4UHg2xJ_43VOPa-viL5AIW-WjagV7"/>
+<span class="absolute top-4 left-4 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Mẹo sửa chữa</span>
+</div>
+<div class="p-6 flex flex-col flex-grow">
+<span class="text-on-surface-variant text-label-sm font-label-sm mb-2">05 tháng 10, 2023</span>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-3 group-hover:text-primary transition-colors">Bộ Dụng Cụ Cần Thiết Mọi Gia Đình Nên Có</h3>
+<p class="text-on-surface-variant text-body-md line-clamp-3 mb-6">Hướng dẫn chi tiết cách tự trang bị những dụng cụ sửa chữa cơ bản để bạn có thể tự tay xử lý những vấn đề nhỏ trong ngôi nhà mình...</p>
+<a class="mt-auto flex items-center text-primary font-label-md text-label-md hover:gap-2 transition-all" href="#">
+                            Xem thêm <span class="material-symbols-outlined ml-1" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+<!-- Pagination -->
+<div class="mt-xl flex justify-center items-center gap-2">
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-label-md text-label-md">1</button>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors">2</button>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors">3</button>
+<span class="px-2">...</span>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors">12</button>
+<button class="w-10 h-10 rounded-full border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</section>
+<!-- Newsletter Section -->
+<section class="bg-surface-container-low py-xl">
+<div class="container max-w-container-max mx-auto px-gutter">
+<div class="glass-card p-12 rounded-[2rem] shadow-xl border border-white/20 text-center relative overflow-hidden">
+<div class="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="absolute bottom-0 left-0 -ml-20 -mb-20 w-64 h-64 bg-secondary/5 rounded-full blur-3xl"></div>
+<div class="relative z-10 max-w-2xl mx-auto space-y-6">
+<span class="material-symbols-outlined text-primary text-5xl" data-icon="mail" style="font-variation-settings: 'FILL' 1;">mail</span>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Đăng ký nhận bản tin sớm nhất</h2>
+<p class="text-body-lg text-on-surface-variant opacity-80">Nhận các mẹo bảo trì nhà cửa, mã giảm giá độc quyền và thông báo cập nhật tính năng mới trực tiếp qua email của bạn.</p>
+<form class="flex flex-col md:flex-row gap-4 pt-4">
+<input class="flex-grow px-6 py-4 rounded-xl border border-outline-variant bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" placeholder="Địa chỉ email của bạn" type="email"/>
+<button class="px-10 py-4 bg-primary text-white font-label-md text-label-md rounded-xl shadow-lg hover:shadow-xl active:scale-95 transition-all">Đăng ký ngay</button>
+</form>
+<p class="text-xs text-on-surface-variant/60">Chúng tôi cam kết bảo mật thông tin của bạn. Không spam.</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer / Bottom Navigation for Mobile -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-2 pt-2 md:hidden backdrop-blur-md bg-surface-glass/70 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] rounded-t-xl">
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-90 duration-150">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm-mobile">Trang chủ</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-90 duration-150">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-label-sm text-label-sm-mobile">Hoạt động</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1.5 active:scale-90 duration-150">
+<span class="material-symbols-outlined" data-icon="notifications" style="font-variation-settings: 'FILL' 1;">notifications</span>
+<span class="font-label-sm text-label-sm-mobile">Thông báo</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-90 duration-150">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm-mobile">Hồ sơ</span>
+</button>
+</nav>
+<!-- Floating Action Button -->
+<button class="fixed right-6 bottom-24 md:bottom-12 z-50 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center group active:scale-95 transition-all">
+<span class="material-symbols-outlined text-2xl group-hover:rotate-12 transition-transform" data-icon="help_outline">help_outline</span>
+</button>
+<script>
+        // Micro-interactions and Category switching logic
+        document.querySelectorAll('section button.rounded-full').forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active styles from siblings
+                this.parentElement.querySelectorAll('button').forEach(btn => {
+                    btn.classList.remove('bg-primary', 'text-white', 'shadow-md');
+                    btn.classList.add('bg-surface-container', 'text-on-surface-variant');
+                });
+                // Add active styles to clicked
+                this.classList.add('bg-primary', 'text-white', 'shadow-md');
+                this.classList.remove('bg-surface-container', 'text-on-surface-variant');
+            });
+        });
+
+        // Header scroll effect
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            if (window.scrollY > 20) {
+                header.classList.add('shadow-xl', 'bg-white/90');
+                header.classList.remove('bg-surface-glass/70');
+            } else {
+                header.classList.remove('shadow-xl', 'bg-white/90');
+                header.classList.add('bg-surface-glass/70');
+            }
+        });
+    </script>
+</body></html>

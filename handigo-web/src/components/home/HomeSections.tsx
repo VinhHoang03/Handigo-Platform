@@ -181,28 +181,43 @@ export const StatsSection = () => (
 
 export const TestimonialsSection = () => {
   const [feedbacks, setFeedbacks] = useState<LatestFeedback[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    homeApi.latestFeedbacks().then(setFeedbacks).catch(() => setFeedbacks([]));
+    homeApi.latestFeedbacks()
+      .then(setFeedbacks)
+      .catch(() => setFeedbacks([]))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
     <section className="mx-auto mt-lg max-w-7xl px-4 md:px-8">
       <SectionHeader title="Đánh giá từ khách hàng" centered />
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
-        {feedbacks.map((feedback) => (
-          <TestimonialCard
-            key={feedback._id}
-            quote={feedback.comment || ''}
-            name={feedback.customerId.fullName || 'Khách hàng'}
-            loc={feedback.serviceId.name || 'Dịch vụ tại nhà'}
-            img={feedback.customerId.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(feedback.customerId.fullName || 'KH')}&background=4f46e5&color=fff`}
-            rating={feedback.rating}
-            providerReply={feedback.providerReply?.content}
-          />
-        ))}
-      </div>
-      {!feedbacks.length && <p className="text-center text-on-surface-variant">Chưa có đánh giá để hiển thị.</p>}
+      {loading ? (
+        <p className="text-center text-on-surface-variant">Đang tải đánh giá...</p>
+      ) : feedbacks.length ? (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+          {feedbacks.map((feedback) => {
+            const serviceName = feedback.serviceId?.name || 'Dịch vụ tại nhà';
+            const comment = feedback.comment?.trim();
+            const customerName = feedback.customerId?.fullName || 'Khách hàng';
+
+            return (
+              <TestimonialCard
+                key={feedback._id}
+                quote={comment || undefined}
+                name={customerName}
+                loc={serviceName}
+                img={feedback.customerId?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(customerName)}&background=4f46e5&color=fff`}
+                rating={feedback.rating}
+                providerReply={feedback.providerReply?.content}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-center text-on-surface-variant">Chưa có đánh giá để hiển thị.</p>
+      )}
     </section>
   );
 };

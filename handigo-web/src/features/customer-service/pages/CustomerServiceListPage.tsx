@@ -17,6 +17,8 @@ const getErrorMessage = (error: unknown) => {
   return err?.response?.data?.message || "Không thể tải danh sách dịch vụ.";
 };
 
+const isImageUrl = (value?: string | null) => /^https?:\/\//i.test(value || "");
+
 export default function CustomerServiceListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -112,9 +114,9 @@ export default function CustomerServiceListPage() {
 
   return (
     <CustomerServiceLayout>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-        <aside className="md:col-span-1">
-          <div className="sticky top-28 rounded-xl border border-outline-variant/30 bg-white p-5 shadow-sm">
+      <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-4">
+        <aside className="md:sticky md:top-32 md:col-span-1 md:self-start">
+          <div className="rounded-xl border border-outline-variant/30 bg-white p-5 shadow-sm md:max-h-[calc(100vh-9rem)] md:overflow-y-auto">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-bold text-on-surface">Bộ lọc</h2>
               <span className="material-symbols-outlined text-on-surface-variant">
@@ -140,23 +142,35 @@ export default function CustomerServiceListPage() {
                 </span>
                 Tất cả dịch vụ
               </button>
-              {categories.map((category) => (
-                <button
-                  key={category._id}
-                  type="button"
-                  onClick={() => handleCategoryChange(category._id)}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
-                    selectedCategoryId === category._id
-                      ? "bg-primary text-on-primary"
-                      : "text-on-surface hover:bg-surface-container-low"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {category.icon || "category"}
-                  </span>
-                  {category.name}
-                </button>
-              ))}
+              {categories.map((category) => {
+                const categoryImage = category.image || (isImageUrl(category.icon) ? category.icon : undefined);
+
+                return (
+                  <button
+                    key={category._id}
+                    type="button"
+                    onClick={() => handleCategoryChange(category._id)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
+                      selectedCategoryId === category._id
+                        ? "bg-primary text-on-primary"
+                        : "text-on-surface hover:bg-surface-container-low"
+                    }`}
+                  >
+                    {categoryImage ? (
+                      <ReliableImage
+                        src={categoryImage.replace(/^http:\/\/res\.cloudinary\.com/i, "https://res.cloudinary.com")}
+                        alt={category.name}
+                        className="h-5 w-5 shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-[20px]">
+                        {category.icon || "category"}
+                      </span>
+                    )}
+                    {category.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </aside>

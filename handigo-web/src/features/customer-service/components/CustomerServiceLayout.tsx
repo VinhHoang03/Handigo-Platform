@@ -7,7 +7,7 @@ interface CustomerServiceLayoutProps {
 
 export function CustomerServiceLayout({ children }: CustomerServiceLayoutProps) {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background font-body-md text-body-md">
+    <div className="min-h-screen overflow-x-clip bg-background font-body-md text-body-md">
       <Navbar role="CUSTOMER" />
 
       <main className="relative min-h-screen pb-12 pt-32">

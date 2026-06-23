@@ -60,9 +60,9 @@ const createNavbarItems = (role?: AppRole): NavbarItem[] => {
   const items: NavbarItem[] = [
     { label: "Trang chủ", path: "/" },
     { label: "Dịch vụ", path: "/customer/services", activePrefix: "/customer/services" },
-    { label: "Giới thiệu", path: "#" },
-    { label: "Tin tức", path: "#" },
-    { label: "Hỗ trợ", path: "#" },
+    { label: "Giới thiệu", path: "/gioi-thieu" },
+    { label: "Tin tức", path: "/tin-tuc", activePrefix: "/tin-tuc" },
+    { label: "Hỗ trợ", path: "/ho-tro" },
   ];
 
   if (role === "PROVIDER") {
@@ -100,6 +100,7 @@ export function Navbar({
 }: NavbarProps) {
   const [internalScrolled, setInternalScrolled] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isNavOpen, setIsNavOpen] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -153,6 +154,14 @@ export function Navbar({
   const handleLogout = async () => {
     await authService.logout();
     navigate("/", { replace: true });
+  };
+
+  const handleBookService = () => {
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: "/customer/bookings/new" } });
+      return;
+    }
+    navigate("/customer/bookings/new");
   };
 
   const isActive = (item: NavbarItem) => {
@@ -252,18 +261,50 @@ export function Navbar({
           })}
         </div>
 
+        <button
+          type="button"
+          aria-label="Mở menu điều hướng"
+          aria-expanded={isNavOpen}
+          onClick={() => setIsNavOpen((open) => !open)}
+          className="ml-auto grid h-10 w-10 place-items-center rounded-xl text-primary hover:bg-surface-container-low xl:hidden"
+        >
+          <span className="material-symbols-outlined">
+            {isNavOpen ? "close" : "menu"}
+          </span>
+        </button>
+
+        {isNavOpen && (
+          <div className="absolute left-0 right-0 top-[calc(100%+16px)] z-50 rounded-2xl border border-outline-variant/30 bg-white p-3 shadow-[0_18px_46px_rgba(19,27,46,0.16)] xl:hidden">
+            <div className="grid gap-1 sm:grid-cols-2">
+              {navItems.map((item) => (
+                <Link
+                  key={item.label}
+                  to={item.path}
+                  onClick={() => setIsNavOpen(false)}
+                  className={`rounded-xl px-4 py-3 text-sm font-semibold ${
+                    isActive(item)
+                      ? "bg-primary text-white"
+                      : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
-          <Link
-            to="/customer/bookings/new"
-            className={`hidden min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90 ${
-              currentRole === "CUSTOMER" ? "sm:inline-flex" : ""
-            }`}
+          <button
+            type="button"
+            onClick={handleBookService}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
           >
             <span className="material-symbols-outlined text-lg">
               cleaning_services
             </span>
             Đặt dịch vụ
-          </Link>
+          </button>
 
           {isAuthenticated && user ? (
             <>

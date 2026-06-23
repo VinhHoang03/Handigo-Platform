@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type MouseEvent, type ReactNode, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ModalProps {
@@ -10,6 +10,7 @@ interface ModalProps {
   closeOnOverlayClick?: boolean;
   closeOnEsc?: boolean;
   danger?: boolean;
+  contentRef?: Ref<HTMLDivElement>;
 }
 
 const sizeClass: Record<NonNullable<ModalProps['size']>, string> = {
@@ -37,10 +38,16 @@ export function Modal({
   closeOnOverlayClick = true,
   closeOnEsc = true,
   danger = false,
+  contentRef,
 }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -68,7 +75,7 @@ export function Modal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && closeOnEsc) {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -104,7 +111,7 @@ export function Modal({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [closeOnEsc, onClose, open]);
+  }, [closeOnEsc, open]);
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
     if (closeOnOverlayClick && event.target === event.currentTarget) onClose();
@@ -138,7 +145,7 @@ export function Modal({
             x
           </button>
         </div>
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 sm:px-8 sm:py-6">
+        <div ref={contentRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 sm:px-8 sm:py-6">
           {children}
         </div>
       </div>
