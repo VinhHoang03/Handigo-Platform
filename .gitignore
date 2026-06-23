@@ -4,6 +4,7 @@ handigo-web/FRONTEND_WEB_INFO.md
 AGENTS.md
 credentials/
 *.json
+!handigo-web/vercel.json
 docs/
 # Node modules cho cả 2 ứng dụng
 node_modules/
