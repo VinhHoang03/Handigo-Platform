@@ -13,6 +13,21 @@ export const normalizeVietnamesePhone = (value: string) => {
 export const isValidPersonName = (value: string) =>
   PERSON_NAME_PATTERN.test(normalizePersonName(value));
 
+export const normalizeExternalPersonName = (
+  value: unknown,
+  fallback = "Khách hàng",
+) => {
+  if (typeof value !== "string") return fallback;
+
+  const normalized = normalizePersonName(
+    value
+      .normalize("NFC")
+      .replace(/[^\p{L}\p{M}\s]/gu, " "),
+  );
+
+  return isValidPersonName(normalized) ? normalized : fallback;
+};
+
 export const isValidVietnamesePhone = (value: string) =>
   VIETNAMESE_PHONE_PATTERN.test(normalizeVietnamesePhone(value));
 

@@ -55,7 +55,7 @@ interface PlacesLibrary {
 
 interface GoogleMapsNamespace {
   maps?: {
-    importLibrary?: (libraryName: "places") => Promise<PlacesLibrary>;
+    importLibrary?: (libraryName: "places" | "geocoding") => Promise<PlacesLibrary>;
   };
 }
 
@@ -176,6 +176,45 @@ export const loadGoogleMapsApi = () => {
   });
 
   return mapsApiPromise;
+};
+
+export const geocodeSavedAddress = async (fullAddress: string) => {
+  await loadGoogleMapsApi();
+  const maps = window.google?.maps as unknown as {
+    Geocoder?: new () => {
+      geocode: (
+        request: { address: string; region: string },
+      ) => Promise<{
+        results: Array<{
+          geometry?: {
+            location?: GoogleLatLng;
+          };
+        }>;
+      }>;
+    };
+  };
+
+  if (!maps?.Geocoder) {
+    throw new Error("Google Maps chưa sẵn sàng để lấy tọa độ địa chỉ.");
+  }
+
+  const response = await new maps.Geocoder().geocode({
+    address: fullAddress,
+    region: "VN",
+  });
+  const location = response.results[0]?.geometry?.location;
+  const coordinates = readLatLng(location);
+  if (
+    !Number.isFinite(coordinates.latitude) ||
+    !Number.isFinite(coordinates.longitude)
+  ) {
+    throw new Error("Không tìm thấy tọa độ phù hợp cho địa chỉ đã lưu.");
+  }
+
+  return {
+    latitude: coordinates.latitude!,
+    longitude: coordinates.longitude!,
+  };
 };
 
 export const loadPlacesNewLibrary = async () => {

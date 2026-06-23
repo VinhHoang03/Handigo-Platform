@@ -7,6 +7,7 @@ import type { Order, OrderQuotation } from "../../../types/booking";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import { OrderFeedbackSection } from "@/features/feedback/components/OrderFeedbackSection";
+import { OrderTrackingMap } from "@/features/tracking/components/OrderTrackingMap";
 
 type PendingAction = {
   type: "confirmQuotation" | "rejectQuotation" | "cancelOrder";
@@ -440,6 +441,10 @@ const BookingDetailPage = () => {
             <span className="text-primary font-bold">#{order.orderCode}</span>
           </nav>
         </div>
+      </div>
+
+      <div className="mb-lg">
+        <OrderTrackingMap order={order} viewerRole="CUSTOMER" />
       </div>
 
       <main className="grid grid-cols-1 lg:grid-cols-12 gap-lg">
