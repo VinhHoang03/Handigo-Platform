@@ -99,19 +99,11 @@ function App() {
           />
           <Route
             path="/customer/services"
-            element={
-              <RouteGuard roles={["CUSTOMER"]}>
-                <CustomerServiceListPage />
-              </RouteGuard>
-            }
+            element={<CustomerServiceListPage />}
           />
           <Route
             path="/customer/services/:serviceId"
-            element={
-              <RouteGuard roles={["CUSTOMER"]}>
-                <CustomerServiceDetailPage />
-              </RouteGuard>
-            }
+            element={<CustomerServiceDetailPage />}
           />
           <Route
             path="/customer/providers/:providerId"

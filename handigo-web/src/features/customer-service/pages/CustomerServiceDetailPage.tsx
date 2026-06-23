@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { bookingApi } from "@/api/booking";
+import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { Address, Category, Service, ServiceOption } from "@/types/booking";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
@@ -69,6 +70,7 @@ export default function CustomerServiceDetailPage() {
   const [error, setError] = useState("");
   const [addressSelectionError, setAddressSelectionError] = useState("");
   const [providerListError, setProviderListError] = useState("");
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
     const loadDetail = async () => {
@@ -207,6 +209,10 @@ export default function CustomerServiceDetailPage() {
 
   const handleBookNow = () => {
     if (!service) return;
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: `/customer/services/${service._id}` } });
+      return;
+    }
     if (!addressId) {
       setAddressSelectionError("Vui lòng chọn địa chỉ thực hiện trước khi đặt lịch.");
       return;

@@ -156,6 +156,14 @@ export function Navbar({
     navigate("/", { replace: true });
   };
 
+  const handleBookService = () => {
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: "/customer/bookings/new" } });
+      return;
+    }
+    navigate("/customer/bookings/new");
+  };
+
   const isActive = (item: NavbarItem) => {
     if (item.path === "#") return false;
     if (item.activePrefix)
@@ -287,17 +295,16 @@ export function Navbar({
         )}
 
         <div className="flex items-center gap-2">
-          <Link
-            to="/customer/bookings/new"
-            className={`hidden min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90 ${
-              currentRole === "CUSTOMER" ? "sm:inline-flex" : ""
-            }`}
+          <button
+            type="button"
+            onClick={handleBookService}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
           >
             <span className="material-symbols-outlined text-lg">
               cleaning_services
             </span>
             Đặt dịch vụ
-          </Link>
+          </button>
 
           {isAuthenticated && user ? (
             <>
