@@ -1,97 +1,214 @@
-# AGENTS.md - Handigo Rules
+# AGENTS.md - Handigo AI Engineering Rules
 
 ## Project Context
 
 Handigo là nền tảng kết nối khách hàng và provider dịch vụ tại nhà.
 
-Roles:
+### Roles
 
 - ADMIN
 - CUSTOMER (default)
-- PROVIDER (có provider profile riêng)
+- PROVIDER (có Provider Profile riêng)
 
-Tech stack:
+### Tech Stack
+
+Backend
 
 - Node.js
 - Express.js
 - TypeScript
-- MongoDB/Mongoose
+- MongoDB / Mongoose
 - JWT
-- React/Vite/Tailwind
+- Socket.IO
+- Zod
+- Cloudinary
+- PayOS
+- Google Vision OCR
+
+Frontend
+
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+- Zustand
+- Axios
+- React Router
 
 ---
 
-# General Rules
+# General Principles
 
-- Không tự ý đổi business logic, API contract, schema, enum, route, field name.
-- Không rewrite hoặc format hàng loạt khi chỉ cần sửa nhỏ.
-- Chỉ sửa file liên quan.
-- Giữ nguyên structure và coding style hiện có.
-- Ưu tiên pattern đã tồn tại trong dự án.
-- Không thêm dependency nếu không cần thiết.
-- Không đọc/sửa `.env`, secret, token, credential.
+- Luôn phân tích codebase hiện có trước khi đề xuất hoặc sửa đổi.
+- Ưu tiên tái sử dụng code, module, service và component hiện có.
+- Chỉ sửa đúng phạm vi được yêu cầu.
+- Không mở rộng phạm vi công việc nếu chưa được yêu cầu.
+- Không tự ý đổi business logic, API contract, schema, enum, route hoặc field name.
+- Không rewrite hoặc format hàng loạt khi chỉ cần sửa một phần nhỏ.
+- Không tạo abstraction mới nếu pattern hiện tại vẫn phù hợp.
+- Không thêm dependency nếu chưa thực sự cần thiết.
+- Không tự ý cập nhật package hoặc framework.
+- Không đọc hoặc sửa `.env`, secret, token hoặc credential.
 - Không hard-code dữ liệu nhạy cảm.
-- Không commit hoặc reset git nếu chưa được yêu cầu.
-- Tất cả nội dung phản hồi, comment, log mô tả, tên biến business và tài liệu sinh ra cho dự án phải dùng tiếng Việt có dấu rõ ràng nếu không có yêu cầu khác.
-- Khi generate hoặc sửa code cho project này, ưu tiên:
-  - comment tiếng Việt có dấu
-  - message/error tiếng Việt có dấu
-  - label/UI tiếng Việt có dấu
-  - tài liệu markdown tiếng Việt có dấu
-- Không dùng tiếng Anh cho nội dung hướng tới người dùng cuối nếu hệ thống hiện tại đang dùng tiếng Việt.
-- Giữ nhất quán ngôn ngữ trong cùng module/file.
+- Không commit, push, reset hoặc revert Git nếu chưa được yêu cầu.
+
+---
+
+# Analysis Before Coding
+
+Trước khi sửa hoặc tạo code:
+
+- Phân tích module liên quan.
+- Xác định file cần sửa.
+- Xác định ảnh hưởng tới backend, frontend và database.
+- Giữ backward compatibility nếu không có yêu cầu thay đổi.
+- Nếu chưa đủ thông tin, hỏi thay vì tự suy đoán.
+
+---
+
+# Existing Project First
+
+Luôn ưu tiên:
+
+- Pattern hiện có.
+- Utility hiện có.
+- Shared component hiện có.
+- Shared middleware hiện có.
+- Shared service hiện có.
+- Shared hook hiện có.
+- Shared validation hiện có.
+
+Không tạo implementation mới nếu project đã có giải pháp tương tự.
+
+---
+
+# Language Rules
+
+Toàn bộ nội dung hướng tới dự án phải sử dụng tiếng Việt có dấu, bao gồm:
+
+- Comment
+- Error message
+- Validation message
+- Label UI
+- Documentation
+- Markdown
+- Log mô tả nghiệp vụ
+
+Tên biến, tên hàm, tên class và tên file vẫn tuân theo quy ước lập trình hiện có.
 
 ---
 
 # Git Safety
 
-- Không dùng:
-  - `git reset --hard`
-  - `git checkout --`
-  - revert/xóa hàng loạt
-- Kiểm tra conflict trước khi sửa.
-- Không đưa build/cache/log/temp file vào commit.
+Không sử dụng:
+
+- git reset --hard
+- git checkout --
+- git clean -fd
+- revert hoặc xóa hàng loạt
+
+Không tạo commit nếu chưa được yêu cầu.
+
+Không thêm build, cache hoặc file tạm vào commit.
 
 ---
 
 # Backend Rules
 
-- Giữ nguyên response shape, status code và API contract.
-- Controller chỉ xử lý request/response.
-- Business logic nằm trong service.
-- Validate input trước khi ghi DB.
-- Không tin dữ liệu client:
-  - role
-  - userId
-  - providerId
-  - isAdmin
-  - isVerified
-- User hiện tại phải lấy từ auth/JWT middleware.
-- Route cần bảo vệ phải có auth/authorization.
-- Không trả dữ liệu nhạy cảm:
-  - password
-  - token
-  - internal note
+- Controller chỉ xử lý request và response.
+- Business logic nằm trong Service.
+- Validation phải thực hiện trước khi ghi database.
+- Không tin dữ liệu gửi từ client.
+- User hiện tại luôn lấy từ Authentication Middleware.
+- Route cần bảo vệ phải kiểm tra Authentication và Authorization.
+- Không trả về dữ liệu nhạy cảm.
 - Password phải hash theo cơ chế hiện có.
-- Config/JWT secret lấy từ env/config.
+- Secret luôn lấy từ config hoặc environment.
 
 ---
 
-# Roles & Authorization
+# API Contract
+
+Không tự ý thay đổi:
+
+- Response shape
+- HTTP Status Code
+- Field name
+- Enum
+- Route
+- Pagination format
+- Error response format
+
+Nếu bắt buộc thay đổi, phải chỉ rõ tất cả module bị ảnh hưởng.
+
+---
+
+# Authorization Rules
 
 - CUSTOMER là role mặc định.
-- PROVIDER cần provider document/profile hợp lệ.
-- ADMIN route phải check role ADMIN.
-- User chỉ thao tác tài nguyên của chính mình trừ ADMIN.
+- PROVIDER phải có Provider Profile hợp lệ.
+- ADMIN route phải kiểm tra quyền ADMIN.
+- Người dùng chỉ thao tác tài nguyên của chính mình nếu không có quyền quản trị.
+- Không tin role, userId hoặc providerId gửi từ client.
 
 ---
 
-# MongoDB & Mongoose
+# MongoDB Rules
 
-- Không tự đổi schema/index/default/required.
-- Field mới phải compatible với dữ liệu cũ.
-- Update ưu tiên:
+- Không tự ý thay đổi schema hiện có.
+- Field mới phải tương thích với dữ liệu cũ.
+- Không xóa field cũ nếu chưa có migration.
+- Cập nhật document phải bật validation.
+- Kiểm tra index khi thay đổi query hoặc filter.
+- Đồng bộ schema, validation và API khi thêm field.
 
-```ts
-{ new: true, runValidators: true }
-```
+---
+
+# Frontend Rules
+
+- Tuân theo cấu trúc feature hiện có.
+- Tái sử dụng component trước khi tạo component mới.
+- Sử dụng API client chung.
+- Không duplicate logic.
+- Luôn xử lý Loading, Error và Empty State.
+- Giữ UI nhất quán với Design System của dự án.
+
+---
+
+# Security Rules
+
+Luôn kiểm tra:
+
+- Authentication
+- Authorization
+- Ownership
+- Upload validation
+- Input validation
+- Sensitive data exposure
+- Payment verification
+- Webhook verification
+- Socket permission
+
+Không tin bất kỳ dữ liệu nào từ client nếu chưa được xác thực.
+
+---
+
+# AI Working Rules
+
+Mặc định:
+
+1. Phân tích trước khi code.
+2. Chỉ sửa file cần thiết.
+3. Giữ thay đổi nhỏ nhất có thể.
+4. Không tạo code trùng lặp.
+5. Không phá vỡ API hoặc business logic.
+6. Tuân theo Skills và Workflows của repository.
+7. Sau khi hoàn thành, tự kiểm tra:
+   - Coding style
+   - Type safety
+   - Validation
+   - Security
+   - Regression risk
+   - Ảnh hưởng tới module khác
+
+Nếu phát hiện giả định chưa được xác minh, phải nêu rõ thay vì tự quyết định.

@@ -2,6 +2,12 @@ HANDIGO_PROJECT_INFO.md
 handigo-backend/BACKEND_INFO.md
 handigo-web/FRONTEND_WEB_INFO.md
 AGENTS.md
+AGENT_FLOW.md
+ARCHITECTURE.md
+.agents/
+.codex/
+.codex-kit/
+codex/
 credentials/
 *.json
 docs/
