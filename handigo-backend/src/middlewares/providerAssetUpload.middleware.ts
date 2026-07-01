@@ -2,6 +2,8 @@ import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary from "../configs/cloudinary";
 import { Provider } from "../models/provider.model";
+import { extractDocumentSuggestion } from "../modules/ocr/ocr.service";
+import { OcrDocumentKind } from "../modules/ocr/ocr.types";
 
 const allowedMimeTypes = new Set([
   "image/jpeg",
@@ -19,6 +21,13 @@ const folderByPurpose: Record<string, string> = {
   portfolio: "provider-portfolio",
   avatar: "provider-avatars",
 };
+
+const ocrKinds = new Set<OcrDocumentKind>([
+  "cccd_front",
+  "cccd_back",
+  "passport",
+  "certificate",
+]);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -75,6 +84,21 @@ export const uploadProviderAssetImage = (
       });
     }
 
+    const requestedKind = String(req.body?.documentKind || "");
+    const kind = ocrKinds.has(requestedKind as OcrDocumentKind)
+      ? (requestedKind as OcrDocumentKind)
+      : undefined;
+    const kindMatchesPurpose =
+      !kind ||
+      (purpose === "certificate" && kind === "certificate") ||
+      (purpose === "identity" && kind !== "certificate");
+    if (!kindMatchesPurpose) {
+      return res.status(400).json({
+        success: false,
+        message: "Loại tài liệu OCR không phù hợp với mục đích tải tệp",
+      });
+    }
+
     try {
       const provider = await Provider.findOne({
         userId: req.user?.id,
@@ -90,6 +114,35 @@ export const uploadProviderAssetImage = (
 
       const folder = `handigo/${folderPrefix}/${provider._id.toString()}`;
       res.locals.imageUrl = await uploadBuffer(req.file.buffer, folder);
+
+      const supportsOcr =
+        req.file.mimetype.startsWith("image/") ||
+        req.file.mimetype === "application/pdf";
+      if (kind && supportsOcr) {
+        try {
+          res.locals.ocrSuggestion = await extractDocumentSuggestion(
+            req.file.buffer,
+            req.file.mimetype,
+            kind,
+          );
+        } catch (ocrError) {
+          const message =
+            ocrError instanceof Error ? ocrError.message : "Lỗi OCR không xác định";
+          console.error(`Google Cloud Vision OCR thất bại: ${message}`);
+          res.locals.ocrSuggestion = {
+            warnings: [
+              "Không thể đọc tài liệu bằng OCR. Vui lòng nhập thông tin thủ công.",
+            ],
+          };
+        }
+      } else if (kind) {
+        res.locals.ocrSuggestion = {
+          warnings: [
+            "Định dạng này không hỗ trợ OCR. Vui lòng nhập thông tin thủ công.",
+          ],
+        };
+      }
+
       next();
     } catch {
       return res.status(502).json({

@@ -1,0 +1,75 @@
+# Codex rules are evaluated at startup.
+# Keep this file focused on execution policy, not general coding behavior.
+
+# Prompt before dependency installs that may change the environment.
+prefix_rule(
+    pattern = [["npm", "pnpm", "yarn", "bun"], "install"],
+    decision = "prompt",
+    justification = "Dependency installs can change the local environment and lockfiles.",
+    match = [
+        "npm install",
+        "pnpm install",
+        "yarn install",
+        "bun install",
+    ],
+    not_match = [
+        "npm test",
+        "pnpm dev",
+    ],
+)
+
+# Prompt before any Git command. Project policy is to avoid Git entirely unless
+# the user explicitly asks for it, including read-only commands such as status,
+# diff, log, show, branch, ls-files, check-ignore, and blame.
+prefix_rule(
+    pattern = ["git"],
+    decision = "prompt",
+    justification = "Git commands are only allowed when the user explicitly requests Git usage.",
+    match = [
+        "git status",
+        "git diff",
+        "git log",
+        "git show",
+        "git branch",
+        "git ls-files",
+        "git check-ignore",
+        "git blame",
+        "git push",
+        "git pull",
+        "git commit",
+    ],
+    not_match = [
+        "npm test",
+        "rg pattern src",
+    ],
+)
+
+# Prompt before writing into the user's local Codex skills directory.
+prefix_rule(
+    pattern = ["npx", "@daominhhiep/codex-kit", ["install", "sync"], "--target", "skills", "--scope", "local"],
+    decision = "prompt",
+    justification = "Local Codex skill changes write into ${CODEX_HOME:-~/.codex}/skills.",
+    match = [
+        "npx @daominhhiep/codex-kit install --target skills --scope local",
+        "npx @daominhhiep/codex-kit sync --target skills --scope local",
+    ],
+    not_match = [
+        "npx @daominhhiep/codex-kit install --target skills",
+        "npx @daominhhiep/codex-kit list --target skills --scope local",
+    ],
+)
+
+# Prompt before writing MCP configuration into the user's local Codex config.
+prefix_rule(
+    pattern = ["npx", "@daominhhiep/codex-kit", ["install", "sync"], "--target", "mcp", "--scope", "local"],
+    decision = "prompt",
+    justification = "Local MCP changes write into ${CODEX_HOME:-~/.codex}/config.toml.",
+    match = [
+        "npx @daominhhiep/codex-kit install --target mcp --scope local",
+        "npx @daominhhiep/codex-kit sync --target mcp --scope local",
+    ],
+    not_match = [
+        "npx @daominhhiep/codex-kit install --target mcp",
+        "npx @daominhhiep/codex-kit list --target mcp --scope local",
+    ],
+)
