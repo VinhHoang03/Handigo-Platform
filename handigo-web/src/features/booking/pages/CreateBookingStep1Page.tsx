@@ -3,6 +3,7 @@ import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../compone
 import { bookingApi } from '../../../api/booking';
 import { useBookingStore } from '../hooks/useBookingStore';
 import type { Category, Service, ServiceOption } from '../../../types/booking';
+import { Modal } from '@/components/common/Modal';
 
 const isImageUrl = (value?: string) => {
   if (!value) return false;
@@ -16,6 +17,7 @@ const CreateBookingStep1Page = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -30,9 +32,17 @@ const CreateBookingStep1Page = () => {
   }, [categoryId, setCategoryId]);
 
   useEffect(() => {
+    let isMounted = true;
     if (categoryId) {
-      bookingApi.getServices(categoryId).then(setServices);
+      bookingApi.getServices(categoryId).then(data => {
+        if (isMounted) setServices(data);
+      });
+    } else {
+      setTimeout(() => {
+        if (isMounted) setServices([]);
+      }, 0);
     }
+    return () => { isMounted = false; };
   }, [categoryId]);
 
   useEffect(() => {
@@ -50,9 +60,12 @@ const CreateBookingStep1Page = () => {
   }, [serviceId]);
 
   const visibleCategories = categories.slice(0, 5);
-  const hasMoreCategories = categories.length > visibleCategories.length;
   const selectedService = services.find((service) => service._id === serviceId);
   const isVariablePrice = selectedService?.serviceType === 'variable_price';
+  const handleSelectCategory = (id: string) => {
+    if (id !== categoryId) setCategoryId(id);
+    setIsCategoryModalOpen(false);
+  };
 
   return (
     <OrderCreationShell>
@@ -69,7 +82,7 @@ const CreateBookingStep1Page = () => {
               {visibleCategories.map((cat) => (
                 <button
                   key={cat._id}
-                  onClick={() => setCategoryId(cat._id)}
+                  onClick={() => handleSelectCategory(cat._id)}
                   className={`group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 bg-white px-2 py-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
                     }`}
                 >
@@ -89,7 +102,8 @@ const CreateBookingStep1Page = () => {
               ))}
               <button
                 type="button"
-                disabled={!hasMoreCategories}
+                onClick={() => setIsCategoryModalOpen(true)}
+                disabled={categories.length === 0}
                 className="group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/60 bg-surface-container-low px-2 py-3 text-center text-on-surface-variant transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:text-primary disabled:cursor-default disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:border-outline-variant/60 disabled:hover:bg-surface-container-low disabled:hover:text-on-surface-variant"
               >
                 <span className="material-symbols-outlined mb-2 text-3xl transition-transform group-hover:translate-x-0.5">
@@ -173,6 +187,37 @@ const CreateBookingStep1Page = () => {
           <OrderSummaryCard step={1} actionLabel="Tiếp tục bước 2" actionTo="/customer/bookings/new/location" />
         </div>
       </div>
+      <Modal
+        open={isCategoryModalOpen}
+        title="Chọn loại dịch vụ"
+        onClose={() => setIsCategoryModalOpen(false)}
+        size="lg"
+      >
+        <div className="grid grid-cols-2 gap-sm sm:grid-cols-3 lg:grid-cols-4">
+          {categories.map((cat) => (
+            <button
+              key={cat._id}
+              type="button"
+              onClick={() => handleSelectCategory(cat._id)}
+              className={`group flex min-h-[112px] flex-col items-center justify-center rounded-xl border-2 bg-white px-3 py-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
+                }`}
+            >
+              <div className="mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary-container/10 transition-colors group-hover:bg-primary-container/20">
+                {isImageUrl(cat.icon) ? (
+                  <img
+                    src={cat.icon}
+                    alt={cat.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-primary text-2xl">{cat.icon || 'category'}</span>
+                )}
+              </div>
+              <span className="line-clamp-2 text-label-md font-bold leading-snug text-on-surface">{cat.name}</span>
+            </button>
+          ))}
+        </div>
+      </Modal>
     </OrderCreationShell>
   );
 };

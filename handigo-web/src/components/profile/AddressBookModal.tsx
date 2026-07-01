@@ -65,16 +65,32 @@ const toSelectOptions = (
     searchText: `${item.codeName} ${item.divisionType}`,
   }));
 
+const normalizeAddressPart = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
 const composeFullAddress = (
   addressLine: string,
   ward: string,
   province: string,
-) =>
-  [addressLine, ward, province]
+) => {
+  const parts = [addressLine.trim()];
+  const normalizedAddressLine = normalizeAddressPart(addressLine);
+
+  [ward, province]
     .map((part) => part.trim())
     .filter(Boolean)
-    .join(", ");
+    .forEach((part) => {
+      if (!normalizedAddressLine.includes(normalizeAddressPart(part))) {
+        parts.push(part);
+      }
+    });
 
+  return parts.filter(Boolean).join(', ');
+};
 const extractAddressLine = (
   fullAddress: string,
   ward?: string,

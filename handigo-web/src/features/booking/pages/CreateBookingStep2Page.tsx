@@ -1,4 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { AddressBookManager } from '@/components/profile/AddressBookManager';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { bookingApi } from '../../../api/booking';
@@ -7,8 +9,60 @@ import { useAuthStore } from '@/features/auth/store/auth.store';
 import type { UserAddress } from '@/features/profile/types/profile.types';
 
 const timeSlots = ['08:00 - 10:00', '10:00 - 12:00', '14:00 - 16:00', '16:00 - 18:00'];
+const MIN_DESCRIPTION_LENGTH = 10;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MIN_IMAGE_WIDTH = 320;
+const MIN_IMAGE_HEIGHT = 240;
+
+type Step2FormErrors = {
+  addressId?: string;
+  problemDescription?: string;
+  scheduledAt?: string;
+};
+
+const getUploadErrorMessage = (error: unknown) => {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || 'Không thể tải ảnh lên. Vui lòng thử lại.';
+  }
+  return 'Không thể tải ảnh lên. Vui lòng thử lại.';
+};
+
+const getTodayInputValue = () => {
+  const today = new Date();
+  const timezoneOffset = today.getTimezoneOffset() * 60000;
+  return new Date(today.getTime() - timezoneOffset).toISOString().split('T')[0];
+};
+
+const validateImageFile = (file: File) => new Promise<string | null>((resolve) => {
+  if (!file.type.startsWith('image/')) {
+    resolve(`"${file.name}" không phải là tệp ảnh hợp lệ.`);
+    return;
+  }
+
+  if (file.size > MAX_IMAGE_SIZE) {
+    resolve(`"${file.name}" vượt quá dung lượng 5MB.`);
+    return;
+  }
+
+  const imageUrl = URL.createObjectURL(file);
+  const image = new Image();
+  image.onload = () => {
+    URL.revokeObjectURL(imageUrl);
+    if (image.naturalWidth < MIN_IMAGE_WIDTH || image.naturalHeight < MIN_IMAGE_HEIGHT) {
+      resolve(`"${file.name}" có độ phân giải quá thấp.`);
+      return;
+    }
+    resolve(null);
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(imageUrl);
+    resolve(`"${file.name}" không thể đọc nội dung ảnh.`);
+  };
+  image.src = imageUrl;
+});
 
 const CreateBookingStep2Page = () => {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const {
     addressId, setAddressId, orderType, setOrderType,
@@ -17,6 +71,9 @@ const CreateBookingStep2Page = () => {
   } = useBookingStore();
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<Step2FormErrors>({});
+  const todayInputValue = useMemo(() => getTodayInputValue(), []);
+
   const handleSelectAddress = useCallback(
     (address: UserAddress | null) => setAddressId(address?.id || ''),
     [setAddressId],
@@ -32,15 +89,21 @@ const CreateBookingStep2Page = () => {
       return;
     }
 
+    const validationMessages = (await Promise.all(selectedFiles.map(validateImageFile))).filter(Boolean);
+    if (validationMessages.length > 0) {
+      setUploadError(`${validationMessages.join(' ')} Vui lòng tải ảnh rõ nét về hiện trạng thiết bị, máy móc hoặc khu vực cần sửa.`);
+      return;
+    }
+
     try {
       setIsUploadingImages(true);
       setUploadError(null);
       const uploadedUrls = await Promise.all(
-        selectedFiles.map((file) => bookingApi.uploadOrderAttachment(file)),
+        selectedFiles.map((file) => bookingApi.uploadOrderAttachment(file, 'order_problem')),
       );
       setCustomerAttachments([...customerAttachments, ...uploadedUrls]);
-    } catch {
-      setUploadError('Không thể tải ảnh lên. Vui lòng thử lại.');
+    } catch (error) {
+      setUploadError(getUploadErrorMessage(error));
     } finally {
       setIsUploadingImages(false);
     }
@@ -56,6 +119,43 @@ const CreateBookingStep2Page = () => {
   };
 
   const shouldShowSchedulePicker = orderType !== 'normal';
+
+  const clearFormError = (field: keyof Step2FormErrors) => {
+    setFormErrors((currentErrors) => {
+      if (!currentErrors[field]) return currentErrors;
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  };
+
+  const validateStep = () => {
+    const description = (problemDescription || '').trim();
+    const scheduleDate = scheduledAt ? scheduledAt.split('T')[0] : '';
+    const nextErrors: Step2FormErrors = {};
+
+    if (!addressId) {
+      nextErrors.addressId = 'Vui lòng chọn địa chỉ thực hiện dịch vụ.';
+    }
+
+    if (description.length < MIN_DESCRIPTION_LENGTH) {
+      nextErrors.problemDescription = 'Vui lòng mô tả tình trạng tối thiểu ' + MIN_DESCRIPTION_LENGTH + ' ký tự.';
+    }
+
+    if (shouldShowSchedulePicker && !scheduleDate) {
+      nextErrors.scheduledAt = 'Vui lòng chọn ngày thực hiện dịch vụ.';
+    } else if (scheduleDate && scheduleDate < todayInputValue) {
+      nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
+    }
+
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleContinue = () => {
+    if (!validateStep()) return;
+    navigate('/customer/bookings/new/payment');
+  };
 
   return (
     <OrderCreationShell>
@@ -77,22 +177,38 @@ const CreateBookingStep2Page = () => {
                   className="w-full p-sm rounded-2xl border border-outline-variant focus:border-primary outline-none min-h-[150px] text-body-md bg-surface-container-lowest"
                   placeholder="Ghi chú chi tiết về tình trạng hoặc yêu cầu cụ thể..."
                   value={problemDescription || ''}
-                  onChange={(event) => setProblemDescription(event.target.value)}
+                  onChange={(event) => {
+                    setProblemDescription(event.target.value);
+                    clearFormError('problemDescription');
+                  }}
                 />
+                {formErrors.problemDescription && (
+                  <p className="mt-xs text-xs font-medium text-red-600">{formErrors.problemDescription}</p>
+                )}
+                <p className="mt-xs text-[10px] text-on-surface-variant italic">
+                  Mô tả tối thiểu {MIN_DESCRIPTION_LENGTH} ký tự để provider nắm rõ tình trạng.
+                </p>
               </div>
 
-              <AddressBookManager
-                compact
-                selectable
-                selectedAddressId={addressId}
-                defaultRecipient={{
-                  name: user?.fullName || '',
-                  phone: user?.phone || '',
-                }}
-                onSelectAddress={handleSelectAddress}
-              />
+              <div>
+                <AddressBookManager
+                  compact
+                  selectable
+                  selectedAddressId={addressId}
+                  defaultRecipient={{
+                    name: user?.fullName || '',
+                    phone: user?.phone || '',
+                  }}
+                  onSelectAddress={(address) => {
+                    handleSelectAddress(address);
+                    clearFormError('addressId');
+                  }}
+                />
+                {formErrors.addressId && (
+                  <p className="mt-xs text-xs font-medium text-red-600">{formErrors.addressId}</p>
+                )}
+              </div>
             </div>
-
             <div className="mt-md pt-md border-t border-outline-variant/30">
               <label className="block font-bold mb-xs text-on-surface-variant text-xs uppercase tracking-wider">
                 Ảnh hiện trạng
@@ -108,7 +224,7 @@ const CreateBookingStep2Page = () => {
                   <input
                     type="file"
                     className="hidden"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp"
                     multiple
                     disabled={isUploadingImages || customerAttachments.length >= 4}
                     onChange={(event) => {
@@ -133,7 +249,7 @@ const CreateBookingStep2Page = () => {
               </div>
               {uploadError && <p className="text-xs text-red-600 mt-xs">{uploadError}</p>}
               <p className="text-[10px] text-on-surface-variant mt-xs italic">
-                Tải lên tối đa 4 ảnh để chuyên gia dễ hình dung vấn đề.
+                Tải lên tối đa 4 ảnh JPG, PNG hoặc WebP, mỗi ảnh tối đa 5MB. Ảnh nên thể hiện rõ thiết bị, máy móc hư hỏng hoặc khu vực cần sửa.
               </p>
             </div>
           </section>
@@ -149,7 +265,10 @@ const CreateBookingStep2Page = () => {
                 <label key={title} className="cursor-pointer">
                   <input
                     checked={orderType === type}
-                    onChange={() => handleOrderTypeChange(type)}
+                    onChange={() => {
+                      handleOrderTypeChange(type);
+                      clearFormError('scheduledAt');
+                    }}
                     className="peer sr-only"
                     name="booking_type"
                     type="radio"
@@ -172,10 +291,17 @@ const CreateBookingStep2Page = () => {
                   </p>
                   <input
                     type="date"
+                    min={todayInputValue}
                     className="w-full p-sm rounded-2xl border border-outline-variant focus:border-primary outline-none bg-surface-container-lowest"
                     value={scheduledAt ? scheduledAt.split('T')[0] : ''}
-                    onChange={(event) => setScheduledAt(event.target.value)}
+                    onChange={(event) => {
+                      setScheduledAt(event.target.value);
+                      clearFormError('scheduledAt');
+                    }}
                   />
+                  {formErrors.scheduledAt && (
+                    <p className="mt-xs text-xs font-medium text-red-600">{formErrors.scheduledAt}</p>
+                  )}
                 </div>
                 <div>
                   <p className="font-bold mb-xs flex items-center gap-xs text-sm">
@@ -186,10 +312,12 @@ const CreateBookingStep2Page = () => {
                     {timeSlots.map((slot) => (
                       <button
                         key={slot}
+                        type="button"
                         onClick={() => {
                           if (scheduledAt) {
                             const date = scheduledAt.split('T')[0];
                             setScheduledAt(`${date}T${slot.split(' ')[0]}:00`);
+                            clearFormError('scheduledAt');
                           }
                         }}
                         className={`py-2 rounded-xl transition-colors text-xs font-medium ${scheduledAt?.includes(slot.split(' ')[0])
@@ -207,7 +335,7 @@ const CreateBookingStep2Page = () => {
           </section>
         </div>
 
-        <OrderSummaryCard step={2} actionLabel="Tiếp tục bước 3" actionTo="/customer/bookings/new/payment" />
+        <OrderSummaryCard step={2} actionLabel="Tiếp tục bước 3" onAction={handleContinue} />
       </div>
 
     </OrderCreationShell>

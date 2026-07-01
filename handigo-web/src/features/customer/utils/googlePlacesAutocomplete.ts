@@ -53,9 +53,26 @@ interface PlacesLibrary {
   AutocompleteSessionToken?: new () => unknown;
 }
 
+interface GeocodingLibrary {
+  Geocoder?: new () => {
+    geocode: (
+      request: { address: string; region: string },
+    ) => Promise<{
+      results: Array<{
+        geometry?: {
+          location?: GoogleLatLng;
+        };
+      }>;
+    }>;
+  };
+}
+
 interface GoogleMapsNamespace {
   maps?: {
-    importLibrary?: (libraryName: "places" | "geocoding") => Promise<PlacesLibrary>;
+    importLibrary?: (
+      libraryName: "places" | "geocoding" | "maps",
+    ) => Promise<PlacesLibrary | GeocodingLibrary | unknown>;
+    Geocoder?: GeocodingLibrary["Geocoder"];
   };
 }
 
@@ -180,25 +197,17 @@ export const loadGoogleMapsApi = () => {
 
 export const geocodeSavedAddress = async (fullAddress: string) => {
   await loadGoogleMapsApi();
-  const maps = window.google?.maps as unknown as {
-    Geocoder?: new () => {
-      geocode: (
-        request: { address: string; region: string },
-      ) => Promise<{
-        results: Array<{
-          geometry?: {
-            location?: GoogleLatLng;
-          };
-        }>;
-      }>;
-    };
-  };
+  const maps = window.google?.maps;
+  const geocodingLibrary = (await maps?.importLibrary?.(
+    "geocoding",
+  )) as GeocodingLibrary | undefined;
+  const Geocoder = geocodingLibrary?.Geocoder || maps?.Geocoder;
 
-  if (!maps?.Geocoder) {
-    throw new Error("Google Maps chưa sẵn sàng để lấy tọa độ địa chỉ.");
+  if (!Geocoder) {
+    throw new Error("Google Maps ch\u01b0a s\u1eb5n s\u00e0ng \u0111\u1ec3 l\u1ea5y t\u1ecda \u0111\u1ed9 \u0111\u1ecba ch\u1ec9.");
   }
 
-  const response = await new maps.Geocoder().geocode({
+  const response = await new Geocoder().geocode({
     address: fullAddress,
     region: "VN",
   });
@@ -208,7 +217,7 @@ export const geocodeSavedAddress = async (fullAddress: string) => {
     !Number.isFinite(coordinates.latitude) ||
     !Number.isFinite(coordinates.longitude)
   ) {
-    throw new Error("Không tìm thấy tọa độ phù hợp cho địa chỉ đã lưu.");
+    throw new Error("Kh\u00f4ng t\u00ecm th\u1ea5y t\u1ecda \u0111\u1ed9 ph\u00f9 h\u1ee3p cho \u0111\u1ecba ch\u1ec9 \u0111\u00e3 l\u01b0u.");
   }
 
   return {
@@ -222,7 +231,7 @@ export const loadPlacesNewLibrary = async () => {
   placesLibraryPromise = loadGoogleMapsApi().then(async () => {
     const importLibrary = window.google?.maps?.importLibrary;
     if (!importLibrary) throw new Error("Google Maps chưa sẵn sàng.");
-    const library = await importLibrary("places");
+    const library = (await importLibrary("places")) as PlacesLibrary;
     if (!library.AutocompleteSuggestion) {
       throw new Error(
         "Places API (New) chưa được bật hoặc khóa API chưa có quyền sử dụng.",

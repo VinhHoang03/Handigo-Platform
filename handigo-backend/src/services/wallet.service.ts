@@ -100,6 +100,18 @@ const assertWalletOwnerActive = async (userId: string | Types.ObjectId) => {
   }
 };
 
+const assertWalletAccess = async (user: RequestUser) => {
+  if (!["CUSTOMER", "PROVIDER"].includes(user.role)) {
+    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền truy cập ví này", 403);
+  }
+
+  if (user.role === "PROVIDER") {
+    await getProviderByUserId(user.id);
+  }
+
+  await assertWalletOwnerActive(user.id);
+};
+
 const getWalletByUserId = async (
   userId: string | Types.ObjectId,
   options?: { createIfMissing?: boolean; session?: ClientSession },
@@ -165,16 +177,20 @@ const sumTransactions = async (
 };
 
 const getWalletTotals = async (userId: string | Types.ObjectId) => {
-  const [totalEarnings, totalWithdrawn, totalPlatformFeesPaid] = await Promise.all([
+  const [totalEarnings, totalWithdrawn, totalPlatformFeesPaid, totalDeposited, totalPaid] = await Promise.all([
     sumTransactions(userId, "provider_earning", "in"),
     sumTransactions(userId, "withdraw", "out"),
     sumTransactions(userId, "platform_fee", "out"),
+    sumTransactions(userId, "deposit", "in"),
+    sumTransactions(userId, "payment", "out"),
   ]);
 
   return {
     totalEarnings,
     totalWithdrawn,
     totalPlatformFeesPaid,
+    totalDeposited,
+    totalPaid,
   };
 };
 
@@ -244,12 +260,7 @@ const buildTransactionFilter = (
 };
 
 export const getCurrentWallet = async (user: RequestUser) => {
-  if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền truy cập ví này", 403);
-  }
-
-  await getProviderByUserId(user.id);
-  await assertWalletOwnerActive(user.id);
+  await assertWalletAccess(user);
 
   const wallet = await getWalletByUserId(user.id, { createIfMissing: true });
   const totals = await getWalletTotals(user.id);
@@ -259,16 +270,13 @@ export const getCurrentWallet = async (user: RequestUser) => {
     pendingBalance: wallet.pendingBalance,
     totalEarnings: totals.totalEarnings,
     totalWithdrawn: totals.totalWithdrawn,
+    totalDeposited: totals.totalDeposited,
+    totalPaid: totals.totalPaid,
   };
 };
 
 export const getWalletSummary = async (user: RequestUser) => {
-  if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền truy cập ví này", 403);
-  }
-
-  await getProviderByUserId(user.id);
-  await assertWalletOwnerActive(user.id);
+  await assertWalletAccess(user);
 
   const wallet = await getWalletByUserId(user.id, { createIfMissing: true });
   const totals = await getWalletTotals(user.id);
@@ -278,6 +286,8 @@ export const getWalletSummary = async (user: RequestUser) => {
     totalEarnings: totals.totalEarnings,
     totalWithdrawals: totals.totalWithdrawn,
     totalPlatformFeesPaid: totals.totalPlatformFeesPaid,
+    totalDeposited: totals.totalDeposited,
+    totalPaid: totals.totalPaid,
   };
 };
 
@@ -285,12 +295,7 @@ export const getWalletTransactionHistory = async (
   user: RequestUser,
   query: WalletTransactionQuery,
 ) => {
-  if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền truy cập ví này", 403);
-  }
-
-  await getProviderByUserId(user.id);
-  await assertWalletOwnerActive(user.id);
+  await assertWalletAccess(user);
 
   const filter = buildTransactionFilter(user.id, query);
   const skip = (query.page - 1) * query.limit;
@@ -312,14 +317,10 @@ export const getWalletTransactionHistory = async (
 };
 
 export const createWalletDeposit = async (user: RequestUser, input: WalletDepositInput) => {
-  if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Ban khong co quyen nap vi nay", 403);
-  }
-
   assertPositiveAmount(input.amount);
 
-  const provider = await getProviderByUserId(user.id);
-  await assertWalletOwnerActive(user.id);
+  const provider = user.role === "PROVIDER" ? await getProviderByUserId(user.id) : null;
+  await assertWalletAccess(user);
   const wallet = await getWalletByUserId(user.id, { createIfMissing: true });
   const orderCode = buildPayosOrderCode();
 
@@ -337,9 +338,10 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
       provider: "payos",
       orderCode,
     },
-    description: "Nap tien vao vi provider",
+    description: "Nạp tiền vào ví Handigo",
     metadata: {
-      providerId: provider._id,
+      ownerRole: user.role,
+      providerId: provider?._id || null,
     },
   });
 
@@ -395,11 +397,7 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
 };
 
 export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) => {
-  if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Ban khong co quyen huy giao dich nay", 403);
-  }
-
-  await getProviderByUserId(user.id);
+  await assertWalletAccess(user);
 
   const transaction = await WalletTransaction.findOne({
     userId: user.id,
@@ -421,8 +419,8 @@ export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) 
     transaction.gatewayResponse = {
       ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
       cancelledAt: new Date(),
-      cancelledBy: "provider",
-      cancelReason: "Provider cancelled PayOS payment link",
+      cancelledBy: user.role,
+      cancelReason: "Người dùng hủy liên kết thanh toán PayOS",
     };
     transaction.description = "Giao dich nap vi da huy";
     await transaction.save();
@@ -481,11 +479,7 @@ const markWalletDepositSuccess = async (
 };
 
 export const syncWalletDeposit = async (user: RequestUser, orderCode: string) => {
-  if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền đồng bộ giao dịch này", 403);
-  }
-
-  await getProviderByUserId(user.id);
+  await assertWalletAccess(user);
 
   const transaction = await WalletTransaction.findOne({
     userId: user.id,
@@ -831,6 +825,8 @@ export const getAdminWalletByProviderId = async (providerId: string) => {
     totalEarnings: totals.totalEarnings,
     totalWithdrawn: totals.totalWithdrawn,
     totalPlatformFeesPaid: totals.totalPlatformFeesPaid,
+    totalDeposited: totals.totalDeposited,
+    totalPaid: totals.totalPaid,
   };
 };
 

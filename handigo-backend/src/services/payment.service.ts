@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+﻿import mongoose, { Types } from "mongoose";
 import { payos } from "../configs/payos.config";
 import { AppError } from "../utils/appError";
 import { Notification } from "../models/notification.model";
@@ -10,6 +10,7 @@ import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import type { CreatePaymentInput, PaymentHistoryQuery } from "../validations/payment.validation";
 import { handleWalletDepositPayosWebhook } from "./wallet.service";
+import { dispatchOrderForMatching } from "./order.service";
 
 type RequestUser = {
   id: string;
@@ -45,7 +46,7 @@ const getPaymentAmount = async (order: any, paymentType: PaymentType) => {
   const depositAmount = order.depositAmount || 0;
 
   if (depositAmount <= 0) {
-    throw new AppError("Dịch vụ khảo sát chưa cấu hình tiền đặt cọc", 400);
+    throw new AppError("Dá»‹ch vá»¥ kháº£o sÃ¡t chÆ°a cáº¥u hÃ¬nh tiá»n Ä‘áº·t cá»c", 400);
   }
 
   return depositAmount;
@@ -83,30 +84,124 @@ const createNotification = async (
   });
 };
 
+
+const createWalletPayment = async (order: any, paymentType: PaymentType, amount: number) => {
+  const session = await mongoose.startSession();
+  let result = null;
+
+  try {
+    await session.withTransaction(async () => {
+      const wallet = await Wallet.findOneAndUpdate(
+        {
+          userId: order.customerId,
+          isDeleted: false,
+          balance: { $gte: amount },
+        },
+        { $inc: { balance: -amount } },
+        { new: true, session },
+      );
+
+      if (!wallet) {
+        throw new AppError("Sá»‘ dÆ° vÃ­ khÃ´ng Ä‘á»§ Ä‘á»ƒ thanh toÃ¡n Ä‘Æ¡n hÃ ng", 400);
+      }
+
+      const [payment] = await Payment.create(
+        [
+          {
+            orderId: order._id,
+            customerId: order.customerId,
+            amount,
+            method: "wallet",
+            paymentType,
+            status: "paid",
+            paidAt: new Date(),
+            transactionCode: buildTransactionCode("WALLET_PAYMENT"),
+            metadata: {
+              walletId: wallet._id,
+              orderCode: order.orderCode,
+            },
+          },
+        ],
+        { session },
+      );
+
+      const [walletTransaction] = await WalletTransaction.create(
+        [
+          {
+            walletId: wallet._id,
+            userId: order.customerId,
+            relatedOrderId: order._id,
+            relatedPaymentId: payment._id,
+            type: "payment",
+            direction: "out",
+            amount,
+            balanceAfter: wallet.balance,
+            status: "success",
+            transactionCode: buildTransactionCode("WALLET_PAYMENT"),
+            description: "Thanh toÃ¡n Ä‘Æ¡n hÃ ng báº±ng vÃ­ Handigo",
+            metadata: {
+              paymentId: payment._id,
+              orderCode: order.orderCode,
+              paymentType,
+            },
+          },
+        ],
+        { session },
+      );
+
+      if (paymentType === "inspection_deposit") {
+        order.depositAmount = amount;
+        order.depositPaidAt = payment.paidAt;
+        order.paymentStatus = "partially_paid";
+      } else {
+        order.paymentStatus = "paid";
+      }
+
+      order.readyForMatching = true;
+      await order.save({ session });
+
+      result = {
+        payment,
+        walletTransaction,
+        method: "WALLET",
+        paymentType,
+        amount,
+      };
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  if (result) {
+    await dispatchOrderForMatching(order._id.toString());
+  }
+
+  return result;
+};
 export const createPayment = async (user: RequestUser, input: CreatePaymentInput) => {
   const order = await Order.findById(input.orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("Không tìm thấy đơn hàng", 404);
+    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
   }
 
   if (order.customerId.toString() !== user.id && user.role !== "ADMIN") {
-    throw new AppError("Bạn không có quyền thanh toán đơn hàng này", 403);
+    throw new AppError("Báº¡n khÃ´ng cÃ³ quyá»n thanh toÃ¡n Ä‘Æ¡n hÃ ng nÃ y", 403);
   }
 
   const paymentType = getPaymentType(order, input.paymentType);
 
   if (order.inspectionRequired && input.method === "CASH") {
-    throw new AppError("Đơn khảo sát phải thanh toán tiền đặt cọc qua PayOS", 400);
+    throw new AppError("ÄÆ¡n kháº£o sÃ¡t pháº£i thanh toÃ¡n tiá»n Ä‘áº·t cá»c qua PayOS", 400);
   }
 
   const amount = await getPaymentAmount(order, paymentType);
 
   if (amount <= 0) {
-    throw new AppError("Số tiền thanh toán không hợp lệ", 400);
+    throw new AppError("Sá»‘ tiá»n thanh toÃ¡n khÃ´ng há»£p lá»‡", 400);
   }
 
-  const paymentMethod = input.method === "PAYOS" ? "payos" : "cash";
+  const paymentMethod = input.method === "PAYOS" ? "payos" : input.method === "WALLET" ? "wallet" : "cash";
 
   const duplicatePayment = await Payment.findOne({
     orderId: order._id,
@@ -116,12 +211,17 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   });
 
   if (duplicatePayment) {
-    throw new AppError("Đơn hàng đã có giao dịch thanh toán cùng loại", 409);
+    throw new AppError("ÄÆ¡n hÃ ng Ä‘Ã£ cÃ³ giao dá»‹ch thanh toÃ¡n cÃ¹ng loáº¡i", 409);
+  }
+
+  if (input.method === "WALLET") {
+    return createWalletPayment(order, paymentType, amount);
   }
 
   if (input.method === "CASH") {
     order.readyForMatching = true;
     await order.save();
+    await dispatchOrderForMatching(order._id.toString());
 
     const payment = await Payment.create({
       orderId: order._id,
@@ -132,7 +232,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
       status: "pending",
       transactionCode: buildTransactionCode("CASH"),
       metadata: {
-        note: "Khách hàng chọn thanh toán tiền mặt cho nhà cung cấp",
+        note: "KhÃ¡ch hÃ ng chá»n thanh toÃ¡n tiá»n máº·t cho nhÃ  cung cáº¥p",
       },
     });
 
@@ -145,7 +245,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   }
 
   if (paymentType !== "inspection_deposit") {
-    order.readyForMatching = true;
+    order.readyForMatching = false;
   } else {
     order.depositAmount = amount;
     order.readyForMatching = false;
@@ -178,7 +278,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
       cancelUrl: input.cancelUrl || DEFAULT_CANCEL_URL,
       items: [
         {
-          name: paymentType === "inspection_deposit" ? "Đặt cọc dịch vụ FixNow" : "Thanh toán dịch vụ FixNow",
+          name: paymentType === "inspection_deposit" ? "Äáº·t cá»c dá»‹ch vá»¥ FixNow" : "Thanh toÃ¡n dá»‹ch vá»¥ FixNow",
           quantity: 1,
           price: amount,
         },
@@ -195,13 +295,13 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   } catch (error: any) {
     payment.status = "failed";
     payment.failedAt = new Date();
-    payment.failureReason = error.message || "Không thể tạo liên kết thanh toán PayOS";
+    payment.failureReason = error.message || "KhÃ´ng thá»ƒ táº¡o liÃªn káº¿t thanh toÃ¡n PayOS";
     payment.gatewayResponse = {
       ...((payment.gatewayResponse as Record<string, unknown>) || {}),
       error: payment.failureReason,
     };
     await payment.save();
-    throw new AppError("Không thể tạo liên kết thanh toán PayOS", 502);
+    throw new AppError("KhÃ´ng thá»ƒ táº¡o liÃªn káº¿t thanh toÃ¡n PayOS", 502);
   }
 
   return {
@@ -216,20 +316,20 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   const order = await Order.findById(orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("Không tìm thấy đơn hàng", 404);
+    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
   }
 
   if (order.inspectionRequired) {
-    throw new AppError("Dịch vụ báo giá không trừ phí nền tảng từ ví thợ", 400);
+    throw new AppError("Dá»‹ch vá»¥ bÃ¡o giÃ¡ khÃ´ng trá»« phÃ­ ná»n táº£ng tá»« vÃ­ thá»£", 400);
   }
 
   const provider = await Provider.findOne({ userId: providerUserId });
   if (!provider) {
-    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
+    throw new AppError("KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ thá»£", 404);
   }
 
   if (order.providerId && order.providerId.toString() !== provider._id.toString()) {
-    throw new AppError("Thợ không khớp với đơn hàng", 403);
+    throw new AppError("Thá»£ khÃ´ng khá»›p vá»›i Ä‘Æ¡n hÃ ng", 403);
   }
 
   const existingTransaction = await WalletTransaction.findOne({
@@ -246,7 +346,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   const platformFee = Math.max(order.pricing?.platformCommissionAmount || 0, 0);
 
   if (platformFee <= 0) {
-    throw new AppError("Phí nền tảng không hợp lệ", 400);
+    throw new AppError("PhÃ­ ná»n táº£ng khÃ´ng há»£p lá»‡", 400);
   }
 
   const wallet = await Wallet.findOneAndUpdate(
@@ -256,7 +356,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   );
 
   if (!wallet) {
-    throw new AppError("Số dư ví không đủ để nhận đơn", 400);
+    throw new AppError("Sá»‘ dÆ° vÃ­ khÃ´ng Ä‘á»§ Ä‘á»ƒ nháº­n Ä‘Æ¡n", 400);
   }
 
   const transaction = await WalletTransaction.create({
@@ -269,7 +369,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
     balanceAfter: wallet.balance,
     status: "success",
     transactionCode: buildTransactionCode("PLATFORM_FEE"),
-    description: "Trừ phí nền tảng khi thợ nhận đơn giá cố định",
+    description: "Trá»« phÃ­ ná»n táº£ng khi thá»£ nháº­n Ä‘Æ¡n giÃ¡ cá»‘ Ä‘á»‹nh",
     metadata: {
       orderCode: order.orderCode,
     },
@@ -278,7 +378,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   order.platformFeeChargedAt = new Date();
   await order.save();
 
-  await createNotification(provider.userId, "Đã trừ phí nền tảng", "Hệ thống đã trừ phí nền tảng từ ví của bạn khi nhận đơn.", {
+  await createNotification(provider.userId, "ÄÃ£ trá»« phÃ­ ná»n táº£ng", "Há»‡ thá»‘ng Ä‘Ã£ trá»« phÃ­ ná»n táº£ng tá»« vÃ­ cá»§a báº¡n khi nháº­n Ä‘Æ¡n.", {
     orderId: order._id,
     transactionId: transaction._id,
     amount: platformFee,
@@ -316,25 +416,31 @@ export const handlePayosWebhook = async (payload: any) => {
     payment.paidAt = new Date();
   } else {
     payment.failedAt = new Date();
-    payment.failureReason = webhookData.desc || payload.desc || "Thanh toán PayOS thất bại";
+    payment.failureReason = webhookData.desc || payload.desc || "Thanh toÃ¡n PayOS tháº¥t báº¡i";
   }
 
   await payment.save();
 
-  if (isSuccess && payment.paymentType === "inspection_deposit") {
+  if (isSuccess) {
     const order = await Order.findById(payment.orderId);
     if (order) {
-      order.depositAmount = payment.amount;
-      order.depositPaidAt = payment.paidAt;
+      if (payment.paymentType === "inspection_deposit") {
+        order.depositAmount = payment.amount;
+        order.depositPaidAt = payment.paidAt;
+        order.paymentStatus = "partially_paid";
+      } else {
+        order.paymentStatus = "paid";
+      }
       order.readyForMatching = true;
       await order.save();
+      await dispatchOrderForMatching(order._id.toString());
     }
   }
 
   await createNotification(
     payment.customerId,
-    isSuccess ? "Thanh toán thành công" : "Thanh toán thất bại",
-    isSuccess ? "Giao dịch PayOS của bạn đã được xác nhận." : "Giao dịch PayOS của bạn không thành công.",
+    isSuccess ? "Thanh toÃ¡n thÃ nh cÃ´ng" : "Thanh toÃ¡n tháº¥t báº¡i",
+    isSuccess ? "Giao dá»‹ch PayOS cá»§a báº¡n Ä‘Ã£ Ä‘Æ°á»£c xÃ¡c nháº­n." : "Giao dá»‹ch PayOS cá»§a báº¡n khÃ´ng thÃ nh cÃ´ng.",
     { orderId: payment.orderId, paymentId: payment._id, amount: payment.amount },
   );
 
@@ -345,12 +451,12 @@ export const getPaymentById = async (paymentId: string, user: RequestUser) => {
   const payment = await Payment.findById(paymentId);
 
   if (!payment || payment.isDeleted) {
-    throw new AppError("Không tìm thấy giao dịch", 404);
+    throw new AppError("KhÃ´ng tÃ¬m tháº¥y giao dá»‹ch", 404);
   }
 
   const order = await Order.findById(payment.orderId);
   if (!order || !(await canAccessOrder(order, user))) {
-    throw new AppError("Bạn không có quyền xem giao dịch này", 403);
+    throw new AppError("Báº¡n khÃ´ng cÃ³ quyá»n xem giao dá»‹ch nÃ y", 403);
   }
 
   return payment;
@@ -360,11 +466,11 @@ export const getPaymentsByOrder = async (orderId: string, user: RequestUser) => 
   const order = await Order.findById(orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("Không tìm thấy đơn hàng", 404);
+    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
   }
 
   if (!(await canAccessOrder(order, user))) {
-    throw new AppError("Bạn không có quyền xem giao dịch của đơn hàng này", 403);
+    throw new AppError("Báº¡n khÃ´ng cÃ³ quyá»n xem giao dá»‹ch cá»§a Ä‘Æ¡n hÃ ng nÃ y", 403);
   }
 
   const payments = await Payment.find({ orderId }).sort({ createdAt: -1 });
@@ -454,7 +560,7 @@ export const refundInspectionDepositIfNoProvider = async (orderId: string) => {
 
   payment.status = "refunded";
   payment.refundedAt = new Date();
-  payment.refundReason = "Không có thợ nhận đơn khảo sát";
+  payment.refundReason = "KhÃ´ng cÃ³ thá»£ nháº­n Ä‘Æ¡n kháº£o sÃ¡t";
   payment.gatewayResponse = {
     ...((payment.gatewayResponse as Record<string, unknown>) || {}),
     refundReason: payment.refundReason,
@@ -464,7 +570,7 @@ export const refundInspectionDepositIfNoProvider = async (orderId: string) => {
   order.readyForMatching = false;
   await order.save();
 
-  await createNotification(payment.customerId, "Hoàn tiền đặt cọc", "Tiền đặt cọc đã được đánh dấu hoàn do chưa có thợ nhận đơn.", {
+  await createNotification(payment.customerId, "HoÃ n tiá»n Ä‘áº·t cá»c", "Tiá»n Ä‘áº·t cá»c Ä‘Ã£ Ä‘Æ°á»£c Ä‘Ã¡nh dáº¥u hoÃ n do chÆ°a cÃ³ thá»£ nháº­n Ä‘Æ¡n.", {
     orderId: payment.orderId,
     paymentId: payment._id,
     amount: payment.amount,
@@ -476,25 +582,25 @@ export const refundInspectionDepositIfNoProvider = async (orderId: string) => {
 export const compensateProviderFromInspectionDeposit = async (
   orderId: string,
   providerUserId: string,
-  reason = "Khách hàng không thực hiện đơn khảo sát",
+  reason = "KhÃ¡ch hÃ ng khÃ´ng thá»±c hiá»‡n Ä‘Æ¡n kháº£o sÃ¡t",
 ) => {
   const order = await Order.findById(orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("Không tìm thấy đơn hàng", 404);
+    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
   }
 
   if (!order.inspectionRequired) {
-    throw new AppError("Chỉ đơn khảo sát mới có thể chuyển cọc bồi thường", 400);
+    throw new AppError("Chá»‰ Ä‘Æ¡n kháº£o sÃ¡t má»›i cÃ³ thá»ƒ chuyá»ƒn cá»c bá»“i thÆ°á»ng", 400);
   }
 
   const provider = await Provider.findOne({ userId: providerUserId });
   if (!provider) {
-    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
+    throw new AppError("KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ thá»£", 404);
   }
 
   if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
-    throw new AppError("Thợ không khớp với đơn hàng", 403);
+    throw new AppError("Thá»£ khÃ´ng khá»›p vá»›i Ä‘Æ¡n hÃ ng", 403);
   }
 
   const payment = await Payment.findOne({
@@ -505,11 +611,11 @@ export const compensateProviderFromInspectionDeposit = async (
   });
 
   if (!payment) {
-    throw new AppError("Đơn hàng chưa có tiền cọc hợp lệ", 400);
+    throw new AppError("ÄÆ¡n hÃ ng chÆ°a cÃ³ tiá»n cá»c há»£p lá»‡", 400);
   }
 
   if (payment.compensatedToProviderId) {
-    throw new AppError("Tiền cọc đã được chuyển bồi thường cho thợ", 409);
+    throw new AppError("Tiá»n cá»c Ä‘Ã£ Ä‘Æ°á»£c chuyá»ƒn bá»“i thÆ°á»ng cho thá»£", 409);
   }
 
   const existingTransaction = await WalletTransaction.findOne({
@@ -543,7 +649,7 @@ export const compensateProviderFromInspectionDeposit = async (
     balanceAfter: wallet.balance,
     status: "success",
     transactionCode: buildTransactionCode("COMPENSATION"),
-    description: "Bồi thường tiền cọc do khách không thực hiện đơn khảo sát",
+    description: "Bá»“i thÆ°á»ng tiá»n cá»c do khÃ¡ch khÃ´ng thá»±c hiá»‡n Ä‘Æ¡n kháº£o sÃ¡t",
     metadata: {
       reason,
       orderCode: order.orderCode,
@@ -559,7 +665,7 @@ export const compensateProviderFromInspectionDeposit = async (
   };
   await payment.save();
 
-  await createNotification(provider.userId, "Nhận bồi thường tiền cọc", "Tiền cọc của đơn khảo sát đã được chuyển vào ví của bạn.", {
+  await createNotification(provider.userId, "Nháº­n bá»“i thÆ°á»ng tiá»n cá»c", "Tiá»n cá»c cá»§a Ä‘Æ¡n kháº£o sÃ¡t Ä‘Ã£ Ä‘Æ°á»£c chuyá»ƒn vÃ o vÃ­ cá»§a báº¡n.", {
     orderId: order._id,
     paymentId: payment._id,
     transactionId: transaction._id,
@@ -568,3 +674,5 @@ export const compensateProviderFromInspectionDeposit = async (
 
   return transaction;
 };
+
+

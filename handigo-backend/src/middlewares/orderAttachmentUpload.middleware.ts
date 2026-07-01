@@ -1,6 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary from "../configs/cloudinary";
+import { analyzeOrderProblemImage } from "../services/orderAttachmentImageAnalysis.service";
+
+const ORDER_PROBLEM_PURPOSE = "order_problem";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -25,6 +28,9 @@ const uploadBuffer = (buffer: Buffer) =>
     stream.end(buffer);
   });
 
+const shouldAnalyzeOrderProblemImage = (req: Request) =>
+  req.body?.purpose === ORDER_PROBLEM_PURPOSE;
+
 export const uploadOrderAttachmentImage = (
   req: Request,
   res: Response,
@@ -38,17 +44,39 @@ export const uploadOrderAttachmentImage = (
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Image is required",
+        message: "Vui lòng tải lên ảnh hợp lệ.",
       });
     }
 
     try {
+      if (shouldAnalyzeOrderProblemImage(req)) {
+        const analysis = await analyzeOrderProblemImage(
+          req.file.buffer,
+          req.file.mimetype,
+        );
+
+        if (!analysis.isRelevant) {
+          return res.status(400).json({
+            success: false,
+            message: analysis.reason,
+            data: { analysis },
+          });
+        }
+
+        res.locals.imageAnalysis = analysis;
+      }
+
       res.locals.imageUrl = await uploadBuffer(req.file.buffer);
       next();
-    } catch {
-      return res.status(502).json({
+    } catch (uploadError) {
+      const message = uploadError instanceof Error ? uploadError.message : "Không thể phân tích ảnh.";
+      const isGeminiError = message.includes("GEMINI") || message.includes("Gemini");
+
+      return res.status(isGeminiError ? 503 : 502).json({
         success: false,
-        message: "Could not upload image",
+        message: isGeminiError
+          ? "Hệ thống chưa thể kiểm tra nội dung ảnh. Vui lòng thử lại sau."
+          : "Không thể tải ảnh lên. Vui lòng thử lại.",
       });
     }
   });

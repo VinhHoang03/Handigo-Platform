@@ -205,16 +205,23 @@ export default function CustomerServiceDetailPage() {
     );
   };
 
-   const handleUseCurrentLocation = () => {
+  const handleUseCurrentLocation = () => {
     setAddressSelectionError("");
+
+    if (!service) return;
 
     if (!navigator.geolocation) {
       setAddressSelectionError("Trình duyệt không hỗ trợ định vị hiện tại.");
       return;
     }
 
-     if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       navigate("/login", { state: { from: `/customer/services/${service._id}` } });
+      return;
+    }
+
+    if (!user.phone) {
+      setAddressSelectionError("Vui lòng cập nhật số điện thoại trước khi sử dụng vị trí hiện tại.");
       return;
     }
 

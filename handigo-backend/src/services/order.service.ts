@@ -41,6 +41,33 @@ function getPopulatedId(value: unknown): string | null {
   return String(value);
 }
 
+export async function dispatchOrderForMatching(orderId: string) {
+  const order = await Order.findById(orderId).select(
+    "addressId serviceId status readyForMatching",
+  );
+  if (!order || order.status !== "created" || !order.readyForMatching) return;
+
+  const address = await Address.findById(order.addressId).select(
+    "latitude longitude province ward",
+  );
+  if (!address) {
+    throw new AppError("Địa chỉ không hợp lệ.", 404);
+  }
+
+  DispatchService.dispatchOrder(order._id.toString(), {
+    latitude: address.latitude,
+    longitude: address.longitude,
+    serviceId: order.serviceId.toString(),
+    province: address.province,
+    ward: address.ward,
+  }).catch((err: unknown) =>
+    console.error(
+      `[OrderService] Dispatch failed for order ${order._id}:`,
+      err,
+    ),
+  );
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CreateOrderPayload {
@@ -184,6 +211,7 @@ export const OrderService = {
       paymentStatus: "unpaid",
       depositAmount:
         service.serviceType === "variable_price" ? bookingBasePrice : 0,
+      readyForMatching: payload.paymentMethod === "cash",
       inspectionRequired,
       hasAdditionalQuotation: false,
       problemDescription: payload.problemDescription ?? null,
@@ -203,7 +231,11 @@ export const OrderService = {
       },
     });
 
-    // 7. Trigger async dispatch (non-blocking – failures are logged, not thrown)
+    // 7. Trigger async dispatch only after the order is ready for matching.
+    if (!order.readyForMatching) {
+      return order;
+    }
+
     if (preferredProvider) {
       const matchingProviderTimeoutSeconds = Math.max(
         await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", 60),
@@ -250,18 +282,7 @@ export const OrderService = {
       }, matchingProviderTimeoutSeconds * 1000);
       assignmentTimer.unref();
     } else {
-      DispatchService.dispatchOrder(order._id.toString(), {
-        latitude: address.latitude,
-        longitude: address.longitude,
-        serviceId: service._id.toString(),
-        province: address.province,
-        ward: address.ward,
-      }).catch((err: unknown) =>
-        console.error(
-          `[OrderService] Dispatch failed for order ${order.orderCode}:`,
-          err,
-        ),
-      );
+      await dispatchOrderForMatching(order._id.toString());
     }
 
     return order;

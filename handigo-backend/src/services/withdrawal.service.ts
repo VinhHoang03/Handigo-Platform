@@ -24,16 +24,18 @@ const buildTransactionCode = (prefix: string) =>
 const toObjectId = (id: string | Types.ObjectId) =>
   typeof id === "string" ? new Types.ObjectId(id) : id;
 
-const getProviderByUserId = async (userId: string | Types.ObjectId) => {
-  const provider = await Provider.findOne({ userId, isDeleted: false });
-
-  if (!provider) {
-    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+const assertWithdrawalAccess = async (user: RequestUser) => {
+  if (!["CUSTOMER", "PROVIDER"].includes(user.role)) {
+    throw new AppError("Bạn không có quyền thao tác với ví này", 403);
   }
 
-  return provider;
+  if (user.role === "PROVIDER") {
+    const provider = await Provider.findOne({ userId: user.id, isDeleted: false });
+    if (!provider) {
+      throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+    }
+  }
 };
-
 const getActiveBankAccount = async (
   userId: string | Types.ObjectId,
   bankAccountId?: string,
@@ -106,9 +108,7 @@ const buildListResult = async (filter: Record<string, unknown>, query: Withdrawa
 };
 
 export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawalInput) => {
-  if (user.role !== "PROVIDER") {
-    throw new AppError("Bạn không có quyền tạo yêu cầu rút tiền", 403);
-  }
+  await assertWithdrawalAccess(user);
 
   if (input.amount <= 0) {
     throw new AppError("Số tiền rút phải lớn hơn 0", 400);
@@ -131,8 +131,7 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
     );
   }
 
-  const provider = await getProviderByUserId(user.id);
-  const bankAccount = await getActiveBankAccount(provider.userId, input.bankAccountId);
+  const bankAccount = await getActiveBankAccount(user.id, input.bankAccountId);
   const session = await mongoose.startSession();
 
   try {
@@ -141,7 +140,7 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
     await session.withTransaction(async () => {
       const wallet = await Wallet.findOneAndUpdate(
         {
-          userId: provider.userId,
+          userId: user.id,
           isDeleted: false,
           balance: { $gte: input.amount },
         },
@@ -161,7 +160,7 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
       const [withdrawal] = await WithdrawRequest.create(
         [
           {
-            userId: provider.userId,
+            userId: user.id,
             walletId: wallet._id,
             bankAccountId: bankAccount._id,
             amount: input.amount,
@@ -181,13 +180,9 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
 };
 
 export const getMyWithdrawals = async (user: RequestUser, query: WithdrawalListQuery) => {
-  if (user.role !== "PROVIDER") {
-    throw new AppError("Bạn không có quyền xem yêu cầu rút tiền", 403);
-  }
-
-  const provider = await getProviderByUserId(user.id);
+  await assertWithdrawalAccess(user);
   const filter: Record<string, unknown> = {
-    userId: provider.userId,
+    userId: user.id,
     isDeleted: false,
   };
 
@@ -199,14 +194,10 @@ export const getMyWithdrawals = async (user: RequestUser, query: WithdrawalListQ
 };
 
 export const getMyWithdrawalById = async (user: RequestUser, withdrawalId: string) => {
-  if (user.role !== "PROVIDER") {
-    throw new AppError("Bạn không có quyền xem yêu cầu rút tiền", 403);
-  }
-
-  const provider = await getProviderByUserId(user.id);
+  await assertWithdrawalAccess(user);
   const withdrawal = await WithdrawRequest.findOne({
     _id: withdrawalId,
-    userId: provider.userId,
+    userId: user.id,
     isDeleted: false,
   })
     .populate("bankAccountId")

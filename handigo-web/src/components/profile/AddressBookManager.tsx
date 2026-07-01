@@ -25,6 +25,9 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return requestError.response?.data?.message || fallback;
 };
 
+const getAddressTitle = (address: UserAddress) =>
+  address.fullAddress?.trim() || "Địa chỉ thực hiện";
+
 export function AddressBookManager({
   defaultRecipient,
   selectedAddressId,
@@ -98,7 +101,7 @@ export function AddressBookManager({
   };
 
   const handleDelete = async (address: UserAddress) => {
-    if (!window.confirm(`Xóa địa chỉ "${address.fullAddress}"?`)) return;
+    if (!window.confirm("Xóa địa chỉ \"" + address.fullAddress + "\"?")) return;
 
     try {
       setIsSaving(true);
@@ -181,10 +184,9 @@ export function AddressBookManager({
                   </span>
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-2 font-bold text-on-surface">
-                      {address.note || `${address.ward}, ${address.province}`}
+                      {getAddressTitle(address)}
                       {address.isDefault && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase text-primary">Mặc định</span>}
                     </span>
-                    <span className="mt-1 block text-sm leading-relaxed text-on-surface-variant">{address.fullAddress}</span>
                     <span className="mt-1 block text-xs text-on-surface-variant">
                       Người nhận: {address.recipientName || "Chưa cập nhật"}
                       {address.recipientPhone ? ` • ${address.recipientPhone}` : ""}

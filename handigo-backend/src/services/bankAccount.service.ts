@@ -12,20 +12,18 @@ type RequestUser = {
   role: string;
 };
 
-const assertProvider = async (user: RequestUser) => {
-  if (user.role !== "PROVIDER") {
+const assertBankAccountAccess = async (user: RequestUser) => {
+  if (!["CUSTOMER", "PROVIDER"].includes(user.role)) {
     throw new AppError("Bạn không có quyền quản lý tài khoản ngân hàng", 403);
   }
 
-  const provider = await Provider.findOne({ userId: user.id, isDeleted: false });
-
-  if (!provider) {
-    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+  if (user.role === "PROVIDER") {
+    const provider = await Provider.findOne({ userId: user.id, isDeleted: false });
+    if (!provider) {
+      throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+    }
   }
-
-  return provider;
 };
-
 const pickPayload = (input: UpdateBankAccountInput) => {
   const payload: UpdateBankAccountInput = {};
   const fields: (keyof UpdateBankAccountInput)[] = [
@@ -74,7 +72,7 @@ const getOwnedBankAccount = async (userId: string, bankAccountId: string) => {
 };
 
 export const listMyBankAccounts = async (user: RequestUser) => {
-  await assertProvider(user);
+  await assertBankAccountAccess(user);
 
   return BankAccount.find({
     userId: user.id,
@@ -86,7 +84,7 @@ export const createMyBankAccount = async (
   user: RequestUser,
   input: CreateBankAccountInput,
 ) => {
-  await assertProvider(user);
+  await assertBankAccountAccess(user);
 
   const activeCount = await BankAccount.countDocuments({
     userId: user.id,
@@ -119,7 +117,7 @@ export const updateMyBankAccount = async (
   bankAccountId: string,
   input: UpdateBankAccountInput,
 ) => {
-  await assertProvider(user);
+  await assertBankAccountAccess(user);
   await getOwnedBankAccount(user.id, bankAccountId);
 
   const payload = pickPayload(input);
@@ -158,7 +156,7 @@ export const setDefaultMyBankAccount = async (
   user: RequestUser,
   bankAccountId: string,
 ) => {
-  await assertProvider(user);
+  await assertBankAccountAccess(user);
   await getOwnedBankAccount(user.id, bankAccountId);
   await unsetOtherDefaults(user.id, bankAccountId);
 
@@ -180,7 +178,7 @@ export const setDefaultMyBankAccount = async (
 };
 
 export const deleteMyBankAccount = async (user: RequestUser, bankAccountId: string) => {
-  await assertProvider(user);
+  await assertBankAccountAccess(user);
   const bankAccount = await getOwnedBankAccount(user.id, bankAccountId);
 
   bankAccount.isDeleted = true;
