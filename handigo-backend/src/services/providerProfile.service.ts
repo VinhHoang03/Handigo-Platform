@@ -32,7 +32,7 @@ const servicePopulate = {
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${fieldName}`, 400);
+    throw new AppError(`Định danh ${fieldName} không hợp lệ`, 400);
   }
 };
 
@@ -53,7 +53,7 @@ const getProviderForUser = async (userId: string) => {
   }).populate(servicePopulate);
 
   if (!provider) {
-    throw new AppError("Provider profile not found", 404);
+    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
   }
 
   return provider;
@@ -146,7 +146,7 @@ const formatProviderProfile = async (provider: IProvider) => {
   const user = await User.findById(provider.userId).select(safeUserSelect);
 
   if (!user || user.isDeleted) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   return {
@@ -544,7 +544,7 @@ export const updateMyCertificate = async (
   const certificate = (provider.certificates as any).id(certificateId);
 
   if (!certificate) {
-    throw new AppError("Certificate not found", 404);
+    throw new AppError("Không tìm thấy chứng chỉ", 404);
   }
 
   if (payload.title !== undefined) certificate.title = payload.title;
@@ -577,7 +577,7 @@ export const deleteMyCertificate = async (
   const certificate = (provider.certificates as any).id(certificateId);
 
   if (!certificate) {
-    throw new AppError("Certificate not found", 404);
+    throw new AppError("Không tìm thấy chứng chỉ", 404);
   }
 
   certificate.deleteOne();

@@ -24,7 +24,7 @@ const chatEnabledStatuses = ["accepted", "in_progress", "completed"];
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${fieldName}`, 400);
+    throw new AppError(`Định danh ${fieldName} không hợp lệ`, 400);
   }
 };
 
@@ -51,7 +51,7 @@ const resolveParticipant = async (userId: string, role: UserRole, conversation: 
     }
   }
 
-  throw new AppError("You are not a participant of this conversation", 403);
+  throw new AppError("Bạn không thuộc cuộc trò chuyện này", 403);
 };
 
 const assertOrderCanChat = async (userId: string, role: UserRole, orderId: string) => {
@@ -60,15 +60,15 @@ const assertOrderCanChat = async (userId: string, role: UserRole, orderId: strin
   const order = await Order.findOne({ _id: orderId, isDeleted: false });
 
   if (!order) {
-    throw new AppError("Order not found", 404);
+    throw new AppError("Không tìm thấy đơn hàng", 404);
   }
 
   if (!order.providerId) {
-    throw new AppError("Order does not have a provider yet", 400);
+    throw new AppError("Đơn hàng chưa có nhà cung cấp", 400);
   }
 
   if (!chatEnabledStatuses.includes(order.status)) {
-    throw new AppError("Order is not ready for chat", 400);
+    throw new AppError("Đơn hàng chưa sẵn sàng để trò chuyện", 400);
   }
 
   if (role === "CUSTOMER" && order.customerId.toString() === userId) {
@@ -82,7 +82,7 @@ const assertOrderCanChat = async (userId: string, role: UserRole, orderId: strin
     }
   }
 
-  throw new AppError("You are not allowed to chat for this order", 403);
+  throw new AppError("Bạn không có quyền trò chuyện trong đơn hàng này", 403);
 };
 
 const getConversationForParticipant = async (
@@ -98,7 +98,7 @@ const getConversationForParticipant = async (
   });
 
   if (!conversation) {
-    throw new AppError("Conversation not found", 404);
+    throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
   }
 
   const participant = await resolveParticipant(userId, role, conversation);
@@ -116,11 +116,11 @@ export const getMyConversations = async (userId: string, role: UserRole, query: 
   } else if (role === "PROVIDER") {
     const provider = await getProviderByUserId(userId);
     if (!provider) {
-      throw new AppError("Provider profile not found", 404);
+      throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
     }
     filter.providerId = provider._id;
   } else {
-    throw new AppError("Only customers and providers can access chat", 403);
+    throw new AppError("Chỉ khách hàng và nhà cung cấp có thể truy cập trò chuyện", 403);
   }
 
   const [items, total] = await Promise.all([
@@ -225,7 +225,7 @@ export const sendMessage = async (
   const content = messageType === "text" ? payload.content : payload.imageUrl;
 
   if (!content) {
-    throw new AppError("Message content is required", 400);
+    throw new AppError("Vui lòng nhập nội dung tin nhắn", 400);
   }
 
   const message = await Message.create({
@@ -376,10 +376,11 @@ export const reportConversation = async (
 
   return Report.create({
     reporterId: userId,
-    targetType: "user",
+    targetType: "chat_conversation",
     targetUserId,
     orderId: conversation.orderId,
-    reportType: "user_behavior",
+    conversationId: conversation._id,
+    reportType: "spam_chat",
     title: "Báo cáo cuộc trò chuyện",
     description: description.trim(),
     evidenceImages: [],

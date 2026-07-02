@@ -2,8 +2,13 @@ import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary from "../configs/cloudinary";
 import { Provider } from "../models/provider.model";
-import { extractDocumentSuggestion } from "../modules/ocr/ocr.service";
-import { OcrDocumentKind } from "../modules/ocr/ocr.types";
+import {
+  extractDocumentSuggestion,
+  OcrDocumentKind,
+} from "../services/ocr.service";
+import { createLogger } from "../utils/logger";
+
+const providerAssetUploadLogger = createLogger("ProviderAssetUpload");
 
 const allowedMimeTypes = new Set([
   "image/jpeg",
@@ -34,7 +39,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
     if (!allowedMimeTypes.has(file.mimetype)) {
-      callback(new Error("Only images, PDF, DOC, and DOCX files are allowed"));
+      callback(new Error("Chỉ chấp nhận ảnh, PDF, DOC và DOCX"));
       return;
     }
 
@@ -48,7 +53,7 @@ const uploadBuffer = (buffer: Buffer, folder: string) =>
       { folder, resource_type: "auto" },
       (error, result) => {
         if (error || !result) {
-          reject(error || new Error("Cloudinary upload failed"));
+          reject(error || new Error("Tải tệp lên Cloudinary thất bại"));
           return;
         }
         resolve(result.secure_url);
@@ -70,7 +75,7 @@ export const uploadProviderAssetImage = (
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Image is required",
+        message: "Vui lòng chọn tệp cần tải lên",
       });
     }
 
@@ -80,7 +85,7 @@ export const uploadProviderAssetImage = (
     if (!folderPrefix) {
       return res.status(400).json({
         success: false,
-        message: "Invalid upload purpose",
+        message: "Mục đích tải tệp không hợp lệ",
       });
     }
 
@@ -108,7 +113,7 @@ export const uploadProviderAssetImage = (
       if (!provider) {
         return res.status(404).json({
           success: false,
-          message: "Provider profile not found",
+          message: "Không tìm thấy hồ sơ nhà cung cấp",
         });
       }
 
@@ -128,7 +133,9 @@ export const uploadProviderAssetImage = (
         } catch (ocrError) {
           const message =
             ocrError instanceof Error ? ocrError.message : "Lỗi OCR không xác định";
-          console.error(`Google Cloud Vision OCR thất bại: ${message}`);
+          providerAssetUploadLogger.error("Google Cloud Vision OCR thất bại.", ocrError, {
+            message,
+          });
           res.locals.ocrSuggestion = {
             warnings: [
               "Không thể đọc tài liệu bằng OCR. Vui lòng nhập thông tin thủ công.",
@@ -147,7 +154,7 @@ export const uploadProviderAssetImage = (
     } catch {
       return res.status(502).json({
         success: false,
-        message: "Could not upload image",
+        message: "Không thể tải tệp lên",
       });
     }
   });

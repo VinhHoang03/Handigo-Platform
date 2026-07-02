@@ -1,7 +1,9 @@
-import { Types } from "mongoose";
+import { ClientSession, Types } from "mongoose";
+import type { RequestUser } from "../middlewares/authContext";
 import { Notification, INotification } from "../models/notification.model";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
+import { toObjectId } from "../utils/mongo";
 import { emitToUser } from "../sockets/socketServer";
 import type {
   AdminNotificationListQuery,
@@ -9,11 +11,6 @@ import type {
   NotificationType,
   SendSystemNotificationInput,
 } from "../validations/notification.validator";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
 
 type CreateNotificationInput = {
   userId: string | Types.ObjectId;
@@ -69,30 +66,48 @@ const toAdminNotificationResponse = (notification: INotification) => {
   };
 };
 
-const ensureObjectId = (id: string | Types.ObjectId) =>
-  typeof id === "string" ? new Types.ObjectId(id) : id;
-
 const ensureAdmin = (user: RequestUser) => {
   if (user.role !== "ADMIN") {
-    throw new AppError("Only admin can send system notifications", 403);
+    throw new AppError("Chỉ quản trị viên mới có thể gửi thông báo hệ thống", 403);
   }
 };
 
+export const createNotificationRecord = async (
+  input: CreateNotificationInput,
+  options?: {
+    session?: ClientSession;
+    emitRealtime?: boolean;
+  },
+) => {
+  const [notification] = await Notification.create(
+    [
+      {
+        userId: toObjectId(input.userId),
+        type: input.type,
+        title: input.title.trim(),
+        content: input.content.trim(),
+        data: input.data ?? null,
+      },
+    ],
+    { session: options?.session },
+  );
+
+  if (options?.emitRealtime) {
+    emitRealtimeNotification(notification);
+  }
+
+  return notification;
+};
+
 export const createNotification = async (input: CreateNotificationInput) => {
-  const notification = await Notification.create({
-    userId: ensureObjectId(input.userId),
-    type: input.type,
-    title: input.title.trim(),
-    content: input.content.trim(),
-    data: input.data ?? null,
-  });
+  const notification = await createNotificationRecord(input);
 
   return toNotificationResponse(notification);
 };
 
 export const getMyNotifications = async (user: RequestUser, query: NotificationListQuery) => {
   const filter: Record<string, unknown> = {
-    userId: new Types.ObjectId(user.id),
+    userId: toObjectId(user.id),
     isDeleted: false,
   };
 
@@ -170,7 +185,7 @@ export const getAdminNotifications = async (
 
 export const getUnreadCount = async (user: RequestUser) => {
   const count = await Notification.countDocuments({
-    userId: new Types.ObjectId(user.id),
+    userId: toObjectId(user.id),
     isRead: false,
     isDeleted: false,
   });
@@ -181,12 +196,12 @@ export const getUnreadCount = async (user: RequestUser) => {
 export const markAsRead = async (user: RequestUser, notificationId: string) => {
   const notification = await Notification.findOne({
     _id: notificationId,
-    userId: new Types.ObjectId(user.id),
+    userId: toObjectId(user.id),
     isDeleted: false,
   });
 
   if (!notification) {
-    throw new AppError("Notification not found", 404);
+    throw new AppError("Không tìm thấy thông báo", 404);
   }
 
   if (!notification.isRead) {
@@ -202,7 +217,7 @@ export const markAllAsRead = async (user: RequestUser) => {
   const now = new Date();
   const result = await Notification.updateMany(
     {
-      userId: new Types.ObjectId(user.id),
+      userId: toObjectId(user.id),
       isRead: false,
       isDeleted: false,
     },

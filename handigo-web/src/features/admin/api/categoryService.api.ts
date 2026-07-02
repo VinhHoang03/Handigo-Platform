@@ -1,4 +1,5 @@
 import api from '@/api/client';
+import { unwrap } from '@/api/response';
 import type {
   Category,
   CategoryDetail,
@@ -12,17 +13,9 @@ import type {
   ServiceQuery,
 } from '../types/categoryService.types';
 
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
 interface UploadedImage {
   url: string;
 }
-
-const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 export const categoryServiceApi = {
   // ── Categories ──────────────────────────────────────────────────────────────

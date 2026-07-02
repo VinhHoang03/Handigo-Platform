@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { requireAuthenticatedUser } from "../middlewares/authContext";
 import {
   getProfileService,
   updateProfileService,
@@ -6,22 +7,21 @@ import {
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = requireAuthenticatedUser(req).id;
     const user = await getProfileService(userId);
     return res.json({
       message: "User profile",
       user,
     });
   } catch (error: any) {
-    return res.status(404).json({ message: error.message || "User not found" });
+    return res.status(404).json({ message: error.message || "Không tìm thấy người dùng" });
   }
 };
 
 export const updateProfile = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
-
-    const user = await updateProfileService(userId!, req.body);
+    const userId = requireAuthenticatedUser(req).id;
+    const user = await updateProfileService(userId, req.body);
 
     res.json({
       message: "Profile updated successfully",
@@ -33,8 +33,6 @@ export const updateProfile = async (req: Request, res: Response) => {
     });
   }
 };
-
-// CRUD Operations
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
@@ -51,10 +49,9 @@ export const getUserById = async (req: Request, res: Response) => {
     const user = await require("../services/user.service").getUserByIdService(id);
     return res.json({ message: "User detailed", data: user });
   } catch (error: any) {
-    return res.status(404).json({ message: error.message || "User not found" });
+    return res.status(404).json({ message: error.message || "Không tìm thấy người dùng" });
   }
 };
-
 
 export const updateUser = async (req: Request, res: Response) => {
   try {

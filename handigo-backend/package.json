@@ -4,7 +4,6 @@
   "main": "server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "seed:payment": "ts-node src/scripts/seedPaymentTestData.ts",
     "start": "node dist/server.js",
     "build": "tsc && tsc-alias",
     "ocr:test": "ts-node src/scripts/testGoogleVisionOcr.ts",

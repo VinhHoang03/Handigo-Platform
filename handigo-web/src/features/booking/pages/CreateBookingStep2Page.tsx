@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
-import { AddressBookManager } from '@/components/profile/AddressBookManager';
+import { AddressBookManager } from '@/features/profile/components/AddressBookManager';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
-import { bookingApi } from '../../../api/booking';
+import { bookingApi } from '@/features/booking/api/booking.api';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import type { UserAddress } from '@/features/profile/types/profile.types';

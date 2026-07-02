@@ -6,7 +6,7 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   createCategorySchema,
   updateCategorySchema,
-} from "../validations/category.validation";
+} from "../validations/category.validator";
 
 const router = Router();
 

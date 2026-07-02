@@ -11,6 +11,7 @@ import { DispatchService } from "./dispatch.service";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { emitToUser } from "../sockets/socketServer";
 import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
+import { createLogger } from "../utils/logger";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
 const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
 const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
   "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
+const orderLogger = createLogger("OrderService");
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -242,10 +244,10 @@ export const OrderService = {
           [],
           1,
         ).catch((error: unknown) =>
-          console.error(
-            `[OrderService] Timeout handling failed for assignment ${assignment._id}:`,
-            error,
-          ),
+          orderLogger.error("Xử lý timeout assignment thất bại.", error, {
+            assignmentId: assignment._id.toString(),
+            orderId: order._id.toString(),
+          }),
         );
       }, matchingProviderTimeoutSeconds * 1000);
       assignmentTimer.unref();
@@ -257,10 +259,10 @@ export const OrderService = {
         province: address.province,
         ward: address.ward,
       }).catch((err: unknown) =>
-        console.error(
-          `[OrderService] Dispatch failed for order ${order.orderCode}:`,
-          err,
-        ),
+        orderLogger.error("Dispatch đơn hàng thất bại.", err, {
+          orderCode: order.orderCode,
+          orderId: order._id.toString(),
+        }),
       );
     }
 

@@ -1,7 +1,10 @@
 import mongoose, { ClientSession, Types } from "mongoose";
 import { payos } from "../configs/payos.config";
+import type { RequestUser } from "../middlewares/authContext";
 import { Provider } from "../models/provider.model";
 import User from "../models/user.model";
+import { toObjectId } from "../utils/mongo";
+import { buildTransactionCode } from "../utils/transaction";
 import { Wallet } from "../models/wallet.model";
 import {
   WalletTransaction,
@@ -14,11 +17,6 @@ import type {
   WalletDepositInput,
   WalletTransactionQuery,
 } from "../validations/wallet.validator";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
 
 type WalletErrorCode =
   | "INSUFFICIENT_BALANCE"
@@ -35,9 +33,6 @@ class WalletError extends AppError {
     this.code = code;
   }
 }
-
-const buildTransactionCode = (prefix: string) =>
-  `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
 const buildPayosOrderCode = () =>
   Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-12));
@@ -64,9 +59,6 @@ const assertPositiveAmount = (amount: number) => {
     throw new WalletError("INVALID_AMOUNT", "Số tiền không hợp lệ", 400);
   }
 };
-
-const toObjectId = (id: string | Types.ObjectId) =>
-  typeof id === "string" ? new Types.ObjectId(id) : id;
 
 const getProviderByUserId = async (userId: string | Types.ObjectId) => {
   const provider = await Provider.findOne({ userId, isDeleted: false });
@@ -313,7 +305,7 @@ export const getWalletTransactionHistory = async (
 
 export const createWalletDeposit = async (user: RequestUser, input: WalletDepositInput) => {
   if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Ban khong co quyen nap vi nay", 403);
+    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền nạp ví này", 403);
   }
 
   assertPositiveAmount(input.amount);
@@ -337,7 +329,7 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
       provider: "payos",
       orderCode,
     },
-    description: "Nap tien vao vi provider",
+    description: "Nạp tiền vào ví nhà cung cấp",
     metadata: {
       providerId: provider._id,
     },
@@ -358,12 +350,12 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
     paymentLink = await payos.paymentRequests.create({
       orderCode,
       amount: input.amount,
-      description: "Nap vi Handigo",
+      description: "Nạp ví Handigo",
       returnUrl,
       cancelUrl,
       items: [
         {
-          name: "Nap tien vao vi Handigo",
+          name: "Nạp tiền vào ví Handigo",
           quantity: 1,
           price: input.amount,
         },
@@ -380,10 +372,10 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
     transaction.status = "failed";
     transaction.gatewayResponse = {
       ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
-      error: error.message || "Khong the tao lien ket nap vi PayOS",
+      error: error.message || "Không thể tạo liên kết nạp ví PayOS",
     };
     await transaction.save();
-    throw new AppError("Khong the tao lien ket nap vi PayOS", 502);
+    throw new AppError("Không thể tạo liên kết nạp ví PayOS", 502);
   }
 
   return {
@@ -396,7 +388,7 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
 
 export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) => {
   if (user.role !== "PROVIDER") {
-    throw new WalletError("UNAUTHORIZED_ACCESS", "Ban khong co quyen huy giao dich nay", 403);
+    throw new WalletError("UNAUTHORIZED_ACCESS", "Bạn không có quyền hủy giao dịch này", 403);
   }
 
   await getProviderByUserId(user.id);
@@ -409,7 +401,7 @@ export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) 
   });
 
   if (!transaction) {
-    throw new AppError("Khong tim thay giao dich nap vi", 404);
+    throw new AppError("Không tìm thấy giao dịch nạp ví", 404);
   }
 
   if (transaction.status === "success") {
@@ -422,9 +414,9 @@ export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) 
       ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
       cancelledAt: new Date(),
       cancelledBy: "provider",
-      cancelReason: "Provider cancelled PayOS payment link",
+      cancelReason: "Nhà cung cấp đã hủy liên kết thanh toán PayOS",
     };
-    transaction.description = "Giao dich nap vi da huy";
+    transaction.description = "Giao dịch nạp ví đã hủy";
     await transaction.save();
   }
 
@@ -532,7 +524,7 @@ export const handleWalletDepositPayosWebhook = async (webhookData: any, payload:
   const orderCode = webhookData.orderCode?.toString();
 
   if (!orderCode) {
-    throw new AppError("Du lieu webhook PayOS khong hop le", 400);
+    throw new AppError("Dữ liệu webhook PayOS không hợp lệ", 400);
   }
 
   const transaction = await WalletTransaction.findOne({
@@ -541,7 +533,7 @@ export const handleWalletDepositPayosWebhook = async (webhookData: any, payload:
   });
 
   if (!transaction) {
-    throw new AppError("Khong tim thay giao dich nap vi PayOS", 404);
+    throw new AppError("Không tìm thấy giao dịch nạp ví PayOS", 404);
   }
 
   if (transaction.status === "success") {

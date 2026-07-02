@@ -3,6 +3,9 @@ import mongoose, { Types } from "mongoose";
 import { Provider } from "../models/provider.model";
 import { ProviderApplication } from "../models/providerApplication.model";
 import { Service } from "../models/service.model";
+import { createLogger } from "../utils/logger";
+
+const migrateLogger = createLogger("MigrateProviderServiceIds");
 
 type LegacyProviderDocument = {
   _id: Types.ObjectId;
@@ -47,12 +50,15 @@ const migrateCollection = async (
     updated += 1;
   }
 
-  console.log(`${label}: migrated ${updated} documents`);
+  migrateLogger.info("Đã migrate serviceIds cho collection.", {
+    collection: label,
+    updated,
+  });
 };
 
 async function migrate() {
   const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-  if (!uri) throw new Error("MONGODB_URI or MONGO_URI is not configured");
+  if (!uri) throw new Error("Chưa cấu hình MONGODB_URI hoặc MONGO_URI");
 
   await mongoose.connect(uri);
   await migrateCollection("providers", Provider);
@@ -61,7 +67,7 @@ async function migrate() {
 }
 
 migrate().catch(async (error) => {
-  console.error(error);
+  migrateLogger.error("Migrate serviceIds provider thất bại.", error);
   await mongoose.disconnect();
   process.exit(1);
 });

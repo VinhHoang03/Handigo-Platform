@@ -8,7 +8,7 @@ import {
 } from "../controllers/payment.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createPaymentSchema } from "../validations/payment.validation";
+import { createPaymentSchema } from "../validations/payment.validator";
 
 const router = Router();
 

@@ -1,4 +1,8 @@
 import mongoose from "mongoose";
+import { createLogger } from "../utils/logger";
+
+const dbLogger = createLogger("Database");
+
 const dropLegacyIndex = async (
   collectionName: string,
   indexName: string,
@@ -10,7 +14,7 @@ const dropLegacyIndex = async (
   }
 
   await collection.dropIndex(indexName);
-  console.log(`Dropped legacy ${collectionName}.${indexName} index`);
+  dbLogger.info("Đã xóa index cũ.", { collectionName, indexName });
 };
 
 export const connectDB = async (): Promise<void> => {
@@ -21,15 +25,15 @@ export const connectDB = async (): Promise<void> => {
     }
 
     await mongoose.connect(mongoUri);
-    console.log("Đã kết nối MongoDB.");
+    dbLogger.info("Đã kết nối MongoDB.");
 
     await dropLegacyIndex("sessions", "refreshToken_1");
   } catch (error) {
-    console.error("Kết nối MongoDB thất bại:", error);
+    dbLogger.error("Kết nối MongoDB thất bại.", error);
     process.exit(1);
   }
 
   mongoose.connection.on("disconnected", () => {
-    console.warn("MongoDB disconnected");
+    dbLogger.warn("MongoDB đã ngắt kết nối.");
   });
 };

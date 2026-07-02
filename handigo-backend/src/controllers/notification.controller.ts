@@ -1,23 +1,12 @@
 import { NextFunction, Request, Response } from "express";
+import { requireRequestUser } from "../middlewares/authContext";
 import * as notificationService from "../services/notification.service";
-import { AppError } from "../utils/appError";
 import {
   adminNotificationListQuerySchema,
   notificationIdParamSchema,
   notificationListQuerySchema,
   sendSystemNotificationSchema,
 } from "../validations/notification.validator";
-
-const getRequestUser = (req: Request) => {
-  if (!req.user) {
-    throw new AppError("Authentication is required", 401);
-  }
-
-  return {
-    id: req.user.id,
-    role: req.user.role,
-  };
-};
 
 export const getMyNotifications = async (
   req: Request,
@@ -26,7 +15,7 @@ export const getMyNotifications = async (
 ) => {
   try {
     const query = notificationListQuerySchema.parse(req.query);
-    const result = await notificationService.getMyNotifications(getRequestUser(req), query);
+    const result = await notificationService.getMyNotifications(requireRequestUser(req), query);
 
     return res.json({
       success: true,
@@ -44,7 +33,7 @@ export const getUnreadCount = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await notificationService.getUnreadCount(getRequestUser(req));
+    const result = await notificationService.getUnreadCount(requireRequestUser(req));
 
     return res.json({
       success: true,
@@ -64,7 +53,7 @@ export const getAdminNotifications = async (
   try {
     const query = adminNotificationListQuerySchema.parse(req.query);
     const result = await notificationService.getAdminNotifications(
-      getRequestUser(req),
+      requireRequestUser(req),
       query,
     );
 
@@ -85,7 +74,10 @@ export const markAsRead = async (
 ) => {
   try {
     const params = notificationIdParamSchema.parse(req.params);
-    const notification = await notificationService.markAsRead(getRequestUser(req), params.id);
+    const notification = await notificationService.markAsRead(
+      requireRequestUser(req),
+      params.id,
+    );
 
     return res.json({
       success: true,
@@ -103,7 +95,7 @@ export const markAllAsRead = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await notificationService.markAllAsRead(getRequestUser(req));
+    const result = await notificationService.markAllAsRead(requireRequestUser(req));
 
     return res.json({
       success: true,
@@ -123,7 +115,7 @@ export const sendSystemNotification = async (
   try {
     const body = sendSystemNotificationSchema.parse(req.body);
     const result = await notificationService.sendSystemNotification(
-      getRequestUser(req),
+      requireRequestUser(req),
       body,
     );
 

@@ -36,7 +36,7 @@ export const providerIdParamSchema = z.object({
 });
 
 export const walletDepositOrderCodeParamSchema = z.object({
-  orderCode: z.string().trim().regex(/^\d+$/, "orderCode khong hop le"),
+  orderCode: z.string().trim().regex(/^\d+$/, "orderCode không hợp lệ"),
 });
 
 export const adminWalletAdjustmentSchema = z.object({
@@ -47,8 +47,8 @@ export const adminWalletAdjustmentSchema = z.object({
 
 export const walletDepositSchema = z.object({
   amount: z.coerce.number().int("So tien phai la so nguyen").positive("So tien phai lon hon 0"),
-  returnUrl: z.string().url("returnUrl khong hop le").optional(),
-  cancelUrl: z.string().url("cancelUrl khong hop le").optional(),
+  returnUrl: z.string().url("returnUrl không hợp lệ").optional(),
+  cancelUrl: z.string().url("cancelUrl không hợp lệ").optional(),
 });
 
 export type WalletTransactionQuery = z.infer<typeof walletTransactionQuerySchema>;

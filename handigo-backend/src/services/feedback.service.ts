@@ -48,6 +48,10 @@ const getPagination = (query: PaginationQuery) => {
 export const recalculateProviderRating = async (providerId: Types.ObjectId | string) => {
   const providerObjectId =
     typeof providerId === "string" ? new Types.ObjectId(providerId) : providerId;
+  const orderIds = await Order.find({
+    providerId: providerObjectId,
+    isDeleted: false,
+  }).distinct("_id");
 
   const [stats] = await Feedback.aggregate<{
     averageRating: number;
@@ -55,14 +59,14 @@ export const recalculateProviderRating = async (providerId: Types.ObjectId | str
   }>([
     {
       $match: {
-        providerId: providerObjectId,
+        orderId: { $in: orderIds },
         isVisible: true,
         isDeleted: false,
       },
     },
     {
       $group: {
-        _id: "$providerId",
+        _id: null,
         averageRating: { $avg: "$rating" },
         totalFeedbacks: { $sum: 1 },
       },
@@ -239,7 +243,6 @@ export const getProviderFeedbackByOrder = async (userId: string, orderId: string
 
   return Feedback.findOne({
     orderId,
-    providerId: provider._id,
     isDeleted: false,
   })
     .populate("customerId", "fullName avatar")
@@ -352,8 +355,12 @@ export const getProviderFeedbacks = async (
   }
 
   const { page, limit, skip } = getPagination(query);
+  const providerOrderIds = await Order.find({
+    providerId: provider._id,
+    isDeleted: false,
+  }).distinct("_id");
   const summaryFilter = {
-    providerId: new Types.ObjectId(providerId),
+    orderId: { $in: providerOrderIds },
     isVisible: true,
     isDeleted: false,
   };
@@ -470,11 +477,19 @@ export const upsertProviderReply = async (
 
   const feedback = await Feedback.findOne({
     _id: feedbackId,
-    providerId: provider._id,
     isDeleted: false,
   });
   if (!feedback) {
     throw new AppError("Không tìm thấy đánh giá", 404);
+  }
+
+  const order = await Order.findOne({
+    _id: feedback.orderId,
+    providerId: provider._id,
+    isDeleted: false,
+  }).select("_id");
+  if (!order) {
+    throw new AppError("Bạn không có quyền phản hồi đánh giá này", 403);
   }
 
   const now = new Date();

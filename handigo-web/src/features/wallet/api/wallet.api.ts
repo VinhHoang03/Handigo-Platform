@@ -1,4 +1,5 @@
 import api from '@/api/client';
+import { unwrap } from '@/api/response';
 import type {
   ListResult,
   WalletDepositPayload,
@@ -11,14 +12,6 @@ import type {
   WithdrawalQuery,
   WithdrawalRequest,
 } from '../types/wallet.types';
-
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
-const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 export const walletApi = {
   getMine: async () => unwrap<WalletOverview>(await api.get('/wallets/me')),

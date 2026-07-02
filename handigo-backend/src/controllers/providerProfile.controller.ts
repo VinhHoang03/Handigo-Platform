@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { requireAuthenticatedUser } from "../middlewares/authContext";
 import * as providerProfileService from "../services/providerProfile.service";
 import { AppError } from "../utils/appError";
 import {
@@ -8,13 +9,7 @@ import {
   updateProviderProfileSchema,
 } from "../validations/providerProfile.validator";
 
-const getUserId = (req: Request) => {
-  if (!req.user?.id) {
-    throw new AppError("Authentication is required", 401);
-  }
-
-  return req.user.id;
-};
+const getUserId = (req: Request) => requireAuthenticatedUser(req).id;
 
 export const getMyProfile = async (
   req: Request,

@@ -274,7 +274,7 @@ export const createApplication = async (
   const user = await User.findOne({ _id: userId, isDeleted: false });
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   if (user.status !== "active") {
@@ -370,7 +370,7 @@ export const saveDraftApplication = async (
   const user = await User.findOne({ _id: userId, isDeleted: false });
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   if (user.status !== "active") {

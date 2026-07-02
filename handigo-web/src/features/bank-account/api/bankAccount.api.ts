@@ -1,13 +1,6 @@
 import api from '@/api/client';
+import { unwrap } from '@/api/response';
 import type { BankAccount, BankAccountPayload } from '../types/bankAccount.types';
-
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
-const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 export const bankAccountApi = {
   list: async () => unwrap<BankAccount[]>(await api.get('/bank-accounts')),
