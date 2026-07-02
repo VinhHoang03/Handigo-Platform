@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { bookingApi } from "@/api/booking";
+import { bookingApi } from "@/features/booking/api/booking.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { Address, Category, Service, ServiceOption } from "@/types/booking";
@@ -214,12 +214,16 @@ export default function CustomerServiceDetailPage() {
     }
 
      if (!isAuthenticated) {
-      navigate("/login", { state: { from: `/customer/services/${service._id}` } });
+      navigate("/login", {
+        state: {
+          from: service ? `/customer/services/${service._id}` : "/customer/services",
+        },
+      });
       return;
     }
 
-    const recipientName = user.fullName || "Khách hàng";
-    const recipientPhone = user.phone;
+    const recipientName = user?.fullName || "Khách hàng";
+    const recipientPhone = user?.phone || "";
 
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(

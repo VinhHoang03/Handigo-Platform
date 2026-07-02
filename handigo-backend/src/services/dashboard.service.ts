@@ -1,4 +1,5 @@
 import { PipelineStage, Types } from "mongoose";
+import type { RequestUser } from "../middlewares/authContext";
 import { Order } from "../models/order.model";
 import { Payment } from "../models/payment.model";
 import { Provider } from "../models/provider.model";
@@ -7,11 +8,6 @@ import { WalletTransaction } from "../models/walletTransaction.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
 import { AppError } from "../utils/appError";
 import type { DashboardQuery } from "../validations/dashboard.validator";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
 
 const dateMatch = (query: DashboardQuery, field = "createdAt") => {
   const range: Record<string, Date> = {};
@@ -113,7 +109,7 @@ const getProviderForUser = async (userId: string) => {
   });
 
   if (!provider) {
-    throw new AppError("Provider profile not found", 404);
+    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
   }
 
   return provider;
@@ -283,7 +279,7 @@ export const getAdminOrders = async (query: DashboardQuery) => {
         $group: {
           _id: "$category._id",
           categoryId: { $first: "$category._id" },
-          categoryName: { $first: { $ifNull: ["$category.name", "Uncategorized"] } },
+          categoryName: { $first: { $ifNull: ["$category.name", "Chưa phân loại"] } },
           count: { $sum: 1 },
         },
       },

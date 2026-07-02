@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { bookingApi } from '@/api/booking';
+import { bookingApi } from '@/features/booking/api/booking.api';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { providerOrderApi } from '../api/providerOrder.api';
 import { RepairQuotationForm } from '../components/RepairQuotationForm';

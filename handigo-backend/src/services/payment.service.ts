@@ -1,26 +1,22 @@
 import { Types } from "mongoose";
 import { payos } from "../configs/payos.config";
+import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
-import { Notification } from "../models/notification.model";
 import { Order } from "../models/order.model";
 import { Payment, PaymentType } from "../models/payment.model";
 import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
-import type { CreatePaymentInput, PaymentHistoryQuery } from "../validations/payment.validation";
+import { createNotificationRecord } from "./notification.service";
+import type { CreatePaymentInput, PaymentHistoryQuery } from "../validations/payment.validator";
 import { handleWalletDepositPayosWebhook } from "./wallet.service";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
+import { buildTransactionCode } from "../utils/transaction";
 
 const DEFAULT_RETURN_URL = process.env.PAYOS_RETURN_URL || "http://localhost:5173/payment/success";
 const DEFAULT_CANCEL_URL = process.env.PAYOS_CANCEL_URL || "http://localhost:5173/payment/cancel";
 
 const buildPayosOrderCode = () => Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-12));
-const buildTransactionCode = (prefix: string) => `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
 const getPaymentType = (
   order: any,
@@ -66,21 +62,6 @@ const canAccessOrder = async (order: any, user: RequestUser) => {
 
   const provider = await Provider.findById(order.providerId).select("userId");
   return provider?.userId?.toString() === user.id;
-};
-
-const createNotification = async (
-  userId: Types.ObjectId | string,
-  title: string,
-  content: string,
-  data?: Record<string, unknown>,
-) => {
-  await Notification.create({
-    userId,
-    type: "PAYMENT",
-    title,
-    content,
-    data: data || null,
-  });
 };
 
 export const createPayment = async (user: RequestUser, input: CreatePaymentInput) => {
@@ -278,10 +259,16 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   order.platformFeeChargedAt = new Date();
   await order.save();
 
-  await createNotification(provider.userId, "Đã trừ phí nền tảng", "Hệ thống đã trừ phí nền tảng từ ví của bạn khi nhận đơn.", {
-    orderId: order._id,
-    transactionId: transaction._id,
-    amount: platformFee,
+  await createNotificationRecord({
+    userId: provider.userId,
+    type: "PAYMENT",
+    title: "Đã trừ phí nền tảng",
+    content: "Hệ thống đã trừ phí nền tảng từ ví của bạn khi nhận đơn.",
+    data: {
+      orderId: order._id,
+      transactionId: transaction._id,
+      amount: platformFee,
+    },
   });
 
   return transaction;
@@ -331,12 +318,15 @@ export const handlePayosWebhook = async (payload: any) => {
     }
   }
 
-  await createNotification(
-    payment.customerId,
-    isSuccess ? "Thanh toán thành công" : "Thanh toán thất bại",
-    isSuccess ? "Giao dịch PayOS của bạn đã được xác nhận." : "Giao dịch PayOS của bạn không thành công.",
-    { orderId: payment.orderId, paymentId: payment._id, amount: payment.amount },
-  );
+  await createNotificationRecord({
+    userId: payment.customerId,
+    type: "PAYMENT",
+    title: isSuccess ? "Thanh toán thành công" : "Thanh toán thất bại",
+    content: isSuccess
+      ? "Giao dịch PayOS của bạn đã được xác nhận."
+      : "Giao dịch PayOS của bạn không thành công.",
+    data: { orderId: payment.orderId, paymentId: payment._id, amount: payment.amount },
+  });
 
   return payment;
 };
@@ -464,10 +454,16 @@ export const refundInspectionDepositIfNoProvider = async (orderId: string) => {
   order.readyForMatching = false;
   await order.save();
 
-  await createNotification(payment.customerId, "Hoàn tiền đặt cọc", "Tiền đặt cọc đã được đánh dấu hoàn do chưa có thợ nhận đơn.", {
-    orderId: payment.orderId,
-    paymentId: payment._id,
-    amount: payment.amount,
+  await createNotificationRecord({
+    userId: payment.customerId,
+    type: "PAYMENT",
+    title: "Hoàn tiền đặt cọc",
+    content: "Tiền đặt cọc đã được đánh dấu hoàn do chưa có thợ nhận đơn.",
+    data: {
+      orderId: payment.orderId,
+      paymentId: payment._id,
+      amount: payment.amount,
+    },
   });
 
   return payment;
@@ -559,11 +555,17 @@ export const compensateProviderFromInspectionDeposit = async (
   };
   await payment.save();
 
-  await createNotification(provider.userId, "Nhận bồi thường tiền cọc", "Tiền cọc của đơn khảo sát đã được chuyển vào ví của bạn.", {
-    orderId: order._id,
-    paymentId: payment._id,
-    transactionId: transaction._id,
-    amount: payment.amount,
+  await createNotificationRecord({
+    userId: provider.userId,
+    type: "PAYMENT",
+    title: "Nhận bồi thường tiền cọc",
+    content: "Tiền cọc của đơn khảo sát đã được chuyển vào ví của bạn.",
+    data: {
+      orderId: order._id,
+      paymentId: payment._id,
+      transactionId: transaction._id,
+      amount: payment.amount,
+    },
   });
 
   return transaction;

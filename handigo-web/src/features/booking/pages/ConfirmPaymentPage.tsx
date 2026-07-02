@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { useBookingStore } from '../hooks/useBookingStore';
-import { bookingApi, type CreateOrderPayload } from '../../../api/booking';
+import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/booking.api';
+import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Address, Service, ServiceOption } from '../../../types/booking';
 
 const paymentMethods = [
@@ -37,10 +38,10 @@ const ConfirmPaymentPage = () => {
   useEffect(() => {
     let isMounted = true;
     if (serviceId) {
-      bookingApi.getServiceById(serviceId).then(data => {
+      serviceCatalogApi.serviceById(serviceId).then(data => {
         if (isMounted) setService(data);
       });
-      bookingApi.getOptions(serviceId).then(data => {
+      serviceCatalogApi.options(serviceId).then(data => {
         if (isMounted) setOptions(data);
       });
     }

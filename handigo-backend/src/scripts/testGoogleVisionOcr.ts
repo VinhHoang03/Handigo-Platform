@@ -2,6 +2,9 @@ import "dotenv/config";
 import { existsSync } from "fs";
 import path from "path";
 import vision from "@google-cloud/vision";
+import { createLogger } from "../utils/logger";
+
+const ocrTestLogger = createLogger("OcrTestScript");
 
 const resolveFromCurrentDirectory = (filePath: string) =>
   path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
@@ -37,14 +40,15 @@ const testGoogleVisionOcr = async () => {
 
   try {
     const projectId = await client.auth.getProjectId();
-    console.log(`Đã đọc credential ADC cho project: ${projectId}`);
+    ocrTestLogger.info("Đã đọc credential ADC.", { projectId });
 
     const [result] = await client.textDetection(absoluteImagePath);
     const text = result.textAnnotations?.[0]?.description?.trim() || "";
 
-    console.log("Đã gọi Google Cloud Vision API thành công.");
-    console.log("Kết quả OCR:");
-    console.log(text || "Không nhận diện được văn bản trong ảnh.");
+    ocrTestLogger.info("Đã gọi Google Cloud Vision API thành công.");
+    ocrTestLogger.info("Kết quả OCR.", {
+      text: text || "Không nhận diện được văn bản trong ảnh.",
+    });
   } finally {
     await client.close();
   }
@@ -52,6 +56,6 @@ const testGoogleVisionOcr = async () => {
 
 testGoogleVisionOcr().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : "Lỗi không xác định";
-  console.error(`Kiểm tra Google Vision OCR thất bại: ${message}`);
+  ocrTestLogger.error("Kiểm tra Google Vision OCR thất bại.", error, { message });
   process.exit(1);
 });

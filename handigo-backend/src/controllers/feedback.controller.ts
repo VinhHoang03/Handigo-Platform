@@ -1,43 +1,28 @@
 import { Request, Response } from "express";
+import { requireAuthenticatedUser } from "../middlewares/authContext";
 import * as feedbackService from "../services/feedback.service";
+import { sendControllerError } from "../utils/controllerError";
 
-const getStatusCode = (error: any) => error.statusCode || 500;
+const getUserId = (req: Request) => requireAuthenticatedUser(req).id;
 
 export const createFeedback = async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    const feedback = await feedbackService.createFeedback(req.user.id, req.body);
+    const feedback = await feedbackService.createFeedback(getUserId(req), req.body);
 
     return res.status(201).json({
       success: true,
       data: feedback,
       message: "Feedback created successfully",
     });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
 export const updateMyFeedback = async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
     const feedback = await feedbackService.updateMyFeedback(
-      req.user.id,
+      getUserId(req),
       req.params.id as string,
       req.body,
     );
@@ -47,35 +32,22 @@ export const updateMyFeedback = async (req: Request, res: Response) => {
       data: feedback,
       message: "Feedback updated successfully",
     });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
 export const getMyFeedbacks = async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    const feedbacks = await feedbackService.getMyFeedbacks(req.user.id);
+    const feedbacks = await feedbackService.getMyFeedbacks(getUserId(req));
 
     return res.json({
       success: true,
       data: feedbacks,
       message: "Success",
     });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
@@ -91,11 +63,8 @@ export const getProviderFeedbacks = async (req: Request, res: Response) => {
       data: result,
       message: "Success",
     });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
@@ -103,22 +72,15 @@ export const getLatestPublicFeedbacks = async (_req: Request, res: Response) => 
   try {
     const data = await feedbackService.getLatestPublicFeedbacks();
     return res.json({ success: true, data });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
 export const getMyProviderFeedbacks = async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
     const result = await feedbackService.getMyProviderFeedbacks(
-      req.user.id,
+      getUserId(req),
       req.query,
     );
 
@@ -127,11 +89,8 @@ export const getMyProviderFeedbacks = async (req: Request, res: Response) => {
       data: result,
       message: "Success",
     });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
@@ -147,42 +106,39 @@ export const setFeedbackVisibility = async (req: Request, res: Response) => {
       data: feedback,
       message: "Feedback visibility updated successfully",
     });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({
-      success: false,
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
 export const getFeedbackByOrder = async (req: Request, res: Response) => {
   try {
     const feedback = await feedbackService.getFeedbackByOrder(
-      req.user!.id,
+      getUserId(req),
       req.params.orderId as string,
     );
     return res.json({ success: true, data: feedback, message: "Success" });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
 export const getOrderFeedbackContext = async (req: Request, res: Response) => {
   try {
     const context = await feedbackService.getOrderFeedbackContext(
-      req.user!.id,
+      getUserId(req),
       req.params.orderId as string,
     );
     return res.json({ success: true, data: context, message: "Success" });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
 export const upsertProviderReply = async (req: Request, res: Response) => {
   try {
     const feedback = await feedbackService.upsertProviderReply(
-      req.user!.id,
+      getUserId(req),
       req.params.id as string,
       req.body.content,
       req.body.images,
@@ -192,20 +148,23 @@ export const upsertProviderReply = async (req: Request, res: Response) => {
       data: feedback,
       message: "Provider reply saved successfully",
     });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 
-export const getProviderFeedbackByOrder = async (req: Request, res: Response) => {
+export const getProviderFeedbackByOrder = async (
+  req: Request,
+  res: Response,
+) => {
   try {
     const feedback = await feedbackService.getProviderFeedbackByOrder(
-      req.user!.id,
+      getUserId(req),
       req.params.orderId as string,
     );
     return res.json({ success: true, data: feedback, message: "Success" });
-  } catch (error: any) {
-    return res.status(getStatusCode(error)).json({ success: false, message: error.message });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
   }
 };
 

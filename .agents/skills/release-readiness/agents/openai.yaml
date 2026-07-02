@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Readiness"
+  short_description: "Higher-confidence release validation"
+  default_prompt: "Use $release-readiness to review rollout risk, migration safety, rollback readiness, and operational validation before release."

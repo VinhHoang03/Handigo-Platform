@@ -19,7 +19,7 @@ import {
   createAdminVoucherSchema,
   removeVoucherSchema,
   updateAdminVoucherSchema,
-} from "../validations/voucher.validation";
+} from "../validations/voucher.validator";
 
 const router = Router();
 

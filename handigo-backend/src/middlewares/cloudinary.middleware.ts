@@ -1,7 +1,9 @@
-// middlewares/cloudinary.middleware.ts
 import { Request, Response, NextFunction } from "express";
 import cloudinary from "../configs/cloudinary";
 import fs from "fs";
+import { createLogger } from "../utils/logger";
+
+const cloudinaryLogger = createLogger("CloudinaryUpload");
 
 export const uploadImageToCloudinary = (folder: string = "images") => {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -20,9 +22,9 @@ export const uploadImageToCloudinary = (folder: string = "images") => {
 
       next();
     } catch (err) {
-      console.error("Cloudinary error:", err);
+      cloudinaryLogger.error("Không thể tải tệp lên Cloudinary.", err);
       return res.status(500).json({
-        message: "Upload failed",
+        message: "Tải tệp thất bại",
       });
     }
   };

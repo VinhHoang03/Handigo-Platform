@@ -17,7 +17,7 @@ export interface UpdateProfileInput {
 export const getProfileService = async (userId: string) => {
   const user = await User.findById(userId).select("-passwordHash -registerOtp -registerOtpExpire -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
   if (!user) {
-    throw new Error("User not found");
+    throw new Error("Không tìm thấy người dùng");
   }
   return user;
 };
@@ -80,7 +80,7 @@ export const getAllUsersService = async (query: any = {}) => {
 export const getUserByIdService = async (userId: string) => {
   const user = await User.findById(userId).select("-passwordHash");
   if (!user) {
-    throw new Error("User not found");
+    throw new Error("Không tìm thấy người dùng");
   }
   return user;
 };
@@ -92,7 +92,7 @@ export const updateUserService = async (userId: string, data: any) => {
     runValidators: true,
   }).select("-passwordHash");
   if (!user) {
-    throw new Error("User not found");
+    throw new Error("Không tìm thấy người dùng");
   }
   return user;
 };
@@ -100,7 +100,7 @@ export const updateUserService = async (userId: string, data: any) => {
 export const deleteUserService = async (userId: string) => {
   const user = await User.findByIdAndDelete(userId);
   if (!user) {
-    throw new Error("User not found");
+    throw new Error("Không tìm thấy người dùng");
   }
   return user;
 };

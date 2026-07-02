@@ -1,18 +1,11 @@
 import { NextFunction, Request, Response } from "express";
+import { requireRequestUser } from "../middlewares/authContext";
 import * as dashboardService from "../services/dashboard.service";
 import { AppError } from "../utils/appError";
-import { dashboardQuerySchema, providerAvailabilitySchema } from "../validations/dashboard.validator";
-
-const getRequestUser = (req: Request) => {
-  if (!req.user) {
-    throw new AppError("Authentication is required", 401);
-  }
-
-  return {
-    id: req.user.id,
-    role: req.user.role,
-  };
-};
+import {
+  dashboardQuerySchema,
+  providerAvailabilitySchema,
+} from "../validations/dashboard.validator";
 
 export const getAdminOverview = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -25,9 +18,13 @@ export const getAdminOverview = async (req: Request, res: Response, next: NextFu
   }
 };
 
-export const getDashboardOverview = async (req: Request, res: Response, next: NextFunction) => {
+export const getDashboardOverview = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    const user = getRequestUser(req);
+    const user = requireRequestUser(req);
     const query = dashboardQuerySchema.parse(req.query);
 
     if (user.role === "ADMIN") {
@@ -82,7 +79,7 @@ export const getAdminProviders = async (req: Request, res: Response, next: NextF
 export const getProviderOverview = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = dashboardQuerySchema.parse(req.query);
-    const data = await dashboardService.getProviderOverview(getRequestUser(req), query);
+    const data = await dashboardService.getProviderOverview(requireRequestUser(req), query);
 
     return res.json({ success: true, data, message: "Get provider dashboard overview successfully" });
   } catch (error) {
@@ -93,7 +90,7 @@ export const getProviderOverview = async (req: Request, res: Response, next: Nex
 export const getProviderEarnings = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = dashboardQuerySchema.parse(req.query);
-    const data = await dashboardService.getProviderEarnings(getRequestUser(req), query);
+    const data = await dashboardService.getProviderEarnings(requireRequestUser(req), query);
 
     return res.json({ success: true, data, message: "Get provider earning dashboard successfully" });
   } catch (error) {
@@ -101,11 +98,15 @@ export const getProviderEarnings = async (req: Request, res: Response, next: Nex
   }
 };
 
-export const updateProviderAvailability = async (req: Request, res: Response, next: NextFunction) => {
+export const updateProviderAvailability = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const payload = providerAvailabilitySchema.parse(req.body);
     const data = await dashboardService.updateProviderAvailability(
-      getRequestUser(req),
+      requireRequestUser(req),
       payload.availabilityStatus,
     );
 

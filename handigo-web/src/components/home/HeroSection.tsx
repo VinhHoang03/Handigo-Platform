@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { tokenStorage } from "@/api/tokenStorage";
-import { homeApi, type CatalogSearchResult } from "./home.api";
+import { homeApi, type CatalogSearchResult } from "@/features/home/api/home.api";
 import { MaterialIcon } from "../common/MaterialIcon";
 
 const heroImage =

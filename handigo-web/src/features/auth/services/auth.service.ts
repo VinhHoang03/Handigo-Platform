@@ -11,6 +11,7 @@ import {
   getMeApi,
 } from '../api/auth.api';
 import { refreshAccessToken } from '@/api/client';
+import { getErrorMessage } from '@/utils/apiError';
 import type {
   LoginRequest,
   RegisterRequest,
@@ -20,18 +21,6 @@ import type {
 } from '../types/auth.types';
 import { useAuthStore } from '../store/auth.store';
 import axios from 'axios';
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (axios.isAxiosError(error) && error.response?.data?.message) {
-    return error.response.data.message;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return fallback;
-};
 
 const isNetworkError = (error: unknown) => {
   return axios.isAxiosError(error) && !error.response;

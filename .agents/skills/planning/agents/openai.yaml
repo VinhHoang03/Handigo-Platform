@@ -1,0 +1,4 @@
+interface:
+  display_name: "Planning"
+  short_description: "Break work into executable plans"
+  default_prompt: "Use $planning to produce a decision-complete implementation plan."

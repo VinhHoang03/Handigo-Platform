@@ -1,6 +1,9 @@
 import "dotenv/config";
 import mongoose, { Types } from "mongoose";
 import { ProviderApplication } from "../models/providerApplication.model";
+import { createLogger } from "../utils/logger";
+
+const migrateLogger = createLogger("MigrateProviderApplicationReviewHistory");
 
 type LegacyApplication = {
   _id: Types.ObjectId;
@@ -85,7 +88,9 @@ const migrateDocuments = async () => {
     updated += 1;
   }
 
-  console.log(`Đã bổ sung lịch sử cho ${updated} hồ sơ Provider.`);
+  migrateLogger.info("Đã bổ sung lịch sử xét duyệt cho hồ sơ Provider.", {
+    updated,
+  });
 };
 
 const migrateIndex = async () => {
@@ -101,7 +106,7 @@ const migrateIndex = async () => {
   for (const index of userStatusIndexes) {
     if (JSON.stringify(index.partialFilterExpression) === expectedFilter) continue;
     await collection.dropIndex(index.name as string);
-    console.log(`Đã xóa index cũ ${index.name}.`);
+    migrateLogger.info("Đã xóa index cũ.", { indexName: index.name });
   }
 
   await collection.createIndex(
@@ -114,7 +119,7 @@ const migrateIndex = async () => {
       },
     },
   );
-  console.log("Đã cập nhật index hồ sơ đang chờ xét duyệt.");
+  migrateLogger.info("Đã cập nhật index hồ sơ đang chờ xét duyệt.");
 };
 
 const migrate = async () => {
@@ -128,7 +133,7 @@ const migrate = async () => {
 };
 
 migrate().catch(async (error) => {
-  console.error("Migration hồ sơ Provider thất bại:", error);
+  migrateLogger.error("Migration hồ sơ Provider thất bại.", error);
   await mongoose.disconnect();
   process.exit(1);
 });

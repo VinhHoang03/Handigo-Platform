@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import { ZodError } from "zod";
+import { requireRequestUser } from "../middlewares/authContext";
 import * as walletService from "../services/wallet.service";
-import { AppError } from "../utils/appError";
+import { sendControllerError } from "../utils/controllerError";
 import {
   adminWalletListQuerySchema,
   providerIdParamSchema,
@@ -9,46 +9,17 @@ import {
   walletTransactionQuerySchema,
 } from "../validations/wallet.validator";
 
-const handleError = (res: Response, error: any) => {
-  if (error instanceof ZodError) {
-    return res.status(400).json({
-      success: false,
-      message: "Dữ liệu không hợp lệ",
-      errors: error.issues,
-    });
-  }
-
-  const statusCode = error instanceof AppError ? error.statusCode : 500;
-
-  return res.status(statusCode).json({
-    success: false,
-    code: error.code,
-    message: error.message || "Có lỗi xảy ra",
-  });
-};
-
-const getRequestUser = (req: Request) => {
-  if (!req.user) {
-    throw new AppError("Bạn cần đăng nhập để thực hiện thao tác này", 401);
-  }
-
-  return {
-    id: req.user.id,
-    role: req.user.role,
-  };
-};
-
 export const getMyWallet = async (req: Request, res: Response) => {
   try {
-    const result = await walletService.getCurrentWallet(getRequestUser(req));
+    const result = await walletService.getCurrentWallet(requireRequestUser(req));
 
     return res.json({
       success: true,
       data: result,
       message: "Lấy thông tin ví thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
@@ -56,7 +27,7 @@ export const getMyWalletTransactions = async (req: Request, res: Response) => {
   try {
     const query = walletTransactionQuerySchema.parse(req.query);
     const result = await walletService.getWalletTransactionHistory(
-      getRequestUser(req),
+      requireRequestUser(req),
       query,
     );
 
@@ -65,36 +36,36 @@ export const getMyWalletTransactions = async (req: Request, res: Response) => {
       data: result,
       message: "Lấy lịch sử giao dịch ví thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
 export const getMyWalletSummary = async (req: Request, res: Response) => {
   try {
-    const result = await walletService.getWalletSummary(getRequestUser(req));
+    const result = await walletService.getWalletSummary(requireRequestUser(req));
 
     return res.json({
       success: true,
       data: result,
       message: "Lấy tổng quan ví thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
 export const createMyWalletDeposit = async (req: Request, res: Response) => {
   try {
-    const result = await walletService.createWalletDeposit(getRequestUser(req), req.body);
+    const result = await walletService.createWalletDeposit(requireRequestUser(req), req.body);
 
     return res.status(201).json({
       success: true,
       data: result,
-      message: "Tao lien ket nap vi thanh cong",
+      message: "Tạo liên kết nạp ví thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
@@ -102,17 +73,17 @@ export const cancelMyWalletDeposit = async (req: Request, res: Response) => {
   try {
     const params = walletDepositOrderCodeParamSchema.parse(req.params);
     const result = await walletService.cancelWalletDeposit(
-      getRequestUser(req),
+      requireRequestUser(req),
       params.orderCode,
     );
 
     return res.json({
       success: true,
       data: result,
-      message: "Da huy giao dich nap vi",
+      message: "Đã hủy giao dịch nạp ví",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
@@ -120,7 +91,7 @@ export const syncMyWalletDeposit = async (req: Request, res: Response) => {
   try {
     const params = walletDepositOrderCodeParamSchema.parse(req.params);
     const result = await walletService.syncWalletDeposit(
-      getRequestUser(req),
+      requireRequestUser(req),
       params.orderCode,
     );
 
@@ -129,8 +100,8 @@ export const syncMyWalletDeposit = async (req: Request, res: Response) => {
       data: result,
       message: "Đồng bộ giao dịch nạp ví thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
@@ -144,8 +115,8 @@ export const getAdminWallets = async (req: Request, res: Response) => {
       data: result,
       message: "Lấy danh sách ví thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
@@ -159,8 +130,8 @@ export const getAdminWalletByProviderId = async (req: Request, res: Response) =>
       data: result,
       message: "Lấy thông tin ví nhà cung cấp thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
@@ -178,14 +149,14 @@ export const getAdminWalletTransactions = async (req: Request, res: Response) =>
       data: result,
       message: "Lấy lịch sử giao dịch ví nhà cung cấp thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };
 
 export const adjustAdminWallet = async (req: Request, res: Response) => {
   try {
-    const user = getRequestUser(req);
+    const user = requireRequestUser(req);
     const params = providerIdParamSchema.parse(req.params);
     const result = await walletService.adjustWallet(params.providerId, user.id, req.body);
 
@@ -194,7 +165,7 @@ export const adjustAdminWallet = async (req: Request, res: Response) => {
       data: result,
       message: "Điều chỉnh ví thành công",
     });
-  } catch (error: any) {
-    return handleError(res, error);
+  } catch (error: unknown) {
+    return sendControllerError(res, error, { includeCode: true });
   }
 };

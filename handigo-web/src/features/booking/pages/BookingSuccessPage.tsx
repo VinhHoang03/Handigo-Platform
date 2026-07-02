@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, Navigate } from 'react-router-dom';
 import { BookingShell } from '../components/BookingComponents';
-import { mapImage } from '../data/bookingMockData';
+import { mapImage } from '../constants/bookingImages';
 import type { Order } from '../../../types/booking';
-import { bookingApi } from '../../../api/booking';
+import { bookingApi } from '@/features/booking/api/booking.api';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { ReliableImage } from '@/components/common/ReliableImage';
 

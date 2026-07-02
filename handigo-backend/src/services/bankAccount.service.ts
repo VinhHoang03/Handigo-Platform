@@ -1,16 +1,12 @@
 import { Types } from "mongoose";
 import { BankAccount } from "../models/bankAccount.model";
+import type { RequestUser } from "../middlewares/authContext";
 import { Provider } from "../models/provider.model";
 import { AppError } from "../utils/appError";
 import type {
   CreateBankAccountInput,
   UpdateBankAccountInput,
 } from "../validations/bankAccount.validator";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
 
 const assertProvider = async (user: RequestUser) => {
   if (user.role !== "PROVIDER") {

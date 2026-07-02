@@ -9,8 +9,10 @@ import { connectDB } from "./configs/db";
 import { initSocket } from "./sockets/initSocket";
 import { DispatchService } from "./services/dispatch.service";
 import { validateProductionConfig } from "./configs/production";
+import { createLogger } from "./utils/logger";
 
 const PORT = Number(process.env.PORT || 5000);
+const serverLogger = createLogger("Server");
 
 const startServer = async () => {
   try {
@@ -22,11 +24,11 @@ const startServer = async () => {
     DispatchService.startTimeoutMonitor();
 
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`Máy chủ đang chạy tại cổng ${PORT}.`);
+      serverLogger.info("Máy chủ đang chạy.", { port: PORT });
     });
 
     const shutdown = (signal: string) => {
-      console.log(`Nhận tín hiệu ${signal}, đang dừng máy chủ...`);
+      serverLogger.info("Nhận tín hiệu dừng máy chủ.", { signal });
       server.close(() => {
         mongoose.connection
           .close()
@@ -39,7 +41,7 @@ const startServer = async () => {
     process.once("SIGTERM", () => shutdown("SIGTERM"));
     process.once("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
-    console.error("Không thể khởi động máy chủ:", error);
+    serverLogger.error("Không thể khởi động máy chủ.", error);
     process.exit(1);
   }
 };

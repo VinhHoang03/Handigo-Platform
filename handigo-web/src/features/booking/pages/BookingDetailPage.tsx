@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BookingShell } from "../components/BookingComponents";
-import { bookingApi } from "../../../api/booking";
+import { bookingApi } from "@/features/booking/api/booking.api";
 import { Modal } from "../../../components/common/Modal";
 import type { Order, OrderQuotation } from "../../../types/booking";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";

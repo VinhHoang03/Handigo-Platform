@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Modal } from "@/components/common/Modal";
-import { AddressBookManager } from "@/components/profile/AddressBookManager";
-import { UserProfileSection } from "@/components/profile/UserProfileSection";
+import { AddressBookManager } from "@/features/profile/components/AddressBookManager";
+import { UserProfileSection } from "@/features/profile/components/UserProfileSection";
 import { changePasswordApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import { ToggleOption } from "@/features/customer/components/CustomerProfileComponents";
+import { ToggleOption } from "@/features/customer/components/ToggleOption";
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
 import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
@@ -14,6 +14,7 @@ import {
   getUserProfile,
   updateUserProfile,
 } from "@/features/profile/api/userProfile.api";
+import { getErrorMessage } from "@/utils/apiError";
 import type {
   UserProfileData,
   UserProfileFormValue,
@@ -21,11 +22,6 @@ import type {
 
 const DEFAULT_AVATAR =
   "https://ui-avatars.com/api/?name=Customer&background=4f46e5&color=fff";
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  const err = error as { response?: { data?: { message?: string } } };
-  return err?.response?.data?.message || fallback;
-};
 
 const WAITING_PROVIDER_STATUSES: ProviderApplication["status"][] = [
   "pending",

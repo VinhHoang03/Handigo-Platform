@@ -16,7 +16,7 @@ const uploadBuffer = (buffer: Buffer) =>
       { folder: "handigo/order-attachments", resource_type: "image" },
       (error, result) => {
         if (error || !result) {
-          reject(error || new Error("Cloudinary upload failed"));
+          reject(error || new Error("Tải tệp lên Cloudinary thất bại"));
           return;
         }
         resolve(result.secure_url);
@@ -38,7 +38,7 @@ export const uploadOrderAttachmentImage = (
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Image is required",
+        message: "Vui lòng chọn ảnh cần tải lên",
       });
     }
 
@@ -48,7 +48,7 @@ export const uploadOrderAttachmentImage = (
     } catch {
       return res.status(502).json({
         success: false,
-        message: "Could not upload image",
+        message: "Không thể tải ảnh lên",
       });
     }
   });

@@ -1,5 +1,7 @@
 import api from '@/api/client';
 import type {
+  OcrDocumentKind,
+  ProviderAssetUpload,
   ProviderProfileResponse,
   SubmitIdentityPayload,
   UpdateProviderProfilePayload,
@@ -41,12 +43,14 @@ export const providerProfileApi = {
   uploadImage: async (
     file: File,
     purpose: 'identity' | 'certificate' | 'portfolio' | 'avatar',
+    documentKind?: OcrDocumentKind,
   ) => {
     const formData = new FormData();
     formData.append('image', file);
     formData.append('purpose', purpose);
+    if (documentKind) formData.append('documentKind', documentKind);
 
-    return data<{ url: string }>(
+    return data<ProviderAssetUpload>(
       await api.post('/provider-assets/images', formData),
     );
   },

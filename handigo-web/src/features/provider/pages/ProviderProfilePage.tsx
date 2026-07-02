@@ -7,9 +7,8 @@ import {
   type FormEvent,
 } from "react";
 import { DashboardShell } from "@/components/common/DashboardShell";
-import { Modal } from "@/components/common/Modal";
-import { AddressBookModal } from "@/components/profile/AddressBookModal";
-import { UserProfileSection } from "@/components/profile/UserProfileSection";
+import { AddressBookModal } from "@/features/profile/components/AddressBookModal";
+import { UserProfileSection } from "@/features/profile/components/UserProfileSection";
 import { changePasswordApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import {
@@ -22,6 +21,7 @@ import { updateUserProfile } from "@/features/profile/api/userProfile.api";
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
 import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
 import type { Category } from "@/features/provider-application/types/providerApplication.types";
+import { getErrorMessage } from "@/utils/apiError";
 import type {
   UserAddress,
   UserAddressPayload,
@@ -30,639 +30,57 @@ import type {
 } from "@/features/profile/types/profile.types";
 import {
   AccountFunctionsPanel,
-  InfoField,
   PerformanceStats,
   ProfileSection,
   ProviderHero,
   ServiceAreaPanel,
-  SkillTags,
   VerificationPanel,
 } from "../components/ProviderProfileComponents";
-import { providerProfileApi } from "../api/providerProfile.api";
-import { useProviderAvailability } from "../hooks/useProviderAvailability";
 import { ProfessionalProfileDialog, ServiceAreaDialog } from "../components/ProviderProfileDialogs";
 import { ProviderFeedbackSection } from "../components/ProviderFeedbackSection";
+import {
+  ProfessionalSummarySection,
+  ProviderCertificatesSection,
+} from "../components/ProviderProfileSections";
+import {
+  ProviderIdentityDialog,
+  ProviderPasswordConfirmDialog,
+  ProviderPasswordUpdateDialog,
+} from "../components/ProviderProfileSecurityDialogs";
+import { providerProfileApi } from "../api/providerProfile.api";
+import { useProviderAvailability } from "../hooks/useProviderAvailability";
 import type {
-  CertificateStatus,
-  IdentityDocument,
-  IdentityDocumentType,
-  PerformanceStat,
   ProviderCertificate,
   ProviderProfile,
   ProviderProfileResponse,
-  ServiceArea,
   SubmitIdentityPayload,
   VerificationItem,
-  VerificationStatus,
 } from "../types/provider.types";
-
-const DEFAULT_AVATAR =
-  "https://ui-avatars.com/api/?name=Provider&background=E8DEF8&color=21005D";
-
-type ProfessionalForm = {
-  bio: string;
-  serviceIds: string[];
-};
-
-type IdentityForm = {
-  type: IdentityDocumentType;
-  documentNumber: string;
-  fullName: string;
-  issuedPlace: string;
-  issuedAt: string;
-  expiresAt: string;
-  frontImageUrl: string;
-  backImageUrl: string;
-  passportImageUrl: string;
-  consentAccepted: boolean;
-};
-
-type CertificateForm = {
-  id?: string;
-  title: string;
-  issuer: string;
-  issuedAt: string;
-  expiresAt: string;
-  imageUrls: string[];
-  description: string;
-};
-
-const emptyProfessionalForm: ProfessionalForm = {
-  bio: "",
-  serviceIds: [],
-};
-
-const emptyIdentityForm: IdentityForm = {
-  type: "cccd",
-  documentNumber: "",
-  fullName: "",
-  issuedPlace: "",
-  issuedAt: "",
-  expiresAt: "",
-  frontImageUrl: "",
-  backImageUrl: "",
-  passportImageUrl: "",
-  consentAccepted: false,
-};
-
-const emptyCertificateForm: CertificateForm = {
-  title: "",
-  issuer: "",
-  issuedAt: "",
-  expiresAt: "",
-  imageUrls: [],
-  description: "",
-};
-
-const identityStatusLabel: Record<VerificationStatus, string> = {
-  unsubmitted: "Chưa gửi",
-  pending: "Đang chờ duyệt",
-  verified: "Đã xác thực",
-  rejected: "Bị từ chối",
-};
-
-const certificateStatusLabel: Record<CertificateStatus, string> = {
-  pending: "Đang chờ duyệt",
-  approved: "Đã duyệt",
-  rejected: "Bị từ chối",
-};
-
-const statusTone = (
-  status?: VerificationStatus,
-): VerificationItem["statusTone"] => {
-  if (status === "verified") return "approved";
-  if (status === "rejected") return "rejected";
-  return "pending";
-};
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "Chưa cập nhật";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
-  return date.toLocaleDateString("vi-VN");
-};
-
-const toDateInput = (value?: string | null) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
-};
-
-const optional = (value: string) => {
-  const trimmed = value.trim();
-  return trimmed || undefined;
-};
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  const err = error as { response?: { data?: { message?: string } } };
-  return err?.response?.data?.message || fallback;
-};
-
-const toProfessionalForm = (
-  profile: ProviderProfileResponse,
-): ProfessionalForm => ({
-  bio: profile.provider.bio || profile.provider.description || "",
-  serviceIds: profile.provider.serviceIds || [],
-});
-
-const toIdentityForm = (identity?: IdentityDocument): IdentityForm => ({
-  type: identity?.type || "cccd",
-  documentNumber: identity?.documentNumber || identity?.numberLast4 || "",
-  fullName: identity?.fullName || "",
-  issuedPlace: identity?.issuedPlace || "",
-  issuedAt: toDateInput(identity?.issuedAt),
-  expiresAt: toDateInput(identity?.expiresAt),
-  frontImageUrl: identity?.frontImageUrl || "",
-  backImageUrl: identity?.backImageUrl || "",
-  passportImageUrl: identity?.passportImageUrl || "",
-  consentAccepted: false,
-});
-
-const toCertificateForm = (
-  certificate: ProviderCertificate,
-): CertificateForm => ({
-  id: certificate.id,
-  title: certificate.title,
-  issuer: certificate.issuer || "",
-  issuedAt: toDateInput(certificate.issuedAt),
-  expiresAt: toDateInput(certificate.expiresAt),
-  imageUrls: certificate.imageUrls,
-  description: certificate.description || "",
-});
-
-const toUserProfileData = (
-  profile: ProviderProfileResponse,
-): UserProfileData => ({
-  id: profile.user.id,
-  fullName: profile.user.fullName,
-  email: profile.user.email,
-  phone: profile.user.phone,
-  avatar: profile.user.avatar,
-  avatarUrl: profile.user.avatar || DEFAULT_AVATAR,
-  birthday: profile.user.birthday,
-  gender: profile.user.gender,
-  createdAt: profile.user.createdAt,
-});
-
-const documentLast4 = (value: string) => {
-  const digits = value.replace(/\D/g, "");
-  return digits.length >= 4 ? digits.slice(-4) : undefined;
-};
-
-const isImageUrl = (url: string) =>
-  /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) ||
-  url.includes("/image/upload/");
-
-function TextInput({
-  id,
-  label,
-  value,
-  type = "text",
-  required = false,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  type?: string;
-  required?: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-bold uppercase text-on-surface-variant">
-        {label}
-      </span>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-      />
-    </label>
-  );
-}
-
-function TextArea({
-  id,
-  label,
-  value,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block md:col-span-2">
-      <span className="mb-2 block text-xs font-bold uppercase text-on-surface-variant">
-        {label}
-      </span>
-      <textarea
-        id={id}
-        value={value}
-        rows={4}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-      />
-    </label>
-  );
-}
-
-function SelectField<T extends string>({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: T;
-  options: Array<{ label: string; value: T }>;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-bold uppercase text-on-surface-variant">
-        {label}
-      </span>
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value as T)}
-        className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function UploadedAsset({
-  url,
-  label,
-  onRemove,
-}: {
-  url: string;
-  label: string;
-  onRemove?: () => void;
-}) {
-  return (
-    <div className="rounded-lg border border-outline-variant/30 bg-white p-3">
-      {isImageUrl(url) ? (
-        <img
-          src={url}
-          alt={label}
-          className="h-28 w-full rounded-lg object-cover"
-        />
-      ) : (
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className="flex h-28 items-center justify-center rounded-lg bg-surface-container-low text-sm font-bold text-primary"
-        >
-          Xem tài liệu
-        </a>
-      )}
-      {onRemove && (
-        <button
-          type="button"
-          className="mt-2 text-xs font-bold text-error hover:underline"
-          onClick={onRemove}
-        >
-          Xóa
-        </button>
-      )}
-    </div>
-  );
-}
-
-function FileUploadSlot({
-  id,
-  label,
-  value,
-  accept,
-  uploading,
-  onUpload,
-  onRemove,
-}: {
-  id: string;
-  label: string;
-  value?: string;
-  accept: string;
-  uploading?: boolean;
-  onUpload: (file: File) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-bold uppercase text-on-surface-variant">
-          {label}
-        </p>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90">
-          <span className="material-symbols-outlined text-[18px]">upload</span>
-          {uploading ? "Đang tải..." : value ? "Thay đổi" : "Tải lên"}
-          <input
-            id={id}
-            type="file"
-            accept={accept}
-            disabled={uploading}
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.currentTarget.value = "";
-              if (file) onUpload(file);
-            }}
-          />
-        </label>
-      </div>
-      {value ? (
-        <UploadedAsset url={value} label={label} onRemove={onRemove} />
-      ) : (
-        <div className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-low p-5 text-center text-sm text-on-surface-variant">
-          Chưa có tệp.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function IdentityDocumentForm({
-  form,
-  error,
-  isSaving,
-  uploadingAsset,
-  onChange,
-  onUpload,
-  onSubmit,
-}: {
-  form: IdentityForm;
-  error?: string;
-  isSaving?: boolean;
-  uploadingAsset?: string | null;
-  onChange: (form: IdentityForm) => void;
-  onUpload: (
-    field: "frontImageUrl" | "backImageUrl" | "passportImageUrl",
-    file: File,
-  ) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <form className="space-y-5" onSubmit={onSubmit}>
-      {error && (
-        <div className="rounded-lg bg-error/10 p-3 text-sm text-error">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <SelectField<IdentityDocumentType>
-          id="identity-type"
-          label="Loại giấy tờ"
-          value={form.type}
-          options={[
-            { label: "CCCD", value: "cccd" },
-            { label: "Hộ chiếu", value: "passport" },
-          ]}
-          onChange={(value) => onChange({ ...form, type: value })}
-        />
-        <TextInput
-          id="identity-document-number"
-          label="Số giấy tờ"
-          value={form.documentNumber}
-          required
-          onChange={(value) => onChange({ ...form, documentNumber: value })}
-        />
-        <TextInput
-          id="identity-full-name"
-          label="Họ tên trên giấy tờ"
-          value={form.fullName}
-          required
-          onChange={(value) => onChange({ ...form, fullName: value })}
-        />
-        <TextInput
-          id="identity-issued-place"
-          label="Nơi cấp"
-          value={form.issuedPlace}
-          onChange={(value) => onChange({ ...form, issuedPlace: value })}
-        />
-        <TextInput
-          id="identity-issued-at"
-          label="Ngày cấp"
-          type="date"
-          value={form.issuedAt}
-          onChange={(value) => onChange({ ...form, issuedAt: value })}
-        />
-        <TextInput
-          id="identity-expires-at"
-          label="Ngày hết hạn"
-          type="date"
-          value={form.expiresAt}
-          onChange={(value) => onChange({ ...form, expiresAt: value })}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {form.type === "cccd" ? (
-          <>
-            <FileUploadSlot
-              id="identity-front-upload"
-              label="Ảnh mặt trước"
-              value={form.frontImageUrl}
-              accept="image/*"
-              uploading={uploadingAsset === "frontImageUrl"}
-              onUpload={(file) => onUpload("frontImageUrl", file)}
-              onRemove={() => onChange({ ...form, frontImageUrl: "" })}
-            />
-            <FileUploadSlot
-              id="identity-back-upload"
-              label="Ảnh mặt sau (nếu cần)"
-              value={form.backImageUrl}
-              accept="image/*"
-              uploading={uploadingAsset === "backImageUrl"}
-              onUpload={(file) => onUpload("backImageUrl", file)}
-              onRemove={() => onChange({ ...form, backImageUrl: "" })}
-            />
-          </>
-        ) : (
-          <FileUploadSlot
-            id="identity-passport-upload"
-            label="Ảnh hộ chiếu"
-            value={form.passportImageUrl}
-            accept="image/*"
-            uploading={uploadingAsset === "passportImageUrl"}
-            onUpload={(file) => onUpload("passportImageUrl", file)}
-            onRemove={() => onChange({ ...form, passportImageUrl: "" })}
-          />
-        )}
-      </div>
-
-      <label className="flex items-start gap-3 rounded-lg bg-surface-container-low p-4 text-sm">
-        <input
-          type="checkbox"
-          checked={form.consentAccepted}
-          required
-          onChange={(event) =>
-            onChange({ ...form, consentAccepted: event.target.checked })
-          }
-          className="mt-1 h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary"
-        />
-        <span>
-          Tôi đồng ý cho Handigo xử lý dữ liệu giấy tờ cá nhân để xác thực tài
-          khoản provider.
-        </span>
-      </label>
-
-      <div className="flex flex-col justify-end gap-3 sm:flex-row">
-        <button type="submit" className="btn-primary" disabled={isSaving}>
-          {isSaving ? "Đang gửi..." : "Gửi xác thực"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function CertificateInlineForm({
-  form,
-  error,
-  isSaving,
-  uploading,
-  onChange,
-  onUpload,
-  onCancel,
-  onSubmit,
-}: {
-  form: CertificateForm;
-  error?: string;
-  isSaving?: boolean;
-  uploading?: boolean;
-  onChange: (form: CertificateForm) => void;
-  onUpload: (file: File) => void;
-  onCancel: () => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  return (
-    <form
-      className="grid grid-cols-1 gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4 md:grid-cols-2"
-      onSubmit={onSubmit}
-    >
-      {error && (
-        <div className="rounded-lg bg-error/10 p-3 text-sm text-error md:col-span-2">
-          {error}
-        </div>
-      )}
-      <TextInput
-        id="certificate-title"
-        label="Tên chứng chỉ"
-        value={form.title}
-        required
-        onChange={(value) => onChange({ ...form, title: value })}
-      />
-      <TextInput
-        id="certificate-issuer"
-        label="Đơn vị cấp"
-        value={form.issuer}
-        onChange={(value) => onChange({ ...form, issuer: value })}
-      />
-      <TextInput
-        id="certificate-issued-at"
-        label="Ngày cấp"
-        type="date"
-        value={form.issuedAt}
-        onChange={(value) => onChange({ ...form, issuedAt: value })}
-      />
-      <TextInput
-        id="certificate-expires-at"
-        label="Ngày hết hạn"
-        type="date"
-        value={form.expiresAt}
-        onChange={(value) => onChange({ ...form, expiresAt: value })}
-      />
-      <div className="space-y-3 md:col-span-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs font-bold uppercase text-on-surface-variant">
-            Ảnh hoặc tài liệu chứng chỉ
-          </p>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90">
-            <span className="material-symbols-outlined text-[18px]">
-              upload
-            </span>
-            {uploading ? "Đang tải..." : "Tải lên"}
-            <input
-              type="file"
-              accept="image/*,.pdf,.doc,.docx"
-              disabled={uploading}
-              className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.currentTarget.value = "";
-                if (file) onUpload(file);
-              }}
-            />
-          </label>
-        </div>
-        {form.imageUrls.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-            {form.imageUrls.map((url) => (
-              <UploadedAsset
-                key={url}
-                url={url}
-                label={form.title || "Chứng chỉ"}
-                onRemove={() =>
-                  onChange({
-                    ...form,
-                    imageUrls: form.imageUrls.filter((item) => item !== url),
-                  })
-                }
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-outline-variant/60 bg-white/70 p-5 text-center text-sm text-on-surface-variant">
-            Chưa có tệp chứng chỉ.
-          </div>
-        )}
-      </div>
-      <TextArea
-        id="certificate-description"
-        label="Mô tả"
-        value={form.description}
-        onChange={(value) => onChange({ ...form, description: value })}
-      />
-      <div className="flex justify-end gap-3 pt-2 md:col-span-2">
-        <button
-          type="button"
-          className="rounded-lg bg-surface-container px-4 py-2 font-bold"
-          disabled={isSaving}
-          onClick={onCancel}
-        >
-          Hủy
-        </button>
-        <button
-          type="submit"
-          className="rounded-lg bg-primary px-4 py-2 font-bold text-on-primary"
-          disabled={isSaving}
-        >
-          {isSaving ? "Đang lưu..." : "Lưu chứng chỉ"}
-        </button>
-      </div>
-    </form>
-  );
-}
+import {
+  buildPerformanceStats,
+  buildProviderProfileView,
+  buildServiceArea,
+  DEFAULT_PROVIDER_AVATAR,
+  documentLast4,
+  emptyCertificateForm,
+  emptyIdentityForm,
+  emptyPasswordForm,
+  emptyProfessionalForm,
+  fillIdentityEmptyFields,
+  optional,
+  toCertificateForm,
+  toIdentityForm,
+  toProfessionalForm,
+  toUserProfileData,
+  type CertificateForm,
+  type IdentityForm,
+  type PasswordForm,
+  type ProfessionalForm,
+} from "../utils/providerProfilePage";
 
 export default function ProviderProfilePage() {
-  const { availabilityStatus, isOnline, toggleAvailability } = useProviderAvailability();
+  const { availabilityStatus, isOnline, toggleAvailability } =
+    useProviderAvailability();
   const userProfileSectionRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState<ProviderProfileResponse | null>(null);
@@ -681,29 +99,21 @@ export default function ProviderProfilePage() {
   const [serviceAreaError, setServiceAreaError] = useState("");
   const [isCertificateFormOpen, setIsCertificateFormOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(
-    null,
-  );
+  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const [phoneHighlighted, setPhoneHighlighted] = useState(false);
   const [uploadingAsset, setUploadingAsset] = useState<string | null>(null);
   const [identityError, setIdentityError] = useState("");
   const [certificateError, setCertificateError] = useState("");
-  const [professionalForm, setProfessionalForm] = useState<ProfessionalForm>(
-    emptyProfessionalForm,
-  );
+  const [professionalForm, setProfessionalForm] =
+    useState<ProfessionalForm>(emptyProfessionalForm);
   const [identityForm, setIdentityForm] =
     useState<IdentityForm>(emptyIdentityForm);
   const [certificateForm, setCertificateForm] =
     useState<CertificateForm>(emptyCertificateForm);
-
   const [isPwdConfirmOpen, setIsPwdConfirmOpen] = useState(false);
   const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
-  const [pwdData, setPwdData] = useState({
-    current: "",
-    next: "",
-    confirm: "",
-  });
+  const [pwdData, setPwdData] = useState<PasswordForm>(emptyPasswordForm);
   const [pwdError, setPwdError] = useState("");
   const [pwdMsg, setPwdMsg] = useState("");
   const [isUpdatingPwd, setIsUpdatingPwd] = useState(false);
@@ -767,90 +177,25 @@ export default function ProviderProfilePage() {
     void loadAddresses();
   }, [loadAddresses, loadProfile]);
 
-  const profileView = useMemo<ProviderProfile | null>(() => {
-    if (!profile) return null;
-
-    const serviceNames =
-      profile.provider.services
-        ?.map((service) => service.name)
-        .filter(Boolean) || [];
-
-    return {
-      fullName: profile.user.fullName,
-      email: profile.user.email,
-      phone: profile.user.phone || "Chưa cập nhật",
-      gender: profile.user.gender || "Chưa cập nhật",
-      birthday: formatDate(profile.user.birthday),
-      bio:
-        profile.provider.bio || profile.provider.description || "Chưa cập nhật",
-      mainService: serviceNames[0] || "Chưa cập nhật",
-      experience: `${profile.provider.experienceYears} năm kinh nghiệm`,
-      skills: serviceNames,
-      certifications: profile.provider.certificates.map((certificate) => ({
-        id: certificate.id,
-        title: certificate.title,
-        expiryDate: certificate.expiresAt
-          ? formatDate(certificate.expiresAt)
-          : "Không thời hạn",
-      })),
-      rating: profile.provider.averageRating || 0,
-      reviewCount: profile.provider.totalFeedbacks || 0,
-      totalBookings: profile.provider.totalCompletedOrders || 0,
-      isVerified: profile.provider.verified,
-      joinDate: profile.user.createdAt
-        ? String(new Date(profile.user.createdAt).getFullYear())
-        : "N/A",
-      avatarUrl: profile.user.avatar || DEFAULT_AVATAR,
-    };
-  }, [profile]);
-
-  const performanceStats = useMemo<PerformanceStat[]>(() => {
-    if (!profile) return [];
-
-    return [
-      {
-        label: "Đánh giá trung bình",
-        value: profile.provider.averageRating.toFixed(2),
-        meta: `${profile.provider.totalFeedbacks} đánh giá`,
-      },
-      {
-        label: "Đơn hoàn tất",
-        value: String(profile.provider.totalCompletedOrders),
-        meta: "Tổng cộng",
-      },
-      {
-        label: "Trạng thái",
-        value: availabilityStatus,
-        meta: "Hiện tại",
-        tone:
-          availabilityStatus === "online"
-            ? "success"
-            : "warning",
-      },
-      {
-        label: "Chứng chỉ",
-        value: String(profile.provider.certificates.length),
-        meta: "Đã khai báo",
-      },
-    ];
-  }, [availabilityStatus, profile]);
-
-  const serviceArea = useMemo<ServiceArea>(
-    () => ({
-      province: profile?.provider.serviceArea?.province,
-      ward: profile?.provider.serviceArea?.ward,
-      workingAreas: profile?.provider.workingAreas,
-    }),
+  const profileView = useMemo<ProviderProfile | null>(
+    () => buildProviderProfileView(profile),
     [profile],
   );
 
-  const refreshAddresses = async () => {
+  const performanceStats = useMemo(
+    () => buildPerformanceStats(profile, availabilityStatus),
+    [availabilityStatus, profile],
+  );
+
+  const serviceArea = useMemo(() => buildServiceArea(profile), [profile]);
+
+  async function refreshAddresses() {
     const nextAddresses = await getUserAddresses();
     setAddresses(nextAddresses);
     setAddressError("");
-  };
+  }
 
-  const handleUserProfileSave = async (payload: UserProfileFormValue) => {
+  async function handleUserProfileSave(payload: UserProfileFormValue) {
     setIsSaving(true);
     setError(null);
 
@@ -883,12 +228,12 @@ export default function ProviderProfilePage() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
-  const handleSubmitAddress = async (
+  async function handleSubmitAddress(
     payload: UserAddressPayload,
     address: UserAddress | null,
-  ) => {
+  ) {
     setIsAddressSaving(true);
     try {
       if (address) {
@@ -905,9 +250,9 @@ export default function ProviderProfilePage() {
     } finally {
       setIsAddressSaving(false);
     }
-  };
+  }
 
-  const handleDeleteAddress = async (address: UserAddress) => {
+  async function handleDeleteAddress(address: UserAddress) {
     setIsAddressSaving(true);
     try {
       await deleteUserAddress(address.id);
@@ -923,11 +268,9 @@ export default function ProviderProfilePage() {
     } finally {
       setIsAddressSaving(false);
     }
-  };
+  }
 
-  const handleProfessionalSubmit = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  async function handleProfessionalSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setIsSaving(true);
@@ -951,18 +294,28 @@ export default function ProviderProfilePage() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
-  const handleIdentityFileUpload = async (
+  async function handleIdentityFileUpload(
     field: "frontImageUrl" | "backImageUrl" | "passportImageUrl",
     file: File,
-  ) => {
+  ) {
     setUploadingAsset(field);
     setIdentityError("");
     try {
-      const uploaded = await providerProfileApi.uploadImage(file, "identity");
+      const documentKind =
+        field === "frontImageUrl"
+          ? "cccd_front"
+          : field === "backImageUrl"
+            ? "cccd_back"
+            : "passport";
+      const uploaded = await providerProfileApi.uploadImage(
+        file,
+        "identity",
+        documentKind,
+      );
       setIdentityForm((current) => ({
-        ...current,
+        ...fillIdentityEmptyFields(current, uploaded.ocrSuggestion),
         [field]: uploaded.url,
       }));
     } catch (uploadError) {
@@ -975,16 +328,13 @@ export default function ProviderProfilePage() {
     } finally {
       setUploadingAsset(null);
     }
-  };
+  }
 
-  const handleCertificateFileUpload = async (file: File) => {
+  async function handleCertificateFileUpload(file: File) {
     setUploadingAsset("certificate");
     setCertificateError("");
     try {
-      const uploaded = await providerProfileApi.uploadImage(
-        file,
-        "certificate",
-      );
+      const uploaded = await providerProfileApi.uploadImage(file, "certificate");
       setCertificateForm((current) => ({
         ...current,
         imageUrls: [...current.imageUrls, uploaded.url],
@@ -999,9 +349,9 @@ export default function ProviderProfilePage() {
     } finally {
       setUploadingAsset(null);
     }
-  };
+  }
 
-  const handleIdentitySubmit = async (event: FormEvent<HTMLFormElement>) => {
+  async function handleIdentitySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIdentityError("");
 
@@ -1069,9 +419,9 @@ export default function ProviderProfilePage() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
-  const handleCertificateSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  async function handleCertificateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCertificateError("");
 
@@ -1099,10 +449,7 @@ export default function ProviderProfilePage() {
       };
 
       const nextProfile = certificateForm.id
-        ? await providerProfileApi.updateCertificate(
-            certificateForm.id,
-            payload,
-          )
+        ? await providerProfileApi.updateCertificate(certificateForm.id, payload)
         : await providerProfileApi.createCertificate(payload);
 
       setProfile(nextProfile);
@@ -1118,9 +465,9 @@ export default function ProviderProfilePage() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
-  const handleDeleteCertificate = async (certificateId: string) => {
+  async function handleDeleteCertificate(certificateId: string) {
     const confirmed = window.confirm("Xóa chứng chỉ này?");
     if (!confirmed) return;
 
@@ -1132,71 +479,92 @@ export default function ProviderProfilePage() {
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
-  const openProfessionalEdit = () => {
+  function openProfessionalEdit() {
     if (profile) setProfessionalForm(toProfessionalForm(profile));
     setIsEditingProfessional(true);
     setIsLoadingServices(true);
-    providerApplicationApi.categories()
+    void providerApplicationApi
+      .categories()
       .then(setCategories)
       .catch(() => setError("Không thể tải danh sách dịch vụ."))
       .finally(() => setIsLoadingServices(false));
-  };
+  }
 
-  const openServiceAreaEdit = () => {
+  function openServiceAreaEdit() {
     if (!profile) return;
-    const legacyArea = [profile.provider.serviceArea?.ward, profile.provider.serviceArea?.province]
+    const legacyArea = [
+      profile.provider.serviceArea?.ward,
+      profile.provider.serviceArea?.province,
+    ]
       .filter(Boolean)
       .join(", ");
-    setWorkingAreasForm(profile.provider.workingAreas?.length ? profile.provider.workingAreas : legacyArea ? [legacyArea] : []);
+    setWorkingAreasForm(
+      profile.provider.workingAreas?.length
+        ? profile.provider.workingAreas
+        : legacyArea
+          ? [legacyArea]
+          : [],
+    );
     setServiceAreaError("");
     setIsServiceAreaModalOpen(true);
-  };
+  }
 
-  const handleServiceAreaSave = async () => {
+  async function handleServiceAreaSave() {
     const [firstArea = ""] = workingAreasForm;
-    const parts = firstArea.split(", ").map((item) => item.trim()).filter(Boolean);
+    const parts = firstArea
+      .split(", ")
+      .map((item) => item.trim())
+      .filter(Boolean);
     setIsSaving(true);
     setServiceAreaError("");
     try {
       const nextProfile = await providerProfileApi.updateProfile({
         workingAreas: workingAreasForm,
-        serviceArea: { ward: parts[0], province: parts.slice(1).join(", ") || undefined },
+        serviceArea: {
+          ward: parts[0],
+          province: parts.slice(1).join(", ") || undefined,
+        },
       });
       setProfile(nextProfile);
       setIsServiceAreaModalOpen(false);
     } catch (saveError) {
-      setServiceAreaError(getErrorMessage(saveError, "Không thể cập nhật khu vực phục vụ."));
+      setServiceAreaError(
+        getErrorMessage(
+          saveError,
+          "Không thể cập nhật khu vực phục vụ.",
+        ),
+      );
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
-  const openCreateAddressModal = () => {
+  function openCreateAddressModal() {
     setEditingAddress(null);
     setAddressError("");
     setIsAddressModalOpen(true);
-  };
+  }
 
-  const openEditAddressModal = (address: UserAddress) => {
+  function openEditAddressModal(address: UserAddress) {
     setEditingAddress(address);
     setAddressError("");
     setIsAddressModalOpen(true);
-  };
+  }
 
-  const closeAddressModal = () => {
+  function closeAddressModal() {
     setIsAddressModalOpen(false);
     setEditingAddress(null);
-  };
+  }
 
-  const openIdentityModal = () => {
+  function openIdentityModal() {
     setIdentityForm(toIdentityForm(profile?.provider.identityDocument));
     setIdentityError("");
     setIsIdentityModalOpen(true);
-  };
+  }
 
-  const handlePhoneVerificationClick = () => {
+  function handlePhoneVerificationClick() {
     if (profile?.user.phone) return;
 
     userProfileSectionRef.current?.scrollIntoView({
@@ -1205,28 +573,38 @@ export default function ProviderProfilePage() {
     });
     setPhoneHighlighted(true);
     window.setTimeout(() => setPhoneHighlighted(false), 2600);
-  };
+  }
 
-  const openCreateCertificateForm = () => {
+  function openCreateCertificateForm() {
     setCertificateForm(emptyCertificateForm);
     setCertificateError("");
     setIsCertificateFormOpen(true);
-  };
+  }
 
-  const openEditCertificateForm = (certificate: ProviderCertificate) => {
+  function openEditCertificateForm(certificate: ProviderCertificate) {
     setCertificateForm(toCertificateForm(certificate));
     setCertificateError("");
     setIsCertificateFormOpen(true);
-  };
+  }
 
-  const closePasswordModal = () => {
+  function closeCertificateForm() {
+    setCertificateForm(emptyCertificateForm);
+    setCertificateError("");
+    setIsCertificateFormOpen(false);
+  }
+
+  function closePasswordModal() {
     setIsPwdModalOpen(false);
-    setPwdData({ current: "", next: "", confirm: "" });
+    setPwdData(emptyPasswordForm);
     setPwdError("");
     setPwdMsg("");
-  };
+  }
 
-  const handleUpdatePassword = async (event: FormEvent<HTMLFormElement>) => {
+  function handlePasswordFieldChange(field: keyof PasswordForm, value: string) {
+    setPwdData((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleUpdatePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPwdError("");
     setPwdMsg("");
@@ -1264,7 +642,7 @@ export default function ProviderProfilePage() {
     } finally {
       setIsUpdatingPwd(false);
     }
-  };
+  }
 
   if (isLoading) {
     return (
@@ -1303,8 +681,8 @@ export default function ProviderProfilePage() {
     );
   }
 
-  const identityDocument = profile.provider.identityDocument;
-  const identityStatus = identityDocument?.verificationStatus || "unsubmitted";
+  const identityStatus =
+    profile.provider.identityDocument?.verificationStatus || "unsubmitted";
   const verificationItems: Array<VerificationItem & { onClick?: () => void }> =
     [
       {
@@ -1320,8 +698,20 @@ export default function ProviderProfilePage() {
       },
       {
         label: "CCCD/Hộ chiếu",
-        status: identityStatusLabel[identityStatus],
-        statusTone: statusTone(identityStatus),
+        status:
+          identityStatus === "verified"
+            ? "Đã xác thực"
+            : identityStatus === "rejected"
+              ? "Bị từ chối"
+              : identityStatus === "pending"
+                ? "Đang chờ duyệt"
+                : "Chưa gửi",
+        statusTone:
+          identityStatus === "verified"
+            ? "approved"
+            : identityStatus === "rejected"
+              ? "rejected"
+              : "pending",
         onClick: openIdentityModal,
       },
     ];
@@ -1352,7 +742,7 @@ export default function ProviderProfilePage() {
               isAddressSaving={isAddressSaving}
               error={error || undefined}
               addressError={addressError}
-              defaultAvatar={DEFAULT_AVATAR}
+              defaultAvatar={DEFAULT_PROVIDER_AVATAR}
               showAvatar={false}
               highlightPhone={phoneHighlighted}
               onSaveProfile={handleUserProfileSave}
@@ -1362,112 +752,30 @@ export default function ProviderProfilePage() {
             />
           </div>
 
-          <ProfileSection
-            title="Thông tin nghề nghiệp"
-            actionLabel="Chỉnh sửa nghề nghiệp"
-            onAction={openProfessionalEdit}
-          >
-            <div className="space-y-6">
-              <InfoField label="Giới thiệu chuyên môn" value={<p className="leading-relaxed text-on-surface-variant">{profileView.bio}</p>} />
-              <InfoField label="Kinh nghiệm" value={profileView.experience} />
-              <InfoField label="Các dịch vụ" value={<SkillTags skills={profileView.skills} />} />
-            </div>
-          </ProfileSection>
+          <ProfessionalSummarySection
+            bio={profileView.bio}
+            experience={profileView.experience}
+            skills={profileView.skills}
+            onEdit={openProfessionalEdit}
+          />
 
-          <ProfileSection
-            title="Chứng chỉ nghề nghiệp"
-            actionLabel={isCertificateFormOpen ? undefined : "Thêm chứng chỉ"}
-            onAction={openCreateCertificateForm}
-          >
-            <div className="space-y-4">
-              {isCertificateFormOpen && (
-                <CertificateInlineForm
-                  form={certificateForm}
-                  error={certificateError}
-                  isSaving={isSaving}
-                  uploading={uploadingAsset === "certificate"}
-                  onChange={setCertificateForm}
-                  onUpload={(file) => void handleCertificateFileUpload(file)}
-                  onSubmit={handleCertificateSubmit}
-                  onCancel={() => {
-                    setCertificateForm(emptyCertificateForm);
-                    setCertificateError("");
-                    setIsCertificateFormOpen(false);
-                  }}
-                />
-              )}
-
-              {profile.provider.certificates.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-outline-variant p-6 text-center text-on-surface-variant">
-                  Chưa có chứng chỉ nghề nghiệp.
-                </div>
-              ) : (
-                profile.provider.certificates.map((certificate) => (
-                  <div
-                    key={certificate.id}
-                    className="rounded-xl border border-outline-variant/30 p-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h4 className="font-bold text-on-surface">
-                          {certificate.title}
-                        </h4>
-                        <p className="text-sm text-on-surface-variant">
-                          {certificate.issuer || "Chưa cập nhật đơn vị cấp"} •{" "}
-                          {certificate.expiresAt
-                            ? `Hết hạn ${formatDate(certificate.expiresAt)}`
-                            : "Không thời hạn"}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-surface-container px-3 py-1 text-xs font-bold text-on-surface-variant">
-                        {certificateStatusLabel[certificate.status]}
-                      </span>
-                    </div>
-                    {certificate.description && (
-                      <p className="mt-3 text-sm text-on-surface-variant">
-                        {certificate.description}
-                      </p>
-                    )}
-                    {certificate.rejectionReason && (
-                      <p className="mt-3 text-sm font-medium text-error">
-                        {certificate.rejectionReason}
-                      </p>
-                    )}
-                    {certificate.imageUrls.length > 0 && (
-                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                        {certificate.imageUrls.map((url) => (
-                          <UploadedAsset
-                            key={url}
-                            url={url}
-                            label={certificate.title}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        type="button"
-                        className="rounded-lg bg-surface-container px-3 py-2 text-sm font-bold"
-                        onClick={() => openEditCertificateForm(certificate)}
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg border border-error/30 px-3 py-2 text-sm font-bold text-error"
-                        disabled={isSaving}
-                        onClick={() =>
-                          void handleDeleteCertificate(certificate.id)
-                        }
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </ProfileSection>
+          <ProviderCertificatesSection
+            certificates={profile.provider.certificates}
+            isFormOpen={isCertificateFormOpen}
+            form={certificateForm}
+            error={certificateError}
+            isSaving={isSaving}
+            isUploading={uploadingAsset === "certificate"}
+            onFormChange={setCertificateForm}
+            onUpload={(file) => void handleCertificateFileUpload(file)}
+            onSubmit={handleCertificateSubmit}
+            onCancelForm={closeCertificateForm}
+            onOpenCreate={openCreateCertificateForm}
+            onEditCertificate={openEditCertificateForm}
+            onDeleteCertificate={(certificateId) =>
+              void handleDeleteCertificate(certificateId)
+            }
+          />
         </div>
 
         <div className="col-span-12 flex flex-col gap-gutter lg:col-span-4">
@@ -1495,8 +803,12 @@ export default function ProviderProfilePage() {
         loadingServices={isLoadingServices}
         error={error || undefined}
         saving={isSaving}
-        onBioChange={(bio) => setProfessionalForm((current) => ({ ...current, bio }))}
-        onSelectedServiceIdsChange={(serviceIds) => setProfessionalForm((current) => ({ ...current, serviceIds }))}
+        onBioChange={(bio) =>
+          setProfessionalForm((current) => ({ ...current, bio }))
+        }
+        onSelectedServiceIdsChange={(serviceIds) =>
+          setProfessionalForm((current) => ({ ...current, serviceIds }))
+        }
         onClose={() => setIsEditingProfessional(false)}
         onSubmit={handleProfessionalSubmit}
       />
@@ -1527,123 +839,37 @@ export default function ProviderProfilePage() {
         />
       )}
 
-      <Modal
+      <ProviderIdentityDialog
         open={isIdentityModalOpen}
-        title="Xác thực CCCD/Hộ chiếu"
+        form={identityForm}
+        error={identityError}
+        isSaving={isSaving}
+        uploadingAsset={uploadingAsset}
+        onChange={setIdentityForm}
+        onUpload={(field, file) => void handleIdentityFileUpload(field, file)}
         onClose={() => setIsIdentityModalOpen(false)}
-        size="lg"
-      >
-        <IdentityDocumentForm
-          form={identityForm}
-          error={identityError}
-          isSaving={isSaving}
-          uploadingAsset={uploadingAsset}
-          onChange={setIdentityForm}
-          onUpload={(field, file) => void handleIdentityFileUpload(field, file)}
-          onSubmit={handleIdentitySubmit}
-        />
-      </Modal>
+        onSubmit={handleIdentitySubmit}
+      />
 
-      <Modal
+      <ProviderPasswordConfirmDialog
         open={isPwdConfirmOpen}
-        title="Mật khẩu và bảo mật"
         onClose={() => setIsPwdConfirmOpen(false)}
-        size="sm"
-      >
-        <div className="space-y-5">
-          <p className="text-on-surface">
-            Bạn có muốn cập nhật mật khẩu không?
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              className="btn-secondary flex-1"
-              onClick={() => setIsPwdConfirmOpen(false)}
-            >
-              Không
-            </button>
-            <button
-              type="button"
-              className="btn-primary flex-1"
-              onClick={() => {
-                setIsPwdConfirmOpen(false);
-                setIsPwdModalOpen(true);
-              }}
-            >
-              Đồng ý
-            </button>
-          </div>
-        </div>
-      </Modal>
+        onConfirm={() => {
+          setIsPwdConfirmOpen(false);
+          setIsPwdModalOpen(true);
+        }}
+      />
 
-      <Modal
+      <ProviderPasswordUpdateDialog
         open={isPwdModalOpen}
-        title="Cập nhật mật khẩu"
+        data={pwdData}
+        error={pwdError}
+        message={pwdMsg}
+        isSaving={isUpdatingPwd}
+        onChange={handlePasswordFieldChange}
         onClose={closePasswordModal}
-        size="sm"
-      >
-        <form onSubmit={handleUpdatePassword} className="space-y-4">
-          {(pwdError || pwdMsg) && (
-            <div
-              className={`rounded-lg p-4 text-sm ${
-                pwdError
-                  ? "bg-error/10 text-error"
-                  : "bg-primary/10 text-primary"
-              }`}
-            >
-              {pwdError || pwdMsg}
-            </div>
-          )}
-
-          <TextInput
-            id="provider-current-password"
-            label="Mật khẩu hiện tại"
-            type="password"
-            value={pwdData.current}
-            required
-            onChange={(value) =>
-              setPwdData((current) => ({ ...current, current: value }))
-            }
-          />
-          <TextInput
-            id="provider-new-password"
-            label="Mật khẩu mới"
-            type="password"
-            value={pwdData.next}
-            required
-            onChange={(value) =>
-              setPwdData((current) => ({ ...current, next: value }))
-            }
-          />
-          <TextInput
-            id="provider-confirm-password"
-            label="Xác nhận mật khẩu mới"
-            type="password"
-            value={pwdData.confirm}
-            required
-            onChange={(value) =>
-              setPwdData((current) => ({ ...current, confirm: value }))
-            }
-          />
-
-          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={closePasswordModal}
-              className="btn-secondary flex-1"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="submit"
-              disabled={isUpdatingPwd}
-              className="btn-primary flex-1"
-            >
-              {isUpdatingPwd ? "Đang xử lý..." : "Cập nhật"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+        onSubmit={handleUpdatePassword}
+      />
     </DashboardShell>
   );
 }
