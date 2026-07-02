@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { bookingApi } from "@/api/booking";
 import { providerOrderApi } from "../api/providerOrder.api";
 import type { Order, OrderCustomer } from "@/types/booking";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -198,8 +197,8 @@ const ProviderHomePage = () => {
   useEffect(() => {
     let cancelled = false;
 
-    bookingApi
-      .getProviderRecentOrders(5)
+    providerOrderApi
+      .getRecentOrders(5)
       .then((items) => {
         if (!cancelled) {
           setRecentOrders(items);

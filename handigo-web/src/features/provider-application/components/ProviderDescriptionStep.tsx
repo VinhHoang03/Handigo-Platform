@@ -13,6 +13,7 @@ import type {
   ProviderApplicationOcrSuggestion,
   ProviderApplicationPayload,
 } from "../types/providerApplication.types";
+import { getErrorMessage } from "@/utils/apiError";
 import {
   getProviderApplicationDateErrors,
   todayDate,
@@ -39,11 +40,6 @@ const emptyCertificate = (): ProviderApplicationCertificate => ({
   expiresAt: "",
   imageUrls: [],
 });
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  const err = error as { response?: { data?: { message?: string } } };
-  return err?.response?.data?.message || fallback;
-};
 
 const isImageUrl = (url: string) =>
   /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) ||

@@ -1,6 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary, { isCloudinaryConfigured } from "../configs/cloudinary";
+import { createLogger } from "../utils/logger";
+
+const feedbackUploadLogger = createLogger("FeedbackUpload");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -20,7 +23,7 @@ const uploadBuffer = (buffer: Buffer) =>
       { folder: "handigo/feedbacks", resource_type: "image" },
       (error, result) => {
         if (error || !result) {
-          reject(error || new Error("Cloudinary upload failed"));
+          reject(error || new Error("Tải tệp lên Cloudinary thất bại"));
           return;
         }
         resolve(result.secure_url);
@@ -67,7 +70,7 @@ export const uploadFeedbackImages = (
       );
       next();
     } catch (error) {
-      console.error("Không thể tải ảnh đánh giá lên Cloudinary:", error);
+      feedbackUploadLogger.error("Không thể tải ảnh đánh giá lên Cloudinary.", error);
       return res.status(502).json({
         success: false,
         message: "Không thể tải ảnh lên. Vui lòng thử lại sau.",

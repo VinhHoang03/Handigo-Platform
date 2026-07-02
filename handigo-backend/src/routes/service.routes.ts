@@ -6,11 +6,11 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   createServiceSchema,
   updateServiceSchema,
-} from "../validations/service.validation";
+} from "../validations/service.validator";
 import {
   createServiceOptionSchema,
   updateServiceOptionSchema,
-} from "../validations/serviceOption.validation";
+} from "../validations/serviceOption.validator";
 
 const router = Router();
 

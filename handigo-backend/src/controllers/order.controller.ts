@@ -1,72 +1,70 @@
 import { Request, Response, NextFunction } from "express";
-import { OrderService } from "../services/order.service";
+import { requireRequestUser } from "../middlewares/authContext";
+import type { UserRole } from "../models/user.model";
 import { AssignmentService } from "../services/assignment.service";
 import { DispatchService } from "../services/dispatch.service";
+import { OrderService } from "../services/order.service";
 import { AppError } from "../utils/appError";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
 
-/** Safely get userId as guaranteed string from JWT payload */
-const uid = (req: Request): string => {
-  const u = req.user as any;
-  return String(u?.id || u?._id || "");
+const uid = (req: Request): string => requireRequestUser(req).id;
+
+const toOrderActorRole = (role: UserRole): "customer" | "provider" | "admin" =>
+  role.toLowerCase() as "customer" | "provider" | "admin";
+
+const toQuotationViewerRole = (role: UserRole): "CUSTOMER" | "PROVIDER" => {
+  if (role === "ADMIN") {
+    throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
+  }
+
+  return role;
 };
 
-/** Safely get a param as string */
 const param = (req: Request, name: string): string => {
-  const val = req.params[name];
-  return Array.isArray(val) ? val[0] : String(val || "");
+  const value = req.params[name];
+  return Array.isArray(value) ? value[0] : String(value || "");
 };
 
-// ─── Order CRUD ───────────────────────────────────────────────────────────────
-
-/**
- * POST /orders
- */
 export const createOrder = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const customerId = uid(req);
     const order = await OrderService.createOrder({
-      customerId,
+      customerId: uid(req),
       ...req.body,
     });
     return ok(res, order, 201);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * GET /orders
- */
 export const getMyOrders = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const customerId = uid(req);
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const status = req.query.status as string;
     const search = req.query.search as string;
-    const result = await OrderService.getOrdersByCustomer(customerId, page, limit, { status, search });
+    const result = await OrderService.getOrdersByCustomer(
+      uid(req),
+      page,
+      limit,
+      { status, search },
+    );
     return ok(res, result);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * GET /orders/provider/recent
- */
 export const getProviderRecentOrders = async (
   req: Request,
   res: Response,
@@ -76,14 +74,11 @@ export const getProviderRecentOrders = async (
     const limit = Number(req.query.limit) || 5;
     const result = await OrderService.getRecentOrdersByProvider(uid(req), limit);
     return ok(res, { items: result });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * GET /orders/provider
- */
 export const getProviderOrders = async (
   req: Request,
   res: Response,
@@ -99,79 +94,68 @@ export const getProviderOrders = async (
       search,
     });
     return ok(res, result);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * GET /orders/:orderId
- */
 export const getOrderById = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const orderId = param(req, "orderId");
-    const order = await OrderService.getOrderById(orderId, uid(req));
+    const order = await OrderService.getOrderById(param(req, "orderId"), uid(req));
     return ok(res, order);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * PATCH /orders/:orderId/cancel
- */
 export const cancelOrder = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const orderId = param(req, "orderId");
-    const u = req.user as any;
-    const role = String(u?.role || "customer").toLowerCase() as
-      | "customer"
-      | "provider"
-      | "admin";
+    const role = toOrderActorRole(requireRequestUser(req).role);
     const { reason } = req.body;
-    if (!reason) throw new AppError("Vui lòng cung cấp lý do hủy.", 400);
-    const order = await OrderService.cancelOrder(orderId, uid(req), role, reason);
+
+    if (!reason) {
+      throw new AppError("Vui lòng cung cấp lý do hủy.", 400);
+    }
+
+    const order = await OrderService.cancelOrder(
+      param(req, "orderId"),
+      uid(req),
+      role,
+      reason,
+    );
     return ok(res, order);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * POST /orders/:orderId/start
- */
 export const startOrder = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const orderId = param(req, "orderId");
-    const order = await OrderService.startOrder(orderId, uid(req));
+    const order = await OrderService.startOrder(param(req, "orderId"), uid(req));
     return ok(res, order);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * POST /orders/:orderId/complete
- */
 export const completeOrder = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const orderId = param(req, "orderId");
     const { completionEvidenceImages, completionNote } = req.body;
     const evidenceImages = Array.isArray(completionEvidenceImages)
       ? completionEvidenceImages.filter(
@@ -179,64 +163,53 @@ export const completeOrder = async (
         )
       : [];
     const order = await OrderService.completeOrder(
-      orderId,
+      param(req, "orderId"),
       uid(req),
       evidenceImages,
       typeof completionNote === "string" ? completionNote : undefined,
     );
     return ok(res, order);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-// ─── Assignment ────────────────────────────────────────────────────────────────
-
-/**
- * POST /orders/assignments/:assignmentId/accept
- */
 export const acceptAssignment = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const assignmentId = param(req, "assignmentId");
     const result = await AssignmentService.acceptAssignment(
-      assignmentId,
+      param(req, "assignmentId"),
       uid(req),
     );
     return ok(res, result);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * POST /orders/assignments/:assignmentId/reject
- */
 export const rejectAssignment = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const assignmentId = param(req, "assignmentId");
     const { rejectReason } = req.body;
     await AssignmentService.rejectAssignment(
-      assignmentId,
+      param(req, "assignmentId"),
       uid(req),
       rejectReason,
     );
-    return ok(res, { message: "Đã từ chối đơn hàng và chuyển sang provider tiếp theo." });
-  } catch (err) {
-    next(err);
+    return ok(res, {
+      message: "Đã từ chối đơn hàng và chuyển sang provider tiếp theo.",
+    });
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * GET /orders/assignments/pending
- */
 export const getPendingAssignments = async (
   req: Request,
   res: Response,
@@ -245,52 +218,39 @@ export const getPendingAssignments = async (
   try {
     const data = await AssignmentService.getPendingAssignmentForProvider(uid(req));
     return ok(res, data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * GET /orders/:orderId/assignments
- */
 export const getOrderAssignments = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const orderId = param(req, "orderId");
-    const data = await AssignmentService.getAssignmentsByOrder(orderId);
+    const data = await AssignmentService.getAssignmentsByOrder(
+      param(req, "orderId"),
+    );
     return ok(res, data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-// ─── Dispatch ────────────────────────────────────────────────────────────────
-
-/**
- * POST /orders/:orderId/redispatch
- */
 export const redispatchOrder = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const orderId = param(req, "orderId");
-    await DispatchService.redispatch(orderId);
+    await DispatchService.redispatch(param(req, "orderId"));
     return ok(res, { message: "Re-dispatch thành công." });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-// ─── Repair Quotation ────────────────────────────────────────────────────────
-
-/**
- * POST /orders/:orderId/quotations
- */
 export const createRepairQuotation = async (
   req: Request,
   res: Response,
@@ -304,75 +264,63 @@ export const createRepairQuotation = async (
       providerUserId,
     );
     return ok(res, quotation, 201);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * GET /orders/:orderId/quotation
- */
 export const getRepairQuotation = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const orderId = param(req, "orderId");
-    const u = req.user as any;
-    const role = String(u?.role || "").toUpperCase() as "CUSTOMER" | "PROVIDER";
-    const data = await AssignmentService.getQuotationByOrder(orderId, uid(req), role);
+    const user = requireRequestUser(req);
+    const data = await AssignmentService.getQuotationByOrder(
+      param(req, "orderId"),
+      user.id,
+      toQuotationViewerRole(user.role),
+    );
     return ok(res, data);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * POST /orders/quotations/:quotationId/confirm
- */
 export const confirmRepairQuotation = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const quotationId = param(req, "quotationId");
     const quotation = await AssignmentService.confirmRepairQuotation(
-      quotationId,
+      param(req, "quotationId"),
       uid(req),
     );
     return ok(res, quotation);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * POST /orders/quotations/:quotationId/reject
- */
 export const rejectRepairQuotation = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const quotationId = param(req, "quotationId");
     const { rejectionReason } = req.body;
     const quotation = await AssignmentService.rejectRepairQuotation(
-      quotationId,
+      param(req, "quotationId"),
       uid(req),
       rejectionReason,
     );
     return ok(res, quotation);
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    return next(error);
   }
 };
 
-/**
- * POST /orders/attachments
- */
 export const uploadOrderAttachment = async (_req: Request, res: Response) => {
   return ok(res, { url: res.locals.imageUrl }, 201);
 };

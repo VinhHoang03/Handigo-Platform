@@ -1,8 +1,11 @@
 import mongoose, { ClientSession, Types } from "mongoose";
+import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
 import { BankAccount } from "../models/bankAccount.model";
-import { Notification } from "../models/notification.model";
 import { Provider } from "../models/provider.model";
+import { createNotificationRecord } from "./notification.service";
+import { toObjectId } from "../utils/mongo";
+import { buildTransactionCode } from "../utils/transaction";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
@@ -11,18 +14,7 @@ import type {
   CreateWithdrawalInput,
   WithdrawalListQuery,
   WithdrawalReviewInput,
-} from "../validations/withdrawal.validation";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
-
-const buildTransactionCode = (prefix: string) =>
-  `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-
-const toObjectId = (id: string | Types.ObjectId) =>
-  typeof id === "string" ? new Types.ObjectId(id) : id;
+} from "../validations/withdrawal.validator";
 
 const getProviderByUserId = async (userId: string | Types.ObjectId) => {
   const provider = await Provider.findOne({ userId, isDeleted: false });
@@ -58,27 +50,6 @@ const getActiveBankAccount = async (
   }
 
   return bankAccount;
-};
-
-const createNotification = async (
-  userId: Types.ObjectId | string,
-  title: string,
-  content: string,
-  data: Record<string, unknown>,
-  session?: ClientSession,
-) => {
-  await Notification.create(
-    [
-      {
-        userId,
-        type: "WITHDRAWAL",
-        title,
-        content,
-        data,
-      },
-    ],
-    { session },
-  );
 };
 
 const buildListResult = async (filter: Record<string, unknown>, query: WithdrawalListQuery) => {
@@ -312,16 +283,19 @@ export const approveWithdrawal = async (
       withdrawal.adminNote = input.adminNote || null;
       await withdrawal.save({ session });
 
-      await createNotification(
-        withdrawal.userId,
-        "Yêu cầu rút tiền đã được duyệt",
-        `Yêu cầu rút ${withdrawal.amount.toLocaleString("vi-VN")} VND của bạn đã được duyệt.`,
+      await createNotificationRecord(
         {
-          withdrawalId: withdrawal._id,
-          amount: withdrawal.amount,
-          status: "approved",
+          userId: withdrawal.userId,
+          type: "WITHDRAWAL",
+          title: "Yêu cầu rút tiền đã được duyệt",
+          content: `Yêu cầu rút ${withdrawal.amount.toLocaleString("vi-VN")} VND của bạn đã được duyệt.`,
+          data: {
+            withdrawalId: withdrawal._id,
+            amount: withdrawal.amount,
+            status: "approved",
+          },
         },
-        session,
+        { session },
       );
 
       approvedRequest = withdrawal;
@@ -380,17 +354,20 @@ export const rejectWithdrawal = async (
       withdrawal.adminNote = input.adminNote || null;
       await withdrawal.save({ session });
 
-      await createNotification(
-        withdrawal.userId,
-        "Yêu cầu rút tiền đã bị từ chối",
-        `Yêu cầu rút ${withdrawal.amount.toLocaleString("vi-VN")} VND của bạn đã bị từ chối. Tiền đã được hoàn về ví.`,
+      await createNotificationRecord(
         {
-          withdrawalId: withdrawal._id,
-          amount: withdrawal.amount,
-          status: "rejected",
-          adminNote: input.adminNote || null,
+          userId: withdrawal.userId,
+          type: "WITHDRAWAL",
+          title: "Yêu cầu rút tiền đã bị từ chối",
+          content: `Yêu cầu rút ${withdrawal.amount.toLocaleString("vi-VN")} VND của bạn đã bị từ chối. Tiền đã được hoàn về ví.`,
+          data: {
+            withdrawalId: withdrawal._id,
+            amount: withdrawal.amount,
+            status: "rejected",
+            adminNote: input.adminNote || null,
+          },
         },
-        session,
+        { session },
       );
 
       rejectedRequest = withdrawal;

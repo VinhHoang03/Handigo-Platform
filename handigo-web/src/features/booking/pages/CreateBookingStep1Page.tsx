@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
-import { bookingApi } from '../../../api/booking';
+import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import { useBookingStore } from '../hooks/useBookingStore';
 import type { Category, Service, ServiceOption } from '../../../types/booking';
 
@@ -19,7 +19,7 @@ const CreateBookingStep1Page = () => {
 
   useEffect(() => {
     let isMounted = true;
-    bookingApi.getCategories().then(data => {
+    serviceCatalogApi.categories().then(data => {
       if (!isMounted) return;
       setCategories(data);
       if (data.length > 0 && !categoryId) {
@@ -31,14 +31,14 @@ const CreateBookingStep1Page = () => {
 
   useEffect(() => {
     if (categoryId) {
-      bookingApi.getServices(categoryId).then(setServices);
+      serviceCatalogApi.servicesByCategory(categoryId).then(setServices);
     }
   }, [categoryId]);
 
   useEffect(() => {
     let isMounted = true;
     if (serviceId) {
-      bookingApi.getOptions(serviceId).then(data => {
+      serviceCatalogApi.options(serviceId).then(data => {
         if (isMounted) setOptions(data);
       });
     } else {

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BookingHistoryCard, BookingPageHeader, BookingShell } from '../components/BookingComponents';
-import { bookingApi } from '../../../api/booking';
-import type { BookingListItem, BookingStatusTone } from '../data/bookingMockData';
+import { bookingApi } from '@/features/booking/api/booking.api';
+import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import type { Order } from '../../../types/booking';
 
 const filters = [

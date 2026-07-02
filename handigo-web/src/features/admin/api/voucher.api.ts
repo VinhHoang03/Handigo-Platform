@@ -1,13 +1,6 @@
 import api from '@/api/client';
+import { unwrap } from '@/api/response';
 import type { Voucher, VoucherListResult, VoucherPayload, VoucherQuery } from '../types/voucher.types';
-
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
-const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 export const voucherApi = {
   list: async (query: VoucherQuery) =>

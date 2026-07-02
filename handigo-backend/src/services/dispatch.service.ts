@@ -9,6 +9,7 @@ import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { emitToUser } from "../sockets/socketServer";
 import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
+import { createLogger } from "../utils/logger";
 
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
 const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
@@ -23,6 +24,7 @@ const DEFAULT_MAX_MATCHING_DURATION_SECONDS = 5 * 60;
 const MATCHING_TIMEOUT_SCAN_INTERVAL_MS = 10_000;
 
 let timeoutMonitor: NodeJS.Timeout | null = null;
+const dispatchLogger = createLogger("DispatchService");
 
 interface DispatchContext {
   latitude?: number;
@@ -184,9 +186,10 @@ export const DispatchService = {
         orderId,
         `Không có provider nhận đơn sau ${maxMatchingAttempts} lượt matching.`,
       );
-      console.warn(
-        `[DispatchService] No provider found for order ${orderId} after ${maxMatchingAttempts} attempts.`,
-      );
+      dispatchLogger.warn("Không tìm được provider sau số lượt matching tối đa.", {
+        orderId,
+        maxMatchingAttempts,
+      });
       return;
     }
 
@@ -202,9 +205,9 @@ export const DispatchService = {
       });
 
     if (candidates.length === 0) {
-      console.warn(
-        `[DispatchService] No available provider found for order ${orderId}. Retrying until matching deadline.`,
-      );
+      dispatchLogger.warn("Chưa tìm được provider khả dụng, sẽ thử lại trước hạn matching.", {
+        orderId,
+      });
 
       const retryDelayMs = Math.min(
         matchingProviderTimeoutSeconds * 1000,
@@ -217,10 +220,7 @@ export const DispatchService = {
           triedProviderIds,
           attemptNumber,
         ).catch((error: unknown) =>
-          console.error(
-            `[DispatchService] Retry failed for order ${orderId}:`,
-            error,
-          ),
+          dispatchLogger.error("Thử lại matching thất bại.", error, { orderId }),
         );
       }, retryDelayMs);
       retryTimer.unref();
@@ -253,11 +253,13 @@ export const DispatchService = {
       assignment: realtimeAssignment,
     });
 
-    console.log(
-      `[DispatchService] Order ${orderId} assigned to provider ${candidate.providerId} ` +
-        `(attempt #${attemptNumber}, dist: ${candidate.distanceMeters}m). ` +
-        `Deadline: ${deadline.toISOString()}`,
-    );
+    dispatchLogger.info("Đã phân công đơn cho provider.", {
+      orderId,
+      providerId: candidate.providerId.toString(),
+      attemptNumber,
+      distanceMeters: candidate.distanceMeters,
+      deadline: deadline.toISOString(),
+    });
 
     const assignmentTimer = setTimeout(() => {
       DispatchService._onAssignmentTimeout(
@@ -268,10 +270,10 @@ export const DispatchService = {
         triedProviderIds,
         attemptNumber,
       ).catch((error: unknown) =>
-        console.error(
-          `[DispatchService] Timeout handling failed for assignment ${assignment._id}:`,
-          error,
-        ),
+        dispatchLogger.error("Xử lý timeout assignment thất bại.", error, {
+          assignmentId: assignment._id.toString(),
+          orderId,
+        }),
       );
     }, Math.max(deadline.getTime() - Date.now(), 1));
     assignmentTimer.unref();
@@ -310,9 +312,10 @@ export const DispatchService = {
       });
     }
 
-    console.log(
-      `[DispatchService] Assignment ${assignmentId} timed out. Retrying next provider...`,
-    );
+    dispatchLogger.info("Assignment đã timeout, chuyển sang provider tiếp theo.", {
+      assignmentId,
+      orderId,
+    });
 
     const order = await Order.findById(orderId);
     if (!order || order.status !== "created") return;
@@ -409,9 +412,10 @@ export const DispatchService = {
           if (!ctx) continue;
 
           const triedState = await getTriedProviderState(order._id);
-          console.log(
-            `[DispatchService] Khôi phục matching cho đơn ${order._id} từ lượt ${triedState.attemptNumber}.`,
-          );
+          dispatchLogger.info("Khôi phục matching cho đơn đang chờ.", {
+            orderId: order._id.toString(),
+            attemptNumber: triedState.attemptNumber,
+          });
           await DispatchService.dispatchOrder(
             order._id.toString(),
             ctx,
@@ -423,11 +427,11 @@ export const DispatchService = {
     };
 
     scan(true).catch((error: unknown) =>
-      console.error("[DispatchService] Initial timeout scan failed:", error),
+      dispatchLogger.error("Quét timeout ban đầu thất bại.", error),
     );
     timeoutMonitor = setInterval(() => {
       scan().catch((error: unknown) =>
-        console.error("[DispatchService] Timeout scan failed:", error),
+        dispatchLogger.error("Quét timeout định kỳ thất bại.", error),
       );
     }, MATCHING_TIMEOUT_SCAN_INTERVAL_MS);
     timeoutMonitor.unref();

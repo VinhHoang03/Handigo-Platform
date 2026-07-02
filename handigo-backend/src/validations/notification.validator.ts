@@ -12,7 +12,7 @@ export const notificationTypeSchema = z.enum([
 export const targetRoleSchema = z.enum(["CUSTOMER", "PROVIDER", "ALL"]);
 
 export const notificationIdParamSchema = z.object({
-  id: z.string().regex(/^[0-9a-fA-F]{24}$/, "ID khong hop le"),
+  id: z.string().regex(/^[0-9a-fA-F]{24}$/, "ID không hợp lệ"),
 });
 
 export const notificationListQuerySchema = z.object({

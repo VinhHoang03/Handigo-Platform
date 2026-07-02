@@ -2,15 +2,12 @@ import React, { type ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { Navbar } from '@/components/common/Navbar';
-import {
-  selectedServiceImage,
-  type BookingListItem,
-  type BookingStatusTone,
-} from '../data/bookingMockData';
+import { selectedServiceImage } from '../constants/bookingImages';
 import { useBookingStore } from '../hooks/useBookingStore';
-import { bookingApi } from '../../../api/booking';
+import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Service, ServiceOption } from '../../../types/booking';
 import { ReliableImage } from '@/components/common/ReliableImage';
+import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
@@ -194,13 +191,13 @@ export const OrderSummaryCard: React.FC<{
   useEffect(() => {
     let isMounted = true;
     if (serviceId) {
-      bookingApi.getServices(categoryId || '').then(services => {
+      serviceCatalogApi.servicesByCategory(categoryId || '').then(services => {
         if (!isMounted) return;
         const found = services.find(s => s._id === serviceId);
         if (found) setService(found);
       });
 
-      bookingApi.getOptions(serviceId).then(data => {
+      serviceCatalogApi.options(serviceId).then(data => {
         if (isMounted) setOptions(data);
       });
     } else {

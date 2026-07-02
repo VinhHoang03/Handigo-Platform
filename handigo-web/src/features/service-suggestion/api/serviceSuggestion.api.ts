@@ -1,4 +1,5 @@
 import api from "@/api/client";
+import { unwrap } from "@/api/response";
 import type {
   CreateServiceSuggestionPayload,
   ServiceSuggestion,
@@ -15,8 +16,6 @@ interface ApiResponse<T> {
   page?: number;
   limit?: number;
 }
-
-const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 export const serviceSuggestionApi = {
   create: async (payload: CreateServiceSuggestionPayload) =>

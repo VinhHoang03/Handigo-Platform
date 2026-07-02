@@ -3,8 +3,11 @@ import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
+import { createLogger } from "../utils/logger";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+const matchingLogger = createLogger("MatchingService");
 
 export interface ProviderCandidate {
   providerId: Types.ObjectId;
@@ -88,7 +91,7 @@ export const MatchingService = {
         .lean();
 
       if (nearbyLocations.length === 0) {
-        console.log("[MatchingService] No nearby locations found, falling back to simple filter.");
+        matchingLogger.info("Không tìm thấy vị trí provider gần đơn, chuyển sang bộ lọc thường.");
       } else {
         // Build userId → { distance estimation } map (order from $near already sorted)
         const userIdToIndex = new Map<string, number>(
@@ -177,24 +180,24 @@ export const MatchingService = {
       );
 
     if (providers.length === 0) {
-      console.warn(
-        `[MatchingService] Không có provider hợp lệ cho service ${serviceId}: ` +
-          `cần verified=true, availabilityStatus=online, isDeleted=false và chưa được thử. ` +
-          `Số provider đã loại: ${excludeIds.length}.`,
-      );
+      matchingLogger.warn("Không có provider hợp lệ cho dịch vụ.", {
+        serviceId,
+        excludedProviderCount: excludeIds.length,
+      });
     } else if (providersInArea.length === 0) {
-      console.warn(
-        `[MatchingService] Có ${providers.length} provider đúng dịch vụ và đang online nhưng ` +
-          `workingAreas không khớp "${ward}, ${province}".`,
-      );
-      console.warn(
-        "[MatchingService] Khu vực của các provider bị loại:",
-        providers.map((provider) => ({
+      matchingLogger.warn("Có provider đúng dịch vụ và đang online nhưng khu vực không khớp.", {
+        serviceId,
+        providerCount: providers.length,
+        ward,
+        province,
+      });
+      matchingLogger.debug("Danh sách khu vực provider bị loại.", {
+        providers: providers.map((provider) => ({
           providerId: provider._id.toString(),
           workingAreas: provider.workingAreas,
           serviceArea: provider.serviceArea,
         })),
-      );
+      });
     }
 
     return providersInArea

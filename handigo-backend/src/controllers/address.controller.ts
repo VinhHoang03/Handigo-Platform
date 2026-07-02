@@ -1,4 +1,5 @@
-import { Response, Request } from "express";
+import { Request, Response } from "express";
+import { requireAuthenticatedUser } from "../middlewares/authContext";
 import * as addressService from "../services/address.service";
 
 export const createAddress = async (req: Request, res: Response) => {
@@ -10,7 +11,7 @@ export const createAddress = async (req: Request, res: Response) => {
       });
     }
 
-    const userId = (req as any).user.id;
+    const userId = requireAuthenticatedUser(req).id;
     const address = await addressService.createAddress(userId, req.body);
 
     return res.json({
@@ -35,7 +36,7 @@ export const updateAddress = async (req: Request, res: Response) => {
       });
     }
 
-    const userId = (req as any).user.id;
+    const userId = requireAuthenticatedUser(req).id;
     const { id } = req.params;
 
     const address = await addressService.updateAddress(id as string, userId, req.body);
@@ -62,7 +63,7 @@ export const deleteAddress = async (req: Request, res: Response) => {
       });
     }
 
-    const userId = (req as any).user.id;
+    const userId = requireAuthenticatedUser(req).id;
     const { id } = req.params;
 
     await addressService.deleteAddress(id as string, userId);
@@ -89,7 +90,7 @@ export const getUserAddresses = async (req: Request, res: Response) => {
       });
     }
 
-    const userId = (req as any).user.id;
+    const userId = requireAuthenticatedUser(req).id;
     const addresses = await addressService.getUserAddresses(userId);
 
     return res.json({
@@ -114,7 +115,7 @@ export const setDefaultAddress = async (req: Request, res: Response) => {
       });
     }
 
-    const userId = (req as any).user.id;
+    const userId = requireAuthenticatedUser(req).id;
     const { id } = req.params;
 
     const address = await addressService.setDefaultAddress(userId, id as string);
@@ -134,9 +135,9 @@ export const setDefaultAddress = async (req: Request, res: Response) => {
 
 export const getServiceHistory = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = requireAuthenticatedUser(req).id;
 
-    const history = await addressService.getServiceHistory(userId as string);
+    const history = await addressService.getServiceHistory(userId);
 
     return res.json({
       success: true,
@@ -154,7 +155,7 @@ export const checkAddressUpdate = async (req: Request, res: Response) => {
   try {
     const data = await addressService.checkAddressUpdate(
       String(req.params.id),
-      req.user!.id,
+      requireAuthenticatedUser(req).id,
       req.body,
     );
     return res.json({ success: true, data });
@@ -168,7 +169,7 @@ export const confirmAddressUpdate = async (req: Request, res: Response) => {
   try {
     const data = await addressService.confirmAddressUpdate(
       String(req.params.id),
-      req.user!.id,
+      requireAuthenticatedUser(req).id,
       req.body,
     );
     return res.json({

@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { AuditLog } from "../models/auditLog.model";
+import type { RequestUser } from "../middlewares/authContext";
 import { Order } from "../models/order.model";
 import { Payment } from "../models/payment.model";
 import { IPromotion, Promotion } from "../models/promotion.model";
@@ -11,12 +12,7 @@ import type {
   CreateAdminVoucherInput,
   RemoveVoucherInput,
   UpdateAdminVoucherInput,
-} from "../validations/voucher.validation";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
+} from "../validations/voucher.validator";
 
 type NormalizedDiscountType = "fixed" | "percentage";
 
@@ -137,7 +133,7 @@ const getVoucherOrFail = async (id: string) => {
   const voucher = await Promotion.findOne({ _id: id, isDeleted: false });
 
   if (!voucher) {
-    throw new AppError("Khong tim thay voucher", 404);
+    throw new AppError("Không tìm thấy voucher", 404);
   }
 
   return voucher;

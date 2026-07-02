@@ -11,7 +11,7 @@ import {
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createWithdrawalSchema } from "../validations/withdrawal.validation";
+import { createWithdrawalSchema } from "../validations/withdrawal.validator";
 
 const router = Router();
 
