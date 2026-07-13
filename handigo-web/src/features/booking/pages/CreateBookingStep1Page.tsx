@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import { useBookingStore } from '../hooks/useBookingStore';
 import type { Category, Service, ServiceOption } from '../../../types/booking';
-
-const isImageUrl = (value?: string) => {
-  if (!value) return false;
-  return /^https?:\/\//i.test(value) || value.startsWith('/');
-};
+import { getMissingRequiredGroup, groupServiceOptions } from '../utils/serviceOptionSelection';
 
 const getOptionPrice = (option: ServiceOption): number => option.price ?? option.fixedPrice ?? 0;
 
@@ -16,6 +14,8 @@ const CreateBookingStep1Page = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
+  const [selectionError, setSelectionError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
@@ -53,6 +53,21 @@ const CreateBookingStep1Page = () => {
   const hasMoreCategories = categories.length > visibleCategories.length;
   const selectedService = services.find((service) => service._id === serviceId);
   const isVariablePrice = selectedService?.serviceType === 'variable_price';
+  const optionGroups = groupServiceOptions(options);
+
+  const continueToLocation = () => {
+    if (!selectedService) {
+      setSelectionError('Vui lòng chọn một dịch vụ cụ thể.');
+      return;
+    }
+    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
+    if (missingGroup) {
+      setSelectionError(`Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`);
+      return;
+    }
+    setSelectionError('');
+    navigate('/customer/bookings/new/location');
+  };
 
   return (
     <OrderCreationShell>
@@ -71,18 +86,15 @@ const CreateBookingStep1Page = () => {
                   key={cat._id}
                   onClick={() => setCategoryId(cat._id)}
                   className={`group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 bg-white px-2 py-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
-                    }`}
+                  }`}
                 >
                   <div className="mb-2 flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-primary-container/10 transition-colors group-hover:bg-primary-container/20">
-                    {isImageUrl(cat.icon) ? (
-                      <img
-                        src={cat.icon}
-                        alt={cat.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-primary text-2xl">{cat.icon || 'category'}</span>
-                    )}
+                    <CategoryIcon
+                      icon={cat.icon}
+                      name={cat.name}
+                      className="h-6 w-6 text-primary"
+                      imageClassName="h-7 w-7 object-contain"
+                    />
                   </div>
                   <span className="line-clamp-2 text-label-sm font-bold leading-snug text-on-surface">{cat.name}</span>
                 </button>
@@ -142,35 +154,47 @@ const CreateBookingStep1Page = () => {
 
               {options.length > 0 && (
                 <div className="mt-md p-md bg-surface-container-low rounded-xl">
-                  <p className="font-label-md mb-sm">Dịch vụ bổ sung</p>
-                  <div className="flex flex-wrap gap-sm">
-                    {options.map((option) => (
-                      <label
-                        key={option._id}
-                        className={`flex items-center gap-2 px-4 py-2 bg-white rounded-full border cursor-pointer hover:border-primary transition-colors ${selectedOptionIds.includes(option._id) ? 'border-primary bg-primary/5' : 'border-outline-variant'
-                          }`}
-                      >
-                        <input
-                          className="rounded text-primary focus:ring-primary"
-                          type="checkbox"
-                          checked={selectedOptionIds.includes(option._id)}
-                          onChange={() => toggleOption(option._id)}
-                        />
-                        <span className="text-label-md">
-                          {option.name}
-                          {!isVariablePrice && ` (+${getOptionPrice(option).toLocaleString()}đ)`}
-                        </span>
-                      </label>
+                  <div className="space-y-md">
+                    {optionGroups.map((group) => (
+                      <fieldset key={group.key}>
+                        <legend className="font-label-md mb-sm">
+                          {group.label}{group.isRequired ? <span className="text-error"> *</span> : null}
+                        </legend>
+                        <div className="flex flex-wrap gap-sm">
+                          {group.options.map((option) => (
+                            <label
+                              key={option._id}
+                              className={`flex items-center gap-2 px-4 py-2 bg-white rounded-full border cursor-pointer hover:border-primary transition-colors ${selectedOptionIds.includes(option._id) ? 'border-primary bg-primary/5' : 'border-outline-variant'}`}
+                            >
+                              <input
+                                className="rounded text-primary focus:ring-primary"
+                                type={group.selectionMode === 'single' ? 'radio' : 'checkbox'}
+                                name={`option-group-${group.key}`}
+                                checked={selectedOptionIds.includes(option._id)}
+                                onChange={() => {
+                                  setSelectionError('');
+                                  toggleOption(option, options);
+                                }}
+                              />
+                              <span className="text-label-md">
+                                {option.name}
+                                {!isVariablePrice && ` (+${getOptionPrice(option).toLocaleString()}đ)`}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
                     ))}
                   </div>
                 </div>
               )}
+              {selectionError && <p className="mt-sm text-sm font-semibold text-error">{selectionError}</p>}
             </div>
           </section>
         </div>
 
         <div className="col-span-12 lg:col-span-4">
-          <OrderSummaryCard step={1} actionLabel="Tiếp tục bước 2" actionTo="/customer/bookings/new/location" />
+          <OrderSummaryCard step={1} actionLabel="Tiếp tục bước 2" onAction={continueToLocation} />
         </div>
       </div>
     </OrderCreationShell>

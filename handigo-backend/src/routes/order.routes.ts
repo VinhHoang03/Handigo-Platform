@@ -2,6 +2,8 @@ import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
+import { validate } from "../middlewares/validate.middleware";
+import { createOrderSchema } from "../validations/order.validator";
 import {
   createOrder,
   getMyOrders,
@@ -31,7 +33,12 @@ router.use(authMiddleware);
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
 // POST   /orders               → Customer: create new booking order
-router.post("/", roleMiddleware("CUSTOMER"), createOrder);
+router.post(
+  "/",
+  roleMiddleware("CUSTOMER"),
+  validate(createOrderSchema),
+  createOrder,
+);
 
 // GET    /orders               → Customer: list own orders (paginated)
 router.get("/", roleMiddleware("CUSTOMER"), getMyOrders);

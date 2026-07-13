@@ -29,8 +29,19 @@ export interface CreateAddressPayload {
   ward: string;
   latitude?: number;
   longitude?: number;
+  placeId?: string;
   isDefault?: boolean;
   note?: string | null;
+}
+
+interface ReverseGeocodedAddress {
+  fullAddress: string;
+  province: string;
+  ward: string;
+  latitude: number;
+  longitude: number;
+  placeId?: string;
+  attribution: string;
 }
 
 export const bookingApi = {
@@ -67,6 +78,16 @@ export const bookingApi = {
       "/addresses",
       payload,
     );
+    return response.data.data;
+  },
+
+  reverseGeocode: async (latitude: number, longitude: number) => {
+    const response = await api.get<{
+      success: boolean;
+      data: ReverseGeocodedAddress;
+    }>("/locations/reverse-geocode", {
+      params: { latitude, longitude },
+    });
     return response.data.data;
   },
 

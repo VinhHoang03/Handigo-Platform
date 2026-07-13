@@ -17,4 +17,11 @@ export const providerDashboardApi = {
         availabilityStatus,
       }),
     ),
+  updateCurrentLocation: async (latitude: number, longitude: number) =>
+    data(
+      await api.put("/locations/me", {
+        latitude,
+        longitude,
+      }),
+    ),
 };

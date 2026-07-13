@@ -12,9 +12,20 @@ import { createNotificationRecord } from "./notification.service";
 import type { CreatePaymentInput, PaymentHistoryQuery } from "../validations/payment.validator";
 import { handleWalletDepositPayosWebhook } from "./wallet.service";
 import { buildTransactionCode } from "../utils/transaction";
+import { DispatchService } from "./dispatch.service";
+import { createLogger } from "../utils/logger";
 
 const DEFAULT_RETURN_URL = process.env.PAYOS_RETURN_URL || "http://localhost:5173/payment/success";
 const DEFAULT_CANCEL_URL = process.env.PAYOS_CANCEL_URL || "http://localhost:5173/payment/cancel";
+const paymentLogger = createLogger("PaymentService");
+
+const triggerDispatch = (orderId: string) => {
+  DispatchService.dispatchReadyOrder(orderId).catch((error: unknown) =>
+    paymentLogger.error("Không thể khởi động điều phối sau thanh toán.", error, {
+      orderId,
+    }),
+  );
+};
 
 const buildPayosOrderCode = () => Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-12));
 
@@ -101,9 +112,6 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   }
 
   if (input.method === "CASH") {
-    order.readyForMatching = true;
-    await order.save();
-
     const payment = await Payment.create({
       orderId: order._id,
       customerId: order.customerId,
@@ -117,6 +125,10 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
       },
     });
 
+    order.readyForMatching = true;
+    await order.save();
+    triggerDispatch(order._id.toString());
+
     return {
       payment,
       method: "CASH",
@@ -125,11 +137,9 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     };
   }
 
-  if (paymentType !== "inspection_deposit") {
-    order.readyForMatching = true;
-  } else {
+  order.readyForMatching = false;
+  if (paymentType === "inspection_deposit") {
     order.depositAmount = amount;
-    order.readyForMatching = false;
   }
 
   const orderCode = buildPayosOrderCode();
@@ -308,13 +318,23 @@ export const handlePayosWebhook = async (payload: any) => {
 
   await payment.save();
 
-  if (isSuccess && payment.paymentType === "inspection_deposit") {
+  if (isSuccess) {
     const order = await Order.findById(payment.orderId);
     if (order) {
-      order.depositAmount = payment.amount;
-      order.depositPaidAt = payment.paidAt;
-      order.readyForMatching = true;
+      if (payment.paymentType === "inspection_deposit") {
+        order.depositAmount = payment.amount;
+        order.depositPaidAt = payment.paidAt;
+        order.paymentStatus = "partially_paid";
+      } else if (payment.paymentType === "full") {
+        order.paymentStatus = "paid";
+      } else {
+        order.paymentStatus = "paid";
+      }
+      if (payment.paymentType !== "remaining" && order.status === "created") {
+        order.readyForMatching = true;
+      }
       await order.save();
+      triggerDispatch(order._id.toString());
     }
   }
 

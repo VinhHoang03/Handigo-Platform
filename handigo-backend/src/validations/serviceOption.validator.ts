@@ -9,10 +9,14 @@ const optionTypeEnum = z.enum([
 ]);
 
 const serviceOptionFields = {
-  name: z.string().trim().min(1, "Name is required").max(200),
+  name: z.string().trim().min(1, "Tên tùy chọn là bắt buộc").max(200),
   description: z.string().trim().max(1000).nullable().optional(),
   optionType: optionTypeEnum,
-  price: z.number().nonnegative("Price must be >= 0"),
+  price: z.number().nonnegative("Giá tùy chọn không được âm"),
+  selectionGroup: z.string().trim().min(1, "Tên nhóm lựa chọn là bắt buộc").max(120).nullable().optional(),
+  selectionMode: z.enum(["single", "multiple"]).optional(),
+  isRequired: z.boolean().optional(),
+  sortOrder: z.number().int().nonnegative("Thứ tự hiển thị không được âm").optional(),
   isActive: z.boolean().optional(),
 };
 

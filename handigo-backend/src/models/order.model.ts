@@ -51,6 +51,7 @@ export interface IOrder extends Document, IBaseDocument {
   orderCode: string;
   customerId: Types.ObjectId;
   providerId?: Types.ObjectId | null;
+  preferredProviderId?: Types.ObjectId | null;
   serviceId: Types.ObjectId;
   servicePackageId?: Types.ObjectId | null;
   selectedOptionIds: Types.ObjectId[];
@@ -65,6 +66,7 @@ export interface IOrder extends Document, IBaseDocument {
   depositAmount: Money;
   depositPaidAt?: Date | null;
   readyForMatching: boolean;
+  matchingStartedAt?: Date | null;
   platformFeeChargedAt?: Date | null;
   hasAdditionalQuotation: boolean;
   currentQuotationId?: Types.ObjectId | null;
@@ -128,6 +130,11 @@ const OrderSchema = new Schema<IOrder>(
     orderCode: { type: String, required: true, unique: true, trim: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     providerId: { type: Schema.Types.ObjectId, ref: "Provider", default: null },
+    preferredProviderId: {
+      type: Schema.Types.ObjectId,
+      ref: "Provider",
+      default: null,
+    },
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
     servicePackageId: {
       type: Schema.Types.ObjectId,
@@ -165,6 +172,7 @@ const OrderSchema = new Schema<IOrder>(
     depositAmount: { type: Number, default: 0, min: 0 },
     depositPaidAt: { type: Date, default: null },
     readyForMatching: { type: Boolean, default: false },
+    matchingStartedAt: { type: Date, default: null },
     platformFeeChargedAt: { type: Date, default: null },
     hasAdditionalQuotation: { type: Boolean, default: false },
     currentQuotationId: {
@@ -211,6 +219,11 @@ const OrderSchema = new Schema<IOrder>(
 OrderSchema.index({ customerId: 1, createdAt: -1 });
 OrderSchema.index({ providerId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
-OrderSchema.index({ readyForMatching: 1, status: 1 });
+OrderSchema.index({
+  readyForMatching: 1,
+  status: 1,
+  matchingStartedAt: 1,
+  scheduledAt: 1,
+});
 
 export const Order = model<IOrder>("Order", OrderSchema, "orders");

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CategoryIcon } from '../common/CategoryIcon';
 import { MaterialIcon } from '../common/MaterialIcon';
 
 const colorClasses: Record<string, string> = {
@@ -41,7 +42,7 @@ export const CategoryCard = ({ icon, imageUrl, title, desc, color, to = '/custom
       <div className="p-6">
         {(!safeImageUrl || imageFailed) && (
           <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl transition-all group-hover:scale-110 group-hover:text-white ${colorClasses[color]}`}>
-            <MaterialIcon className="text-3xl">{/^https?:\/\//i.test(icon) ? 'category' : icon}</MaterialIcon>
+            <CategoryIcon icon={icon} name={title} className="h-7 w-7" />
           </div>
         )}
         <h3 className="mb-1 font-headline-md text-headline-md text-on-surface">{title}</h3>

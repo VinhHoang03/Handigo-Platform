@@ -29,6 +29,8 @@ export interface FindNearestProvidersOptions {
   limit?: number;
   /** Already-tried provider IDs to exclude from result */
   excludeProviderIds?: Types.ObjectId[];
+  /** Chỉ kiểm tra một provider cụ thể trong luồng khách hàng ưu tiên thợ. */
+  onlyProviderId?: Types.ObjectId;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -63,6 +65,7 @@ export const MatchingService = {
       maxDistanceMeters = Math.max(configuredRadiusKm, 0) * 1000,
       limit = 10,
       excludeProviderIds = [],
+      onlyProviderId,
     } = options;
 
     const serviceObjectId = new Types.ObjectId(serviceId);
@@ -91,7 +94,7 @@ export const MatchingService = {
         .lean();
 
       if (nearbyLocations.length === 0) {
-        matchingLogger.info("Không tìm thấy vị trí provider gần đơn, chuyển sang bộ lọc thường.");
+        matchingLogger.info("Không tìm thấy provider có vị trí trong bán kính phục vụ.");
       } else {
         // Build userId → { distance estimation } map (order from $near already sorted)
         const userIdToIndex = new Map<string, number>(
@@ -106,6 +109,7 @@ export const MatchingService = {
           availabilityStatus: "online",
           verified: true,
           isDeleted: false,
+          ...(onlyProviderId && { _id: onlyProviderId }),
           ...(excludeIds.length > 0 && {
             _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
           }),
@@ -155,6 +159,10 @@ export const MatchingService = {
           });
         }
       }
+
+      // Khi địa chỉ có tọa độ, chỉ trả về khoảng cách địa lý thực tế.
+      // Không fallback theo tên phường vì có thể đưa provider ngoài bán kính vào kết quả.
+      return [];
     }
 
     // ── Path B: no coordinates or no geo-matches found → simple filter ─────
@@ -163,6 +171,7 @@ export const MatchingService = {
       availabilityStatus: "online",
       verified: true,
       isDeleted: false,
+      ...(onlyProviderId && { _id: onlyProviderId }),
       ...(excludeIds.length > 0 && {
         _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
       }),

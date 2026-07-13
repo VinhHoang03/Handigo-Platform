@@ -1,4 +1,5 @@
 import { AlertCircle, Check } from "lucide-react";
+import { CategoryIcon } from "@/components/common/CategoryIcon";
 import type { Category } from "../types/providerApplication.types";
 
 interface Props {
@@ -15,38 +16,6 @@ const EXPERIENCE_OPTIONS = [
   { label: "3-5 năm", value: 5 },
   { label: "Trên 5 năm", value: 6 },
 ];
-
-const isImageIcon = (icon: string) =>
-  /^(https?:)?\/\//i.test(icon) ||
-  icon.startsWith("/") ||
-  icon.startsWith("data:image/");
-
-const CategoryIcon = ({ icon, name }: { icon?: string; name: string }) => {
-  if (!icon) return null;
-
-  if (isImageIcon(icon)) {
-    return (
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10">
-        <img
-          src={icon}
-          alt=""
-          aria-hidden="true"
-          className="h-5 w-5 object-contain"
-          loading="lazy"
-        />
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="material-symbols-outlined text-primary"
-      aria-label={`${name} icon`}
-    >
-      {icon}
-    </span>
-  );
-};
 
 export function CategorySelectionStep({
   categories,
@@ -80,7 +49,9 @@ export function CategorySelectionStep({
                 className="rounded-2xl border border-outline-variant bg-surface p-4"
               >
                 <div className="mb-3 flex items-center gap-2">
-                  <CategoryIcon icon={category.icon} name={category.name} />
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <CategoryIcon icon={category.icon} name={category.name} className="h-5 w-5" />
+                  </span>
                   <h3 className="font-bold text-on-surface">{category.name}</h3>
                 </div>
 
