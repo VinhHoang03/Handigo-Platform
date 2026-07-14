@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Review"
+  short_description: "Review patches for risk and regressions"
+  default_prompt: "Use $code-review to review this patch for correctness, regressions, security, and missing tests."

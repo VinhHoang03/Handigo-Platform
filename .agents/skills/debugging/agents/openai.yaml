@@ -1,0 +1,4 @@
+interface:
+  display_name: "Debugging"
+  short_description: "Reproduce and isolate failures fast"
+  default_prompt: "Use $debugging to reproduce, isolate, and explain this bug before fixing it."

@@ -46,6 +46,7 @@ import type {
   CertificateStatus,
   IdentityDocument,
   IdentityDocumentType,
+  ProviderOcrSuggestion,
   PerformanceStat,
   ProviderCertificate,
   ProviderProfile,
@@ -178,6 +179,21 @@ const toIdentityForm = (identity?: IdentityDocument): IdentityForm => ({
   passportImageUrl: identity?.passportImageUrl || "",
   consentAccepted: false,
 });
+
+const fillIdentityEmptyFields = (
+  identity: IdentityForm,
+  suggestion?: ProviderOcrSuggestion,
+): IdentityForm => {
+  if (!suggestion) return identity;
+  return {
+    ...identity,
+    documentNumber: identity.documentNumber || suggestion.documentNumber || "",
+    fullName: identity.fullName || suggestion.fullName || "",
+    issuedPlace: identity.issuedPlace || suggestion.issuedPlace || "",
+    issuedAt: identity.issuedAt || suggestion.issuedAt || "",
+    expiresAt: identity.expiresAt || suggestion.expiresAt || "",
+  };
+};
 
 const toCertificateForm = (
   certificate: ProviderCertificate,
@@ -960,9 +976,19 @@ export default function ProviderProfilePage() {
     setUploadingAsset(field);
     setIdentityError("");
     try {
-      const uploaded = await providerProfileApi.uploadImage(file, "identity");
+      const documentKind =
+        field === "frontImageUrl"
+          ? "cccd_front"
+          : field === "backImageUrl"
+            ? "cccd_back"
+            : "passport";
+      const uploaded = await providerProfileApi.uploadImage(
+        file,
+        "identity",
+        documentKind,
+      );
       setIdentityForm((current) => ({
-        ...current,
+        ...fillIdentityEmptyFields(current, uploaded.ocrSuggestion),
         [field]: uploaded.url,
       }));
     } catch (uploadError) {

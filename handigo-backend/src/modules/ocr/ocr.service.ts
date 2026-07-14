@@ -86,6 +86,17 @@ const findValueByLabels = (lines: string[], labels: string[]) => {
 const getAllDates = (text: string) =>
   [...new Set((text.match(datePattern) || []).map(parseDate).filter(Boolean))] as string[];
 
+const findCccdDocumentNumber = (text: string) => {
+  const normalizedText = normalizeLine(text);
+  const direct = normalizedText.match(/\b\d{12}\b/)?.[0];
+  if (direct) return direct;
+
+  const candidates = normalizedText.match(/(?:\d[\s.,:;|\-]*){12}/g) || [];
+  return candidates
+    .map((candidate) => candidate.replace(/\D/g, ""))
+    .find((candidate) => candidate.length === 12);
+};
+
 const averageConfidence = (responses: any[]) => {
   const values: number[] = [];
   for (const response of responses) {
@@ -173,7 +184,7 @@ const parseIdentity = (text: string, kind: OcrDocumentKind): OcrSuggestion => {
   const documentNumber =
     kind === "passport"
       ? normalizedText.match(/\b[A-Z][0-9]{7,8}\b/)?.[0]
-      : normalizedText.match(/\b\d{12}\b/)?.[0];
+      : findCccdDocumentNumber(text);
 
   const genderText = normalizeLine(
     findValueByLabels(lines, ["GIOI TINH", "SEX", "GENDER"]) || "",

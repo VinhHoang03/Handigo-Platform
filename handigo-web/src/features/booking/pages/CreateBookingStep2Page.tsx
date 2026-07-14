@@ -99,7 +99,7 @@ const CreateBookingStep2Page = () => {
       setIsUploadingImages(true);
       setUploadError(null);
       const uploadedUrls = await Promise.all(
-        selectedFiles.map((file) => bookingApi.uploadOrderAttachment(file, 'order_problem')),
+        selectedFiles.map((file) => bookingApi.uploadOrderAttachment(file)),
       );
       setCustomerAttachments([...customerAttachments, ...uploadedUrls]);
     } catch (error) {
@@ -343,3 +343,4 @@ const CreateBookingStep2Page = () => {
 };
 
 export default CreateBookingStep2Page;
+

@@ -33,6 +33,34 @@ export type IdentityVerificationProvider =
   | 'viettel'
   | 'didit';
 export type CertificateStatus = 'pending' | 'approved' | 'rejected';
+export type OcrDocumentKind =
+  | 'cccd_front'
+  | 'cccd_back'
+  | 'passport'
+  | 'certificate';
+
+export interface ProviderOcrSuggestion {
+  documentNumber?: string;
+  fullName?: string;
+  issuedPlace?: string;
+  dateOfBirth?: string;
+  gender?: Gender;
+  nationality?: string;
+  placeOfOrigin?: string;
+  placeOfResidence?: string;
+  title?: string;
+  certificateNumber?: string;
+  issuer?: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  confidence?: number;
+  warnings: string[];
+}
+
+export interface ProviderAssetUpload {
+  url: string;
+  ocrSuggestion?: ProviderOcrSuggestion;
+}
 
 export interface ProviderServiceArea {
   province?: string;
