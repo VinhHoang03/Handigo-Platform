@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { Modal } from '@/components/common/Modal';
@@ -40,7 +41,6 @@ const getErrorMessage = (error: unknown) => {
   return error instanceof Error ? error.message : 'Có lỗi xảy ra, vui lòng thử lại.';
 };
 
-const categoryIcon = (category: Category | CategoryDetail | null) => category?.icon || 'category';
 const isImageUrl = (value: string | null | undefined) => /^https?:\/\//i.test(value || '');
 const getServiceCategoryId = (service: Service) => {
   if (!service.categoryId) return '';
@@ -295,7 +295,7 @@ export default function AdminCategoryServicesPage() {
                   <button key={category._id} onClick={() => setSelectedId(category._id)} className={`group flex w-full items-center justify-between rounded-xl border p-4 text-left transition-all ${active ? 'border-primary bg-primary/5 shadow-md' : 'border-outline-variant/30 bg-surface-container-lowest hover:border-primary/50'}`}>
                     <span className="flex min-w-0 items-center gap-4">
                       <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-primary/10 text-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
-                        <CategoryIconPreview value={categoryIcon(category)} className="h-full w-full" iconClassName="text-3xl" />
+                        <CategoryIcon icon={category.icon} name={category.name} className="h-7 w-7" />
                       </span>
                       <span className="min-w-0">
                         <span className={`block truncate font-semibold ${active ? 'text-primary' : ''}`}>{category.name}</span>
@@ -321,7 +321,7 @@ export default function AdminCategoryServicesPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex gap-4">
                     <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <CategoryIconPreview value={categoryIcon(selected)} className="h-full w-full" iconClassName="text-[48px]" />
+                      <CategoryIcon icon={selected.icon} name={selected.name} className="h-11 w-11" />
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -396,23 +396,17 @@ function ServiceTable({ services, onEdit, onDelete }: { services: Service[]; onE
   );
 }
 
-function CategoryIconPreview({ value, className, iconClassName }: { value: string; className?: string; iconClassName?: string }) {
-  if (isImageUrl(value)) {
-    return <img src={value} alt="Category icon" className={`${className || ''} object-cover`} />;
-  }
-
-  return <span className={`material-symbols-outlined flex items-center justify-center ${className || ''} ${iconClassName || ''}`}>{value}</span>;
-}
-
 function AssetInput({
   label,
   value,
+  name,
   onChange,
   placeholder,
   mode,
 }: {
   label: string;
   value: string;
+  name?: string;
   onChange: (value: string) => void;
   placeholder?: string;
   mode: 'icon' | 'image';
@@ -448,7 +442,7 @@ function AssetInput({
       <div className="flex gap-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low text-primary">
           {mode === 'icon'
-            ? <CategoryIconPreview value={value || 'category'} className="h-full w-full" iconClassName="text-3xl" />
+            ? <CategoryIcon icon={value} name={name} className="h-8 w-8" imageClassName="h-9 w-9 object-contain" />
             : value && isImageUrl(value)
               ? <img src={value} alt="Service" className="h-full w-full object-cover" />
               : <span className="material-symbols-outlined text-3xl">image</span>}
@@ -471,7 +465,7 @@ function AssetInput({
 }
 
 function CategoryModal({ open, mode, form, busy, onChange, onClose, onSubmit }: { open: boolean; mode: 'create' | 'edit'; form: CategoryFormState; busy: boolean; onChange: (form: CategoryFormState) => void; onClose: () => void; onSubmit: (event: FormEvent) => void }) {
-  return <Modal open={open} title={mode === 'edit' ? 'Sửa danh mục' : 'Thêm danh mục'} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><FormInput label="Tên danh mục" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} /><FormInput label="Slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" /><AssetInput label="Icon danh mục" value={form.icon} onChange={(value) => onChange({ ...form, icon: value })} placeholder="cleaning_services hoặc https://..." mode="icon" /><FormTextArea label="Mô tả" value={form.description} onChange={(value) => onChange({ ...form, description: value })} /><ToggleRow checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị danh mục" /><FormActions busy={busy} onCancel={onClose} /></form></Modal>;
+  return <Modal open={open} title={mode === 'edit' ? 'Sửa danh mục' : 'Thêm danh mục'} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><FormInput label="Tên danh mục" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} /><FormInput label="Slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" /><AssetInput label="Icon danh mục" value={form.icon} name={form.name} onChange={(value) => onChange({ ...form, icon: value })} placeholder="electrical, cleaning, plumbing hoặc https://..." mode="icon" /><FormTextArea label="Mô tả" value={form.description} onChange={(value) => onChange({ ...form, description: value })} /><ToggleRow checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị danh mục" /><FormActions busy={busy} onCancel={onClose} /></form></Modal>;
 }
 
 function ServiceModal({ open, mode, form, busy, onChange, onClose, onSubmit }: { open: boolean; mode: 'create' | 'edit'; form: ServiceFormState; busy: boolean; onChange: (form: ServiceFormState) => void; onClose: () => void; onSubmit: (event: FormEvent) => void }) {

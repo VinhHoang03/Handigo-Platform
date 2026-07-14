@@ -14,6 +14,10 @@ export interface IServiceOption extends Document, IBaseDocument {
   description?: string | null;
   optionType: ServiceOptionType;
   price: Money;
+  selectionGroup?: string | null;
+  selectionMode: "single" | "multiple";
+  isRequired: boolean;
+  sortOrder: number;
   isActive: boolean;
 }
 
@@ -29,12 +33,20 @@ const ServiceOptionSchema = new Schema<IServiceOption>(
       default: "other",
     },
     price: { type: Number, required: true, min: 0 },
+    selectionGroup: { type: String, default: null, trim: true, maxlength: 120 },
+    selectionMode: {
+      type: String,
+      enum: ["single", "multiple"],
+      default: "multiple",
+    },
+    isRequired: { type: Boolean, default: false },
+    sortOrder: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true },
     ...baseFields,
   },
   { timestamps: true },
 );
 
-ServiceOptionSchema.index({ serviceId: 1 });
+ServiceOptionSchema.index({ serviceId: 1, sortOrder: 1, createdAt: 1 });
 
 export const ServiceOption = model<IServiceOption>("ServiceOption", ServiceOptionSchema, "serviceoptions");

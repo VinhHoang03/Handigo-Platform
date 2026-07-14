@@ -102,6 +102,22 @@ export const getServiceOptions = async (
   }
 };
 
+export const getAdminServiceOptions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const data = await serviceOptionService.getOptionsByServiceId(
+      req.params.id as string,
+      true,
+    );
+    return res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createService = async (
   req: Request,
   res: Response,

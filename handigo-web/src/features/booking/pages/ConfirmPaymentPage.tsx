@@ -5,9 +5,9 @@ import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/booking.api';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Address, Service, ServiceOption } from '../../../types/booking';
+import { getMissingRequiredGroup } from '../utils/serviceOptionSelection';
 
 const paymentMethods = [
-  ['account_balance_wallet', 'Ví HandiGo', 'Số dư: 1.500.000đ', 'wallet'],
   ['account_balance', 'Chuyển khoản ngân hàng', 'Quét mã VietQR hoặc Internet Banking', 'bank'],
   ['payments', 'Tiền mặt', 'Thanh toán trực tiếp cho nhân viên', 'cash'],
 ] as const;
@@ -25,7 +25,7 @@ const formatAddress = (address: Address | null) => {
 const ConfirmPaymentPage = () => {
   const {
     categoryId, serviceId, selectedOptionIds, addressId, orderType,
-    preferredProviderId, scheduledAt, problemDescription, customerAttachments, paymentMethod, setPaymentMethod, reset
+    preferredProviderId, preferredProviderName, scheduledAt, problemDescription, customerAttachments, paymentMethod, setPaymentMethod, reset
   } = useBookingStore();
 
   const [service, setService] = useState<Service | null>(null);
@@ -57,6 +57,11 @@ const ConfirmPaymentPage = () => {
 
 
   const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
+  const effectivePaymentMethod =
+    paymentMethod === 'wallet' ||
+    (service?.serviceType === 'variable_price' && paymentMethod === 'cash')
+      ? 'bank'
+      : paymentMethod;
 
   const handleConfirm = async () => {
     if (!serviceId) {
@@ -65,6 +70,18 @@ const ConfirmPaymentPage = () => {
     }
     if (!addressId) {
       alert('Vui lòng chọn địa chỉ thực hiện.');
+      return;
+    }
+    if (
+      (orderType === 'scheduled' || orderType === 'recurring') &&
+      (!scheduledAt || new Date(scheduledAt).getTime() <= Date.now())
+    ) {
+      setPaymentError('Vui lòng chọn thời gian thực hiện trong tương lai.');
+      return;
+    }
+    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
+    if (missingGroup) {
+      setPaymentError(`Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`);
       return;
     }
 
@@ -80,13 +97,11 @@ const ConfirmPaymentPage = () => {
         scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         problemDescription,
         customerAttachments,
-        paymentMethod,
+        paymentMethod: effectivePaymentMethod,
       };
 
       const order = await bookingApi.createOrder(payload);
-      const orderDetail = await bookingApi.getOrderById(order._id);
-
-      if (paymentMethod === 'bank') {
+      if (effectivePaymentMethod === 'bank') {
         const payment = await bookingApi.createPayment({
           orderId: order._id,
           method: 'PAYOS',
@@ -99,16 +114,33 @@ const ConfirmPaymentPage = () => {
           throw new Error('PayOS checkoutUrl is missing');
         }
 
-        sessionStorage.setItem('latestBookingOrderId', orderDetail._id);
+        sessionStorage.setItem('latestBookingOrderId', order._id);
         window.location.href = payment.checkoutUrl;
         return;
       }
 
+      await bookingApi.createPayment({
+        orderId: order._id,
+        method: 'CASH',
+        paymentType: 'FULL',
+      });
+
+      const orderDetail = await bookingApi.getOrderById(order._id);
+
       reset();
       navigate('/customer/bookings/success', { state: { order: orderDetail } });
     } catch (error) {
-      const requestError = error as { response?: { data?: { message?: string } } };
-      const message = requestError.response?.data?.message ||
+      const requestError = error as {
+        response?: {
+          data?: {
+            message?: string;
+            errors?: Array<{ message?: string }>;
+          };
+        };
+      };
+      const message = requestError.response?.data?.errors?.find(
+        (issue) => issue.message,
+      )?.message || requestError.response?.data?.message ||
         'Không thể tạo đơn đặt lịch. Vui lòng thử lại hoặc chọn địa chỉ khác.';
       console.error('Không thể tạo đơn đặt lịch.', error);
       setPaymentError(message);
@@ -122,6 +154,13 @@ const ConfirmPaymentPage = () => {
     ['cleaning_services', 'Dịch vụ', service?.name || '...'],
     ['calendar_today', 'Thời gian', scheduledAt ? new Date(scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất có thể'],
     ...(addressText ? [['location_on', 'Địa chỉ', addressText]] : []),
+    [
+      'person_search',
+      'Điều phối chuyên gia',
+      preferredProviderId
+        ? `Ưu tiên ${preferredProviderName || 'chuyên gia đã chọn'}`
+        : 'Handigo tự điều phối',
+    ],
   ] as string[][];
 
   return (
@@ -173,8 +212,8 @@ const ConfirmPaymentPage = () => {
               {paymentMethods
                 .filter(([, , , value]) => {
                   if (service?.serviceType === 'variable_price') {
-                    // Variable price (repair): Wallet and QR/Bank only
-                    return value === 'wallet' || value === 'bank';
+                    // Dịch vụ cần khảo sát chỉ thanh toán tiền cọc qua PayOS.
+                    return value === 'bank';
                   }
                   // Fixed price: All 3 methods (Wallet, Bank, Cash)
                   return true;
@@ -185,7 +224,7 @@ const ConfirmPaymentPage = () => {
                     className="group relative flex items-center p-4 rounded-xl border border-outline-variant/50 hover:border-primary cursor-pointer transition-all bg-surface-container-low/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
                   >
                     <input
-                      checked={paymentMethod === value}
+                      checked={effectivePaymentMethod === value}
                       onChange={() => setPaymentMethod(value)}
                       className="hidden peer"
                       name="payment"
@@ -193,7 +232,7 @@ const ConfirmPaymentPage = () => {
                       value={value}
                     />
                     <div className="flex-1 flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${paymentMethod === value ? 'bg-primary text-white' : 'bg-on-surface/5 text-on-surface'}`}>
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${effectivePaymentMethod === value ? 'bg-primary text-white' : 'bg-on-surface/5 text-on-surface'}`}>
                         <span className="material-symbols-outlined">{icon}</span>
                       </div>
                       <div>

@@ -39,6 +39,10 @@ export interface ServiceOption {
   price: number;
   fixedPrice?: number;
   isFixedPrice?: boolean;
+  selectionGroup?: string | null;
+  selectionMode?: "single" | "multiple";
+  isRequired?: boolean;
+  sortOrder?: number;
   isActive: boolean;
 }
 
@@ -197,6 +201,7 @@ export interface BookingState {
   selectedOptionIds: string[];
   addressId?: string;
   preferredProviderId?: string;
+  preferredProviderName?: string;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
   problemDescription?: string;
@@ -211,9 +216,9 @@ export interface BookingState {
     serviceId: string,
     selectedOptionIds?: string[],
   ) => void;
-  toggleOption: (id: string) => void;
+  toggleOption: (option: ServiceOption, options: ServiceOption[]) => void;
   setAddressId: (id: string) => void;
-  setPreferredProviderId: (id?: string) => void;
+  setPreferredProviderId: (id?: string, name?: string) => void;
   setOrderType: (type: BookingState["orderType"]) => void;
   setScheduledAt: (date: string) => void;
   setProblemDescription: (desc: string) => void;

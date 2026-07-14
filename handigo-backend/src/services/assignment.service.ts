@@ -70,10 +70,8 @@ export const AssignmentService = {
       );
     }
     if (assignment.responseDeadline < new Date()) {
-      assignment.status = "timeout";
-      await assignment.save();
       throw new AppError(
-        "Thời gian phản hồi đã hết hạn (timeout). Đơn hàng đã được chuyển sang provider khác.",
+        "Thời gian phản hồi đã hết hạn. Hệ thống đang chuyển đơn sang provider khác.",
         400,
       );
     }
@@ -96,32 +94,73 @@ export const AssignmentService = {
       );
     }
 
-    // 4. Accept
-    assignment.status = "accepted";
-    assignment.respondedAt = new Date();
-    await assignment.save();
-
-    // 5. Update order
-    const order = await Order.findByIdAndUpdate(
-      assignment.orderId,
-      {
-        providerId: provider._id,
-        status: "accepted",
-      },
-      { new: true },
+    // 4. Khóa provider trước để không thể nhận đồng thời hai đơn.
+    const claimedProvider = await Provider.findOneAndUpdate(
+      { _id: provider._id, availabilityStatus: "online" },
+      { $set: { availabilityStatus: "busy" } },
+      { returnDocument: "after", runValidators: true },
     );
-    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+    if (!claimedProvider) {
+      throw new AppError(
+        "Bạn đang bận hoặc không còn sẵn sàng nhận đơn mới.",
+        409,
+      );
+    }
 
-    // 6. Set provider as busy
-    await Provider.findByIdAndUpdate(provider._id, {
-      availabilityStatus: "busy",
-    });
+    const respondedAt = new Date();
+    const claimedAssignment = await OrderAssignment.findOneAndUpdate(
+      {
+        _id: assignment._id,
+        status: "pending",
+        responseDeadline: { $gt: respondedAt },
+      },
+      { $set: { status: "accepted", respondedAt } },
+      { returnDocument: "after", runValidators: true },
+    );
+    if (!claimedAssignment) {
+      await Provider.findOneAndUpdate(
+        { _id: provider._id, availabilityStatus: "busy" },
+        { $set: { availabilityStatus: "online" } },
+      );
+      throw new AppError(
+        "Assignment không còn khả dụng hoặc đã hết thời gian phản hồi.",
+        409,
+      );
+    }
+
+    // 5. Chỉ một provider có thể chuyển đơn từ created sang accepted.
+    const order = await Order.findOneAndUpdate(
+      {
+        _id: assignment.orderId,
+        status: "created",
+        providerId: null,
+      },
+      {
+        $set: {
+          providerId: provider._id,
+          status: "accepted",
+        },
+      },
+      { returnDocument: "after", runValidators: true },
+    );
+    if (!order) {
+      await Promise.all([
+        OrderAssignment.findByIdAndUpdate(claimedAssignment._id, {
+          $set: { status: "cancelled" },
+        }),
+        Provider.findOneAndUpdate(
+          { _id: provider._id, availabilityStatus: "busy" },
+          { $set: { availabilityStatus: "online" } },
+        ),
+      ]);
+      throw new AppError("Đơn hàng đã được xử lý bởi provider khác.", 409);
+    }
 
     // 7. Cancel any other pending assignments for the same order
     await OrderAssignment.updateMany(
       {
         orderId: assignment.orderId,
-        _id: { $ne: assignment._id },
+        _id: { $ne: claimedAssignment._id },
         status: "pending",
       },
       { status: "cancelled" },
@@ -133,7 +172,7 @@ export const AssignmentService = {
     });
 
     return {
-      assignment: assignment as any,
+      assignment: claimedAssignment as any,
       order: order as any,
     };
   },
@@ -167,11 +206,21 @@ export const AssignmentService = {
       );
     }
 
-    // 3. Reject
-    assignment.status = "rejected";
-    assignment.rejectReason = rejectReason ?? null;
-    assignment.respondedAt = new Date();
-    await assignment.save();
+    // 3. Reject bằng cập nhật có điều kiện để tránh re-dispatch hai lần.
+    const rejectedAssignment = await OrderAssignment.findOneAndUpdate(
+      { _id: assignment._id, status: "pending" },
+      {
+        $set: {
+          status: "rejected",
+          rejectReason: rejectReason ?? null,
+          respondedAt: new Date(),
+        },
+      },
+      { returnDocument: "after", runValidators: true },
+    );
+    if (!rejectedAssignment) {
+      throw new AppError("Assignment không còn ở trạng thái chờ phản hồi.", 409);
+    }
 
     emitToUser(providerUserId, "assignment:closed", {
       assignmentId: assignment._id.toString(),
@@ -191,7 +240,7 @@ export const AssignmentService = {
 
     // Collect all tried providers from existing assignment history
     const triedAssignments = await OrderAssignment.find({
-      orderId: assignment.orderId,
+      orderId: rejectedAssignment.orderId,
       status: { $in: ["rejected", "timeout"] },
     }).lean();
     const triedProviderIds = triedAssignments.map((a) => a.providerId);

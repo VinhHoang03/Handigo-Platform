@@ -22,6 +22,8 @@ router.get("/:id/options", serviceController.getServiceOptions);
 // Admin-only write routes
 router.use(authMiddleware, roleMiddleware("ADMIN"));
 
+router.get("/:id/options/admin", serviceController.getAdminServiceOptions);
+
 // Service CRUD
 router.post("/", validate(createServiceSchema), serviceController.createService);
 router.patch("/:id", validate(updateServiceSchema), serviceController.updateService);

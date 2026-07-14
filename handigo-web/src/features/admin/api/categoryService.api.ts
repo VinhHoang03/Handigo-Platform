@@ -52,7 +52,7 @@ export const categoryServiceApi = {
 
   // ── Service Options ─────────────────────────────────────────────────────────
   listServiceOptions: async (serviceId: string) =>
-    unwrap<ServiceOption[]>(await api.get(`/services/${serviceId}/options`)),
+    unwrap<ServiceOption[]>(await api.get(`/services/${serviceId}/options/admin`)),
 
   createServiceOption: async (serviceId: string, payload: ServiceOptionPayload) =>
     unwrap<ServiceOption>(await api.post(`/services/${serviceId}/options`, payload)),
@@ -67,6 +67,10 @@ export const categoryServiceApi = {
   uploadImage: async (file: File) => {
     const form = new FormData();
     form.append('image', file);
-    return unwrap<UploadedImage>(await api.post('/admin/assets/images', form));
+    return unwrap<UploadedImage>(
+      await api.post('/admin/assets/images', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }),
+    );
   },
 };

@@ -10,14 +10,13 @@ import {
   money,
 } from "../utils/serviceDisplay";
 import { ReliableImage } from "@/components/common/ReliableImage";
+import { CategoryIcon } from "@/components/common/CategoryIcon";
 import type { Category, Service, ServiceOption } from "@/types/booking";
 
 const getErrorMessage = (error: unknown) => {
   const err = error as { response?: { data?: { message?: string } } };
   return err?.response?.data?.message || "Không thể tải danh sách dịch vụ.";
 };
-
-const isImageUrl = (value?: string | null) => /^https?:\/\//i.test(value || "");
 
 export default function CustomerServiceListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -99,8 +98,7 @@ export default function CustomerServiceListPage() {
     return [...filtered].sort((left, right) => {
       if (sortBy === "price_asc") {
         return (
-          getServicePrice(left, optionMap[left._id]) -
-          getServicePrice(right, optionMap[right._id])
+          getServicePrice(left) - getServicePrice(right)
         );
       }
       if (sortBy === "name") return left.name.localeCompare(right.name, "vi");
@@ -143,7 +141,7 @@ export default function CustomerServiceListPage() {
                 Tất cả dịch vụ
               </button>
               {categories.map((category) => {
-                const categoryImage = category.image || (isImageUrl(category.icon) ? category.icon : undefined);
+                const categoryImage = category.image;
 
                 return (
                   <button
@@ -163,9 +161,7 @@ export default function CustomerServiceListPage() {
                         className="h-5 w-5 shrink-0 rounded object-cover"
                       />
                     ) : (
-                      <span className="material-symbols-outlined text-[20px]">
-                        {category.icon || "category"}
-                      </span>
+                      <CategoryIcon icon={category.icon} name={category.name} className="h-5 w-5 shrink-0" />
                     )}
                     {category.name}
                   </button>
@@ -230,8 +226,7 @@ export default function CustomerServiceListPage() {
           ) : (
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
               {visibleServices.map((service, index) => {
-                const options = optionMap[service._id] || [];
-                const price = getServicePrice(service, options);
+                const price = getServicePrice(service);
                 return (
                   <article
                     key={service._id}
