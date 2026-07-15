@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { bookingApi } from "@/api/booking";
+import { bookingApi } from "@/features/booking/api/booking.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { Address, Category, Service, ServiceOption } from "@/types/booking";
@@ -15,6 +15,15 @@ import {
   money,
 } from "../utils/serviceDisplay";
 import { ReliableImage } from "@/components/common/ReliableImage";
+import {
+  getMissingRequiredGroup,
+  groupServiceOptions,
+  toggleServiceOption,
+} from "@/features/booking/utils/serviceOptionSelection";
+import {
+  isValidVietnamesePhone,
+  normalizeVietnamesePhone,
+} from "@/utils/phoneValidation";
 
 const checklist = [
   "Tư vấn phạm vi công việc",
@@ -25,9 +34,22 @@ const checklist = [
   "Minh bạch chi phí",
 ];
 
-const getErrorMessage = (error: unknown) => {
-  const err = error as { response?: { data?: { message?: string } } };
-  return err?.response?.data?.message || "Không thể tải chi tiết dịch vụ.";
+const getErrorMessage = (
+  error: unknown,
+  fallback = "Không thể tải chi tiết dịch vụ.",
+) => {
+  const err = error as {
+    response?: {
+      data?: {
+        message?: string;
+        errors?: Array<{ message?: string }>;
+      };
+    };
+  };
+  const validationMessage = err.response?.data?.errors?.find(
+    (issue) => issue.message?.trim(),
+  )?.message;
+  return validationMessage || err.response?.data?.message || fallback;
 };
 
 const CURRENT_LOCATION_VALUE = "__current_location__";
@@ -40,7 +62,7 @@ const formatAddressLabel = (address: Address) =>
   "Địa chỉ đã lưu";
 
 const formatDistance = (distanceMeters: number) => {
-  if (distanceMeters < 0) return "Trong khu vực";
+  if (distanceMeters < 0) return "Chưa xác định khoảng cách";
   if (distanceMeters < 1000) return `${Math.round(distanceMeters)} m`;
   return `${(distanceMeters / 1000).toFixed(1)} km`;
 };
@@ -72,7 +94,9 @@ export default function CustomerServiceDetailPage() {
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [error, setError] = useState("");
   const [addressSelectionError, setAddressSelectionError] = useState("");
+  const [optionSelectionError, setOptionSelectionError] = useState("");
   const [isLocating, setIsLocating] = useState(false);
+  const [requiresPhoneUpdate, setRequiresPhoneUpdate] = useState(false);
   const [providerListError, setProviderListError] = useState("");
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -183,7 +207,8 @@ export default function CustomerServiceDetailPage() {
     selectedOptionIds.includes(option._id),
   );
 
-  const basePrice = service ? getServicePrice(service, options) : 0;
+  const basePrice = service ? getServicePrice(service) : 0;
+  const optionGroups = groupServiceOptions(options);
   const selectedOptionTotal = selectedOptions.reduce(
     (total, option) => total + getOptionPrice(option),
     0,
@@ -194,19 +219,17 @@ export default function CustomerServiceDetailPage() {
     if (service.serviceType === "fixed_price") {
       return (service.fixedPrice || 0) + selectedOptionTotal;
     }
-    return selectedOptions.length > 0 ? selectedOptionTotal : basePrice;
-  }, [basePrice, selectedOptionTotal, selectedOptions.length, service]);
+    return basePrice;
+  }, [basePrice, selectedOptionTotal, service]);
 
-  const handleToggleOption = (optionId: string) => {
-    setSelectedOptionIds((current) =>
-      current.includes(optionId)
-        ? current.filter((id) => id !== optionId)
-        : [...current, optionId],
-    );
+  const handleToggleOption = (option: ServiceOption) => {
+    setOptionSelectionError("");
+    setSelectedOptionIds((current) => toggleServiceOption(current, option, options));
   };
 
   const handleUseCurrentLocation = () => {
     setAddressSelectionError("");
+    setRequiresPhoneUpdate(false);
 
     if (!service) return;
 
@@ -215,31 +238,51 @@ export default function CustomerServiceDetailPage() {
       return;
     }
 
-    if (!isAuthenticated || !user) {
-      navigate("/login", { state: { from: `/customer/services/${service._id}` } });
+     if (!isAuthenticated) {
+      navigate("/login", {
+        state: {
+          from: service ? `/customer/services/${service._id}` : "/customer/services",
+        },
+      });
       return;
     }
 
-    if (!user.phone) {
-      setAddressSelectionError("Vui lòng cập nhật số điện thoại trước khi sử dụng vị trí hiện tại.");
+    const addressWithValidPhone = addresses.find((address) =>
+      isValidVietnamesePhone(address.recipientPhone || ""),
+    );
+    const phoneCandidates = [user?.phone, addressWithValidPhone?.recipientPhone];
+    const recipientPhone = normalizeVietnamesePhone(
+      phoneCandidates.find((phone) => isValidVietnamesePhone(phone || "")) || "",
+    );
+
+    if (!recipientPhone) {
+      setRequiresPhoneUpdate(true);
+      setAddressSelectionError(
+        "Vui lòng cập nhật số điện thoại Việt Nam hợp lệ trước khi dùng vị trí hiện tại.",
+      );
       return;
     }
 
-    const recipientName = user.fullName || "Khách hàng";
-    const recipientPhone = user.phone;
+    const recipientName =
+      user?.fullName || addressWithValidPhone?.recipientName || "Khách hàng";
 
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
+          const currentAddress = await bookingApi.reverseGeocode(
+            coords.latitude,
+            coords.longitude,
+          );
           const createdAddress = await bookingApi.createAddress({
             recipientName,
             recipientPhone,
-            fullAddress: `Vị trí hiện tại (${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)})`,
-            ward: "Vị trí hiện tại",
-            province: "Vị trí hiện tại",
-            latitude: coords.latitude,
-            longitude: coords.longitude,
+            fullAddress: currentAddress.fullAddress,
+            ward: currentAddress.ward,
+            province: currentAddress.province,
+            latitude: currentAddress.latitude,
+            longitude: currentAddress.longitude,
+            placeId: currentAddress.placeId,
             note: "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.",
             isDefault: false,
           });
@@ -250,8 +293,12 @@ export default function CustomerServiceDetailPage() {
           ]);
           setAddressId(createdAddress._id);
         } catch (createError) {
-          const err = createError as { response?: { data?: { message?: string } } };
-          setAddressSelectionError(err?.response?.data?.message || "Không thể lưu vị trí hiện tại. Vui lòng thử lại.");
+          setAddressSelectionError(
+            getErrorMessage(
+              createError,
+              "Không thể lưu vị trí hiện tại. Vui lòng thử lại.",
+            ),
+          );
         } finally {
           setIsLocating(false);
         }
@@ -282,6 +329,13 @@ export default function CustomerServiceDetailPage() {
     }
     if (!addressId) {
       setAddressSelectionError("Vui lòng chọn địa chỉ thực hiện trước khi đặt lịch.");
+      return;
+    }
+    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
+    if (missingGroup) {
+      setOptionSelectionError(
+        `Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`,
+      );
       return;
     }
 
@@ -403,35 +457,49 @@ export default function CustomerServiceDetailPage() {
                 Dịch vụ này chưa có tùy chọn bổ sung.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {options.map((option) => {
-                  const checked = selectedOptionIds.includes(option._id);
-                  return (
-                    <button
-                      key={option._id}
-                      type="button"
-                      onClick={() => handleToggleOption(option._id)}
-                      className={`rounded-xl border-2 bg-white p-5 text-left transition ${
-                        checked
-                          ? "border-primary bg-surface-container-low shadow-sm"
-                          : "border-outline-variant hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <h3 className="font-bold text-primary">{option.name}</h3>
-                        <span className="font-bold text-on-surface">
-                          {getOptionPrice(option) > 0
-                            ? money.format(getOptionPrice(option))
-                            : "Báo giá"}
-                        </span>
-                      </div>
-                      <p className="text-sm text-on-surface-variant">
-                        {option.description || "Tùy chọn bổ sung cho dịch vụ này."}
-                      </p>
-                    </button>
-                  );
-                })}
+              <div className="space-y-6">
+                {optionGroups.map((group) => (
+                  <fieldset key={group.key}>
+                    <legend className="mb-3 font-bold text-on-surface">
+                      {group.label}{group.isRequired ? <span className="text-error"> *</span> : null}
+                    </legend>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {group.options.map((option) => {
+                        const checked = selectedOptionIds.includes(option._id);
+                        return (
+                          <button
+                            key={option._id}
+                            type="button"
+                            role={group.selectionMode === "single" ? "radio" : "checkbox"}
+                            aria-checked={checked}
+                            onClick={() => handleToggleOption(option)}
+                            className={`rounded-xl border-2 bg-white p-5 text-left transition ${checked ? "border-primary bg-surface-container-low shadow-sm" : "border-outline-variant hover:border-primary/50"}`}
+                          >
+                            <div className="mb-2 flex items-start justify-between gap-3">
+                              <h3 className="font-bold text-primary">{option.name}</h3>
+                              <span className="font-bold text-on-surface">
+                                {service.serviceType === "variable_price"
+                                  ? "Theo báo giá"
+                                  : getOptionPrice(option) > 0
+                                    ? `+${money.format(getOptionPrice(option))}`
+                                    : "Miễn phí"}
+                              </span>
+                            </div>
+                            <p className="text-sm text-on-surface-variant">
+                              {option.description || "Tùy chọn bổ sung cho dịch vụ này."}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                ))}
               </div>
+            )}
+            {optionSelectionError && (
+              <p className="mt-3 rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error">
+                {optionSelectionError}
+              </p>
             )}
           </section>
 
@@ -550,10 +618,33 @@ export default function CustomerServiceDetailPage() {
                 </span>
               </div>
               {addressSelectionError && (
-                <p className="mt-2 rounded-lg bg-error/10 px-3 py-2 text-xs font-semibold text-error">
-                  {addressSelectionError}
-                </p>
+                <div className="mt-2 rounded-lg bg-error/10 px-3 py-2 text-xs font-semibold text-error">
+                  <p>{addressSelectionError}</p>
+                  {requiresPhoneUpdate && (
+                    <Link
+                      to="/customer/profile"
+                      className="mt-2 inline-flex items-center gap-1 underline underline-offset-2"
+                    >
+                      Cập nhật số điện thoại
+                      <span className="material-symbols-outlined text-sm">
+                        arrow_forward
+                      </span>
+                    </Link>
+                  )}
+                </div>
               )}
+              <p className="mt-2 text-[11px] text-on-surface-variant">
+                Địa chỉ vị trí hiện tại từ{" "}
+                <a
+                  href="https://www.openstreetmap.org/copyright"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  © OpenStreetMap contributors
+                </a>
+                .
+              </p>
             </div>
 
             <button
@@ -612,7 +703,7 @@ export default function CustomerServiceDetailPage() {
                     auto_awesome
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-bold text-on-surface">Handigo tự chọn chuyên gia</span>
+                    <span className="block font-bold text-on-surface">Handigo tự điều phối chuyên gia</span>
                     <span className="block text-xs text-on-surface-variant">
                       Hệ thống sẽ điều phối người phù hợp nhất khi bạn đặt lịch.
                     </span>
@@ -656,7 +747,10 @@ export default function CustomerServiceDetailPage() {
                             </b>
                           </span>
                           <span>{provider.totalCompletedOrders}+ đơn</span>
-                          <span>{formatDistance(provider.distanceMeters)}</span>
+                          <span>
+                            {provider.distanceMeters >= 0 ? "Cách bạn " : ""}
+                            {formatDistance(provider.distanceMeters)}
+                          </span>
                         </div>
                       </div>
                       <Link
@@ -679,6 +773,9 @@ export default function CustomerServiceDetailPage() {
                       onClick={() =>
                         setPreferredProviderId(
                           preferredProviderId === provider.id ? undefined : provider.id,
+                          preferredProviderId === provider.id
+                            ? undefined
+                            : provider.user.fullName,
                         )
                       }
                       className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition ${
@@ -687,11 +784,16 @@ export default function CustomerServiceDetailPage() {
                           : "border-primary text-primary hover:bg-primary/5"
                       }`}
                     >
-                      {preferredProviderId === provider.id ? "Đã chọn chuyên gia" : "Chọn chuyên gia này"}
+                      {preferredProviderId === provider.id ? "Đã ưu tiên chuyên gia" : "Ưu tiên chuyên gia này"}
                       <span className="material-symbols-outlined text-[18px]">
                         {preferredProviderId === provider.id ? "check_circle" : "add_circle"}
                       </span>
                     </button>
+                    {preferredProviderId === provider.id && (
+                      <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+                        Nếu chuyên gia không thể nhận, Handigo sẽ tự tìm người phù hợp khác.
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

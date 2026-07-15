@@ -2,9 +2,13 @@ import { Types } from "mongoose";
 import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
 import { getNumberConfigValue } from "./systemConfig.service";
+import { getEligibleProviderUserIds } from "./providerWalletEligibility.service";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
+import { createLogger } from "../utils/logger";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+const matchingLogger = createLogger("MatchingService");
 
 export interface ProviderCandidate {
   providerId: Types.ObjectId;
@@ -26,6 +30,8 @@ export interface FindNearestProvidersOptions {
   limit?: number;
   /** Already-tried provider IDs to exclude from result */
   excludeProviderIds?: Types.ObjectId[];
+  /** Chỉ kiểm tra một provider cụ thể trong luồng khách hàng ưu tiên thợ. */
+  onlyProviderId?: Types.ObjectId;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -60,10 +66,20 @@ export const MatchingService = {
       maxDistanceMeters = Math.max(configuredRadiusKm, 0) * 1000,
       limit = 10,
       excludeProviderIds = [],
+      onlyProviderId,
     } = options;
 
     const serviceObjectId = new Types.ObjectId(serviceId);
     const excludeIds = excludeProviderIds.map((id) => id.toString());
+    const eligibleProviderUserIds = await getEligibleProviderUserIds();
+    const eligibleProviderUserIdSet = new Set(
+      eligibleProviderUserIds.map((userId) => userId.toString()),
+    );
+
+    if (eligibleProviderUserIds.length === 0) {
+      matchingLogger.info("Không có provider đủ số dư ví tối thiểu để nhận đơn mới.");
+      return [];
+    }
 
     // ── Path A: geo-sorted lookup ──────────────────────────────────────────
     if (latitude != null && longitude != null) {
@@ -88,7 +104,7 @@ export const MatchingService = {
         .lean();
 
       if (nearbyLocations.length === 0) {
-        console.log("[MatchingService] No nearby locations found, falling back to simple filter.");
+        matchingLogger.info("Không tìm thấy provider có vị trí trong bán kính phục vụ.");
       } else {
         // Build userId → { distance estimation } map (order from $near already sorted)
         const userIdToIndex = new Map<string, number>(
@@ -98,11 +114,16 @@ export const MatchingService = {
 
         // 2. Fetch matching providers
         const providers = await Provider.find({
-          userId: { $in: nearbyUserIds },
+          userId: {
+            $in: nearbyUserIds.filter((userId) =>
+              eligibleProviderUserIdSet.has(userId.toString()),
+            ),
+          },
           serviceIds: serviceObjectId,
           availabilityStatus: "online",
           verified: true,
           isDeleted: false,
+          ...(onlyProviderId && { _id: onlyProviderId }),
           ...(excludeIds.length > 0 && {
             _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
           }),
@@ -152,14 +173,20 @@ export const MatchingService = {
           });
         }
       }
+
+      // Khi địa chỉ có tọa độ, chỉ trả về khoảng cách địa lý thực tế.
+      // Không fallback theo tên phường vì có thể đưa provider ngoài bán kính vào kết quả.
+      return [];
     }
 
     // ── Path B: no coordinates or no geo-matches found → simple filter ─────
     const providers = await Provider.find({
+      userId: { $in: eligibleProviderUserIds },
       serviceIds: serviceObjectId,
       availabilityStatus: "online",
       verified: true,
       isDeleted: false,
+      ...(onlyProviderId && { _id: onlyProviderId }),
       ...(excludeIds.length > 0 && {
         _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
       }),
@@ -177,24 +204,24 @@ export const MatchingService = {
       );
 
     if (providers.length === 0) {
-      console.warn(
-        `[MatchingService] Không có provider hợp lệ cho service ${serviceId}: ` +
-          `cần verified=true, availabilityStatus=online, isDeleted=false và chưa được thử. ` +
-          `Số provider đã loại: ${excludeIds.length}.`,
-      );
+      matchingLogger.warn("Không có provider hợp lệ cho dịch vụ.", {
+        serviceId,
+        excludedProviderCount: excludeIds.length,
+      });
     } else if (providersInArea.length === 0) {
-      console.warn(
-        `[MatchingService] Có ${providers.length} provider đúng dịch vụ và đang online nhưng ` +
-          `workingAreas không khớp "${ward}, ${province}".`,
-      );
-      console.warn(
-        "[MatchingService] Khu vực của các provider bị loại:",
-        providers.map((provider) => ({
+      matchingLogger.warn("Có provider đúng dịch vụ và đang online nhưng khu vực không khớp.", {
+        serviceId,
+        providerCount: providers.length,
+        ward,
+        province,
+      });
+      matchingLogger.debug("Danh sách khu vực provider bị loại.", {
+        providers: providers.map((provider) => ({
           providerId: provider._id.toString(),
           workingAreas: provider.workingAreas,
           serviceArea: provider.serviceArea,
         })),
-      );
+      });
     }
 
     return providersInArea

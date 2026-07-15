@@ -15,6 +15,14 @@ export const providerOrderApi = {
     return response.data.data;
   },
 
+  getRecentOrders: async (limit = 5) => {
+    const response = await api.get<{
+      success: boolean;
+      data: { items: Order[] };
+    }>(`/orders/provider/recent?limit=${limit}`);
+    return response.data.data.items;
+  },
+
   getProviderOrders: async (page = 1, limit = 10, status?: string, search?: string) => {
     let url = `/orders/provider?page=${page}&limit=${limit}`;
     if (status && status !== 'all') url += `&status=${status}`;

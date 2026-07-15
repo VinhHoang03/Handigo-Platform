@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { SectionHeader } from '../common/SectionHeader';
 import { MaterialIcon } from '../common/MaterialIcon';
 import { CategoryCard, FeatureCard, ProviderCard, StatItem, TestimonialCard } from './HomeCards';
-import { features, stats } from './homeData';
-import { homeApi, type FeaturedProvider, type LatestFeedback } from './home.api';
+import { features, stats } from '@/features/home/data/homeData';
+import { homeApi, type FeaturedProvider, type LatestFeedback } from '@/features/home/api/home.api';
 import { customerServiceApi } from '@/features/customer-service/api/customerService.api';
 import type { Category } from '@/types/booking';
 
@@ -27,7 +27,7 @@ export const CategoriesSection = () => {
           <CategoryCard
             key={category._id}
             icon={category.icon || 'category'}
-            imageUrl={category.image || (/^https?:\/\//i.test(category.icon || '') ? category.icon : undefined)}
+            imageUrl={category.image}
             title={category.name}
             desc={category.description || 'Xem các dịch vụ phù hợp trong danh mục'}
             color={['primary', 'secondary', 'tertiary'][index % 3]}

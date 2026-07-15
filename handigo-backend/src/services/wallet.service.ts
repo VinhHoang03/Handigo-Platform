@@ -1,7 +1,12 @@
 import mongoose, { ClientSession, Types } from "mongoose";
 import { payos } from "../configs/payos.config";
+import type { RequestUser } from "../middlewares/authContext";
 import { Provider } from "../models/provider.model";
+import type { IProvider } from "../models/provider.model";
+import type { IOrder } from "../models/order.model";
 import User from "../models/user.model";
+import { toObjectId } from "../utils/mongo";
+import { buildTransactionCode } from "../utils/transaction";
 import { Wallet } from "../models/wallet.model";
 import {
   WalletTransaction,
@@ -14,11 +19,6 @@ import type {
   WalletDepositInput,
   WalletTransactionQuery,
 } from "../validations/wallet.validator";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
 
 type WalletErrorCode =
   | "INSUFFICIENT_BALANCE"
@@ -36,11 +36,14 @@ class WalletError extends AppError {
   }
 }
 
-const buildTransactionCode = (prefix: string) =>
-  `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-
 const buildPayosOrderCode = () =>
-  Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-12));
+  Number(`${Date.now()}${Math.floor(Math.random() * 100)}`.slice(-11)) * 10 + 2;
+
+const isDuplicateKeyError = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error as { code?: number }).code === 11000;
 
 const DEFAULT_WALLET_DEPOSIT_RETURN_URL =
   process.env.PAYOS_WALLET_DEPOSIT_RETURN_URL || "http://localhost:5173/wallet/deposit/success";
@@ -65,9 +68,6 @@ const assertPositiveAmount = (amount: number) => {
   }
 };
 
-const toObjectId = (id: string | Types.ObjectId) =>
-  typeof id === "string" ? new Types.ObjectId(id) : id;
-
 const getProviderByUserId = async (userId: string | Types.ObjectId) => {
   const provider = await Provider.findOne({ userId, isDeleted: false });
 
@@ -88,8 +88,11 @@ const getProviderById = async (providerId: string | Types.ObjectId) => {
   return provider;
 };
 
-const assertWalletOwnerActive = async (userId: string | Types.ObjectId) => {
-  const user = await User.findById(userId).select("status");
+const assertWalletOwnerActive = async (
+  userId: string | Types.ObjectId,
+  session?: ClientSession,
+) => {
+  const user = await User.findById(userId).select("status").session(session || null);
 
   if (!user || user.isDeleted) {
     throw new WalletError("WALLET_NOT_FOUND", "Không tìm thấy chủ ví", 404);
@@ -177,7 +180,7 @@ const sumTransactions = async (
 };
 
 const getWalletTotals = async (userId: string | Types.ObjectId) => {
-  const [totalEarnings, totalWithdrawn, totalPlatformFeesPaid, totalDeposited, totalPaid] = await Promise.all([
+  const [grossEarnings, totalWithdrawn, totalPlatformFeesPaid, totalDeposited, totalPaid] = await Promise.all([
     sumTransactions(userId, "provider_earning", "in"),
     sumTransactions(userId, "withdraw", "out"),
     sumTransactions(userId, "platform_fee", "out"),
@@ -186,7 +189,7 @@ const getWalletTotals = async (userId: string | Types.ObjectId) => {
   ]);
 
   return {
-    totalEarnings,
+    totalEarnings: grossEarnings - totalPlatformFeesPaid,
     totalWithdrawn,
     totalPlatformFeesPaid,
     totalDeposited,
@@ -319,8 +322,8 @@ export const getWalletTransactionHistory = async (
 export const createWalletDeposit = async (user: RequestUser, input: WalletDepositInput) => {
   assertPositiveAmount(input.amount);
 
-  const provider = user.role === "PROVIDER" ? await getProviderByUserId(user.id) : null;
   await assertWalletAccess(user);
+  const provider = user.role === "PROVIDER" ? await getProviderByUserId(user.id) : null;
   const wallet = await getWalletByUserId(user.id, { createIfMissing: true });
   const orderCode = buildPayosOrderCode();
 
@@ -360,12 +363,12 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
     paymentLink = await payos.paymentRequests.create({
       orderCode,
       amount: input.amount,
-      description: "Nap vi Handigo",
+      description: "Nạp ví Handigo",
       returnUrl,
       cancelUrl,
       items: [
         {
-          name: "Nap tien vao vi Handigo",
+          name: "Nạp tiền vào ví Handigo",
           quantity: 1,
           price: input.amount,
         },
@@ -382,10 +385,10 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
     transaction.status = "failed";
     transaction.gatewayResponse = {
       ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
-      error: error.message || "Khong the tao lien ket nap vi PayOS",
+      error: error.message || "Không thể tạo liên kết nạp ví PayOS",
     };
     await transaction.save();
-    throw new AppError("Khong the tao lien ket nap vi PayOS", 502);
+    throw new AppError("Không thể tạo liên kết nạp ví PayOS", 502);
   }
 
   return {
@@ -407,7 +410,7 @@ export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) 
   });
 
   if (!transaction) {
-    throw new AppError("Khong tim thay giao dich nap vi", 404);
+    throw new AppError("Không tìm thấy giao dịch nạp ví", 404);
   }
 
   if (transaction.status === "success") {
@@ -415,15 +418,31 @@ export const cancelWalletDeposit = async (user: RequestUser, orderCode: string) 
   }
 
   if (transaction.status === "pending") {
-    transaction.status = "cancelled";
-    transaction.gatewayResponse = {
+    const gatewayResponse = {
       ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
       cancelledAt: new Date(),
-      cancelledBy: user.role,
-      cancelReason: "Người dùng hủy liên kết thanh toán PayOS",
+      cancelledBy: "provider",
+      cancelReason: "Nhà cung cấp đã hủy liên kết thanh toán PayOS",
     };
-    transaction.description = "Giao dich nap vi da huy";
-    await transaction.save();
+    const cancelledTransaction = await WalletTransaction.findOneAndUpdate(
+      {
+        _id: transaction._id,
+        status: "pending",
+        isDeleted: false,
+      },
+      {
+        $set: {
+          status: "cancelled",
+          gatewayResponse,
+          description: "Giao dịch nạp ví đã hủy",
+        },
+      },
+      { new: true, runValidators: true },
+    );
+    return (
+      cancelledTransaction ||
+      WalletTransaction.findOne({ _id: transaction._id, isDeleted: false })
+    );
   }
 
   return transaction;
@@ -452,6 +471,10 @@ const markWalletDepositSuccess = async (
         updatedTransaction = freshTransaction;
         return;
       }
+      if (freshTransaction.status === "cancelled") {
+        updatedTransaction = freshTransaction;
+        return;
+      }
 
       const wallet = await Wallet.findOneAndUpdate(
         { _id: freshTransaction.walletId, isDeleted: false },
@@ -471,6 +494,11 @@ const markWalletDepositSuccess = async (
       await freshTransaction.save({ session });
       updatedTransaction = freshTransaction;
     });
+  } catch (error: unknown) {
+    if (isDuplicateKeyError(error)) {
+      throw new AppError("Mã giao dịch PayOS đã được sử dụng", 409);
+    }
+    throw error;
   } finally {
     await session.endSession();
   }
@@ -512,11 +540,27 @@ export const syncWalletDeposit = async (user: RequestUser, orderCode: string) =>
   }
 
   if (["CANCELLED", "EXPIRED", "FAILED"].includes(paymentLink.status)) {
-    transaction.status = paymentLink.status === "CANCELLED" ? "cancelled" : "failed";
-    transaction.gatewayTransactionId = gatewayPatch.gatewayTransactionId;
-    transaction.gatewayPaymentLinkId = gatewayPatch.gatewayPaymentLinkId;
-    transaction.gatewayResponse = gatewayPatch.gatewayResponse;
-    await transaction.save();
+    const syncedTransaction = await WalletTransaction.findOneAndUpdate(
+      {
+        _id: transaction._id,
+        status: { $in: ["pending", "failed"] },
+        isDeleted: false,
+      },
+      {
+        $set: {
+          status:
+            paymentLink.status === "CANCELLED" ? "cancelled" : "failed",
+          gatewayTransactionId: gatewayPatch.gatewayTransactionId,
+          gatewayPaymentLinkId: gatewayPatch.gatewayPaymentLinkId,
+          gatewayResponse: gatewayPatch.gatewayResponse,
+        },
+      },
+      { new: true, runValidators: true },
+    );
+    return (
+      syncedTransaction ||
+      WalletTransaction.findOne({ _id: transaction._id, isDeleted: false })
+    );
   }
 
   return transaction;
@@ -526,30 +570,54 @@ export const handleWalletDepositPayosWebhook = async (webhookData: any, payload:
   const orderCode = webhookData.orderCode?.toString();
 
   if (!orderCode) {
-    throw new AppError("Du lieu webhook PayOS khong hop le", 400);
+    throw new AppError("Dữ liệu webhook PayOS không hợp lệ", 400);
   }
 
   const transaction = await WalletTransaction.findOne({
     type: "deposit",
     gatewayOrderCode: orderCode,
+    isDeleted: false,
   });
 
   if (!transaction) {
-    throw new AppError("Khong tim thay giao dich nap vi PayOS", 404);
+    throw new AppError("Không tìm thấy giao dịch nạp ví PayOS", 404);
   }
 
-  if (transaction.status === "success") {
+  const verifiedAmount = Number(webhookData.amount);
+  if (!Number.isFinite(verifiedAmount) || verifiedAmount <= 0) {
+    throw new AppError("Số tiền trong webhook PayOS không hợp lệ", 400);
+  }
+  if (transaction.amount !== verifiedAmount) {
+    throw new AppError("Số tiền webhook PayOS không khớp giao dịch nạp ví", 409);
+  }
+
+  const webhookPaymentLinkId = webhookData.paymentLinkId?.toString();
+  const webhookReference = webhookData.reference?.toString();
+  if (
+    transaction.gatewayPaymentLinkId &&
+    transaction.gatewayPaymentLinkId !== webhookPaymentLinkId
+  ) {
+    throw new AppError("Mã liên kết PayOS không khớp giao dịch nạp ví", 409);
+  }
+  if (
+    transaction.gatewayTransactionId &&
+    webhookReference &&
+    transaction.gatewayTransactionId !== webhookReference
+  ) {
+    throw new AppError("Mã tham chiếu PayOS không khớp giao dịch nạp ví", 409);
+  }
+
+  const isSuccess = webhookData.code === "00";
+  if (isSuccess && !webhookReference) {
+    throw new AppError("Webhook PayOS thành công thiếu mã tham chiếu giao dịch", 400);
+  }
+  if (transaction.status === "success" || transaction.status === "cancelled") {
     return transaction;
   }
-
-  if (transaction.status === "cancelled") {
-    return transaction;
-  }
-
-  const isSuccess = payload.success === true && webhookData.code === "00";
   const gatewayPatch = {
-    gatewayTransactionId: webhookData.reference || null,
-    gatewayPaymentLinkId: webhookData.paymentLinkId || transaction.gatewayPaymentLinkId || null,
+    gatewayTransactionId: webhookReference || null,
+    gatewayPaymentLinkId:
+      webhookPaymentLinkId || transaction.gatewayPaymentLinkId || null,
     gatewayResponse: {
       ...((transaction.gatewayResponse as Record<string, unknown>) || {}),
       webhook: payload,
@@ -558,12 +626,30 @@ export const handleWalletDepositPayosWebhook = async (webhookData: any, payload:
   };
 
   if (!isSuccess) {
-    transaction.status = "failed";
-    transaction.gatewayTransactionId = gatewayPatch.gatewayTransactionId;
-    transaction.gatewayPaymentLinkId = gatewayPatch.gatewayPaymentLinkId;
-    transaction.gatewayResponse = gatewayPatch.gatewayResponse;
-    await transaction.save();
-    return transaction;
+    if (transaction.status === "failed") {
+      return transaction;
+    }
+
+    const failedTransaction = await WalletTransaction.findOneAndUpdate(
+      {
+        _id: transaction._id,
+        status: "pending",
+        isDeleted: false,
+      },
+      {
+        $set: {
+          status: "failed",
+          gatewayTransactionId: gatewayPatch.gatewayTransactionId,
+          gatewayPaymentLinkId: gatewayPatch.gatewayPaymentLinkId,
+          gatewayResponse: gatewayPatch.gatewayResponse,
+        },
+      },
+      { new: true, runValidators: true },
+    );
+    return (
+      failedTransaction ||
+      WalletTransaction.findOne({ _id: transaction._id, isDeleted: false })
+    );
   }
 
   return markWalletDepositSuccess(transaction, gatewayPatch);
@@ -578,6 +664,127 @@ export const checkSufficientBalance = async (
   const { wallet } = await getWalletByProviderId(providerId, { createIfMissing: true });
 
   return wallet.balance >= platformFee;
+};
+
+export const recordCompletedOrderSettlement = async (
+  order: IOrder,
+  provider: IProvider,
+  session: ClientSession,
+) => {
+  const existingTransaction = await WalletTransaction.findOne({
+    relatedOrderId: order._id,
+    type: { $in: ["provider_earning", "platform_fee"] },
+    status: "success",
+    isDeleted: false,
+  }).session(session);
+  if (existingTransaction) {
+    throw new WalletError(
+      "INVALID_AMOUNT",
+      "Thu nhập của đơn hàng đã được ghi nhận",
+      409,
+    );
+  }
+
+  await assertWalletOwnerActive(provider.userId, session);
+  const wallet = await getWalletByUserId(provider.userId, {
+    createIfMissing: true,
+    session,
+  });
+  const grossAmount = order.pricing.totalPaidAmount;
+  const platformFee = order.pricing.platformCommissionAmount;
+  const netEarning = order.pricing.providerEarningAmount;
+
+  if (
+    ![grossAmount, platformFee, netEarning].every(Number.isFinite) ||
+    grossAmount < 0 ||
+    platformFee < 0 ||
+    netEarning < 0 ||
+    platformFee + netEarning !== grossAmount
+  ) {
+    throw new WalletError(
+      "INVALID_AMOUNT",
+      "Dữ liệu doanh thu của đơn hàng không hợp lệ",
+      400,
+    );
+  }
+
+  const balanceBefore = wallet.balance;
+  const isCashOrder = order.paymentMethod === "cash";
+  if (isCashOrder && balanceBefore < platformFee) {
+    throw new WalletError(
+      "INSUFFICIENT_BALANCE",
+      "Số dư ví không đủ để thanh toán phí nền tảng của đơn hàng",
+      400,
+    );
+  }
+
+  const balanceAfterGross = isCashOrder
+    ? balanceBefore
+    : balanceBefore + grossAmount;
+  const balanceAfterSettlement = balanceAfterGross - platformFee;
+  wallet.balance = balanceAfterSettlement;
+  await wallet.save({ session });
+
+  const commonMetadata = {
+    providerId: provider._id,
+    orderId: order._id,
+    orderCode: order.orderCode,
+    paymentMethod: order.paymentMethod,
+    grossAmount,
+    platformFee,
+    netEarning,
+  };
+
+  const earningTransaction = await createWalletTransaction(
+    {
+      walletId: wallet._id as Types.ObjectId,
+      userId: provider.userId,
+      relatedOrderId: order._id as Types.ObjectId,
+      type: "provider_earning",
+      direction: "in",
+      amount: grossAmount,
+      balanceAfter: balanceAfterGross,
+      description: isCashOrder
+        ? "Ghi nhận doanh thu tiền mặt khi đơn hàng hoàn tất"
+        : "Cộng doanh thu dịch vụ khi đơn hàng hoàn tất",
+      transactionCodePrefix: "PROVIDER_EARNING",
+      metadata: {
+        ...commonMetadata,
+        affectsWalletBalance: !isCashOrder,
+      },
+    },
+    session,
+  );
+
+  const platformFeeTransaction =
+    platformFee > 0
+      ? await createWalletTransaction(
+          {
+            walletId: wallet._id as Types.ObjectId,
+            userId: provider.userId,
+            relatedOrderId: order._id as Types.ObjectId,
+            type: "platform_fee",
+            direction: "out",
+            amount: platformFee,
+            balanceAfter: balanceAfterSettlement,
+            description: isCashOrder
+              ? "Trừ phí nền tảng của đơn hàng thanh toán tiền mặt"
+              : "Khấu trừ phí nền tảng từ doanh thu dịch vụ",
+            transactionCodePrefix: "PLATFORM_FEE",
+            metadata: {
+              ...commonMetadata,
+              affectsWalletBalance: true,
+            },
+          },
+          session,
+        )
+      : null;
+
+  return {
+    wallet,
+    earningTransaction,
+    platformFeeTransaction,
+  };
 };
 
 export const deductPlatformFee = async (

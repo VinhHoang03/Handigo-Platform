@@ -1,6 +1,9 @@
 import "dotenv/config";
 import mongoose from "mongoose";
 import { Category } from "../models/category.model";
+import { createLogger } from "../utils/logger";
+
+const seedLogger = createLogger("SeedCategories");
 
 const categories = [
   { name: "Điện dân dụng", slug: "dien-dan-dung", icon: "bolt" },
@@ -12,7 +15,7 @@ const categories = [
 
 async function seed() {
   const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-  if (!uri) throw new Error("MONGODB_URI or MONGO_URI is not configured");
+  if (!uri) throw new Error("Chưa cấu hình MONGODB_URI hoặc MONGO_URI");
 
   await mongoose.connect(uri);
   await Promise.all(
@@ -33,12 +36,12 @@ async function seed() {
       ),
     ),
   );
-  console.log(`Seeded ${categories.length} categories`);
+  seedLogger.info("Đã seed danh mục.", { count: categories.length });
   await mongoose.disconnect();
 }
 
 seed().catch(async (error) => {
-  console.error(error);
+  seedLogger.error("Seed danh mục thất bại.", error);
   await mongoose.disconnect();
   process.exit(1);
 });

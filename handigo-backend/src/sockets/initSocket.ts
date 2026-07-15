@@ -116,18 +116,14 @@ export const initSocket = (server: HttpServer) => {
     socket.on("order:tracking:join", async (payload, callback) => {
       try {
         const orderId = String(payload?.orderId || "");
-        console.log(`[Socket] User ${socket.user!.id} (${socket.user!.role}) joining tracking for order ${orderId}`);
         const trackingState = await orderTrackingService.getOrderTrackingState(
           orderId,
           socket.user!.id,
           socket.user!.role as "CUSTOMER" | "PROVIDER",
         );
         socket.join(`order:${orderId}`);
-        const roomSize = io.sockets.adapter.rooms.get(`order:${orderId}`)?.size ?? 0;
-        console.log(`[Socket] User ${socket.user!.id} joined order:${orderId}. Room size: ${roomSize}. State:`, JSON.stringify(trackingState));
         callback?.({ success: true, data: trackingState });
       } catch (error: any) {
-        console.error(`[Socket] User ${socket.user!.id} failed to join order ${payload?.orderId}:`, error.message);
         callback?.({ success: false, message: error.message });
       }
     });
@@ -135,7 +131,6 @@ export const initSocket = (server: HttpServer) => {
     socket.on("order:location:update", async (payload, callback) => {
       try {
         const orderId = String(payload?.orderId || "");
-        console.log(`[Socket] Location update from ${socket.user!.id} (${socket.user!.role}) for order ${orderId}: lat=${payload?.latitude}, lng=${payload?.longitude}`);
         const location = await orderTrackingService.updateOrderTrackingLocation(
           orderId,
           socket.user!.id,
@@ -145,12 +140,9 @@ export const initSocket = (server: HttpServer) => {
             longitude: Number(payload?.longitude),
           },
         );
-        const roomSize = io.sockets.adapter.rooms.get(`order:${orderId}`)?.size ?? 0;
-        console.log(`[Socket] Broadcasting order:location to room order:${orderId} (${roomSize} members):`, JSON.stringify(location));
         io.to(`order:${orderId}`).emit("order:location", location);
         callback?.({ success: true, data: location });
       } catch (error: any) {
-        console.error(`[Socket] Location update error for order ${payload?.orderId}:`, error.message);
         callback?.({ success: false, message: error.message });
       }
     });

@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { BankAccount } from "../models/bankAccount.model";
+import type { RequestUser } from "../middlewares/authContext";
 import { Provider } from "../models/provider.model";
 import { AppError } from "../utils/appError";
 import type {
@@ -7,13 +8,8 @@ import type {
   UpdateBankAccountInput,
 } from "../validations/bankAccount.validator";
 
-type RequestUser = {
-  id: string;
-  role: string;
-};
-
 const assertBankAccountAccess = async (user: RequestUser) => {
-  if (!["CUSTOMER", "PROVIDER"].includes(user.role)) {
+  if (user.role !== "CUSTOMER" && user.role !== "PROVIDER") {
     throw new AppError("Bạn không có quyền quản lý tài khoản ngân hàng", 403);
   }
 

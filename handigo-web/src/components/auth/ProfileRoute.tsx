@@ -1,6 +1,6 @@
-import { Navigate } from 'react-router-dom';
-import { useAuthStore } from '@/features/auth/store/auth.store';
-import { getRoleProfilePath } from '@/features/auth/utils/roleNavigation';
+import { Navigate } from "react-router-dom";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { getRoleProfilePath } from "@/features/auth/utils/roleNavigation";
 
 export function ProfileRoute() {
   const user = useAuthStore((state) => state.user);
@@ -10,7 +10,7 @@ export function ProfileRoute() {
   if (isInitializing) {
     return (
       <div className="grid min-h-screen place-items-center text-on-surface-variant">
-        Dang khoi phuc phien dang nhap...
+        Đang khôi phục phiên đăng nhập...
       </div>
     );
   }
@@ -21,8 +21,8 @@ export function ProfileRoute() {
         to="/login"
         replace
         state={{
-          from: '/profile',
-          message: 'Vui lòng đăng nhập để truy cập hồ sơ cá nhân.',
+          from: "/profile",
+          message: "Vui lòng đăng nhập để truy cập hồ sơ cá nhân.",
         }}
       />
     );

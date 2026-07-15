@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model";
+import type { AuthenticatedUser } from "./authContext";
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -11,20 +12,6 @@ const getAccessSecret = (): string => {
 
   return secret;
 };
-
-interface DecodedToken extends jwt.JwtPayload {
-  id: string;
-  email: string;
-  role: string;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: DecodedToken;
-    }
-  }
-}
 
 export const authMiddleware = (
   req: Request,
@@ -45,11 +32,11 @@ export const authMiddleware = (
   }
 
   try {
-    const decoded = jwt.verify(token, getAccessSecret()) as DecodedToken;
+    const decoded = jwt.verify(token, getAccessSecret()) as AuthenticatedUser;
     User.findOne({ _id: decoded.id, isDeleted: false })
       .then((user) => {
         if (!user) {
-          return res.status(401).json({ message: "User not found or deleted" });
+          return res.status(401).json({ message: "Không tìm thấy người dùng hoặc người dùng đã bị xóa" });
         }
 
         if (user.status === "locked") {

@@ -1,5 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import { AuditLog } from "../models/auditLog.model";
+import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
 import type {
   CreateSystemConfigInput,
@@ -7,11 +8,6 @@ import type {
   SystemConfigType,
   UpdateSystemConfigInput,
 } from "../validations/systemConfig.validator";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
 
 type SystemConfigDocument = {
   _id: Types.ObjectId;

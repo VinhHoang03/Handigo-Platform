@@ -1,5 +1,6 @@
-import { Types } from "mongoose";
+import mongoose, { ClientSession, Types } from "mongoose";
 import { AuditLog } from "../models/auditLog.model";
+import type { RequestUser } from "../middlewares/authContext";
 import { Order } from "../models/order.model";
 import { Payment } from "../models/payment.model";
 import { IPromotion, Promotion } from "../models/promotion.model";
@@ -11,12 +12,7 @@ import type {
   CreateAdminVoucherInput,
   RemoveVoucherInput,
   UpdateAdminVoucherInput,
-} from "../validations/voucher.validation";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
+} from "../validations/voucher.validator";
 
 type NormalizedDiscountType = "fixed" | "percentage";
 
@@ -137,7 +133,7 @@ const getVoucherOrFail = async (id: string) => {
   const voucher = await Promotion.findOne({ _id: id, isDeleted: false });
 
   if (!voucher) {
-    throw new AppError("Khong tim thay voucher", 404);
+    throw new AppError("Không tìm thấy voucher", 404);
   }
 
   return voucher;
@@ -203,8 +199,14 @@ const assertCustomerCanModifyOrder = (order: any, user: RequestUser) => {
   }
 };
 
-const getOrderForVoucher = async (orderId: string, user: RequestUser) => {
-  const order = await Order.findById(orderId);
+const getOrderForVoucher = async (
+  orderId: string,
+  user: RequestUser,
+  session?: ClientSession,
+) => {
+  const query = Order.findById(orderId);
+  if (session) query.session(session);
+  const order = await query;
 
   if (!order || order.isDeleted) {
     throw new AppError("Không tìm thấy đơn hàng", 404);
@@ -219,11 +221,16 @@ const getOrderForVoucher = async (orderId: string, user: RequestUser) => {
   return order;
 };
 
-const assertNoLockedPayment = async (orderId: Types.ObjectId | string) => {
-  const payment = await Payment.findOne({
+const assertNoLockedPayment = async (
+  orderId: Types.ObjectId | string,
+  session?: ClientSession,
+) => {
+  const query = Payment.findOne({
     orderId,
     status: { $in: ["pending", "paid", "refunded"] },
   }).select("_id status");
+  if (session) query.session(session);
+  const payment = await query;
 
   if (payment) {
     throw new AppError("Không thể thay đổi voucher vì đơn hàng đã có giao dịch thanh toán", 409);
@@ -231,112 +238,178 @@ const assertNoLockedPayment = async (orderId: Types.ObjectId | string) => {
 };
 
 export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) => {
-  const order = await getOrderForVoucher(input.orderId, user);
-
-  if (order.voucherSnapshot) {
-    throw new AppError("Đơn hàng đã áp dụng một voucher", 409);
-  }
-
-  await assertNoLockedPayment(order._id as Types.ObjectId);
-
-  const code = normalizeCode(input.code);
-  const promotion = await Promotion.findOne({ code });
-
-  if (!promotion) {
-    throw new AppError("Voucher không tồn tại", 404);
-  }
-
-  if (!isPromotionActive(promotion)) {
-    throw new AppError("Voucher không hoạt động hoặc đã hết hạn", 400);
-  }
-
-  const originalAmount = getOriginalAmount(order);
-  const minOrderAmount = promotion.minOrderAmount ?? 0;
-
-  if (originalAmount < minOrderAmount) {
-    throw new AppError("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng voucher", 400);
-  }
-
-  if (promotion.usageLimit !== null && promotion.usageLimit !== undefined && promotion.usedCount >= promotion.usageLimit) {
-    throw new AppError("Voucher đã hết lượt sử dụng", 400);
-  }
-
-  const amountBeforeVoucher = getAmountBeforeVoucher(order);
-  const discountAmount = calculateDiscountAmount(promotion, amountBeforeVoucher);
-  const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
-
-  const usageFilter: Record<string, unknown> = { _id: promotion._id };
-  if (promotion.usageLimit !== null && promotion.usageLimit !== undefined) {
-    usageFilter.$expr = { $lt: ["$usedCount", "$usageLimit"] };
-  }
-
-  const updatedPromotion = await Promotion.findOneAndUpdate(
-    usageFilter,
-    { $inc: { usedCount: 1 } },
-    { new: true },
-  );
-
-  if (!updatedPromotion) {
-    throw new AppError("Voucher đã hết lượt sử dụng", 400);
-  }
-
-  order.voucherSnapshot = {
-    voucherId: promotion._id as Types.ObjectId,
-    name: promotion.name,
-    code,
-    discountType: normalizeDiscountType(promotion.discountType),
-    discountValue: promotion.discountValue,
-    discountAmount,
-  };
-  order.pricing.voucherDiscountAmount = discountAmount;
-  order.pricing.totalPaidAmount = finalAmount;
+  const session = await mongoose.startSession();
+  let result: ReturnType<typeof buildVoucherResponse> | null | undefined;
 
   try {
-    await order.save();
-  } catch (error) {
-    await Promotion.updateOne(
-      { _id: promotion._id, usedCount: { $gt: 0 } },
-      { $inc: { usedCount: -1 } },
-    );
-    throw error;
+    result = await session.withTransaction(async () => {
+      const order = await getOrderForVoucher(input.orderId, user, session);
+
+      if (order.voucherSnapshot) {
+        throw new AppError("Đơn hàng đã áp dụng một voucher", 409);
+      }
+
+      await assertNoLockedPayment(order._id as Types.ObjectId, session);
+
+      const code = normalizeCode(input.code);
+      const promotion = await Promotion.findOne({ code }).session(session);
+
+      if (!promotion) {
+        throw new AppError("Voucher không tồn tại", 404);
+      }
+
+      const now = new Date();
+      if (!isPromotionActive(promotion, now)) {
+        throw new AppError("Voucher không hoạt động hoặc đã hết hạn", 400);
+      }
+
+      const originalAmount = getOriginalAmount(order);
+      const minOrderAmount = promotion.minOrderAmount ?? 0;
+
+      if (originalAmount < minOrderAmount) {
+        throw new AppError("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng voucher", 400);
+      }
+
+      const amountBeforeVoucher = getAmountBeforeVoucher(order);
+      const discountAmount = calculateDiscountAmount(promotion, amountBeforeVoucher);
+      const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
+      const usageFilter: Record<string, unknown> = {
+        _id: promotion._id,
+        isDeleted: false,
+        isActive: true,
+        startAt: { $lte: now },
+        endAt: { $gte: now },
+        $or: [
+          { status: "ACTIVE" },
+          { status: "active" },
+          { status: { $exists: false } },
+        ],
+      };
+
+      if (promotion.usageLimit !== null && promotion.usageLimit !== undefined) {
+        usageFilter.$expr = { $lt: ["$usedCount", "$usageLimit"] };
+      }
+
+      const updatedPromotion = await Promotion.findOneAndUpdate(
+        usageFilter,
+        { $inc: { usedCount: 1 } },
+        { new: true, session },
+      );
+
+      if (!updatedPromotion) {
+        throw new AppError("Voucher đã hết lượt sử dụng", 400);
+      }
+
+      const updatedOrder = await Order.findOneAndUpdate(
+        {
+          _id: order._id,
+          voucherSnapshot: null,
+          status: { $nin: ["completed", "cancelled"] },
+        },
+        {
+          $set: {
+            voucherSnapshot: {
+              voucherId: promotion._id as Types.ObjectId,
+              name: promotion.name,
+              code,
+              discountType: normalizeDiscountType(promotion.discountType),
+              discountValue: promotion.discountValue,
+              discountAmount,
+            },
+            "pricing.voucherDiscountAmount": discountAmount,
+            "pricing.totalPaidAmount": finalAmount,
+          },
+        },
+        { new: true, session, runValidators: true },
+      );
+
+      if (!updatedOrder) {
+        throw new AppError("Đơn hàng vừa được xử lý bởi yêu cầu khác", 409);
+      }
+
+      return buildVoucherResponse(updatedOrder, updatedPromotion, discountAmount);
+    });
+  } finally {
+    await session.endSession();
   }
 
-  return buildVoucherResponse(order, promotion, discountAmount);
+  if (!result) {
+    throw new AppError("Không thể áp dụng voucher", 500);
+  }
+
+  return result;
 };
 
 export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput) => {
-  const order = await getOrderForVoucher(input.orderId, user);
+  const session = await mongoose.startSession();
+  let result: {
+    originalAmount: number;
+    discountAmount: number;
+    finalAmount: number;
+    voucher: { code: string } | null;
+  } | null | undefined;
 
-  if (!order.voucherSnapshot) {
-    throw new AppError("Đơn hàng chưa áp dụng voucher", 400);
+  try {
+    result = await session.withTransaction(async () => {
+      const order = await getOrderForVoucher(input.orderId, user, session);
+
+      if (!order.voucherSnapshot) {
+        throw new AppError("Đơn hàng chưa áp dụng voucher", 400);
+      }
+
+      await assertNoLockedPayment(order._id as Types.ObjectId, session);
+
+      const voucherId = order.voucherSnapshot.voucherId;
+      const voucherCode = order.voucherSnapshot.code || null;
+      const amountBeforeVoucher = getAmountBeforeVoucher(order);
+      const originalAmount = getOriginalAmount(order);
+      const snapshotFilter = voucherId
+        ? { "voucherSnapshot.voucherId": voucherId }
+        : { "voucherSnapshot.code": voucherCode };
+      const updatedOrder = await Order.findOneAndUpdate(
+        {
+          _id: order._id,
+          status: { $nin: ["completed", "cancelled"] },
+          ...snapshotFilter,
+        },
+        {
+          $set: {
+            voucherSnapshot: null,
+            "pricing.voucherDiscountAmount": 0,
+            "pricing.totalPaidAmount": amountBeforeVoucher,
+          },
+        },
+        { new: true, session, runValidators: true },
+      );
+
+      if (!updatedOrder) {
+        throw new AppError("Đơn hàng vừa được xử lý bởi yêu cầu khác", 409);
+      }
+
+      if (voucherId) {
+        await Promotion.updateOne(
+          { _id: voucherId, usedCount: { $gt: 0 } },
+          { $inc: { usedCount: -1 } },
+          { session },
+        );
+      }
+
+      return {
+        originalAmount,
+        discountAmount: 0,
+        finalAmount: amountBeforeVoucher,
+        voucher: voucherCode ? { code: voucherCode } : null,
+      };
+    });
+  } finally {
+    await session.endSession();
   }
 
-  await assertNoLockedPayment(order._id as Types.ObjectId);
-
-  const voucherId = order.voucherSnapshot.voucherId;
-  const voucherCode = order.voucherSnapshot.code || null;
-  const amountBeforeVoucher = getAmountBeforeVoucher(order);
-  const originalAmount = getOriginalAmount(order);
-
-  order.voucherSnapshot = null;
-  order.pricing.voucherDiscountAmount = 0;
-  order.pricing.totalPaidAmount = amountBeforeVoucher;
-
-  await order.save();
-
-  if (voucherId) {
-    await Promotion.updateOne(
-      { _id: voucherId, usedCount: { $gt: 0 } },
-      { $inc: { usedCount: -1 } },
-    );
+  if (!result) {
+    throw new AppError("Không thể gỡ voucher", 500);
   }
 
-  return {
-    originalAmount,
-    discountAmount: 0,
-    finalAmount: amountBeforeVoucher,
-    voucher: voucherCode ? { code: voucherCode } : null,
-  };
+  return result;
 };
 
 export const getAvailableVouchers = async (user: RequestUser, query: AvailableVoucherQuery) => {

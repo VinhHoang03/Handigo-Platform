@@ -2,6 +2,20 @@ import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
+import { validate } from "../middlewares/validate.middleware";
+import {
+  dispatchRateLimit,
+  routingRateLimit,
+  uploadRateLimit,
+} from "../middlewares/rateLimit.middleware";
+import {
+  assignmentIdParamSchema,
+  cancelOrderSchema,
+  createOrderSchema,
+  orderIdParamSchema,
+  rejectAssignmentSchema,
+  trackingRouteQuerySchema,
+} from "../validations/order.validator";
 import {
   createOrder,
   getMyOrders,
@@ -22,6 +36,7 @@ import {
   confirmRepairQuotation,
   rejectRepairQuotation,
 } from "../controllers/order.controller";
+import { getOrderTrackingRoute } from "../controllers/orderTracking.controller";
 
 const router = Router();
 
@@ -31,7 +46,13 @@ router.use(authMiddleware);
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
 // POST   /orders               → Customer: create new booking order
-router.post("/", roleMiddleware("CUSTOMER"), createOrder);
+router.post(
+  "/",
+  roleMiddleware("CUSTOMER"),
+  dispatchRateLimit,
+  validate(createOrderSchema),
+  createOrder,
+);
 
 // GET    /orders               → Customer: list own orders (paginated)
 router.get("/", roleMiddleware("CUSTOMER"), getMyOrders);
@@ -50,14 +71,28 @@ router.get("/provider", roleMiddleware("PROVIDER"), getProviderOrders);
 router.post(
   "/attachments",
   roleMiddleware("CUSTOMER", "PROVIDER"),
+  uploadRateLimit,
   uploadOrderAttachmentImage,
   uploadOrderAttachment,
+);
+
+router.get(
+  "/:orderId/tracking-route",
+  roleMiddleware("CUSTOMER", "PROVIDER"),
+  routingRateLimit,
+  validate(orderIdParamSchema, "params"),
+  validate(trackingRouteQuerySchema, "query"),
+  getOrderTrackingRoute,
 );
 
 router.get("/:orderId", getOrderById);
 
 // PATCH  /orders/:orderId/cancel → Customer / Provider / Admin: cancel order
-router.patch("/:orderId/cancel", cancelOrder);
+router.patch(
+  "/:orderId/cancel",
+  validate(cancelOrderSchema),
+  cancelOrder,
+);
 
 // POST   /orders/:orderId/start    → Provider: start working on order
 router.post("/:orderId/start", roleMiddleware("PROVIDER"), startOrder);
@@ -78,6 +113,7 @@ router.get(
 router.post(
   "/assignments/:assignmentId/accept",
   roleMiddleware("PROVIDER"),
+  validate(assignmentIdParamSchema, "params"),
   acceptAssignment,
 );
 
@@ -85,11 +121,18 @@ router.post(
 router.post(
   "/assignments/:assignmentId/reject",
   roleMiddleware("PROVIDER"),
+  validate(assignmentIdParamSchema, "params"),
+  validate(rejectAssignmentSchema),
   rejectAssignment,
 );
 
 // GET    /orders/:orderId/assignments → Admin / Owner: assignment history
-router.get("/:orderId/assignments", getOrderAssignments);
+router.get(
+  "/:orderId/assignments",
+  roleMiddleware("ADMIN", "CUSTOMER", "PROVIDER"),
+  validate(orderIdParamSchema, "params"),
+  getOrderAssignments,
+);
 
 // ─── Dispatch (Admin) ─────────────────────────────────────────────────────────
 
@@ -97,6 +140,8 @@ router.get("/:orderId/assignments", getOrderAssignments);
 router.post(
   "/:orderId/redispatch",
   roleMiddleware("ADMIN"),
+  dispatchRateLimit,
+  validate(orderIdParamSchema, "params"),
   redispatchOrder,
 );
 

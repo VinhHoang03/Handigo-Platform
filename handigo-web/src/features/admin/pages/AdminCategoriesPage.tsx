@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { Modal } from '@/components/common/Modal';
@@ -20,8 +21,6 @@ const getError = (err: unknown) => {
   return err instanceof Error ? err.message : 'Có lỗi xảy ra.';
 };
 
-const isImageUrl = (v: string | null | undefined) => /^https?:\/\//i.test(v ?? '');
-
 // ─── form state ─────────────────────────────────────────────────────────────
 
 type FormState = { name: string; slug: string; icon: string; description: string; isActive: boolean };
@@ -36,17 +35,6 @@ const toPayload = (f: FormState): CategoryPayload => ({
 });
 
 // ─── sub-components ─────────────────────────────────────────────────────────
-
-function IconPreview({ value, className = '', iconClass = '' }: { value: string; className?: string; iconClass?: string }) {
-  if (isImageUrl(value))
-    return <img src={value} alt="" className={`object-cover ${className}`} />;
-  return (
-    <span className={`material-symbols-outlined flex items-center justify-center ${className} ${iconClass}`}
-      style={{ fontVariationSettings: "'FILL' 1" }}>
-      {value || 'category'}
-    </span>
-  );
-}
 
 function FormInput({ label, value, onChange, placeholder, required }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean }) {
   return (
@@ -291,7 +279,7 @@ export default function AdminCategoriesPage() {
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-fixed-dim/30 text-primary">
-                          <IconPreview value={cat.icon || 'category'} iconClass="text-[28px]" />
+                          <CategoryIcon icon={cat.icon} name={cat.name} className="h-7 w-7" />
                         </div>
                         <span className="font-bold text-on-surface">{cat.name}</span>
                       </div>
@@ -371,13 +359,13 @@ export default function AdminCategoriesPage() {
           <FormInput label="Tên danh mục" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
           <FormInput label="Slug" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="Tự sinh nếu bỏ trống" />
           <div>
-            <span className="mb-1 block text-sm font-semibold">Icon (Material Symbol hoặc URL ảnh)</span>
+            <span className="mb-1 block text-sm font-semibold">Mã icon danh mục hoặc URL ảnh</span>
             <div className="flex gap-3">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <IconPreview value={form.icon || 'category'} iconClass="text-3xl" />
+                <CategoryIcon icon={form.icon} name={form.name} className="h-7 w-7" />
               </div>
               <input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })}
-                placeholder="cleaning_services hoặc https://..."
+                placeholder="electrical, cleaning, plumbing hoặc https://..."
                 className="flex-1 rounded-xl border border-outline-variant bg-surface p-3 outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
           </div>

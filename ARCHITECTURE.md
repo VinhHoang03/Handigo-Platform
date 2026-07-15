@@ -85,7 +85,6 @@ Các script trong `handigo-backend/package.json`:
 - `dev`: chạy `src/server.ts` bằng `ts-node-dev`.
 - `build`: biên dịch TypeScript và chạy `tsc-alias`.
 - `start`: chạy `dist/server.js`.
-- `seed:payment`: seed dữ liệu payment test.
 - `seed:categories`: seed category.
 - `migrate:provider-service-ids`: migrate service id của provider.
 - `migrate:provider-applications`: migrate review history của provider application.

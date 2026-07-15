@@ -117,7 +117,16 @@ export default function ProviderOrdersPage() {
         </header>
 
         {error && (
-          <div className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">{error}</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-error/10 px-md py-sm text-sm text-error">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => void Promise.all([loadAssignments(), loadOrders()])}
+              className="rounded-lg bg-error px-3 py-2 font-semibold text-on-error"
+            >
+              Thử lại
+            </button>
+          </div>
         )}
 
         <section className="hidden">

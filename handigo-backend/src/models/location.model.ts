@@ -39,5 +39,9 @@ const LocationSchema = new Schema<ILocation>(
 
 LocationSchema.index({ coordinates: "2dsphere" });
 LocationSchema.index({ userId: 1, ownerType: 1 });
+LocationSchema.index(
+  { lastUpdatedAt: 1 },
+  { expireAfterSeconds: 24 * 60 * 60 },
+);
 
 export const Location = model<ILocation>("Location", LocationSchema, "locations");

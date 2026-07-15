@@ -3,8 +3,11 @@ import multer from "multer";
 import cloudinary from "../configs/cloudinary";
 import {
   extractDocumentSuggestion,
-} from "../modules/ocr/ocr.service";
-import { OcrDocumentKind } from "../modules/ocr/ocr.types";
+  OcrDocumentKind,
+} from "../services/ocr.service";
+import { createLogger } from "../utils/logger";
+
+const providerApplicationAssetLogger = createLogger("ProviderApplicationAssetUpload");
 
 const allowedMimeTypes = new Set([
   "image/jpeg",
@@ -47,7 +50,7 @@ const uploadBuffer = (buffer: Buffer, folder: string) =>
       { folder, resource_type: "auto" },
       (error, result) => {
         if (error || !result) {
-          reject(error || new Error("Cloudinary upload failed"));
+          reject(error || new Error("Tải tệp lên Cloudinary thất bại"));
           return;
         }
 
@@ -71,7 +74,7 @@ export const uploadProviderApplicationAsset = (
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "File is required",
+        message: "Vui lòng chọn tệp cần tải lên",
       });
     }
 
@@ -117,14 +120,17 @@ export const uploadProviderApplicationAsset = (
             kind,
           );
           if (process.env.NODE_ENV !== "production") {
-            console.info(
-              `Google Cloud Vision OCR thành công: loại=${kind}, định dạng=${req.file.mimetype}`,
-            );
+            providerApplicationAssetLogger.info("Google Cloud Vision OCR thành công.", {
+              kind,
+              mimetype: req.file.mimetype,
+            });
           }
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Lỗi OCR không xác định";
-          console.error(`Google Cloud Vision OCR thất bại: ${message}`);
+          providerApplicationAssetLogger.error("Google Cloud Vision OCR thất bại.", error, {
+            message,
+          });
           res.locals.ocrSuggestion = {
             warnings: ["Không thể đọc tài liệu bằng OCR. Vui lòng nhập thông tin thủ công."],
           };

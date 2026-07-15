@@ -1,4 +1,5 @@
 import { PipelineStage, Types } from "mongoose";
+import type { RequestUser } from "../middlewares/authContext";
 import { Order } from "../models/order.model";
 import { Payment } from "../models/payment.model";
 import { Provider } from "../models/provider.model";
@@ -7,11 +8,6 @@ import { WalletTransaction } from "../models/walletTransaction.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
 import { AppError } from "../utils/appError";
 import type { DashboardQuery } from "../validations/dashboard.validator";
-
-type RequestUser = {
-  id: string;
-  role: string;
-};
 
 const dateMatch = (query: DashboardQuery, field = "createdAt") => {
   const range: Record<string, Date> = {};
@@ -42,8 +38,11 @@ const sumAggregate = async (
   return result?.total || 0;
 };
 
-const formatGroup = (format: string): Record<string, unknown> => ({
-  $dateToString: { format, date: "$createdAt" },
+const formatGroup = (
+  format: string,
+  dateField = "createdAt",
+): Record<string, unknown> => ({
+  $dateToString: { format, date: `$${dateField}` },
 });
 
 const seriesAggregate = async (
@@ -52,12 +51,13 @@ const seriesAggregate = async (
   format: string,
   amountExpression: string | Record<string, unknown>,
   label: string,
+  dateField = "createdAt",
 ) => {
   const rows = await model.aggregate([
     { $match: match },
     {
       $group: {
-        _id: formatGroup(format),
+        _id: formatGroup(format, dateField),
         amount: { $sum: amountExpression },
         count: { $sum: 1 },
       },
@@ -79,7 +79,7 @@ const seriesAggregate = async (
 const basePaymentMatch = (query: DashboardQuery) => ({
   status: "paid",
   isDeleted: false,
-  ...dateMatch(query),
+  ...dateMatch(query, "paidAt"),
 });
 
 const baseOrderMatch = (query: DashboardQuery) => ({
@@ -92,6 +92,19 @@ const baseTransactionMatch = (query: DashboardQuery) => ({
   isDeleted: false,
   ...dateMatch(query),
 });
+
+const providerSettlementMatch = (query: DashboardQuery) => ({
+  ...baseTransactionMatch(query),
+  type: { $in: ["provider_earning", "platform_fee"] },
+});
+
+const providerNetEarningExpression = {
+  $cond: [
+    { $eq: ["$type", "provider_earning"] },
+    "$amount",
+    { $multiply: ["$amount", -1] },
+  ],
+};
 
 const baseWithdrawalMatch = (query: DashboardQuery) => ({
   isDeleted: false,
@@ -113,7 +126,7 @@ const getProviderForUser = async (userId: string) => {
   });
 
   if (!provider) {
-    throw new AppError("Provider profile not found", 404);
+    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
   }
 
   return provider;
@@ -180,8 +193,8 @@ export const getAdminOverview = async (query: DashboardQuery) => {
     ]),
     sumAggregate(
       WalletTransaction,
-      { ...baseTransactionMatch(query), type: "provider_earning", direction: "in" },
-      "$amount",
+      providerSettlementMatch(query),
+      providerNetEarningExpression,
     ),
   ]);
 
@@ -206,9 +219,11 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     type: "platform_fee",
     direction: "out",
   };
-  const completedOrderMatch = {
-    ...baseOrderMatch(query),
-    status: "completed",
+  const completedOrderRevenueMatch = {
+    ...baseTransactionMatch(query),
+    type: "provider_earning",
+    direction: "in",
+    "metadata.netEarning": { $exists: true },
   };
   const depositMatch = {
     ...paidPaymentMatch,
@@ -226,14 +241,14 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     completedOrderRevenue,
     depositRevenue,
   ] = await Promise.all([
-    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m-%d", "$amount", "day"),
-    seriesAggregate(Payment, paidPaymentMatch, "%G-W%V", "$amount", "week"),
-    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m", "$amount", "month"),
+    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m-%d", "$amount", "day", "paidAt"),
+    seriesAggregate(Payment, paidPaymentMatch, "%G-W%V", "$amount", "week", "paidAt"),
+    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m", "$amount", "month", "paidAt"),
     seriesAggregate(WalletTransaction, platformFeeMatch, "%Y-%m", "$amount", "month"),
-    seriesAggregate(Order, completedOrderMatch, "%Y-%m", "$pricing.totalPaidAmount", "month"),
-    seriesAggregate(Payment, depositMatch, "%Y-%m", "$amount", "month"),
+    seriesAggregate(WalletTransaction, completedOrderRevenueMatch, "%Y-%m", "$amount", "month"),
+    seriesAggregate(Payment, depositMatch, "%Y-%m", "$amount", "month", "paidAt"),
     sumAggregate(WalletTransaction, platformFeeMatch, "$amount"),
-    sumAggregate(Order, completedOrderMatch, "$pricing.totalPaidAmount"),
+    sumAggregate(WalletTransaction, completedOrderRevenueMatch, "$amount"),
     sumAggregate(Payment, depositMatch, "$amount"),
   ]);
 
@@ -283,7 +298,7 @@ export const getAdminOrders = async (query: DashboardQuery) => {
         $group: {
           _id: "$category._id",
           categoryId: { $first: "$category._id" },
-          categoryName: { $first: { $ifNull: ["$category.name", "Uncategorized"] } },
+          categoryName: { $first: { $ifNull: ["$category.name", "Chưa phân loại"] } },
           count: { $sum: 1 },
         },
       },
@@ -323,9 +338,7 @@ export const getAdminOrders = async (query: DashboardQuery) => {
 export const getAdminProviders = async (query: DashboardQuery) => {
   const providerMatch = { isDeleted: false };
   const transactionMatch = {
-    ...baseTransactionMatch(query),
-    type: "provider_earning",
-    direction: "in",
+    ...providerSettlementMatch(query),
   };
   const completedOrderMatch = {
     ...baseOrderMatch(query),
@@ -363,7 +376,12 @@ export const getAdminProviders = async (query: DashboardQuery) => {
     ]),
     WalletTransaction.aggregate([
       { $match: transactionMatch },
-      { $group: { _id: "$userId", revenue: { $sum: "$amount" } } },
+      {
+        $group: {
+          _id: "$userId",
+          revenue: { $sum: providerNetEarningExpression },
+        },
+      },
       { $sort: { revenue: -1 } },
       { $limit: query.topLimit },
       {
@@ -454,12 +472,10 @@ export const getProviderOverview = async (user: RequestUser, query: DashboardQue
     sumAggregate(
       WalletTransaction,
       {
-        ...baseTransactionMatch(providerDateQuery as DashboardQuery),
+        ...providerSettlementMatch(providerDateQuery as DashboardQuery),
         userId: providerUserId,
-        type: "provider_earning",
-        direction: "in",
       },
-      "$amount",
+      providerNetEarningExpression,
     ),
     Order.countDocuments({
       ...baseOrderMatch(query),
@@ -507,15 +523,13 @@ export const getProviderEarnings = async (user: RequestUser, query: DashboardQue
   const provider = await getProviderForUser(user.id);
   const providerUserId = new Types.ObjectId(user.id);
   const transactionMatch = {
-    ...baseTransactionMatch(query),
+    ...providerSettlementMatch(query),
     userId: providerUserId,
-    type: "provider_earning",
-    direction: "in",
   };
   const completedOrderMatch = {
     ...baseOrderMatch(query),
     providerId: provider._id,
-    status: "completed",
+    status: "completed" as const,
   };
   const skip = (query.page - 1) * query.limit;
   const sortDirection = query.sortOrder === "asc" ? 1 : -1;
@@ -524,16 +538,19 @@ export const getProviderEarnings = async (user: RequestUser, query: DashboardQue
     earningsByDay,
     earningsByWeek,
     earningsByMonth,
-    completedOrders,
+    completedOrderCount,
+    completedOrderAmount,
     recentTransactionsResult,
   ] = await Promise.all([
-    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m-%d", "$amount", "day"),
-    seriesAggregate(WalletTransaction, transactionMatch, "%G-W%V", "$amount", "week"),
-    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m", "$amount", "month"),
-    Order.aggregate([
-      { $match: completedOrderMatch },
-      { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: "$pricing.providerEarningAmount" } } },
-    ]),
+    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m-%d", providerNetEarningExpression, "day"),
+    seriesAggregate(WalletTransaction, transactionMatch, "%G-W%V", providerNetEarningExpression, "week"),
+    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m", providerNetEarningExpression, "month"),
+    Order.countDocuments(completedOrderMatch),
+    sumAggregate(
+      WalletTransaction,
+      transactionMatch,
+      providerNetEarningExpression,
+    ),
     WalletTransaction.aggregate([
       {
         $match: {
@@ -579,8 +596,8 @@ export const getProviderEarnings = async (user: RequestUser, query: DashboardQue
     earningsByWeek,
     earningsByMonth,
     completedOrders: {
-      count: completedOrders[0]?.count || 0,
-      amount: completedOrders[0]?.amount || 0,
+      count: completedOrderCount,
+      amount: completedOrderAmount,
     },
     recentTransactions: {
       items: recentTransactions.items,

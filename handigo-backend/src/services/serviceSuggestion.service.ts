@@ -208,7 +208,7 @@ export const updateServiceSuggestion = async (
         serviceType: "variable_price",
         fixedPrice: null,
         depositAmount: null,
-        isActive: true,
+        isActive: false,
       });
 
       updateData.categoryId = new Types.ObjectId(categoryId);

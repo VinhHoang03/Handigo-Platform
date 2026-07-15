@@ -8,11 +8,18 @@ import {
 } from "../controllers/payment.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { createPaymentSchema } from "../validations/payment.validation";
+import { createPaymentSchema } from "../validations/payment.validator";
+import { paymentRateLimit } from "../middlewares/rateLimit.middleware";
 
 const router = Router();
 
-router.post("/create", authMiddleware, validate(createPaymentSchema), createPayment);
+router.post(
+  "/create",
+  authMiddleware,
+  paymentRateLimit,
+  validate(createPaymentSchema),
+  createPayment,
+);
 router.post("/webhook", payosWebhook);
 router.get("/history", authMiddleware, getPaymentHistory);
 router.get("/order/:orderId", authMiddleware, getPaymentsByOrder);

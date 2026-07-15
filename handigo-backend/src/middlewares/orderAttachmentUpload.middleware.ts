@@ -19,7 +19,7 @@ const uploadBuffer = (buffer: Buffer) =>
       { folder: "handigo/order-attachments", resource_type: "image" },
       (error, result) => {
         if (error || !result) {
-          reject(error || new Error("Cloudinary upload failed"));
+          reject(error || new Error("Tải tệp lên Cloudinary thất bại"));
           return;
         }
         resolve(result.secure_url);
@@ -44,7 +44,7 @@ export const uploadOrderAttachmentImage = (
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Vui lòng tải lên ảnh hợp lệ.",
+        message: "Vui lòng chọn ảnh cần tải lên",
       });
     }
 
@@ -74,9 +74,7 @@ export const uploadOrderAttachmentImage = (
 
       return res.status(isGeminiError ? 503 : 502).json({
         success: false,
-        message: isGeminiError
-          ? "Hệ thống chưa thể kiểm tra nội dung ảnh. Vui lòng thử lại sau."
-          : "Không thể tải ảnh lên. Vui lòng thử lại.",
+        message: "Không thể tải ảnh lên",
       });
     }
   });

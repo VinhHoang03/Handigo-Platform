@@ -73,6 +73,7 @@ export interface ServicePayload {
 }
 
 export type ServiceOptionType = "room_count" | "area_size" | "package" | "add_on" | "other";
+export type ServiceOptionSelectionMode = "single" | "multiple";
 
 export interface ServiceOption {
   _id: string;
@@ -81,6 +82,10 @@ export interface ServiceOption {
   description?: string | null;
   optionType: ServiceOptionType;
   price: number;
+  selectionGroup?: string | null;
+  selectionMode?: ServiceOptionSelectionMode;
+  isRequired?: boolean;
+  sortOrder?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -91,5 +96,9 @@ export interface ServiceOptionPayload {
   description?: string | null;
   optionType: ServiceOptionType;
   price: number;
+  selectionGroup?: string | null;
+  selectionMode?: ServiceOptionSelectionMode;
+  isRequired?: boolean;
+  sortOrder?: number;
   isActive?: boolean;
 }

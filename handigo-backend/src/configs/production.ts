@@ -1,6 +1,18 @@
 const REQUIRED_PRODUCTION_ENV = [
   "ACCESS_TOKEN_SECRET",
   "REFRESH_TOKEN_SECRET",
+  "CLOUDINARY_NAME",
+  "CLOUDINARY_API_KEY",
+  "CLOUDINARY_API_SECRET",
+  "PAYOS_CLIENT_ID",
+  "PAYOS_API_KEY",
+  "PAYOS_CHECKSUM_KEY",
+  "PAYOS_RETURN_URL",
+  "PAYOS_CANCEL_URL",
+  "PAYOS_WALLET_DEPOSIT_RETURN_URL",
+  "PAYOS_WALLET_DEPOSIT_CANCEL_URL",
+  "EMAIL_USER",
+  "EMAIL_PASSWORD",
 ] as const;
 
 export const validateProductionConfig = () => {
@@ -27,5 +39,10 @@ export const validateProductionConfig = () => {
     throw new Error(
       `Thiếu biến môi trường production: ${missingVariables.join(", ")}.`,
     );
+  }
+
+  const port = Number(process.env.PORT || 5000);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error("PORT phải là số nguyên từ 1 đến 65535.");
   }
 };

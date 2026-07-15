@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { io } from "socket.io-client";
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import { chatApi } from "../api/chat.api";
 import type { Conversation } from "../types/chat.types";
 import { ChatPopup } from "./ChatPopup";
@@ -17,7 +17,7 @@ const formatMessageTime = (value?: string) => {
 
 export function MessageCenter() {
   const user = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.token);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
@@ -85,22 +85,28 @@ export function MessageCenter() {
   }, []);
 
   useEffect(() => {
-    if (!token || !conversationIds.length) return;
-    const socket = io(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000", {
-      auth: { token },
-    });
-    conversationIds.forEach((conversationId) => {
-      socket.emit("conversation:join", { conversationId });
-    });
+    if (!isAuthenticated || !conversationIds.length) return;
+    const { socket, dispose } = createAuthenticatedSocket();
+    const joinConversations = () => {
+      conversationIds.forEach((conversationId) => {
+        socket.emit("conversation:join", { conversationId });
+      });
+    };
     const refresh = () => void load();
+    socket.on("connect", joinConversations);
     socket.on("message:new", refresh);
     socket.on("message:updated", refresh);
     socket.on("message:deleted", refresh);
     socket.on("message:seen", refresh);
     return () => {
-      socket.disconnect();
+      socket.off("connect", joinConversations);
+      socket.off("message:new", refresh);
+      socket.off("message:updated", refresh);
+      socket.off("message:deleted", refresh);
+      socket.off("message:seen", refresh);
+      dispose();
     };
-  }, [conversationIds, load, token]);
+  }, [conversationIds, isAuthenticated, load]);
 
   const openConversation = (conversation: Conversation) => {
     setSelected(conversation);

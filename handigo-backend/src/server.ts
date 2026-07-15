@@ -1,47 +1,102 @@
 import dotenv from "dotenv";
 import http from "http";
 import mongoose from "mongoose";
+import { validateProductionConfig } from "./configs/production";
+import { createLogger } from "./utils/logger";
 
 dotenv.config();
 
-import app from "./app";
-import { connectDB } from "./configs/db";
-import { initSocket } from "./sockets/initSocket";
-import { DispatchService } from "./services/dispatch.service";
-import { validateProductionConfig } from "./configs/production";
-
 const PORT = Number(process.env.PORT || 5000);
+const REQUEST_TIMEOUT_MS = 120_000;
+const HEADERS_TIMEOUT_MS = 60_000;
+const KEEP_ALIVE_TIMEOUT_MS = 5_000;
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+const serverLogger = createLogger("Server");
 
 const startServer = async () => {
   try {
     validateProductionConfig();
+
+    const [
+      { default: app },
+      { connectDB },
+      { initSocket },
+      { DispatchService },
+      {
+        startRefundReconciliationMonitor,
+        stopRefundReconciliationMonitor,
+      },
+    ] = await Promise.all([
+      import("./app"),
+      import("./configs/db"),
+      import("./sockets/initSocket"),
+      import("./services/dispatch.service"),
+      import("./services/orderCancellation.service"),
+    ]);
+
     await connectDB();
 
     const server = http.createServer(app);
-    initSocket(server);
+    server.requestTimeout = REQUEST_TIMEOUT_MS;
+    server.headersTimeout = HEADERS_TIMEOUT_MS;
+    server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
+    server.setTimeout(REQUEST_TIMEOUT_MS);
+
+    const io = initSocket(server);
     DispatchService.startTimeoutMonitor();
+    startRefundReconciliationMonitor();
 
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`Máy chủ đang chạy tại cổng ${PORT}.`);
+      serverLogger.info("Máy chủ đang chạy.", { port: PORT });
     });
 
-    const shutdown = (signal: string) => {
-      console.log(`Nhận tín hiệu ${signal}, đang dừng máy chủ...`);
-      server.close(() => {
-        mongoose.connection
-          .close()
-          .finally(() => process.exit(0));
-      });
+    let isShuttingDown = false;
 
-      setTimeout(() => process.exit(1), 10_000).unref();
+    const shutdown = async (signal: string) => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
+
+      serverLogger.info("Nhận tín hiệu dừng máy chủ.", { signal });
+      DispatchService.stopTimeoutMonitor();
+      stopRefundReconciliationMonitor();
+      io.disconnectSockets(true);
+
+      const forceShutdownTimer = setTimeout(() => {
+        serverLogger.error("Đóng máy chủ quá thời gian cho phép.");
+        server.closeAllConnections();
+        process.exit(1);
+      }, SHUTDOWN_TIMEOUT_MS);
+      forceShutdownTimer.unref();
+
+      try {
+        server.closeIdleConnections();
+        await new Promise<void>((resolve, reject) => {
+          server.close((error) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            resolve();
+          });
+        });
+        await mongoose.connection.close();
+        clearTimeout(forceShutdownTimer);
+        serverLogger.info("Đã đóng máy chủ an toàn.");
+        process.exit(0);
+      } catch (error) {
+        clearTimeout(forceShutdownTimer);
+        serverLogger.error("Đóng máy chủ thất bại.", error);
+        server.closeAllConnections();
+        process.exit(1);
+      }
     };
 
-    process.once("SIGTERM", () => shutdown("SIGTERM"));
-    process.once("SIGINT", () => shutdown("SIGINT"));
+    process.once("SIGTERM", () => void shutdown("SIGTERM"));
+    process.once("SIGINT", () => void shutdown("SIGINT"));
   } catch (error) {
-    console.error("Không thể khởi động máy chủ:", error);
+    serverLogger.error("Không thể khởi động máy chủ.", error);
     process.exit(1);
   }
 };
 
-startServer();
+void startServer();

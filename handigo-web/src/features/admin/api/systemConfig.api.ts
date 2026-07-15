@@ -1,18 +1,11 @@
 import api from '@/api/client';
+import { unwrap } from '@/api/response';
 import type {
   SystemConfig,
   SystemConfigPayload,
   SystemConfigQuery,
   UpdateSystemConfigPayload,
 } from '../types/systemConfig.types';
-
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
-const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 const toParams = (query: SystemConfigQuery) => ({
   ...query,

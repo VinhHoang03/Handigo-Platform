@@ -64,6 +64,18 @@ const configDefinitions: ConfigDefinition[] = [
     isEffective: true,
   },
   {
+    key: 'PROVIDER_MINIMUM_WALLET_BALANCE',
+    label: 'Số dư tối thiểu để nhận đơn',
+    group: 'payment',
+    type: 'NUMBER',
+    defaultValue: 100_000,
+    unit: 'VNĐ',
+    isPublic: false,
+    description: 'Số dư ví tối thiểu provider phải duy trì để được điều phối và nhận đơn mới.',
+    effect: 'Có hiệu lực khi hệ thống chọn provider và khi provider xác nhận nhận đơn.',
+    isEffective: true,
+  },
+  {
     key: 'QUOTATION_SERVICE_DEPOSIT_AMOUNT',
     label: 'Tiền cọc dịch vụ báo giá',
     group: 'payment',

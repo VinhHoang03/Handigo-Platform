@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { BookingShell } from "../components/BookingComponents";
-import { bookingApi } from "../../../api/booking";
+import { bookingApi } from "@/features/booking/api/booking.api";
 import { Modal } from "../../../components/common/Modal";
-import type { Order, OrderQuotation } from "../../../types/booking";
+import type { Order, OrderQuotation, Payment } from "../../../types/booking";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import { OrderFeedbackSection } from "@/features/feedback/components/OrderFeedbackSection";
@@ -29,9 +29,11 @@ const BookingDetailPage = () => {
   const { bookingId: id } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [quotation, setQuotation] = useState<OrderQuotation | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
@@ -50,6 +52,14 @@ const BookingDetailPage = () => {
         setApiError("Không tìm thấy thông tin đơn hàng.");
       } else {
         setOrder(data);
+
+        try {
+          const paymentResult = await bookingApi.getPaymentsByOrder(id);
+          setPayments(paymentResult.payments);
+        } catch (error) {
+          console.error("Không thể tải lịch sử thanh toán:", error);
+          setPayments([]);
+        }
 
         try {
           const quo = await bookingApi.getQuotation(id);
@@ -89,6 +99,33 @@ const BookingDetailPage = () => {
   const handleCancelOrder = () => {
     if (!order || !["created", "accepted"].includes(order.status)) return;
     setPendingAction({ type: "cancelOrder", reason: "", additionalInfo: "" });
+  };
+
+  const handleRemainingPayment = async () => {
+    if (!order || !quotation) return;
+
+    try {
+      setBusy(true);
+      setPaymentError(null);
+      const detailUrl = `${window.location.origin}/customer/bookings/${order._id}`;
+      const result = await bookingApi.createPayment({
+        orderId: order._id,
+        method: "PAYOS",
+        paymentType: "REMAINING",
+        returnUrl: detailUrl,
+        cancelUrl: detailUrl,
+      });
+      if (!result.checkoutUrl) {
+        throw new Error("PayOS không trả về liên kết thanh toán.");
+      }
+      window.location.assign(result.checkoutUrl);
+    } catch (error) {
+      console.error("Không thể tạo thanh toán phần còn lại:", error);
+      setPaymentError(
+        "Không thể tạo thanh toán phần còn lại. Vui lòng tải lại trang và thử lại.",
+      );
+      setBusy(false);
+    }
   };
 
   const closeActionDialog = () => {
@@ -305,6 +342,51 @@ const BookingDetailPage = () => {
     const isFlexiblePrice =
       currentOrder.serviceId?.serviceType !== "fixed_price";
 
+    if (currentOrder.status === "cancelled") {
+      if (currentOrder.paymentStatus === "refunded") {
+        return {
+          label: "Đã hoàn tiền",
+          className: "text-emerald-600",
+        };
+      }
+
+      if (
+        currentOrder.paymentStatus === "paid" ||
+        currentOrder.paymentStatus === "partially_paid"
+      ) {
+        return {
+          label: "Đang xử lý hoàn tiền",
+          className: "text-amber-600",
+        };
+      }
+
+      return {
+        label: "Đã hủy, chưa phát sinh thanh toán",
+        className: "text-on-surface-variant",
+      };
+    }
+
+    if (currentOrder.paymentStatus === "refunded") {
+      return {
+        label: "Đã hoàn tiền",
+        className: "text-emerald-600",
+      };
+    }
+
+    if (currentOrder.paymentStatus === "paid") {
+      return {
+        label: "Đã thanh toán",
+        className: "text-emerald-600",
+      };
+    }
+
+    if (currentOrder.paymentStatus === "partially_paid") {
+      return {
+        label: "Đã thanh toán một phần",
+        className: "text-amber-600",
+      };
+    }
+
     if (isFlexiblePrice) {
       return {
         label: "Chờ báo giá",
@@ -319,19 +401,7 @@ const BookingDetailPage = () => {
       };
     }
 
-    if (
-      currentOrder.paymentMethod === "bank" ||
-      currentOrder.paymentMethod === "wallet"
-    ) {
-      return {
-        label: "Đã thanh toán",
-        className: "text-emerald-600",
-      };
-    }
-
-    return currentOrder.paymentStatus === "paid"
-      ? { label: "Đã thanh toán", className: "text-emerald-600" }
-      : { label: "Chờ thanh toán", className: "text-primary" };
+    return { label: "Chờ thanh toán", className: "text-primary" };
   };
 
   const getQuotationStatusLabel = (
@@ -417,6 +487,16 @@ const BookingDetailPage = () => {
 
   const providerInfo = getProviderInfo();
   const paymentStatusDisplay = getPaymentStatusDisplay(order);
+  const paidAmount = payments
+    .filter((payment) => payment.status === "paid")
+    .reduce((total, payment) => total + payment.amount, 0);
+  const remainingAmount = quotation
+    ? Math.max(quotation.quotation.finalAmount - paidAmount, 0)
+    : 0;
+  const hasPendingRemainingPayment = payments.some(
+    (payment) =>
+      payment.paymentType === "remaining" && payment.status === "pending",
+  );
 
   return (
     <BookingShell>
@@ -694,6 +774,52 @@ const BookingDetailPage = () => {
                         </div>
                       )}
                     </div>
+
+                    {quotation.quotation.status === "approved" && (
+                      <div className="mt-md rounded-3xl border border-outline-variant/40 bg-surface-container-low p-md">
+                        <div className="grid gap-sm sm:grid-cols-2">
+                          <div>
+                            <p className="text-xs font-bold uppercase text-on-surface-variant">
+                              Đã thanh toán
+                            </p>
+                            <p className="mt-1 text-lg font-bold text-emerald-700">
+                              {formatCurrency(paidAmount)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold uppercase text-on-surface-variant">
+                              Còn phải thanh toán
+                            </p>
+                            <p className="mt-1 text-lg font-bold text-primary">
+                              {formatCurrency(remainingAmount)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {remainingAmount > 0 && (
+                          <div className="mt-md">
+                            <button
+                              type="button"
+                              disabled={busy || hasPendingRemainingPayment}
+                              onClick={handleRemainingPayment}
+                              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-bold text-on-primary shadow-lg shadow-primary/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <span className="material-symbols-outlined text-lg">
+                                payments
+                              </span>
+                              {hasPendingRemainingPayment
+                                ? "Đang chờ xác nhận thanh toán"
+                                : `Thanh toán ${formatCurrency(remainingAmount)}`}
+                            </button>
+                            {paymentError && (
+                              <p className="mt-2 text-sm font-medium text-red-600">
+                                {paymentError}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {quotation.quotation.inspectionNote && (
                       <div className="mt-md p-md bg-surface-container rounded-2xl border border-outline-variant/30 italic text-on-surface-variant text-sm">

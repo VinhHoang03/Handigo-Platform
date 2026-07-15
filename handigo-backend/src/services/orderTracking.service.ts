@@ -4,6 +4,8 @@ import { Location } from "../models/location.model";
 import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import * as locationService from "./location.service";
+import { getDrivingRoute } from "./routing.service";
+import type { TrackingRouteQuery } from "../validations/order.validator";
 
 type TrackingRole = "CUSTOMER" | "PROVIDER";
 
@@ -84,13 +86,11 @@ const getTrackingParticipants = async (
 
   const customerUserId = order.customerId.toString();
   const providerUserId = provider.userId.toString();
-  console.log(`[Tracking] canTrack check — role=${role} userId=${userId} customerUserId=${customerUserId} providerUserId=${providerUserId}`);
   const canTrack =
     (role === "CUSTOMER" && customerUserId === userId) ||
     (role === "PROVIDER" && providerUserId === userId);
 
   if (!canTrack) {
-    console.error(`[Tracking] FORBIDDEN — role=${role} userId=${userId} does NOT match customerUserId=${customerUserId} nor providerUserId=${providerUserId}`);
     throw new AppError(trackingText.forbidden, 403);
   }
 
@@ -107,7 +107,9 @@ export const getOrderTrackingState = async (
   role: TrackingRole,
 ) => {
   const { order, customerUserId, providerUserId } =
-    await getTrackingParticipants(orderId, userId, role);
+    await getTrackingParticipants(orderId, userId, role, {
+      requireActiveTracking: true,
+    });
 
   const [customerLocation, providerLocation, address] = await Promise.all([
     Location.findOne({
@@ -147,12 +149,74 @@ export const getOrderTrackingState = async (
   };
 };
 
+export const getOrderTrackingRoute = async (
+  orderId: string,
+  userId: string,
+  role: TrackingRole,
+  fallbackCoordinates: TrackingRouteQuery = {},
+) => {
+  const { order, providerUserId } = await getTrackingParticipants(
+    orderId,
+    userId,
+    role,
+    { requireActiveTracking: true },
+  );
+
+  const [providerLocation, address] = await Promise.all([
+    Location.findOne({
+      userId: providerUserId,
+      ownerType: "provider",
+      isActive: true,
+      isDeleted: false,
+    })
+      .sort({ lastUpdatedAt: -1 })
+      .lean(),
+    Address.findById(order.addressId).select("latitude longitude").lean(),
+  ]);
+
+  const providerCoordinate =
+    toCoordinate(providerLocation) ||
+    (fallbackCoordinates.originLatitude !== undefined &&
+      fallbackCoordinates.originLongitude !== undefined
+      ? {
+        latitude: fallbackCoordinates.originLatitude,
+        longitude: fallbackCoordinates.originLongitude,
+      }
+      : null);
+  const customerCoordinate =
+    Number.isFinite(address?.latitude) && Number.isFinite(address?.longitude)
+      ? {
+        latitude: address!.latitude!,
+        longitude: address!.longitude!,
+      }
+      : fallbackCoordinates.destinationLatitude !== undefined &&
+          fallbackCoordinates.destinationLongitude !== undefined
+        ? {
+          latitude: fallbackCoordinates.destinationLatitude,
+          longitude: fallbackCoordinates.destinationLongitude,
+        }
+        : null;
+
+  if (!providerCoordinate || !customerCoordinate) {
+    throw new AppError(
+      "Chưa có đủ tọa độ để tính tuyến đường.",
+      422,
+    );
+  }
+
+  return getDrivingRoute(providerCoordinate, customerCoordinate);
+};
+
 export const updateOrderTrackingLocation = async (
   orderId: string,
   userId: string,
   role: TrackingRole,
   payload: { latitude: number; longitude: number },
 ) => {
+  if (role !== "PROVIDER") {
+    throw new AppError(trackingText.forbidden, 403);
+  }
+
   const { order, customerUserId, providerUserId } = await getTrackingParticipants(orderId, userId, role);
   void customerUserId;
   void providerUserId;

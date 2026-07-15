@@ -242,7 +242,7 @@ export const verifyRegisterOtp = async (
   const user = await User.findOne({ email });
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   if (user.isEmailVerified) {
@@ -261,7 +261,7 @@ export const resendRegisterOtp = async (email: string): Promise<void> => {
   const user = await User.findOne({ email });
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   if (user.isEmailVerified) {
@@ -584,7 +584,7 @@ export const resetPassword = async (
   const user = await User.findOne({ email });
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   ensureOtpValid(otp, user.resetPasswordOtp, user.resetPasswordOtpExpire);
@@ -623,7 +623,7 @@ export const refreshToken = async (
   const user = await User.findById(decoded.id);
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   const session = await Session.findOne({
@@ -684,7 +684,7 @@ export const changePassword = async (
   const user = await User.findById(userId);
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   if (!user.passwordHash) {
@@ -717,7 +717,7 @@ export const getCurrentUser = async (
   );
 
   if (!user) {
-    throw new AppError("User not found", 404);
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
 
   return user;

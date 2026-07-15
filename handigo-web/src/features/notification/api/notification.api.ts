@@ -1,4 +1,5 @@
 import api from '@/api/client';
+import { unwrap } from '@/api/response';
 import type {
   AppNotification,
   ListResult,
@@ -8,14 +9,6 @@ import type {
   SendSystemNotificationResult,
   UnreadCountResult,
 } from '../types/notification.types';
-
-interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-}
-
-const unwrap = <T>(response: { data: ApiResponse<T> }) => response.data.data;
 
 const toQueryParams = (query: NotificationQuery) => ({
   ...query,

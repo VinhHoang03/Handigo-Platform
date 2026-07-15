@@ -1,4 +1,6 @@
+import { Types } from "mongoose";
 import User from "../models/user.model";
+import { Session } from "../models/session.model";
 import { AppError } from "../utils/appError";
 import {
   normalizePersonName,
@@ -14,10 +16,51 @@ export interface UpdateProfileInput {
   gender?: "male" | "female" | "other" | null;
 }
 
+export const SAFE_USER_PROJECTION = [
+  "-passwordHash",
+  "-registerOtp",
+  "-registerOtpExpire",
+  "-resetPasswordOtp",
+  "-resetPasswordOtpExpire",
+  "-resetPasswordTokenHash",
+  "-resetPasswordExpire",
+  "-googleId",
+  "-facebookId",
+].join(" ");
+
+const assertObjectId = (id: string) => {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new AppError("ID người dùng không hợp lệ", 400);
+  }
+};
+
+const buildAdminUserFilter = (query: Record<string, unknown>) => {
+  const filter: Record<string, unknown> = { isDeleted: false };
+
+  if (
+    typeof query.role === "string" &&
+    ["CUSTOMER", "PROVIDER", "ADMIN"].includes(query.role)
+  ) {
+    filter.role = query.role;
+  }
+
+  if (
+    typeof query.status === "string" &&
+    ["active", "locked"].includes(query.status)
+  ) {
+    filter.status = query.status;
+  }
+
+  return filter;
+};
+
 export const getProfileService = async (userId: string) => {
-  const user = await User.findById(userId).select("-passwordHash -registerOtp -registerOtpExpire -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
+  assertObjectId(userId);
+  const user = await User.findOne({ _id: userId, isDeleted: false }).select(
+    SAFE_USER_PROJECTION,
+  );
   if (!user) {
-    throw new Error("User not found");
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
   return user;
 };
@@ -26,6 +69,7 @@ export const updateProfileService = async (
   userId: string,
   data: UpdateProfileInput
 ) => {
+  assertObjectId(userId);
   const updateData: any = {};
 
   if (data.fullName !== undefined) {
@@ -49,14 +93,14 @@ export const updateProfileService = async (
 
   let user;
   try {
-    user = await User.findByIdAndUpdate(
-      userId,
+    user = await User.findOneAndUpdate(
+      { _id: userId, isDeleted: false },
       updateData,
       {
         new: true,
         runValidators: true,
       },
-    ).select("-passwordHash -registerOtp -registerOtpExpire -resetPasswordOtp -resetPasswordOtpExpire -resetPasswordTokenHash -resetPasswordExpire");
+    ).select(SAFE_USER_PROJECTION);
   } catch (error: any) {
     if (error?.code === 11000 && error?.keyPattern?.phone) {
       throw new AppError("Số điện thoại đã được sử dụng", 409);
@@ -71,36 +115,59 @@ export const updateProfileService = async (
   return user;
 };
 
-// CRUD Operations
-
-export const getAllUsersService = async (query: any = {}) => {
-  return await User.find(query).select("-passwordHash");
+// Các thao tác legacy được giữ để tương thích và chỉ được gọi từ route ADMIN.
+export const getAllUsersService = async (
+  query: Record<string, unknown> = {},
+) => {
+  return User.find(buildAdminUserFilter(query)).select(SAFE_USER_PROJECTION);
 };
 
 export const getUserByIdService = async (userId: string) => {
-  const user = await User.findById(userId).select("-passwordHash");
+  assertObjectId(userId);
+  const user = await User.findOne({ _id: userId, isDeleted: false }).select(
+    SAFE_USER_PROJECTION,
+  );
   if (!user) {
-    throw new Error("User not found");
+    throw new AppError("Không tìm thấy người dùng", 404);
   }
   return user;
 };
 
-
-export const updateUserService = async (userId: string, data: any) => {
-  const user = await User.findByIdAndUpdate(userId, data, {
-    new: true,
-    runValidators: true,
-  }).select("-passwordHash");
-  if (!user) {
-    throw new Error("User not found");
-  }
-  return user;
+export const updateUserService = async (
+  userId: string,
+  data: UpdateProfileInput,
+) => {
+  return updateProfileService(userId, data);
 };
 
-export const deleteUserService = async (userId: string) => {
-  const user = await User.findByIdAndDelete(userId);
-  if (!user) {
-    throw new Error("User not found");
+export const deleteUserService = async (userId: string, adminId: string) => {
+  assertObjectId(userId);
+  assertObjectId(adminId);
+
+  if (userId === adminId) {
+    throw new AppError("Quản trị viên không thể tự xóa tài khoản", 400);
   }
+
+  const user = await User.findOneAndUpdate(
+    { _id: userId, isDeleted: false },
+    {
+      $set: {
+        status: "locked",
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
+    },
+    { new: true, runValidators: true },
+  ).select(SAFE_USER_PROJECTION);
+
+  if (!user) {
+    throw new AppError("Không tìm thấy người dùng", 404);
+  }
+
+  await Session.updateMany(
+    { userId: user._id, revokedAt: null },
+    { $set: { revokedAt: new Date() } },
+  );
+
   return user;
 };

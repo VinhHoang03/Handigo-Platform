@@ -1,9 +1,13 @@
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { io, type Socket } from "socket.io-client";
-import { tokenStorage } from "@/api/tokenStorage";
+import type { Socket } from "socket.io-client";
+import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import type { Address, Order } from "@/types/booking";
+import {
+  trackingApi,
+  type TrackingRoute,
+} from "@/features/tracking/api/tracking.api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,6 +176,8 @@ const hasGeolocationSupport = () =>
   typeof navigator !== "undefined" && "geolocation" in navigator;
 
 const toLatLng = (c: Coordinate): [number, number] => [c.latitude, c.longitude];
+const ROUTE_REFRESH_INTERVAL_MS = 20_000;
+const MIN_ROUTE_REFRESH_DISTANCE_METERS = 50;
 
 // ─── Custom Leaflet marker HTML factory ───────────────────────────────────────
 
@@ -215,6 +221,10 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
 
   const socketRef = useRef<Socket | null>(null);
   const lastSentAtRef = useRef(0);
+  const lastRouteRequestAtRef = useRef(0);
+  const lastRoutedProviderRef = useRef<Coordinate | null>(null);
+  const routeRequestRef = useRef<AbortController | null>(null);
+  const routeOrderIdRef = useRef(order._id);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Partial<Record<TrackingPointKey, L.Marker>>>({});
@@ -224,6 +234,7 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
     customer: savedCustomerCoordinate,
     provider: null,
   });
+  const [trackingRoute, setTrackingRoute] = useState<TrackingRoute | null>(null);
   // Toạ độ được geocode từ Nominatim khi address không có lat/lng trong DB
   const [geocodedCoordinate, setGeocodedCoordinate] = useState<Coordinate | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -257,63 +268,44 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
 
   // Socket connection
   useEffect(() => {
-    const token = tokenStorage.get();
-    if (!trackingEnabled || !token) return;
+    if (!trackingEnabled) return;
 
     console.log(`[Socket-Client] Connecting for order ${order._id} as ${viewerRole}...`);
-    const socket = io(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000", {
-      auth: { token },
+    const { socket, dispose } = createAuthenticatedSocket({
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 2000,
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => {
+    const joinOrderRoom = () => {
       console.log(`[Socket-Client] Connected! Socket ID: ${socket.id}`);
-    });
-
-    socket.on("reconnect", (attempt: number) => {
-      console.log(`[Socket-Client] Reconnected after ${attempt} attempt(s). Rejoining order room...`);
-      // Rejoin phòng sau khi reconnect để không bị miss broadcast
       socket.emit(
         "order:tracking:join",
         { orderId: order._id },
         (response: { success: boolean; data?: TrackingState; message?: string }) => {
-          console.log("[Socket-Client] Rejoin after reconnect:", response);
-          if (response.success && response.data?.provider) {
+          console.log("[Socket-Client] order:tracking:join response:", response);
+          if (response.success) {
             setTracking((cur) => ({
               customer: cur.customer,
-              provider: response.data!.provider || cur.provider,
+              provider: response.data?.provider || cur.provider,
             }));
+            setLocationMessage(mapText.connected);
+            lastSentAtRef.current = 0;
+          } else {
+            setLocationMessage(response.message || mapText.joinFailed);
           }
         },
       );
-    });
+    };
 
-    socket.on("connect_error", (err) => {
+    const handleConnectError = (err: Error) => {
       console.error("[Socket-Client] Connection error:", err.message);
       setLocationMessage(`Lỗi kết nối định vị: ${err.message}`);
-    });
+    };
 
-    socket.emit(
-      "order:tracking:join",
-      { orderId: order._id },
-      (response: { success: boolean; data?: TrackingState; message?: string }) => {
-        console.log("[Socket-Client] order:tracking:join response:", response);
-        if (response.success) {
-          setTracking((cur) => ({
-            customer: cur.customer,
-            provider: response.data?.provider || cur.provider,
-          }));
-          setLocationMessage(mapText.connected);
-          // Reset throttle timer để provider emit vị trí ngay sau khi join thành công
-          lastSentAtRef.current = 0;
-        } else {
-          setLocationMessage(response.message || mapText.joinFailed);
-        }
-      },
-    );
+    socket.on("connect", joinOrderRoom);
+    socket.on("connect_error", handleConnectError);
 
     const handleLocation = (location: LocationEvent) => {
       console.log("[Socket-Client] order:location received:", location);
@@ -327,8 +319,10 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
 
     return () => {
       console.log("[Socket-Client] Cleaning up socket connection...");
+      socket.off("connect", joinOrderRoom);
+      socket.off("connect_error", handleConnectError);
       socket.off("order:location", handleLocation);
-      socket.disconnect();
+      dispose();
       socketRef.current = null;
     };
   }, [order._id, trackingEnabled, viewerRole]);
@@ -352,8 +346,8 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
         // Cập nhật vị trí provider ngay lập tức trên local map
         setTracking((cur) => ({ ...cur, provider: nextCoordinate }));
 
-        // Gửi lên server mỗi 5 giây để tránh quá tải socket
-        if (now - lastSentAtRef.current < 5000) return;
+        // Gửi lên server mỗi 10 giây để giảm tần suất chia sẻ GPS.
+        if (now - lastSentAtRef.current < 10_000) return;
         lastSentAtRef.current = now;
         socketRef.current?.emit(
           "order:location:update",
@@ -371,7 +365,7 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
         console.error("[Socket-Client] GPS watchPosition error:", err.message);
         setLocationMessage(mapText.locationPermission);
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 },
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
@@ -382,6 +376,67 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
   // Không bao giờ dùng GPS của customer — luôn là địa chỉ đặt dịch vụ (tĩnh).
   const customerCoordinate = savedCustomerCoordinate ?? geocodedCoordinate;
   const providerCoordinate = isValidCoordinate(tracking.provider) ? tracking.provider : null;
+
+  useEffect(() => {
+    if (routeOrderIdRef.current !== order._id) {
+      routeOrderIdRef.current = order._id;
+      lastRouteRequestAtRef.current = 0;
+      lastRoutedProviderRef.current = null;
+      routeRequestRef.current?.abort();
+      setTrackingRoute(null);
+    }
+
+    if (!liveTrackingEnabled || !customerCoordinate || !providerCoordinate) {
+      return;
+    }
+
+    const now = Date.now();
+    const movedDistance = lastRoutedProviderRef.current
+      ? haversineDistanceInMeters(
+        lastRoutedProviderRef.current,
+        providerCoordinate,
+      )
+      : Number.POSITIVE_INFINITY;
+
+    if (
+      movedDistance < MIN_ROUTE_REFRESH_DISTANCE_METERS ||
+      now - lastRouteRequestAtRef.current < ROUTE_REFRESH_INTERVAL_MS
+    ) {
+      return;
+    }
+
+    lastRouteRequestAtRef.current = now;
+    routeRequestRef.current?.abort();
+    const controller = new AbortController();
+    routeRequestRef.current = controller;
+    const routedProviderCoordinate = providerCoordinate;
+
+    void trackingApi
+      .getOrderRoute(
+        order._id,
+        providerCoordinate,
+        customerCoordinate,
+        controller.signal,
+      )
+      .then((route) => {
+        if (controller.signal.aborted) return;
+        lastRoutedProviderRef.current = routedProviderCoordinate;
+        setTrackingRoute(route);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        console.warn(
+          "Không thể tải tuyến đường OSRM, sử dụng đường thẳng dự phòng:",
+          error,
+        );
+        setTrackingRoute(null);
+      });
+  }, [
+    customerCoordinate,
+    liveTrackingEnabled,
+    order._id,
+    providerCoordinate,
+  ]);
 
   // Customer pin luôn là "địa chỉ đặt dịch vụ", không phải vị trí GPS hiện tại
   const customerMarkerLabel = mapText.serviceAddressMarker;
@@ -421,9 +476,22 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
 
   const hasMapCoordinate = points.length > 0;
 
+  const routePath = useMemo(
+    () =>
+      trackingRoute?.geometry.coordinates.map(
+        ([longitude, latitude]) => [latitude, longitude] as [number, number],
+      ) ?? [],
+    [trackingRoute],
+  );
+  const hasRoadRoute = liveTrackingEnabled && routePath.length >= 2;
+
   const distanceLabel =
     customerCoordinate && providerCoordinate
-      ? formatDistance(haversineDistanceInMeters(customerCoordinate, providerCoordinate))
+      ? formatDistance(
+        hasRoadRoute
+          ? trackingRoute!.distanceMeters
+          : haversineDistanceInMeters(customerCoordinate, providerCoordinate),
+      )
       : null;
 
   const otherPartyLabel = viewerRole === "CUSTOMER" ? "kỹ thuật viên" : mapText.customerLabel;
@@ -527,22 +595,29 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
       }
     });
 
-    // Dashed polyline between customer & provider
+    // Tuyến đường OSRM; fallback về đường thẳng nét đứt khi routing lỗi.
     if (customerCoordinate && providerCoordinate) {
-      const path: [number, number][] = [
-        toLatLng(customerCoordinate),
-        toLatLng(providerCoordinate),
-      ];
+      const path: [number, number][] = hasRoadRoute
+        ? routePath
+        : [
+          toLatLng(providerCoordinate),
+          toLatLng(customerCoordinate),
+        ];
+      const routeStyle: L.PathOptions = {
+        color: "#4f46e5",
+        weight: hasRoadRoute ? 5 : 3,
+        opacity: hasRoadRoute ? 0.82 : 0.65,
+        dashArray: hasRoadRoute ? undefined : "8 8",
+        lineCap: "round",
+        lineJoin: "round",
+      };
       if (routeLineRef.current) {
         routeLineRef.current.setLatLngs(path);
+        routeLineRef.current.setStyle(routeStyle);
       } else {
-        routeLineRef.current = L.polyline(path, {
-          color: "#4f46e5",
-          weight: 3,
-          opacity: 0.65,
-          dashArray: "8 8",
-          lineCap: "round",
-        }).addTo(mapRef.current!);
+        routeLineRef.current = L.polyline(path, routeStyle).addTo(
+          mapRef.current!,
+        );
       }
     } else {
       if (routeLineRef.current) {
@@ -553,23 +628,30 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
 
     // Fit bounds
     if (points.length > 1) {
-      const bounds = L.latLngBounds(points.map((p) => toLatLng(p.coordinate)));
+      const bounds = L.latLngBounds(
+        hasRoadRoute
+          ? routePath
+          : points.map((p) => toLatLng(p.coordinate)),
+      );
       mapRef.current.fitBounds(bounds, { padding: [60, 60] });
     } else {
       mapRef.current.setView(toLatLng(firstPoint.coordinate), 16);
     }
   }, [
     customerCoordinate,
+    hasRoadRoute,
     providerCoordinate,
     hasMapCoordinate,
     liveTrackingEnabled,
     points,
+    routePath,
   ]);
 
   // Cleanup on unmount
   useEffect(
     () => () => {
       Object.values(markersRef.current).forEach((m) => m?.remove());
+      routeRequestRef.current?.abort();
       routeLineRef.current?.remove();
       mapRef.current?.remove();
       mapRef.current = null;

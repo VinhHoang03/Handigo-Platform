@@ -6,11 +6,11 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   createServiceSchema,
   updateServiceSchema,
-} from "../validations/service.validation";
+} from "../validations/service.validator";
 import {
   createServiceOptionSchema,
   updateServiceOptionSchema,
-} from "../validations/serviceOption.validation";
+} from "../validations/serviceOption.validator";
 
 const router = Router();
 
@@ -21,6 +21,8 @@ router.get("/:id/options", serviceController.getServiceOptions);
 
 // Admin-only write routes
 router.use(authMiddleware, roleMiddleware("ADMIN"));
+
+router.get("/:id/options/admin", serviceController.getAdminServiceOptions);
 
 // Service CRUD
 router.post("/", validate(createServiceSchema), serviceController.createService);

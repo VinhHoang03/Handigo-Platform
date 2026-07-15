@@ -16,7 +16,7 @@ const uploadBuffer = (buffer: Buffer) =>
       { folder: "handigo/admin-assets", resource_type: "image" },
       (error, result) => {
         if (error || !result) {
-          reject(error || new Error("Cloudinary upload failed"));
+          reject(error || new Error("Tải tệp lên Cloudinary thất bại"));
           return;
         }
         resolve(result.secure_url);
