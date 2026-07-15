@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
 import { getNumberConfigValue } from "./systemConfig.service";
+import { getEligibleProviderUserIds } from "./providerWalletEligibility.service";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { createLogger } from "../utils/logger";
 
@@ -70,6 +71,15 @@ export const MatchingService = {
 
     const serviceObjectId = new Types.ObjectId(serviceId);
     const excludeIds = excludeProviderIds.map((id) => id.toString());
+    const eligibleProviderUserIds = await getEligibleProviderUserIds();
+    const eligibleProviderUserIdSet = new Set(
+      eligibleProviderUserIds.map((userId) => userId.toString()),
+    );
+
+    if (eligibleProviderUserIds.length === 0) {
+      matchingLogger.info("Không có provider đủ số dư ví tối thiểu để nhận đơn mới.");
+      return [];
+    }
 
     // ── Path A: geo-sorted lookup ──────────────────────────────────────────
     if (latitude != null && longitude != null) {
@@ -104,7 +114,11 @@ export const MatchingService = {
 
         // 2. Fetch matching providers
         const providers = await Provider.find({
-          userId: { $in: nearbyUserIds },
+          userId: {
+            $in: nearbyUserIds.filter((userId) =>
+              eligibleProviderUserIdSet.has(userId.toString()),
+            ),
+          },
           serviceIds: serviceObjectId,
           availabilityStatus: "online",
           verified: true,
@@ -167,6 +181,7 @@ export const MatchingService = {
 
     // ── Path B: no coordinates or no geo-matches found → simple filter ─────
     const providers = await Provider.find({
+      userId: { $in: eligibleProviderUserIds },
       serviceIds: serviceObjectId,
       availabilityStatus: "online",
       verified: true,

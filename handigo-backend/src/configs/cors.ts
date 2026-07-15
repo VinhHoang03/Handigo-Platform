@@ -25,6 +25,5 @@ export const getAllowedOrigins = () => {
 
 export const isAllowedOrigin = (origin?: string) => {
   if (!origin) return true;
-  if (process.env.NODE_ENV !== "production") return true;
   return getAllowedOrigins().includes(normalizeOrigin(origin));
 };

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { io } from "socket.io-client";
-import { tokenStorage } from "@/api/tokenStorage";
+import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import { notificationApi } from "@/features/notification/api/notification.api";
 import type { AppNotification, NotificationQuery, NotificationType } from "@/features/notification/types/notification.types";
 import type { AppRole } from "./Navbar";
@@ -88,12 +87,7 @@ export function NotificationBell({ role }: { role?: AppRole }) {
   useEffect(() => {
     if (!canUseUserNotifications) return undefined;
 
-    const token = tokenStorage.get();
-    if (!token) return undefined;
-
-    const socket = io(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000", {
-      auth: { token },
-    });
+    const { socket, dispose } = createAuthenticatedSocket();
 
     const handleNewNotification = (notification: AppNotification) => {
       setUnreadCount((current) => current + 1);
@@ -111,7 +105,7 @@ export function NotificationBell({ role }: { role?: AppRole }) {
 
     return () => {
       socket.off("notification:new", handleNewNotification);
-      socket.disconnect();
+      dispose();
     };
   }, [canUseUserNotifications]);
 

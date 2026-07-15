@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import { Types } from "mongoose";
 import User, { IUser } from "../models/user.model";
 import { Session } from "../models/session.model";
+import { Wallet } from "../models/wallet.model";
 import { generateOtp, getOtpExpireDate, hashOtp } from "../utils/otp";
 import { sendOtpEmail } from "../utils/mail";
 import {
@@ -143,6 +144,25 @@ const issueSessionTokens = async (
   };
 };
 
+
+const ensureWalletForUser = async (userId: Types.ObjectId | string): Promise<void> => {
+  await Wallet.updateOne(
+    { userId },
+    {
+      $setOnInsert: {
+        userId,
+        balance: 0,
+        pendingBalance: 0,
+        currency: "VND",
+      },
+      $set: {
+        isDeleted: false,
+        deletedAt: null,
+      },
+    },
+    { upsert: true },
+  );
+};
 const createAndSendRegisterOtp = async (user: IUser): Promise<void> => {
   const otp = generateOtp();
   user.registerOtp = hashOtp(otp);
@@ -182,6 +202,7 @@ export const register = async (payload: {
     existingUser.phone = payload.phone;
     existingUser.status = "active";
     try {
+      await ensureWalletForUser(existingUser._id as Types.ObjectId);
       await createAndSendRegisterOtp(existingUser);
     } catch (error: any) {
       if (error?.code === 11000 && error?.keyPattern?.phone) {
@@ -210,6 +231,7 @@ export const register = async (payload: {
     throw error;
   }
 
+  await ensureWalletForUser(user._id as Types.ObjectId);
   await createAndSendRegisterOtp(user);
 };
 
@@ -424,6 +446,8 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
     await authenticatedUser.save();
   }
 
+  await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
+
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
@@ -517,6 +541,8 @@ export const facebookLogin = async (accessToken: string) => {
       await authenticatedUser.save();
     }
   }
+
+  await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
 
   const tokens = await issueSessionTokens(authenticatedUser);
 

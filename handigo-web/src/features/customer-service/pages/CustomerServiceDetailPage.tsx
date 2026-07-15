@@ -227,9 +227,11 @@ export default function CustomerServiceDetailPage() {
     setSelectedOptionIds((current) => toggleServiceOption(current, option, options));
   };
 
-   const handleUseCurrentLocation = () => {
+  const handleUseCurrentLocation = () => {
     setAddressSelectionError("");
     setRequiresPhoneUpdate(false);
+
+    if (!service) return;
 
     if (!navigator.geolocation) {
       setAddressSelectionError("Trình duyệt không hỗ trợ định vị hiện tại.");

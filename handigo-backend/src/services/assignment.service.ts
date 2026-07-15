@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
@@ -9,6 +9,10 @@ import { AppError } from "../utils/appError";
 import { Address } from "../models/address.model";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { emitToUser } from "../sockets/socketServer";
+import { cancelOrderWithSettlement } from "./orderCancellation.service";
+import { Payment } from "../models/payment.model";
+import { assertProviderWalletEligible } from "./providerWalletEligibility.service";
+import type { UserRole } from "../models/user.model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +32,6 @@ export interface QuotationItemInput {
 
 export interface CreateQuotationPayload {
   orderId: string;
-  providerId: string;
   inspectionNote?: string;
   recommendation?: string;
   attachments?: string[];
@@ -52,11 +55,18 @@ export const AssignmentService = {
     providerUserId: string,
   ): Promise<AcceptAssignmentResult> {
     // 1. Load assignment
-    const assignment = await OrderAssignment.findById(assignmentId);
+    const assignment = await OrderAssignment.findOne({
+      _id: assignmentId,
+      isDeleted: false,
+    });
     if (!assignment) throw new AppError("Assignment không tồn tại.", 404);
 
     // 2. Verify provider owns this assignment
-    const provider = await Provider.findOne({ userId: providerUserId });
+    const provider = await Provider.findOne({
+      userId: providerUserId,
+      verified: true,
+      isDeleted: false,
+    });
     if (!provider) throw new AppError("Provider không tồn tại.", 404);
     if (assignment.providerId.toString() !== provider._id.toString()) {
       throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
@@ -94,6 +104,8 @@ export const AssignmentService = {
       );
     }
 
+    await assertProviderWalletEligible(provider.userId);
+
     // 4. Khóa provider trước để không thể nhận đồng thời hai đơn.
     const claimedProvider = await Provider.findOneAndUpdate(
       { _id: provider._id, availabilityStatus: "online" },
@@ -111,8 +123,10 @@ export const AssignmentService = {
     const claimedAssignment = await OrderAssignment.findOneAndUpdate(
       {
         _id: assignment._id,
+        providerId: provider._id,
         status: "pending",
         responseDeadline: { $gt: respondedAt },
+        isDeleted: false,
       },
       { $set: { status: "accepted", respondedAt } },
       { returnDocument: "after", runValidators: true },
@@ -189,11 +203,18 @@ export const AssignmentService = {
     rejectReason?: string,
   ): Promise<void> {
     // 1. Load assignment
-    const assignment = await OrderAssignment.findById(assignmentId);
+    const assignment = await OrderAssignment.findOne({
+      _id: assignmentId,
+      isDeleted: false,
+    });
     if (!assignment) throw new AppError("Assignment không tồn tại.", 404);
 
     // 2. Verify provider
-    const provider = await Provider.findOne({ userId: providerUserId });
+    const provider = await Provider.findOne({
+      userId: providerUserId,
+      verified: true,
+      isDeleted: false,
+    });
     if (!provider) throw new AppError("Provider không tồn tại.", 404);
     if (assignment.providerId.toString() !== provider._id.toString()) {
       throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
@@ -208,7 +229,12 @@ export const AssignmentService = {
 
     // 3. Reject bằng cập nhật có điều kiện để tránh re-dispatch hai lần.
     const rejectedAssignment = await OrderAssignment.findOneAndUpdate(
-      { _id: assignment._id, status: "pending" },
+      {
+        _id: assignment._id,
+        providerId: provider._id,
+        status: "pending",
+        isDeleted: false,
+      },
       {
         $set: {
           status: "rejected",
@@ -281,7 +307,11 @@ export const AssignmentService = {
       );
     }
 
-    const provider = await Provider.findOne({ userId: providerUserId });
+    const provider = await Provider.findOne({
+      userId: providerUserId,
+      verified: true,
+      isDeleted: false,
+    });
     if (!provider) throw new AppError("Provider không tồn tại.", 404);
     if (
       !order.providerId ||
@@ -307,6 +337,12 @@ export const AssignmentService = {
     );
     const discountAmount = payload.discountAmount ?? 0;
     const finalAmount = Math.max(subtotalAmount - discountAmount, 0);
+    if (finalAmount < order.depositAmount) {
+      throw new AppError(
+        "Tổng báo giá không được thấp hơn khoản đặt cọc khách hàng đã thanh toán.",
+        400,
+      );
+    }
 
     const quotationCode = `QUO-${randomBytes(6).toString("hex").toUpperCase()}`;
 
@@ -356,32 +392,74 @@ export const AssignmentService = {
     quotationId: string,
     customerUserId: string,
   ): Promise<InstanceType<typeof RepairQuotation>> {
-    const quotation = await RepairQuotation.findById(quotationId);
-    if (!quotation) throw new AppError("Báo giá không tồn tại.", 404);
-    if (quotation.status !== "pending") {
-      throw new AppError(
-        `Báo giá đã ở trạng thái "${quotation.status}".`,
-        400,
-      );
+    const session = await mongoose.startSession();
+    let approvedQuotation: InstanceType<typeof RepairQuotation> | null = null;
+
+    try {
+      await session.withTransaction(async () => {
+        const quotation = await RepairQuotation.findById(quotationId).session(
+          session,
+        );
+        if (!quotation) throw new AppError("Báo giá không tồn tại.", 404);
+        if (quotation.status !== "pending") {
+          throw new AppError(
+            `Báo giá đã ở trạng thái "${quotation.status}".`,
+            400,
+          );
+        }
+
+        const order = await Order.findById(quotation.orderId).session(session);
+        if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+        if (order.customerId.toString() !== customerUserId) {
+          throw new AppError("Bạn không có quyền xác nhận báo giá này.", 403);
+        }
+        if (order.currentQuotationId?.toString() !== quotation.id) {
+          throw new AppError("Báo giá này không còn là báo giá hiện tại.", 409);
+        }
+
+        const [paymentSummary] = await Payment.aggregate<{ total: number }>([
+          {
+            $match: {
+              orderId: order._id,
+              status: "paid",
+              isDeleted: { $ne: true },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]).session(session);
+        const paidAmount = paymentSummary?.total || 0;
+        const requiredAmount = quotation.finalAmount;
+        const confirmedAt = new Date();
+
+        quotation.status = "approved";
+        quotation.customerConfirmed = true;
+        quotation.approvedAt = confirmedAt;
+        await quotation.save({ session });
+
+        order.status = "in_progress";
+        order.pricing.totalPaidAmount = requiredAmount;
+        order.pricing.platformCommissionRate = 0;
+        order.pricing.platformCommissionAmount = 0;
+        order.pricing.providerEarningAmount = requiredAmount;
+        order.paymentStatus =
+          paidAmount >= requiredAmount
+            ? "paid"
+            : paidAmount > 0
+              ? "partially_paid"
+              : "unpaid";
+        order.confirmation.customerConfirmedAt = confirmedAt;
+        await order.save({ session });
+
+        approvedQuotation = quotation;
+      });
+    } finally {
+      await session.endSession();
     }
 
-    const order = await Order.findById(quotation.orderId);
-    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
-    if (order.customerId.toString() !== customerUserId) {
-      throw new AppError("Bạn không có quyền xác nhận báo giá này.", 403);
+    if (!approvedQuotation) {
+      throw new AppError("Không thể xác nhận báo giá.", 500);
     }
-
-    quotation.status = "approved";
-    quotation.customerConfirmed = true;
-    quotation.approvedAt = new Date();
-    await quotation.save();
-
-    // Update order status to in_progress
-    order.status = "in_progress";
-    order.confirmation.customerConfirmedAt = new Date();
-    await order.save();
-
-    return quotation as any;
+    return approvedQuotation;
   },
 
   /**
@@ -413,14 +491,14 @@ export const AssignmentService = {
     quotation.rejectionReason = rejectionReason ?? null;
     await quotation.save();
 
-    order.status = "cancelled";
-    order.cancellation = {
-      cancelledBy: new Types.ObjectId(customerUserId),
-      cancelledByRole: "customer",
-      reason: `Từ chối báo giá sửa chữa: ${rejectionReason ?? "không có lý do"}`,
-      cancelledAt: new Date(),
-    };
-    await order.save();
+    await cancelOrderWithSettlement({
+      orderId: order._id.toString(),
+      actorId: customerUserId,
+      role: "customer",
+      reason:
+        "Từ chối báo giá sửa chữa: " +
+        (rejectionReason ?? "không có lý do"),
+    });
 
     return quotation as any;
   },
@@ -428,8 +506,47 @@ export const AssignmentService = {
   /**
    * Get all assignments for an order (admin / audit).
    */
-  async getAssignmentsByOrder(orderId: string) {
-    return OrderAssignment.find({ orderId })
+  async getAssignmentsByOrder(
+    orderId: string,
+    actorUserId: string,
+    actorRole: UserRole,
+  ) {
+    const order = await Order.findOne({
+      _id: orderId,
+      isDeleted: false,
+    })
+      .select("customerId providerId")
+      .lean();
+    if (!order) {
+      throw new AppError("Đơn hàng không tồn tại.", 404);
+    }
+
+    let hasAccess = actorRole === "ADMIN";
+    if (actorRole === "CUSTOMER") {
+      hasAccess = order.customerId.toString() === actorUserId;
+    }
+    if (actorRole === "PROVIDER") {
+      const provider = await Provider.findOne({
+        userId: actorUserId,
+        verified: true,
+        isDeleted: false,
+      })
+        .select("_id")
+        .lean();
+      hasAccess = Boolean(
+        provider &&
+          order.providerId &&
+          order.providerId.toString() === provider._id.toString(),
+      );
+    }
+    if (!hasAccess) {
+      throw new AppError(
+        "Bạn không có quyền xem lịch sử phân công của đơn hàng này.",
+        403,
+      );
+    }
+
+    return OrderAssignment.find({ orderId, isDeleted: false })
       .sort({ assignedAt: 1 })
       .populate("providerId", "userId averageRating totalCompletedOrders")
       .lean();
@@ -439,12 +556,17 @@ export const AssignmentService = {
    * Get pending assignment for the currently-logged-in provider.
    */
   async getPendingAssignmentForProvider(providerUserId: string) {
-    const provider = await Provider.findOne({ userId: providerUserId });
+    const provider = await Provider.findOne({
+      userId: providerUserId,
+      verified: true,
+      isDeleted: false,
+    });
     if (!provider) throw new AppError("Provider không tồn tại.", 404);
 
     return OrderAssignment.find({
       providerId: provider._id,
       status: "pending",
+      isDeleted: false,
     })
       .populate({
         path: "orderId",
@@ -474,7 +596,11 @@ export const AssignmentService = {
         throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
       }
     } else {
-      const provider = await Provider.findOne({ userId });
+      const provider = await Provider.findOne({
+        userId,
+        verified: true,
+        isDeleted: false,
+      });
       if (!provider) throw new AppError("Provider không tồn tại.", 404);
       if (
         !order.providerId ||

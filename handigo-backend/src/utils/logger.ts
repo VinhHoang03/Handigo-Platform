@@ -54,6 +54,10 @@ const writeLog = (
   message: string,
   details?: unknown,
 ) => {
+  if (level === "DEBUG" && process.env.NODE_ENV === "production") {
+    return;
+  }
+
   const line = formatLog(level, scope, message, details);
 
   if (level === "ERROR") {

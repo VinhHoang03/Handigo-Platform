@@ -220,6 +220,11 @@ export default function ProviderOrderDetailPage() {
     paid: 'Đã thanh toán',
     refunded: 'Đã hoàn tiền',
   };
+  const paymentStatusLabel =
+    order.status === 'cancelled' &&
+    ['paid', 'partially_paid'].includes(order.paymentStatus)
+      ? 'Đang xử lý hoàn tiền'
+      : paymentStatusLabels[order.paymentStatus];
   const orderTypeLabels: Record<Order['orderType'], string> = {
     normal: 'Thực hiện sớm nhất',
     urgent: 'Khẩn cấp',
@@ -278,7 +283,7 @@ export default function ProviderOrderDetailPage() {
           />
           <PaymentSummaryCard
             order={order}
-            paymentStatus={paymentStatusLabels[order.paymentStatus]}
+            paymentStatus={paymentStatusLabel}
           />
           <OrderProgressCard order={order} />
         </div>

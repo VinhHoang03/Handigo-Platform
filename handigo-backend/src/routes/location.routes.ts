@@ -2,6 +2,7 @@ import { Router } from "express";
 import * as locationController from "../controllers/location.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
+import { roleMiddleware } from "../middlewares/role.middleware";
 import {
   currentLocationSchema,
   reverseGeocodeQuerySchema,
@@ -18,6 +19,7 @@ router.get(
 router.get("/me", locationController.getCurrentLocation);
 router.put(
   "/me",
+  roleMiddleware("PROVIDER"),
   validate(currentLocationSchema),
   locationController.updateCurrentLocation,
 );

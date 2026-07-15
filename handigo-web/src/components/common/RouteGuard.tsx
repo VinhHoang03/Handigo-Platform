@@ -14,7 +14,7 @@ export function RouteGuard({ roles, children }: { roles: AppRole[]; children: Re
   if (isInitializing) {
     return (
       <div className="grid min-h-screen place-items-center text-on-surface-variant">
-        Dang khoi phuc phien dang nhap...
+        Đang khôi phục phiên đăng nhập...
       </div>
     );
   }

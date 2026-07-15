@@ -8,6 +8,7 @@ import type { Address, Service, ServiceOption } from '../../../types/booking';
 import { getMissingRequiredGroup } from '../utils/serviceOptionSelection';
 
 const paymentMethods = [
+  ['account_balance_wallet', 'Ví Handigo', 'Thanh toán ngay từ số dư ví', 'wallet'],
   ['account_balance', 'Chuyển khoản ngân hàng', 'Quét mã VietQR hoặc Internet Banking', 'bank'],
   ['payments', 'Tiền mặt', 'Thanh toán trực tiếp cho nhân viên', 'cash'],
 ] as const;
@@ -58,8 +59,7 @@ const ConfirmPaymentPage = () => {
 
   const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
   const effectivePaymentMethod =
-    paymentMethod === 'wallet' ||
-    (service?.serviceType === 'variable_price' && paymentMethod === 'cash')
+    service?.serviceType === 'variable_price' && paymentMethod !== 'bank'
       ? 'bank'
       : paymentMethod;
 
@@ -119,11 +119,19 @@ const ConfirmPaymentPage = () => {
         return;
       }
 
-      await bookingApi.createPayment({
-        orderId: order._id,
-        method: 'CASH',
-        paymentType: 'FULL',
-      });
+      await bookingApi.createPayment(
+        effectivePaymentMethod === 'wallet'
+          ? {
+              orderId: order._id,
+              method: 'WALLET',
+              paymentType: 'FULL',
+            }
+          : {
+              orderId: order._id,
+              method: 'CASH',
+              paymentType: 'FULL',
+            },
+      );
 
       const orderDetail = await bookingApi.getOrderById(order._id);
 

@@ -121,26 +121,53 @@ function App() {
             <Route path="/tin-tuc" element={<NewsPage />} />
             <Route path="/tin-tuc/:articleId" element={<NewsDetailPage />} />
             <Route path="/ho-tro" element={<SupportPage />} />
-            <Route path="/customer/bookings" element={<BookingHistoryPage />} />
+            <Route
+              path="/customer/bookings"
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <BookingHistoryPage />
+                </RouteGuard>
+              }
+            />
             <Route
               path="/customer/bookings/new"
-              element={<CreateBookingStep1Page />}
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <CreateBookingStep1Page />
+                </RouteGuard>
+              }
             />
             <Route
               path="/customer/bookings/new/location"
-              element={<CreateBookingStep2Page />}
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <CreateBookingStep2Page />
+                </RouteGuard>
+              }
             />
             <Route
               path="/customer/bookings/new/payment"
-              element={<ConfirmPaymentPage />}
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <ConfirmPaymentPage />
+                </RouteGuard>
+              }
             />
             <Route
               path="/customer/bookings/success"
-              element={<BookingSuccessPage />}
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <BookingSuccessPage />
+                </RouteGuard>
+              }
             />
             <Route
               path="/customer/bookings/:bookingId"
-              element={<BookingDetailPage />}
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <BookingDetailPage />
+                </RouteGuard>
+              }
             />
             <Route
               path="/customer"

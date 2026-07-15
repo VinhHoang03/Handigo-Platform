@@ -4,6 +4,7 @@ import User from "../models/user.model";
 import { Session } from "../models/session.model";
 import * as providerApplicationService from "./providerApplication.service";
 import { getAdminFeedbacks as listFeedbacks } from "./feedback.service";
+import { SAFE_USER_PROJECTION } from "./user.service";
 
 interface UserQuery {
   keyword?: string;
@@ -45,7 +46,7 @@ export const getUsers = async (query: UserQuery = {}) => {
 
   const [items, total] = await Promise.all([
     User.find(filter)
-      .select("-passwordHash -registerOtp -resetPasswordOtp")
+      .select(SAFE_USER_PROJECTION)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -67,7 +68,7 @@ export const getUserById = async (userId: string) => {
   assertObjectId(userId, "user id");
 
   const user = await User.findOne({ _id: userId, isDeleted: false }).select(
-    "-passwordHash -registerOtp -resetPasswordOtp",
+    SAFE_USER_PROJECTION,
   );
 
   if (!user) {

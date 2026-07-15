@@ -1,8 +1,9 @@
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import User from "../models/user.model";
 import { Provider, type IIdentityDocument, type IProviderCertificate } from "../models/provider.model";
 import { ProviderApplication } from "../models/providerApplication.model";
+import { Session } from "../models/session.model";
 import { Service } from "../models/service.model";
 
 type IdentityDocumentPayload = {
@@ -634,76 +635,106 @@ export const reviewApplication = async (
   assertObjectId(adminId, "admin id");
   assertObjectId(applicationId, "application id");
 
-  const application = await ProviderApplication.findOne({
-    _id: applicationId,
-    isDeleted: false,
-  });
+  const session = await mongoose.startSession();
 
-  if (!application) {
-    throw new AppError("Provider application not found", 404);
-  }
-
-  if (!["pending", "resubmitted"].includes(application.status)) {
-    throw new AppError("Chỉ hồ sơ đang chờ duyệt mới có thể xét duyệt", 400);
-  }
-
-  const reviewedAt = new Date();
-  application.status = payload.status;
-  application.reviewedBy = new Types.ObjectId(adminId);
-  application.reviewedAt = reviewedAt;
-
-  if (payload.status === "rejected") {
-    application.rejectionReason = payload.rejectionReason || null;
-    application.rejectionNotes = payload.rejectionNotes || null;
-    application.reviewHistory.push({
-      action: "rejected",
-      status: "rejected",
-      actorId: new Types.ObjectId(adminId),
-      actorRole: "ADMIN",
-      occurredAt: reviewedAt,
-      rejectionReason: payload.rejectionReason || null,
-      notes: payload.rejectionNotes || null,
-    });
-    await application.save();
-    return getApplicationById(applicationId);
-  }
-
-  application.rejectionReason = null;
-  application.rejectionNotes = null;
-  application.reviewHistory.push({
-    action: "approved",
-    status: "approved",
-    actorId: new Types.ObjectId(adminId),
-    actorRole: "ADMIN",
-    occurredAt: reviewedAt,
-  });
-  const identityDocument = approveIdentityDocument(
-    application.identityDocument,
-    adminId,
-  );
-  const certificates = approveCertificates(application.certificates, adminId);
-
-  await Promise.all([
-    Provider.findOneAndUpdate(
-      { userId: application.userId },
-      {
-        userId: application.userId,
-        description: application.description,
-        experienceYears: application.experienceYears,
-        serviceIds: application.serviceIds,
-        workingAreas: application.workingAreas,
-        identityDocument,
-        certificates,
-        availabilityStatus: "offline",
-        verified: true,
+  try {
+    await session.withTransaction(async () => {
+      const application = await ProviderApplication.findOne({
+        _id: applicationId,
         isDeleted: false,
-        deletedAt: null,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    ),
-    User.findByIdAndUpdate(application.userId, { role: "PROVIDER" }),
-    application.save(),
-  ]);
+      }).session(session);
+
+      if (!application) {
+        throw new AppError("Provider application not found", 404);
+      }
+
+      if (!["pending", "resubmitted"].includes(application.status)) {
+        throw new AppError("Chỉ hồ sơ đang chờ duyệt mới có thể xét duyệt", 400);
+      }
+
+      const reviewedAt = new Date();
+      application.status = payload.status;
+      application.reviewedBy = new Types.ObjectId(adminId);
+      application.reviewedAt = reviewedAt;
+
+      if (payload.status === "rejected") {
+        application.rejectionReason = payload.rejectionReason || null;
+        application.rejectionNotes = payload.rejectionNotes || null;
+        application.reviewHistory.push({
+          action: "rejected",
+          status: "rejected",
+          actorId: new Types.ObjectId(adminId),
+          actorRole: "ADMIN",
+          occurredAt: reviewedAt,
+          rejectionReason: payload.rejectionReason || null,
+          notes: payload.rejectionNotes || null,
+        });
+        await application.save({ session });
+        return;
+      }
+
+      application.rejectionReason = null;
+      application.rejectionNotes = null;
+      application.reviewHistory.push({
+        action: "approved",
+        status: "approved",
+        actorId: new Types.ObjectId(adminId),
+        actorRole: "ADMIN",
+        occurredAt: reviewedAt,
+      });
+
+      const identityDocument = approveIdentityDocument(
+        application.identityDocument,
+        adminId,
+      );
+      const certificates = approveCertificates(application.certificates, adminId);
+
+      await application.save({ session });
+
+      await Provider.findOneAndUpdate(
+        { userId: application.userId },
+        {
+          $set: {
+            userId: application.userId,
+            description: application.description,
+            experienceYears: application.experienceYears,
+            serviceIds: application.serviceIds,
+            workingAreas: application.workingAreas,
+            identityDocument,
+            certificates,
+            availabilityStatus: "offline",
+            verified: true,
+            isDeleted: false,
+            deletedAt: null,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          runValidators: true,
+          setDefaultsOnInsert: true,
+          session,
+        },
+      );
+
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: application.userId, isDeleted: false },
+        { $set: { role: "PROVIDER" } },
+        { new: true, runValidators: true, session },
+      );
+      if (!updatedUser) {
+        throw new AppError("Không tìm thấy người dùng của hồ sơ provider", 404);
+      }
+
+      await Session.updateMany(
+        { userId: application.userId, revokedAt: null },
+        { $set: { revokedAt: reviewedAt } },
+        { session },
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
 
   return getApplicationById(applicationId);
 };

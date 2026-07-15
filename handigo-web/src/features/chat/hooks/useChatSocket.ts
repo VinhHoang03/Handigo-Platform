@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { io } from 'socket.io-client';
+import { createAuthenticatedSocket } from '@/realtime/authenticatedSocket';
 import type { ChatMessage } from '../types/chat.types';
 
 export function useChatSocket(
@@ -10,18 +10,23 @@ export function useChatSocket(
 ) {
   useEffect(() => {
     if (!conversationId) return;
-    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-      auth: { token: localStorage.getItem('token') },
-    });
-    socket.emit('conversation:join', { conversationId });
+    const { socket, dispose } = createAuthenticatedSocket();
+    const joinConversation = () => {
+      socket.emit('conversation:join', { conversationId });
+    };
+    const handleDeletedMessage = (payload: { messageId: string }) =>
+      onMessageDeleted(payload.messageId);
+
+    socket.on('connect', joinConversation);
     socket.on('message:new', onMessage);
     socket.on('message:updated', onMessageUpdated);
-    socket.on('message:deleted', (payload: { messageId: string }) => onMessageDeleted(payload.messageId));
+    socket.on('message:deleted', handleDeletedMessage);
     return () => {
+      socket.off('connect', joinConversation);
       socket.off('message:new', onMessage);
       socket.off('message:updated', onMessageUpdated);
-      socket.off('message:deleted');
-      socket.disconnect();
+      socket.off('message:deleted', handleDeletedMessage);
+      dispose();
     };
   }, [conversationId, onMessage, onMessageDeleted, onMessageUpdated]);
 }

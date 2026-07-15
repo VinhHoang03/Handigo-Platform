@@ -29,7 +29,15 @@ const hasStatusCode = (error: unknown): error is ErrorWithStatusCode =>
 const hasCode = (error: unknown): error is ErrorWithCode =>
   typeof error === "object" && error !== null && "code" in error;
 
-const getErrorMessage = (error: unknown, fallbackMessage: string) => {
+const getErrorMessage = (
+  error: unknown,
+  fallbackMessage: string,
+  statusCode: number,
+) => {
+  if (statusCode >= 500) {
+    return fallbackMessage;
+  }
+
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
@@ -48,15 +56,15 @@ const getErrorMessage = (error: unknown, fallbackMessage: string) => {
 };
 
 const getErrorStatusCode = (error: unknown) => {
+  let statusCode = 500;
+
   if (error instanceof AppError) {
-    return error.statusCode;
+    statusCode = error.statusCode;
+  } else if (hasStatusCode(error)) {
+    statusCode = error.statusCode as number;
   }
 
-  if (hasStatusCode(error)) {
-    return error.statusCode as number;
-  }
-
-  return 500;
+  return statusCode >= 400 && statusCode <= 599 ? statusCode : 500;
 };
 
 export const sendControllerError = (
@@ -66,7 +74,7 @@ export const sendControllerError = (
 ) => {
   const {
     includeCode = false,
-    fallbackMessage = "Có lỗi xảy ra",
+    fallbackMessage = "Lỗi máy chủ nội bộ",
     invalidDataMessage = "Dữ liệu không hợp lệ",
   } = options;
 
@@ -78,18 +86,20 @@ export const sendControllerError = (
     });
   }
 
+  const statusCode = getErrorStatusCode(error);
+
   const body: {
     success: false;
     message: string;
     code?: unknown;
   } = {
     success: false,
-    message: getErrorMessage(error, fallbackMessage),
+    message: getErrorMessage(error, fallbackMessage, statusCode),
   };
 
-  if (includeCode && hasCode(error)) {
+  if (includeCode && statusCode < 500 && hasCode(error)) {
     body.code = error.code;
   }
 
-  return res.status(getErrorStatusCode(error)).json(body);
+  return res.status(statusCode).json(body);
 };

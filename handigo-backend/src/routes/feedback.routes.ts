@@ -10,6 +10,7 @@ import {
   visibilitySchema,
 } from "../validations/feedback.validator";
 import { uploadFeedbackImages } from "../middlewares/feedbackUpload.middleware";
+import { uploadRateLimit } from "../middlewares/rateLimit.middleware";
 
 const router = Router();
 
@@ -56,6 +57,7 @@ router.post(
   "/images",
   authMiddleware,
   roleMiddleware("CUSTOMER"),
+  uploadRateLimit,
   uploadFeedbackImages,
   feedbackController.uploadFeedbackImages,
 );
@@ -78,6 +80,7 @@ router.post(
   "/provider/images",
   authMiddleware,
   roleMiddleware("PROVIDER"),
+  uploadRateLimit,
   uploadFeedbackImages,
   feedbackController.uploadFeedbackImages,
 );

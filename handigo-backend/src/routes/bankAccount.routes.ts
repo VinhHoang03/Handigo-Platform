@@ -16,31 +16,31 @@ import {
 
 const router = Router();
 
-router.get("/", authMiddleware, roleMiddleware("PROVIDER"), listMyBankAccounts);
+router.get("/", authMiddleware, roleMiddleware("CUSTOMER", "PROVIDER"), listMyBankAccounts);
 router.post(
   "/",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(createBankAccountSchema),
   createMyBankAccount,
 );
 router.patch(
   "/:id",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(updateBankAccountSchema),
   updateMyBankAccount,
 );
 router.patch(
   "/:id/default",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   setDefaultMyBankAccount,
 );
 router.delete(
   "/:id",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   deleteMyBankAccount,
 );
 
