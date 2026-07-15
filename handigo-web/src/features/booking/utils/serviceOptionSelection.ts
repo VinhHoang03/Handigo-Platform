@@ -1,10 +1,9 @@
-import type { ServiceOption } from "@/types/booking";
+import type { Service, ServiceOption } from "@/types/booking";
 
 export type ServiceOptionGroup = {
   key: string;
   label: string;
   selectionMode: "single" | "multiple";
-  isRequired: boolean;
   options: ServiceOption[];
 };
 
@@ -21,13 +20,15 @@ export const groupServiceOptions = (
     const existing = groups.get(key);
     if (existing) {
       existing.options.push(option);
+      if ((option.selectionMode ?? "multiple") === "multiple") {
+        existing.selectionMode = "multiple";
+      }
       continue;
     }
     groups.set(key, {
       key,
       label: option.selectionGroup?.trim() || "Dịch vụ bổ sung",
       selectionMode: option.selectionMode ?? "multiple",
-      isRequired: option.isRequired ?? false,
       options: [option],
     });
   }
@@ -42,30 +43,31 @@ export const toggleServiceOption = (
 ) => {
   const isSelected = selectedIds.includes(option._id);
   if (isSelected) {
-    return option.isRequired
-      ? selectedIds
-      : selectedIds.filter((id) => id !== option._id);
-  }
-
-  if ((option.selectionMode ?? "multiple") !== "single") {
-    return [...selectedIds, option._id];
+    return selectedIds.filter((id) => id !== option._id);
   }
 
   const groupKey = getGroupKey(option);
+  const groupOptions = allOptions.filter(
+    (candidate) => getGroupKey(candidate) === groupKey,
+  );
+  const selectionMode = groupOptions.some(
+    (candidate) => (candidate.selectionMode ?? "multiple") === "multiple",
+  )
+    ? "multiple"
+    : "single";
+
+  if (selectionMode === "multiple") {
+    return [...selectedIds, option._id];
+  }
+
   const siblingIds = new Set(
-    allOptions
-      .filter((candidate) => getGroupKey(candidate) === groupKey)
-      .map((candidate) => candidate._id),
+    groupOptions.map((candidate) => candidate._id),
   );
   return [...selectedIds.filter((id) => !siblingIds.has(id)), option._id];
 };
 
-export const getMissingRequiredGroup = (
+export const isRequiredOptionSelectionMissing = (
+  service: Service | null | undefined,
   selectedIds: string[],
-  options: ServiceOption[],
 ) =>
-  groupServiceOptions(options).find(
-    (group) =>
-      group.isRequired &&
-      !group.options.some((option) => selectedIds.includes(option._id)),
-  );
+  Boolean(service?.requiresOptionSelection && selectedIds.length === 0);

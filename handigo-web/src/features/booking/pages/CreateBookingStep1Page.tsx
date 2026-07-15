@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CategoryIcon } from '@/components/common/CategoryIcon';
+import { ReliableImage } from '@/components/common/ReliableImage';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import { useBookingStore } from '../hooks/useBookingStore';
 import type { Category, Service, ServiceOption } from '../../../types/booking';
-import { getMissingRequiredGroup, groupServiceOptions } from '../utils/serviceOptionSelection';
+import { groupServiceOptions, isRequiredOptionSelectionMissing } from '../utils/serviceOptionSelection';
 
 const getOptionPrice = (option: ServiceOption): number => option.price ?? option.fixedPrice ?? 0;
 
@@ -60,9 +61,8 @@ const CreateBookingStep1Page = () => {
       setSelectionError('Vui lòng chọn một dịch vụ cụ thể.');
       return;
     }
-    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
-    if (missingGroup) {
-      setSelectionError(`Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`);
+    if (isRequiredOptionSelectionMissing(selectedService, selectedOptionIds)) {
+      setSelectionError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
       return;
     }
     setSelectionError('');
@@ -154,11 +154,17 @@ const CreateBookingStep1Page = () => {
 
               {options.length > 0 && (
                 <div className="mt-md p-md bg-surface-container-low rounded-xl">
+                  <p className="mb-md font-label-md font-bold text-on-surface">
+                    Tùy chọn dịch vụ
+                    {selectedService?.requiresOptionSelection ? (
+                      <span className="text-error"> *</span>
+                    ) : null}
+                  </p>
                   <div className="space-y-md">
                     {optionGroups.map((group) => (
                       <fieldset key={group.key}>
                         <legend className="font-label-md mb-sm">
-                          {group.label}{group.isRequired ? <span className="text-error"> *</span> : null}
+                          {group.label}
                         </legend>
                         <div className="flex flex-wrap gap-sm">
                           {group.options.map((option) => (
@@ -175,6 +181,12 @@ const CreateBookingStep1Page = () => {
                                   setSelectionError('');
                                   toggleOption(option, options);
                                 }}
+                              />
+                              <ReliableImage
+                                src={option.image}
+                                alt=""
+                                aria-hidden="true"
+                                className="h-8 w-8 rounded-md object-cover"
                               />
                               <span className="text-label-md">
                                 {option.name}

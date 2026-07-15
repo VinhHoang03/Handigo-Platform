@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AddressBookManager } from '@/features/profile/components/AddressBookManager';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { bookingApi } from '@/features/booking/api/booking.api';
@@ -9,6 +10,7 @@ import type { UserAddress } from '@/features/profile/types/profile.types';
 const timeSlots = ['08:00 - 10:00', '10:00 - 12:00', '14:00 - 16:00', '16:00 - 18:00'];
 
 const CreateBookingStep2Page = () => {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const {
     addressId, setAddressId, orderType, setOrderType,
@@ -84,7 +86,9 @@ const CreateBookingStep2Page = () => {
               <AddressBookManager
                 compact
                 selectable
+                singleAddressMode
                 selectedAddressId={addressId}
+                onManageAddresses={() => navigate('/customer/profile#saved-addresses')}
                 defaultRecipient={{
                   name: user?.fullName || '',
                   phone: user?.phone || '',

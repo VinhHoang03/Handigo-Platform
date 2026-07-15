@@ -5,7 +5,7 @@ import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/booking.api';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Address, Service, ServiceOption } from '../../../types/booking';
-import { getMissingRequiredGroup } from '../utils/serviceOptionSelection';
+import { isRequiredOptionSelectionMissing } from '../utils/serviceOptionSelection';
 
 const paymentMethods = [
   ['account_balance', 'Chuyển khoản ngân hàng', 'Quét mã VietQR hoặc Internet Banking', 'bank'],
@@ -79,9 +79,8 @@ const ConfirmPaymentPage = () => {
       setPaymentError('Vui lòng chọn thời gian thực hiện trong tương lai.');
       return;
     }
-    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
-    if (missingGroup) {
-      setPaymentError(`Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`);
+    if (isRequiredOptionSelectionMissing(service, selectedOptionIds)) {
+      setPaymentError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
       return;
     }
 

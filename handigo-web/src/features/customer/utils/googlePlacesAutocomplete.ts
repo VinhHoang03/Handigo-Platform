@@ -255,6 +255,9 @@ export const mountPlaceAutocompleteElement = async ({
   input.className = "google-place-autocomplete places-address-field__input";
   input.type = "text";
   input.autocomplete = "street-address";
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("aria-expanded", "false");
   input.placeholder = placeholder;
   input.value = value;
   const loading = document.createElement("span");
@@ -263,19 +266,38 @@ export const mountPlaceAutocompleteElement = async ({
   loading.hidden = true;
   const dropdown = document.createElement("div");
   dropdown.className = "places-address-dropdown";
+  dropdown.setAttribute("role", "listbox");
   dropdown.hidden = true;
   wrapper.append(icon, input, loading, dropdown);
   container.replaceChildren(wrapper);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   let requestSequence = 0;
+  let activeOptionIndex = -1;
   let sessionToken = library.AutocompleteSessionToken
     ? new library.AutocompleteSessionToken()
     : undefined;
 
   const closeDropdown = () => {
+    activeOptionIndex = -1;
+    input.setAttribute("aria-expanded", "false");
     dropdown.hidden = true;
     dropdown.replaceChildren();
+  };
+
+  const setActiveOption = (index: number) => {
+    const options = Array.from(
+      dropdown.querySelectorAll<HTMLButtonElement>(".places-address-option"),
+    );
+    if (options.length === 0) return;
+
+    activeOptionIndex = (index + options.length) % options.length;
+    options.forEach((option, optionIndex) => {
+      const isActive = optionIndex === activeOptionIndex;
+      option.dataset.active = String(isActive);
+      option.setAttribute("aria-selected", String(isActive));
+      if (isActive) option.scrollIntoView({ block: "nearest" });
+    });
   };
 
   const selectPrediction = async (prediction: PlacePrediction) => {
@@ -318,6 +340,8 @@ export const mountPlaceAutocompleteElement = async ({
       const button = document.createElement("button");
       button.type = "button";
       button.className = "places-address-option";
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", "false");
       const optionIcon = document.createElement("span");
       optionIcon.className = "material-symbols-outlined places-address-option__icon";
       optionIcon.textContent = "location_on";
@@ -335,6 +359,8 @@ export const mountPlaceAutocompleteElement = async ({
       dropdown.appendChild(button);
     }
     dropdown.hidden = dropdown.childElementCount === 0;
+    input.setAttribute("aria-expanded", String(!dropdown.hidden));
+    activeOptionIndex = -1;
   };
 
   const fetchSuggestions = async () => {
@@ -370,7 +396,25 @@ export const mountPlaceAutocompleteElement = async ({
     timer = setTimeout(() => void fetchSuggestions(), 280);
   };
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") closeDropdown();
+    if (event.key === "Escape") {
+      closeDropdown();
+      return;
+    }
+
+    if (dropdown.hidden) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveOption(activeOptionIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveOption(activeOptionIndex - 1);
+    } else if (event.key === "Enter" && activeOptionIndex >= 0) {
+      event.preventDefault();
+      const activeOption = dropdown.querySelectorAll<HTMLButtonElement>(
+        ".places-address-option",
+      )[activeOptionIndex];
+      activeOption?.click();
+    }
   };
   const handleBlur = () => setTimeout(closeDropdown, 150);
 

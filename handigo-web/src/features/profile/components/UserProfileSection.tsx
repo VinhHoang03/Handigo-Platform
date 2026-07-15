@@ -4,6 +4,7 @@ import {
   type ReactNode,
 } from "react";
 import { Camera, Eye, EyeOff, MapPin, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type {
   GenderValue,
   UserAddress,
@@ -245,6 +246,7 @@ export function UserProfileSection({
 }: UserProfileSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEmailVisible, setIsEmailVisible] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserAddress | null>(null);
   const [profileForm, setProfileForm] = useState<UserProfileFormValue>(() =>
     toProfileForm(user),
   );
@@ -317,10 +319,14 @@ export function UserProfileSection({
     reader.readAsDataURL(file);
   };
 
-  const handleDeleteAddress = async (address: UserAddress) => {
-    const confirmed = window.confirm(`Xóa địa chỉ "${address.fullAddress}"?`);
-    if (!confirmed) return;
-    await onDeleteAddress?.(address);
+  const confirmDeleteAddress = async () => {
+    if (!deleteTarget || !onDeleteAddress) return;
+    try {
+      await onDeleteAddress(deleteTarget);
+      setDeleteTarget(null);
+    } catch {
+      // Component cha hiển thị lỗi xóa địa chỉ.
+    }
   };
 
   return (
@@ -565,9 +571,7 @@ export function UserProfileSection({
                   onEdit={onEditAddress}
                   onDelete={
                     onDeleteAddress
-                      ? (item) => {
-                          void handleDeleteAddress(item);
-                        }
+                      ? setDeleteTarget
                       : undefined
                   }
                 />
@@ -580,6 +584,15 @@ export function UserProfileSection({
           )}
         </div>)}
       </div>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Xóa địa chỉ"
+        message={`Bạn chắc chắn muốn xóa địa chỉ "${deleteTarget?.fullAddress || ""}"? Hành động này không thể khôi phục.`}
+        busy={isAddressSaving}
+        variant="danger"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDeleteAddress()}
+      />
     </section>
   );
 }

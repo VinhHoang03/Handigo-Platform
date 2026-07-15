@@ -19,6 +19,7 @@ const serviceFields = {
   fixedPrice: z.number().min(0).nullable().optional(),
   depositAmount: z.number().min(0).nullable().optional(),
   image: z.string().trim().url("Ảnh dịch vụ phải là một đường dẫn hợp lệ").max(2000).nullable().optional(),
+  requiresOptionSelection: z.boolean().optional(),
   isActive: z.boolean().optional(),
 };
 

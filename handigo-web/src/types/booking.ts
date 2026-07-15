@@ -18,6 +18,7 @@ export interface Service {
   fixedPrice?: number;
   depositAmount?: number;
   image?: string;
+  requiresOptionSelection: boolean;
   isActive: boolean;
 }
 
@@ -26,6 +27,7 @@ export interface ServiceOption {
   serviceId: string;
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType:
     | "room_count"
     | "area_size"
@@ -41,7 +43,6 @@ export interface ServiceOption {
   isFixedPrice?: boolean;
   selectionGroup?: string | null;
   selectionMode?: "single" | "multiple";
-  isRequired?: boolean;
   sortOrder?: number;
   isActive: boolean;
 }
@@ -78,6 +79,7 @@ export interface Address {
   ward: string;
   latitude?: number;
   longitude?: number;
+  placeId?: string;
   isDefault: boolean;
   note?: string;
 }

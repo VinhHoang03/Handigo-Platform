@@ -26,6 +26,7 @@ export interface Service {
   fixedPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  requiresOptionSelection: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -69,6 +70,7 @@ export interface ServicePayload {
   fixedPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  requiresOptionSelection?: boolean;
   isActive?: boolean;
 }
 
@@ -80,11 +82,11 @@ export interface ServiceOption {
   serviceId: string;
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType: ServiceOptionType;
   price: number;
   selectionGroup?: string | null;
   selectionMode?: ServiceOptionSelectionMode;
-  isRequired?: boolean;
   sortOrder?: number;
   isActive: boolean;
   createdAt: string;
@@ -94,11 +96,11 @@ export interface ServiceOption {
 export interface ServiceOptionPayload {
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType: ServiceOptionType;
   price: number;
   selectionGroup?: string | null;
   selectionMode?: ServiceOptionSelectionMode;
-  isRequired?: boolean;
   sortOrder?: number;
   isActive?: boolean;
 }

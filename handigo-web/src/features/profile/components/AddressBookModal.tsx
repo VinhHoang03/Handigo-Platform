@@ -76,19 +76,54 @@ const composeFullAddress = (
     .filter(Boolean)
     .join(", ");
 
+const normalizeAdministrativeName = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/đ/g, "d")
+    .replace(/[_.,/-]+/g, " ")
+    .replace(
+      /^(tinh|thanh pho|tp|phuong|xa|thi tran|dac khu)\s+/,
+      "",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+
+const findAdministrativeUnit = (
+  items: AdministrativeUnit[],
+  name: string,
+) => {
+  const normalizedName = normalizeAdministrativeName(name);
+  if (!normalizedName) return undefined;
+
+  return items.find(
+    (item) =>
+      normalizeAdministrativeName(item.name) === normalizedName ||
+      normalizeAdministrativeName(item.codeName) === normalizedName,
+  );
+};
+
 const extractAddressLine = (
   fullAddress: string,
   ward?: string,
   province?: string,
 ) => {
   const administrativeParts = [ward, province]
-    .map((part) => part?.trim().toLowerCase())
+    .map((part) => normalizeAdministrativeName(part || ""))
     .filter(Boolean);
 
   return fullAddress
     .split(",")
     .map((part) => part.trim())
-    .filter((part) => !administrativeParts.includes(part.toLowerCase()))
+    .filter((part) => {
+      const normalizedPart = normalizeAdministrativeName(part);
+      return (
+        normalizedPart !== "viet nam" &&
+        !/^\d{4,6}$/.test(part) &&
+        !administrativeParts.includes(normalizedPart)
+      );
+    })
     .join(", ")
     .trim();
 };
@@ -143,13 +178,21 @@ export function AddressBookModal({
   const [addressFormError, setAddressFormError] = useState("");
   const [addressAutocompleteError, setAddressAutocompleteError] = useState("");
   const [administrativeError, setAdministrativeError] = useState("");
+  const [administrativeMatchMessage, setAdministrativeMatchMessage] =
+    useState("");
   const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
   const [wards, setWards] = useState<AdministrativeUnit[]>([]);
   const [isProvinceLoading, setIsProvinceLoading] = useState(false);
   const [isWardLoading, setIsWardLoading] = useState(false);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const [loadedWardProvinceCode, setLoadedWardProvinceCode] = useState<
+    number | undefined
+  >();
 
   const addressAutocompleteContainerRef = useRef<HTMLDivElement>(null);
   const addressLineValueRef = useRef("");
+  const placeResolutionSequenceRef = useRef(0);
+  const provincesRef = useRef<AdministrativeUnit[]>([]);
 
   const provinceOptions = useMemo(
     () => toSelectOptions(provinces),
@@ -160,6 +203,10 @@ export function AddressBookModal({
   useEffect(() => {
     addressLineValueRef.current = addressForm.addressLine;
   }, [addressForm.addressLine]);
+
+  useEffect(() => {
+    provincesRef.current = provinces;
+  }, [provinces]);
 
   useEffect(() => {
     if (!open || provinces.length > 0) return undefined;
@@ -188,7 +235,13 @@ export function AddressBookModal({
   }, [open, provinces.length]);
 
   useEffect(() => {
-    if (!open || !addressForm.provinceCode) return undefined;
+    if (
+      !open ||
+      !addressForm.provinceCode ||
+      loadedWardProvinceCode === addressForm.provinceCode
+    ) {
+      return undefined;
+    }
 
     let cancelled = false;
 
@@ -199,7 +252,10 @@ export function AddressBookModal({
         const data = await getWardsByProvince(
           addressForm.provinceCode as number,
         );
-        if (!cancelled) setWards(data);
+        if (!cancelled) {
+          setWards(data);
+          setLoadedWardProvinceCode(addressForm.provinceCode);
+        }
       } catch {
         if (!cancelled) {
           setAdministrativeError("Không tải được danh sách phường/xã.");
@@ -213,7 +269,7 @@ export function AddressBookModal({
     return () => {
       cancelled = true;
     };
-  }, [addressForm.provinceCode, open]);
+  }, [addressForm.provinceCode, loadedWardProvinceCode, open]);
 
   useEffect(() => {
     if (
@@ -228,6 +284,9 @@ export function AddressBookModal({
     let detachAutocomplete: (() => void) | undefined;
 
     const handlePlaceInput = (value: string) => {
+      placeResolutionSequenceRef.current += 1;
+      setIsResolvingAddress(false);
+      setAdministrativeMatchMessage("");
       setAddressForm((current) => {
         const next = {
           ...current,
@@ -244,32 +303,99 @@ export function AddressBookModal({
       });
     };
 
-    const handlePlaceSelect = (placeAddress: ParsedPlaceAddress) => {
+    const handlePlaceSelect = async (placeAddress: ParsedPlaceAddress) => {
+      const resolutionSequence = ++placeResolutionSequenceRef.current;
+      setIsResolvingAddress(true);
+      setAdministrativeError("");
+      setAdministrativeMatchMessage("");
+
       setAddressForm((current) => ({
         ...current,
         addressLine: extractAddressLine(
           placeAddress.fullAddress || current.addressLine,
-          current.ward,
-          current.province,
+          placeAddress.ward,
+          placeAddress.province,
         ),
+        province: "",
+        provinceCode: undefined,
+        ward: "",
+        wardCode: undefined,
         latitude: placeAddress.latitude,
         longitude: placeAddress.longitude,
         placeId: placeAddress.placeId,
       }));
-    };
 
-    const contextParts = [addressForm.ward, addressForm.province]
-      .map((part) => part.trim())
-      .filter(Boolean);
+      try {
+        const availableProvinces =
+          provincesRef.current.length > 0
+            ? provincesRef.current
+            : await getProvinces();
+        if (resolutionSequence !== placeResolutionSequenceRef.current) return;
+        if (provincesRef.current.length === 0) setProvinces(availableProvinces);
+
+        const matchedProvince = findAdministrativeUnit(
+          availableProvinces,
+          placeAddress.province,
+        );
+        if (!matchedProvince) {
+          setWards([]);
+          setLoadedWardProvinceCode(undefined);
+          setAdministrativeMatchMessage(
+            "Chưa tự xác định được tỉnh/thành phố. Vui lòng chọn thủ công.",
+          );
+          return;
+        }
+
+        setLoadedWardProvinceCode(matchedProvince.code);
+        setAddressForm((current) => ({
+          ...current,
+          province: matchedProvince.name,
+          provinceCode: matchedProvince.code,
+        }));
+
+        const availableWards = await getWardsByProvince(matchedProvince.code);
+        if (resolutionSequence !== placeResolutionSequenceRef.current) return;
+        setWards(availableWards);
+        setLoadedWardProvinceCode(matchedProvince.code);
+
+        const matchedWard = findAdministrativeUnit(
+          availableWards,
+          placeAddress.ward,
+        );
+        if (!matchedWard) {
+          setAdministrativeMatchMessage(
+            "Đã xác định tỉnh/thành phố. Vui lòng chọn phường/xã để xác nhận.",
+          );
+          return;
+        }
+
+        setAddressForm((current) => ({
+          ...current,
+          ward: matchedWard.name,
+          wardCode: matchedWard.code,
+        }));
+        setAdministrativeMatchMessage(
+          `Đã xác định: ${matchedWard.name}, ${matchedProvince.name}.`,
+        );
+      } catch {
+        if (resolutionSequence !== placeResolutionSequenceRef.current) return;
+        setLoadedWardProvinceCode(undefined);
+        setAdministrativeMatchMessage(
+          "Không thể tự điền đơn vị hành chính. Vui lòng chọn thủ công.",
+        );
+      } finally {
+        if (resolutionSequence === placeResolutionSequenceRef.current) {
+          setIsResolvingAddress(false);
+        }
+      }
+    };
 
     void mountPlaceAutocompleteElement({
       container: addressAutocompleteContainerRef.current,
       value: addressLineValueRef.current,
-      placeholder: contextParts.length
-        ? `Nhập số nhà, tên đường, ${contextParts.join(", ")}`
-        : "Nhập số nhà, tên đường",
+      placeholder: "Nhập số nhà, tên đường hoặc tên địa điểm",
       onInput: handlePlaceInput,
-      onPlaceSelect: handlePlaceSelect,
+      onPlaceSelect: (placeAddress) => void handlePlaceSelect(placeAddress),
       onError: (message) =>
         setAddressAutocompleteError(
           `${message} Bạn vẫn có thể nhập địa chỉ thủ công.`,
@@ -294,7 +420,7 @@ export function AddressBookModal({
       cancelled = true;
       detachAutocomplete?.();
     };
-  }, [addressAutocompleteError, addressForm.province, addressForm.ward, open]);
+  }, [addressAutocompleteError, open]);
 
   const handleAddressInputChange = (
     field: keyof AddressFormState,
@@ -320,6 +446,8 @@ export function AddressBookModal({
       wardCode: undefined,
     }));
     setWards([]);
+    setLoadedWardProvinceCode(undefined);
+    setAdministrativeMatchMessage("");
   };
 
   const handleWardChange = (option: SearchableSelectOption | null) => {
@@ -328,6 +456,7 @@ export function AddressBookModal({
       ward: option?.label || "",
       wardCode: option?.value,
     }));
+    setAdministrativeMatchMessage("");
   };
 
   const getCurrentPlacesInputValue = () => {
@@ -453,36 +582,12 @@ export function AddressBookModal({
               }
             />
           </label>
-          <SearchableSelect
-            id="address-province"
-            label="Tỉnh /Thành phố"
-            value={addressForm.provinceCode}
-            options={provinceOptions}
-            loading={isProvinceLoading}
-            placeholder="Nhập để tìm kiếm tỉnh/thành"
-            emptyText="Không tìm thấy tỉnh/thành."
-            containerClassName="order-3"
-            onChange={handleProvinceChange}
-          />
-          <SearchableSelect
-            id="address-ward"
-            label="Phường / Xã"
-            value={addressForm.wardCode}
-            options={wardOptions}
-            loading={isWardLoading}
-            disabled={!addressForm.provinceCode}
-            placeholder="Nhập để tìm kiếm phường/xã"
-            emptyText="Không tìm thấy phường/xã."
-            containerClassName="order-4"
-            onChange={handleWardChange}
-          />
-
-          <div className="order-5 space-y-2 md:col-span-2">
+          <div className="order-3 space-y-2 md:col-span-2">
             <label
               htmlFor="address-line-google-places"
               className="ml-1 block text-label-sm font-medium text-on-surface-variant"
             >
-              Địa chỉ cụ thể
+              Địa chỉ
             </label>
             {addressAutocompleteError ? (
               <input
@@ -511,9 +616,47 @@ export function AddressBookModal({
               }`}
             >
               {addressAutocompleteError ||
-                "Google Places sẽ gợi ý địa chỉ tại Việt Nam. Tỉnh/thành và phường/xã vẫn lấy từ dropdown đã chọn."}
+                "Nhập và chọn một địa chỉ gợi ý để tự động điền tỉnh/thành phố và phường/xã."}
             </p>
           </div>
+
+          {(isResolvingAddress || administrativeMatchMessage) && (
+            <div
+              className={`order-4 rounded-xl px-3 py-2 text-sm md:col-span-2 ${
+                addressForm.provinceCode && addressForm.wardCode
+                  ? "bg-primary/10 text-primary"
+                  : "bg-surface-container-low text-on-surface-variant"
+              }`}
+            >
+              {isResolvingAddress
+                ? "Đang xác định tỉnh/thành phố và phường/xã..."
+                : administrativeMatchMessage}
+            </div>
+          )}
+
+          <SearchableSelect
+            id="address-province"
+            label="Tỉnh / Thành phố"
+            value={addressForm.provinceCode}
+            options={provinceOptions}
+            loading={isProvinceLoading}
+            placeholder="Nhập để tìm kiếm tỉnh/thành"
+            emptyText="Không tìm thấy tỉnh/thành."
+            containerClassName="order-5"
+            onChange={handleProvinceChange}
+          />
+          <SearchableSelect
+            id="address-ward"
+            label="Phường / Xã"
+            value={addressForm.wardCode}
+            options={wardOptions}
+            loading={isWardLoading}
+            disabled={!addressForm.provinceCode}
+            placeholder="Nhập để tìm kiếm phường/xã"
+            emptyText="Không tìm thấy phường/xã."
+            containerClassName="order-6"
+            onChange={handleWardChange}
+          />
 
           <FloatingTextarea
             id="address-note"
@@ -521,7 +664,7 @@ export function AddressBookModal({
             value={addressForm.note || ""}
             rows={3}
             maxLength={200}
-            containerClassName="order-6 md:col-span-2"
+            containerClassName="order-7 md:col-span-2"
             onValueChange={(value) => handleAddressInputChange("note", value)}
           />
         </div>
@@ -549,8 +692,14 @@ export function AddressBookModal({
           >
             Hủy
           </button>
-          <button type="submit" disabled={isSaving} className="btn-primary">
-            {isSaving
+          <button
+            type="submit"
+            disabled={isSaving || isResolvingAddress}
+            className="btn-primary"
+          >
+            {isResolvingAddress
+              ? "Đang xác định địa chỉ..."
+              : isSaving
               ? "Đang lưu..."
               : address
                 ? "Cập nhật địa chỉ"

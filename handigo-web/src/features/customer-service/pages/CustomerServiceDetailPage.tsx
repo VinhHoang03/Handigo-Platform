@@ -16,8 +16,8 @@ import {
 } from "../utils/serviceDisplay";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import {
-  getMissingRequiredGroup,
   groupServiceOptions,
+  isRequiredOptionSelectionMissing,
   toggleServiceOption,
 } from "@/features/booking/utils/serviceOptionSelection";
 import {
@@ -53,6 +53,59 @@ const getErrorMessage = (
 };
 
 const CURRENT_LOCATION_VALUE = "__current_location__";
+const CURRENT_LOCATION_NOTE = "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
+const CURRENT_LOCATION_DUPLICATE_RADIUS_METERS = 50;
+
+const getDistanceMeters = (
+  latitudeA: number,
+  longitudeA: number,
+  latitudeB: number,
+  longitudeB: number,
+) => {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const latitudeDelta = toRadians(latitudeB - latitudeA);
+  const longitudeDelta = toRadians(longitudeB - longitudeA);
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(toRadians(latitudeA)) *
+      Math.cos(toRadians(latitudeB)) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const findExistingCurrentLocation = (
+  addresses: Address[],
+  currentAddress: {
+    latitude: number;
+    longitude: number;
+    placeId?: string;
+  },
+) =>
+  addresses.find((address) => {
+    if (currentAddress.placeId && address.placeId === currentAddress.placeId) {
+      return true;
+    }
+
+    if (
+      typeof address.latitude !== "number" ||
+      typeof address.longitude !== "number" ||
+      !Number.isFinite(address.latitude) ||
+      !Number.isFinite(address.longitude)
+    ) {
+      return false;
+    }
+
+    return (
+      getDistanceMeters(
+        address.latitude,
+        address.longitude,
+        currentAddress.latitude,
+        currentAddress.longitude,
+      ) <= CURRENT_LOCATION_DUPLICATE_RADIUS_METERS
+    );
+  });
 
 const formatAddressLabel = (address: Address) =>
   address.fullAddress ||
@@ -146,9 +199,17 @@ export default function CustomerServiceDetailPage() {
         if (!isMounted) return;
 
         setAddresses(data);
-        if (!addressId && data.length > 0) {
-          const defaultAddress = data.find((item) => item.isDefault) || data[0];
-          setAddressId(defaultAddress._id);
+        if (data.length > 0) {
+          const selectedAddress = data.find((item) => item._id === addressId);
+          const isCurrentLocationSelected =
+            selectedAddress?.note?.trim() === CURRENT_LOCATION_NOTE;
+          const nextAddress = isCurrentLocationSelected
+            ? selectedAddress
+            : data.find((item) => item.isDefault) || data[0];
+
+          if (nextAddress._id !== addressId) {
+            setAddressId(nextAddress._id);
+          }
         }
       } catch {
         if (isMounted) {
@@ -272,6 +333,16 @@ export default function CustomerServiceDetailPage() {
             coords.latitude,
             coords.longitude,
           );
+          const existingAddress = findExistingCurrentLocation(
+            addresses,
+            currentAddress,
+          );
+
+          if (existingAddress) {
+            setAddressId(existingAddress._id);
+            return;
+          }
+
           const createdAddress = await bookingApi.createAddress({
             recipientName,
             recipientPhone,
@@ -281,7 +352,7 @@ export default function CustomerServiceDetailPage() {
             latitude: currentAddress.latitude,
             longitude: currentAddress.longitude,
             placeId: currentAddress.placeId,
-            note: "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.",
+            note: CURRENT_LOCATION_NOTE,
             isDefault: false,
           });
 
@@ -329,11 +400,8 @@ export default function CustomerServiceDetailPage() {
       setAddressSelectionError("Vui lòng chọn địa chỉ thực hiện trước khi đặt lịch.");
       return;
     }
-    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
-    if (missingGroup) {
-      setOptionSelectionError(
-        `Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`,
-      );
+    if (isRequiredOptionSelectionMissing(service, selectedOptionIds)) {
+      setOptionSelectionError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.");
       return;
     }
 
@@ -449,7 +517,12 @@ export default function CustomerServiceDetailPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-2xl font-bold">Gói dịch vụ</h2>
+            <h2 className="mb-3 text-2xl font-bold">
+              Gói dịch vụ
+              {service.requiresOptionSelection ? (
+                <span className="text-error"> *</span>
+              ) : null}
+            </h2>
             {options.length === 0 ? (
               <div className="rounded-xl border border-dashed border-outline-variant bg-white p-6 text-on-surface-variant">
                 Dịch vụ này chưa có tùy chọn bổ sung.
@@ -459,7 +532,7 @@ export default function CustomerServiceDetailPage() {
                 {optionGroups.map((group) => (
                   <fieldset key={group.key}>
                     <legend className="mb-3 font-bold text-on-surface">
-                      {group.label}{group.isRequired ? <span className="text-error"> *</span> : null}
+                      {group.label}
                     </legend>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       {group.options.map((option) => {
@@ -473,19 +546,28 @@ export default function CustomerServiceDetailPage() {
                             onClick={() => handleToggleOption(option)}
                             className={`rounded-xl border-2 bg-white p-5 text-left transition ${checked ? "border-primary bg-surface-container-low shadow-sm" : "border-outline-variant hover:border-primary/50"}`}
                           >
-                            <div className="mb-2 flex items-start justify-between gap-3">
-                              <h3 className="font-bold text-primary">{option.name}</h3>
-                              <span className="font-bold text-on-surface">
-                                {service.serviceType === "variable_price"
-                                  ? "Theo báo giá"
-                                  : getOptionPrice(option) > 0
-                                    ? `+${money.format(getOptionPrice(option))}`
-                                    : "Miễn phí"}
-                              </span>
+                            <div className="flex gap-4">
+                              <ReliableImage
+                                src={option.image}
+                                alt={`Ảnh tùy chọn ${option.name}`}
+                                className="h-24 w-24 shrink-0 rounded-lg object-cover"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-2 flex items-start justify-between gap-3">
+                                  <h3 className="font-bold text-primary">{option.name}</h3>
+                                  {service.serviceType === "fixed_price" ? (
+                                    <span className="font-bold text-on-surface">
+                                      {getOptionPrice(option) > 0
+                                        ? `+${money.format(getOptionPrice(option))}`
+                                        : "Miễn phí"}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="text-sm text-on-surface-variant">
+                                  {option.description || "Tùy chọn bổ sung cho dịch vụ này."}
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-sm text-on-surface-variant">
-                              {option.description || "Tùy chọn bổ sung cho dịch vụ này."}
-                            </p>
                           </button>
                         );
                       })}
