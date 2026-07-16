@@ -143,14 +143,6 @@ const geocodeAddressViaNominatim = async (
 const formatCoordinate = (coordinate: Coordinate) =>
   coordinate.latitude.toFixed(5) + ", " + coordinate.longitude.toFixed(5);
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-
 const formatUpdatedAt = (value?: string) => {
   if (!value) return "--";
   const date = new Date(value);
@@ -208,6 +200,33 @@ const createCustomIcon = (shortLabel: string, color: string, pulse: boolean) => 
     iconAnchor: [20, 20],
     popupAnchor: [0, -22],
   });
+};
+
+const createPopupContent = (point: TrackingPoint) => {
+  const container = document.createElement("div");
+  container.style.minWidth = "160px";
+
+  const title = document.createElement("p");
+  title.style.cssText =
+    "margin:0 0 4px;font-weight:700;font-size:13px;color:#131b2e";
+  title.textContent = point.label;
+  container.appendChild(title);
+
+  const location = document.createElement("p");
+  location.style.cssText = "margin:0;font-size:11px;color:#6b7280";
+  location.textContent = point.displayText;
+  container.appendChild(location);
+
+  if (point.updatedAtLabel !== "--") {
+    const updatedAt = document.createElement("p");
+    updatedAt.style.cssText =
+      "margin:4px 0 0;font-size:11px;color:#9ca3af";
+    updatedAt.textContent =
+      mapText.lastUpdated + ": " + point.updatedAtLabel;
+    container.appendChild(updatedAt);
+  }
+
+  return container;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -566,23 +585,17 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
       const latlng = toLatLng(point.coordinate);
       const pulse = liveTrackingEnabled;
       const icon = createCustomIcon(point.shortLabel, point.color, pulse);
-      const popupHtml = `
-        <div style="min-width:160px">
-          <p style="margin:0 0 4px;font-weight:700;font-size:13px;color:#131b2e">${point.label}</p>
-          <p style="margin:0;font-size:11px;color:#6b7280">${escapeHtml(point.displayText)}</p>
-          ${point.updatedAtLabel !== "--" ? `<p style="margin:4px 0 0;font-size:11px;color:#9ca3af">${mapText.lastUpdated}: ${point.updatedAtLabel}</p>` : ""}
-        </div>
-      `;
+      const popupContent = createPopupContent(point);
 
       const existing = markersRef.current[point.key];
       if (existing) {
         existing.setLatLng(latlng);
         existing.setIcon(icon);
-        existing.getPopup()?.setContent(popupHtml);
+        existing.getPopup()?.setContent(popupContent);
       } else {
         const marker = L.marker(latlng, { icon })
           .addTo(mapRef.current!)
-          .bindPopup(popupHtml, { className: "custom-popup", closeButton: false, offset: [0, -8] });
+          .bindPopup(popupContent, { className: "custom-popup", closeButton: false, offset: [0, -8] });
         markersRef.current[point.key] = marker;
       }
     }

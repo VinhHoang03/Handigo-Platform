@@ -1,0 +1,234 @@
+import { useMemo, useState, type FormEvent } from "react";
+import { Modal } from "@/components/common/Modal";
+import type { Order } from "@/types/booking";
+import { getErrorMessage } from "@/utils/apiError";
+import { caseManagementApi } from "../api/caseManagement.api";
+import type {
+  CreateReportPayload,
+  ReportType,
+  SupportTicketCategory,
+  SupportTicketPriority,
+} from "../types/caseManagement.types";
+import { EvidenceImagePicker } from "./EvidenceImagePicker";
+
+export type CreateCaseKind = "complaint" | "ticket" | "report";
+
+interface CreateCaseModalProps {
+  open: boolean;
+  kind: CreateCaseKind;
+  role: "CUSTOMER" | "PROVIDER";
+  orders: Order[];
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+const KIND_TITLES: Record<CreateCaseKind, string> = {
+  complaint: "Tạo khiếu nại",
+  ticket: "Tạo yêu cầu hỗ trợ",
+  report: "Gửi báo cáo",
+};
+
+const REPORT_TYPES: Array<{ value: ReportType; label: string }> = [
+  { value: "harassment", label: "Quấy rối" },
+  { value: "insulting_language", label: "Ngôn từ xúc phạm" },
+  { value: "fraud", label: "Gian lận" },
+  { value: "impersonation", label: "Mạo danh" },
+  { value: "spam_booking", label: "Đặt đơn rác" },
+  { value: "payment_fraud", label: "Gian lận thanh toán" },
+  { value: "user_behavior", label: "Hành vi người dùng" },
+  { value: "other", label: "Khác" },
+];
+
+const CATEGORY_OPTIONS: Array<{ value: SupportTicketCategory; label: string }> = [
+  { value: "ACCOUNT", label: "Tài khoản" },
+  { value: "PAYMENT", label: "Thanh toán" },
+  { value: "ORDER", label: "Đơn dịch vụ" },
+  { value: "TECHNICAL", label: "Kỹ thuật" },
+  { value: "SECURITY", label: "Bảo mật" },
+  { value: "APPEAL", label: "Khiếu nại quyết định" },
+  { value: "OTHER", label: "Khác" },
+];
+
+const getCustomerId = (order: Order) =>
+  typeof order.customerId === "string" ? order.customerId : order.customerId._id;
+
+export function CreateCaseModal({
+  open,
+  kind,
+  role,
+  orders,
+  onClose,
+  onCreated,
+}: CreateCaseModalProps) {
+  const [orderId, setOrderId] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<SupportTicketCategory>("ORDER");
+  const [priority, setPriority] = useState<SupportTicketPriority>("MEDIUM");
+  const [reportType, setReportType] = useState<ReportType>("user_behavior");
+  const [reportTarget, setReportTarget] = useState<"participant" | "order">("participant");
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const availableOrders = useMemo(
+    () => (kind === "complaint" ? orders.filter((order) => order.status === "completed") : orders),
+    [kind, orders],
+  );
+
+  const selectedOrder = orders.find((order) => order._id === orderId);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if ((kind === "complaint" || kind === "report") && !selectedOrder) {
+      setError("Vui lòng chọn đơn dịch vụ liên quan.");
+      return;
+    }
+
+    try {
+      setBusy(true);
+      setError("");
+      const uploadedFiles = files.length ? await caseManagementApi.uploadImages(files) : [];
+      const imageUrls = uploadedFiles.map((file) => file.url);
+
+      if (kind === "complaint") {
+        await caseManagementApi.createComplaint({
+          orderId,
+          title: title.trim(),
+          description: description.trim(),
+          evidenceImages: imageUrls,
+        });
+      } else if (kind === "ticket") {
+        await caseManagementApi.createTicket({
+          orderId: orderId || undefined,
+          category,
+          priority,
+          subject: title.trim(),
+          description: description.trim(),
+          attachments: uploadedFiles,
+        });
+      } else if (selectedOrder) {
+        const payload: CreateReportPayload = {
+          targetType: reportTarget === "order" ? "order" : role === "CUSTOMER" ? "provider" : "user",
+          reportType,
+          title: title.trim(),
+          description: description.trim(),
+          evidenceImages: imageUrls,
+          evidenceFiles: uploadedFiles,
+        };
+
+        if (reportTarget === "order") {
+          payload.orderId = selectedOrder._id;
+        } else if (role === "CUSTOMER") {
+          if (!selectedOrder.providerId?._id) {
+            throw new Error("Đơn dịch vụ chưa có nhà cung cấp để báo cáo.");
+          }
+          payload.targetProviderId = selectedOrder.providerId._id;
+          payload.orderId = selectedOrder._id;
+        } else {
+          payload.targetUserId = getCustomerId(selectedOrder);
+          payload.orderId = selectedOrder._id;
+        }
+        await caseManagementApi.createReport(payload);
+      }
+
+      onCreated();
+      onClose();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Không thể gửi yêu cầu. Vui lòng thử lại."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      title={KIND_TITLES[kind]}
+      onClose={onClose}
+      size="lg"
+      closeOnEsc={!busy}
+      closeOnOverlayClick={!busy}
+    >
+      <form onSubmit={submit} className="space-y-5">
+        <label className="block text-sm font-semibold">
+          Đơn dịch vụ {kind === "ticket" ? "(không bắt buộc)" : ""}
+          <select
+            value={orderId}
+            onChange={(event) => setOrderId(event.target.value)}
+            required={kind !== "ticket"}
+            disabled={busy}
+            className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
+          >
+            <option value="">Chọn đơn dịch vụ</option>
+            {availableOrders.map((order) => (
+              <option key={order._id} value={order._id}>
+                {order.orderCode} · {order.serviceId?.name || "Dịch vụ"} · {order.status}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {kind === "ticket" && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-semibold">
+              Danh mục
+              <select value={category} onChange={(event) => setCategory(event.target.value as SupportTicketCategory)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
+                {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-semibold">
+              Mức ưu tiên
+              <select value={priority} onChange={(event) => setPriority(event.target.value as SupportTicketPriority)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
+                <option value="LOW">Thấp</option>
+                <option value="MEDIUM">Trung bình</option>
+                <option value="HIGH">Cao</option>
+                <option value="URGENT">Khẩn cấp</option>
+              </select>
+            </label>
+          </div>
+        )}
+
+        {kind === "report" && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-semibold">
+              Đối tượng báo cáo
+              <select value={reportTarget} onChange={(event) => setReportTarget(event.target.value as "participant" | "order")} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
+                <option value="participant">{role === "CUSTOMER" ? "Nhà cung cấp của đơn" : "Khách hàng của đơn"}</option>
+                <option value="order">Đơn dịch vụ</option>
+              </select>
+            </label>
+            <label className="text-sm font-semibold">
+              Loại báo cáo
+              <select value={reportType} onChange={(event) => setReportType(event.target.value as ReportType)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
+                {REPORT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+
+        <label className="block text-sm font-semibold">
+          Tiêu đề
+          <input value={title} onChange={(event) => setTitle(event.target.value)} minLength={5} maxLength={200} required disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3" />
+        </label>
+        <label className="block text-sm font-semibold">
+          Nội dung chi tiết
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} minLength={10} maxLength={3000} rows={6} required disabled={busy} className="mt-2 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3" />
+        </label>
+
+        <div>
+          <p className="mb-2 text-sm font-semibold">Ảnh bằng chứng</p>
+          <EvidenceImagePicker files={files} onChange={setFiles} disabled={busy} />
+        </div>
+
+        {error && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{error}</p>}
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
+          <button type="submit" disabled={busy} className="btn-primary">
+            {busy ? "Đang gửi..." : "Gửi yêu cầu"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

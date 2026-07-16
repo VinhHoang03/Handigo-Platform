@@ -5,6 +5,7 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   createProviderApplicationSchema,
+  providerApplicationIdParamSchema,
   saveProviderApplicationDraftSchema,
 } from "../validations/providerApplication.validator";
 
@@ -36,6 +37,7 @@ router.get(
   "/:id",
   authMiddleware,
   roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(providerApplicationIdParamSchema, "params"),
   providerApplicationController.getMyApplicationById,
 );
 
@@ -43,6 +45,7 @@ router.patch(
   "/:id/resubmit",
   authMiddleware,
   roleMiddleware("CUSTOMER"),
+  validate(providerApplicationIdParamSchema, "params"),
   validate(createProviderApplicationSchema),
   providerApplicationController.resubmitApplication,
 );

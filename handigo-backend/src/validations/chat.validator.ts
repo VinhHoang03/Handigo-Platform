@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const conversationIdParamSchema = z.object({
+  conversationId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, "ID cuộc trò chuyện không hợp lệ"),
+});
+
 export const sendMessageSchema = z
   .object({
     messageType: z.enum(["text", "image"]).default("text"),

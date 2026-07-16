@@ -953,7 +953,11 @@ export const getAdminWallets = async (query: AdminWalletListQuery) => {
   };
 
   if (query.search) {
-    const searchRegex = new RegExp(query.search, "i");
+    const search = query.search.replace(
+      /[.*+?^$()|[\]\\{}]/g,
+      "\\$&",
+    );
+    const searchRegex = new RegExp(search, "i");
     userFilter.$or = [
       { fullName: searchRegex },
       { email: searchRegex },

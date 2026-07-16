@@ -26,6 +26,11 @@ const emptyItem: QuotationFormItem = {
   note: "",
 };
 
+const MAX_QUOTATION_ITEMS = 100;
+const MAX_GENERAL_TEXT_LENGTH = 2000;
+const MAX_ITEM_TITLE_LENGTH = 200;
+const MAX_ITEM_NOTE_LENGTH = 1000;
+
 interface RepairQuotationFormProps {
   onSubmit: (payload: CreateQuotationPayload) => Promise<void>;
   onCancel: () => void;
@@ -64,6 +69,41 @@ export function RepairQuotationForm({
     );
     if (!validItems.length) {
       setError("Vui lòng thêm ít nhất một hạng mục báo giá hợp lệ.");
+      return;
+    }
+    if (
+      inspectionNote.trim().length > MAX_GENERAL_TEXT_LENGTH ||
+      recommendation.trim().length > MAX_GENERAL_TEXT_LENGTH
+    ) {
+      setError('Ghi chú khảo sát và đề xuất không được vượt quá 2000 ký tự.');
+      return;
+    }
+    if (
+      validItems.some(
+        (item) =>
+          item.title.trim().length > MAX_ITEM_TITLE_LENGTH ||
+          item.description.trim().length > MAX_GENERAL_TEXT_LENGTH ||
+          item.note.trim().length > MAX_ITEM_NOTE_LENGTH ||
+          !Number.isInteger(item.quantity) ||
+          item.quantity < 1 ||
+          item.quantity > 1000 ||
+          !Number.isFinite(item.unitPrice) ||
+          item.unitPrice < 0,
+      )
+    ) {
+      setError('Có hạng mục báo giá chưa hợp lệ.');
+      return;
+    }
+    const validSubtotal = validItems.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
+    if (
+      !Number.isFinite(discountAmount) ||
+      discountAmount < 0 ||
+      discountAmount > validSubtotal
+    ) {
+      setError('Số tiền giảm giá phải từ 0 đến tạm tính.');
       return;
     }
 
@@ -111,6 +151,7 @@ export function RepairQuotationForm({
           <textarea
             value={inspectionNote}
             onChange={(event) => setInspectionNote(event.target.value)}
+            maxLength={MAX_GENERAL_TEXT_LENGTH}
             rows={4}
             className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
             placeholder="Mô tả tình trạng thiết bị sau khi kiểm tra..."
@@ -123,6 +164,7 @@ export function RepairQuotationForm({
           <textarea
             value={recommendation}
             onChange={(event) => setRecommendation(event.target.value)}
+            maxLength={MAX_GENERAL_TEXT_LENGTH}
             rows={4}
             className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
             placeholder="Phương án sửa chữa đề xuất..."
@@ -135,10 +177,11 @@ export function RepairQuotationForm({
           <h4 className="font-label-md text-on-surface">Hạng mục báo giá</h4>
           <button
             type="button"
+            disabled={items.length >= MAX_QUOTATION_ITEMS}
             onClick={() =>
               setItems((current) => [...current, { ...emptyItem }])
             }
-            className="text-sm font-medium text-primary hover:underline"
+            className="text-sm font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Thêm hạng mục
           </button>
@@ -151,6 +194,7 @@ export function RepairQuotationForm({
           >
             <input
               value={item.title}
+              maxLength={MAX_ITEM_TITLE_LENGTH}
               onChange={(event) =>
                 updateItem(index, { title: event.target.value })
               }
@@ -175,6 +219,8 @@ export function RepairQuotationForm({
             <input
               type="number"
               min={1}
+              max={1000}
+              step={1}
               value={item.quantity}
               onChange={(event) =>
                 updateItem(index, { quantity: Number(event.target.value) })
@@ -184,6 +230,7 @@ export function RepairQuotationForm({
             <input
               type="number"
               min={0}
+              step={1}
               value={item.unitPrice}
               onChange={(event) =>
                 updateItem(index, { unitPrice: Number(event.target.value) })
@@ -221,6 +268,8 @@ export function RepairQuotationForm({
           <input
             type="number"
             min={0}
+            max={subtotal}
+            step={1}
             value={discountAmount}
             onChange={(event) => setDiscountAmount(Number(event.target.value))}
             className="w-full rounded-2xl border border-outline-variant px-4 py-3"

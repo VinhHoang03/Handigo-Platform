@@ -1,12 +1,20 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary, { isCloudinaryConfigured } from "../configs/cloudinary";
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  hasValidFileSignature,
+} from "../utils/fileSignature";
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
-    callback(null, file.mimetype.startsWith("image/"));
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
+      callback(new Error("Chỉ chấp nhận ảnh JPEG, PNG, WebP, GIF hoặc AVIF"));
+      return;
+    }
+    callback(null, true);
   },
 }).single("image");
 
@@ -46,6 +54,13 @@ export const uploadAdminAssetImage = (
       return res.status(400).json({
         success: false,
         message: "Vui lòng chọn một tệp ảnh hợp lệ",
+      });
+    }
+
+    if (!hasValidFileSignature(req.file.buffer, req.file.mimetype)) {
+      return res.status(400).json({
+        success: false,
+        message: "Nội dung tệp không khớp với định dạng ảnh đã khai báo",
       });
     }
 

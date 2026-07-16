@@ -97,8 +97,9 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  uploadOrderAttachment: async (file: File) => {
+  uploadOrderAttachment: async (file: File, purpose?: 'order_problem') => {
     const formData = new FormData();
+    if (purpose) formData.append('purpose', purpose);
     formData.append("image", file);
     const response = await api.post<{
       success: boolean;

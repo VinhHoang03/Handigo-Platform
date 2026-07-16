@@ -244,7 +244,10 @@ export const getAdminReports = async (query: Query = {}) => {
   if (query.reportType) filter.reportType = query.reportType;
   if (query.targetType) filter.targetType = query.targetType;
   if (query.keyword?.trim()) {
-    const regex = new RegExp(query.keyword.trim(), "i");
+    const keyword = query.keyword
+      .trim()
+      .replace(/[.*+?^$()|[\]\\{}]/g, "\\$&");
+    const regex = new RegExp(keyword, "i");
     filter.$or = [{ title: regex }, { description: regex }];
   }
 

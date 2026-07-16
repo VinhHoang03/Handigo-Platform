@@ -4,6 +4,7 @@ import { Navbar } from "@/components/common/Navbar";
 import { NotificationBell } from "@/components/common/NotificationBell";
 import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { MessageCenter } from "@/features/chat/components/MessageCenter";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { isNavItemActive } from "./dashboardNavigation";
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
@@ -112,13 +113,7 @@ function ProviderTopbar({
           )}
 
           <NotificationBell role="PROVIDER" />
-          <button
-            type="button"
-            aria-label="Tin nhắn"
-            className="material-symbols-outlined hidden rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary sm:inline-flex"
-          >
-            chat_bubble
-          </button>
+          <MessageCenter />
           <div ref={accountRef} className="relative">
             <button
               type="button"

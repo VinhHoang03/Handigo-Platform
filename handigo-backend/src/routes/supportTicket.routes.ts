@@ -7,6 +7,7 @@ import {
   addSupportTicketResponseSchema,
   createSupportTicketSchema,
   supportTicketIdSchema,
+  supportTicketListQuerySchema,
 } from "../validations/supportTicket.validator";
 
 const router = Router();
@@ -19,7 +20,11 @@ router.post(
   validate(createSupportTicketSchema),
   supportTicketController.createSupportTicket,
 );
-router.get("/me", supportTicketController.getMySupportTickets);
+router.get(
+  "/me",
+  validate(supportTicketListQuerySchema, "query"),
+  supportTicketController.getMySupportTickets,
+);
 router.get(
   "/:id",
   validate(supportTicketIdSchema, "params"),

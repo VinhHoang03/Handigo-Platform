@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/booking.api';
+import { bookingVoucherApi } from '@/features/booking/api/voucher.api';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Address, Service, ServiceOption } from '../../../types/booking';
+import type { AvailableVoucher } from '../types/voucher.types';
 import { getMissingRequiredGroup } from '../utils/serviceOptionSelection';
 
 const paymentMethods = [
@@ -34,6 +36,10 @@ const ConfirmPaymentPage = () => {
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherError, setVoucherError] = useState('');
+  const [pendingOrderId, setPendingOrderId] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,6 +61,20 @@ const ConfirmPaymentPage = () => {
     }
     return () => { isMounted = false; };
   }, [serviceId, addressId, categoryId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    bookingVoucherApi.available()
+      .then((vouchers) => {
+        if (isMounted) setAvailableVouchers(vouchers);
+      })
+      .catch(() => {
+        if (isMounted) setAvailableVouchers([]);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
 
   const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
@@ -87,6 +107,7 @@ const ConfirmPaymentPage = () => {
 
     setIsSubmitting(true);
     setPaymentError('');
+    setVoucherError('');
     try {
       const payload: CreateOrderPayload = {
         serviceId,
@@ -100,13 +121,30 @@ const ConfirmPaymentPage = () => {
         paymentMethod: effectivePaymentMethod,
       };
 
-      const order = await bookingApi.createOrder(payload);
+      let orderId = pendingOrderId;
+      if (!orderId) {
+        const createdOrder = await bookingApi.createOrder(payload);
+        orderId = createdOrder._id;
+        setPendingOrderId(orderId);
+      }
+
+      const currentOrder = await bookingApi.getOrderById(orderId);
+      const currentVoucherCode = currentOrder.voucherSnapshot?.code || '';
+      const desiredVoucherCode = voucherCode.trim().toUpperCase();
+
+      if (currentVoucherCode && currentVoucherCode !== desiredVoucherCode) {
+        await bookingVoucherApi.remove(orderId);
+      }
+      if (desiredVoucherCode && currentVoucherCode !== desiredVoucherCode) {
+        await bookingVoucherApi.apply(orderId, desiredVoucherCode);
+      }
+
       if (effectivePaymentMethod === 'bank') {
         const payment = await bookingApi.createPayment({
-          orderId: order._id,
+          orderId,
           method: 'PAYOS',
           paymentType: service?.serviceType === 'variable_price' ? 'INSPECTION_DEPOSIT' : 'FULL',
-          returnUrl: `${window.location.origin}/customer/bookings/success?orderId=${order._id}`,
+          returnUrl: `${window.location.origin}/customer/bookings/success?orderId=${orderId}`,
           cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
         });
 
@@ -114,7 +152,7 @@ const ConfirmPaymentPage = () => {
           throw new Error('PayOS checkoutUrl is missing');
         }
 
-        sessionStorage.setItem('latestBookingOrderId', order._id);
+        sessionStorage.setItem('latestBookingOrderId', orderId);
         window.location.href = payment.checkoutUrl;
         return;
       }
@@ -122,18 +160,18 @@ const ConfirmPaymentPage = () => {
       await bookingApi.createPayment(
         effectivePaymentMethod === 'wallet'
           ? {
-              orderId: order._id,
+              orderId,
               method: 'WALLET',
               paymentType: 'FULL',
             }
           : {
-              orderId: order._id,
+              orderId,
               method: 'CASH',
               paymentType: 'FULL',
             },
       );
 
-      const orderDetail = await bookingApi.getOrderById(order._id);
+      const orderDetail = await bookingApi.getOrderById(orderId);
 
       reset();
       navigate('/customer/bookings/success', { state: { order: orderDetail } });
@@ -151,7 +189,11 @@ const ConfirmPaymentPage = () => {
       )?.message || requestError.response?.data?.message ||
         'Không thể tạo đơn đặt lịch. Vui lòng thử lại hoặc chọn địa chỉ khác.';
       console.error('Không thể tạo đơn đặt lịch.', error);
-      setPaymentError(message);
+      if (message.toLowerCase().includes('voucher')) {
+        setVoucherError(message);
+      } else {
+        setPaymentError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -177,6 +219,55 @@ const ConfirmPaymentPage = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
         <div className="lg:col-span-8 space-y-gutter">
+          <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
+            <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">local_offer</span>
+              Voucher
+            </h2>
+            <label className="block text-sm font-semibold">
+              Chọn voucher khả dụng
+              <select
+                value={voucherCode}
+                onChange={(event) => {
+                  setVoucherCode(event.target.value);
+                  setVoucherError('');
+                }}
+                disabled={isSubmitting}
+                className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
+              >
+                <option value="">Không sử dụng voucher</option>
+                {availableVouchers.map((voucher) => (
+                  <option key={voucher.id} value={voucher.code}>
+                    {voucher.code} · {voucher.discountType === 'PERCENT'
+                      ? `Giảm ${voucher.discountValue}%`
+                      : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}đ`}
+                    {voucher.minOrderAmount ? ` · Đơn từ ${voucher.minOrderAmount.toLocaleString('vi-VN')}đ` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={voucherCode}
+                onChange={(event) => {
+                  setVoucherCode(event.target.value.toUpperCase());
+                  setVoucherError('');
+                }}
+                maxLength={50}
+                disabled={isSubmitting}
+                placeholder="Hoặc nhập mã voucher"
+                className="min-h-11 flex-1 rounded-xl border border-outline-variant px-3 uppercase"
+              />
+              {voucherCode && (
+                <button type="button" onClick={() => setVoucherCode('')} disabled={isSubmitting} className="rounded-xl border border-outline-variant px-4 font-semibold text-on-surface-variant">
+                  Gỡ
+                </button>
+              )}
+            </div>
+            {voucherError && <p className="mt-3 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">{voucherError}</p>}
+            <p className="mt-3 text-xs text-on-surface-variant">Voucher được backend kiểm tra và áp dụng sau khi tạo đơn, trước khi khởi tạo giao dịch thanh toán.</p>
+          </section>
+
           <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
             <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">receipt_long</span>

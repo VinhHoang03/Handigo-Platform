@@ -5,6 +5,7 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   createFeedbackSchema,
+  feedbackListQuerySchema,
   providerReplySchema,
   updateFeedbackSchema,
   visibilitySchema,
@@ -66,6 +67,7 @@ router.get(
   "/provider/me",
   authMiddleware,
   roleMiddleware("PROVIDER"),
+  validate(feedbackListQuerySchema, "query"),
   feedbackController.getMyProviderFeedbacks,
 );
 
@@ -95,6 +97,7 @@ router.put(
 
 router.get(
   "/provider/:providerId",
+  validate(feedbackListQuerySchema, "query"),
   feedbackController.getProviderFeedbacks,
 );
 

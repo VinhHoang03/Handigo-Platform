@@ -566,7 +566,10 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
   }
 
   if (query.keyword) {
-    const keywordRegex = new RegExp(String(query.keyword).trim(), "i");
+    const keyword = String(query.keyword)
+      .trim()
+      .replace(/[.*+?^$()|[\]\\{}]/g, "\\$&");
+    const keywordRegex = new RegExp(keyword, "i");
     const users = await User.find({
       isDeleted: false,
       $or: [{ email: keywordRegex }, { fullName: keywordRegex }],

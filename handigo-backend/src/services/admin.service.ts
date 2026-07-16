@@ -32,7 +32,10 @@ export const getUsers = async (query: UserQuery = {}) => {
   const filter: Record<string, unknown> = { isDeleted: false };
 
   if (query.keyword) {
-    const keywordRegex = new RegExp(String(query.keyword).trim(), "i");
+    const keyword = String(query.keyword)
+      .trim()
+      .replace(/[.*+?^$()|[\]\\{}]/g, "\\$&");
+    const keywordRegex = new RegExp(keyword, "i");
     filter.$or = [{ email: keywordRegex }, { fullName: keywordRegex }];
   }
 

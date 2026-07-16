@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const dateStringSchema = z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), {
-  message: "Invalid date",
+  message: "Ngày không hợp lệ",
 });
 
 const toStartOfDay = (value: string) => {
@@ -30,7 +30,7 @@ export const dashboardQuerySchema = z
       ctx.addIssue({
         code: "custom",
         path: ["toDate"],
-        message: "toDate must be greater than or equal to fromDate",
+        message: "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu",
       });
     }
   });

@@ -321,7 +321,10 @@ const buildFeedbackFilter = (
   if (replied === false) filter.providerReply = null;
 
   if (query.keyword?.trim()) {
-    filter.comment = { $regex: query.keyword.trim(), $options: "i" };
+    const keyword = query.keyword
+      .trim()
+      .replace(/[.*+?^$()|[\]\\{}]/g, "\\$&");
+    filter.comment = { $regex: keyword, $options: "i" };
   }
 
   return filter;

@@ -24,7 +24,7 @@ export const vietnamesePhoneSchema = z.string().transform(normalizeVietnamesePho
 export const updateUserProfileSchema = z.object({
   fullName: personNameSchema.optional(),
   phone: vietnamesePhoneSchema.optional(),
-  avatar: z.string().trim().nullable().optional(),
+  avatar: z.string().trim().max(2000).nullable().optional(),
   birthday: z
     .union([z.string().trim(), z.date()])
     .nullable()
@@ -32,8 +32,17 @@ export const updateUserProfileSchema = z.object({
     .refine(
       (value) => value === undefined || value === null || !Number.isNaN(new Date(value).getTime()),
       "Ngày sinh không hợp lệ",
+    )
+    .refine(
+      (value) =>
+        value === undefined ||
+        value === null ||
+        new Date(value).getTime() <= Date.now(),
+      "Ngày sinh không được sau ngày hiện tại",
     ),
   gender: z.enum(["male", "female", "other"]).nullable().optional(),
+}).refine((payload) => Object.keys(payload).length > 0, {
+  message: "Cần cung cấp ít nhất một trường để cập nhật hồ sơ",
 });
 
 export type UpdateUserProfilePayload = z.infer<typeof updateUserProfileSchema>;

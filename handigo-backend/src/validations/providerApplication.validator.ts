@@ -182,3 +182,17 @@ export const reviewProviderApplicationSchema = z
       });
     }
   });
+
+export const providerApplicationIdParamSchema = z.object({
+  id: objectIdSchema,
+});
+
+export const providerApplicationListQuerySchema = z.object({
+  status: z
+    .enum(["draft", "pending", "resubmitted", "approved", "rejected"])
+    .optional(),
+  keyword: z.string().trim().max(100).optional(),
+  categoryId: objectIdSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});

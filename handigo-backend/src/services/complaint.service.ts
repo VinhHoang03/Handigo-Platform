@@ -260,7 +260,10 @@ export const getAdminComplaints = async (query: Query = {}) => {
   if (query.status) filter.status = query.status;
   if (query.orderId && Types.ObjectId.isValid(query.orderId)) filter.orderId = query.orderId;
   if (query.keyword?.trim()) {
-    const regex = new RegExp(query.keyword.trim(), "i");
+    const keyword = query.keyword
+      .trim()
+      .replace(/[.*+?^$()|[\]\\{}]/g, "\\$&");
+    const regex = new RegExp(keyword, "i");
     filter.$or = [{ title: regex }, { description: regex }];
   }
 
