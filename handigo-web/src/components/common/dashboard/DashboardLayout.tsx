@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/common/Navbar";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { NotificationBell } from "@/components/common/NotificationBell";
 import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
@@ -34,6 +35,8 @@ function ProviderTopbar({
 }: ProviderTopbarProps) {
   const user = useAuthStore((state) => state.user);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const avatar =
@@ -56,9 +59,19 @@ function ProviderTopbar({
   }, []);
 
   const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await authService.logout();
+      navigate("/", { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+      setIsLogoutConfirmOpen(false);
+    }
+  };
+
+  const requestLogout = () => {
     setIsAccountOpen(false);
-    await authService.logout();
-    navigate("/", { replace: true });
+    setIsLogoutConfirmOpen(true);
   };
 
   return (
@@ -113,7 +126,9 @@ function ProviderTopbar({
           )}
 
           <NotificationBell role="PROVIDER" />
-          <MessageCenter />
+          <div className="hidden sm:inline-flex">
+            <MessageCenter />
+          </div>
           <div ref={accountRef} className="relative">
             <button
               type="button"
@@ -163,7 +178,7 @@ function ProviderTopbar({
                   </Link>
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={requestLogout}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-error transition hover:bg-error/10"
                   >
                     <span className="material-symbols-outlined !text-[20px]">
@@ -177,6 +192,16 @@ function ProviderTopbar({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={isLogoutConfirmOpen}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản hiện tại?"
+        busy={isLoggingOut}
+        variant="danger"
+        onCancel={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={() => void handleLogout()}
+      />
     </header>
   );
 }
@@ -215,9 +240,9 @@ export function DashboardLayout({
   const isProvider = currentRole === "PROVIDER";
   const hasSidebar = Boolean(
     currentRole &&
-      currentRole !== "CUSTOMER" &&
-      !hideSidebar &&
-      navItems.length > 0,
+    currentRole !== "CUSTOMER" &&
+    !hideSidebar &&
+    navItems.length > 0,
   );
 
   return (

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { personNameSchema, vietnamesePhoneSchema } from "./user.validator";
+import { providerWorkingAreasSchema } from "./providerApplication.validator";
 
 const dateStringSchema = z
   .string()
@@ -72,7 +73,7 @@ export const updateProviderProfileSchema = z.object({
   mainServiceText: optionalText(200),
   serviceArea: providerServiceAreaSchema.optional(),
   serviceIds: z.array(objectIdSchema).min(1).optional(),
-  workingAreas: z.array(z.string().trim().min(1).max(120)).min(1).optional(),
+  workingAreas: providerWorkingAreasSchema.optional(),
 }).superRefine((payload, context) => {
   if (payload.birthday && new Date(payload.birthday) > endOfToday()) {
     context.addIssue({

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import { customerServiceApi } from "../api/customerService.api";
@@ -22,12 +22,15 @@ export default function CustomerServiceListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [optionMap, setOptionMap] = useState<Record<string, ServiceOption[]>>({});
+  const [optionMap, setOptionMap] = useState<Record<string, ServiceOption[]>>(
+    {},
+  );
   const selectedCategoryId = searchParams.get("categoryId") || "";
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [sortBy, setSortBy] = useState("popular");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const requestedOptionIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -40,17 +43,6 @@ export default function CustomerServiceListPage() {
         ]);
         setCategories(categoryData);
         setServices(serviceData.items);
-
-        const optionEntries = await Promise.all(
-          serviceData.items.map(async (service) => {
-            try {
-              return [service._id, await customerServiceApi.options(service._id)] as const;
-            } catch {
-              return [service._id, []] as const;
-            }
-          }),
-        );
-        setOptionMap(Object.fromEntries(optionEntries));
       } catch (loadError) {
         setError(getErrorMessage(loadError));
       } finally {
@@ -60,6 +52,46 @@ export default function CustomerServiceListPage() {
 
     void loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!search.trim() || services.length === 0) return undefined;
+
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      const missingServices = services.filter(
+        (service) => !requestedOptionIdsRef.current.has(service._id),
+      );
+      if (missingServices.length === 0) return;
+
+      missingServices.forEach((service) =>
+        requestedOptionIdsRef.current.add(service._id),
+      );
+
+      void Promise.all(
+        missingServices.map(async (service) => {
+          try {
+            return [
+              service._id,
+              await customerServiceApi.options(service._id),
+            ] as const;
+          } catch {
+            return [service._id, []] as const;
+          }
+        }),
+      ).then((entries) => {
+        if (cancelled) return;
+        setOptionMap((current) => ({
+          ...current,
+          ...Object.fromEntries(entries),
+        }));
+      });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [search, services]);
 
   const handleCategoryChange = (categoryId: string) => {
     if (categoryId) {
@@ -83,23 +115,28 @@ export default function CustomerServiceListPage() {
     const filtered = services.filter((service) => {
       const matchCategory =
         !selectedCategoryId || getCategoryId(service) === selectedCategoryId;
-      const category = categories.find((item) => item._id === getCategoryId(service));
+      const category = categories.find(
+        (item) => item._id === getCategoryId(service),
+      );
       const searchableText = [
         service.name,
         service.description,
         category?.name,
         category?.description,
-        ...(optionMap[service._id] || []).flatMap((option) => [option.name, option.description]),
-      ].map(normalizeText).join(" ");
+        ...(optionMap[service._id] || []).flatMap((option) => [
+          option.name,
+          option.description,
+        ]),
+      ]
+        .map(normalizeText)
+        .join(" ");
       const matchSearch = !keyword || searchableText.includes(keyword);
       return matchCategory && matchSearch;
     });
 
     return [...filtered].sort((left, right) => {
       if (sortBy === "price_asc") {
-        return (
-          getServicePrice(left) - getServicePrice(right)
-        );
+        return getServicePrice(left) - getServicePrice(right);
       }
       if (sortBy === "name") return left.name.localeCompare(right.name, "vi");
       return 0;
@@ -156,12 +193,21 @@ export default function CustomerServiceListPage() {
                   >
                     {categoryImage ? (
                       <ReliableImage
-                        src={categoryImage.replace(/^http:\/\/res\.cloudinary\.com/i, "https://res.cloudinary.com")}
+                        src={categoryImage.replace(
+                          /^http:\/\/res\.cloudinary\.com/i,
+                          "https://res.cloudinary.com",
+                        )}
                         alt={category.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-5 w-5 shrink-0 rounded object-cover"
                       />
                     ) : (
-                      <CategoryIcon icon={category.icon} name={category.name} className="h-5 w-5 shrink-0" />
+                      <CategoryIcon
+                        icon={category.icon}
+                        name={category.name}
+                        className="h-5 w-5 shrink-0"
+                      />
                     )}
                     {category.name}
                   </button>
@@ -227,15 +273,20 @@ export default function CustomerServiceListPage() {
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
               {visibleServices.map((service, index) => {
                 const price = getServicePrice(service);
+                const isQuoteOnly = price <= 0;
                 return (
-                  <article
+                  <Link
                     key={service._id}
+                    to={`/customer/services/${service._id}`}
                     className="group overflow-hidden rounded-2xl border border-outline-variant/20 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
                   >
                     <div className="relative h-48 overflow-hidden">
                       <ReliableImage
                         src={getServiceImage(service, index)}
                         alt={service.name}
+                        loading={index < 3 ? "eager" : "lazy"}
+                        decoding="async"
+                        fetchPriority={index < 3 ? "high" : "auto"}
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       <span className="absolute left-4 top-4 rounded-full bg-primary-container/90 px-3 py-1 text-xs font-bold uppercase text-white">
@@ -247,26 +298,28 @@ export default function CustomerServiceListPage() {
                         {service.name}
                       </h3>
                       <p className="mt-2 line-clamp-2 min-h-10 text-sm text-on-surface-variant">
-                        {service.description || "Dịch vụ tại nhà được kiểm duyệt bởi Handigo."}
+                        {service.description ||
+                          "Dịch vụ tại nhà được kiểm duyệt bởi Handigo."}
                       </p>
                       <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
                         <div>
-                          <span className="block text-xs text-outline">
-                            {service.serviceType === "fixed_price" ? "Giá" : "Từ"}
-                          </span>
+                          {!isQuoteOnly && (
+                            <span className="block text-xs text-outline">
+                              {service.serviceType === "fixed_price"
+                                ? "Giá"
+                                : "Từ"}
+                            </span>
+                          )}
                           <span className="text-lg font-bold text-primary">
-                            {price > 0 ? money.format(price) : "Báo giá"}
+                            {isQuoteOnly ? "Báo giá" : money.format(price)}
                           </span>
                         </div>
-                        <Link
-                          to={`/customer/services/${service._id}`}
-                          className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary transition hover:bg-primary hover:text-on-primary"
-                        >
+                        <span className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary transition group-hover:bg-primary group-hover:text-on-primary">
                           Xem chi tiết
-                        </Link>
+                        </span>
                       </div>
                     </div>
-                  </article>
+                  </Link>
                 );
               })}
             </div>

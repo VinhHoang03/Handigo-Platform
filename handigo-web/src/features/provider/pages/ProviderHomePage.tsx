@@ -99,7 +99,7 @@ function formatDateTime(value?: string | null) {
 
 function shortAddress(order: Order) {
   const address = order.addressId;
-  if (!address) return '';
+  if (!address) return "";
   return [
     (address as { fullAddress?: string }).fullAddress,
     address.ward,
@@ -107,7 +107,7 @@ function shortAddress(order: Order) {
     address.province,
   ]
     .filter(Boolean)
-    .join(', ');
+    .join(", ");
 }
 
 function getOrderLoadError(error: unknown) {
@@ -144,7 +144,9 @@ function StatCard({
 }) {
   return (
     <div className="glass-card flex items-center gap-md rounded-3xl p-md transition-transform hover:-translate-y-1">
-      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone}`}>
+      <div
+        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone}`}
+      >
         <span className="material-symbols-outlined">{icon}</span>
       </div>
       <div>
@@ -545,7 +547,10 @@ const ProviderHomePage = () => {
                 <h3 className="font-headline-md text-on-surface">
                   Booking gần nhất
                 </h3>
-                <Link to="/provider/orders" className="font-label-md text-primary hover:underline">
+                <Link
+                  to="/provider/orders"
+                  className="font-label-md text-primary hover:underline"
+                >
                   Xem tất cả
                 </Link>
               </div>
@@ -561,11 +566,13 @@ const ProviderHomePage = () => {
                     {ordersError}
                   </div>
                 )}
-                {!isLoadingOrders && !ordersError && recentOrders.length === 0 && (
-                  <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
-                    Chưa có booking nào được phân công cho bạn.
-                  </div>
-                )}
+                {!isLoadingOrders &&
+                  !ordersError &&
+                  recentOrders.length === 0 && (
+                    <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
+                      Chưa có booking nào được phân công cho bạn.
+                    </div>
+                  )}
                 {!isLoadingOrders &&
                   !ordersError &&
                   recentOrders.map((order) => (
