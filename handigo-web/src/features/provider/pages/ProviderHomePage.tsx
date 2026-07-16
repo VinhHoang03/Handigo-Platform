@@ -80,7 +80,7 @@ function formatDateTime(value?: string | null) {
 
 function shortAddress(order: Order) {
   const address = order.addressId;
-  if (!address) return '';
+  if (!address) return "";
   return [
     (address as { fullAddress?: string }).fullAddress,
     address.ward,
@@ -88,7 +88,7 @@ function shortAddress(order: Order) {
     address.province,
   ]
     .filter(Boolean)
-    .join(', ');
+    .join(", ");
 }
 
 function getOrderLoadError(error: unknown) {
@@ -125,7 +125,9 @@ function StatCard({
 }) {
   return (
     <div className="glass-card flex items-center gap-md rounded-3xl p-md transition-transform hover:-translate-y-1">
-      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone}`}>
+      <div
+        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone}`}
+      >
         <span className="material-symbols-outlined">{icon}</span>
       </div>
       <div>
@@ -259,10 +261,6 @@ const ProviderHomePage = () => {
               <span className="material-symbols-outlined">bolt</span>
               Xem đơn mới
             </Link>
-            <button className="flex items-center gap-base rounded-xl bg-surface-container-high px-md py-sm font-label-md text-primary transition-all hover:bg-primary-fixed">
-              <span className="material-symbols-outlined">chat</span>
-              Tin nhắn
-            </button>
             <Link
               to="/provider/wallet"
               className="flex items-center gap-base rounded-xl bg-surface-container-high px-md py-sm font-label-md text-primary transition-all hover:bg-primary-fixed"
@@ -314,7 +312,10 @@ const ProviderHomePage = () => {
               </div>
               <div className="flex h-64 items-end justify-between gap-base px-sm">
                 {weeklyRevenue.map((day) => (
-                  <div key={day.label} className="flex flex-1 flex-col items-center gap-sm">
+                  <div
+                    key={day.label}
+                    className="flex flex-1 flex-col items-center gap-sm"
+                  >
                     <div className="group relative h-40 w-full rounded-t-lg bg-primary-container/20">
                       <div
                         className="absolute bottom-0 w-full rounded-t-lg bg-primary transition-all duration-500 group-hover:brightness-110"
@@ -334,7 +335,10 @@ const ProviderHomePage = () => {
                 <h3 className="font-headline-md text-on-surface">
                   Booking gần nhất
                 </h3>
-                <Link to="/provider/orders" className="font-label-md text-primary hover:underline">
+                <Link
+                  to="/provider/orders"
+                  className="font-label-md text-primary hover:underline"
+                >
                   Xem tất cả
                 </Link>
               </div>
@@ -350,11 +354,13 @@ const ProviderHomePage = () => {
                     {ordersError}
                   </div>
                 )}
-                {!isLoadingOrders && !ordersError && recentOrders.length === 0 && (
-                  <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
-                    Chưa có booking nào được phân công cho bạn.
-                  </div>
-                )}
+                {!isLoadingOrders &&
+                  !ordersError &&
+                  recentOrders.length === 0 && (
+                    <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
+                      Chưa có booking nào được phân công cho bạn.
+                    </div>
+                  )}
                 {!isLoadingOrders &&
                   !ordersError &&
                   recentOrders.map((order) => (
@@ -378,16 +384,21 @@ const ProviderHomePage = () => {
               </div>
               <div className="relative space-y-md before:absolute before:bottom-2 before:left-[11px] before:top-2 before:w-[2px] before:bg-surface-variant before:content-['']">
                 {fallbackSchedule.map((item) => (
-                  <div key={`${item.time}-${item.title}`} className="relative pl-xl">
+                  <div
+                    key={`${item.time}-${item.title}`}
+                    className="relative pl-xl"
+                  >
                     <div
-                      className={`absolute left-0 top-1 z-10 h-6 w-6 rounded-full border-4 border-surface-container-high ${item.active ? "bg-primary" : "bg-outline-variant"
-                        }`}
+                      className={`absolute left-0 top-1 z-10 h-6 w-6 rounded-full border-4 border-surface-container-high ${
+                        item.active ? "bg-primary" : "bg-outline-variant"
+                      }`}
                     />
                     <div
-                      className={`rounded-2xl p-sm ${item.active
-                        ? "border-l-4 border-primary bg-primary/5"
-                        : "bg-surface-container-low"
-                        }`}
+                      className={`rounded-2xl p-sm ${
+                        item.active
+                          ? "border-l-4 border-primary bg-primary/5"
+                          : "bg-surface-container-low"
+                      }`}
                     >
                       {item.active && (
                         <span className="mb-1 inline-flex rounded-full bg-primary px-sm text-[10px] font-bold text-white">

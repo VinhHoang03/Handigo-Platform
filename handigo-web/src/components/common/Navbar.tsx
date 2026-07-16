@@ -7,6 +7,7 @@ import { customerServiceApi } from "@/features/customer-service/api/customerServ
 import { getServiceImage } from "@/features/customer-service/utils/serviceDisplay";
 import type { Service } from "@/types/booking";
 import { BrandLogo } from "./BrandLogo";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { NotificationBell } from "./NotificationBell";
 import { MessageCenter } from "@/features/chat/components/MessageCenter";
 
@@ -59,7 +60,11 @@ const getRoleLabel = (role?: AppRole) => {
 const createNavbarItems = (role?: AppRole): NavbarItem[] => {
   const items: NavbarItem[] = [
     { label: "Trang chủ", path: "/" },
-    { label: "Dịch vụ", path: "/customer/services", activePrefix: "/customer/services" },
+    {
+      label: "Dịch vụ",
+      path: "/customer/services",
+      activePrefix: "/customer/services",
+    },
     { label: "Giới thiệu", path: "/gioi-thieu" },
     { label: "Tin tức", path: "/tin-tuc", activePrefix: "/tin-tuc" },
     { label: "Hỗ trợ", path: "/ho-tro" },
@@ -101,6 +106,8 @@ export function Navbar({
   const [internalScrolled, setInternalScrolled] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -152,8 +159,19 @@ export function Navbar({
   }, []);
 
   const handleLogout = async () => {
-    await authService.logout();
-    navigate("/", { replace: true });
+    try {
+      setIsLoggingOut(true);
+      await authService.logout();
+      navigate("/", { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+      setIsLogoutConfirmOpen(false);
+    }
+  };
+
+  const requestLogout = () => {
+    setIsAccountOpen(false);
+    setIsLogoutConfirmOpen(true);
   };
 
   const handleBookService = () => {
@@ -402,7 +420,7 @@ export function Navbar({
                       )}
                       <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={requestLogout}
                         className="mt-1 flex w-full items-center gap-3 px-4 py-2 text-sm text-error hover:bg-error/10"
                       >
                         <span className="material-symbols-outlined text-xl">
@@ -434,6 +452,15 @@ export function Navbar({
         </div>
       </div>
 
+      <ConfirmDialog
+        open={isLogoutConfirmOpen}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản hiện tại?"
+        busy={isLoggingOut}
+        variant="danger"
+        onCancel={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={() => void handleLogout()}
+      />
     </nav>
   );
 }
