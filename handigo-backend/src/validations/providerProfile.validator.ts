@@ -6,14 +6,56 @@ const dateStringSchema = z
   .string()
   .trim()
   .refine((value) => !Number.isNaN(Date.parse(value)), {
-    message: "Invalid date",
+    message: "Ngày không hợp lệ",
   });
 
 const optionalText = (max: number) =>
   z.string().trim().max(max).optional();
 
 const imageUrlSchema = z.string().trim().url().max(2000);
-const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Invalid object id");
+const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "ID không hợp lệ");
+
+const endOfToday = () => {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return today;
+};
+
+const startOfToday = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+};
+
+const validateDateRange = (
+  payload: { issuedAt?: string; expiresAt?: string },
+  context: z.RefinementCtx,
+) => {
+  const issuedAt = payload.issuedAt ? new Date(payload.issuedAt) : undefined;
+  const expiresAt = payload.expiresAt ? new Date(payload.expiresAt) : undefined;
+
+  if (issuedAt && issuedAt > endOfToday()) {
+    context.addIssue({
+      code: "custom",
+      path: ["issuedAt"],
+      message: "Ngày cấp không được sau ngày hiện tại",
+    });
+  }
+  if (expiresAt && expiresAt < startOfToday()) {
+    context.addIssue({
+      code: "custom",
+      path: ["expiresAt"],
+      message: "Tài liệu đã hết hạn",
+    });
+  }
+  if (issuedAt && expiresAt && expiresAt <= issuedAt) {
+    context.addIssue({
+      code: "custom",
+      path: ["expiresAt"],
+      message: "Ngày hết hạn phải sau ngày cấp",
+    });
+  }
+};
 
 export const providerServiceAreaSchema = z.object({
   province: optionalText(120),
@@ -32,6 +74,14 @@ export const updateProviderProfileSchema = z.object({
   serviceArea: providerServiceAreaSchema.optional(),
   serviceIds: z.array(objectIdSchema).min(1).optional(),
   workingAreas: providerWorkingAreasSchema.optional(),
+}).superRefine((payload, context) => {
+  if (payload.birthday && new Date(payload.birthday) > endOfToday()) {
+    context.addIssue({
+      code: "custom",
+      path: ["birthday"],
+      message: "Ngày sinh không được sau ngày hiện tại",
+    });
+  }
 });
 
 export const submitIdentitySchema = z
@@ -55,11 +105,20 @@ export const submitIdentitySchema = z
     consentAccepted: z.literal(true),
   })
   .superRefine((payload, ctx) => {
+    validateDateRange(payload, ctx);
+    if (payload.dateOfBirth && new Date(payload.dateOfBirth) > endOfToday()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["dateOfBirth"],
+        message: "Ngày sinh không được sau ngày hiện tại",
+      });
+    }
+
     if (payload.type === "cccd" && !payload.frontImageUrl) {
       ctx.addIssue({
         code: "custom",
         path: ["frontImageUrl"],
-        message: "frontImageUrl is required for CCCD",
+        message: "Ảnh mặt trước CCCD là bắt buộc",
       });
     }
 
@@ -67,25 +126,33 @@ export const submitIdentitySchema = z
       ctx.addIssue({
         code: "custom",
         path: ["passportImageUrl"],
-        message: "passportImageUrl is required for passport",
+        message: "Ảnh hộ chiếu là bắt buộc",
       });
     }
   });
 
-export const createCertificateSchema = z.object({
+const certificateFields = {
   title: z.string().trim().min(1).max(200),
   certificateNumber: optionalText(100),
   issuer: optionalText(200),
   issuedAt: dateStringSchema.optional(),
   expiresAt: dateStringSchema.optional(),
-  imageUrls: z.array(imageUrlSchema).default([]),
+  imageUrls: z.array(imageUrlSchema).max(10).default([]),
   description: optionalText(2000),
-});
+};
 
-export const updateCertificateSchema = createCertificateSchema.partial().refine(
-  (payload) => Object.keys(payload).length > 0,
-  "At least one field is required",
-);
+export const createCertificateSchema = z
+  .object(certificateFields)
+  .superRefine(validateDateRange);
+
+export const updateCertificateSchema = z
+  .object(certificateFields)
+  .partial()
+  .refine(
+    (payload) => Object.keys(payload).length > 0,
+    "Cần cung cấp ít nhất một trường để cập nhật",
+  )
+  .superRefine(validateDateRange);
 
 export type UpdateProviderProfilePayload = z.infer<
   typeof updateProviderProfileSchema

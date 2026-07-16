@@ -5,10 +5,10 @@ import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { NotificationBell } from "@/components/common/NotificationBell";
 import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { MessageCenter } from "@/features/chat/components/MessageCenter";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { isNavItemActive } from "./dashboardNavigation";
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
-import { MessageCenter } from "@/features/chat/components/MessageCenter";
 
 const normalizeRole = (role?: string | null): DashboardRole | undefined => {
   const value = role?.toUpperCase();

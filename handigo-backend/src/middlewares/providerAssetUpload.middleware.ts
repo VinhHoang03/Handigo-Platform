@@ -7,6 +7,7 @@ import {
   OcrDocumentKind,
 } from "../services/ocr.service";
 import { createLogger } from "../utils/logger";
+import { hasValidFileSignature } from "../utils/fileSignature";
 
 const providerAssetUploadLogger = createLogger("ProviderAssetUpload");
 
@@ -76,6 +77,13 @@ export const uploadProviderAssetImage = (
       return res.status(400).json({
         success: false,
         message: "Vui lòng chọn tệp cần tải lên",
+      });
+    }
+
+    if (!hasValidFileSignature(req.file.buffer, req.file.mimetype)) {
+      return res.status(400).json({
+        success: false,
+        message: "Nội dung tệp không khớp với định dạng đã khai báo",
       });
     }
 

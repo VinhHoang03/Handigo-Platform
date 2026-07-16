@@ -64,6 +64,15 @@ const AdminCategoriesPage = lazy(() => import("./features/admin/pages/AdminCateg
 const AdminServicesPage = lazy(() => import("./features/admin/pages/AdminServicesPage"));
 const AdminPromotionsPage = lazy(() => import("./features/admin/pages/AdminPromotionsPage"));
 const AdminWithdrawalsPage = lazy(() => import("./features/admin/pages/AdminWithdrawalsPage"));
+const AdminSupportPage = lazy(() => import("./features/admin/pages/AdminSupportPage"));
+const AdminRevenuePage = lazy(() => import("./features/admin/pages/AdminRevenuePage"));
+const AdminCasesPage = lazy(() => import("./features/admin/pages/AdminCasesPage"));
+const AdminDashboardPage = lazy(() => import("./features/admin/pages/AdminDashboardPage"));
+const AdminPaymentsPage = lazy(() => import("./features/admin/pages/AdminPaymentsPage"));
+const AdminWalletsPage = lazy(() => import("./features/admin/pages/AdminWalletsPage"));
+const CaseManagementPage = lazy(() =>
+  import("./features/case-management/pages/CaseManagementPage"),
+);
 const AdminSystemConfigsPage = lazy(() => import("./features/admin/pages/AdminSystemConfigsPage"));
 const AdminServiceSuggestionsPage = lazy(() =>
   import("./features/service-suggestion/pages/AdminServiceSuggestionsPage"),
@@ -210,6 +219,14 @@ function App() {
               }
             />
             <Route
+              path="/customer/support"
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <CaseManagementPage role="CUSTOMER" />
+                </RouteGuard>
+              }
+            />
+            <Route
               path="/provider"
               element={
                 <RouteGuard roles={["PROVIDER"]}>
@@ -290,10 +307,26 @@ function App() {
               }
             />
             <Route
+              path="/provider/support"
+              element={
+                <RouteGuard roles={["PROVIDER"]}>
+                  <CaseManagementPage role="PROVIDER" />
+                </RouteGuard>
+              }
+            />
+            <Route
               path="/register-provider"
               element={
                 <RouteGuard roles={["CUSTOMER"]}>
                   <RegisterProviderPage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <RouteGuard roles={["ADMIN"]}>
+                  <AdminDashboardPage />
                 </RouteGuard>
               }
             />
@@ -358,6 +391,46 @@ function App() {
               element={
                 <RouteGuard roles={["ADMIN"]}>
                   <AdminWithdrawalsPage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/admin/support"
+              element={
+                <RouteGuard roles={["ADMIN"]}>
+                  <AdminSupportPage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/admin/cases"
+              element={
+                <RouteGuard roles={["ADMIN"]}>
+                  <AdminCasesPage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/admin/revenue"
+              element={
+                <RouteGuard roles={["ADMIN"]}>
+                  <AdminRevenuePage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/admin/payments"
+              element={
+                <RouteGuard roles={["ADMIN"]}>
+                  <AdminPaymentsPage />
+                </RouteGuard>
+              }
+            />
+            <Route
+              path="/admin/wallets"
+              element={
+                <RouteGuard roles={["ADMIN"]}>
+                  <AdminWalletsPage />
                 </RouteGuard>
               }
             />

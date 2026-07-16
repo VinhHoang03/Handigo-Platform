@@ -7,6 +7,20 @@ const objectIdSchema = z
 
 const imageUrlSchema = z.string().trim().url("Image must be a valid URL");
 
+const booleanQuerySchema = z.enum(["true", "false"]).transform(
+  (value) => value === "true",
+);
+
+export const feedbackListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  rating: z.coerce.number().int().min(1).max(5).optional(),
+  hasImages: booleanQuerySchema.optional(),
+  replied: booleanQuerySchema.optional(),
+  keyword: z.string().trim().max(100).optional(),
+  isVisible: booleanQuerySchema.optional(),
+});
+
 export const createFeedbackSchema = z.object({
   orderId: objectIdSchema,
   rating: z.number().int().min(1).max(5),

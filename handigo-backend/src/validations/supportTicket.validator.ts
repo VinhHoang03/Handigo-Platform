@@ -33,10 +33,20 @@ export const addSupportTicketResponseSchema = z.object({
   attachments: z.array(attachmentSchema).max(10).optional(),
 });
 
-export const updateSupportTicketStatusSchema = z.object({
-  status: z.enum(SUPPORT_TICKET_STATUSES),
-  resolutionNote: z.string().trim().max(3000).nullable().optional(),
-});
+export const updateSupportTicketStatusSchema = z
+  .object({
+    status: z.enum(SUPPORT_TICKET_STATUSES),
+    resolutionNote: z.string().trim().max(3000).nullable().optional(),
+  })
+  .superRefine((payload, ctx) => {
+    if (payload.status === "resolved" && (!payload.resolutionNote || payload.resolutionNote.length < 10)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["resolutionNote"],
+        message: "Ghi chú xử lý phải có ít nhất 10 ký tự khi hoàn tất yêu cầu",
+      });
+    }
+  });
 
 export const assignSupportTicketSchema = z.object({
   assignedAdminId: objectIdSchema.nullable().optional(),
@@ -44,4 +54,15 @@ export const assignSupportTicketSchema = z.object({
 
 export const supportTicketIdSchema = z.object({
   id: objectIdSchema,
+});
+
+export const supportTicketListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  status: z.enum(SUPPORT_TICKET_STATUSES).optional(),
+  category: z.enum(SUPPORT_TICKET_CATEGORIES).optional(),
+  priority: z.enum(SUPPORT_TICKET_PRIORITIES).optional(),
+  keyword: z.string().trim().max(100).optional(),
+  assignedAdminId: objectIdSchema.optional(),
+  assignment: z.enum(["assigned", "unassigned"]).optional(),
 });

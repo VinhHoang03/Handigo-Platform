@@ -5,6 +5,11 @@ import type { Order, OrderCustomer } from "@/types/booking";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useProviderAvailability } from "../hooks/useProviderAvailability";
+import {
+  providerDashboardApi,
+  type ProviderEarningPoint,
+} from "../api/providerDashboard.api";
+import { providerProfileApi } from "../api/providerProfile.api";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -28,36 +33,50 @@ const statusStyles: Record<Order["status"], string> = {
   cancelled: "border-error text-error",
 };
 
-const weeklyRevenue = [
-  { label: "Thứ 2", value: 60 },
-  { label: "Thứ 3", value: 85 },
-  { label: "Thứ 4", value: 45 },
-  { label: "Thứ 5", value: 70 },
-  { label: "Thứ 6", value: 95 },
-  { label: "Thứ 7", value: 55 },
-  { label: "CN", value: 30 },
-];
+const dateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
-const fallbackSchedule = [
-  {
-    time: "08:00 - 09:30",
-    title: "Bảo trì hệ thống lạnh",
-    address: "Landmark 81, Bình Thạnh",
-    active: false,
-  },
-  {
-    time: "10:00 - 11:30",
-    title: "Sửa bình nóng lạnh",
-    address: "Vinhomes Central Park",
-    active: true,
-  },
-  {
-    time: "14:00 - 15:30",
-    title: "Lắp đặt camera",
-    address: "Thảo Điền, Quận 2",
-    active: false,
-  },
-];
+type RevenuePeriod = "week" | "month";
+
+const getRevenueRange = (period: RevenuePeriod) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  let dayCount = 7;
+
+  if (period === "week") {
+    const daysSinceMonday = (today.getDay() + 6) % 7;
+    start.setDate(today.getDate() - daysSinceMonday);
+  } else {
+    start.setDate(1);
+    dayCount = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0,
+    ).getDate();
+  }
+
+  const dates = Array.from({ length: dayCount }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+
+  return {
+    dates,
+    label:
+      period === "week"
+        ? `${dates[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} - ${dates[dates.length - 1].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}`
+        : `Tháng ${today.getMonth() + 1}/${today.getFullYear()}`,
+  };
+};
+
+const getOrderDate = (order: Order) =>
+  new Date(order.scheduledAt || order.createdAt);
 
 function getCustomer(order: Order): OrderCustomer | null {
   return typeof order.customerId === "object" ? order.customerId : null;
@@ -195,6 +214,16 @@ const ProviderHomePage = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("week");
+  const [revenueEarnings, setRevenueEarnings] = useState<ProviderEarningPoint[]>([]);
+  const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
+  const [earningsError, setEarningsError] = useState<string | null>(null);
+  const [todaySchedule, setTodaySchedule] = useState<Order[]>([]);
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [workingAreas, setWorkingAreas] = useState<string[]>([]);
+  const [isLoadingAreas, setIsLoadingAreas] = useState(true);
+  const [areasError, setAreasError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,16 +247,117 @@ const ProviderHomePage = () => {
         }
       });
 
-    providerOrderApi.getProviderOrders(1, 1).then((res) => {
-      if (!cancelled) {
-        setTotalOrders(res.pagination.total);
-      }
-    });
+    providerOrderApi
+      .getProviderOrders(1, 100)
+      .then((result) => {
+        if (!cancelled) {
+          const todayKey = dateKey(new Date());
+          const schedule = result.items
+            .filter(
+              (order) =>
+                order.status !== "cancelled" &&
+                dateKey(getOrderDate(order)) === todayKey,
+            )
+            .sort(
+              (first, second) =>
+                getOrderDate(first).getTime() - getOrderDate(second).getTime(),
+            );
+
+          setTotalOrders(result.pagination.total);
+          setTodaySchedule(schedule);
+          setScheduleError(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScheduleError("Không thể tải lịch làm việc hôm nay.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingSchedule(false);
+        }
+      });
 
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    providerProfileApi
+      .getProfile()
+      .then((profile) => {
+        if (cancelled) return;
+
+        const configuredAreas = (profile.provider.workingAreas || [])
+          .map((area) => area.trim())
+          .filter(Boolean);
+        const legacyArea = [
+          profile.provider.serviceArea?.ward,
+          profile.provider.serviceArea?.province,
+        ]
+          .map((area) => area?.trim())
+          .filter(Boolean)
+          .join(", ");
+
+        setWorkingAreas(
+          configuredAreas.length
+            ? [...new Set(configuredAreas)]
+            : legacyArea
+              ? [legacyArea]
+              : [],
+        );
+        setAreasError(null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAreasError("Không thể tải khu vực hoạt động.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingAreas(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const range = getRevenueRange(revenuePeriod);
+
+    providerDashboardApi
+      .earnings(
+        dateKey(range.dates[0]),
+        dateKey(range.dates[range.dates.length - 1]),
+      )
+      .then((result) => {
+        if (!cancelled) {
+          setRevenueEarnings(result.earningsByDay);
+          setEarningsError(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEarningsError("Không thể tải dữ liệu doanh thu.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingEarnings(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [revenuePeriod]);
 
   const activeOrders = recentOrders.filter((order) =>
     ["created", "accepted", "in_progress"].includes(order.status),
@@ -235,6 +365,26 @@ const ProviderHomePage = () => {
   const todayIncome = recentOrders
     .filter((order) => order.status !== "cancelled")
     .reduce((sum, order) => sum + order.pricing.providerEarningAmount, 0);
+  const revenueRange = getRevenueRange(revenuePeriod);
+  const earningsByDay = new Map(
+    revenueEarnings.map((item) => [item.day, item.amount]),
+  );
+  const revenueChart = revenueRange.dates.map((date) => ({
+    key: dateKey(date),
+    label:
+      revenuePeriod === "week"
+        ? date.toLocaleDateString("vi-VN", { weekday: "short" })
+        : String(date.getDate()),
+    amount: earningsByDay.get(dateKey(date)) ?? 0,
+  }));
+  const maxRevenue = Math.max(
+    ...revenueChart.map((item) => item.amount),
+    0,
+  );
+  const revenueTotal = revenueChart.reduce(
+    (total, item) => total + item.amount,
+    0,
+  );
 
   return (
     <DashboardShell
@@ -301,33 +451,95 @@ const ProviderHomePage = () => {
         <section className="grid grid-cols-1 gap-gutter lg:grid-cols-12">
           <div className="space-y-gutter lg:col-span-8">
             <div className="glass-card rounded-3xl p-md">
-              <div className="mb-md flex items-center justify-between">
+              <div className="mb-md flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <h3 className="font-headline-md text-on-surface">
-                  Doanh thu tuần
+                  Doanh thu
                 </h3>
-                <select className="rounded-lg border-none bg-surface-container py-xs pl-sm pr-xl text-label-sm focus:ring-primary">
-                  <option>7 ngày qua</option>
-                  <option>30 ngày qua</option>
-                </select>
-              </div>
-              <div className="flex h-64 items-end justify-between gap-base px-sm">
-                {weeklyRevenue.map((day) => (
-                  <div
-                    key={day.label}
-                    className="flex flex-1 flex-col items-center gap-sm"
-                  >
-                    <div className="group relative h-40 w-full rounded-t-lg bg-primary-container/20">
-                      <div
-                        className="absolute bottom-0 w-full rounded-t-lg bg-primary transition-all duration-500 group-hover:brightness-110"
-                        style={{ height: `${day.value}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-label-sm text-on-surface-variant">
-                      {day.label}
-                    </span>
+                <div className="flex items-center justify-between gap-3 sm:justify-end">
+                  <div className="text-left sm:text-right">
+                    <p className="text-sm font-bold text-primary">
+                      {formatMoney(revenueTotal)}
+                    </p>
+                    <p className="text-xs text-on-surface-variant">
+                      {revenueRange.label}
+                    </p>
                   </div>
-                ))}
+                  <select
+                    value={revenuePeriod}
+                    onChange={(event) => {
+                      setRevenuePeriod(event.target.value as RevenuePeriod);
+                      setIsLoadingEarnings(true);
+                      setEarningsError(null);
+                    }}
+                    aria-label="Lọc biểu đồ doanh thu"
+                    className="rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                  >
+                    <option value="week">Tuần này</option>
+                    <option value="month">Tháng này</option>
+                  </select>
+                </div>
               </div>
+              {isLoadingEarnings ? (
+                <div className="h-64 animate-pulse rounded-2xl bg-surface-container-low" />
+              ) : earningsError ? (
+                <div className="flex h-64 items-center justify-center rounded-2xl bg-error/5 px-4 text-center text-sm text-error">
+                  {earningsError}
+                </div>
+              ) : (
+                <div className="overflow-x-auto pb-2">
+                  <div
+                    className={`relative ${revenuePeriod === "month" ? "min-w-[900px]" : "min-w-[520px]"}`}
+                  >
+                    {revenueTotal === 0 && (
+                      <p className="absolute inset-x-0 top-1/2 z-20 -translate-y-1/2 text-center text-sm font-semibold text-on-surface-variant">
+                        Chưa phát sinh doanh thu trong khoảng thời gian này.
+                      </p>
+                    )}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-8 top-8 flex flex-col justify-between">
+                      {[0, 1, 2, 3].map((line) => (
+                        <span
+                          key={line}
+                          className="block border-t border-dashed border-outline-variant/35"
+                        />
+                      ))}
+                    </div>
+                    <div className="relative z-10 flex h-64 items-end justify-between gap-1 px-sm pt-8 sm:gap-2">
+                      {revenueChart.map((item) => {
+                        const height = maxRevenue
+                          ? Math.max(
+                              (item.amount / maxRevenue) * 100,
+                              item.amount > 0 ? 4 : 0,
+                            )
+                          : 0;
+
+                        return (
+                          <div
+                            key={item.key}
+                            className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"
+                          >
+                            <div
+                              className="group relative h-48 w-full rounded-t-md bg-primary-container/15"
+                              title={`${item.label}: ${formatMoney(item.amount)}`}
+                              aria-label={`${item.label}: ${formatMoney(item.amount)}`}
+                            >
+                              <div
+                                className="absolute bottom-0 w-full rounded-t-md bg-primary transition-all duration-500 group-hover:bg-primary/85"
+                                style={{ height: `${height}%` }}
+                              />
+                              <span className="pointer-events-none absolute -top-7 left-1/2 z-30 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-on-surface px-2 py-1 text-[10px] font-bold text-surface shadow-md group-hover:block">
+                                {formatMoney(item.amount)}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-label-sm capitalize text-on-surface-variant">
+                              {item.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="glass-card rounded-3xl p-md">
@@ -376,63 +588,115 @@ const ProviderHomePage = () => {
                 <h3 className="font-headline-md text-on-surface">
                   Lịch hôm nay
                 </h3>
-                <button className="rounded-full p-xs transition-colors hover:bg-surface-container">
+                <Link
+                  to="/provider/schedule"
+                  aria-label="Xem lịch làm việc"
+                  className="rounded-full p-xs transition-colors hover:bg-surface-container"
+                >
                   <span className="material-symbols-outlined text-outline">
-                    more_horiz
+                    arrow_forward
                   </span>
-                </button>
+                </Link>
               </div>
-              <div className="relative space-y-md before:absolute before:bottom-2 before:left-[11px] before:top-2 before:w-[2px] before:bg-surface-variant before:content-['']">
-                {fallbackSchedule.map((item) => (
-                  <div
-                    key={`${item.time}-${item.title}`}
-                    className="relative pl-xl"
-                  >
-                    <div
-                      className={`absolute left-0 top-1 z-10 h-6 w-6 rounded-full border-4 border-surface-container-high ${
-                        item.active ? "bg-primary" : "bg-outline-variant"
-                      }`}
-                    />
-                    <div
-                      className={`rounded-2xl p-sm ${
-                        item.active
-                          ? "border-l-4 border-primary bg-primary/5"
-                          : "bg-surface-container-low"
-                      }`}
-                    >
-                      {item.active && (
-                        <span className="mb-1 inline-flex rounded-full bg-primary px-sm text-[10px] font-bold text-white">
-                          ĐANG THỰC HIỆN
-                        </span>
-                      )}
-                      <p className="text-xs font-bold uppercase text-primary">
-                        {item.time}
-                      </p>
-                      <h4 className="text-sm font-bold">{item.title}</h4>
-                      <p className="text-xs text-on-surface-variant">
-                        {item.address}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {isLoadingSchedule ? (
+                <div className="h-64 animate-pulse rounded-2xl bg-surface-container-low" />
+              ) : scheduleError ? (
+                <div className="rounded-2xl bg-error/5 px-4 py-8 text-center text-sm text-error">
+                  {scheduleError}
+                </div>
+              ) : todaySchedule.length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed border-outline-variant/40 px-4 py-10 text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-4xl">event_available</span>
+                  <p className="mt-2 text-sm font-semibold">
+                    Hôm nay chưa có lịch làm việc.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative space-y-md before:absolute before:bottom-2 before:left-[11px] before:top-2 before:w-[2px] before:bg-surface-variant before:content-['']">
+                  {todaySchedule.map((order) => {
+                    const active = order.status === "in_progress";
+                    const address = shortAddress(order);
+
+                    return (
+                      <div key={order._id} className="relative pl-xl">
+                        <div
+                          className={`absolute left-0 top-1 z-10 h-6 w-6 rounded-full border-4 border-surface-container-high ${active ? "bg-primary" : "bg-outline-variant"}`}
+                        />
+                        <Link
+                          to={`/provider/orders/${order._id}`}
+                          className={`block rounded-2xl p-sm transition hover:bg-primary/10 ${active ? "border-l-4 border-primary bg-primary/5" : "bg-surface-container-low"}`}
+                        >
+                          <div className="mb-1 flex flex-wrap items-center gap-2">
+                            {active && (
+                              <span className="inline-flex rounded-full bg-primary px-sm text-[10px] font-bold text-white">
+                                ĐANG THỰC HIỆN
+                              </span>
+                            )}
+                            <span className="text-[10px] font-bold uppercase text-on-surface-variant">
+                              {statusLabels[order.status]}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold uppercase text-primary">
+                            {getOrderDate(order).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                          <h4 className="text-sm font-bold">
+                            {order.serviceId?.name || "Dịch vụ"}
+                          </h4>
+                          {address && (
+                            <p className="line-clamp-2 text-xs text-on-surface-variant">
+                              {address}
+                            </p>
+                          )}
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="glass-card overflow-hidden rounded-3xl">
               <div className="relative h-48 bg-[radial-gradient(circle_at_20%_20%,rgba(53,37,205,0.18),transparent_30%),linear-gradient(135deg,#eef0ff,#dae2fc)]">
                 <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(53,37,205,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(53,37,205,0.12)_1px,transparent_1px)] [background-size:28px_28px]" />
-                <div className="absolute bottom-sm left-sm right-sm flex items-center justify-between">
-                  <div className="rounded-lg border border-glass-border bg-white/90 px-sm py-xs shadow-sm backdrop-blur">
+                <div className="absolute bottom-sm left-sm right-sm flex items-end justify-between gap-3">
+                  <div className="min-w-0 flex-1 rounded-xl border border-glass-border bg-white/90 px-sm py-xs shadow-sm backdrop-blur">
                     <p className="text-[10px] font-bold uppercase text-on-surface-variant">
                       Khu vực hoạt động
                     </p>
-                    <p className="text-xs font-bold text-primary">
-                      TP. Hồ Chí Minh
-                    </p>
+                    {isLoadingAreas ? (
+                      <div className="mt-1 h-5 w-32 animate-pulse rounded bg-primary/10" />
+                    ) : areasError ? (
+                      <p className="mt-1 text-xs font-semibold text-error">
+                        {areasError}
+                      </p>
+                    ) : workingAreas.length ? (
+                      <div className="mt-1 flex max-h-16 flex-wrap gap-1.5 overflow-y-auto">
+                        {workingAreas.map((area) => (
+                          <span
+                            key={area}
+                            className="max-w-full truncate rounded-full bg-primary/10 px-2 py-1 text-[11px] font-bold text-primary"
+                            title={area}
+                          >
+                            {area}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-xs font-semibold text-on-surface-variant">
+                        Chưa cập nhật
+                      </p>
+                    )}
                   </div>
-                  <button className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform hover:scale-110">
+                  <Link
+                    to="/provider/profile"
+                    aria-label="Cập nhật khu vực hoạt động"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform hover:scale-110"
+                  >
                     <span className="material-symbols-outlined">near_me</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

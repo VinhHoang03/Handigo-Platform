@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
+import { hasValidFileSignature } from "../utils/fileSignature";
 
 const allowedMimeTypes = new Set([
   "image/jpeg",
@@ -20,24 +21,6 @@ const upload = multer({
   },
 }).single("file");
 
-const hasValidSignature = (file: Express.Multer.File) => {
-  const bytes = file.buffer;
-  if (file.mimetype === "application/pdf") {
-    return bytes.subarray(0, 5).toString("ascii") === "%PDF-";
-  }
-  if (file.mimetype === "image/png") {
-    return bytes.subarray(0, 8).equals(
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    );
-  }
-  return (
-    bytes.length >= 3 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[2] === 0xff
-  );
-};
-
 export const uploadOcrFile = (
   req: Request,
   res: Response,
@@ -45,7 +28,10 @@ export const uploadOcrFile = (
 ) => {
   upload(req, res, (error) => {
     if (!error) {
-      if (req.file && !hasValidSignature(req.file)) {
+      if (
+        req.file &&
+        !hasValidFileSignature(req.file.buffer, req.file.mimetype)
+      ) {
         return res.status(400).json({
           success: false,
           message: "Nội dung tệp không khớp với định dạng đã khai báo",

@@ -41,7 +41,7 @@ const normalizeRole = (
 const getProfilePath = (role?: AppRole) => {
   if (role === "PROVIDER") return "/provider/profile";
   if (role === "CUSTOMER") return "/customer/profile";
-  return "/admin/users";
+  return "/admin";
 };
 
 const getWalletPath = (role?: AppRole) => {
@@ -86,7 +86,7 @@ const createNavbarItems = (role?: AppRole): NavbarItem[] => {
       ...items,
       {
         label: "Quản lý hệ thống",
-        path: "/admin/users",
+        path: "/admin",
         activePrefix: "/admin",
       },
     ];
@@ -313,16 +313,18 @@ export function Navbar({
         )}
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleBookService}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
-          >
-            <span className="material-symbols-outlined text-lg">
-              cleaning_services
-            </span>
-            Đặt dịch vụ
-          </button>
+          {currentRole !== "ADMIN" && (
+            <button
+              type="button"
+              onClick={handleBookService}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
+            >
+              <span className="material-symbols-outlined text-lg">
+                cleaning_services
+              </span>
+              Đặt dịch vụ
+            </button>
+          )}
 
           {isAuthenticated && user ? (
             <>
@@ -403,6 +405,19 @@ export function Navbar({
                             receipt_long
                           </span>
                           Đơn dịch vụ của tôi
+                        </Link>
+                      )}
+                      {(currentRole === "CUSTOMER" ||
+                        currentRole === "PROVIDER") && (
+                        <Link
+                          to={currentRole === "CUSTOMER" ? "/customer/support" : "/provider/support"}
+                          onClick={() => setIsAccountOpen(false)}
+                          className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
+                        >
+                          <span className="material-symbols-outlined text-xl">
+                            support_agent
+                          </span>
+                          Hỗ trợ và khiếu nại
                         </Link>
                       )}
                       {(currentRole === "CUSTOMER" ||

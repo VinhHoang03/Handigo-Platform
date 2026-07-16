@@ -40,3 +40,12 @@ export const createViolationSchema = z
 export const violationIdSchema = z.object({
   id: objectIdSchema,
 });
+
+export const violationListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  status: z.enum(["active", "resolved"]).optional(),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  sourceType: z.enum(["REPORT", "COMPLAINT", "SUPPORT_TICKET"]).optional(),
+  userId: objectIdSchema.optional(),
+});
