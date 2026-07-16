@@ -9,6 +9,10 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
+  adminEntityIdParamSchema,
+  adminUserListQuerySchema,
+  providerApplicationIdParamSchema,
+  providerApplicationListQuerySchema,
   reviewProviderApplicationSchema,
   updateUserStatusSchema,
 } from "../validations/admin.validator";
@@ -20,33 +24,61 @@ import {
 } from "../validations/category.validator";
 import {
   complaintIdSchema,
+  complaintListQuerySchema,
   requestComplaintEvidenceSchema,
   updateComplaintStatusSchema,
 } from "../validations/complaint.validator";
-import { reportIdSchema, reviewReportSchema } from "../validations/report.validator";
+import {
+  reportIdSchema,
+  reportListQuerySchema,
+  reviewReportSchema,
+} from "../validations/report.validator";
 import {
   addSupportTicketResponseSchema,
   assignSupportTicketSchema,
   supportTicketIdSchema,
+  supportTicketListQuerySchema,
   updateSupportTicketStatusSchema,
 } from "../validations/supportTicket.validator";
-import { createViolationSchema, violationIdSchema } from "../validations/violation.validator";
+import {
+  createViolationSchema,
+  violationIdSchema,
+  violationListQuerySchema,
+} from "../validations/violation.validator";
+import { feedbackListQuerySchema } from "../validations/feedback.validator";
 
 const router = Router();
 
 router.use(authMiddleware, roleMiddleware("ADMIN"));
 
-router.get("/users", adminController.getUsers);
-router.get("/users/:id", adminController.getUserById);
+router.get(
+  "/users",
+  validate(adminUserListQuerySchema, "query"),
+  adminController.getUsers,
+);
+router.get(
+  "/users/:id",
+  validate(adminEntityIdParamSchema, "params"),
+  adminController.getUserById,
+);
 router.patch(
   "/users/:id/status",
+  validate(adminEntityIdParamSchema, "params"),
   validate(updateUserStatusSchema),
   adminController.updateUserStatus,
 );
 
-router.get("/feedbacks", adminController.getFeedbacks);
+router.get(
+  "/feedbacks",
+  validate(feedbackListQuerySchema, "query"),
+  adminController.getFeedbacks,
+);
 
-router.get("/reports", reportController.getAdminReports);
+router.get(
+  "/reports",
+  validate(reportListQuerySchema, "query"),
+  reportController.getAdminReports,
+);
 router.get(
   "/reports/:id",
   validate(reportIdSchema, "params"),
@@ -59,7 +91,11 @@ router.patch(
   reportController.reviewReport,
 );
 
-router.get("/complaints", complaintController.getAdminComplaints);
+router.get(
+  "/complaints",
+  validate(complaintListQuerySchema, "query"),
+  complaintController.getAdminComplaints,
+);
 router.get(
   "/complaints/:id",
   validate(complaintIdSchema, "params"),
@@ -78,7 +114,11 @@ router.patch(
   complaintController.requestEvidence,
 );
 
-router.get("/support-tickets", supportTicketController.getAdminSupportTickets);
+router.get(
+  "/support-tickets",
+  validate(supportTicketListQuerySchema, "query"),
+  supportTicketController.getAdminSupportTickets,
+);
 router.get(
   "/support-tickets/:id",
   validate(supportTicketIdSchema, "params"),
@@ -103,7 +143,11 @@ router.patch(
   supportTicketController.assignSupportTicket,
 );
 
-router.get("/violations", violationController.getAdminViolations);
+router.get(
+  "/violations",
+  validate(violationListQuerySchema, "query"),
+  violationController.getAdminViolations,
+);
 router.get(
   "/violations/:id",
   validate(violationIdSchema, "params"),
@@ -142,10 +186,19 @@ router.delete(
   categoryController.deleteCategory,
 );
 
-router.get("/provider-applications", adminController.getProviderApplications);
-router.get("/provider-applications/:id", adminController.getProviderApplicationById);
+router.get(
+  "/provider-applications",
+  validate(providerApplicationListQuerySchema, "query"),
+  adminController.getProviderApplications,
+);
+router.get(
+  "/provider-applications/:id",
+  validate(providerApplicationIdParamSchema, "params"),
+  adminController.getProviderApplicationById,
+);
 router.patch(
   "/provider-applications/:id/review",
+  validate(providerApplicationIdParamSchema, "params"),
   validate(reviewProviderApplicationSchema),
   adminController.reviewProviderApplication,
 );

@@ -229,6 +229,30 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     ...paidPaymentMatch,
     paymentType: "inspection_deposit",
   };
+  const refundedPaymentMatch = {
+    status: "refunded",
+    isDeleted: false,
+    ...dateMatch(query, "refundedAt"),
+  };
+  const collectedPaymentMatch = {
+    status: { $in: ["paid", "refunded"] },
+    isDeleted: false,
+    ...dateMatch(query, "paidAt"),
+  };
+  const refundedAmountExpression = {
+    $ifNull: ["$metadata.refund.amount", "$amount"],
+  };
+  const providerNetRevenueExpression = {
+    $ifNull: ["$metadata.netEarning", 0],
+  };
+  const cashCompletedRevenueMatch = {
+    ...completedOrderRevenueMatch,
+    "metadata.paymentMethod": "cash",
+  };
+  const onlineCompletedRevenueMatch = {
+    ...completedOrderRevenueMatch,
+    "metadata.paymentMethod": { $ne: "cash" },
+  };
 
   const [
     revenueByDay,
@@ -240,6 +264,13 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     platformFeeRevenue,
     completedOrderRevenue,
     depositRevenue,
+    collectedPaymentRevenue,
+    refundedRevenue,
+    providerNetRevenue,
+    cashCompletedRevenue,
+    onlineCompletedRevenue,
+    providerNetRevenueByMonth,
+    collectedPaymentByDay,
   ] = await Promise.all([
     seriesAggregate(Payment, paidPaymentMatch, "%Y-%m-%d", "$amount", "day", "paidAt"),
     seriesAggregate(Payment, paidPaymentMatch, "%G-W%V", "$amount", "week", "paidAt"),
@@ -250,6 +281,19 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     sumAggregate(WalletTransaction, platformFeeMatch, "$amount"),
     sumAggregate(WalletTransaction, completedOrderRevenueMatch, "$amount"),
     sumAggregate(Payment, depositMatch, "$amount"),
+    sumAggregate(Payment, collectedPaymentMatch, "$amount"),
+    sumAggregate(Payment, refundedPaymentMatch, refundedAmountExpression),
+    sumAggregate(WalletTransaction, completedOrderRevenueMatch, providerNetRevenueExpression),
+    sumAggregate(WalletTransaction, cashCompletedRevenueMatch, "$amount"),
+    sumAggregate(WalletTransaction, onlineCompletedRevenueMatch, "$amount"),
+    seriesAggregate(
+      WalletTransaction,
+      completedOrderRevenueMatch,
+      "%Y-%m",
+      providerNetRevenueExpression,
+      "month",
+    ),
+    seriesAggregate(Payment, collectedPaymentMatch, "%Y-%m-%d", "$amount", "day", "paidAt"),
   ]);
 
   return {
@@ -262,6 +306,14 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     platformFeeByMonth,
     completedOrderRevenueByMonth,
     depositRevenueByMonth,
+    collectedPaymentRevenue,
+    refundedRevenue,
+    netCollectedPaymentRevenue: collectedPaymentRevenue - refundedRevenue,
+    providerNetRevenue,
+    cashCompletedRevenue,
+    onlineCompletedRevenue,
+    providerNetRevenueByMonth,
+    collectedPaymentByDay,
   };
 };
 

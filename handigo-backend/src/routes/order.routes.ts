@@ -11,9 +11,15 @@ import {
 import {
   assignmentIdParamSchema,
   cancelOrderSchema,
+  completeOrderSchema,
+  createRepairQuotationSchema,
   createOrderSchema,
   orderIdParamSchema,
+  orderListQuerySchema,
+  quotationIdParamSchema,
+  recentOrderQuerySchema,
   rejectAssignmentSchema,
+  rejectRepairQuotationSchema,
   trackingRouteQuerySchema,
 } from "../validations/order.validator";
 import {
@@ -55,17 +61,28 @@ router.post(
 );
 
 // GET    /orders               → Customer: list own orders (paginated)
-router.get("/", roleMiddleware("CUSTOMER"), getMyOrders);
+router.get(
+  "/",
+  roleMiddleware("CUSTOMER"),
+  validate(orderListQuerySchema, "query"),
+  getMyOrders,
+);
 
 // GET    /orders/provider/recent  -> Provider: list newest assigned orders
 router.get(
   "/provider/recent",
   roleMiddleware("PROVIDER"),
+  validate(recentOrderQuerySchema, "query"),
   getProviderRecentOrders,
 );
 
 // GET    /orders/provider          -> Provider: paginated order list
-router.get("/provider", roleMiddleware("PROVIDER"), getProviderOrders);
+router.get(
+  "/provider",
+  roleMiddleware("PROVIDER"),
+  validate(orderListQuerySchema, "query"),
+  getProviderOrders,
+);
 
 // GET    /orders/:orderId      → Customer / Provider: view order detail
 router.post(
@@ -85,20 +102,32 @@ router.get(
   getOrderTrackingRoute,
 );
 
-router.get("/:orderId", getOrderById);
+router.get("/:orderId", validate(orderIdParamSchema, "params"), getOrderById);
 
 // PATCH  /orders/:orderId/cancel → Customer / Provider / Admin: cancel order
 router.patch(
   "/:orderId/cancel",
+  validate(orderIdParamSchema, "params"),
   validate(cancelOrderSchema),
   cancelOrder,
 );
 
 // POST   /orders/:orderId/start    → Provider: start working on order
-router.post("/:orderId/start", roleMiddleware("PROVIDER"), startOrder);
+router.post(
+  "/:orderId/start",
+  roleMiddleware("PROVIDER"),
+  validate(orderIdParamSchema, "params"),
+  startOrder,
+);
 
 // POST   /orders/:orderId/complete → Provider: complete order
-router.post("/:orderId/complete", roleMiddleware("PROVIDER"), completeOrder);
+router.post(
+  "/:orderId/complete",
+  roleMiddleware("PROVIDER"),
+  validate(orderIdParamSchema, "params"),
+  validate(completeOrderSchema),
+  completeOrder,
+);
 
 // ─── Assignments ──────────────────────────────────────────────────────────────
 
@@ -151,6 +180,8 @@ router.post(
 router.post(
   "/:orderId/quotations",
   roleMiddleware("PROVIDER"),
+  validate(orderIdParamSchema, "params"),
+  validate(createRepairQuotationSchema),
   createRepairQuotation,
 );
 
@@ -158,6 +189,7 @@ router.post(
 router.get(
   "/:orderId/quotation",
   roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(orderIdParamSchema, "params"),
   getRepairQuotation,
 );
 
@@ -165,6 +197,7 @@ router.get(
 router.post(
   "/quotations/:quotationId/confirm",
   roleMiddleware("CUSTOMER"),
+  validate(quotationIdParamSchema, "params"),
   confirmRepairQuotation,
 );
 
@@ -172,6 +205,8 @@ router.post(
 router.post(
   "/quotations/:quotationId/reject",
   roleMiddleware("CUSTOMER"),
+  validate(quotationIdParamSchema, "params"),
+  validate(rejectRepairQuotationSchema),
   rejectRepairQuotation,
 );
 

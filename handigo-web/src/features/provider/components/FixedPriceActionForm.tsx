@@ -11,6 +11,15 @@ interface FixedPriceActionFormProps {
 }
 
 const MAX_EVIDENCE_IMAGES = 5;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_COMPLETION_NOTE_LENGTH = 1000;
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+]);
 
 export function FixedPriceActionForm({
   order,
@@ -37,9 +46,25 @@ export function FixedPriceActionForm({
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
-    setFiles((current) => [...current, ...selectedFiles].slice(0, MAX_EVIDENCE_IMAGES));
-    setValidationError('');
     event.target.value = '';
+
+    if (selectedFiles.some((file) => !ALLOWED_IMAGE_TYPES.has(file.type))) {
+      setValidationError('Chỉ hỗ trợ ảnh JPEG, PNG, WebP, GIF hoặc AVIF.');
+      return;
+    }
+    if (selectedFiles.some((file) => file.size > MAX_IMAGE_SIZE)) {
+      setValidationError('Mỗi ảnh không được vượt quá 5 MB.');
+      return;
+    }
+    if (files.length + selectedFiles.length > MAX_EVIDENCE_IMAGES) {
+      setValidationError(
+        'Chỉ được tải tối đa ' + MAX_EVIDENCE_IMAGES + ' ảnh.',
+      );
+      return;
+    }
+
+    setFiles((current) => [...current, ...selectedFiles]);
+    setValidationError('');
   };
 
   const handleComplete = () => {
@@ -47,7 +72,16 @@ export function FixedPriceActionForm({
       setValidationError('Vui lòng tải lên ít nhất một ảnh bằng chứng hoàn thành.');
       return;
     }
-    void onComplete(files, note);
+    if (note.trim().length > MAX_COMPLETION_NOTE_LENGTH) {
+      setValidationError(
+        'Ghi chú không được vượt quá ' +
+          MAX_COMPLETION_NOTE_LENGTH +
+          ' ký tự.',
+      );
+      return;
+    }
+    setValidationError('');
+    void onComplete(files, note.trim());
   };
 
   return (
@@ -78,7 +112,7 @@ export function FixedPriceActionForm({
               Chọn ảnh hoàn thành
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                 multiple
                 disabled={busy || files.length >= MAX_EVIDENCE_IMAGES}
                 onChange={handleFileChange}
@@ -112,6 +146,7 @@ export function FixedPriceActionForm({
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
+              maxLength={MAX_COMPLETION_NOTE_LENGTH}
               rows={4}
               disabled={busy}
               className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"

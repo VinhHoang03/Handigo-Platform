@@ -2,6 +2,10 @@ import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary, { isCloudinaryConfigured } from "../configs/cloudinary";
 import { createLogger } from "../utils/logger";
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  hasValidFileSignature,
+} from "../utils/fileSignature";
 
 const feedbackUploadLogger = createLogger("FeedbackUpload");
 
@@ -9,7 +13,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 5 },
   fileFilter: (_req, file, callback) => {
-    if (!file.mimetype.startsWith("image/")) {
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
       callback(new Error("Chỉ chấp nhận tệp hình ảnh."));
       return;
     }
@@ -61,6 +65,17 @@ export const uploadFeedbackImages = (
       return res.status(400).json({
         success: false,
         message: "Vui lòng chọn ít nhất một ảnh.",
+      });
+    }
+
+    if (
+      files.some(
+        (file) => !hasValidFileSignature(file.buffer, file.mimetype),
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Có tệp không khớp với định dạng ảnh đã khai báo.",
       });
     }
 

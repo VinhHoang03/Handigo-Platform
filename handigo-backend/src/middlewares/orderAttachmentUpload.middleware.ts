@@ -2,6 +2,10 @@ import { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cloudinary from "../configs/cloudinary";
 import { analyzeOrderProblemImage } from "../services/orderAttachmentImageAnalysis.service";
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  hasValidFileSignature,
+} from "../utils/fileSignature";
 
 const ORDER_PROBLEM_PURPOSE = "order_problem";
 
@@ -9,7 +13,11 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
-    callback(null, file.mimetype.startsWith("image/"));
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
+      callback(new Error("Chỉ chấp nhận ảnh JPEG, PNG, WebP, GIF hoặc AVIF"));
+      return;
+    }
+    callback(null, true);
   },
 }).single("image");
 
@@ -45,6 +53,21 @@ export const uploadOrderAttachmentImage = (
       return res.status(400).json({
         success: false,
         message: "Vui lòng chọn ảnh cần tải lên",
+      });
+    }
+
+    if (!hasValidFileSignature(req.file.buffer, req.file.mimetype)) {
+      return res.status(400).json({
+        success: false,
+        message: "Nội dung tệp không khớp với định dạng ảnh đã khai báo",
+      });
+    }
+
+    const purpose = String(req.body?.purpose || "");
+    if (purpose && purpose !== ORDER_PROBLEM_PURPOSE) {
+      return res.status(400).json({
+        success: false,
+        message: "Mục đích tải ảnh không hợp lệ",
       });
     }
 

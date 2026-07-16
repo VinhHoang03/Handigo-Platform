@@ -12,6 +12,7 @@ import {
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
+  addressIdParamSchema,
   createAddressSchema,
   updateAddressSchema,
   mapAddressCandidateSchema,
@@ -39,6 +40,7 @@ router.post(
 router.put(
   "/:id",
   authMiddleware,
+  validate(addressIdParamSchema, "params"),
   validate(updateAddressSchema),
   updateAddress
 );
@@ -46,6 +48,7 @@ router.put(
 router.post(
   "/:id/verification",
   authMiddleware,
+  validate(addressIdParamSchema, "params"),
   validate(mapAddressCandidateSchema),
   checkAddressUpdate,
 );
@@ -53,6 +56,7 @@ router.post(
 router.patch(
   "/:id/verification",
   authMiddleware,
+  validate(addressIdParamSchema, "params"),
   validate(mapAddressCandidateSchema),
   confirmAddressUpdate,
 );
@@ -60,6 +64,7 @@ router.patch(
 router.delete(
   "/:id",
   authMiddleware,
+  validate(addressIdParamSchema, "params"),
   deleteAddress
 );
 
