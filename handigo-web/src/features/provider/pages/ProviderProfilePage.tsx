@@ -19,8 +19,8 @@ import {
 } from "@/features/profile/api/addressBook.api";
 import { updateUserProfile } from "@/features/profile/api/userProfile.api";
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
-import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
-import type { Category } from "@/features/provider-application/types/providerApplication.types";
+import { ServiceAdditionApplicationDialog } from "@/features/provider-application/components/ServiceAdditionApplicationDialog";
+import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import { getErrorMessage } from "@/utils/apiError";
 import type {
   UserAddress,
@@ -92,8 +92,10 @@ export default function ProviderProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isAddressSaving, setIsAddressSaving] = useState(false);
   const [isEditingProfessional, setIsEditingProfessional] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoadingServices, setIsLoadingServices] = useState(false);
+  const [isServiceApplicationOpen, setIsServiceApplicationOpen] = useState(false);
+  const [editingServiceApplication, setEditingServiceApplication] =
+    useState<ProviderApplication | null>(null);
+  const [applicationHistoryKey, setApplicationHistoryKey] = useState(0);
   const [isServiceAreaModalOpen, setIsServiceAreaModalOpen] = useState(false);
   const [workingAreasForm, setWorkingAreasForm] = useState<string[]>([]);
   const [serviceAreaError, setServiceAreaError] = useState("");
@@ -278,7 +280,6 @@ export default function ProviderProfilePage() {
     try {
       const nextProfile = await providerProfileApi.updateProfile({
         bio: optional(professionalForm.bio),
-        serviceIds: professionalForm.serviceIds,
       });
 
       setProfile(nextProfile);
@@ -484,12 +485,11 @@ export default function ProviderProfilePage() {
   function openProfessionalEdit() {
     if (profile) setProfessionalForm(toProfessionalForm(profile));
     setIsEditingProfessional(true);
-    setIsLoadingServices(true);
-    void providerApplicationApi
-      .categories()
-      .then(setCategories)
-      .catch(() => setError("Không thể tải danh sách dịch vụ."))
-      .finally(() => setIsLoadingServices(false));
+  }
+
+  function openServiceApplication(application?: ProviderApplication) {
+    setEditingServiceApplication(application || null);
+    setIsServiceApplicationOpen(true);
   }
 
   function openServiceAreaEdit() {
@@ -757,6 +757,7 @@ export default function ProviderProfilePage() {
             experience={profileView.experience}
             skills={profileView.skills}
             onEdit={openProfessionalEdit}
+            onRequestServiceAddition={() => openServiceApplication()}
           />
 
           <ProviderCertificatesSection
@@ -785,7 +786,18 @@ export default function ProviderProfilePage() {
           />
           <ServiceAreaPanel area={serviceArea} onEdit={openServiceAreaEdit} />
           <ProfileSection title="Lịch sử hồ sơ đăng ký">
-            <ProviderApplicationHistory canEditRejected={false} />
+            <ProviderApplicationHistory
+              key={applicationHistoryKey}
+              canEditRejected
+              canEditApplication={(application) =>
+                application.applicationType === "service_addition"
+              }
+              onEdit={(application) => {
+                if (application.applicationType === "service_addition") {
+                  openServiceApplication(application);
+                }
+              }}
+            />
           </ProfileSection>
         </div>
 
@@ -797,21 +809,29 @@ export default function ProviderProfilePage() {
       <ProfessionalProfileDialog
         open={isEditingProfessional}
         bio={professionalForm.bio}
-        selectedServiceIds={professionalForm.serviceIds}
-        categories={categories}
-        experienceYears={profile.provider.experienceYears}
-        loadingServices={isLoadingServices}
         error={error || undefined}
         saving={isSaving}
         onBioChange={(bio) =>
           setProfessionalForm((current) => ({ ...current, bio }))
         }
-        onSelectedServiceIdsChange={(serviceIds) =>
-          setProfessionalForm((current) => ({ ...current, serviceIds }))
-        }
         onClose={() => setIsEditingProfessional(false)}
         onSubmit={handleProfessionalSubmit}
       />
+
+      {isServiceApplicationOpen && (
+        <ServiceAdditionApplicationDialog
+          open
+          currentServiceIds={profile.provider.serviceIds}
+          application={editingServiceApplication}
+          onClose={() => {
+            setIsServiceApplicationOpen(false);
+            setEditingServiceApplication(null);
+          }}
+          onSubmitted={() =>
+            setApplicationHistoryKey((current) => current + 1)
+          }
+        />
+      )}
 
       <ServiceAreaDialog
         open={isServiceAreaModalOpen}

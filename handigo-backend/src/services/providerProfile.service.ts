@@ -59,21 +59,6 @@ const getProviderForUser = async (userId: string) => {
   return provider;
 };
 
-const getActiveServiceIds = async (serviceIds: string[]) => {
-  const uniqueIds = [...new Set(serviceIds)];
-  const services = await Service.find({
-    _id: { $in: uniqueIds },
-    isActive: true,
-    isDeleted: false,
-  }).select("_id");
-
-  if (services.length !== uniqueIds.length) {
-    throw new AppError("Một hoặc nhiều dịch vụ không còn hoạt động", 400);
-  }
-
-  return uniqueIds.map((id) => new Types.ObjectId(id));
-};
-
 const toIdString = (value: unknown) => {
   const candidate = value as { _id?: Types.ObjectId };
   if (candidate?._id) return candidate._id.toString();
@@ -453,9 +438,6 @@ export const updateMyProviderProfile = async (
       province: payload.serviceArea.province,
       ward: payload.serviceArea.ward,
     };
-  }
-  if (payload.serviceIds !== undefined) {
-    provider.serviceIds = await getActiveServiceIds(payload.serviceIds);
   }
   if (payload.workingAreas !== undefined) {
     provider.workingAreas = [...new Set(payload.workingAreas)];

@@ -16,11 +16,13 @@ export function ProfessionalSummarySection({
   experience,
   skills,
   onEdit,
+  onRequestServiceAddition,
 }: {
   bio: string;
   experience: string;
   skills: string[];
   onEdit: () => void;
+  onRequestServiceAddition: () => void;
 }) {
   return (
     <ProfileSection
@@ -35,6 +37,18 @@ export function ProfessionalSummarySection({
         />
         <InfoField label="Kinh nghiệm" value={experience} />
         <InfoField label="Các dịch vụ" value={<SkillTags skills={skills} />} />
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <p className="text-sm text-on-surface-variant">
+            Muốn nhận thêm loại dịch vụ mới, bạn cần gửi chứng chỉ để admin xét duyệt.
+          </p>
+          <button
+            type="button"
+            className="btn-primary mt-3"
+            onClick={onRequestServiceAddition}
+          >
+            Đăng ký thêm dịch vụ
+          </button>
+        </div>
       </div>
     </ProfileSection>
   );

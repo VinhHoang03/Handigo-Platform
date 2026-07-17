@@ -14,7 +14,7 @@ const router = Router();
 router.post(
   "/",
   authMiddleware,
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(createProviderApplicationSchema),
   providerApplicationController.createApplication,
 );
@@ -44,7 +44,7 @@ router.get(
 router.patch(
   "/:id/resubmit",
   authMiddleware,
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(providerApplicationIdParamSchema, "params"),
   validate(createProviderApplicationSchema),
   providerApplicationController.resubmitApplication,

@@ -151,7 +151,6 @@ export interface UpdateProviderProfilePayload {
   bio?: string;
   mainServiceText?: string;
   serviceArea?: ProviderServiceArea;
-  serviceIds?: string[];
   workingAreas?: string[];
 }
 
