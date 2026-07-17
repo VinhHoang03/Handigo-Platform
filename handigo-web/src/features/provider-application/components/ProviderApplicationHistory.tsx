@@ -33,8 +33,10 @@ const isImageUrl = (url: string) =>
   /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) ||
   url.includes("/image/upload/");
 
-const actorName = (actor: ApplicationActor | string) =>
-  typeof actor === "string" ? "Người dùng hệ thống" : actor.fullName;
+const actorName = (actor: ApplicationActor | string | null) =>
+  !actor || typeof actor === "string"
+    ? "Người dùng hệ thống"
+    : actor.fullName || "Người dùng hệ thống";
 
 const actionLabel: Record<string, string> = {
   submitted: "Đã gửi hồ sơ",
@@ -47,9 +49,12 @@ const applicationName = (application: ProviderApplication) => {
   const serviceNames = application.serviceIds
     .map((service) => typeof service === "string" ? "" : service.name)
     .filter(Boolean);
+  const prefix = application.applicationType === "service_addition"
+    ? "Đơn bổ sung dịch vụ"
+    : "Hồ sơ đăng ký provider";
   return serviceNames.length
-    ? `Hồ sơ ${serviceNames.slice(0, 2).join(", ")}`
-    : "Hồ sơ đăng ký nhà cung cấp";
+    ? `${prefix}: ${serviceNames.slice(0, 2).join(", ")}`
+    : prefix;
 };
 
 const submittedDate = (application: ProviderApplication) => {
@@ -178,6 +183,12 @@ function ApplicationDetail({ application }: { application: ProviderApplication }
         <StatusBadge value={application.status} />
       </div>
 
+      <p className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+        {application.applicationType === "service_addition"
+          ? "Đăng ký thêm dịch vụ"
+          : "Đăng ký trở thành provider"}
+      </p>
+
       {(application.rejectionReason || application.rejectionNotes) && (
         <section className="rounded-2xl border border-error/20 bg-error-container/30 p-4">
           <h3 className="font-bold text-on-error-container">Thông tin từ chối gần nhất</h3>
@@ -190,7 +201,9 @@ function ApplicationDetail({ application }: { application: ProviderApplication }
         </section>
       )}
 
-      <IdentityDetail application={application} />
+      {application.applicationType !== "service_addition" && (
+        <IdentityDetail application={application} />
+      )}
 
       <section className="space-y-3">
         <h3 className="font-bold">Chứng chỉ nghề nghiệp</h3>
@@ -237,9 +250,11 @@ function ApplicationDetail({ application }: { application: ProviderApplication }
 export function ProviderApplicationHistory({
   canEditRejected,
   onEdit,
+  canEditApplication = () => true,
 }: {
   canEditRejected: boolean;
   onEdit?: (application: ProviderApplication) => void;
+  canEditApplication?: (application: ProviderApplication) => boolean;
 }) {
   const [items, setItems] = useState<ProviderApplication[]>([]);
   const [page, setPage] = useState(1);
@@ -299,7 +314,7 @@ export function ProviderApplicationHistory({
                     {application.status === "rejected" && (
                       <button type="button" className="btn-secondary min-h-9 px-3 py-1 text-xs" onClick={() => void openDetail(application)}>Xem lý do</button>
                     )}
-                    {canEditRejected && ["draft", "rejected"].includes(application.status) && (
+                    {canEditRejected && canEditApplication(application) && ["draft", "rejected"].includes(application.status) && (
                       <button type="button" className="btn-primary min-h-9 px-3 py-1 text-xs" onClick={() => onEdit?.(application)}><Pencil size={15} /> {application.status === "draft" ? "Tiếp tục" : "Sửa và gửi lại"}</button>
                     )}
                   </div>
@@ -321,7 +336,7 @@ export function ProviderApplicationHistory({
             <div className="flex flex-col gap-2 sm:flex-row">
               <button type="button" className="btn-secondary flex-1" onClick={() => void openDetail(application)}><Eye size={16} /> Xem chi tiết</button>
               {application.status === "rejected" && <button type="button" className="btn-secondary flex-1" onClick={() => void openDetail(application)}>Xem lý do</button>}
-              {canEditRejected && ["draft", "rejected"].includes(application.status) && <button type="button" className="btn-primary flex-1" onClick={() => onEdit?.(application)}><Pencil size={16} /> {application.status === "draft" ? "Tiếp tục" : "Sửa và gửi lại"}</button>}
+              {canEditRejected && canEditApplication(application) && ["draft", "rejected"].includes(application.status) && <button type="button" className="btn-primary flex-1" onClick={() => onEdit?.(application)}><Pencil size={16} /> {application.status === "draft" ? "Tiếp tục" : "Sửa và gửi lại"}</button>}
             </div>
           </article>
         ))}

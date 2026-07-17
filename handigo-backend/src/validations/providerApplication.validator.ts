@@ -157,6 +157,7 @@ const certificateSchema = z
     issuedAt: dateStringSchema.optional(),
     expiresAt: dateStringSchema.optional(),
     imageUrls: z.array(imageUrlSchema).min(1),
+    description: optionalText(2000),
   })
   .superRefine(validateDateRange);
 
@@ -176,7 +177,8 @@ const draftCertificateSchema = z.object({
   imageUrls: z.array(imageUrlSchema).default([]),
 });
 
-export const createProviderApplicationSchema = z.object({
+const initialProviderApplicationSchema = z.object({
+  applicationType: z.literal("initial").default("initial"),
   description: z.string().trim().min(1).max(2000),
   experienceYears: z.number().int().min(0),
   serviceIds: z.array(objectIdSchema).min(1),
@@ -184,6 +186,19 @@ export const createProviderApplicationSchema = z.object({
   identityDocument: identityDocumentSchema,
   certificates: z.array(certificateSchema).default([]),
 });
+
+const serviceAdditionApplicationSchema = z.object({
+  applicationType: z.literal("service_addition"),
+  description: z.string().trim().max(2000).optional().default(""),
+  experienceYears: z.number().int().min(0).optional().default(0),
+  serviceIds: z.array(objectIdSchema).min(1),
+  certificates: z.array(certificateSchema).min(1),
+});
+
+export const createProviderApplicationSchema = z.union([
+  initialProviderApplicationSchema,
+  serviceAdditionApplicationSchema,
+]);
 
 export const saveProviderApplicationDraftSchema = z.object({
   description: z.string().trim().max(2000).optional(),
@@ -228,6 +243,7 @@ export const providerApplicationListQuerySchema = z.object({
     .optional(),
   keyword: z.string().trim().max(100).optional(),
   categoryId: objectIdSchema.optional(),
+  applicationType: z.enum(["initial", "service_addition"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10),
 });

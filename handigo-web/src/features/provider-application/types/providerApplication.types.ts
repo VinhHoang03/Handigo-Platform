@@ -91,12 +91,14 @@ export interface ProviderApplicationCertificate {
   issuedAt?: string;
   expiresAt?: string;
   imageUrls: string[];
+  description?: string;
   status?: CertificateStatus;
   reviewedAt?: string;
   rejectionReason?: string | null;
 }
 
 export interface ProviderApplicationPayload {
+  applicationType?: 'initial';
   description: string;
   experienceYears: number;
   serviceIds: string[];
@@ -106,8 +108,9 @@ export interface ProviderApplicationPayload {
 }
 
 export interface ProviderApplication
-  extends Omit<ProviderApplicationPayload, 'serviceIds'> {
+  extends Omit<ProviderApplicationPayload, 'serviceIds' | 'applicationType'> {
   _id: string;
+  applicationType: 'initial' | 'service_addition';
   status: 'draft' | 'pending' | 'resubmitted' | 'approved' | 'rejected';
   serviceIds: Array<string | Service>;
   rejectionReason?: string | null;
@@ -121,6 +124,14 @@ export interface ProviderApplication
   createdAt: string;
 }
 
+export interface ServiceAdditionApplicationPayload {
+  applicationType: 'service_addition';
+  description?: string;
+  experienceYears?: number;
+  serviceIds: string[];
+  certificates: ProviderApplicationCertificate[];
+}
+
 export interface ApplicationActor {
   _id: string;
   fullName: string;
@@ -131,8 +142,8 @@ export interface ApplicationActor {
 export interface ProviderApplicationReviewHistory {
   action: 'submitted' | 'rejected' | 'resubmitted' | 'approved';
   status: ProviderApplication['status'];
-  actorId: ApplicationActor | string;
-  actorRole: 'CUSTOMER' | 'ADMIN';
+  actorId: ApplicationActor | string | null;
+  actorRole: 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
   occurredAt: string;
   rejectionReason?: string | null;
   notes?: string | null;
