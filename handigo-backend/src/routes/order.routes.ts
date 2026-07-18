@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
+import { approvedProviderMiddleware } from "../middlewares/approvedProvider.middleware";
 import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
@@ -72,6 +73,7 @@ router.get(
 router.get(
   "/provider/recent",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   validate(recentOrderQuerySchema, "query"),
   getProviderRecentOrders,
 );
@@ -80,6 +82,7 @@ router.get(
 router.get(
   "/provider",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   validate(orderListQuerySchema, "query"),
   getProviderOrders,
 );
@@ -116,6 +119,7 @@ router.patch(
 router.post(
   "/:orderId/start",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
   startOrder,
 );
@@ -124,6 +128,7 @@ router.post(
 router.post(
   "/:orderId/complete",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
   validate(completeOrderSchema),
   completeOrder,
@@ -135,6 +140,7 @@ router.post(
 router.get(
   "/assignments/pending",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   getPendingAssignments,
 );
 
@@ -142,6 +148,7 @@ router.get(
 router.post(
   "/assignments/:assignmentId/accept",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   validate(assignmentIdParamSchema, "params"),
   acceptAssignment,
 );
@@ -150,6 +157,7 @@ router.post(
 router.post(
   "/assignments/:assignmentId/reject",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   validate(assignmentIdParamSchema, "params"),
   validate(rejectAssignmentSchema),
   rejectAssignment,
@@ -180,6 +188,7 @@ router.post(
 router.post(
   "/:orderId/quotations",
   roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
   validate(createRepairQuotationSchema),
   createRepairQuotation,

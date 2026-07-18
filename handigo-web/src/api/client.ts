@@ -104,7 +104,8 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
-      originalRequest.url !== REFRESH_TOKEN_PATH
+      originalRequest.url !== REFRESH_TOKEN_PATH &&
+      originalRequest.url !== "/auth/login"
     ) {
       originalRequest._retry = true;
 

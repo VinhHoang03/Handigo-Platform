@@ -5,6 +5,7 @@ import type {
   ProviderApplication,
   ProviderApplicationAssetUpload,
   ProviderApplicationPayload,
+  ProviderApplicationDraftPayload,
   ProviderApplicationListResult,
   ServiceAdditionApplicationPayload,
 } from '../types/providerApplication.types';
@@ -66,7 +67,7 @@ export const providerApplicationApi = {
         await api.patch(`/provider-applications/${id}/resubmit`, payload),
       ),
     ),
-  saveDraft: async (payload: ProviderApplicationPayload) =>
+  saveDraft: async (payload: ProviderApplicationDraftPayload) =>
     normalizeApplication(
       data<ProviderApplication>(
         await api.patch('/provider-applications/me/draft', payload),

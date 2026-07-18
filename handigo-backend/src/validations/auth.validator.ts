@@ -27,6 +27,7 @@ export const registerSchema = z.object({
     (value) => typeof value === "string" && !value.trim() ? undefined : value,
     vietnamesePhoneSchema.optional(),
   ),
+  registrationType: z.enum(["CUSTOMER", "PROVIDER"]).default("CUSTOMER"),
 });
 
 export const verifyRegisterOtpSchema = z.object({

@@ -165,8 +165,15 @@ function PageLoading() {
 function ProviderAssignmentModalGate() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const role = useAuthStore((state) => state.user?.role);
+  const onboardingStatus = useAuthStore(
+    (state) => state.user?.providerOnboardingStatus,
+  );
 
-  if (!isAuthenticated || role !== "PROVIDER") return null;
+  if (
+    !isAuthenticated ||
+    role !== "PROVIDER" ||
+    (onboardingStatus && onboardingStatus !== "APPROVED")
+  ) return null;
 
   return (
     <Suspense fallback={null}>
@@ -323,7 +330,7 @@ function App() {
               <Route
                 path="/provider/profile"
                 element={
-                  <RouteGuard roles={["PROVIDER"]}>
+                  <RouteGuard roles={["PROVIDER"]} allowUnapprovedProvider>
                     <ProviderProfilePage />
                   </RouteGuard>
                 }
@@ -379,7 +386,10 @@ function App() {
               <Route
                 path="/register-provider"
                 element={
-                  <RouteGuard roles={["CUSTOMER"]}>
+                  <RouteGuard
+                    roles={["CUSTOMER", "PROVIDER"]}
+                    allowUnapprovedProvider
+                  >
                     <RegisterProviderPage />
                   </RouteGuard>
                 }

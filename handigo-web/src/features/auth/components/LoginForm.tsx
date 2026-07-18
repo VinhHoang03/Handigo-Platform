@@ -18,7 +18,7 @@ export function LoginForm({ rememberMe, onRememberMeChange }: LoginFormProps) {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const user = await login({ email: email.trim().toLowerCase(), password }, rememberMe);
-    if (user) navigate(getRoleHomePath(user.role), { replace: true });
+    if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
   };
 
   return (

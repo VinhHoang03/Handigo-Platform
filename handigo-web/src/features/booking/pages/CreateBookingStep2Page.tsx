@@ -74,11 +74,6 @@ const CreateBookingStep2Page = () => {
   const [formErrors, setFormErrors] = useState<Step2FormErrors>({});
   const todayInputValue = useMemo(() => getTodayInputValue(), []);
 
-  const handleSelectAddress = useCallback(
-    (address: UserAddress | null) => setAddressId(address?.id || ''),
-    [setAddressId],
-  );
-
   const handleUploadImages = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -120,14 +115,22 @@ const CreateBookingStep2Page = () => {
 
   const shouldShowSchedulePicker = orderType !== 'normal';
 
-  const clearFormError = (field: keyof Step2FormErrors) => {
+  const clearFormError = useCallback((field: keyof Step2FormErrors) => {
     setFormErrors((currentErrors) => {
       if (!currentErrors[field]) return currentErrors;
       const nextErrors = { ...currentErrors };
       delete nextErrors[field];
       return nextErrors;
     });
-  };
+  }, []);
+
+  const handleSelectAddress = useCallback(
+    (address: UserAddress | null) => {
+      setAddressId(address?.id || '');
+      clearFormError('addressId');
+    },
+    [clearFormError, setAddressId],
+  );
 
   const validateStep = () => {
     const description = (problemDescription || '').trim();
@@ -168,7 +171,23 @@ const CreateBookingStep2Page = () => {
               <h2 className="font-headline-sm text-headline-sm text-primary">Thông tin thực hiện</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
+            <div className="space-y-md">
+              <div>
+                <AddressBookManager
+                  compact
+                  selectable
+                  selectedAddressId={addressId}
+                  defaultRecipient={{
+                    name: user?.fullName || '',
+                    phone: user?.phone || '',
+                  }}
+                  onSelectAddress={handleSelectAddress}
+                />
+                {formErrors.addressId && (
+                  <p className="mt-xs text-xs font-medium text-red-600">{formErrors.addressId}</p>
+                )}
+              </div>
+
               <div>
                 <label className="block font-bold mb-xs text-on-surface-variant text-xs uppercase tracking-wider">
                   Mô tả tình trạng
@@ -188,25 +207,6 @@ const CreateBookingStep2Page = () => {
                 <p className="mt-xs text-[10px] text-on-surface-variant italic">
                   Mô tả tối thiểu {MIN_DESCRIPTION_LENGTH} ký tự để provider nắm rõ tình trạng.
                 </p>
-              </div>
-
-              <div>
-                <AddressBookManager
-                  compact
-                  selectable
-                  selectedAddressId={addressId}
-                  defaultRecipient={{
-                    name: user?.fullName || '',
-                    phone: user?.phone || '',
-                  }}
-                  onSelectAddress={(address) => {
-                    handleSelectAddress(address);
-                    clearFormError('addressId');
-                  }}
-                />
-                {formErrors.addressId && (
-                  <p className="mt-xs text-xs font-medium text-red-600">{formErrors.addressId}</p>
-                )}
               </div>
             </div>
             <div className="mt-md pt-md border-t border-outline-variant/30">

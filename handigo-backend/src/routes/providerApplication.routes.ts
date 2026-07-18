@@ -53,7 +53,7 @@ router.patch(
 router.patch(
   "/me/draft",
   authMiddleware,
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(saveProviderApplicationDraftSchema),
   providerApplicationController.saveDraftApplication,
 );

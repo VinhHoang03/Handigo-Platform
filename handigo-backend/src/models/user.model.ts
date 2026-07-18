@@ -8,6 +8,12 @@ import {
 
 export type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 export type UserStatus = "active" | "locked";
+export type RegistrationIntent = "CUSTOMER" | "PROVIDER";
+export type ProviderOnboardingStatus =
+  | "PROFILE_INCOMPLETE"
+  | "PENDING_REVIEW"
+  | "REJECTED"
+  | "APPROVED";
 
 export interface IUser extends Document {
   email: string;
@@ -21,6 +27,9 @@ export interface IUser extends Document {
   gender?: "male" | "female" | "other" | null;
   role: UserRole;
   status: UserStatus;
+  registrationIntent?: RegistrationIntent;
+  providerOnboardingStatus?: ProviderOnboardingStatus | null;
+  providerOnboardingStep?: 1 | 2 | 3 | null;
   isEmailVerified: boolean;
   isDeleted: boolean;
   deletedAt?: Date | null;
@@ -72,7 +81,8 @@ const UserSchema = new Schema<IUser>(
 
     phone: {
       type: String,
-      set: normalizeVietnamesePhone,
+      set: (value: string | undefined) =>
+        value === undefined ? undefined : normalizeVietnamesePhone(value),
       validate: {
         validator: isValidVietnamesePhone,
         message: "Số điện thoại Việt Nam không hợp lệ",
@@ -90,6 +100,23 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: ["CUSTOMER", "PROVIDER", "ADMIN"],
       default: "CUSTOMER",
+    },
+
+    registrationIntent: {
+      type: String,
+      enum: ["CUSTOMER", "PROVIDER"],
+    },
+
+    providerOnboardingStatus: {
+      type: String,
+      enum: ["PROFILE_INCOMPLETE", "PENDING_REVIEW", "REJECTED", "APPROVED"],
+      default: null,
+    },
+
+    providerOnboardingStep: {
+      type: Number,
+      enum: [1, 2, 3],
+      default: null,
     },
 
     status: {

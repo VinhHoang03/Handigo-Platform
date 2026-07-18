@@ -10,7 +10,7 @@ const router = Router();
 router.post(
   "/images",
   authMiddleware,
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   uploadRateLimit,
   uploadProviderApplicationAsset,
   providerAssetController.uploadImage,

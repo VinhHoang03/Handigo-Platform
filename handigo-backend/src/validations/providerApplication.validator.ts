@@ -201,6 +201,7 @@ export const createProviderApplicationSchema = z.union([
 ]);
 
 export const saveProviderApplicationDraftSchema = z.object({
+  onboardingStep: z.number().int().min(1).max(3).optional(),
   description: z.string().trim().max(2000).optional(),
   experienceYears: z.number().int().min(0).optional(),
   serviceIds: z.array(objectIdSchema).optional(),

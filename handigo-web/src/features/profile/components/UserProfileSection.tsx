@@ -27,7 +27,7 @@ const DEFAULT_AVATAR =
 
 interface UserProfileSectionProps {
   user: UserProfileData;
-  addresses: UserAddress[];
+  addresses?: UserAddress[];
   isSaving?: boolean;
   isAddressLoading?: boolean;
   isAddressSaving?: boolean;
@@ -237,7 +237,7 @@ function AddressRow({
 
 export function UserProfileSection({
   user,
-  addresses,
+  addresses = [],
   isSaving,
   isAddressLoading,
   isAddressSaving,

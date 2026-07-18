@@ -10,6 +10,13 @@ export interface User {
   gender?: 'male' | 'female' | 'other' | null;
   status?: 'active' | 'locked';
   isEmailVerified?: boolean;
+  providerOnboardingStatus?:
+    | 'PROFILE_INCOMPLETE'
+    | 'PENDING_REVIEW'
+    | 'REJECTED'
+    | 'APPROVED'
+    | null;
+  providerOnboardingStep?: 1 | 2 | 3 | null;
 }
 
 export interface AuthResponse {
@@ -32,6 +39,7 @@ export interface RegisterRequest {
   fullName: string;
   password: string;
   phone?: string;
+  registrationType?: 'CUSTOMER' | 'PROVIDER';
 }
 
 export interface VerifyRegisterOtpRequest {
