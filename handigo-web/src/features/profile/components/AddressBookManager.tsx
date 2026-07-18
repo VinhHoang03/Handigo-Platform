@@ -21,8 +21,34 @@ interface AddressBookManagerProps {
   onSelectAddress?: (address: UserAddress | null) => void;
 }
 
+const extractAddressTitle = (address: UserAddress) => {
+  const segments = address.fullAddress
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!segments.length) return "";
+
+  const [streetSegment] = segments;
+  const secondSegment = segments[1];
+  const isWardSegment =
+    Boolean(secondSegment) &&
+    Boolean(address.ward) &&
+    secondSegment.localeCompare(address.ward, "vi", {
+      sensitivity: "accent",
+    }) === 0;
+
+  return isWardSegment ? streetSegment : segments.slice(0, 2).join(" ");
+};
+
+const getAddressDisplay = (address: UserAddress) =>
+  [extractAddressTitle(address), address.ward, address.province]
+    .filter(Boolean)
+    .join(", ");
+
 const getAddressTitle = (address: UserAddress) =>
   address.note?.trim() ||
+  getAddressDisplay(address) ||
   [address.ward, address.province].filter(Boolean).join(", ") ||
   "Địa chỉ";
 
@@ -99,7 +125,7 @@ export function AddressBookManager({
   };
 
   const handleDelete = async (address: UserAddress) => {
-    if (!window.confirm("Xóa địa chỉ \"" + address.fullAddress + "\"?")) return;
+    if (!window.confirm(`Xóa địa chỉ "${address.fullAddress}"?`)) return;
 
     try {
       setIsSaving(true);
@@ -124,7 +150,13 @@ export function AddressBookManager({
   };
 
   return (
-    <div className={compact ? "space-y-3" : "rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5"}>
+    <div
+      className={
+        compact
+          ? "space-y-3"
+          : "rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5"
+      }
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h4 className="font-headline-sm text-headline-sm text-on-surface">
@@ -145,7 +177,11 @@ export function AddressBookManager({
         </button>
       </div>
 
-      {error && <p className="mb-3 rounded-lg bg-error/10 p-3 text-sm text-error">{error}</p>}
+      {error && (
+        <p className="mb-3 rounded-lg bg-error/10 p-3 text-sm text-error">
+          {error}
+        </p>
+      )}
 
       {isLoading ? (
         <div className="rounded-lg bg-surface-container-low p-4 text-on-surface-variant">
@@ -160,7 +196,9 @@ export function AddressBookManager({
           Bạn chưa có địa chỉ. Nhấn để thêm địa chỉ mới.
         </button>
       ) : (
-        <div className={compact ? "max-h-52 space-y-2 overflow-y-auto pr-1" : "space-y-3"}>
+        <div
+          className={compact ? "max-h-52 space-y-2 overflow-y-auto pr-1" : "space-y-3"}
+        >
           {addresses.map((address) => {
             const selected = selectedAddressId === address.id;
             return (
@@ -177,14 +215,27 @@ export function AddressBookManager({
                   className="flex min-w-0 flex-1 items-start gap-3 text-left"
                   onClick={() => selectable && onSelectAddress?.(address)}
                 >
-                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${selected ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"}`}>
+                  <span
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${
+                      selected ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"
+                    }`}
+                  >
                     <MapPin size={18} />
                   </span>
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-2 font-bold text-on-surface">
                       {getAddressTitle(address)}
-                      {address.isDefault && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase text-primary">Mặc định</span>}
+                      {address.isDefault && (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase text-primary">
+                          Mặc định
+                        </span>
+                      )}
                     </span>
+                    {address.note?.trim() && (
+                      <span className="mt-1 block text-sm text-on-surface-variant">
+                        {getAddressDisplay(address)}
+                      </span>
+                    )}
                     <span className="mt-1 block text-xs text-on-surface-variant">
                       Người nhận: {address.recipientName || "Chưa cập nhật"}
                       {address.recipientPhone ? ` • ${address.recipientPhone}` : ""}
@@ -192,10 +243,22 @@ export function AddressBookManager({
                   </span>
                 </button>
                 <div className="flex shrink-0 gap-1">
-                  <button type="button" aria-label="Sửa địa chỉ" className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary" disabled={isSaving} onClick={() => openEdit(address)}>
+                  <button
+                    type="button"
+                    aria-label="Sửa địa chỉ"
+                    className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary"
+                    disabled={isSaving}
+                    onClick={() => openEdit(address)}
+                  >
                     <Pencil size={16} />
                   </button>
-                  <button type="button" aria-label="Xóa địa chỉ" className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error" disabled={isSaving} onClick={() => void handleDelete(address)}>
+                  <button
+                    type="button"
+                    aria-label="Xóa địa chỉ"
+                    className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error"
+                    disabled={isSaving}
+                    onClick={() => void handleDelete(address)}
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>

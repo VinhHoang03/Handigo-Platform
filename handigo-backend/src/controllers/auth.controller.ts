@@ -48,10 +48,29 @@ export const verifyRegisterOtp = async (
   next: NextFunction,
 ) => {
   try {
-    await authService.verifyRegisterOtp(req.body.email, req.body.otp);
-    res.json({ message: "Email verified successfully" });
+    const result = await authService.verifyRegisterOtp(req.body.email, req.body.otp);
+
+    if (!result) {
+      return res.json({ message: "Xác thực email thành công" });
+    }
+
+    res.cookie(
+      REFRESH_TOKEN_COOKIE,
+      result.refreshToken,
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, true),
+    );
+    res.cookie(
+      REMEMBER_LOGIN_COOKIE,
+      "true",
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, true),
+    );
+    return res.json({
+      message: "Xác thực email thành công",
+      token: result.token,
+      user: result.user,
+    });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 

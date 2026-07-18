@@ -93,10 +93,16 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use((req, res, next) => {
-  appLogger.info("Yêu cầu HTTP", {
-    method: req.method,
-    path: req.path,
+  const startedAt = process.hrtime.bigint();
+
+  res.once("finish", () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    appLogger.info(`${req.method} ${req.path}`, {
+      status: res.statusCode,
+      durationMs: Number(durationMs.toFixed(1)),
+    });
   });
+
   next();
 });
 

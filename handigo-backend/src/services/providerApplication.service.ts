@@ -5,6 +5,24 @@ import { Provider, type IIdentityDocument, type IProviderCertificate } from "../
 import { ProviderApplication } from "../models/providerApplication.model";
 import { Session } from "../models/session.model";
 import { Service } from "../models/service.model";
+import { createNotificationRecord } from "./notification.service";
+
+const notifyInitialApplicationSubmitted = async (
+  userId: string,
+  applicationId: Types.ObjectId,
+) => {
+  await createNotificationRecord({
+    userId,
+    type: "SYSTEM",
+    title: "Hồ sơ Provider đã được gửi thành công",
+    content:
+      "Hồ sơ của bạn đã được gửi thành công. Bạn sẽ nhận được thông tin phản hồi ngay sau khi quản trị viên kiểm duyệt xong. Sau khi được phê duyệt, bạn có thể bắt đầu nhận việc.",
+    data: {
+      providerApplicationId: applicationId,
+      status: "pending",
+    },
+  });
+};
 
 type IdentityDocumentPayload = {
   type: "cccd" | "passport";
@@ -50,6 +68,7 @@ interface SaveProviderApplicationDraftPayload {
   workingAreas?: string[];
   identityDocument?: Partial<IdentityDocumentPayload>;
   certificates?: Array<Partial<CertificatePayload>>;
+  onboardingStep?: 1 | 2 | 3;
 }
 
 interface ReviewProviderApplicationPayload {
@@ -310,8 +329,18 @@ export const createApplication = async (
     throw new AppError("Account is not active", 403);
   }
 
-  const expectedRole = applicationType === "initial" ? "CUSTOMER" : "PROVIDER";
-  if (user.role !== expectedRole) {
+  const canSubmitInitial =
+    user.role === "CUSTOMER" ||
+    (user.role === "PROVIDER" &&
+      user.providerOnboardingStatus === "PROFILE_INCOMPLETE");
+  const canSubmitServiceAddition =
+    user.role === "PROVIDER" &&
+    (!user.providerOnboardingStatus ||
+      user.providerOnboardingStatus === "APPROVED");
+  if (
+    (applicationType === "initial" && !canSubmitInitial) ||
+    (applicationType === "service_addition" && !canSubmitServiceAddition)
+  ) {
     throw new AppError(
       applicationType === "initial"
         ? "Chỉ khách hàng mới có thể đăng ký trở thành provider"
@@ -365,14 +394,24 @@ export const createApplication = async (
       action: "submitted",
       status: "pending",
       actorId: new Types.ObjectId(userId),
-      actorRole: "CUSTOMER",
+      actorRole: user.role,
       occurredAt: submittedAt,
     });
-    return draftApplication.save();
+    const savedApplication = await draftApplication.save();
+    if (user.role === "PROVIDER") {
+      user.providerOnboardingStatus = "PENDING_REVIEW";
+      user.providerOnboardingStep = 3;
+      await user.save();
+    }
+    await notifyInitialApplicationSubmitted(
+      userId,
+      savedApplication._id as Types.ObjectId,
+    );
+    return savedApplication;
   }
 
   const submittedAt = new Date();
-  return ProviderApplication.create({
+  const application = await ProviderApplication.create({
     userId,
     applicationType,
     description: payload.description || "",
@@ -390,11 +429,23 @@ export const createApplication = async (
         action: "submitted",
         status: "pending",
         actorId: new Types.ObjectId(userId),
-        actorRole: expectedRole,
+        actorRole: user.role,
         occurredAt: submittedAt,
       },
     ],
   });
+  if (applicationType === "initial" && user.role === "PROVIDER") {
+    user.providerOnboardingStatus = "PENDING_REVIEW";
+    user.providerOnboardingStep = 3;
+    await user.save();
+  }
+  if (applicationType === "initial") {
+    await notifyInitialApplicationSubmitted(
+      userId,
+      application._id as Types.ObjectId,
+    );
+  }
+  return application;
 };
 
 export const saveDraftApplication = async (
@@ -413,8 +464,12 @@ export const saveDraftApplication = async (
     throw new AppError("Account is not active", 403);
   }
 
-  if (user.role !== "CUSTOMER") {
-    throw new AppError("Only customers can apply to become providers", 403);
+  const canSaveInitialDraft =
+    user.role === "CUSTOMER" ||
+    (user.role === "PROVIDER" &&
+      user.providerOnboardingStatus === "PROFILE_INCOMPLETE");
+  if (!canSaveInitialDraft) {
+    throw new AppError("Bạn không có quyền lưu nháp hồ sơ Provider", 403);
   }
 
   const pendingApplication = await ProviderApplication.findOne({
@@ -469,6 +524,11 @@ export const saveDraftApplication = async (
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
+
+  if (user.role === "PROVIDER") {
+    user.providerOnboardingStep = payload.onboardingStep || user.providerOnboardingStep || 1;
+    await user.save();
+  }
 
   return getMyApplication(String(application.userId));
 };
@@ -572,9 +632,21 @@ export const resubmitApplication = async (
   }
 
   const applicationType = application.applicationType || "initial";
-  const user = await User.findOne({ _id: userId, isDeleted: false }).select("role status");
-  const expectedRole = applicationType === "initial" ? "CUSTOMER" : "PROVIDER";
-  if (!user || user.status !== "active" || user.role !== expectedRole) {
+  const user = await User.findOne({ _id: userId, isDeleted: false }).select(
+    "role status providerOnboardingStatus",
+  );
+  const canResubmitInitial =
+    user?.role === "CUSTOMER" ||
+    (user?.role === "PROVIDER" && user.providerOnboardingStatus === "REJECTED");
+  const canResubmitServiceAddition =
+    user?.role === "PROVIDER" &&
+    (!user.providerOnboardingStatus || user.providerOnboardingStatus === "APPROVED");
+  if (
+    !user ||
+    user.status !== "active" ||
+    (applicationType === "initial" && !canResubmitInitial) ||
+    (applicationType === "service_addition" && !canResubmitServiceAddition)
+  ) {
     throw new AppError("Bạn không có quyền gửi lại hồ sơ này", 403);
   }
   if ((payload.applicationType || "initial") !== applicationType) {
@@ -601,11 +673,22 @@ export const resubmitApplication = async (
     action: "resubmitted",
     status: "resubmitted",
     actorId: new Types.ObjectId(userId),
-    actorRole: expectedRole,
+    actorRole: user.role,
     occurredAt: resubmittedAt,
   });
 
   await application.save();
+  if (applicationType === "initial" && user.role === "PROVIDER") {
+    user.providerOnboardingStatus = "PENDING_REVIEW";
+    user.providerOnboardingStep = 3;
+    await user.save();
+  }
+  if (applicationType === "initial") {
+    await notifyInitialApplicationSubmitted(
+      userId,
+      application._id as Types.ObjectId,
+    );
+  }
   return getMyApplicationById(userId, applicationId);
 };
 
@@ -738,6 +821,16 @@ export const reviewApplication = async (
           notes: payload.rejectionNotes || null,
         });
         await application.save({ session });
+        await User.updateOne(
+          { _id: application.userId, role: "PROVIDER", isDeleted: false },
+          {
+            $set: {
+              providerOnboardingStatus: "REJECTED",
+              providerOnboardingStep: 3,
+            },
+          },
+          { runValidators: true, session },
+        );
         return;
       }
 
@@ -810,7 +903,13 @@ export const reviewApplication = async (
 
       const updatedUser = await User.findOneAndUpdate(
         { _id: application.userId, isDeleted: false },
-        { $set: { role: "PROVIDER" } },
+        {
+          $set: {
+            role: "PROVIDER",
+            providerOnboardingStatus: "APPROVED",
+            providerOnboardingStep: null,
+          },
+        },
         { new: true, runValidators: true, session },
       );
       if (!updatedUser) {

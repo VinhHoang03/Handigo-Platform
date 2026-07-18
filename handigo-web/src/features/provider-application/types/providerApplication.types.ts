@@ -124,6 +124,10 @@ export interface ProviderApplication
   createdAt: string;
 }
 
+export type ProviderApplicationDraftPayload = ProviderApplicationPayload & {
+  onboardingStep?: 1 | 2 | 3;
+};
+
 export interface ServiceAdditionApplicationPayload {
   applicationType: 'service_addition';
   description?: string;

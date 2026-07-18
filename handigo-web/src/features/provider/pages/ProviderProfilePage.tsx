@@ -7,24 +7,15 @@ import {
   type FormEvent,
 } from "react";
 import { DashboardShell } from "@/components/common/DashboardShell";
-import { AddressBookModal } from "@/features/profile/components/AddressBookModal";
 import { UserProfileSection } from "@/features/profile/components/UserProfileSection";
 import { changePasswordApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import {
-  createUserAddress,
-  deleteUserAddress,
-  getUserAddresses,
-  updateUserAddress,
-} from "@/features/profile/api/addressBook.api";
 import { updateUserProfile } from "@/features/profile/api/userProfile.api";
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
 import { ServiceAdditionApplicationDialog } from "@/features/provider-application/components/ServiceAdditionApplicationDialog";
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import { getErrorMessage } from "@/utils/apiError";
 import type {
-  UserAddress,
-  UserAddressPayload,
   UserProfileData,
   UserProfileFormValue,
 } from "@/features/profile/types/profile.types";
@@ -36,7 +27,10 @@ import {
   ServiceAreaPanel,
   VerificationPanel,
 } from "../components/ProviderProfileComponents";
-import { ProfessionalProfileDialog, ServiceAreaDialog } from "../components/ProviderProfileDialogs";
+import {
+  ProfessionalProfileDialog,
+  ServiceAreaDialog,
+} from "../components/ProviderProfileDialogs";
 import { ProviderFeedbackSection } from "../components/ProviderFeedbackSection";
 import {
   ProfessionalSummarySection,
@@ -77,22 +71,24 @@ import {
   type PasswordForm,
   type ProfessionalForm,
 } from "../utils/providerProfilePage";
+import { Navigate } from "react-router-dom";
 
-export default function ProviderProfilePage() {
+function ProviderProfileContent() {
+  const onboardingStatus = useAuthStore(
+    (state) => state.user?.providerOnboardingStatus,
+  );
+  const canReceiveJobs = !onboardingStatus || onboardingStatus === "APPROVED";
   const { availabilityStatus, isOnline, toggleAvailability } =
-    useProviderAvailability();
+    useProviderAvailability(canReceiveJobs);
   const userProfileSectionRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState<ProviderProfileResponse | null>(null);
-  const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAddressLoading, setIsAddressLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [addressError, setAddressError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [isAddressSaving, setIsAddressSaving] = useState(false);
   const [isEditingProfessional, setIsEditingProfessional] = useState(false);
-  const [isServiceApplicationOpen, setIsServiceApplicationOpen] = useState(false);
+  const [isServiceApplicationOpen, setIsServiceApplicationOpen] =
+    useState(false);
   const [editingServiceApplication, setEditingServiceApplication] =
     useState<ProviderApplication | null>(null);
   const [applicationHistoryKey, setApplicationHistoryKey] = useState(0);
@@ -100,15 +96,14 @@ export default function ProviderProfilePage() {
   const [workingAreasForm, setWorkingAreasForm] = useState<string[]>([]);
   const [serviceAreaError, setServiceAreaError] = useState("");
   const [isCertificateFormOpen, setIsCertificateFormOpen] = useState(false);
-  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const [phoneHighlighted, setPhoneHighlighted] = useState(false);
   const [uploadingAsset, setUploadingAsset] = useState<string | null>(null);
   const [identityError, setIdentityError] = useState("");
   const [certificateError, setCertificateError] = useState("");
-  const [professionalForm, setProfessionalForm] =
-    useState<ProfessionalForm>(emptyProfessionalForm);
+  const [professionalForm, setProfessionalForm] = useState<ProfessionalForm>(
+    emptyProfessionalForm,
+  );
   const [identityForm, setIdentityForm] =
     useState<IdentityForm>(emptyIdentityForm);
   const [certificateForm, setCertificateForm] =
@@ -143,19 +138,6 @@ export default function ProviderProfilePage() {
     if (hasChanged) setUser(syncedUser);
   }, []);
 
-  const loadAddresses = useCallback(async () => {
-    setIsAddressLoading(true);
-    try {
-      const nextAddresses = await getUserAddresses();
-      setAddresses(nextAddresses);
-      setAddressError("");
-    } catch {
-      setAddressError("Không tải được địa chỉ đã lưu.");
-    } finally {
-      setIsAddressLoading(false);
-    }
-  }, []);
-
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -176,8 +158,7 @@ export default function ProviderProfilePage() {
     // Initial remote loads are intentionally started from this effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadProfile();
-    void loadAddresses();
-  }, [loadAddresses, loadProfile]);
+  }, [loadProfile]);
 
   const profileView = useMemo<ProviderProfile | null>(
     () => buildProviderProfileView(profile),
@@ -190,12 +171,6 @@ export default function ProviderProfilePage() {
   );
 
   const serviceArea = useMemo(() => buildServiceArea(profile), [profile]);
-
-  async function refreshAddresses() {
-    const nextAddresses = await getUserAddresses();
-    setAddresses(nextAddresses);
-    setAddressError("");
-  }
 
   async function handleUserProfileSave(payload: UserProfileFormValue) {
     setIsSaving(true);
@@ -229,46 +204,6 @@ export default function ProviderProfilePage() {
       throw saveError;
     } finally {
       setIsSaving(false);
-    }
-  }
-
-  async function handleSubmitAddress(
-    payload: UserAddressPayload,
-    address: UserAddress | null,
-  ) {
-    setIsAddressSaving(true);
-    try {
-      if (address) {
-        await updateUserAddress(address.id, payload);
-      } else {
-        await createUserAddress(payload);
-      }
-      await refreshAddresses();
-    } catch (saveError) {
-      setAddressError(
-        getErrorMessage(saveError, "Không thể lưu địa chỉ. Vui lòng thử lại."),
-      );
-      throw saveError;
-    } finally {
-      setIsAddressSaving(false);
-    }
-  }
-
-  async function handleDeleteAddress(address: UserAddress) {
-    setIsAddressSaving(true);
-    try {
-      await deleteUserAddress(address.id);
-      await refreshAddresses();
-    } catch (deleteError) {
-      setAddressError(
-        getErrorMessage(
-          deleteError,
-          "Không thể xóa địa chỉ. Vui lòng thử lại.",
-        ),
-      );
-      throw deleteError;
-    } finally {
-      setIsAddressSaving(false);
     }
   }
 
@@ -335,7 +270,10 @@ export default function ProviderProfilePage() {
     setUploadingAsset("certificate");
     setCertificateError("");
     try {
-      const uploaded = await providerProfileApi.uploadImage(file, "certificate");
+      const uploaded = await providerProfileApi.uploadImage(
+        file,
+        "certificate",
+      );
       setCertificateForm((current) => ({
         ...current,
         imageUrls: [...current.imageUrls, uploaded.url],
@@ -450,7 +388,10 @@ export default function ProviderProfilePage() {
       };
 
       const nextProfile = certificateForm.id
-        ? await providerProfileApi.updateCertificate(certificateForm.id, payload)
+        ? await providerProfileApi.updateCertificate(
+            certificateForm.id,
+            payload,
+          )
         : await providerProfileApi.createCertificate(payload);
 
       setProfile(nextProfile);
@@ -531,31 +472,11 @@ export default function ProviderProfilePage() {
       setIsServiceAreaModalOpen(false);
     } catch (saveError) {
       setServiceAreaError(
-        getErrorMessage(
-          saveError,
-          "Không thể cập nhật khu vực phục vụ.",
-        ),
+        getErrorMessage(saveError, "Không thể cập nhật khu vực phục vụ."),
       );
     } finally {
       setIsSaving(false);
     }
-  }
-
-  function openCreateAddressModal() {
-    setEditingAddress(null);
-    setAddressError("");
-    setIsAddressModalOpen(true);
-  }
-
-  function openEditAddressModal(address: UserAddress) {
-    setEditingAddress(address);
-    setAddressError("");
-    setIsAddressModalOpen(true);
-  }
-
-  function closeAddressModal() {
-    setIsAddressModalOpen(false);
-    setEditingAddress(null);
   }
 
   function openIdentityModal() {
@@ -648,7 +569,7 @@ export default function ProviderProfilePage() {
     return (
       <DashboardShell
         role="PROVIDER"
-        showStatusToggle
+        showStatusToggle={canReceiveJobs}
         isOnline={isOnline}
         onStatusToggle={toggleAvailability}
       >
@@ -663,7 +584,7 @@ export default function ProviderProfilePage() {
     return (
       <DashboardShell
         role="PROVIDER"
-        showStatusToggle
+        showStatusToggle={canReceiveJobs}
         isOnline={isOnline}
         onStatusToggle={toggleAvailability}
       >
@@ -719,11 +640,11 @@ export default function ProviderProfilePage() {
   return (
     <DashboardShell
       role="PROVIDER"
-      showStatusToggle
+      showStatusToggle={canReceiveJobs}
       isOnline={isOnline}
       onStatusToggle={toggleAvailability}
     >
-      <div className="grid grid-cols-12 gap-gutter">
+      <div className="grid grid-cols-12 items-start gap-gutter">
         <div className="col-span-12">
           <ProviderHero profile={profileView} />
         </div>
@@ -732,23 +653,17 @@ export default function ProviderProfilePage() {
           <PerformanceStats stats={performanceStats} />
         </div>
 
-        <div className="col-span-12 flex flex-col gap-gutter lg:col-span-8">
-          <div ref={userProfileSectionRef}>
+        <div className="col-span-12 flex min-w-0 flex-col gap-gutter xl:col-span-7">
+          <div ref={userProfileSectionRef} className="[&>section]:!p-6">
             <UserProfileSection
               user={toUserProfileData(profile)}
-              addresses={addresses}
               isSaving={isSaving}
-              isAddressLoading={isAddressLoading}
-              isAddressSaving={isAddressSaving}
               error={error || undefined}
-              addressError={addressError}
               defaultAvatar={DEFAULT_PROVIDER_AVATAR}
               showAvatar={false}
+              showAddresses={false}
               highlightPhone={phoneHighlighted}
               onSaveProfile={handleUserProfileSave}
-              onAddAddress={openCreateAddressModal}
-              onEditAddress={openEditAddressModal}
-              onDeleteAddress={handleDeleteAddress}
             />
           </div>
 
@@ -779,16 +694,18 @@ export default function ProviderProfilePage() {
           />
         </div>
 
-        <div className="col-span-12 flex flex-col gap-gutter lg:col-span-4">
+        <div className="col-span-12 flex min-w-0 flex-col gap-gutter xl:col-span-5">
           <VerificationPanel items={verificationItems} />
+          <ServiceAreaPanel area={serviceArea} onEdit={openServiceAreaEdit} />
           <AccountFunctionsPanel
             onPasswordClick={() => setIsPwdConfirmOpen(true)}
           />
-          <ServiceAreaPanel area={serviceArea} onEdit={openServiceAreaEdit} />
-          <ProfileSection title="Lịch sử hồ sơ đăng ký">
+          <ProfileSection title="Lịch sử đơn/hồ sơ">
             <ProviderApplicationHistory
               key={applicationHistoryKey}
               canEditRejected
+              compact
+              hideLastUpdated
               canEditApplication={(application) =>
                 application.applicationType === "service_addition"
               }
@@ -802,7 +719,7 @@ export default function ProviderProfilePage() {
         </div>
 
         <div className="col-span-12">
-          <ProviderFeedbackSection />
+          <ProviderFeedbackSection enabled={canReceiveJobs} />
         </div>
       </div>
 
@@ -827,9 +744,7 @@ export default function ProviderProfilePage() {
             setIsServiceApplicationOpen(false);
             setEditingServiceApplication(null);
           }}
-          onSubmitted={() =>
-            setApplicationHistoryKey((current) => current + 1)
-          }
+          onSubmitted={() => setApplicationHistoryKey((current) => current + 1)}
         />
       )}
 
@@ -842,22 +757,6 @@ export default function ProviderProfilePage() {
         onClose={() => setIsServiceAreaModalOpen(false)}
         onSave={() => void handleServiceAreaSave()}
       />
-
-      {isAddressModalOpen && (
-        <AddressBookModal
-          key={editingAddress?.id || "new-address"}
-          open={isAddressModalOpen}
-          address={editingAddress}
-          addressCount={addresses.length}
-          isSaving={isAddressSaving}
-          defaultRecipient={{
-            name: profile.user.fullName,
-            phone: profile.user.phone || "",
-          }}
-          onClose={closeAddressModal}
-          onSubmit={handleSubmitAddress}
-        />
-      )}
 
       <ProviderIdentityDialog
         open={isIdentityModalOpen}
@@ -892,4 +791,20 @@ export default function ProviderProfilePage() {
       />
     </DashboardShell>
   );
+}
+
+export default function ProviderProfilePage() {
+  const onboardingStatus = useAuthStore(
+    (state) => state.user?.providerOnboardingStatus,
+  );
+
+  if (
+    onboardingStatus &&
+    onboardingStatus !== "APPROVED" &&
+    onboardingStatus !== "PENDING_REVIEW"
+  ) {
+    return <Navigate to="/register-provider" replace />;
+  }
+
+  return <ProviderProfileContent />;
 }

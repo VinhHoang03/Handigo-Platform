@@ -79,12 +79,6 @@ const AUTH_RATE_LIMIT_MESSAGE =
 const RESOURCE_RATE_LIMIT_MESSAGE =
   "Bạn thao tác quá nhanh. Vui lòng chờ rồi thử lại.";
 
-export const loginRateLimit = createRateLimit({
-  windowMs: 15 * 60_000,
-  maxRequests: 10,
-  message: AUTH_RATE_LIMIT_MESSAGE,
-});
-
 export const otpRateLimit = createRateLimit({
   windowMs: 10 * 60_000,
   maxRequests: 10,
