@@ -18,12 +18,14 @@ const getCurrentCoordinates = () =>
     );
   });
 
-export function useProviderAvailability() {
+export function useProviderAvailability(enabled = true) {
   const [availabilityStatus, setAvailabilityStatus] =
     useState<ProviderAvailabilityStatus>("offline");
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
+
     let cancelled = false;
 
     providerDashboardApi
@@ -42,9 +44,11 @@ export function useProviderAvailability() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   const toggleAvailability = useCallback(async () => {
+    if (!enabled) return;
+
     const nextStatus = availabilityStatus === "online" ? "offline" : "online";
     setIsUpdating(true);
 
@@ -69,7 +73,7 @@ export function useProviderAvailability() {
     } finally {
       setIsUpdating(false);
     }
-  }, [availabilityStatus]);
+  }, [availabilityStatus, enabled]);
 
   return {
     availabilityStatus,

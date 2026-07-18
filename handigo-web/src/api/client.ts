@@ -42,7 +42,7 @@ const shouldRefreshToken = (token: string) => {
 };
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000",
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -104,7 +104,8 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
-      originalRequest.url !== REFRESH_TOKEN_PATH
+      originalRequest.url !== REFRESH_TOKEN_PATH &&
+      originalRequest.url !== "/auth/login"
     ) {
       originalRequest._retry = true;
 

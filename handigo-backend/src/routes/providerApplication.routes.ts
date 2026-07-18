@@ -5,6 +5,7 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   createProviderApplicationSchema,
+  providerApplicationIdParamSchema,
   saveProviderApplicationDraftSchema,
 } from "../validations/providerApplication.validator";
 
@@ -13,7 +14,7 @@ const router = Router();
 router.post(
   "/",
   authMiddleware,
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(createProviderApplicationSchema),
   providerApplicationController.createApplication,
 );
@@ -36,13 +37,15 @@ router.get(
   "/:id",
   authMiddleware,
   roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(providerApplicationIdParamSchema, "params"),
   providerApplicationController.getMyApplicationById,
 );
 
 router.patch(
   "/:id/resubmit",
   authMiddleware,
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(providerApplicationIdParamSchema, "params"),
   validate(createProviderApplicationSchema),
   providerApplicationController.resubmitApplication,
 );
@@ -50,7 +53,7 @@ router.patch(
 router.patch(
   "/me/draft",
   authMiddleware,
-  roleMiddleware("CUSTOMER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(saveProviderApplicationDraftSchema),
   providerApplicationController.saveDraftApplication,
 );

@@ -18,11 +18,11 @@ const router = Router();
 router.post(
   "/",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   validate(createWithdrawalSchema),
   createWithdrawal,
 );
-router.get("/me", authMiddleware, roleMiddleware("PROVIDER"), getMyWithdrawals);
+router.get("/me", authMiddleware, roleMiddleware("CUSTOMER", "PROVIDER"), getMyWithdrawals);
 
 router.get("/admin", authMiddleware, roleMiddleware("ADMIN"), getAdminWithdrawals);
 router.get(
@@ -44,6 +44,6 @@ router.patch(
   rejectWithdrawal,
 );
 
-router.get("/:id", authMiddleware, roleMiddleware("PROVIDER"), getMyWithdrawalById);
+router.get("/:id", authMiddleware, roleMiddleware("CUSTOMER", "PROVIDER"), getMyWithdrawalById);
 
 export default router;

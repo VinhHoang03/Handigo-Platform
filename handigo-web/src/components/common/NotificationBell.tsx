@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { io } from "socket.io-client";
-import { tokenStorage } from "@/api/tokenStorage";
+import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import { notificationApi } from "@/features/notification/api/notification.api";
-import type { AppNotification, NotificationQuery, NotificationType } from "@/features/notification/types/notification.types";
+import type {
+  AppNotification,
+  NotificationQuery,
+  NotificationType,
+} from "@/features/notification/types/notification.types";
 import type { AppRole } from "./Navbar";
 
 const typeIcons: Record<NotificationType, string> = {
@@ -27,7 +30,8 @@ const getNotificationPath = (role?: AppRole) => {
 
 const getErrorMessage = (error: unknown) => {
   if (typeof error === "object" && error && "response" in error) {
-    const response = (error as { response?: { data?: { message?: string } } }).response;
+    const response = (error as { response?: { data?: { message?: string } } })
+      .response;
     if (response?.data?.message) return response.data.message;
   }
   return error instanceof Error ? error.message : "Không tải được thông báo.";
@@ -36,7 +40,11 @@ const getErrorMessage = (error: unknown) => {
 export function NotificationBell({ role }: { role?: AppRole }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
-  const [query, setQuery] = useState<NotificationQuery>({ page: 1, limit: 6, isRead: "" });
+  const [query, setQuery] = useState<NotificationQuery>({
+    page: 1,
+    limit: 6,
+    isRead: "",
+  });
   const [totalPages, setTotalPages] = useState(1);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -47,30 +55,35 @@ export function NotificationBell({ role }: { role?: AppRole }) {
   const notificationPath = getNotificationPath(role);
   const canUseUserNotifications = role === "CUSTOMER" || role === "PROVIDER";
 
-  const load = useCallback(async (nextQuery: NotificationQuery = query, append = false) => {
-    if (!canUseUserNotifications) return;
+  const load = useCallback(
+    async (nextQuery: NotificationQuery = query, append = false) => {
+      if (!canUseUserNotifications) return;
 
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
-    setError("");
-    try {
-      const [listResult, countResult] = await Promise.all([
-        notificationApi.list(nextQuery),
-        notificationApi.unreadCount(),
-      ]);
-      setItems((current) => (append ? [...current, ...listResult.items] : listResult.items));
-      setTotalPages(listResult.pagination.totalPages || 1);
-      setUnreadCount(countResult.count);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [canUseUserNotifications, query]);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      setError("");
+      try {
+        const [listResult, countResult] = await Promise.all([
+          notificationApi.list(nextQuery),
+          notificationApi.unreadCount(),
+        ]);
+        setItems((current) =>
+          append ? [...current, ...listResult.items] : listResult.items,
+        );
+        setTotalPages(listResult.pagination.totalPages || 1);
+        setUnreadCount(countResult.count);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [canUseUserNotifications, query],
+  );
 
   useEffect(() => {
     const initialTimer = window.setTimeout(() => void load(), 0);
@@ -88,12 +101,7 @@ export function NotificationBell({ role }: { role?: AppRole }) {
   useEffect(() => {
     if (!canUseUserNotifications) return undefined;
 
-    const token = tokenStorage.get();
-    if (!token) return undefined;
-
-    const socket = io(import.meta.env.VITE_API_BASE_URL || "http://localhost:5000", {
-      auth: { token },
-    });
+    const { socket, dispose } = createAuthenticatedSocket();
 
     const handleNewNotification = (notification: AppNotification) => {
       setUnreadCount((current) => current + 1);
@@ -111,13 +119,16 @@ export function NotificationBell({ role }: { role?: AppRole }) {
 
     return () => {
       socket.off("notification:new", handleNewNotification);
-      socket.disconnect();
+      dispose();
     };
   }, [canUseUserNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -180,13 +191,19 @@ export function NotificationBell({ role }: { role?: AppRole }) {
       setItems((current) =>
         current.map((notification) =>
           notification.id === item.id
-            ? { ...notification, isRead: true, readAt: new Date().toISOString() }
+            ? {
+                ...notification,
+                isRead: true,
+                readAt: new Date().toISOString(),
+              }
             : notification,
         ),
       );
       setUnreadCount((current) => Math.max(current - 1, 0));
       if (query.isRead === false) {
-        setItems((current) => current.filter((notification) => notification.id !== item.id));
+        setItems((current) =>
+          current.filter((notification) => notification.id !== item.id),
+        );
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -197,7 +214,11 @@ export function NotificationBell({ role }: { role?: AppRole }) {
     try {
       await notificationApi.markAllAsRead();
       setItems((current) =>
-        current.map((item) => ({ ...item, isRead: true, readAt: item.readAt || new Date().toISOString() })),
+        current.map((item) => ({
+          ...item,
+          isRead: true,
+          readAt: item.readAt || new Date().toISOString(),
+        })),
       );
       setUnreadCount(0);
     } catch (err) {
@@ -226,7 +247,9 @@ export function NotificationBell({ role }: { role?: AppRole }) {
         onClick={toggleOpen}
         className="relative grid h-10 w-10 place-items-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary"
       >
-        <span className="material-symbols-outlined text-[22px]">notifications</span>
+        <span className="material-symbols-outlined text-[22px]">
+          notifications
+        </span>
         {unreadCount > 0 && (
           <span className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-error px-1.5 text-center text-[11px] font-bold leading-5 text-on-error">
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -239,7 +262,9 @@ export function NotificationBell({ role }: { role?: AppRole }) {
           <div className="flex items-center justify-between border-b border-outline-variant/20 px-4 py-3">
             <div>
               <p className="font-bold text-on-surface">Thông báo</p>
-              <p className="text-xs text-on-surface-variant">{unreadCount} thông báo chưa đọc</p>
+              <p className="text-xs text-on-surface-variant">
+                {unreadCount} thông báo chưa đọc
+              </p>
             </div>
             <button
               type="button"
@@ -256,7 +281,9 @@ export function NotificationBell({ role }: { role?: AppRole }) {
               type="button"
               onClick={() => changeUnreadFilter("")}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                query.isRead === "" ? "bg-primary text-on-primary" : "bg-surface-container-low text-on-surface-variant hover:text-primary"
+                query.isRead === ""
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-low text-on-surface-variant hover:text-primary"
               }`}
             >
               Tất cả
@@ -265,7 +292,9 @@ export function NotificationBell({ role }: { role?: AppRole }) {
               type="button"
               onClick={() => changeUnreadFilter(false)}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                query.isRead === false ? "bg-primary text-on-primary" : "bg-surface-container-low text-on-surface-variant hover:text-primary"
+                query.isRead === false
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-low text-on-surface-variant hover:text-primary"
               }`}
             >
               Chưa đọc ({unreadCount})
@@ -274,13 +303,19 @@ export function NotificationBell({ role }: { role?: AppRole }) {
 
           <div className="max-h-[420px] overflow-y-auto">
             {loading && items.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-on-surface-variant">Đang tải thông báo...</div>
+              <div className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                Đang tải thông báo...
+              </div>
             )}
             {error && items.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-error">{error}</div>
+              <div className="px-4 py-8 text-center text-sm text-error">
+                {error}
+              </div>
             )}
             {!loading && !error && items.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-on-surface-variant">Chưa có thông báo.</div>
+              <div className="px-4 py-8 text-center text-sm text-on-surface-variant">
+                Chưa có thông báo.
+              </div>
             )}
             {items.map((item) => (
               <button
@@ -291,17 +326,29 @@ export function NotificationBell({ role }: { role?: AppRole }) {
                   item.isRead ? "bg-white" : "bg-primary/5"
                 }`}
               >
-                <span className={`material-symbols-outlined mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full ${
-                  item.isRead ? "bg-surface-container-low text-on-surface-variant" : "bg-primary/10 text-primary"
-                }`}>
-                  {typeIcons[item.type]}
+                <span
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
+                    item.isRead
+                      ? "bg-surface-container-low text-on-surface-variant"
+                      : "bg-primary/10 text-primary"
+                  }`}
+                >
+                  <span className="material-symbols-outlined block text-[20px] leading-none">
+                    {typeIcons[item.type]}
+                  </span>
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-start justify-between gap-2">
-                    <span className="line-clamp-1 font-semibold text-on-surface">{item.title}</span>
-                    {!item.isRead && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                    <span className="line-clamp-1 font-semibold text-on-surface">
+                      {item.title}
+                    </span>
+                    {!item.isRead && (
+                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    )}
                   </span>
-                  <span className="mt-1 line-clamp-2 text-sm leading-5 text-on-surface-variant">{item.content}</span>
+                  <span className="mt-1 line-clamp-2 text-sm leading-5 text-on-surface-variant">
+                    {item.content}
+                  </span>
                   <span className="mt-2 block text-xs text-on-surface-variant">
                     {dateTime.format(new Date(item.createdAt))}
                   </span>
@@ -318,11 +365,15 @@ export function NotificationBell({ role }: { role?: AppRole }) {
                 disabled={loadingMore}
                 className="inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:text-on-surface-variant"
               >
-                <span className="material-symbols-outlined text-[18px]">expand_more</span>
+                <span className="material-symbols-outlined text-[18px]">
+                  expand_more
+                </span>
                 {loadingMore ? "Đang tải..." : "Xem thông báo trước đó"}
               </button>
             ) : (
-              <span className="text-xs text-on-surface-variant">Đã hiển thị toàn bộ thông báo.</span>
+              <span className="text-xs text-on-surface-variant">
+                Đã hiển thị toàn bộ thông báo.
+              </span>
             )}
           </div>
         </div>

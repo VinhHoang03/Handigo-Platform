@@ -3,6 +3,7 @@ import type {
   ProviderApplicationCertificate,
   ProviderApplicationIdentityDocument,
   ProviderApplicationPayload,
+  ProviderApplicationDraftPayload,
 } from '../types/providerApplication.types';
 import { hasProviderApplicationDateErrors } from '../utils/providerApplicationValidation';
 
@@ -89,7 +90,7 @@ const cleanCertificates = (
     return clean;
   });
 
-const cleanDraft = (payload: ProviderApplicationPayload): ProviderApplicationPayload => ({
+const cleanDraft = (payload: ProviderApplicationDraftPayload): ProviderApplicationDraftPayload => ({
   ...payload,
   serviceIds: [...new Set(payload.serviceIds)],
   description: payload.description.trim(),
@@ -132,7 +133,7 @@ export const providerApplicationService = {
   loadMine: providerApplicationApi.mine,
   loadDetail: providerApplicationApi.detail,
   uploadImage: providerApplicationApi.uploadImage,
-  saveDraft: (payload: ProviderApplicationPayload) =>
+  saveDraft: (payload: ProviderApplicationDraftPayload) =>
     providerApplicationApi.saveDraft(cleanDraft(payload)),
   submit: (payload: ProviderApplicationPayload) => {
     if (hasProviderApplicationDateErrors(payload)) {

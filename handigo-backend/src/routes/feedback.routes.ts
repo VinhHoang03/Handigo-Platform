@@ -5,11 +5,13 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   createFeedbackSchema,
+  feedbackListQuerySchema,
   providerReplySchema,
   updateFeedbackSchema,
   visibilitySchema,
 } from "../validations/feedback.validator";
 import { uploadFeedbackImages } from "../middlewares/feedbackUpload.middleware";
+import { uploadRateLimit } from "../middlewares/rateLimit.middleware";
 
 const router = Router();
 
@@ -56,6 +58,7 @@ router.post(
   "/images",
   authMiddleware,
   roleMiddleware("CUSTOMER"),
+  uploadRateLimit,
   uploadFeedbackImages,
   feedbackController.uploadFeedbackImages,
 );
@@ -64,6 +67,7 @@ router.get(
   "/provider/me",
   authMiddleware,
   roleMiddleware("PROVIDER"),
+  validate(feedbackListQuerySchema, "query"),
   feedbackController.getMyProviderFeedbacks,
 );
 
@@ -78,6 +82,7 @@ router.post(
   "/provider/images",
   authMiddleware,
   roleMiddleware("PROVIDER"),
+  uploadRateLimit,
   uploadFeedbackImages,
   feedbackController.uploadFeedbackImages,
 );
@@ -92,6 +97,7 @@ router.put(
 
 router.get(
   "/provider/:providerId",
+  validate(feedbackListQuerySchema, "query"),
   feedbackController.getProviderFeedbacks,
 );
 

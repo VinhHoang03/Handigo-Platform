@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import { Modal } from '@/components/common/Modal';
-import { tokenStorage } from '@/api/tokenStorage';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { createAuthenticatedSocket } from '@/realtime/authenticatedSocket';
 import { providerOrderApi } from '../api/providerOrder.api';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import {
@@ -60,11 +59,7 @@ export function ProviderAssignmentModal() {
 
     void Promise.resolve().then(loadPendingAssignment);
 
-    const socketToken = token || tokenStorage.get();
-    if (!socketToken) return undefined;
-    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-      auth: { token: socketToken },
-    });
+    const { socket, dispose } = createAuthenticatedSocket();
 
     const handleNewAssignment = (payload: AssignmentRealtimePayload) => {
       const nextAssignment = payload?.assignment;
@@ -95,7 +90,7 @@ export function ProviderAssignmentModal() {
       socket.off('assignment:new', handleNewAssignment);
       socket.off('assignment:closed', handleClosedAssignment);
       socket.off('connect', loadPendingAssignment);
-      socket.disconnect();
+      dispose();
     };
   }, [enabled, loadPendingAssignment, token]);
 

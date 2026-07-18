@@ -54,7 +54,8 @@ export interface ApplicationCertificate {
   rejectionReason?: string | null;
 }
 export interface AdminApplication {
-  _id: string; userId: ApplicationUser; description: string; experienceYears: number;
+  _id: string; userId: ApplicationUser | null; description: string; experienceYears: number;
+  applicationType: 'initial' | 'service_addition';
   serviceIds: ServiceRef[]; workingAreas: string[];
   identityDocument?: ApplicationIdentityDocument;
   certificates?: ApplicationCertificate[];
@@ -69,7 +70,7 @@ export interface AdminApplication {
     action: 'submitted' | 'rejected' | 'resubmitted' | 'approved';
     status: 'pending' | 'resubmitted' | 'approved' | 'rejected';
     actorId: ApplicationUser | string;
-    actorRole: 'CUSTOMER' | 'ADMIN';
+    actorRole: 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
     occurredAt: string;
     rejectionReason?: string | null;
     notes?: string | null;
@@ -78,7 +79,7 @@ export interface AdminApplication {
   updatedAt: string;
 }
 export interface ListResult<T> { items: T[]; pagination: Pagination }
-export interface AdminQuery { page?: number; limit?: number; keyword?: string; role?: string; status?: string; categoryId?: string }
+export interface AdminQuery { page?: number; limit?: number; keyword?: string; role?: string; status?: string; categoryId?: string; applicationType?: string }
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
 export interface AdminWithdrawalUser { _id: string; fullName: string; email: string; phone?: string }
 export interface AdminWithdrawalBankAccount {

@@ -1,19 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { MapPin, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
 import {
   SearchableSelect,
   type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
 import { FloatingTextarea } from "@/components/common/FloatingField";
+import { bookingApi } from "@/features/booking/api/booking.api";
 import {
   getProvinces,
   getWardsByProvince,
   type AdministrativeUnit,
 } from "@/features/customer/api/vietnamAddress.api";
-import {
-  mountPlaceAutocompleteElement,
-  type ParsedPlaceAddress,
-} from "@/features/customer/utils/googlePlacesAutocomplete";
 import type {
   UserAddress,
   UserAddressPayload,
@@ -66,42 +64,31 @@ const toSelectOptions = (
     searchText: `${item.codeName} ${item.divisionType}`,
   }));
 
+const normalizeAddressPart = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 const composeFullAddress = (
   addressLine: string,
   ward: string,
   province: string,
-) =>
-  [addressLine, ward, province]
+) => {
+  const parts = [addressLine.trim()];
+  const normalizedAddressLine = normalizeAddressPart(addressLine);
+
+  [ward, province]
     .map((part) => part.trim())
     .filter(Boolean)
-    .join(", ");
+    .forEach((part) => {
+      if (!normalizedAddressLine.includes(normalizeAddressPart(part))) {
+        parts.push(part);
+      }
+    });
 
-const normalizeAdministrativeName = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/đ/g, "d")
-    .replace(/[_.,/-]+/g, " ")
-    .replace(
-      /^(tinh|thanh pho|tp|phuong|xa|thi tran|dac khu)\s+/,
-      "",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-
-const findAdministrativeUnit = (
-  items: AdministrativeUnit[],
-  name: string,
-) => {
-  const normalizedName = normalizeAdministrativeName(name);
-  if (!normalizedName) return undefined;
-
-  return items.find(
-    (item) =>
-      normalizeAdministrativeName(item.name) === normalizedName ||
-      normalizeAdministrativeName(item.codeName) === normalizedName,
-  );
+  return parts.filter(Boolean).join(", ");
 };
 
 const extractAddressLine = (
@@ -110,22 +97,74 @@ const extractAddressLine = (
   province?: string,
 ) => {
   const administrativeParts = [ward, province]
-    .map((part) => normalizeAdministrativeName(part || ""))
+    .map((part) => part?.trim().toLowerCase())
     .filter(Boolean);
 
   return fullAddress
     .split(",")
     .map((part) => part.trim())
-    .filter((part) => {
-      const normalizedPart = normalizeAdministrativeName(part);
-      return (
-        normalizedPart !== "viet nam" &&
-        !/^\d{4,6}$/.test(part) &&
-        !administrativeParts.includes(normalizedPart)
-      );
-    })
+    .filter((part) => !administrativeParts.includes(part.toLowerCase()))
     .join(", ")
     .trim();
+};
+
+const extractStreetAddressLine = (
+  fullAddress: string,
+  ward?: string,
+  province?: string,
+) => {
+  const segments = fullAddress
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!segments.length) return "";
+
+  const normalizedWard = normalizeAddressPart(ward || "");
+  const normalizedProvince = normalizeAddressPart(province || "");
+  const streetParts: string[] = [];
+
+  for (const segment of segments) {
+    const normalizedSegment = normalizeAddressPart(segment);
+    const isAdministrativeSegment =
+      normalizedSegment === normalizedWard ||
+      normalizedSegment === normalizedProvince ||
+      normalizedSegment.includes("viet nam") ||
+      normalizedSegment.includes("vietnam") ||
+      /\b\d{5,6}\b/.test(segment);
+
+    if (isAdministrativeSegment) break;
+    streetParts.push(segment);
+  }
+
+  return extractAddressLine(streetParts.join(" "), ward, province);
+};
+
+const findAdministrativeUnitByName = (
+  items: AdministrativeUnit[],
+  target: string,
+) => {
+  const normalizedTarget = normalizeAddressPart(target);
+  if (!normalizedTarget) return undefined;
+
+  return items.find((item) => {
+    const normalizedName = normalizeAddressPart(item.name);
+    const normalizedCodeName = normalizeAddressPart(item.codeName);
+    return (
+      normalizedName === normalizedTarget ||
+      normalizedCodeName === normalizedTarget ||
+      normalizedName.includes(normalizedTarget) ||
+      normalizedTarget.includes(normalizedName)
+    );
+  });
+};
+
+const clearGeocodedFields = (form: AddressFormState): AddressFormState => {
+  const next = { ...form };
+  delete next.latitude;
+  delete next.longitude;
+  delete next.placeId;
+  return next;
 };
 
 const toAddressForm = (
@@ -176,37 +215,20 @@ export function AddressBookModal({
     toAddressForm(address, addressCount, defaultRecipient),
   );
   const [addressFormError, setAddressFormError] = useState("");
-  const [addressAutocompleteError, setAddressAutocompleteError] = useState("");
   const [administrativeError, setAdministrativeError] = useState("");
-  const [administrativeMatchMessage, setAdministrativeMatchMessage] =
-    useState("");
+  const [locationError, setLocationError] = useState("");
+  const [locationHint, setLocationHint] = useState("");
   const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
   const [wards, setWards] = useState<AdministrativeUnit[]>([]);
   const [isProvinceLoading, setIsProvinceLoading] = useState(false);
   const [isWardLoading, setIsWardLoading] = useState(false);
-  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
-  const [loadedWardProvinceCode, setLoadedWardProvinceCode] = useState<
-    number | undefined
-  >();
-
-  const addressAutocompleteContainerRef = useRef<HTMLDivElement>(null);
-  const addressLineValueRef = useRef("");
-  const placeResolutionSequenceRef = useRef(0);
-  const provincesRef = useRef<AdministrativeUnit[]>([]);
+  const [isLocating, setIsLocating] = useState(false);
 
   const provinceOptions = useMemo(
     () => toSelectOptions(provinces),
     [provinces],
   );
   const wardOptions = useMemo(() => toSelectOptions(wards), [wards]);
-
-  useEffect(() => {
-    addressLineValueRef.current = addressForm.addressLine;
-  }, [addressForm.addressLine]);
-
-  useEffect(() => {
-    provincesRef.current = provinces;
-  }, [provinces]);
 
   useEffect(() => {
     if (!open || provinces.length > 0) return undefined;
@@ -218,7 +240,23 @@ export function AddressBookModal({
         setIsProvinceLoading(true);
         setAdministrativeError("");
         const data = await getProvinces();
-        if (!cancelled) setProvinces(data);
+        if (!cancelled) {
+          setProvinces(data);
+
+          if (addressForm.province && !addressForm.provinceCode) {
+            const matchedProvince = findAdministrativeUnitByName(
+              data,
+              addressForm.province,
+            );
+            if (matchedProvince) {
+              setAddressForm((current) => ({
+                ...current,
+                province: matchedProvince.name,
+                provinceCode: matchedProvince.code,
+              }));
+            }
+          }
+        }
       } catch {
         if (!cancelled) {
           setAdministrativeError("Không tải được danh sách tỉnh/thành.");
@@ -232,16 +270,10 @@ export function AddressBookModal({
     return () => {
       cancelled = true;
     };
-  }, [open, provinces.length]);
+  }, [addressForm.province, addressForm.provinceCode, open, provinces.length]);
 
   useEffect(() => {
-    if (
-      !open ||
-      !addressForm.provinceCode ||
-      loadedWardProvinceCode === addressForm.provinceCode
-    ) {
-      return undefined;
-    }
+    if (!open || !addressForm.provinceCode) return undefined;
 
     let cancelled = false;
 
@@ -254,7 +286,20 @@ export function AddressBookModal({
         );
         if (!cancelled) {
           setWards(data);
-          setLoadedWardProvinceCode(addressForm.provinceCode);
+
+          if (addressForm.ward && !addressForm.wardCode) {
+            const matchedWard = findAdministrativeUnitByName(
+              data,
+              addressForm.ward,
+            );
+            if (matchedWard) {
+              setAddressForm((current) => ({
+                ...current,
+                ward: matchedWard.name,
+                wardCode: matchedWard.code,
+              }));
+            }
+          }
         }
       } catch {
         if (!cancelled) {
@@ -269,158 +314,7 @@ export function AddressBookModal({
     return () => {
       cancelled = true;
     };
-  }, [addressForm.provinceCode, loadedWardProvinceCode, open]);
-
-  useEffect(() => {
-    if (
-      !open ||
-      addressAutocompleteError ||
-      !addressAutocompleteContainerRef.current
-    ) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    let detachAutocomplete: (() => void) | undefined;
-
-    const handlePlaceInput = (value: string) => {
-      placeResolutionSequenceRef.current += 1;
-      setIsResolvingAddress(false);
-      setAdministrativeMatchMessage("");
-      setAddressForm((current) => {
-        const next = {
-          ...current,
-          addressLine: extractAddressLine(
-            value,
-            current.ward,
-            current.province,
-          ),
-        };
-        delete next.latitude;
-        delete next.longitude;
-        delete next.placeId;
-        return next;
-      });
-    };
-
-    const handlePlaceSelect = async (placeAddress: ParsedPlaceAddress) => {
-      const resolutionSequence = ++placeResolutionSequenceRef.current;
-      setIsResolvingAddress(true);
-      setAdministrativeError("");
-      setAdministrativeMatchMessage("");
-
-      setAddressForm((current) => ({
-        ...current,
-        addressLine: extractAddressLine(
-          placeAddress.fullAddress || current.addressLine,
-          placeAddress.ward,
-          placeAddress.province,
-        ),
-        province: "",
-        provinceCode: undefined,
-        ward: "",
-        wardCode: undefined,
-        latitude: placeAddress.latitude,
-        longitude: placeAddress.longitude,
-        placeId: placeAddress.placeId,
-      }));
-
-      try {
-        const availableProvinces =
-          provincesRef.current.length > 0
-            ? provincesRef.current
-            : await getProvinces();
-        if (resolutionSequence !== placeResolutionSequenceRef.current) return;
-        if (provincesRef.current.length === 0) setProvinces(availableProvinces);
-
-        const matchedProvince = findAdministrativeUnit(
-          availableProvinces,
-          placeAddress.province,
-        );
-        if (!matchedProvince) {
-          setWards([]);
-          setLoadedWardProvinceCode(undefined);
-          setAdministrativeMatchMessage(
-            "Chưa tự xác định được tỉnh/thành phố. Vui lòng chọn thủ công.",
-          );
-          return;
-        }
-
-        setLoadedWardProvinceCode(matchedProvince.code);
-        setAddressForm((current) => ({
-          ...current,
-          province: matchedProvince.name,
-          provinceCode: matchedProvince.code,
-        }));
-
-        const availableWards = await getWardsByProvince(matchedProvince.code);
-        if (resolutionSequence !== placeResolutionSequenceRef.current) return;
-        setWards(availableWards);
-        setLoadedWardProvinceCode(matchedProvince.code);
-
-        const matchedWard = findAdministrativeUnit(
-          availableWards,
-          placeAddress.ward,
-        );
-        if (!matchedWard) {
-          setAdministrativeMatchMessage(
-            "Đã xác định tỉnh/thành phố. Vui lòng chọn phường/xã để xác nhận.",
-          );
-          return;
-        }
-
-        setAddressForm((current) => ({
-          ...current,
-          ward: matchedWard.name,
-          wardCode: matchedWard.code,
-        }));
-        setAdministrativeMatchMessage(
-          `Đã xác định: ${matchedWard.name}, ${matchedProvince.name}.`,
-        );
-      } catch {
-        if (resolutionSequence !== placeResolutionSequenceRef.current) return;
-        setLoadedWardProvinceCode(undefined);
-        setAdministrativeMatchMessage(
-          "Không thể tự điền đơn vị hành chính. Vui lòng chọn thủ công.",
-        );
-      } finally {
-        if (resolutionSequence === placeResolutionSequenceRef.current) {
-          setIsResolvingAddress(false);
-        }
-      }
-    };
-
-    void mountPlaceAutocompleteElement({
-      container: addressAutocompleteContainerRef.current,
-      value: addressLineValueRef.current,
-      placeholder: "Nhập số nhà, tên đường hoặc tên địa điểm",
-      onInput: handlePlaceInput,
-      onPlaceSelect: (placeAddress) => void handlePlaceSelect(placeAddress),
-      onError: (message) =>
-        setAddressAutocompleteError(
-          `${message} Bạn vẫn có thể nhập địa chỉ thủ công.`,
-        ),
-    })
-      .then((detach) => {
-        if (cancelled) {
-          detach();
-        } else {
-          detachAutocomplete = detach;
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setAddressAutocompleteError(
-            `${error instanceof Error ? error.message : "Google Places chưa sẵn sàng."} Bạn vẫn có thể nhập địa chỉ thủ công.`,
-          );
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      detachAutocomplete?.();
-    };
-  }, [addressAutocompleteError, open]);
+  }, [addressForm.provinceCode, addressForm.ward, addressForm.wardCode, open]);
 
   const handleAddressInputChange = (
     field: keyof AddressFormState,
@@ -429,55 +323,121 @@ export function AddressBookModal({
     setAddressForm((current) => {
       const next = { ...current, [field]: value };
       if (field === "addressLine") {
-        delete next.latitude;
-        delete next.longitude;
-        delete next.placeId;
+        return clearGeocodedFields(next);
       }
       return next;
     });
   };
 
   const handleProvinceChange = (option: SearchableSelectOption | null) => {
-    setAddressForm((current) => ({
-      ...current,
-      province: option?.label || "",
-      provinceCode: option?.value,
-      ward: "",
-      wardCode: undefined,
-    }));
+    setAddressForm((current) =>
+      clearGeocodedFields({
+        ...current,
+        province: option?.label || "",
+        provinceCode: option?.value,
+        ward: "",
+        wardCode: undefined,
+      }),
+    );
     setWards([]);
-    setLoadedWardProvinceCode(undefined);
-    setAdministrativeMatchMessage("");
+    setLocationHint("");
   };
 
   const handleWardChange = (option: SearchableSelectOption | null) => {
-    setAddressForm((current) => ({
-      ...current,
-      ward: option?.label || "",
-      wardCode: option?.value,
-    }));
-    setAdministrativeMatchMessage("");
+    setAddressForm((current) =>
+      clearGeocodedFields({
+        ...current,
+        ward: option?.label || "",
+        wardCode: option?.value,
+      }),
+    );
+    setLocationHint("");
   };
 
-  const getCurrentPlacesInputValue = () => {
-    const element = addressAutocompleteContainerRef.current?.querySelector(
-      ".google-place-autocomplete",
-    ) as { value?: string } | null;
+  const handleUseCurrentLocation = () => {
+    setAddressFormError("");
+    setLocationError("");
+    setLocationHint("");
 
-    return element?.value?.trim() || "";
+    if (!navigator.geolocation) {
+      setLocationError("Trình duyệt không hỗ trợ định vị hiện tại.");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const currentAddress = await bookingApi.reverseGeocode(
+            coords.latitude,
+            coords.longitude,
+          );
+
+          const provinceSource =
+            provinces.length > 0 ? provinces : await getProvinces();
+          if (provinces.length === 0) {
+            setProvinces(provinceSource);
+          }
+
+          const matchedProvince = findAdministrativeUnitByName(
+            provinceSource,
+            currentAddress.province,
+          );
+          const wardSource = matchedProvince
+            ? await getWardsByProvince(matchedProvince.code)
+            : [];
+          const matchedWard = findAdministrativeUnitByName(
+            wardSource,
+            currentAddress.ward,
+          );
+
+          setAddressForm((current) => ({
+            ...current,
+            addressLine: extractStreetAddressLine(
+              currentAddress.fullAddress,
+              currentAddress.ward,
+              currentAddress.province,
+            ),
+            fullAddress: currentAddress.fullAddress,
+            province: matchedProvince?.name || currentAddress.province,
+            provinceCode: matchedProvince?.code,
+            ward: matchedWard?.name || currentAddress.ward,
+            wardCode: matchedWard?.code,
+            latitude: currentAddress.latitude,
+            longitude: currentAddress.longitude,
+            placeId: currentAddress.placeId,
+          }));
+
+          setWards(wardSource);
+          setLocationHint(
+            "Đã điền địa chỉ từ vị trí hiện tại. Bạn có thể kiểm tra và chỉnh lại các ô nếu cần.",
+          );
+        } catch (error) {
+          setLocationError(
+            getErrorMessage(
+              error,
+              "Không thể lấy địa chỉ từ vị trí hiện tại. Vui lòng thử lại.",
+            ),
+          );
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      () => {
+        setLocationError(
+          "Không thể lấy vị trí hiện tại. Vui lòng kiểm tra quyền định vị.",
+        );
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    );
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAddressFormError("");
 
-    const currentAddressLine =
-      addressForm.addressLine.trim() ||
-      extractAddressLine(
-        getCurrentPlacesInputValue(),
-        addressForm.ward,
-        addressForm.province,
-      );
+    const currentAddressLine = addressForm.addressLine.trim();
 
     if (
       !addressForm.recipientName.trim() ||
@@ -496,8 +456,14 @@ export function AddressBookModal({
       addressForm.recipientPhone,
     );
 
-    if (!/^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u.test(addressForm.recipientName.trim().replace(/\s+/g, " "))) {
-      setAddressFormError("Tên người nhận chỉ được chứa chữ cái và khoảng trắng.");
+    if (
+      !/^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u.test(
+        addressForm.recipientName.trim().replace(/\s+/g, " "),
+      )
+    ) {
+      setAddressFormError(
+        "Tên người nhận chỉ được chứa chữ cái và khoảng trắng.",
+      );
       return;
     }
 
@@ -546,9 +512,15 @@ export function AddressBookModal({
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {(addressFormError || administrativeError) && (
+        {(addressFormError || administrativeError || locationError) && (
           <div className="rounded-2xl bg-error/10 p-3 text-sm text-error">
-            {addressFormError || administrativeError}
+            {addressFormError || administrativeError || locationError}
+          </div>
+        )}
+
+        {locationHint && !addressFormError && !locationError && (
+          <div className="rounded-2xl bg-primary/10 p-3 text-sm text-primary">
+            {locationHint}
           </div>
         )}
 
@@ -568,6 +540,7 @@ export function AddressBookModal({
               }
             />
           </label>
+
           <label className="order-2 block space-y-2">
             <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
               Số điện thoại người nhận
@@ -582,57 +555,27 @@ export function AddressBookModal({
               }
             />
           </label>
-          <div className="order-3 space-y-2 md:col-span-2">
-            <label
-              htmlFor="address-line-google-places"
-              className="ml-1 block text-label-sm font-medium text-on-surface-variant"
+
+          <div className="order-3 md:col-span-2">
+            <button
+              type="button"
+              disabled={isLocating || isSaving}
+              onClick={handleUseCurrentLocation}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Địa chỉ
-            </label>
-            {addressAutocompleteError ? (
-              <input
-                id="address-line-google-places"
-                type="text"
-                value={addressForm.addressLine}
-                minLength={2}
-                required
-                placeholder="Nhập số nhà, tên đường"
-                className="form-field__input pb-2 pt-2"
-                onChange={(event) =>
-                  handleAddressInputChange("addressLine", event.target.value)
-                }
-              />
-            ) : (
-              <div
-                ref={addressAutocompleteContainerRef}
-                className="google-place-autocomplete-shell"
-              />
-            )}
-            <p
-              className={`px-1 text-xs ${
-                addressAutocompleteError
-                  ? "text-error"
-                  : "text-on-surface-variant"
-              }`}
-            >
-              {addressAutocompleteError ||
-                "Nhập và chọn một địa chỉ gợi ý để tự động điền tỉnh/thành phố và phường/xã."}
+              {isLocating ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <MapPin size={16} />
+              )}
+              {isLocating
+                ? "Đang lấy vị trí hiện tại..."
+                : "Dùng vị trí hiện tại"}
+            </button>
+            <p className="mt-2 px-1 text-xs text-on-surface-variant">
+              Hệ thống sẽ tự điền địa chỉ từ vị trí hiện tại.
             </p>
           </div>
-
-          {(isResolvingAddress || administrativeMatchMessage) && (
-            <div
-              className={`order-4 rounded-xl px-3 py-2 text-sm md:col-span-2 ${
-                addressForm.provinceCode && addressForm.wardCode
-                  ? "bg-primary/10 text-primary"
-                  : "bg-surface-container-low text-on-surface-variant"
-              }`}
-            >
-              {isResolvingAddress
-                ? "Đang xác định tỉnh/thành phố và phường/xã..."
-                : administrativeMatchMessage}
-            </div>
-          )}
 
           <SearchableSelect
             id="address-province"
@@ -642,9 +585,10 @@ export function AddressBookModal({
             loading={isProvinceLoading}
             placeholder="Nhập để tìm kiếm tỉnh/thành"
             emptyText="Không tìm thấy tỉnh/thành."
-            containerClassName="order-5"
+            containerClassName="order-4"
             onChange={handleProvinceChange}
           />
+
           <SearchableSelect
             id="address-ward"
             label="Phường / Xã"
@@ -654,9 +598,26 @@ export function AddressBookModal({
             disabled={!addressForm.provinceCode}
             placeholder="Nhập để tìm kiếm phường/xã"
             emptyText="Không tìm thấy phường/xã."
-            containerClassName="order-6"
+            containerClassName="order-5"
             onChange={handleWardChange}
           />
+
+          <label className="order-6 block space-y-2 md:col-span-2">
+            <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
+              Địa chỉ cụ thể
+            </span>
+            <input
+              type="text"
+              value={addressForm.addressLine}
+              minLength={2}
+              required
+              placeholder="Nhập số nhà, tên đường, tòa nhà..."
+              className="form-field__input pb-2 pt-2"
+              onChange={(event) =>
+                handleAddressInputChange("addressLine", event.target.value)
+              }
+            />
+          </label>
 
           <FloatingTextarea
             id="address-note"
@@ -692,14 +653,8 @@ export function AddressBookModal({
           >
             Hủy
           </button>
-          <button
-            type="submit"
-            disabled={isSaving || isResolvingAddress}
-            className="btn-primary"
-          >
-            {isResolvingAddress
-              ? "Đang xác định địa chỉ..."
-              : isSaving
+          <button type="submit" disabled={isSaving} className="btn-primary">
+            {isSaving
               ? "Đang lưu..."
               : address
                 ? "Cập nhật địa chỉ"

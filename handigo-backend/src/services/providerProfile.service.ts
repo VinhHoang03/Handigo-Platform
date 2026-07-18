@@ -16,6 +16,10 @@ import { Address } from "../models/address.model";
 import { Feedback } from "../models/feedback.model";
 import { MatchingService } from "./matching.service";
 import {
+  ProviderApplication,
+  type IProviderApplication,
+} from "../models/providerApplication.model";
+import {
   CreateCertificatePayload,
   SubmitIdentityPayload,
   UpdateCertificatePayload,
@@ -57,21 +61,6 @@ const getProviderForUser = async (userId: string) => {
   }
 
   return provider;
-};
-
-const getActiveServiceIds = async (serviceIds: string[]) => {
-  const uniqueIds = [...new Set(serviceIds)];
-  const services = await Service.find({
-    _id: { $in: uniqueIds },
-    isActive: true,
-    isDeleted: false,
-  }).select("_id");
-
-  if (services.length !== uniqueIds.length) {
-    throw new AppError("Một hoặc nhiều dịch vụ không còn hoạt động", 400);
-  }
-
-  return uniqueIds.map((id) => new Types.ObjectId(id));
 };
 
 const toIdString = (value: unknown) => {
@@ -141,6 +130,65 @@ const formatCertificate = (certificate: IProviderCertificate) => ({
   reviewedAt: certificate.reviewedAt,
   rejectionReason: certificate.rejectionReason || null,
 });
+
+const formatPendingProviderProfile = async (
+  application: IProviderApplication,
+) => {
+  const user = await User.findById(application.userId).select(safeUserSelect);
+
+  if (
+    !user ||
+    user.isDeleted ||
+    user.role !== "PROVIDER" ||
+    user.providerOnboardingStatus !== "PENDING_REVIEW"
+  ) {
+    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+  }
+
+  const services = (application.serviceIds as unknown[])
+    .filter((service) => typeof service === "object" && service !== null)
+    .map((service) => {
+      const item = service as {
+        _id: Types.ObjectId;
+        name?: string;
+        slug?: string;
+      };
+
+      return {
+        id: item._id.toString(),
+        name: item.name || "",
+        slug: item.slug || "",
+      };
+    });
+
+  return {
+    user: {
+      id: user._id.toString(),
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      avatar: user.avatar,
+      birthday: user.birthday,
+      gender: user.gender,
+      createdAt: user.createdAt,
+    },
+    provider: {
+      id: application._id.toString(),
+      description: application.description,
+      experienceYears: application.experienceYears,
+      availabilityStatus: "offline" as const,
+      verified: false,
+      serviceIds: application.serviceIds.map(toIdString),
+      services,
+      workingAreas: application.workingAreas || [],
+      averageRating: 0,
+      totalFeedbacks: 0,
+      totalCompletedOrders: 0,
+      identityDocument: formatIdentityDocument(application.identityDocument),
+      certificates: (application.certificates || []).map(formatCertificate),
+    },
+  };
+};
 
 const formatProviderProfile = async (provider: IProvider) => {
   const user = await User.findById(provider.userId).select(safeUserSelect);
@@ -420,8 +468,29 @@ export const getPublicProviderProfile = async (providerId: string) => {
 };
 
 export const getMyProviderProfile = async (userId: string) => {
-  const provider = await getProviderForUser(userId);
-  return formatProviderProfile(provider);
+  assertObjectId(userId, "user id");
+
+  const provider = await Provider.findOne({
+    userId: new Types.ObjectId(userId),
+    isDeleted: false,
+  }).populate(servicePopulate);
+
+  if (provider) return formatProviderProfile(provider);
+
+  const pendingApplication = await ProviderApplication.findOne({
+    userId: new Types.ObjectId(userId),
+    applicationType: { $in: ["initial", null] },
+    status: { $in: ["pending", "resubmitted"] },
+    isDeleted: false,
+  })
+    .sort({ updatedAt: -1 })
+    .populate(servicePopulate);
+
+  if (!pendingApplication) {
+    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+  }
+
+  return formatPendingProviderProfile(pendingApplication);
 };
 
 export const updateMyProviderProfile = async (
@@ -453,9 +522,6 @@ export const updateMyProviderProfile = async (
       province: payload.serviceArea.province,
       ward: payload.serviceArea.ward,
     };
-  }
-  if (payload.serviceIds !== undefined) {
-    provider.serviceIds = await getActiveServiceIds(payload.serviceIds);
   }
   if (payload.workingAreas !== undefined) {
     provider.workingAreas = [...new Set(payload.workingAreas)];

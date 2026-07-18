@@ -229,8 +229,11 @@ export const getOrderAssignments = async (
   next: NextFunction,
 ) => {
   try {
+    const actor = requireRequestUser(req);
     const data = await AssignmentService.getAssignmentsByOrder(
       param(req, "orderId"),
+      actor.id,
+      actor.role,
     );
     return ok(res, data);
   } catch (error) {
@@ -260,7 +263,7 @@ export const createRepairQuotation = async (
     const orderId = param(req, "orderId");
     const providerUserId = uid(req);
     const quotation = await AssignmentService.createRepairQuotation(
-      { orderId, providerId: providerUserId, ...req.body },
+      { ...req.body, orderId },
       providerUserId,
     );
     return ok(res, quotation, 201);

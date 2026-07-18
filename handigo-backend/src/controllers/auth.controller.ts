@@ -5,9 +5,18 @@ import { AppError } from "../utils/appError";
 const REFRESH_TOKEN_COOKIE = "refreshToken";
 const REMEMBER_LOGIN_COOKIE = "rememberLogin";
 
-const getRefreshTokenCookieOptions = (expires: Date, remember = true): CookieOptions => ({
+// Cookies storing refresh tokens MUST be HttpOnly and set with `sameSite: 'none'` + `secure: true` in
+// production so browsers will send them on cross-site XHR/POST requests (frontend and backend
+// often run on different origins). For local development we keep `sameSite: 'lax'` and `secure: false`
+// to avoid requiring HTTPS, but in production you MUST enable HTTPS and set the frontend origin in
+// `FRONTEND_URL` so CORS with credentials works correctly.
+const getRefreshTokenCookieOptions = (
+  expires: Date,
+  remember = true,
+): CookieOptions => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
+  // `none` in production to allow cross-site cookie; `lax` in dev to be more permissive on localhost
   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   ...(remember ? { expires } : {}),
 });
@@ -39,10 +48,29 @@ export const verifyRegisterOtp = async (
   next: NextFunction,
 ) => {
   try {
-    await authService.verifyRegisterOtp(req.body.email, req.body.otp);
-    res.json({ message: "Email verified successfully" });
+    const result = await authService.verifyRegisterOtp(req.body.email, req.body.otp);
+
+    if (!result) {
+      return res.json({ message: "Xác thực email thành công" });
+    }
+
+    res.cookie(
+      REFRESH_TOKEN_COOKIE,
+      result.refreshToken,
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, true),
+    );
+    res.cookie(
+      REMEMBER_LOGIN_COOKIE,
+      "true",
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, true),
+    );
+    return res.json({
+      message: "Xác thực email thành công",
+      token: result.token,
+      user: result.user,
+    });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -72,7 +100,11 @@ export const login = async (
       result.refreshToken,
       getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember),
     );
-    res.cookie(REMEMBER_LOGIN_COOKIE, String(remember), getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember));
+    res.cookie(
+      REMEMBER_LOGIN_COOKIE,
+      String(remember),
+      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember),
+    );
     res.json({
       message: "Login successful",
       token: result.token,
@@ -111,7 +143,11 @@ export const refreshToken = async (
   }
 };
 
-export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
+export const googleLogin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const { credential, accessToken, remember } = req.body;
     if (!credential && !accessToken) {
@@ -123,9 +159,19 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       result.refreshToken,
-      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false),
+      getRefreshTokenCookieOptions(
+        result.refreshTokenExpiresAt,
+        remember !== false,
+      ),
     );
-    res.cookie(REMEMBER_LOGIN_COOKIE, String(remember !== false), getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false));
+    res.cookie(
+      REMEMBER_LOGIN_COOKIE,
+      String(remember !== false),
+      getRefreshTokenCookieOptions(
+        result.refreshTokenExpiresAt,
+        remember !== false,
+      ),
+    );
     res.status(200).json({
       message: "Google login success",
       token: result.token,
@@ -136,19 +182,34 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
-export const facebookLogin = async (req: Request, res: Response, next: NextFunction) => {
+export const facebookLogin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const { accessToken, remember } = req.body;
-    if (!accessToken) throw new AppError("Facebook access token is required", 400);
+    if (!accessToken)
+      throw new AppError("Facebook access token is required", 400);
 
     const result = await authService.facebookLogin(accessToken);
 
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       result.refreshToken,
-      getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false),
+      getRefreshTokenCookieOptions(
+        result.refreshTokenExpiresAt,
+        remember !== false,
+      ),
     );
-    res.cookie(REMEMBER_LOGIN_COOKIE, String(remember !== false), getRefreshTokenCookieOptions(result.refreshTokenExpiresAt, remember !== false));
+    res.cookie(
+      REMEMBER_LOGIN_COOKIE,
+      String(remember !== false),
+      getRefreshTokenCookieOptions(
+        result.refreshTokenExpiresAt,
+        remember !== false,
+      ),
+    );
     res.status(200).json({
       message: "Facebook login success",
       token: result.token,
@@ -208,7 +269,11 @@ export const changePassword = async (
   }
 };
 
-export const logout = async (req: Request, res: Response, next: NextFunction) => {
+export const logout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     await authService.logout(req.cookies?.[REFRESH_TOKEN_COOKIE]);
     res.clearCookie(REFRESH_TOKEN_COOKIE, clearRefreshTokenCookieOptions);
@@ -220,7 +285,11 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
   }
 };
 
-export const getProfile = async (req: Request, res: Response, next: NextFunction) => {
+export const getProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const user = await authService.getCurrentUser(req.user!.id);
     res.json({ user });

@@ -1,7 +1,6 @@
 import { Types } from "mongoose";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
-import { Notification } from "../models/notification.model";
 import { Address } from "../models/address.model";
 import { Provider } from "../models/provider.model";
 import { MatchingService, ProviderCandidate } from "./matching.service";
@@ -10,6 +9,7 @@ import { getNumberConfigValue } from "./systemConfig.service";
 import { emitToUser } from "../sockets/socketServer";
 import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
 import { createLogger } from "../utils/logger";
+import { cancelSystemOrderWithSettlement } from "./orderCancellation.service";
 
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
 const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
@@ -80,47 +80,12 @@ async function getMatchingConfig() {
 }
 
 async function cancelUnmatchedOrder(orderId: string, reason: string) {
-  const order = await Order.findOneAndUpdate(
-    { _id: orderId, status: "created" },
-    {
-      $set: {
-        status: "cancelled",
-        readyForMatching: false,
-        cancellation: {
-          cancelledByRole: "admin",
-          reason,
-          cancelledAt: new Date(),
-        },
-      },
-    },
-    { returnDocument: "after" },
-  );
+  const order = await Order.findById(orderId).select("status");
+  if (!order || order.status !== "created") {
+    return false;
+  }
 
-  if (!order) return false;
-
-  await OrderAssignment.updateMany(
-    { orderId: order._id, status: "pending" },
-    {
-      $set: {
-        status: "cancelled",
-        respondedAt: new Date(),
-      },
-    },
-  );
-
-  await Notification.create({
-    userId: order.customerId,
-    type: "ORDER",
-    title: "Đơn hàng đã được hủy",
-    content: `Đơn ${order.orderCode} đã được hủy vì hệ thống chưa tìm được provider nhận đơn trong thời gian quy định.`,
-    data: {
-      orderId: order._id.toString(),
-      orderCode: order.orderCode,
-      status: "cancelled",
-      reason,
-    },
-  });
-
+  await cancelSystemOrderWithSettlement(orderId, reason);
   return true;
 }
 
@@ -586,6 +551,13 @@ export const DispatchService = {
       );
     }, MATCHING_TIMEOUT_SCAN_INTERVAL_MS);
     timeoutMonitor.unref();
+  },
+
+  stopTimeoutMonitor(): void {
+    if (!timeoutMonitor) return;
+
+    clearInterval(timeoutMonitor);
+    timeoutMonitor = null;
   },
 
   /**

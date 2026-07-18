@@ -6,7 +6,7 @@ const objectIdSchema = z
 
 export const createPaymentSchema = z.object({
   orderId: objectIdSchema,
-  method: z.enum(["PAYOS", "CASH"]),
+  method: z.enum(["PAYOS", "CASH", "WALLET"]),
   paymentType: z.enum(["INSPECTION_DEPOSIT", "FULL", "REMAINING"]).optional(),
   returnUrl: z.string().url("returnUrl không hợp lệ").optional(),
   cancelUrl: z.string().url("cancelUrl không hợp lệ").optional(),
@@ -24,7 +24,7 @@ export const paymentHistoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   status: z.enum(["pending", "paid", "failed", "refunded"]).optional(),
-  method: z.enum(["payos", "vnpay", "cash"]).optional(),
+  method: z.enum(["payos", "vnpay", "cash", "wallet"]).optional(),
   paymentType: z.enum(["full", "remaining", "inspection_deposit"]).optional(),
 });
 

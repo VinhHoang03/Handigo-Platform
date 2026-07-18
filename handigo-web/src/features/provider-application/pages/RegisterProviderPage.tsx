@@ -1,79 +1,80 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Send } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AsyncState } from '@/components/common/AsyncState';
-import { DashboardShell } from '@/components/common/DashboardShell';
-import { CategorySelectionStep } from '../components/CategorySelectionStep';
-import { ProviderApplicationStepper } from '../components/ProviderApplicationStepper';
-import { ProviderDescriptionStep } from '../components/ProviderDescriptionStep';
-import { WorkingAreasStep } from '../components/WorkingAreasStep';
-import { useProviderApplication } from '../hooks/useProviderApplication';
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Send } from "lucide-react";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { AsyncState } from "@/components/common/AsyncState";
+import { DashboardShell } from "@/components/common/DashboardShell";
+import { CategorySelectionStep } from "../components/CategorySelectionStep";
+import { ProviderApplicationStepper } from "../components/ProviderApplicationStepper";
+import { ProviderDescriptionStep } from "../components/ProviderDescriptionStep";
+import { WorkingAreasStep } from "../components/WorkingAreasStep";
+import { useProviderApplication } from "../hooks/useProviderApplication";
 import type {
   ProviderApplication,
   ProviderApplicationPayload,
   Service,
-} from '../types/providerApplication.types';
-import { hasProviderApplicationDateErrors } from '../utils/providerApplicationValidation';
+} from "../types/providerApplication.types";
+import { hasProviderApplicationDateErrors } from "../utils/providerApplicationValidation";
+import { useAuthStore } from "@/features/auth/store/auth.store";
 
 const initial: ProviderApplicationPayload = {
-  description: '',
+  description: "",
   experienceYears: 2,
   serviceIds: [],
   workingAreas: [],
   identityDocument: {
-    type: 'cccd',
-    documentNumber: '',
-    fullName: '',
-    issuedPlace: '',
-    frontImageUrl: '',
-    backImageUrl: '',
-    passportImageUrl: '',
-    dateOfBirth: '',
+    type: "cccd",
+    documentNumber: "",
+    fullName: "",
+    issuedPlace: "",
+    frontImageUrl: "",
+    backImageUrl: "",
+    passportImageUrl: "",
+    dateOfBirth: "",
     gender: undefined,
-    nationality: '',
-    placeOfOrigin: '',
-    placeOfResidence: '',
+    nationality: "",
+    placeOfOrigin: "",
+    placeOfResidence: "",
   },
   certificates: [],
 };
 
 const hasRequiredIdentityImage = (form: ProviderApplicationPayload) =>
-  form.identityDocument.type === 'cccd'
+  form.identityDocument.type === "cccd"
     ? Boolean(form.identityDocument.frontImageUrl)
     : Boolean(form.identityDocument.passportImageUrl);
 
 const serviceId = (service: string | Service) =>
-  typeof service === 'string' ? service : service._id;
+  typeof service === "string" ? service : service._id;
 
 const applicationToForm = (
   application: ProviderApplication,
 ): ProviderApplicationPayload => ({
-  description: application.description || '',
+  description: application.description || "",
   experienceYears: application.experienceYears || 0,
   serviceIds: (application.serviceIds || []).map(serviceId).filter(Boolean),
   workingAreas: application.workingAreas || [],
   identityDocument: {
-    type: application.identityDocument?.type || 'cccd',
-    documentNumber: application.identityDocument?.documentNumber || '',
-    fullName: application.identityDocument?.fullName || '',
-    issuedPlace: application.identityDocument?.issuedPlace || '',
-    issuedAt: application.identityDocument?.issuedAt?.slice(0, 10) || '',
-    expiresAt: application.identityDocument?.expiresAt?.slice(0, 10) || '',
-    frontImageUrl: application.identityDocument?.frontImageUrl || '',
-    backImageUrl: application.identityDocument?.backImageUrl || '',
-    passportImageUrl: application.identityDocument?.passportImageUrl || '',
-    dateOfBirth: application.identityDocument?.dateOfBirth?.slice(0, 10) || '',
+    type: application.identityDocument?.type || "cccd",
+    documentNumber: application.identityDocument?.documentNumber || "",
+    fullName: application.identityDocument?.fullName || "",
+    issuedPlace: application.identityDocument?.issuedPlace || "",
+    issuedAt: application.identityDocument?.issuedAt?.slice(0, 10) || "",
+    expiresAt: application.identityDocument?.expiresAt?.slice(0, 10) || "",
+    frontImageUrl: application.identityDocument?.frontImageUrl || "",
+    backImageUrl: application.identityDocument?.backImageUrl || "",
+    passportImageUrl: application.identityDocument?.passportImageUrl || "",
+    dateOfBirth: application.identityDocument?.dateOfBirth?.slice(0, 10) || "",
     gender: application.identityDocument?.gender,
-    nationality: application.identityDocument?.nationality || '',
-    placeOfOrigin: application.identityDocument?.placeOfOrigin || '',
-    placeOfResidence: application.identityDocument?.placeOfResidence || '',
+    nationality: application.identityDocument?.nationality || "",
+    placeOfOrigin: application.identityDocument?.placeOfOrigin || "",
+    placeOfResidence: application.identityDocument?.placeOfResidence || "",
   },
   certificates: (application.certificates || []).map((certificate) => ({
-    title: certificate.title || '',
-    certificateNumber: certificate.certificateNumber || '',
-    issuer: certificate.issuer || '',
-    issuedAt: certificate.issuedAt?.slice(0, 10) || '',
-    expiresAt: certificate.expiresAt?.slice(0, 10) || '',
+    title: certificate.title || "",
+    certificateNumber: certificate.certificateNumber || "",
+    issuer: certificate.issuer || "",
+    issuedAt: certificate.issuedAt?.slice(0, 10) || "",
+    expiresAt: certificate.expiresAt?.slice(0, 10) || "",
     imageUrls: certificate.imageUrls || [],
   })),
 });
@@ -81,22 +82,33 @@ const applicationToForm = (
 const hasUploadedAsset = (form: ProviderApplicationPayload) =>
   Boolean(
     form.identityDocument.frontImageUrl ||
-      form.identityDocument.backImageUrl ||
-      form.identityDocument.passportImageUrl ||
-      form.certificates.some((certificate) => certificate.imageUrls.length),
+    form.identityDocument.backImageUrl ||
+    form.identityDocument.passportImageUrl ||
+    form.certificates.some((certificate) => certificate.imageUrls.length),
   );
 
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const applicationId = searchParams.get('applicationId');
+  const applicationId = searchParams.get("applicationId");
+  const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
+  const isDirectProvider = user?.role.toUpperCase() === "PROVIDER";
   const providerApplication = useProviderApplication(applicationId);
   const saveDraft = providerApplication.saveDraft;
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<1 | 2 | 3>(
+    isDirectProvider ? user?.providerOnboardingStep || 1 : 1,
+  );
   const [form, setForm] = useState(initial);
-  const [success, setSuccess] = useState('');
+  const [success, setSuccess] = useState("");
   const hydratedApplicationIdRef = useRef<string | null>(null);
   const didHydrateRef = useRef(false);
+
+  useEffect(() => {
+    if (user?.providerOnboardingStatus === "APPROVED") {
+      navigate("/provider", { replace: true });
+    }
+  }, [navigate, user?.providerOnboardingStatus]);
 
   useEffect(() => {
     const application = providerApplication.application;
@@ -114,20 +126,29 @@ export default function RegisterProviderPage() {
     if (
       applicationId ||
       !didHydrateRef.current ||
-      step !== 3 ||
-      !hasUploadedAsset(form)
+      providerApplication.application?.status === "pending" ||
+      providerApplication.application?.status === "resubmitted" ||
+      providerApplication.application?.status === "rejected" ||
+      (!isDirectProvider && (step !== 3 || !hasUploadedAsset(form)))
     ) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      void saveDraft(form).catch(() => {
+      void saveDraft({ ...form, onboardingStep: step }).catch(() => {
         // The hook exposes the draft error for rendering.
       });
     }, 700);
 
     return () => window.clearTimeout(timeout);
-  }, [applicationId, form, saveDraft, step]);
+  }, [
+    applicationId,
+    form,
+    isDirectProvider,
+    providerApplication.application?.status,
+    saveDraft,
+    step,
+  ]);
 
   const toggleService = (id: string) =>
     setForm((value) => ({
@@ -166,14 +187,32 @@ export default function RegisterProviderPage() {
       await providerApplication.submit(form);
       setSuccess(
         applicationId
-          ? 'Hồ sơ đã được gửi lại và đang chờ quản trị viên xét duyệt.'
-          : 'Hồ sơ đã được gửi và đang chờ quản trị viên xét duyệt.',
+          ? "Hồ sơ đã được gửi lại và đang chờ quản trị viên xét duyệt."
+          : "Hồ sơ đã được gửi và đang chờ quản trị viên xét duyệt.",
       );
-      window.setTimeout(() => navigate('/customer/profile'), 1500);
+      if (isDirectProvider && user) {
+        setUser({
+          ...user,
+          providerOnboardingStatus: "PENDING_REVIEW",
+          providerOnboardingStep: 3,
+        });
+        navigate("/provider/profile", { replace: true });
+      } else {
+        window.setTimeout(() => navigate("/customer/profile"), 1500);
+      }
     } catch {
       // The hook exposes the request error for rendering.
     }
   };
+
+  const isWaitingForReview =
+    user?.providerOnboardingStatus === "PENDING_REVIEW" ||
+    providerApplication.application?.status === "pending" ||
+    providerApplication.application?.status === "resubmitted";
+
+  if (isDirectProvider && isWaitingForReview) {
+    return <Navigate to="/provider/profile" replace />;
+  }
 
   return (
     <DashboardShell role="CUSTOMER">
@@ -192,11 +231,17 @@ export default function RegisterProviderPage() {
 
         <ProviderApplicationStepper step={step} />
 
-        {applicationId && providerApplication.application?.rejectionReason && (
+        {providerApplication.application?.status === "rejected" && (
           <section className="rounded-2xl border border-error/20 bg-error-container/30 p-4 text-on-error-container">
             <h2 className="font-bold">Nội dung cần chỉnh sửa</h2>
-            <p className="mt-2"><b>Lý do:</b> {providerApplication.application.rejectionReason}</p>
-            <p className="mt-1"><b>Ghi chú của quản trị viên:</b> {providerApplication.application.rejectionNotes || 'Chưa cập nhật'}</p>
+            <p className="mt-2">
+              <b>Lý do:</b> {providerApplication.application.rejectionReason}
+            </p>
+            <p className="mt-1">
+              <b>Ghi chú của quản trị viên:</b>{" "}
+              {providerApplication.application.rejectionNotes ||
+                "Chưa cập nhật"}
+            </p>
           </section>
         )}
 
@@ -246,31 +291,37 @@ export default function RegisterProviderPage() {
               </p>
             )}
 
-            {(providerApplication.submitError || providerApplication.draftError || success) && (
+            {(providerApplication.submitError ||
+              providerApplication.draftError ||
+              success) && (
               <p
                 className={`mt-5 rounded-2xl p-3 ${
                   success
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-error/10 text-error'
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-error/10 text-error"
                 }`}
               >
-                {success || providerApplication.submitError || providerApplication.draftError}
+                {success ||
+                  providerApplication.submitError ||
+                  providerApplication.draftError}
               </p>
             )}
 
             <div className="mt-8 flex flex-col-reverse justify-between gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => (step === 1 ? navigate(-1) : setStep(step - 1))}
+                onClick={() =>
+                  step === 1 ? navigate(-1) : setStep((step - 1) as 1 | 2)
+                }
                 className="btn-secondary"
               >
-                <ArrowLeft size={18} /> {step === 1 ? 'Hủy' : 'Quay lại'}
+                <ArrowLeft size={18} /> {step === 1 ? "Hủy" : "Quay lại"}
               </button>
               {step < 3 ? (
                 <button
                   type="button"
                   disabled={!canContinue}
-                  onClick={() => setStep(step + 1)}
+                  onClick={() => setStep((step + 1) as 2 | 3)}
                   className="btn-primary"
                 >
                   Tiếp tục <ArrowRight size={18} />
@@ -282,8 +333,8 @@ export default function RegisterProviderPage() {
                   disabled={providerApplication.submitting || !canSubmit}
                   className="btn-primary"
                 >
-                  <Send size={18} />{' '}
-                  {providerApplication.submitting ? 'Đang gửi...' : 'Gửi hồ sơ'}
+                  <Send size={18} />{" "}
+                  {providerApplication.submitting ? "Đang gửi..." : "Gửi hồ sơ"}
                 </button>
               )}
             </div>

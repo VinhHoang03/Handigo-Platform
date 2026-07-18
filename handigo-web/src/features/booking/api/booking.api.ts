@@ -8,6 +8,12 @@ import type {
   Pagination,
   Payment,
 } from "@/types/booking";
+import type { WalletTransaction } from "@/features/wallet/types/wallet.types";
+
+export interface OrderPaymentsResult {
+  payments: Payment[];
+  platformFeeTransaction: WalletTransaction | null;
+}
 
 export interface CreateOrderPayload {
   serviceId: string;
@@ -91,8 +97,9 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  uploadOrderAttachment: async (file: File) => {
+  uploadOrderAttachment: async (file: File, purpose?: 'order_problem') => {
     const formData = new FormData();
+    if (purpose) formData.append('purpose', purpose);
     formData.append("image", file);
     const response = await api.post<{
       success: boolean;
@@ -113,7 +120,7 @@ export const bookingApi = {
 
   createPayment: async (payload: {
     orderId: string;
-    method: "PAYOS" | "CASH";
+    method: "PAYOS" | "CASH" | "WALLET";
     paymentType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING";
     returnUrl?: string;
     cancelUrl?: string;
@@ -129,6 +136,21 @@ export const bookingApi = {
     const response = await api.get<{ success: boolean; data: Payment }>(
       `/payments/${paymentId}`,
     );
+    return response.data.data;
+  },
+
+  getPaymentsByOrder: async (orderId: string) => {
+    const response = await api.get<{
+      success: boolean;
+      data: OrderPaymentsResult;
+    }>(
+      `/payments/order/${orderId}`,
+    );
+
+    if (!response.data.data || !Array.isArray(response.data.data.payments)) {
+      throw new Error("Dữ liệu lịch sử thanh toán không hợp lệ.");
+    }
+
     return response.data.data;
   },
 

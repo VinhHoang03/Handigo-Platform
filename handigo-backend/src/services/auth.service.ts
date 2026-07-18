@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import { Types } from "mongoose";
 import User, { IUser } from "../models/user.model";
 import { Session } from "../models/session.model";
+import { Wallet } from "../models/wallet.model";
 import { generateOtp, getOtpExpireDate, hashOtp } from "../utils/otp";
 import { sendOtpEmail } from "../utils/mail";
 import {
@@ -46,6 +47,8 @@ type AuthUserResponse = {
   role: string;
   status: string;
   isEmailVerified: boolean;
+  providerOnboardingStatus?: string | null;
+  providerOnboardingStep?: number | null;
 };
 
 type RefreshTokenPayload = jwt.JwtPayload & {
@@ -143,6 +146,38 @@ const issueSessionTokens = async (
   };
 };
 
+const toAuthUserResponse = (user: IUser): AuthUserResponse => ({
+  id: user._id.toString(),
+  email: user.email,
+  fullName: user.fullName,
+  phone: user.phone,
+  avatar: user.avatar,
+  role: user.role,
+  status: user.status,
+  isEmailVerified: user.isEmailVerified,
+  providerOnboardingStatus: user.providerOnboardingStatus,
+  providerOnboardingStep: user.providerOnboardingStep,
+});
+
+
+const ensureWalletForUser = async (userId: Types.ObjectId | string): Promise<void> => {
+  await Wallet.updateOne(
+    { userId },
+    {
+      $setOnInsert: {
+        userId,
+        balance: 0,
+        pendingBalance: 0,
+        currency: "VND",
+      },
+      $set: {
+        isDeleted: false,
+        deletedAt: null,
+      },
+    },
+    { upsert: true },
+  );
+};
 const createAndSendRegisterOtp = async (user: IUser): Promise<void> => {
   const otp = generateOtp();
   user.registerOtp = hashOtp(otp);
@@ -157,6 +192,7 @@ export const register = async (payload: {
   password: string;
   fullName: string;
   phone?: string;
+  registrationType?: "CUSTOMER" | "PROVIDER";
 }): Promise<void> => {
   const existingUser = await User.findOne({ email: payload.email });
 
@@ -181,7 +217,9 @@ export const register = async (payload: {
     existingUser.fullName = payload.fullName;
     existingUser.phone = payload.phone;
     existingUser.status = "active";
+    existingUser.registrationIntent = payload.registrationType || "CUSTOMER";
     try {
+      await ensureWalletForUser(existingUser._id as Types.ObjectId);
       await createAndSendRegisterOtp(existingUser);
     } catch (error: any) {
       if (error?.code === 11000 && error?.keyPattern?.phone) {
@@ -200,6 +238,7 @@ export const register = async (payload: {
       fullName: payload.fullName,
       phone: payload.phone,
       role: "CUSTOMER",
+      registrationIntent: payload.registrationType || "CUSTOMER",
       status: "active",
       isEmailVerified: false,
     });
@@ -210,13 +249,14 @@ export const register = async (payload: {
     throw error;
   }
 
+  await ensureWalletForUser(user._id as Types.ObjectId);
   await createAndSendRegisterOtp(user);
 };
 
 export const verifyRegisterOtp = async (
   email: string,
   otp: string,
-): Promise<void> => {
+): Promise<(AuthTokens & { user: AuthUserResponse }) | null> => {
   const user = await User.findOne({ email });
 
   if (!user) {
@@ -229,10 +269,22 @@ export const verifyRegisterOtp = async (
 
   ensureOtpValid(otp, user.registerOtp, user.registerOtpExpire);
 
+  const isProviderRegistration = user.registrationIntent === "PROVIDER";
   user.isEmailVerified = true;
+  user.role = isProviderRegistration ? "PROVIDER" : "CUSTOMER";
+  user.providerOnboardingStatus = isProviderRegistration
+    ? "PROFILE_INCOMPLETE"
+    : null;
+  user.providerOnboardingStep = isProviderRegistration ? 1 : null;
+  user.registrationIntent = undefined;
   user.registerOtp = undefined;
   user.registerOtpExpire = undefined;
   await user.save();
+
+  if (!isProviderRegistration) return null;
+
+  const tokens = await issueSessionTokens(user);
+  return { ...tokens, user: toAuthUserResponse(user) };
 };
 
 export const resendRegisterOtp = async (email: string): Promise<void> => {
@@ -281,16 +333,7 @@ export const login = async (
 
   return {
     ...tokens,
-    user: {
-      id: user._id.toString(),
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      avatar: user.avatar,
-      role: user.role,
-      status: user.status,
-      isEmailVerified: user.isEmailVerified,
-    },
+    user: toAuthUserResponse(user),
   };
 };
 
@@ -424,20 +467,13 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
     await authenticatedUser.save();
   }
 
+  await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
+
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
     ...tokens,
-    user: {
-      id: authenticatedUser._id.toString(),
-      email: authenticatedUser.email,
-      fullName: authenticatedUser.fullName,
-      phone: authenticatedUser.phone,
-      avatar: authenticatedUser.avatar,
-      role: authenticatedUser.role,
-      status: authenticatedUser.status,
-      isEmailVerified: authenticatedUser.isEmailVerified,
-    },
+    user: toAuthUserResponse(authenticatedUser),
   };
 };
 
@@ -518,20 +554,13 @@ export const facebookLogin = async (accessToken: string) => {
     }
   }
 
+  await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
+
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
     ...tokens,
-    user: {
-      id: authenticatedUser._id.toString(),
-      email: authenticatedUser.email,
-      fullName: authenticatedUser.fullName,
-      phone: authenticatedUser.phone,
-      avatar: authenticatedUser.avatar,
-      role: authenticatedUser.role,
-      status: authenticatedUser.status,
-      isEmailVerified: authenticatedUser.isEmailVerified,
-    },
+    user: toAuthUserResponse(authenticatedUser),
   };
 };
 

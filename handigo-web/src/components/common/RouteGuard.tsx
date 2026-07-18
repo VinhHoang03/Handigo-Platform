@@ -5,7 +5,15 @@ import { getRoleHomePath } from '@/features/auth/utils/roleNavigation';
 
 type AppRole = 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
 
-export function RouteGuard({ roles, children }: { roles: AppRole[]; children: ReactNode }) {
+export function RouteGuard({
+  roles,
+  children,
+  allowUnapprovedProvider = false,
+}: {
+  roles: AppRole[];
+  children: ReactNode;
+  allowUnapprovedProvider?: boolean;
+}) {
   const location = useLocation();
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
@@ -14,7 +22,7 @@ export function RouteGuard({ roles, children }: { roles: AppRole[]; children: Re
   if (isInitializing) {
     return (
       <div className="grid min-h-screen place-items-center text-on-surface-variant">
-        Dang khoi phuc phien dang nhap...
+        Đang khôi phục phiên đăng nhập...
       </div>
     );
   }
@@ -25,7 +33,16 @@ export function RouteGuard({ roles, children }: { roles: AppRole[]; children: Re
 
   const normalizedRole = user.role.toUpperCase() as AppRole;
   if (!roles.includes(normalizedRole)) {
-    return <Navigate to={getRoleHomePath(user.role)} replace />;
+    return <Navigate to={getRoleHomePath(user.role, user.providerOnboardingStatus)} replace />;
+  }
+
+  if (
+    normalizedRole === 'PROVIDER' &&
+    !allowUnapprovedProvider &&
+    user.providerOnboardingStatus &&
+    user.providerOnboardingStatus !== 'APPROVED'
+  ) {
+    return <Navigate to="/register-provider" replace />;
   }
 
   return children;

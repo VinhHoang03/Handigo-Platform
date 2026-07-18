@@ -12,15 +12,16 @@ import {
 } from "../controllers/providerProfile.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
+import { approvedProviderMiddleware } from "../middlewares/approvedProvider.middleware";
 
 const router = Router();
 
 router.get("/featured", getFeaturedProviders);
 router.get("/nearby", authMiddleware, roleMiddleware("CUSTOMER"), getNearbyProviders);
 router.get("/:providerId/public", getPublicProviderProfile);
-router.use(authMiddleware, roleMiddleware("PROVIDER"));
+router.get("/me", authMiddleware, roleMiddleware("PROVIDER"), getMyProfile);
+router.use(authMiddleware, roleMiddleware("PROVIDER"), approvedProviderMiddleware);
 
-router.get("/me", getMyProfile);
 router.patch("/me", updateMyProfile);
 router.post("/me/identity", submitIdentity);
 router.post("/me/certificates", createCertificate);

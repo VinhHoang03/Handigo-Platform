@@ -1,24 +1,41 @@
-const TOKEN_STORAGE_KEYS = ['token', 'handigo_token'] as const;
+// Keep access token only in-memory to reduce XSS risk. For backwards compatibility we will read
+// any persisted token once on startup and then remove it from storage.
+const TOKEN_STORAGE_KEYS = ["token", "handigo_token"] as const;
+let inMemoryToken: string | null = null;
 
-const getFrom = (storage: Storage) => {
+const readAndClearLegacy = (): string | null => {
   for (const key of TOKEN_STORAGE_KEYS) {
-    const token = storage.getItem(key);
-    if (token) return token;
+    const t = sessionStorage.getItem(key) || localStorage.getItem(key);
+    if (t) {
+      // remove legacy persisted token
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+      return t;
+    }
   }
   return null;
 };
 
 export const tokenStorage = {
-  get: () => getFrom(sessionStorage) || getFrom(localStorage),
-  set: (token: string, remember = localStorage.getItem('handigo:remember-login') !== 'false') => {
-    const target = remember ? localStorage : sessionStorage;
-    const other = remember ? sessionStorage : localStorage;
-    for (const key of TOKEN_STORAGE_KEYS) {
-      target.setItem(key, token);
-      other.removeItem(key);
+  get: () => {
+    if (inMemoryToken) return inMemoryToken;
+    const legacy = readAndClearLegacy();
+    if (legacy) {
+      inMemoryToken = legacy;
+      return inMemoryToken;
     }
+    return null;
+  },
+  // Do NOT persist access tokens to localStorage/sessionStorage anymore.
+  set: (
+    token: string,
+    _remember = localStorage.getItem("handigo:remember-login") !== "false",
+  ) => {
+    void _remember;
+    inMemoryToken = token;
   },
   clear: () => {
+    inMemoryToken = null;
     for (const key of TOKEN_STORAGE_KEYS) {
       localStorage.removeItem(key);
       sessionStorage.removeItem(key);

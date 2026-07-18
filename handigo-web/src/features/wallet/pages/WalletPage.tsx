@@ -98,11 +98,6 @@ export function WalletPage({ role }: { role: WalletRole }) {
   const isProvider = role === 'PROVIDER';
 
   const loadOverview = useCallback(async () => {
-    if (!isProvider) {
-      setLoading(false);
-      return;
-    }
-
     try {
       const [walletResult, summaryResult] = await Promise.all([
         walletApi.getMine(),
@@ -115,14 +110,9 @@ export function WalletPage({ role }: { role: WalletRole }) {
     } finally {
       setLoading(false);
     }
-  }, [isProvider]);
+  }, []);
 
   const loadTransactions = useCallback(async () => {
-    if (!isProvider) {
-      setTransactionLoading(false);
-      return;
-    }
-
     try {
       const result = await walletApi.listTransactions({
         ...transactionQuery,
@@ -135,7 +125,7 @@ export function WalletPage({ role }: { role: WalletRole }) {
     } finally {
       setTransactionLoading(false);
     }
-  }, [isProvider, transactionQuery]);
+  }, [transactionQuery]);
 
   const loadWithdrawals = useCallback(async () => {
     if (!isProvider) {
@@ -180,20 +170,30 @@ export function WalletPage({ role }: { role: WalletRole }) {
 
   const stats = useMemo(() => {
     const currentBalance = wallet?.balance ?? summary?.currentBalance ?? 0;
+
+    if (!isProvider) {
+      return [
+        { icon: 'account_balance_wallet', label: 'Số dư khả dụng', value: currentBalance, strong: true },
+        { icon: 'hourglass_top', label: 'Đang chờ xử lý', value: wallet?.pendingBalance ?? 0 },
+        { icon: 'add_card', label: 'Tổng đã nạp', value: wallet?.totalDeposited ?? summary?.totalDeposited ?? 0 },
+        { icon: 'receipt_long', label: 'Đã thanh toán', value: wallet?.totalPaid ?? summary?.totalPaid ?? 0 },
+      ];
+    }
+
     return [
       { icon: 'account_balance_wallet', label: 'Số dư khả dụng', value: currentBalance, strong: true },
       { icon: 'hourglass_top', label: 'Đang chờ xử lý', value: wallet?.pendingBalance ?? 0 },
       { icon: 'trending_up', label: 'Tổng thu nhập', value: wallet?.totalEarnings ?? summary?.totalEarnings ?? 0 },
       { icon: 'payments', label: 'Đã rút', value: wallet?.totalWithdrawn ?? summary?.totalWithdrawals ?? 0 },
     ];
-  }, [summary, wallet]);
+  }, [isProvider, summary, wallet]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([loadOverview(), loadTransactions(), loadWithdrawals()]);
   }, [loadOverview, loadTransactions, loadWithdrawals]);
 
   useEffect(() => {
-    if (!isProvider || handledDepositReturnRef.current) return;
+    if (handledDepositReturnRef.current) return;
 
     const params = new URLSearchParams(window.location.search);
     const walletDepositStatus = params.get('walletDeposit');
@@ -230,7 +230,7 @@ export function WalletPage({ role }: { role: WalletRole }) {
     };
 
     void syncDepositStatus();
-  }, [isProvider, refreshAll]);
+  }, [refreshAll]);
 
   const submitDeposit = async (event: FormEvent) => {
     event.preventDefault();
@@ -243,10 +243,11 @@ export function WalletPage({ role }: { role: WalletRole }) {
         setError('Số tiền phải lớn hơn hoặc bằng 1.');
         return;
       }
+      const walletPath = isProvider ? '/provider/wallet' : '/customer/wallet';
       const result = await walletApi.createDeposit({
         amount,
-        returnUrl: `${window.location.origin}/provider/wallet`,
-        cancelUrl: `${window.location.origin}/provider/wallet`,
+        returnUrl: `${window.location.origin}${walletPath}`,
+        cancelUrl: `${window.location.origin}${walletPath}`,
       });
       const orderCode = result.transaction.gatewayOrderCode || result.transaction.transactionCode;
       if (orderCode) {
@@ -291,37 +292,25 @@ export function WalletPage({ role }: { role: WalletRole }) {
     }
   };
 
-  if (!isProvider) {
-    return (
-      <DashboardShell role={role}>
-        <section className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-8 shadow-sm">
-          <span className="material-symbols-outlined text-4xl text-primary">account_balance_wallet</span>
-          <h1 className="mt-4 text-headline-lg font-bold text-on-background">Ví Handigo</h1>
-          <p className="mt-2 max-w-2xl text-on-surface-variant">
-            Backend hiện chỉ hỗ trợ ví cho tài khoản nhà cung cấp. Khi API ví khách hàng được mở, màn này có thể dùng lại cấu trúc hiện tại.
-          </p>
-        </section>
-      </DashboardShell>
-    );
-  }
-
   return (
     <DashboardShell role={role}>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h1 className="text-headline-lg font-bold text-on-background">Ví Handigo</h1>
-            <p className="text-on-surface-variant">Theo dõi số dư, nạp ví và gửi yêu cầu rút tiền về tài khoản ngân hàng của bạn.</p>
+            <p className="text-on-surface-variant">{isProvider ? 'Theo dõi số dư, nạp ví và gửi yêu cầu rút tiền về tài khoản ngân hàng của bạn.' : 'Theo dõi số dư, nạp ví và lịch sử thanh toán dịch vụ của bạn.'}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={() => setDepositOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low">
               <span className="material-symbols-outlined text-[20px]">add_card</span>
               Nạp ví
             </button>
-            <button type="button" onClick={() => setWithdrawOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm">
-              <span className="material-symbols-outlined text-[20px]">payments</span>
-              Rút tiền
-            </button>
+            {isProvider && (
+              <button type="button" onClick={() => setWithdrawOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm">
+                <span className="material-symbols-outlined text-[20px]">payments</span>
+                Rút tiền
+              </button>
+            )}
           </div>
         </div>
 
@@ -363,8 +352,9 @@ export function WalletPage({ role }: { role: WalletRole }) {
           <Pagination page={transactionQuery.page || 1} totalPages={transactionPages} onChange={(page) => setTransactionQuery({ ...transactionQuery, page })} />
         </section>
 
-        <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
-          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {isProvider && (
+          <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
+            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-title-lg font-bold text-on-surface">Yêu cầu rút tiền</h2>
               <p className="text-sm text-on-surface-variant">Theo dõi trạng thái duyệt và tài khoản nhận tiền.</p>
@@ -378,14 +368,15 @@ export function WalletPage({ role }: { role: WalletRole }) {
               <option value="pending">Chờ duyệt</option>
               <option value="approved">Đã duyệt</option>
               <option value="rejected">Từ chối</option>
-            </select>
-          </div>
+              </select>
+            </div>
 
-          <AsyncState loading={withdrawalLoading} error="" empty={!withdrawals.length} emptyMessage="Chưa có yêu cầu rút tiền.">
-            <WithdrawalTable items={withdrawals} />
-          </AsyncState>
-          <Pagination page={withdrawalQuery.page || 1} totalPages={withdrawalPages} onChange={(page) => setWithdrawalQuery({ ...withdrawalQuery, page })} />
-        </section>
+            <AsyncState loading={withdrawalLoading} error="" empty={!withdrawals.length} emptyMessage="Chưa có yêu cầu rút tiền.">
+              <WithdrawalTable items={withdrawals} />
+            </AsyncState>
+            <Pagination page={withdrawalQuery.page || 1} totalPages={withdrawalPages} onChange={(page) => setWithdrawalQuery({ ...withdrawalQuery, page })} />
+          </section>
+        )}
       </div>
 
       <AmountModal
@@ -400,7 +391,8 @@ export function WalletPage({ role }: { role: WalletRole }) {
         onSubmit={submitDeposit}
       />
 
-      <AmountModal
+      {isProvider && (
+        <AmountModal
         open={withdrawOpen}
         title="Rút tiền"
         amount={withdrawForm.amount}
@@ -411,7 +403,8 @@ export function WalletPage({ role }: { role: WalletRole }) {
         onAmountChange={(amount) => setWithdrawForm({ amount })}
         onClose={() => setWithdrawOpen(false)}
         onSubmit={submitWithdrawal}
-      />
+        />
+      )}
     </DashboardShell>
   );
 }

@@ -187,4 +187,8 @@ ProviderSchema.index({ serviceIds: 1 });
 ProviderSchema.index({ availabilityStatus: 1, verified: 1 });
 ProviderSchema.index({ "serviceArea.province": 1, "serviceArea.ward": 1 });
 
-export const Provider = model<IProvider>("Provider", ProviderSchema, "providers");
+export const Provider = model<IProvider>(
+  "Provider",
+  ProviderSchema,
+  "providers",
+);

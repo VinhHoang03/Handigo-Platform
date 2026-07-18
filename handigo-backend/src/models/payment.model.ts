@@ -62,5 +62,52 @@ PaymentSchema.index({ gatewayOrderCode: 1 });
 PaymentSchema.index({ gatewayPaymentLinkId: 1 });
 PaymentSchema.index({ gatewayTransactionId: 1 });
 PaymentSchema.index({ orderId: 1, paymentType: 1, method: 1, status: 1 });
+PaymentSchema.index(
+  { orderId: 1, paymentType: 1 },
+  {
+    name: "order_payment_type_active_unique",
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ["pending", "paid"] },
+      isDeleted: false,
+    },
+  },
+);
+PaymentSchema.index(
+  { method: 1, gatewayOrderCode: 1 },
+  {
+    name: "payos_gateway_order_code_unique",
+    unique: true,
+    partialFilterExpression: {
+      method: "payos",
+      gatewayOrderCode: { $type: "string" },
+      isDeleted: false,
+    },
+  },
+);
+PaymentSchema.index(
+  { method: 1, gatewayPaymentLinkId: 1 },
+  {
+    name: "payos_payment_link_unique",
+    unique: true,
+    partialFilterExpression: {
+      method: "payos",
+      gatewayPaymentLinkId: { $type: "string" },
+      isDeleted: false,
+    },
+  },
+);
+PaymentSchema.index(
+  { method: 1, gatewayTransactionId: 1 },
+  {
+    name: "payos_transaction_reference_unique",
+    unique: true,
+    partialFilterExpression: {
+      method: "payos",
+      gatewayTransactionId: { $type: "string" },
+      isDeleted: false,
+    },
+  },
+);
 
 export const Payment = model<IPayment>("Payment", PaymentSchema, "payments");

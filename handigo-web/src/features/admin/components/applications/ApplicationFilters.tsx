@@ -13,7 +13,7 @@ export function ApplicationFilters({
   onChange: (query: AdminQuery) => void;
 }) {
   return (
-    <div className="grid gap-3 border-y border-outline-variant/40 py-4 lg:grid-cols-[minmax(14rem,1fr)_12rem_minmax(12rem,16rem)]">
+    <div className="grid gap-3 border-y border-outline-variant/40 py-4 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_12rem_14rem_minmax(12rem,16rem)]">
       <FloatingInput
         id="admin-application-keyword"
         label="Tên hoặc email"
@@ -31,6 +31,16 @@ export function ApplicationFilters({
         <option value="resubmitted">Đã gửi lại</option>
         <option value="approved">Đã duyệt</option>
         <option value="rejected">Từ chối</option>
+      </FormSelect>
+      <FormSelect
+        id="admin-application-type"
+        label="Loại đơn"
+        value={query.applicationType || ''}
+        onValueChange={(value) => onChange({ ...query, applicationType: value, page: 1 })}
+      >
+        <option value="">Tất cả loại đơn</option>
+        <option value="initial">Đăng ký provider</option>
+        <option value="service_addition">Bổ sung dịch vụ</option>
       </FormSelect>
       <FormSelect
         id="admin-application-category"

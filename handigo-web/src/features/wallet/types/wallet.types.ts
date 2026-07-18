@@ -17,6 +17,8 @@ export interface WalletOverview {
   pendingBalance: number;
   totalEarnings: number;
   totalWithdrawn: number;
+  totalDeposited?: number;
+  totalPaid?: number;
 }
 
 export interface WalletSummary {
@@ -24,6 +26,8 @@ export interface WalletSummary {
   totalEarnings: number;
   totalWithdrawals: number;
   totalPlatformFeesPaid: number;
+  totalDeposited?: number;
+  totalPaid?: number;
 }
 
 export interface WalletTransaction {

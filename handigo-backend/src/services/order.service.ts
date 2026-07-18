@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
@@ -9,6 +9,10 @@ import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
+import { DispatchService } from "./dispatch.service";
+import { cancelOrderWithSettlement } from "./orderCancellation.service";
+import { Payment } from "../models/payment.model";
+import { recordCompletedOrderSettlement } from "./wallet.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -20,9 +24,10 @@ function generateOrderCode(): string {
 }
 
 async function getProviderByUserId(providerUserId: string) {
-  const provider = await Provider.findOne({ userId: providerUserId }).select(
-    "_id",
-  );
+  const provider = await Provider.findOne({
+    userId: providerUserId,
+    isDeleted: false,
+  }).select("_id");
   if (!provider) {
     throw new AppError("Provider không tồn tại.", 404);
   }
@@ -35,6 +40,33 @@ function getPopulatedId(value: unknown): string | null {
     return String((value as { _id: unknown })._id);
   }
   return String(value);
+}
+
+export async function dispatchOrderForMatching(orderId: string) {
+  const order = await Order.findById(orderId).select(
+    "addressId serviceId status readyForMatching",
+  );
+  if (!order || order.status !== "created" || !order.readyForMatching) return;
+
+  const address = await Address.findById(order.addressId).select(
+    "latitude longitude province ward",
+  );
+  if (!address) {
+    throw new AppError("Địa chỉ không hợp lệ.", 404);
+  }
+
+  DispatchService.dispatchOrder(order._id.toString(), {
+    latitude: address.latitude,
+    longitude: address.longitude,
+    serviceId: order.serviceId.toString(),
+    province: address.province,
+    ward: address.ward,
+  }).catch((err: unknown) =>
+    console.error(
+      `[OrderService] Dispatch failed for order ${order._id}:`,
+      err,
+    ),
+  );
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -117,12 +149,6 @@ export const OrderService = {
         400,
       );
     }
-    if (payload.paymentMethod === "wallet") {
-      throw new AppError(
-        "Thanh toán đơn dịch vụ bằng ví chưa được hỗ trợ. Vui lòng chọn chuyển khoản hoặc tiền mặt.",
-        400,
-      );
-    }
     if (
       payload.preferredProviderId &&
       !Types.ObjectId.isValid(payload.preferredProviderId)
@@ -148,11 +174,14 @@ export const OrderService = {
       payload.selectedOptionIds,
     );
 
+    const inspectionRequired = service.serviceType === "variable_price";
     const platformCommissionPercent = await getNumberConfigValue(
       PLATFORM_FEE_PERCENT_CONFIG_KEY,
       DEFAULT_PLATFORM_COMMISSION_PERCENT,
     );
-    const platformCommissionRate = Math.max(platformCommissionPercent, 0) / 100;
+    const platformCommissionRate = inspectionRequired
+      ? 0
+      : Math.max(platformCommissionPercent, 0) / 100;
     // 4. Giá cố định gồm giá cơ bản và phụ phí; giá linh hoạt chỉ thu tiền cọc.
     const totalAmount = pricingSnapshot.bookingAmount;
 
@@ -161,8 +190,6 @@ export const OrderService = {
     );
     const providerEarningAmount = totalAmount - platformCommissionAmount;
 
-    // 5. Determine if inspection is required (repair service)
-    const inspectionRequired = service.serviceType === "variable_price";
     // 6. Persist order
     const order = await Order.create({
       orderCode: generateOrderCode(),
@@ -479,6 +506,19 @@ export const OrderService = {
       );
     }
 
+    if (order.inspectionRequired && order.paymentStatus !== "paid") {
+      throw new AppError(
+        "Không thể hoàn thành đơn khi khách hàng chưa thanh toán đủ báo giá.",
+        400,
+      );
+    }
+    if (order.paymentMethod !== "cash" && order.paymentStatus !== "paid") {
+      throw new AppError(
+        "Không thể hoàn thành đơn khi thanh toán điện tử chưa được xác nhận.",
+        400,
+      );
+    }
+
     const evidenceImages = completionEvidenceImages
       .map((url) => url.trim())
       .filter(Boolean);
@@ -495,24 +535,113 @@ export const OrderService = {
       );
     }
 
-    order.status = "completed";
-    order.completionEvidenceImages = evidenceImages;
-    order.completionNote = completionNote?.trim() || null;
-    order.confirmation.providerConfirmedAt = new Date();
-    if (
-      order.paymentStatus === "unpaid" ||
-      order.paymentStatus === "partially_paid"
-    ) {
-      order.paymentStatus = "paid";
+    const session = await mongoose.startSession();
+    let completedOrder: IOrder | null = null;
+
+    try {
+      await session.withTransaction(async () => {
+        const transactionalOrder = await Order.findById(orderId).session(session);
+        const transactionalProvider = await Provider.findById(provider._id).session(
+          session,
+        );
+        if (!transactionalOrder || !transactionalProvider) {
+          throw new AppError("Không tìm thấy dữ liệu đơn hàng hoặc nhà cung cấp.", 404);
+        }
+        if (
+          !transactionalOrder.providerId ||
+          transactionalOrder.providerId.toString() !==
+            transactionalProvider._id.toString()
+        ) {
+          throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
+        }
+        if (transactionalOrder.status !== "in_progress") {
+          throw new AppError(
+            `Không thể hoàn thành đơn hàng ở trạng thái "${transactionalOrder.status}".`,
+            400,
+          );
+        }
+        if (
+          transactionalOrder.inspectionRequired &&
+          transactionalOrder.paymentStatus !== "paid"
+        ) {
+          throw new AppError(
+            "Không thể hoàn thành đơn khi khách hàng chưa thanh toán đủ báo giá.",
+            400,
+          );
+        }
+        if (
+          transactionalOrder.paymentMethod !== "cash" &&
+          transactionalOrder.paymentStatus !== "paid"
+        ) {
+          throw new AppError(
+            "Không thể hoàn thành đơn khi thanh toán điện tử chưa được xác nhận.",
+            400,
+          );
+        }
+
+        const totalAmount = transactionalOrder.pricing.totalPaidAmount;
+        const commissionRate = transactionalOrder.inspectionRequired
+          ? 0
+          : Math.max(transactionalOrder.pricing.platformCommissionRate, 0);
+        const platformCommissionAmount = Math.min(
+          Math.round(totalAmount * commissionRate),
+          totalAmount,
+        );
+        transactionalOrder.pricing.platformCommissionAmount =
+          platformCommissionAmount;
+        transactionalOrder.pricing.providerEarningAmount =
+          totalAmount - platformCommissionAmount;
+        if (transactionalOrder.inspectionRequired) {
+          transactionalOrder.pricing.platformCommissionRate = 0;
+        }
+
+        if (transactionalOrder.paymentMethod === "cash") {
+          const cashPayment = await Payment.findOne({
+            orderId: transactionalOrder._id,
+            method: "cash",
+            status: { $in: ["pending", "paid"] },
+            isDeleted: false,
+          }).session(session);
+          if (!cashPayment) {
+            throw new AppError(
+              "Không tìm thấy giao dịch tiền mặt hợp lệ của đơn hàng.",
+              409,
+            );
+          }
+          if (cashPayment.status === "pending") {
+            cashPayment.status = "paid";
+            cashPayment.paidAt = new Date();
+            await cashPayment.save({ session });
+          }
+          transactionalOrder.paymentStatus = "paid";
+        }
+
+        await recordCompletedOrderSettlement(
+          transactionalOrder,
+          transactionalProvider,
+          session,
+        );
+
+        transactionalOrder.status = "completed";
+        transactionalOrder.completionEvidenceImages = evidenceImages;
+        transactionalOrder.completionNote = completionNote?.trim() || null;
+        transactionalOrder.confirmation.providerConfirmedAt = new Date();
+        await transactionalOrder.save({ session });
+
+        transactionalProvider.totalCompletedOrders += 1;
+        transactionalProvider.availabilityStatus = "online";
+        await transactionalProvider.save({ session });
+
+        completedOrder = transactionalOrder;
+      });
+    } finally {
+      await session.endSession();
     }
-    await order.save();
 
-    await Provider.findByIdAndUpdate(provider._id, {
-      $inc: { totalCompletedOrders: 1 },
-      availabilityStatus: "online",
-    });
-
-    return order;
+    if (!completedOrder) {
+      throw new AppError("Không thể hoàn tất đơn hàng.", 500);
+    }
+    return completedOrder;
   },
 
   /**
@@ -524,46 +653,11 @@ export const OrderService = {
     role: "customer" | "provider" | "admin",
     reason: string,
   ): Promise<IOrder> {
-    const order = await Order.findById(orderId);
-    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
-
-    const cancellableStatuses = ["created", "accepted"];
-    if (!cancellableStatuses.includes(order.status)) {
-      throw new AppError(
-        `Không thể hủy đơn hàng ở trạng thái "${order.status}".`,
-        400,
-      );
-    }
-
-    if (role === "customer" && order.customerId.toString() !== userId) {
-      throw new AppError("Bạn không có quyền hủy đơn hàng này.", 403);
-    }
-
-    if (role === "provider") {
-      const provider = await getProviderByUserId(userId);
-      if (
-        !order.providerId ||
-        order.providerId.toString() !== provider._id.toString()
-      ) {
-        throw new AppError("Bạn không có quyền hủy đơn hàng này.", 403);
-      }
-    }
-
-    order.status = "cancelled";
-    order.cancellation = {
-      cancelledBy: new Types.ObjectId(userId),
-      cancelledByRole: role,
+    return cancelOrderWithSettlement({
+      orderId,
+      actorId: userId,
+      role,
       reason,
-      cancelledAt: new Date(),
-    };
-    await order.save();
-
-    if (role === "provider" && order.providerId) {
-      await Provider.findByIdAndUpdate(order.providerId, {
-        availabilityStatus: "online",
-      });
-    }
-
-    return order;
+    });
   },
 };

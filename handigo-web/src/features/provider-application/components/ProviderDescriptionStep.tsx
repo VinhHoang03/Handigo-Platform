@@ -101,7 +101,11 @@ function UploadedAsset({
   return (
     <div className="rounded-lg border border-outline-variant/40 bg-surface-container-lowest p-3">
       {isImageUrl(url) ? (
-        <img src={url} alt={label} className="h-32 w-full rounded-lg object-cover" />
+        <img
+          src={url}
+          alt={label}
+          className="h-32 w-full rounded-lg object-cover"
+        />
       ) : (
         <a
           href={url}
@@ -141,7 +145,9 @@ function FileUploadSlot({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-bold uppercase text-on-surface-variant">{label}</p>
+        <p className="text-xs font-bold uppercase text-on-surface-variant">
+          {label}
+        </p>
         <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90">
           <UploadCloud size={17} />
           {uploading ? "Đang tải và OCR..." : value ? "Thay đổi" : "Tải lên"}
@@ -183,7 +189,9 @@ function IdentityTypeSelect({
       <select
         id="application-identity-type"
         value={value}
-        onChange={(event) => onChange(event.target.value as IdentityDocumentType)}
+        onChange={(event) =>
+          onChange(event.target.value as IdentityDocumentType)
+        }
         className="form-select__control"
       >
         <option value="cccd">CCCD</option>
@@ -254,7 +262,9 @@ export function ProviderDescriptionStep({
       const warning = uploaded.ocrSuggestion?.warnings.join(" ");
       setOcrMessages((current) => ({
         ...current,
-        [key]: warning || "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin.",
+        [key]:
+          warning ||
+          "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin.",
       }));
     } catch (error) {
       setUploadError(getErrorMessage(error, "Không thể tải giấy tờ lên."));
@@ -283,7 +293,9 @@ export function ProviderDescriptionStep({
       const warning = uploaded.ocrSuggestion?.warnings.join(" ");
       setOcrMessages((current) => ({
         ...current,
-        [key]: warning || "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin.",
+        [key]:
+          warning ||
+          "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin.",
       }));
     } catch (error) {
       setUploadError(getErrorMessage(error, "Không thể tải chứng chỉ lên."));
@@ -303,22 +315,26 @@ export function ProviderDescriptionStep({
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-headline-md font-bold">Giới thiệu và hồ sơ xác thực</h2>
+        <h2 className="text-headline-md font-bold">
+          Giới thiệu và hồ sơ xác thực
+        </h2>
         <p className="mt-1 text-on-surface-variant">
-          Tải giấy tờ để hệ thống tự điền thông tin, sau đó kiểm tra trước khi gửi.
+          Tải giấy tờ để hệ thống tự điền thông tin, sau đó kiểm tra trước khi
+          gửi.
         </p>
       </div>
 
       {uploadError && (
-        <p className="rounded-2xl bg-error/10 p-3 text-sm text-error">{uploadError}</p>
+        <p className="rounded-2xl bg-error/10 p-3 text-sm text-error">
+          {uploadError}
+        </p>
       )}
 
       <div className="space-y-5 rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-4 md:p-6">
         <div>
-          <h3 className="text-title-md font-bold">Xác thực giấy tờ định danh</h3>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            OCR chỉ hỗ trợ nhập liệu; quản trị viên vẫn kiểm tra thủ công.
-          </p>
+          <h3 className="text-title-md font-bold">
+            Xác thực giấy tờ định danh
+          </h3>
         </div>
 
         <IdentityTypeSelect
@@ -334,7 +350,9 @@ export function ProviderDescriptionStep({
                 label="Ảnh mặt trước"
                 value={identity.frontImageUrl}
                 uploading={uploadingKey === "identity-front"}
-                onUpload={(file) => void uploadIdentity("identity-front", "cccd_front", file)}
+                onUpload={(file) =>
+                  void uploadIdentity("identity-front", "cccd_front", file)
+                }
                 onRemove={() => updateIdentity({ frontImageUrl: "" })}
               />
               <FileUploadSlot
@@ -342,7 +360,9 @@ export function ProviderDescriptionStep({
                 label="Ảnh mặt sau"
                 value={identity.backImageUrl}
                 uploading={uploadingKey === "identity-back"}
-                onUpload={(file) => void uploadIdentity("identity-back", "cccd_back", file)}
+                onUpload={(file) =>
+                  void uploadIdentity("identity-back", "cccd_back", file)
+                }
                 onRemove={() => updateIdentity({ backImageUrl: "" })}
               />
             </>
@@ -352,7 +372,9 @@ export function ProviderDescriptionStep({
               label="Ảnh hộ chiếu"
               value={identity.passportImageUrl}
               uploading={uploadingKey === "identity-passport"}
-              onUpload={(file) => void uploadIdentity("identity-passport", "passport", file)}
+              onUpload={(file) =>
+                void uploadIdentity("identity-passport", "passport", file)
+              }
               onRemove={() => updateIdentity({ passportImageUrl: "" })}
             />
           )}
@@ -361,30 +383,103 @@ export function ProviderDescriptionStep({
         {Object.entries(ocrMessages)
           .filter(([key]) => key.startsWith("identity-"))
           .map(([key, message]) => (
-            <p key={key} className="rounded-lg bg-primary/5 p-3 text-sm text-on-surface-variant">
+            <p
+              key={key}
+              className="rounded-lg bg-primary/5 p-3 text-sm text-on-surface-variant"
+            >
               {message}
             </p>
           ))}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <FloatingInput id="application-identity-number" label="Số giấy tờ" value={identity.documentNumber} onValueChange={(documentNumber) => updateIdentity({ documentNumber })} />
-          <FloatingInput id="application-identity-name" label="Họ tên trên giấy tờ" value={identity.fullName} onValueChange={(fullName) => updateIdentity({ fullName })} />
-          <FloatingInput id="application-identity-birth-date" label="Ngày sinh" type="date" value={identity.dateOfBirth || ""} max={today} error={dateErrors.identity.dateOfBirth} onValueChange={(dateOfBirth) => updateIdentity({ dateOfBirth })} />
+          <FloatingInput
+            id="application-identity-number"
+            label="Số giấy tờ"
+            value={identity.documentNumber}
+            onValueChange={(documentNumber) =>
+              updateIdentity({ documentNumber })
+            }
+          />
+          <FloatingInput
+            id="application-identity-name"
+            label="Họ tên trên giấy tờ"
+            value={identity.fullName}
+            onValueChange={(fullName) => updateIdentity({ fullName })}
+          />
+          <FloatingInput
+            id="application-identity-birth-date"
+            label="Ngày sinh"
+            type="date"
+            value={identity.dateOfBirth || ""}
+            max={today}
+            error={dateErrors.identity.dateOfBirth}
+            onValueChange={(dateOfBirth) => updateIdentity({ dateOfBirth })}
+          />
           <label className="form-select">
             <span className="form-select__label">Giới tính</span>
-            <select className="form-select__control" value={identity.gender || ""} onChange={(event) => updateIdentity({ gender: (event.target.value || undefined) as "male" | "female" | "other" | undefined })}>
+            <select
+              className="form-select__control"
+              value={identity.gender || ""}
+              onChange={(event) =>
+                updateIdentity({
+                  gender: (event.target.value || undefined) as
+                    | "male"
+                    | "female"
+                    | "other"
+                    | undefined,
+                })
+              }
+            >
               <option value="">Chưa cập nhật</option>
               <option value="male">Nam</option>
               <option value="female">Nữ</option>
               <option value="other">Khác</option>
             </select>
           </label>
-          <FloatingInput id="application-identity-nationality" label="Quốc tịch" value={identity.nationality || ""} onValueChange={(nationality) => updateIdentity({ nationality })} />
-          <FloatingInput id="application-identity-origin" label="Quê quán / Nơi sinh" value={identity.placeOfOrigin || ""} onValueChange={(placeOfOrigin) => updateIdentity({ placeOfOrigin })} />
-          <FloatingInput id="application-identity-residence" label="Nơi thường trú" value={identity.placeOfResidence || ""} onValueChange={(placeOfResidence) => updateIdentity({ placeOfResidence })} />
-          <FloatingInput id="application-identity-issued-place" label="Nơi cấp" value={identity.issuedPlace || ""} onValueChange={(issuedPlace) => updateIdentity({ issuedPlace })} />
-          <FloatingInput id="application-identity-issued-at" label="Ngày cấp" type="date" value={identity.issuedAt || ""} max={today} error={dateErrors.identity.issuedAt} onValueChange={(issuedAt) => updateIdentity({ issuedAt })} />
-          <FloatingInput id="application-identity-expires-at" label="Ngày hết hạn" type="date" value={identity.expiresAt || ""} min={identity.issuedAt || today} error={dateErrors.identity.expiresAt} onValueChange={(expiresAt) => updateIdentity({ expiresAt })} />
+          <FloatingInput
+            id="application-identity-nationality"
+            label="Quốc tịch"
+            value={identity.nationality || ""}
+            onValueChange={(nationality) => updateIdentity({ nationality })}
+          />
+          <FloatingInput
+            id="application-identity-origin"
+            label="Quê quán / Nơi sinh"
+            value={identity.placeOfOrigin || ""}
+            onValueChange={(placeOfOrigin) => updateIdentity({ placeOfOrigin })}
+          />
+          <FloatingInput
+            id="application-identity-residence"
+            label="Nơi thường trú"
+            value={identity.placeOfResidence || ""}
+            onValueChange={(placeOfResidence) =>
+              updateIdentity({ placeOfResidence })
+            }
+          />
+          <FloatingInput
+            id="application-identity-issued-place"
+            label="Nơi cấp"
+            value={identity.issuedPlace || ""}
+            onValueChange={(issuedPlace) => updateIdentity({ issuedPlace })}
+          />
+          <FloatingInput
+            id="application-identity-issued-at"
+            label="Ngày cấp"
+            type="date"
+            value={identity.issuedAt || ""}
+            max={today}
+            error={dateErrors.identity.issuedAt}
+            onValueChange={(issuedAt) => updateIdentity({ issuedAt })}
+          />
+          <FloatingInput
+            id="application-identity-expires-at"
+            label="Ngày hết hạn"
+            type="date"
+            value={identity.expiresAt || ""}
+            min={identity.issuedAt || today}
+            error={dateErrors.identity.expiresAt}
+            onValueChange={(expiresAt) => updateIdentity({ expiresAt })}
+          />
         </div>
 
         <FloatingTextarea
@@ -393,7 +488,9 @@ export function ProviderDescriptionStep({
           maxLength={2000}
           label="Mô tả kinh nghiệm"
           value={form.description}
-          onValueChange={(description) => onChange((current) => ({ ...current, description }))}
+          onValueChange={(description) =>
+            onChange((current) => ({ ...current, description }))
+          }
           hint={`${form.description.length}/2000 ký tự`}
         />
       </div>
@@ -402,55 +499,154 @@ export function ProviderDescriptionStep({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-title-md font-bold">Chứng chỉ nghề nghiệp</h3>
-            <p className="mt-1 text-sm text-on-surface-variant">Chứng chỉ là tùy chọn.</p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Chứng chỉ là tùy chọn.
+            </p>
           </div>
-          <button type="button" className="btn-secondary min-h-10 px-3 py-2" onClick={() => onChange((current) => ({ ...current, certificates: [...current.certificates, emptyCertificate()] }))}>
+          <button
+            type="button"
+            className="btn-secondary min-h-10 px-3 py-2"
+            onClick={() =>
+              onChange((current) => ({
+                ...current,
+                certificates: [...current.certificates, emptyCertificate()],
+              }))
+            }
+          >
             <Plus size={18} /> Thêm chứng chỉ
           </button>
         </div>
 
         {form.certificates.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-low p-4 text-sm text-on-surface-variant">Chưa có chứng chỉ.</p>
+          <p className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-low p-4 text-sm text-on-surface-variant">
+            Chưa có chứng chỉ.
+          </p>
         ) : (
           <div className="space-y-4">
             {form.certificates.map((certificate, index) => {
               const key = `certificate-${index}`;
               return (
-                <div key={index} className="space-y-4 rounded-xl border border-outline-variant/40 bg-surface-container-low p-4">
+                <div
+                  key={index}
+                  className="space-y-4 rounded-xl border border-outline-variant/40 bg-surface-container-low p-4"
+                >
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-bold">Chứng chỉ {index + 1}</p>
-                    <button type="button" className="inline-flex items-center gap-1 text-sm font-bold text-error hover:underline" onClick={() => onChange((current) => ({ ...current, certificates: current.certificates.filter((_, currentIndex) => currentIndex !== index) }))}>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-sm font-bold text-error hover:underline"
+                      onClick={() =>
+                        onChange((current) => ({
+                          ...current,
+                          certificates: current.certificates.filter(
+                            (_, currentIndex) => currentIndex !== index,
+                          ),
+                        }))
+                      }
+                    >
                       <Trash2 size={16} /> Xóa
                     </button>
                   </div>
 
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-xs font-bold uppercase text-on-surface-variant">Ảnh hoặc tài liệu chứng chỉ</p>
+                      <p className="text-xs font-bold uppercase text-on-surface-variant">
+                        Ảnh hoặc tài liệu chứng chỉ
+                      </p>
                       <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90">
                         <UploadCloud size={17} />
-                        {uploadingKey === key ? "Đang tải và OCR..." : "Tải lên"}
-                        <input type="file" accept="image/*,.pdf,.doc,.docx" disabled={uploadingKey === key} className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void uploadCertificate(index, file); }} />
+                        {uploadingKey === key
+                          ? "Đang tải và OCR..."
+                          : "Tải lên"}
+                        <input
+                          type="file"
+                          accept="image/*,.pdf,.doc,.docx"
+                          disabled={uploadingKey === key}
+                          className="sr-only"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.currentTarget.value = "";
+                            if (file) void uploadCertificate(index, file);
+                          }}
+                        />
                       </label>
                     </div>
                     {certificate.imageUrls.length > 0 ? (
                       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                         {certificate.imageUrls.map((url) => (
-                          <UploadedAsset key={url} url={url} label={certificate.title || "Chứng chỉ"} onRemove={() => updateCertificate(index, { imageUrls: certificate.imageUrls.filter((item) => item !== url) })} />
+                          <UploadedAsset
+                            key={url}
+                            url={url}
+                            label={certificate.title || "Chứng chỉ"}
+                            onRemove={() =>
+                              updateCertificate(index, {
+                                imageUrls: certificate.imageUrls.filter(
+                                  (item) => item !== url,
+                                ),
+                              })
+                            }
+                          />
                         ))}
                       </div>
                     ) : (
-                      <div className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-lowest p-5 text-center text-sm text-on-surface-variant">Chưa có tệp chứng chỉ.</div>
+                      <div className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-lowest p-5 text-center text-sm text-on-surface-variant">
+                        Chưa có tệp chứng chỉ.
+                      </div>
                     )}
-                    {ocrMessages[key] && <p className="rounded-lg bg-primary/5 p-3 text-sm text-on-surface-variant">{ocrMessages[key]}</p>}
+                    {ocrMessages[key] && (
+                      <p className="rounded-lg bg-primary/5 p-3 text-sm text-on-surface-variant">
+                        {ocrMessages[key]}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <FloatingInput id={`application-certificate-title-${index}`} label="Tên chứng chỉ" value={certificate.title} onValueChange={(title) => updateCertificate(index, { title })} />
-                    <FloatingInput id={`application-certificate-number-${index}`} label="Số chứng chỉ" value={certificate.certificateNumber || ""} onValueChange={(certificateNumber) => updateCertificate(index, { certificateNumber })} />
-                    <FloatingInput id={`application-certificate-issuer-${index}`} label="Đơn vị cấp" value={certificate.issuer || ""} onValueChange={(issuer) => updateCertificate(index, { issuer })} />
-                    <FloatingInput id={`application-certificate-issued-at-${index}`} label="Ngày cấp" type="date" value={certificate.issuedAt || ""} max={today} error={dateErrors.certificates[index]?.issuedAt} onValueChange={(issuedAt) => updateCertificate(index, { issuedAt })} />
-                    <FloatingInput id={`application-certificate-expires-at-${index}`} label="Ngày hết hạn" type="date" value={certificate.expiresAt || ""} min={certificate.issuedAt || today} error={dateErrors.certificates[index]?.expiresAt} onValueChange={(expiresAt) => updateCertificate(index, { expiresAt })} />
+                    <FloatingInput
+                      id={`application-certificate-title-${index}`}
+                      label="Tên chứng chỉ"
+                      value={certificate.title}
+                      onValueChange={(title) =>
+                        updateCertificate(index, { title })
+                      }
+                    />
+                    <FloatingInput
+                      id={`application-certificate-number-${index}`}
+                      label="Số chứng chỉ"
+                      value={certificate.certificateNumber || ""}
+                      onValueChange={(certificateNumber) =>
+                        updateCertificate(index, { certificateNumber })
+                      }
+                    />
+                    <FloatingInput
+                      id={`application-certificate-issuer-${index}`}
+                      label="Đơn vị cấp"
+                      value={certificate.issuer || ""}
+                      onValueChange={(issuer) =>
+                        updateCertificate(index, { issuer })
+                      }
+                    />
+                    <FloatingInput
+                      id={`application-certificate-issued-at-${index}`}
+                      label="Ngày cấp"
+                      type="date"
+                      value={certificate.issuedAt || ""}
+                      max={today}
+                      error={dateErrors.certificates[index]?.issuedAt}
+                      onValueChange={(issuedAt) =>
+                        updateCertificate(index, { issuedAt })
+                      }
+                    />
+                    <FloatingInput
+                      id={`application-certificate-expires-at-${index}`}
+                      label="Ngày hết hạn"
+                      type="date"
+                      value={certificate.expiresAt || ""}
+                      min={certificate.issuedAt || today}
+                      error={dateErrors.certificates[index]?.expiresAt}
+                      onValueChange={(expiresAt) =>
+                        updateCertificate(index, { expiresAt })
+                      }
+                    />
                   </div>
                 </div>
               );
@@ -460,11 +656,22 @@ export function ProviderDescriptionStep({
       </div>
 
       <div className="space-y-2 rounded-2xl bg-surface-container-low p-4 text-sm">
-        <p><b>Kinh nghiệm:</b> {formatExperienceYears(form.experienceYears)}</p>
-        <p><b>Dịch vụ:</b> {selectedNames.join(", ") || "Chưa chọn"}</p>
-        <p><b>Khu vực:</b> {form.workingAreas.join(", ") || "Chưa thêm"}</p>
-        <p><b>Giấy tờ:</b> {hasIdentityImage ? "Đã tải ảnh để admin duyệt" : "Chưa tải ảnh"}</p>
-        <p><b>Chứng chỉ:</b> {filledCertificates.length} mục</p>
+        <p>
+          <b>Kinh nghiệm:</b> {formatExperienceYears(form.experienceYears)}
+        </p>
+        <p>
+          <b>Dịch vụ:</b> {selectedNames.join(", ") || "Chưa chọn"}
+        </p>
+        <p>
+          <b>Khu vực:</b> {form.workingAreas.join(", ") || "Chưa thêm"}
+        </p>
+        <p>
+          <b>Giấy tờ:</b>{" "}
+          {hasIdentityImage ? "Đã tải ảnh để admin duyệt" : "Chưa tải ảnh"}
+        </p>
+        <p>
+          <b>Chứng chỉ:</b> {filledCertificates.length} mục
+        </p>
       </div>
     </section>
   );
