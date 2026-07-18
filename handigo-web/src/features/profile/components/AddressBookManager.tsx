@@ -183,26 +183,14 @@ export function AddressBookManager({
             </p>
           )}
         </div>
-        {(!singleAddressMode || !isLoading) && (
+        {!singleAddressMode && (
           <button
             type="button"
             className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"
-            onClick={() => {
-              if (singleAddressMode && onManageAddresses) {
-                onManageAddresses();
-                return;
-              }
-              if (singleAddressMode && activeAddress) {
-                openEdit(activeAddress);
-                return;
-              }
-              openCreate();
-            }}
+            onClick={openCreate}
           >
-            {singleAddressMode && activeAddress
-              ? <Pencil size={16} />
-              : <Plus size={16} />}
-            {singleAddressMode && activeAddress ? "Sửa" : "Thêm địa chỉ mới"}
+            <Plus size={16} />
+            Thêm địa chỉ mới
           </button>
         )}
       </div>

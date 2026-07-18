@@ -50,6 +50,15 @@ export const getNearbyProviders = async (
     const userId = getUserId(req);
     const serviceId = String(req.query.serviceId || "");
     const addressId = String(req.query.addressId || "");
+    const scheduledAt = req.query.scheduledAt
+      ? String(req.query.scheduledAt)
+      : undefined;
+    const recurrenceUnit = req.query.recurrenceUnit
+      ? String(req.query.recurrenceUnit)
+      : undefined;
+    const recurrenceCount = req.query.recurrenceCount
+      ? Number(req.query.recurrenceCount)
+      : undefined;
 
     if (!serviceId || !addressId) {
       throw new AppError("Vui lòng chọn dịch vụ và địa chỉ.", 400);
@@ -59,6 +68,9 @@ export const getNearbyProviders = async (
       userId,
       serviceId,
       addressId,
+      scheduledAt,
+      recurrenceUnit,
+      recurrenceCount,
     );
 
     return res.json({ success: true, data });

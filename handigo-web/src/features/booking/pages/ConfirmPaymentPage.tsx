@@ -14,7 +14,7 @@ import { bookingVoucherApi } from "@/features/booking/api/voucher.api";
 import { serviceCatalogApi } from "@/features/customer-service/api/serviceCatalog.api";
 import type { Address, Service, ServiceOption } from "../../../types/booking";
 import type { AvailableVoucher } from "../types/voucher.types";
-import { getMissingRequiredGroup } from "../utils/serviceOptionSelection";
+import { isRequiredOptionSelectionMissing } from "../utils/serviceOptionSelection";
 
 const paymentMethods = [
   [
@@ -58,6 +58,8 @@ const ConfirmPaymentPage = () => {
     preferredProviderId,
     preferredProviderName,
     scheduledAt,
+    recurrenceUnit,
+    recurrenceCount,
     problemDescription,
     customerAttachments,
     paymentMethod,
@@ -122,6 +124,7 @@ const ConfirmPaymentPage = () => {
     service?.serviceType === "variable_price" && paymentMethod !== "bank"
       ? "bank"
       : paymentMethod;
+  const isAppointment = orderType === "scheduled" || orderType === "recurring";
 
   const handleConfirm = async () => {
     if (!serviceId) {
@@ -139,11 +142,8 @@ const ConfirmPaymentPage = () => {
       setPaymentError("Vui lòng chọn thời gian thực hiện trong tương lai.");
       return;
     }
-    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
-    if (missingGroup) {
-      setPaymentError(
-        `Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`,
-      );
+    if (isRequiredOptionSelectionMissing(service, selectedOptionIds)) {
+      setPaymentError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.");
       return;
     }
 
@@ -160,6 +160,8 @@ const ConfirmPaymentPage = () => {
         scheduledAt: scheduledAt
           ? new Date(scheduledAt).toISOString()
           : undefined,
+        recurrenceUnit: orderType === "recurring" ? recurrenceUnit : undefined,
+        recurrenceCount: orderType === "recurring" ? recurrenceCount : undefined,
         problemDescription,
         customerAttachments,
         paymentMethod: effectivePaymentMethod,
@@ -181,6 +183,12 @@ const ConfirmPaymentPage = () => {
       }
       if (desiredVoucherCode && currentVoucherCode !== desiredVoucherCode) {
         await bookingVoucherApi.apply(orderId, desiredVoucherCode);
+      }
+
+      if (orderType === "scheduled" || orderType === "recurring") {
+        reset();
+        navigate(`/customer/bookings/${orderId}`);
+        return;
       }
 
       if (effectivePaymentMethod === "bank") {
@@ -249,7 +257,7 @@ const ConfirmPaymentPage = () => {
 
   const addressText = formatAddress(address);
   const detailItems = [
-    ["cleaning_services", "Dịch vụ", service?.name || "..."],
+    ["cleaning_services", "Dịch vụ", service?.name || "…"],
     [
       "calendar_today",
       "Thời gian",
@@ -260,9 +268,11 @@ const ConfirmPaymentPage = () => {
     ...(addressText ? [["location_on", "Địa chỉ", addressText]] : []),
     [
       "person_search",
-      "Điều phối chuyên gia",
+      isAppointment ? "Chuyên gia đặt trước" : "Điều phối chuyên gia",
       preferredProviderId
-        ? `Ưu tiên ${preferredProviderName || "chuyên gia đã chọn"}`
+        ? isAppointment
+          ? preferredProviderName || "Chuyên gia đã chọn"
+          : `Ưu tiên ${preferredProviderName || "chuyên gia đã chọn"}`
         : "Handigo tự điều phối",
     ],
   ] as string[][];
@@ -273,6 +283,18 @@ const ConfirmPaymentPage = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
         <div className="lg:col-span-8 space-y-gutter">
+          {isAppointment && (
+            <section className="flex items-start gap-sm rounded-xl border border-primary/20 bg-primary-container/10 p-md">
+              <span aria-hidden="true" className="material-symbols-outlined text-primary">event_available</span>
+              <div>
+                <h2 className="font-bold text-on-surface">Xác nhận yêu cầu lịch hẹn</h2>
+                <p className="mt-1 text-sm leading-6 text-on-surface-variant">
+                  Handigo chưa thu tiền ở bước này. Chuyên gia sẽ xác nhận lịch trước,
+                  sau đó bạn có 15 phút để thanh toán và giữ chỗ.
+                </p>
+              </div>
+            </section>
+          )}
           <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
             <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">
@@ -283,6 +305,8 @@ const ConfirmPaymentPage = () => {
             <label className="block text-sm font-semibold">
               Chọn voucher khả dụng
               <select
+                name="availableVoucher"
+                autoComplete="off"
                 value={voucherCode}
                 onChange={(event) => {
                   setVoucherCode(event.target.value);
@@ -307,6 +331,10 @@ const ConfirmPaymentPage = () => {
             </label>
             <div className="mt-3 flex gap-2">
               <input
+                name="voucherCode"
+                aria-label="Nhập mã voucher"
+                autoComplete="off"
+                spellCheck={false}
                 value={voucherCode}
                 onChange={(event) => {
                   setVoucherCode(event.target.value.toUpperCase());
@@ -389,8 +417,13 @@ const ConfirmPaymentPage = () => {
               <span className="material-symbols-outlined text-primary">
                 account_balance_wallet
               </span>
-              Phương thức thanh toán
+              {isAppointment ? "Phương thức sẽ thanh toán" : "Phương thức thanh toán"}
             </h2>
+            {isAppointment && (
+              <p className="mb-4 text-sm text-on-surface-variant">
+                Phương thức này được lưu cho bước thanh toán sau khi chuyên gia nhận lịch.
+              </p>
+            )}
             <div className="space-y-3">
               {paymentMethods
                 .filter(([, , , value]) => {
@@ -404,17 +437,17 @@ const ConfirmPaymentPage = () => {
                 .map(([icon, title, subtitle, value]) => (
                   <label
                     key={value}
-                    className="group relative flex items-center p-4 rounded-xl border border-outline-variant/50 hover:border-primary cursor-pointer transition-all bg-surface-container-low/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                    className="group relative flex items-center p-4 rounded-xl border border-outline-variant/50 hover:border-primary cursor-pointer transition-colors bg-surface-container-low/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
                   >
                     <input
                       checked={effectivePaymentMethod === value}
                       onChange={() => setPaymentMethod(value)}
-                      className="hidden peer"
+                      className="peer sr-only"
                       name="payment"
                       type="radio"
                       value={value}
                     />
-                    <div className="flex-1 flex items-center gap-4">
+                    <div className="flex-1 flex items-center gap-4 peer-focus-visible:rounded-lg peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15">
                       <div
                         className={`w-12 h-12 rounded-lg flex items-center justify-center ${effectivePaymentMethod === value ? "bg-primary text-white" : "bg-on-surface/5 text-on-surface"}`}
                       >
@@ -439,7 +472,7 @@ const ConfirmPaymentPage = () => {
             </div>
 
             {paymentError && (
-              <div className="mt-4 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
+              <div role="alert" className="mt-4 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
                 {paymentError}
               </div>
             )}
@@ -449,7 +482,11 @@ const ConfirmPaymentPage = () => {
         <div className="lg:col-span-4">
           <OrderSummaryCard
             step={3}
-            actionLabel="Xác nhận & Thanh toán"
+            actionLabel={
+              orderType === "scheduled" || orderType === "recurring"
+                ? "Gửi yêu cầu lịch hẹn"
+                : "Xác nhận & Thanh toán"
+            }
             onAction={handleConfirm}
             isLoading={isSubmitting}
           />

@@ -43,6 +43,27 @@ const triggerDispatch = (orderId: string) => {
   );
 };
 
+const assertAppointmentPaymentReady = (
+  order: InstanceType<typeof Order>,
+  paymentType?: PaymentType,
+) => {
+  if (paymentType === "remaining") return;
+  if (!["scheduled", "recurring"].includes(order.orderType)) return;
+  if (
+    order.status !== "accepted" ||
+    order.bookingStatus !== "awaiting_payment" ||
+    !order.providerId
+  ) {
+    throw new AppError(
+      "Chỉ có thể thanh toán sau khi chuyên gia xác nhận lịch hẹn.",
+      409,
+    );
+  }
+  if (order.paymentDueAt && order.paymentDueAt <= new Date()) {
+    throw new AppError("Thời hạn thanh toán giữ lịch đã kết thúc.", 409);
+  }
+};
+
 const buildPayosOrderCode = () =>
   Number(`${Date.now()}${Math.floor(Math.random() * 100)}`.slice(-11)) * 10 + 1;
 
@@ -129,6 +150,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       if (!transactionalOrder || transactionalOrder.isDeleted) {
         throw new AppError("Không tìm thấy đơn hàng", 404);
       }
+      assertAppointmentPaymentReady(transactionalOrder, paymentType);
 
       chargedAmount = await getPaymentAmount(transactionalOrder, paymentType, session);
       if (chargedAmount <= 0) {
@@ -208,6 +230,10 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       if (shouldDispatch) {
         transactionalOrder.readyForMatching = true;
       }
+      if (["scheduled", "recurring"].includes(transactionalOrder.orderType)) {
+        transactionalOrder.bookingStatus = "confirmed";
+        transactionalOrder.readyForMatching = false;
+      }
 
       await transactionalOrder.save({ session });
       paymentOrder = transactionalOrder;
@@ -270,6 +296,7 @@ const reserveExternalPayment = async (
       }
 
       const paymentType = getPaymentType(order, input.paymentType);
+      assertAppointmentPaymentReady(order, paymentType);
 
       if (paymentType === "remaining") {
         if (!order.inspectionRequired || !order.currentQuotationId) {
@@ -338,7 +365,10 @@ const reserveExternalPayment = async (
       );
 
       if (method === "cash") {
-        order.readyForMatching = true;
+        order.readyForMatching = !["scheduled", "recurring"].includes(order.orderType);
+        if (["scheduled", "recurring"].includes(order.orderType)) {
+          order.bookingStatus = "confirmed";
+        }
       } else {
         if (paymentType !== "remaining") {
           order.readyForMatching = false;
@@ -376,6 +406,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   }
 
   const paymentType = getPaymentType(order, input.paymentType);
+  assertAppointmentPaymentReady(order, paymentType);
 
   if (paymentType === "remaining") {
     if (!order.inspectionRequired || !order.currentQuotationId) {
@@ -601,6 +632,10 @@ const syncPaidPayosPaymentToOrder = async (
     payment.paymentType !== "remaining" && order.status === "created";
   if (shouldDispatch) {
     order.readyForMatching = true;
+  }
+  if (["scheduled", "recurring"].includes(order.orderType)) {
+    order.bookingStatus = "confirmed";
+    order.readyForMatching = false;
   }
   await order.save({ session });
   return shouldDispatch;

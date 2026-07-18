@@ -112,6 +112,39 @@ export const getOrderById = async (
   }
 };
 
+export const getRecurringSeries = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const orders = await OrderService.getRecurringSeries(
+      param(req, "orderId"),
+      uid(req),
+    );
+    return ok(res, { items: orders });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const selectAppointmentProvider = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const order = await OrderService.selectAppointmentProvider(
+      param(req, "orderId"),
+      uid(req),
+      String(req.body.providerId || ""),
+    );
+    return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const cancelOrder = async (
   req: Request,
   res: Response,
@@ -132,6 +165,24 @@ export const cancelOrder = async (
       reason,
     );
     return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const cancelRecurringSeries = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { reason } = req.body;
+    const result = await OrderService.cancelRecurringSeries(
+      param(req, "orderId"),
+      uid(req),
+      reason,
+    );
+    return ok(res, result);
   } catch (error) {
     return next(error);
   }

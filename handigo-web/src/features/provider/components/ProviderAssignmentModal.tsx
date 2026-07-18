@@ -32,6 +32,7 @@ export function ProviderAssignmentModal() {
   const order = assignment ? getOrderFromAssignment(assignment) : null;
   const customer = order ? getCustomer(order) : null;
   const isExpired = countdown === 'Hết hạn';
+  const isAppointment = assignment?.assignmentType === 'appointment';
   const enabled = isAuthenticated && user?.role === 'PROVIDER' && Boolean(token);
 
   const loadPendingAssignment = useCallback(async () => {
@@ -152,7 +153,7 @@ export function ProviderAssignmentModal() {
   return (
     <Modal
       open
-      title="Đơn mới cần phản hồi"
+      title={isAppointment ? "Yêu cầu lịch hẹn" : "Đơn mới cần phản hồi"}
       onClose={() => undefined}
       size="sm"
       closeOnEsc={false}
@@ -183,6 +184,16 @@ export function ProviderAssignmentModal() {
           <InfoTile label="Thời gian" value={formatDateTime(order.scheduledAt || order.createdAt)} />
           <InfoTile label="Thu nhập dự kiến" value={formatMoney(order.pricing?.providerEarningAmount)} highlight />
         </div>
+
+        {order.orderType === 'recurring' && (
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-sm text-sm text-on-surface">
+            <p className="font-bold">Lịch định kỳ gồm {order.totalOccurrences} buổi</p>
+            <p className="mt-1 text-on-surface-variant">
+              Xác nhận yêu cầu này đồng nghĩa với nhận toàn bộ chuỗi lịch lặp theo{' '}
+              {order.recurrenceUnit === 'monthly' ? 'tháng' : 'tuần'}.
+            </p>
+          </div>
+        )}
 
         <div className="rounded-2xl bg-surface-container-low p-sm">
           <p className="text-[10px] font-bold uppercase text-on-surface-variant">Địa chỉ</p>
@@ -215,7 +226,13 @@ export function ProviderAssignmentModal() {
             onClick={handleAccept}
             className="btn-primary flex-1 disabled:opacity-50"
           >
-            {busy ? 'Đang xử lý...' : 'Nhận đơn'}
+            {busy
+              ? 'Đang xử lý...'
+              : order.orderType === 'recurring'
+                ? 'Xác nhận toàn bộ lịch'
+                : isAppointment
+                  ? 'Xác nhận lịch'
+                  : 'Nhận đơn'}
           </button>
           <button
             type="button"

@@ -8,9 +8,10 @@ import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import { OrderFeedbackSection } from "@/features/feedback/components/OrderFeedbackSection";
 import { OrderTrackingMap } from "@/features/tracking/components/OrderTrackingMap";
+import { NearbyProviderSelector } from "@/features/customer-service/components/NearbyProviderSelector";
 
 type PendingAction = {
-  type: "confirmQuotation" | "rejectQuotation" | "cancelOrder";
+  type: "confirmQuotation" | "rejectQuotation" | "cancelOrder" | "cancelSeries";
   reason: string;
   additionalInfo?: string;
   error?: string;
@@ -28,12 +29,15 @@ const customerCancellationReasons = [
 const BookingDetailPage = () => {
   const { bookingId: id } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
+  const [recurringOrders, setRecurringOrders] = useState<Order[]>([]);
   const [quotation, setQuotation] = useState<OrderQuotation | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [replacementProviderId, setReplacementProviderId] = useState<string>();
+  const [replacementProviderError, setReplacementProviderError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
@@ -52,6 +56,17 @@ const BookingDetailPage = () => {
         setApiError("Không tìm thấy thông tin đơn hàng.");
       } else {
         setOrder(data);
+
+        if (data.orderType === "recurring") {
+          try {
+            setRecurringOrders(await bookingApi.getRecurringSeries(id));
+          } catch (error) {
+            console.error("Không thể tải các buổi trong lịch định kỳ:", error);
+            setRecurringOrders([]);
+          }
+        } else {
+          setRecurringOrders([]);
+        }
 
         try {
           const paymentResult = await bookingApi.getPaymentsByOrder(id);
@@ -128,6 +143,75 @@ const BookingDetailPage = () => {
     }
   };
 
+  const handleCancelSeries = () => {
+    if (
+      !order ||
+      order.orderType !== "recurring" ||
+      !["created", "accepted"].includes(order.status)
+    ) return;
+    setPendingAction({ type: "cancelSeries", reason: "", additionalInfo: "" });
+  };
+
+  const handleAppointmentPayment = async () => {
+    if (!order || order.bookingStatus !== "awaiting_payment") return;
+
+    try {
+      setBusy(true);
+      setPaymentError(null);
+      const detailUrl = `${window.location.origin}/customer/bookings/${order._id}`;
+      const method =
+        order.paymentMethod === "bank"
+          ? "PAYOS"
+          : order.paymentMethod === "wallet"
+            ? "WALLET"
+            : "CASH";
+      const result = await bookingApi.createPayment({
+        orderId: order._id,
+        method,
+        paymentType: order.inspectionRequired ? "INSPECTION_DEPOSIT" : "FULL",
+        returnUrl: detailUrl,
+        cancelUrl: detailUrl,
+      });
+
+      if (method === "PAYOS") {
+        if (!result.checkoutUrl) {
+          throw new Error("PayOS không trả về liên kết thanh toán.");
+        }
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
+      await loadData();
+    } catch (error) {
+      console.error("Không thể thanh toán giữ lịch:", error);
+      setPaymentError(
+        "Không thể thanh toán giữ lịch. Vui lòng tải lại trang và thử lại.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSelectReplacementProvider = async () => {
+    if (!order || !replacementProviderId) {
+      setReplacementProviderError("Vui lòng chọn một chuyên gia còn lịch trống.");
+      return;
+    }
+    try {
+      setBusy(true);
+      setReplacementProviderError(null);
+      await bookingApi.selectAppointmentProvider(order._id, replacementProviderId);
+      setReplacementProviderId(undefined);
+      await loadData();
+    } catch (error) {
+      console.error("Không thể gửi lại yêu cầu lịch hẹn:", error);
+      setReplacementProviderError(
+        "Không thể gửi yêu cầu cho chuyên gia này. Vui lòng chọn người khác.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const closeActionDialog = () => {
     if (!busy) setPendingAction(null);
   };
@@ -149,18 +233,21 @@ const BookingDetailPage = () => {
 
     let reason = pendingAction.reason.trim();
     const additionalInfo = pendingAction.additionalInfo?.trim() || "";
+    const isCancellationAction = ["cancelOrder", "cancelSeries"].includes(
+      pendingAction.type,
+    );
     if (pendingAction.type !== "confirmQuotation" && !reason) {
       setPendingAction({
         ...pendingAction,
-        error: pendingAction.type === "cancelOrder" ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.",
+        error: isCancellationAction ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.",
       });
       return;
     }
-    if (pendingAction.type === "cancelOrder" && reason === "Lý do khác" && !additionalInfo) {
+    if (isCancellationAction && reason === "Lý do khác" && !additionalInfo) {
       setPendingAction({ ...pendingAction, error: "Vui lòng nhập thông tin cho lý do khác." });
       return;
     }
-    if (pendingAction.type === "cancelOrder" && additionalInfo) {
+    if (isCancellationAction && additionalInfo) {
       reason = `${reason}: ${additionalInfo}`;
     }
 
@@ -175,6 +262,9 @@ const BookingDetailPage = () => {
       } else if (pendingAction.type === "cancelOrder") {
         if (!order) return;
         await bookingApi.cancelOrder(order._id, reason);
+      } else if (pendingAction.type === "cancelSeries") {
+        if (!order) return;
+        await bookingApi.cancelRecurringSeries(order._id, reason);
       }
 
       setPendingAction(null);
@@ -463,6 +553,14 @@ const BookingDetailPage = () => {
           tone: "danger",
           requiresReason: true,
         },
+        cancelSeries: {
+          title: "Hủy các buổi còn lại",
+          message:
+            "Buổi đang xem và tất cả buổi phía sau còn có thể hủy sẽ được hủy. Khoản đã thanh toán của từng buổi được xử lý theo chính sách hiện tại.",
+          confirmLabel: "Hủy các buổi còn lại",
+          tone: "danger",
+          requiresReason: true,
+        },
       }[pendingAction.type]
     : null;
 
@@ -523,12 +621,151 @@ const BookingDetailPage = () => {
         </div>
       </div>
 
+      {order.bookingStatus === "awaiting_provider" && (
+        <div className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm text-on-surface">
+          <p className="font-bold">Đang chờ chuyên gia xác nhận lịch hẹn</p>
+          <p className="mt-1 text-on-surface-variant">
+            Bạn chưa cần thanh toán. Handigo sẽ thông báo ngay khi chuyên gia phản hồi.
+          </p>
+        </div>
+      )}
+
+      {order.bookingStatus === "awaiting_payment" && (
+        <div className="mb-lg rounded-2xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-950">
+          <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold">Chuyên gia đã nhận lịch</p>
+              <p className="mt-1">
+                Thanh toán trước {order.paymentDueAt
+                  ? new Date(order.paymentDueAt).toLocaleString("vi-VN")
+                  : "thời hạn giữ lịch"} để xác nhận lịch hẹn.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleAppointmentPayment()}
+              className="rounded-xl bg-primary px-5 py-3 font-bold text-on-primary disabled:opacity-60"
+            >
+              {busy ? "Đang xử lý..." : "Thanh toán giữ lịch"}
+            </button>
+          </div>
+          {paymentError && <p className="mt-sm font-medium text-error">{paymentError}</p>}
+        </div>
+      )}
+
+      {order.bookingStatus === "reserved" && (
+        <div className="mb-lg rounded-2xl border border-emerald-200 bg-emerald-50 p-md text-sm text-emerald-950">
+          <p className="font-bold">Chuyên gia đã giữ lịch cho buổi này</p>
+          <p className="mt-1 text-emerald-800">
+            Thanh toán sẽ được mở trước giờ thực hiện 24 giờ. Handigo sẽ gửi thông báo khi đến hạn.
+          </p>
+        </div>
+      )}
+
+      {order.bookingStatus === "rejected" && (
+        <div className="mb-lg rounded-2xl border border-error/20 bg-error/5 p-md">
+          <p className="font-bold text-error">Chuyên gia chưa thể nhận lịch này</p>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Chọn một chuyên gia khác còn trống trong cùng khung giờ.
+          </p>
+          <div className="mt-md">
+            <NearbyProviderSelector
+              serviceId={order.serviceId._id}
+              addressId={order.addressId._id}
+              scheduledAt={order.scheduledAt || undefined}
+              recurrenceUnit={order.recurrenceUnit || undefined}
+              recurrenceCount={order.totalOccurrences || undefined}
+              requireSelection
+              selectedProviderId={replacementProviderId}
+              onSelectProvider={(providerId) => {
+                setReplacementProviderId(providerId);
+                setReplacementProviderError(null);
+              }}
+            />
+          </div>
+          {replacementProviderError && (
+            <p className="mt-sm text-sm font-medium text-error">{replacementProviderError}</p>
+          )}
+          <button
+            type="button"
+            disabled={busy || !replacementProviderId}
+            onClick={() => void handleSelectReplacementProvider()}
+            className="mt-md rounded-xl bg-primary px-5 py-3 text-sm font-bold text-on-primary disabled:opacity-50"
+          >
+            {busy ? "Đang gửi..." : "Gửi yêu cầu cho chuyên gia"}
+          </button>
+        </div>
+      )}
+
+      {order.bookingStatus === "expired" && (
+        <div className="mb-lg rounded-2xl border border-error/20 bg-error/10 p-md text-sm text-error">
+          <p className="font-bold">Lịch hẹn đã hết thời gian thanh toán</p>
+          <p className="mt-1">Yêu cầu đã được giải phóng để chuyên gia nhận lịch khác.</p>
+        </div>
+      )}
+
       <div className="mb-lg">
         <OrderTrackingMap order={order} viewerRole="CUSTOMER" />
       </div>
 
       <main className="grid grid-cols-1 lg:grid-cols-12 gap-lg">
         <div className="lg:col-span-8 flex flex-col gap-lg">
+          {order.orderType === "recurring" && (
+            <section className="glass-card rounded-3xl border border-outline-variant/30 p-lg shadow-sm">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-label-sm font-bold uppercase tracking-wider text-primary">
+                    Lịch định kỳ
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold text-on-surface">
+                    Buổi {order.occurrenceNumber || 1}/{order.totalOccurrences || recurringOrders.length}
+                  </h2>
+                </div>
+                <p className="text-sm text-on-surface-variant">
+                  Lặp theo {order.recurrenceUnit === "monthly" ? "tháng" : "tuần"}
+                </p>
+              </div>
+
+              {recurringOrders.length > 0 ? (
+                <div className="mt-md grid gap-2 sm:grid-cols-2">
+                  {recurringOrders.map((recurringOrder) => {
+                    const isCurrent = recurringOrder._id === order._id;
+                    return (
+                      <Link
+                        key={recurringOrder._id}
+                        to={`/customer/bookings/${recurringOrder._id}`}
+                        className={`rounded-2xl border p-3 transition hover:border-primary/50 ${
+                          isCurrent
+                            ? "border-primary bg-primary/5"
+                            : "border-outline-variant/50 bg-surface-container-low"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-on-surface">
+                            Buổi {recurringOrder.occurrenceNumber}
+                          </span>
+                          <span className="text-xs font-semibold text-on-surface-variant">
+                            {getStatusLabel(recurringOrder.status)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-on-surface-variant">
+                          {recurringOrder.scheduledAt
+                            ? new Date(recurringOrder.scheduledAt).toLocaleString("vi-VN")
+                            : "Chưa có thời gian"}
+                        </p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-md text-sm text-on-surface-variant">
+                  Chưa thể tải danh sách các buổi trong chuỗi.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* Main Info Card */}
           <section className="glass-card rounded-3xl p-lg shadow-sm border border-outline-variant/30">
             <div className="flex flex-col md:flex-row md:justify-between items-start gap-md mb-lg">
@@ -1032,18 +1269,29 @@ const BookingDetailPage = () => {
           </section>
 
           {["created", "accepted"].includes(order.status) && (
-            <button
-              disabled={busy}
-              className="w-full py-3 border-2 border-red-100 text-red-600 rounded-2xl font-bold hover:bg-red-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleCancelOrder}
-            >
-              {busy ? (
-                <div className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin" />
-              ) : (
-                <span className="material-symbols-outlined text-sm">close</span>
+            <div className="space-y-2">
+              <button
+                disabled={busy}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-red-100 py-3 font-bold text-red-600 transition-all hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleCancelOrder}
+              >
+                {busy ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-red-600" />
+                ) : (
+                  <span className="material-symbols-outlined text-sm">close</span>
+                )}
+                {order.orderType === "recurring" ? "Hủy buổi này" : "Hủy yêu cầu"}
+              </button>
+              {order.orderType === "recurring" && (
+                <button
+                  disabled={busy}
+                  className="w-full rounded-2xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handleCancelSeries}
+                >
+                  Hủy buổi này và các buổi sau
+                </button>
               )}
-              Hủy yêu cầu
-            </button>
+            </div>
           )}
 
           <button className="flex items-center justify-center gap-2 text-on-surface-variant hover:text-primary transition-colors py-2 group">
@@ -1069,7 +1317,7 @@ const BookingDetailPage = () => {
               {actionDialogConfig.message}
             </p>
 
-            {pendingAction.type === "cancelOrder" ? (
+            {["cancelOrder", "cancelSeries"].includes(pendingAction.type) ? (
               <div className="space-y-md">
                 <fieldset className="space-y-2">
                   <legend className="mb-2 text-label-sm font-bold uppercase text-on-surface-variant">

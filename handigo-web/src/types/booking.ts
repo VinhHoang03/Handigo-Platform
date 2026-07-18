@@ -147,6 +147,19 @@ export interface Order {
   addressId: Address;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string | null;
+  bookingStatus?:
+    | "not_required"
+    | "awaiting_provider"
+    | "awaiting_payment"
+    | "reserved"
+    | "confirmed"
+    | "rejected"
+    | "expired";
+  paymentDueAt?: string | null;
+  recurringGroupId?: string | null;
+  recurrenceUnit?: "weekly" | "monthly" | null;
+  occurrenceNumber?: number | null;
+  totalOccurrences?: number | null;
   status: "created" | "accepted" | "in_progress" | "completed" | "cancelled";
   paymentMethod: "wallet" | "bank" | "cash";
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
@@ -206,6 +219,8 @@ export interface BookingState {
   preferredProviderName?: string;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
+  recurrenceUnit?: "weekly" | "monthly";
+  recurrenceCount?: 1 | 2 | 3 | 4 | 8 | 12;
   problemDescription?: string;
   customerAttachments: string[];
   paymentMethod: "wallet" | "bank" | "cash";
@@ -223,6 +238,8 @@ export interface BookingState {
   setPreferredProviderId: (id?: string, name?: string) => void;
   setOrderType: (type: BookingState["orderType"]) => void;
   setScheduledAt: (date: string) => void;
+  setRecurrenceUnit: (unit: "weekly" | "monthly") => void;
+  setRecurrenceCount: (count: 1 | 2 | 3 | 4 | 8 | 12) => void;
   setProblemDescription: (desc: string) => void;
   setCustomerAttachments: (attachments: string[]) => void;
   setPaymentMethod: (method: BookingState["paymentMethod"]) => void;

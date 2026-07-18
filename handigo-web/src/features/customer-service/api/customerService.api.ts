@@ -97,10 +97,16 @@ export const customerServiceApi = {
   serviceById: serviceCatalogApi.serviceById,
   options: serviceCatalogApi.options,
 
-  nearbyProviders: async (serviceId: string, addressId: string) =>
+  nearbyProviders: async (
+    serviceId: string,
+    addressId: string,
+    scheduledAt?: string,
+    recurrenceUnit?: "weekly" | "monthly",
+    recurrenceCount?: number,
+  ) =>
     unwrap<NearbyProvider[]>(
       await api.get("/providers/nearby", {
-        params: { serviceId, addressId },
+        params: { serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount },
       }),
     ),
 

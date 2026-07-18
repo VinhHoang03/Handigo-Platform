@@ -59,6 +59,19 @@ export interface IOrder extends Document, IBaseDocument {
   addressId: Types.ObjectId;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | null;
+  bookingStatus:
+    | "not_required"
+    | "awaiting_provider"
+    | "awaiting_payment"
+    | "reserved"
+    | "confirmed"
+    | "rejected"
+    | "expired";
+  paymentDueAt?: Date | null;
+  recurringGroupId?: Types.ObjectId | null;
+  recurrenceUnit?: "weekly" | "monthly" | null;
+  occurrenceNumber?: number | null;
+  totalOccurrences?: number | null;
   status: OrderStatusValue;
   paymentMethod: "wallet" | "bank" | "cash";
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
@@ -153,6 +166,28 @@ const OrderSchema = new Schema<IOrder>(
       default: "normal",
     },
     scheduledAt: { type: Date, default: null },
+    bookingStatus: {
+      type: String,
+      enum: [
+        "not_required",
+        "awaiting_provider",
+        "awaiting_payment",
+        "reserved",
+        "confirmed",
+        "rejected",
+        "expired",
+      ],
+      default: "not_required",
+    },
+    paymentDueAt: { type: Date, default: null },
+    recurringGroupId: { type: Schema.Types.ObjectId, default: null },
+    recurrenceUnit: {
+      type: String,
+      enum: ["weekly", "monthly", null],
+      default: null,
+    },
+    occurrenceNumber: { type: Number, min: 1, default: null },
+    totalOccurrences: { type: Number, min: 1, max: 12, default: null },
     status: {
       type: String,
       enum: ["created", "accepted", "in_progress", "completed", "cancelled"],
@@ -225,5 +260,8 @@ OrderSchema.index({
   matchingStartedAt: 1,
   scheduledAt: 1,
 });
+OrderSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
+OrderSchema.index({ bookingStatus: 1, paymentDueAt: 1 });
+OrderSchema.index({ recurringGroupId: 1, occurrenceNumber: 1 });
 
 export const Order = model<IOrder>("Order", OrderSchema, "orders");

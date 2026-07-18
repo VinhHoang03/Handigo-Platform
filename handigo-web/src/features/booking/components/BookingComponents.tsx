@@ -183,7 +183,14 @@ export const OrderSummaryCard: React.FC<{
   onAction?: () => void;
   isLoading?: boolean;
 }> = ({ step, actionLabel, actionTo, onAction, isLoading }) => {
-  const { categoryId, serviceId, selectedOptionIds } = useBookingStore();
+  const {
+    categoryId,
+    serviceId,
+    selectedOptionIds,
+    orderType,
+    scheduledAt,
+    preferredProviderName,
+  } = useBookingStore();
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const navigate = useNavigate();
@@ -265,6 +272,31 @@ export const OrderSummaryCard: React.FC<{
             </div>
           </div>
 
+          {step >= 2 && orderType !== 'normal' && (
+            <div className="space-y-sm border-t border-dashed border-outline-variant pt-md text-sm">
+              <div className="flex items-start gap-sm">
+                <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-primary">calendar_today</span>
+                <div>
+                  <p className="text-xs text-on-surface-variant">Lịch thực hiện</p>
+                  <p className="font-bold text-on-surface">
+                    {scheduledAt?.includes('T')
+                      ? new Date(scheduledAt).toLocaleString('vi-VN')
+                      : 'Chưa chọn đủ ngày giờ'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-sm">
+                <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-primary">person</span>
+                <div>
+                  <p className="text-xs text-on-surface-variant">Chuyên gia</p>
+                  <p className="font-bold text-on-surface">
+                    {preferredProviderName || 'Chưa chọn chuyên gia'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="border-t border-dashed border-outline-variant pt-md space-y-sm text-sm">
             <div className="flex justify-between">
               <span className="text-on-surface-variant">
@@ -298,7 +330,7 @@ export const OrderSummaryCard: React.FC<{
           {step > 1 && (
             <button
               onClick={() => navigate(-1)}
-              className="w-full py-3 border border-primary text-primary rounded-2xl font-bold hover:bg-primary/5 transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="w-full py-3 border border-primary text-primary rounded-2xl font-bold hover:bg-primary/5 transition-[background-color,transform] active:scale-95 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
             >
               <span className="material-symbols-outlined text-sm">arrow_back</span>
               Quay lại
@@ -307,13 +339,17 @@ export const OrderSummaryCard: React.FC<{
           <button
             onClick={handleAction}
             disabled={isLoading || (step === 1 && !serviceId)}
-            className="w-full bg-primary text-white py-md rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary text-white py-md rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:-translate-y-1 active:translate-y-0 transition-[transform,box-shadow] flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
           >
             {isLoading ? (
               <span className="animate-spin material-symbols-outlined">progress_activity</span>
             ) : (
               <>
-                {step === 3 ? <span className="material-symbols-outlined">lock</span> : null}
+                {step === 3 ? (
+                  <span className="material-symbols-outlined">
+                    {orderType === 'normal' ? 'lock' : 'event_available'}
+                  </span>
+                ) : null}
                 {actionLabel}
                 <span className="material-symbols-outlined">arrow_forward</span>
               </>
@@ -321,8 +357,10 @@ export const OrderSummaryCard: React.FC<{
           </button>
         </div>
 
-        <p className="text-center text-xs text-on-surface-variant mt-md">
-          Thanh toán an toàn và bảo mật bởi HandiGo.
+        <p className="text-center text-xs leading-5 text-on-surface-variant mt-md">
+          {orderType !== 'normal' && step >= 2
+            ? 'Chưa thu tiền khi gửi yêu cầu. Bạn chỉ thanh toán sau khi chuyên gia xác nhận lịch.'
+            : 'Thanh toán an toàn và bảo mật bởi HandiGo.'}
         </p>
       </div>
     </aside>
