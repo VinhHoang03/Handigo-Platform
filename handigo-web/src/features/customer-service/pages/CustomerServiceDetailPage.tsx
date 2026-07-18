@@ -5,7 +5,8 @@ import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { Address, Category, Service, ServiceOption } from "@/types/booking";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
-import { customerServiceApi, type NearbyProvider } from "../api/customerService.api";
+import { NearbyProviderSelector } from "../components/NearbyProviderSelector";
+import { customerServiceApi } from "../api/customerService.api";
 import {
   getCategoryId,
   getCategoryName,
@@ -16,8 +17,8 @@ import {
 } from "../utils/serviceDisplay";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import {
-  getMissingRequiredGroup,
   groupServiceOptions,
+  isRequiredOptionSelectionMissing,
   toggleServiceOption,
 } from "@/features/booking/utils/serviceOptionSelection";
 import {
@@ -53,6 +54,59 @@ const getErrorMessage = (
 };
 
 const CURRENT_LOCATION_VALUE = "__current_location__";
+const CURRENT_LOCATION_NOTE = "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
+const CURRENT_LOCATION_DUPLICATE_RADIUS_METERS = 50;
+
+const getDistanceMeters = (
+  latitudeA: number,
+  longitudeA: number,
+  latitudeB: number,
+  longitudeB: number,
+) => {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const latitudeDelta = toRadians(latitudeB - latitudeA);
+  const longitudeDelta = toRadians(longitudeB - longitudeA);
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(toRadians(latitudeA)) *
+      Math.cos(toRadians(latitudeB)) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const findExistingCurrentLocation = (
+  addresses: Address[],
+  currentAddress: {
+    latitude: number;
+    longitude: number;
+    placeId?: string;
+  },
+) =>
+  addresses.find((address) => {
+    if (currentAddress.placeId && address.placeId === currentAddress.placeId) {
+      return true;
+    }
+
+    if (
+      typeof address.latitude !== "number" ||
+      typeof address.longitude !== "number" ||
+      !Number.isFinite(address.latitude) ||
+      !Number.isFinite(address.longitude)
+    ) {
+      return false;
+    }
+
+    return (
+      getDistanceMeters(
+        address.latitude,
+        address.longitude,
+        currentAddress.latitude,
+        currentAddress.longitude,
+      ) <= CURRENT_LOCATION_DUPLICATE_RADIUS_METERS
+    );
+  });
 
 const formatAddressLabel = (address: Address) =>
   address.fullAddress ||
@@ -60,16 +114,6 @@ const formatAddressLabel = (address: Address) =>
     .filter(Boolean)
     .join(", ") ||
   "Địa chỉ đã lưu";
-
-const formatDistance = (distanceMeters: number) => {
-  if (distanceMeters < 0) return "Chưa xác định khoảng cách";
-  if (distanceMeters < 1000) return `${Math.round(distanceMeters)} m`;
-  return `${(distanceMeters / 1000).toFixed(1)} km`;
-};
-
-const getProviderAvatar = (provider: NearbyProvider) =>
-  provider.user.avatar ||
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.user.fullName || "Handigo")}&background=E2DFFF&color=0F006D`;
 
 export default function CustomerServiceDetailPage() {
   const { serviceId } = useParams();
@@ -87,18 +131,16 @@ export default function CustomerServiceDetailPage() {
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const [relatedServices, setRelatedServices] = useState<Service[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [nearbyProviders, setNearbyProviders] = useState<NearbyProvider[]>([]);
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
-  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [error, setError] = useState("");
   const [addressSelectionError, setAddressSelectionError] = useState("");
   const [optionSelectionError, setOptionSelectionError] = useState("");
   const [isLocating, setIsLocating] = useState(false);
   const [requiresPhoneUpdate, setRequiresPhoneUpdate] = useState(false);
-  const [providerListError, setProviderListError] = useState("");
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isAuthInitializing = useAuthStore((state) => state.isInitializing);
 
   useEffect(() => {
     const loadDetail = async () => {
@@ -139,6 +181,15 @@ export default function CustomerServiceDetailPage() {
     let isMounted = true;
 
     const loadAddresses = async () => {
+      if (isAuthInitializing) return;
+
+      if (!isAuthenticated) {
+        setAddresses([]);
+        setAddressSelectionError("");
+        setIsLoadingAddresses(false);
+        return;
+      }
+
       setIsLoadingAddresses(true);
       setAddressSelectionError("");
       try {
@@ -146,12 +197,9 @@ export default function CustomerServiceDetailPage() {
         if (!isMounted) return;
 
         setAddresses(data);
-        if (!addressId && data.length > 0) {
-          const defaultAddress = data.find((item) => item.isDefault) || data[0];
-          setAddressId(defaultAddress._id);
-        }
       } catch {
         if (isMounted) {
+          setAddresses([]);
           setAddressSelectionError("Không tải được danh sách địa chỉ đã lưu.");
         }
       } finally {
@@ -164,44 +212,15 @@ export default function CustomerServiceDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [addressId, setAddressId]);
+  }, [isAuthenticated, isAuthInitializing]);
 
   useEffect(() => {
-    let isMounted = true;
+    if (isAuthInitializing || isLoadingAddresses) return;
+    if (addresses.some((address) => address._id === addressId)) return;
 
-    const loadNearbyProviders = async () => {
-      if (!service?._id || !addressId) {
-        setNearbyProviders([]);
-        return;
-      }
-
-      setIsLoadingProviders(true);
-      setProviderListError("");
-      try {
-        const data = await customerServiceApi.nearbyProviders(service._id, addressId);
-        if (isMounted) setNearbyProviders(data);
-      } catch {
-        if (isMounted) {
-          setNearbyProviders([]);
-          setProviderListError("Không tải được chuyên gia phù hợp với địa chỉ này.");
-        }
-      } finally {
-        if (isMounted) setIsLoadingProviders(false);
-      }
-    };
-
-    void loadNearbyProviders();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [addressId, service?._id]);
-
-  useEffect(() => {
-    if (!preferredProviderId) return;
-    if (nearbyProviders.some((provider) => provider.id === preferredProviderId)) return;
-    setPreferredProviderId(undefined);
-  }, [nearbyProviders, preferredProviderId, setPreferredProviderId]);
+    const nextAddress = addresses.find((address) => address.isDefault) || addresses[0];
+    setAddressId(nextAddress?._id || "");
+  }, [addressId, addresses, isAuthInitializing, isLoadingAddresses, setAddressId]);
 
   const selectedOptions = options.filter((option) =>
     selectedOptionIds.includes(option._id),
@@ -274,6 +293,16 @@ export default function CustomerServiceDetailPage() {
             coords.latitude,
             coords.longitude,
           );
+          const existingAddress = findExistingCurrentLocation(
+            addresses,
+            currentAddress,
+          );
+
+          if (existingAddress) {
+            setAddressId(existingAddress._id);
+            return;
+          }
+
           const createdAddress = await bookingApi.createAddress({
             recipientName,
             recipientPhone,
@@ -283,7 +312,7 @@ export default function CustomerServiceDetailPage() {
             latitude: currentAddress.latitude,
             longitude: currentAddress.longitude,
             placeId: currentAddress.placeId,
-            note: "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.",
+            note: CURRENT_LOCATION_NOTE,
             isDefault: false,
           });
 
@@ -312,7 +341,7 @@ export default function CustomerServiceDetailPage() {
   };
 
   const handleAddressChange = (value: string) => {
-        if (value === CURRENT_LOCATION_VALUE) {
+    if (value === CURRENT_LOCATION_VALUE) {
       handleUseCurrentLocation();
       return;
     }
@@ -327,20 +356,19 @@ export default function CustomerServiceDetailPage() {
       navigate("/login", { state: { from: `/customer/services/${service._id}` } });
       return;
     }
-    if (!addressId) {
+    if (!addressId || !addresses.some((address) => address._id === addressId)) {
       setAddressSelectionError("Vui lòng chọn địa chỉ thực hiện trước khi đặt lịch.");
       return;
     }
-    const missingGroup = getMissingRequiredGroup(selectedOptionIds, options);
-    if (missingGroup) {
-      setOptionSelectionError(
-        `Vui lòng chọn một tùy chọn trong nhóm “${missingGroup.label}”.`,
-      );
+    if (isRequiredOptionSelectionMissing(service, selectedOptionIds)) {
+      setOptionSelectionError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.");
       return;
     }
 
     selectService(getCategoryId(service), service._id, selectedOptionIds);
-    navigate("/customer/bookings/new/location");
+    navigate("/customer/bookings/new/location", {
+      state: { fromServiceDetail: true },
+    });
   };
 
   if (isLoading) {
@@ -451,7 +479,12 @@ export default function CustomerServiceDetailPage() {
           </section>
 
           <section>
-            <h2 className="mb-3 text-2xl font-bold">Gói dịch vụ</h2>
+            <h2 className="mb-3 text-2xl font-bold">
+              Gói dịch vụ
+              {service.requiresOptionSelection ? (
+                <span className="text-error"> *</span>
+              ) : null}
+            </h2>
             {options.length === 0 ? (
               <div className="rounded-xl border border-dashed border-outline-variant bg-white p-6 text-on-surface-variant">
                 Dịch vụ này chưa có tùy chọn bổ sung.
@@ -461,7 +494,7 @@ export default function CustomerServiceDetailPage() {
                 {optionGroups.map((group) => (
                   <fieldset key={group.key}>
                     <legend className="mb-3 font-bold text-on-surface">
-                      {group.label}{group.isRequired ? <span className="text-error"> *</span> : null}
+                      {group.label}
                     </legend>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       {group.options.map((option) => {
@@ -475,19 +508,28 @@ export default function CustomerServiceDetailPage() {
                             onClick={() => handleToggleOption(option)}
                             className={`rounded-xl border-2 bg-white p-5 text-left transition ${checked ? "border-primary bg-surface-container-low shadow-sm" : "border-outline-variant hover:border-primary/50"}`}
                           >
-                            <div className="mb-2 flex items-start justify-between gap-3">
-                              <h3 className="font-bold text-primary">{option.name}</h3>
-                              <span className="font-bold text-on-surface">
-                                {service.serviceType === "variable_price"
-                                  ? "Theo báo giá"
-                                  : getOptionPrice(option) > 0
-                                    ? `+${money.format(getOptionPrice(option))}`
-                                    : "Miễn phí"}
-                              </span>
+                            <div className="flex gap-4">
+                              <ReliableImage
+                                src={option.image}
+                                alt={`Ảnh tùy chọn ${option.name}`}
+                                className="h-24 w-24 shrink-0 rounded-lg object-cover"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-2 flex items-start justify-between gap-3">
+                                  <h3 className="font-bold text-primary">{option.name}</h3>
+                                  {service.serviceType === "fixed_price" ? (
+                                    <span className="font-bold text-on-surface">
+                                      {getOptionPrice(option) > 0
+                                        ? `+${money.format(getOptionPrice(option))}`
+                                        : "Miễn phí"}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p className="text-sm text-on-surface-variant">
+                                  {option.description || "Tùy chọn bổ sung cho dịch vụ này."}
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-sm text-on-surface-variant">
-                              {option.description || "Tùy chọn bổ sung cho dịch vụ này."}
-                            </p>
                           </button>
                         );
                       })}
@@ -657,148 +699,16 @@ export default function CustomerServiceDetailPage() {
             </button>
           </div>
 
-          <div className="rounded-xl border border-outline-variant/20 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                Các chuyên gia phụ trách
-              </h3>
-              {nearbyProviders.length > 0 && (
-                <span className="rounded-full bg-primary-container/10 px-2 py-1 text-xs font-bold text-primary">
-                  {nearbyProviders.length} phù hợp
-                </span>
-              )}
-            </div>
-
-            {isLoadingProviders ? (
-              <div className="flex items-center gap-2 rounded-lg bg-surface-container-low p-3 text-sm font-semibold text-on-surface-variant">
-                <span className="material-symbols-outlined animate-spin text-primary">
-                  progress_activity
-                </span>
-                Đang tìm chuyên gia gần bạn...
-              </div>
-            ) : providerListError ? (
-              <p className="rounded-lg bg-error/10 px-3 py-2 text-sm font-semibold text-error">
-                {providerListError}
-              </p>
-            ) : nearbyProviders.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 py-3 text-sm text-on-surface-variant">
-                Chưa có chuyên gia phù hợp với địa chỉ đã chọn. Bạn vẫn có thể đặt lịch để hệ thống tiếp tục điều phối.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setPreferredProviderId(undefined)}
-                  className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
-                    !preferredProviderId
-                      ? "border-primary bg-primary-container/10"
-                      : "border-outline-variant/40 bg-surface-container-lowest hover:border-primary/50"
-                  }`}
-                >
-                  <span
-                    className={`material-symbols-outlined ${
-                      !preferredProviderId ? "text-primary" : "text-on-surface-variant"
-                    }`}
-                  >
-                    auto_awesome
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-bold text-on-surface">Handigo tự điều phối chuyên gia</span>
-                    <span className="block text-xs text-on-surface-variant">
-                      Hệ thống sẽ điều phối người phù hợp nhất khi bạn đặt lịch.
-                    </span>
-                  </span>
-                  {!preferredProviderId && (
-                    <span className="material-symbols-outlined text-primary">check_circle</span>
-                  )}
-                </button>
-                {nearbyProviders.map((provider) => (
-                  <div
-                    key={provider.id}
-                    className={`rounded-lg border p-3 ${
-                      preferredProviderId === provider.id
-                        ? "border-primary bg-primary-container/10"
-                        : "border-outline-variant/40 bg-surface-container-lowest"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative shrink-0">
-                        <img
-                          src={getProviderAvatar(provider)}
-                          alt={provider.user.fullName}
-                          className="h-14 w-14 rounded-full object-cover"
-                        />
-                        <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white bg-success-green" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-bold text-on-surface">
-                          {provider.user.fullName}
-                        </p>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
-                          <span className="inline-flex items-center gap-1">
-                            <span
-                              className="material-symbols-outlined text-[16px] text-star-gold"
-                              style={{ fontVariationSettings: "'FILL' 1" }}
-                            >
-                              star
-                            </span>
-                            <b className="text-on-surface">
-                              {provider.averageRating.toFixed(1)}
-                            </b>
-                          </span>
-                          <span>{provider.totalCompletedOrders}+ đơn</span>
-                          <span>
-                            {provider.distanceMeters >= 0 ? "Cách bạn " : ""}
-                            {formatDistance(provider.distanceMeters)}
-                          </span>
-                        </div>
-                      </div>
-                      <Link
-                        to={`/customer/providers/${provider.id}`}
-                        className="grid h-10 w-10 place-items-center rounded-full bg-primary-container/10 text-primary hover:bg-primary-container/20"
-                        aria-label={`Xem chuyên gia ${provider.user.fullName}`}
-                      >
-                        <span className="material-symbols-outlined">person_search</span>
-                      </Link>
-                    </div>
-                    <p className="mt-3 line-clamp-1 text-xs text-on-surface-variant">
-                      {[provider.serviceArea?.ward, provider.serviceArea?.province]
-                        .filter(Boolean)
-                        .join(", ") ||
-                        provider.workingAreas.slice(0, 2).join(", ") ||
-                        "Khu vực hoạt động chưa cập nhật"}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPreferredProviderId(
-                          preferredProviderId === provider.id ? undefined : provider.id,
-                          preferredProviderId === provider.id
-                            ? undefined
-                            : provider.user.fullName,
-                        )
-                      }
-                      className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition ${
-                        preferredProviderId === provider.id
-                          ? "border-primary bg-primary text-on-primary"
-                          : "border-primary text-primary hover:bg-primary/5"
-                      }`}
-                    >
-                      {preferredProviderId === provider.id ? "Đã ưu tiên chuyên gia" : "Ưu tiên chuyên gia này"}
-                      <span className="material-symbols-outlined text-[18px]">
-                        {preferredProviderId === provider.id ? "check_circle" : "add_circle"}
-                      </span>
-                    </button>
-                    {preferredProviderId === provider.id && (
-                      <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-                        Nếu chuyên gia không thể nhận, Handigo sẽ tự tìm người phù hợp khác.
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <NearbyProviderSelector
+            serviceId={service._id}
+            addressId={addressId}
+            enabled={
+              !isLoadingAddresses &&
+              addresses.some((address) => address._id === addressId)
+            }
+            selectedProviderId={preferredProviderId}
+            onSelectProvider={setPreferredProviderId}
+          />
         </aside>
       </div>
     </CustomerServiceLayout>

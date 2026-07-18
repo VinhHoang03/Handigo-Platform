@@ -47,6 +47,10 @@ export const buildServicePricingSnapshot = async (
     );
   }
 
+  if (service.requiresOptionSelection && selectedOptions.length === 0) {
+    throw new AppError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.", 400);
+  }
+
   const groups = new Map<string, typeof availableOptions>();
   for (const option of availableOptions) {
     const group = normalizeGroup(option.selectionGroup);
@@ -59,14 +63,14 @@ export const buildServicePricingSnapshot = async (
       selectedIdSet.has(option._id.toString()),
     );
     const groupName = groupOptions[0].selectionGroup;
-    const selectionMode = groupOptions[0].selectionMode ?? "multiple";
-    const isRequired = groupOptions[0].isRequired ?? false;
+    const selectionMode = groupOptions.some(
+      (option) => (option.selectionMode ?? "multiple") === "multiple",
+    )
+      ? "multiple"
+      : "single";
 
     if (selectionMode === "single" && selectedInGroup.length > 1) {
       throw new AppError(`Nhóm “${groupName}” chỉ được chọn một tùy chọn.`, 400);
-    }
-    if (isRequired && selectedInGroup.length === 0) {
-      throw new AppError(`Vui lòng chọn một tùy chọn trong nhóm “${groupName}”.`, 400);
     }
   }
 
@@ -74,7 +78,7 @@ export const buildServicePricingSnapshot = async (
     optionId: option._id as Types.ObjectId,
     name: option.name,
     optionType: option.optionType,
-    price: option.price,
+    price: service.serviceType === "variable_price" ? 0 : option.price,
   }));
   const optionAmount = selectedOptionsSnapshot.reduce(
     (sum, option) => sum + option.price,

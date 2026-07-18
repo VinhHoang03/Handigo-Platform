@@ -18,6 +18,9 @@ type AddressPayload = {
   note?: string | null;
 };
 
+const CURRENT_LOCATION_NOTE =
+  "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
+
 const pickAddressPayload = (data: AddressPayload): AddressPayload => {
   const payload: AddressPayload = {};
   const fields: (keyof AddressPayload)[] = [
@@ -49,6 +52,29 @@ const pickAddressPayload = (data: AddressPayload): AddressPayload => {
 
 export const createAddress = async (userId: string, data: AddressPayload) => {
   const payload = pickAddressPayload(data);
+
+  if (payload.note === CURRENT_LOCATION_NOTE) {
+    const locationConditions: Record<string, unknown>[] = [];
+    if (payload.placeId) {
+      locationConditions.push({ placeId: payload.placeId });
+    }
+    if (payload.fullAddress && payload.province && payload.ward) {
+      locationConditions.push({
+        fullAddress: payload.fullAddress,
+        province: payload.province,
+        ward: payload.ward,
+      });
+    }
+
+    if (locationConditions.length > 0) {
+      const existingAddress = await Address.findOne({
+        userId,
+        note: CURRENT_LOCATION_NOTE,
+        $or: locationConditions,
+      });
+      if (existingAddress) return existingAddress;
+    }
+  }
 
   if (payload.isDefault) {
     await Address.updateMany(

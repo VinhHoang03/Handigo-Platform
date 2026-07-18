@@ -14,6 +14,7 @@ interface ServiceInput {
   fixedPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  requiresOptionSelection?: boolean;
   isActive?: boolean;
 }
 
@@ -183,6 +184,8 @@ export const updateService = async (id: string, data: ServiceInput) => {
     depositAmount:
       data.depositAmount === undefined ? service.depositAmount : data.depositAmount,
     image: data.image === undefined ? service.image : data.image,
+    requiresOptionSelection:
+      data.requiresOptionSelection ?? service.requiresOptionSelection,
     isActive: data.isActive ?? service.isActive,
   };
   normalizeAndValidatePricing(nextData, service.isActive);

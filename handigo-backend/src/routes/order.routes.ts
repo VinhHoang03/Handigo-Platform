@@ -20,6 +20,7 @@ import {
   quotationIdParamSchema,
   recentOrderQuerySchema,
   rejectAssignmentSchema,
+  selectAppointmentProviderSchema,
   rejectRepairQuotationSchema,
   trackingRouteQuerySchema,
 } from "../validations/order.validator";
@@ -29,7 +30,9 @@ import {
   getProviderOrders,
   getProviderRecentOrders,
   getOrderById,
+  getRecurringSeries,
   cancelOrder,
+  cancelRecurringSeries,
   startOrder,
   completeOrder,
   uploadOrderAttachment,
@@ -42,6 +45,7 @@ import {
   getRepairQuotation,
   confirmRepairQuotation,
   rejectRepairQuotation,
+  selectAppointmentProvider,
 } from "../controllers/order.controller";
 import { getOrderTrackingRoute } from "../controllers/orderTracking.controller";
 
@@ -107,12 +111,35 @@ router.get(
 
 router.get("/:orderId", validate(orderIdParamSchema, "params"), getOrderById);
 
+router.get(
+  "/:orderId/series",
+  roleMiddleware("CUSTOMER"),
+  validate(orderIdParamSchema, "params"),
+  getRecurringSeries,
+);
+
+router.patch(
+  "/:orderId/appointment-provider",
+  roleMiddleware("CUSTOMER"),
+  validate(orderIdParamSchema, "params"),
+  validate(selectAppointmentProviderSchema),
+  selectAppointmentProvider,
+);
+
 // PATCH  /orders/:orderId/cancel → Customer / Provider / Admin: cancel order
 router.patch(
   "/:orderId/cancel",
   validate(orderIdParamSchema, "params"),
   validate(cancelOrderSchema),
   cancelOrder,
+);
+
+router.patch(
+  "/:orderId/cancel-series",
+  roleMiddleware("CUSTOMER"),
+  validate(orderIdParamSchema, "params"),
+  validate(cancelOrderSchema),
+  cancelRecurringSeries,
 );
 
 // POST   /orders/:orderId/start    → Provider: start working on order

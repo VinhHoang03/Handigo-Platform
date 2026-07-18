@@ -4,6 +4,7 @@ export interface OrderAssignment {
   _id: string;
   orderId: Order | string;
   providerId: string;
+  assignmentType?: 'dispatch' | 'appointment';
   status: 'pending' | 'accepted' | 'rejected' | 'timeout' | 'cancelled';
   assignedAt: string;
   responseDeadline: string;

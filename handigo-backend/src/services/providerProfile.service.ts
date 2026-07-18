@@ -13,6 +13,7 @@ import {
 import { AppError } from "../utils/appError";
 import { Service } from "../models/service.model";
 import { Address } from "../models/address.model";
+import { Order } from "../models/order.model";
 import { Feedback } from "../models/feedback.model";
 import { MatchingService } from "./matching.service";
 import {
@@ -274,6 +275,9 @@ export const getNearbyProvidersForCustomer = async (
   userId: string,
   serviceId: string,
   addressId: string,
+  scheduledAtValue?: string,
+  recurrenceUnitValue?: string,
+  recurrenceCountValue?: number,
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(serviceId, "service id");
@@ -299,6 +303,22 @@ export const getNearbyProvidersForCustomer = async (
     throw new AppError("Không tìm thấy địa chỉ của bạn.", 404);
   }
 
+  const scheduledAt = scheduledAtValue ? new Date(scheduledAtValue) : null;
+  if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date())) {
+    throw new AppError("Thời gian lịch hẹn không hợp lệ.", 400);
+  }
+  const recurrenceUnit = ["weekly", "monthly"].includes(recurrenceUnitValue || "")
+    ? (recurrenceUnitValue as "weekly" | "monthly")
+    : undefined;
+  const validRecurrenceCounts = recurrenceUnit === "weekly"
+    ? [1, 2, 3, 4]
+    : recurrenceUnit === "monthly"
+      ? [4, 8, 12]
+      : [];
+  const recurrenceCount = validRecurrenceCounts.includes(recurrenceCountValue || 0)
+    ? recurrenceCountValue
+    : undefined;
+
   const candidates = await MatchingService.findNearestProviders({
     latitude: address.latitude,
     longitude: address.longitude,
@@ -306,6 +326,7 @@ export const getNearbyProvidersForCustomer = async (
     province: address.province,
     ward: address.ward,
     limit: 5,
+    requireOnline: !scheduledAt,
   });
 
   if (candidates.length === 0) return [];
@@ -313,7 +334,42 @@ export const getNearbyProvidersForCustomer = async (
   const candidateByProviderId = new Map(
     candidates.map((candidate) => [candidate.providerId.toString(), candidate]),
   );
-  const providerIds = candidates.map((candidate) => candidate.providerId);
+  let providerIds = candidates.map((candidate) => candidate.providerId);
+  if (scheduledAt && providerIds.length > 0) {
+    const occurrenceDates = recurrenceUnit && recurrenceCount
+      ? Array.from({ length: recurrenceCount }, (_, index) => {
+          const occurrence = new Date(scheduledAt);
+          if (recurrenceUnit === "weekly") {
+            occurrence.setDate(scheduledAt.getDate() + index * 7);
+          } else {
+            const targetDay = scheduledAt.getDate();
+            occurrence.setDate(1);
+            occurrence.setMonth(scheduledAt.getMonth() + index);
+            const lastDay = new Date(
+              occurrence.getFullYear(),
+              occurrence.getMonth() + 1,
+              0,
+            ).getDate();
+            occurrence.setDate(Math.min(targetDay, lastDay));
+          }
+          return occurrence;
+        })
+      : [scheduledAt];
+    const conflictingProviderIds = await Order.distinct("providerId", {
+      providerId: { $in: providerIds },
+      status: { $in: ["accepted", "in_progress"] },
+      $or: occurrenceDates.map((date) => ({
+        scheduledAt: {
+          $gt: new Date(date.getTime() - 60 * 60 * 1000),
+          $lt: new Date(date.getTime() + 60 * 60 * 1000),
+        },
+      })),
+      isDeleted: false,
+    });
+    const conflictingIds = new Set(conflictingProviderIds.map(String));
+    providerIds = providerIds.filter((id) => !conflictingIds.has(id.toString()));
+  }
+  const availableProviderIdSet = new Set(providerIds.map(String));
   const providers = await Provider.find({
     _id: { $in: providerIds },
     isDeleted: false,
@@ -323,6 +379,7 @@ export const getNearbyProvidersForCustomer = async (
     .lean();
 
   return providers
+    .filter((provider) => availableProviderIdSet.has(provider._id.toString()))
     .map((provider) => {
       const candidate = candidateByProviderId.get(provider._id.toString());
       const user = provider.userId as unknown as {

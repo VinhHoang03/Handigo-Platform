@@ -46,38 +46,43 @@ type ServiceForm = {
   serviceType: 'fixed_price' | 'variable_price';
   fixedPrice: string;
   depositAmount: string;
+  requiresOptionSelection: boolean;
   isActive: boolean;
 };
 
 const emptyServiceForm: ServiceForm = {
   categoryId: '', name: '', slug: '', image: '', description: '',
-  serviceType: 'fixed_price', fixedPrice: '', depositAmount: '', isActive: true,
+  serviceType: 'fixed_price', fixedPrice: '', depositAmount: '',
+  requiresOptionSelection: false, isActive: true,
 };
 type OptionForm = {
   name: string;
   description: string;
+  image: string;
   optionType: ServiceOptionType;
   price: string;
   selectionGroup: string;
   selectionMode: ServiceOptionSelectionMode;
-  isRequired: boolean;
   sortOrder: string;
   isActive: boolean;
 };
 
 const emptyOptionForm: OptionForm = {
-  name: '', description: '', optionType: 'other', price: '', selectionGroup: '',
-  selectionMode: 'multiple', isRequired: false, sortOrder: '0', isActive: true,
+  name: '', description: '', image: '', optionType: 'other', price: '', selectionGroup: '',
+  selectionMode: 'multiple', sortOrder: '0', isActive: true,
 };
 
-const toOptionPayload = (f: OptionForm): ServiceOptionPayload => ({
+const toOptionPayload = (
+  f: OptionForm,
+  serviceType: Service['serviceType'],
+): ServiceOptionPayload => ({
   name: f.name.trim(),
   description: f.description.trim() || undefined,
+  image: f.image.trim() || undefined,
   optionType: f.optionType,
-  price: Number(f.price) || 0,
+  price: serviceType === 'variable_price' ? 0 : Number(f.price) || 0,
   selectionGroup: f.selectionGroup.trim() || null,
   selectionMode: f.selectionMode,
-  isRequired: f.isRequired,
   sortOrder: Number(f.sortOrder) || 0,
   isActive: f.isActive,
 });
@@ -91,6 +96,7 @@ const toServicePayload = (f: ServiceForm): ServicePayload => ({
   serviceType: f.serviceType,
   fixedPrice: f.serviceType === 'fixed_price' ? Number(f.fixedPrice) : null,
   depositAmount: f.serviceType === 'variable_price' ? Number(f.depositAmount) : null,
+  requiresOptionSelection: f.requiresOptionSelection,
   isActive: f.isActive,
 });
 
@@ -145,7 +151,12 @@ function FormActions({ busy, onCancel }: { busy: boolean; onCancel: () => void }
 
 // ─── image upload input ───────────────────────────────────────────────────────
 
-function ImageInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', inputName = 'service-image' }: {
+  value: string;
+  onChange: (v: string) => void;
+  label?: string;
+  inputName?: string;
+}) {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -163,21 +174,21 @@ function ImageInput({ value, onChange }: { value: string; onChange: (v: string) 
   return (
     <div className="rounded-xl border border-outline-variant bg-surface p-3">
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-semibold">Ảnh dịch vụ</span>
+        <span className="text-sm font-semibold">{label}</span>
         <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
           <span className="material-symbols-outlined text-[18px]" aria-hidden="true">upload</span>
           {uploading ? 'Đang tải…' : 'Chọn ảnh'}
-          <input type="file" name="service-image-file" accept="image/*" className="sr-only" onChange={(e) => void upload(e.target.files?.[0])} />
+          <input type="file" name={`${inputName}-file`} accept="image/*" className="sr-only" onChange={(e) => void upload(e.target.files?.[0])} />
         </label>
       </div>
       <div className="flex gap-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low">
           {value && isImageUrl(value)
-            ? <img src={value} alt="Xem trước ảnh dịch vụ" width={64} height={64} className="h-full w-full object-cover" />
+            ? <img src={value} alt={`Xem trước ${label.toLowerCase()}`} width={64} height={64} className="h-full w-full object-cover" />
             : <span className="material-symbols-outlined text-3xl text-on-surface-variant" aria-hidden="true">image</span>}
         </div>
         <div className="min-w-0 flex-1">
-          <input type="url" name="service-image-url" autoComplete="off" value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://example.com/anh-dich-vu…"
+          <input type="url" name={`${inputName}-url`} autoComplete="off" value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://example.com/anh-dich-vu…"
             className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" />
           <p aria-live="polite" className={`mt-1 text-xs ${msg.includes('lỗi') ? 'text-error' : 'text-on-surface-variant'}`}>
             {msg || 'Nhập URL hoặc chọn file từ máy.'}
@@ -208,6 +219,7 @@ export default function AdminServicesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [optionFormError, setOptionFormError] = useState('');
 
   // modals
   const [serviceModal, setServiceModal] = useState<'create' | 'edit' | null>(null);
@@ -301,6 +313,7 @@ export default function AdminServicesPage() {
       description: s.description || '', serviceType: s.serviceType,
       fixedPrice: s.fixedPrice == null ? '' : String(s.fixedPrice),
       depositAmount: s.depositAmount == null ? '' : String(s.depositAmount),
+      requiresOptionSelection: s.requiresOptionSelection ?? false,
       isActive: s.isActive,
     };
     setServiceForm(nextForm);
@@ -344,6 +357,7 @@ export default function AdminServicesPage() {
     setOptionForm(emptyOptionForm);
     setInitialOptionForm(emptyOptionForm);
     setEditingOption(null);
+    setOptionFormError('');
     setOptionModal('create');
   };
 
@@ -352,16 +366,17 @@ export default function AdminServicesPage() {
     const nextForm = {
       name: opt.name,
       description: opt.description || '',
+      image: opt.image || '',
       optionType: opt.optionType,
       price: String(opt.price),
       selectionGroup: opt.selectionGroup || '',
       selectionMode: opt.selectionMode ?? 'multiple',
-      isRequired: opt.isRequired ?? false,
       sortOrder: String(opt.sortOrder ?? 0),
       isActive: opt.isActive,
     };
     setOptionForm(nextForm);
     setInitialOptionForm(nextForm);
+    setOptionFormError('');
     setOptionModal('edit');
   };
 
@@ -383,18 +398,49 @@ export default function AdminServicesPage() {
   const saveOption = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedService) return;
+    const normalizedGroup = optionForm.selectionGroup.trim().toLocaleLowerCase('vi-VN');
+    const normalizedOriginalGroup = editingOption?.selectionGroup
+      ?.trim()
+      .toLocaleLowerCase('vi-VN') ?? '';
+    const staysInCurrentGroup = optionModal === 'edit'
+      && normalizedGroup === normalizedOriginalGroup;
+    const sibling = normalizedGroup
+      ? options.find((option) =>
+          option._id !== editingOption?._id &&
+          option.selectionGroup?.trim().toLocaleLowerCase('vi-VN') === normalizedGroup)
+      : undefined;
+    if (
+      !staysInCurrentGroup
+      && sibling
+      && (sibling.selectionMode ?? 'multiple') !== optionForm.selectionMode
+    ) {
+      const expectedMode = sibling.selectionMode === 'single' ? 'Chỉ chọn một' : 'Được chọn nhiều';
+      setOptionFormError(
+        `Nhóm “${optionForm.selectionGroup.trim()}” đang dùng cách lựa chọn “${expectedMode}”. Các tùy chọn trong cùng nhóm phải có cùng cách lựa chọn.`,
+      );
+      return;
+    }
+
+    setOptionFormError('');
     setBusy(true); setNotice('');
     try {
       if (optionModal === 'edit' && editingOption) {
-        await categoryServiceApi.updateServiceOption(editingOption._id, toOptionPayload(optionForm));
+        await categoryServiceApi.updateServiceOption(
+          editingOption._id,
+          toOptionPayload(optionForm, selectedService.serviceType),
+        );
         setNotice('Đã cập nhật tùy chọn.');
       } else {
-        await categoryServiceApi.createServiceOption(selectedService._id, toOptionPayload(optionForm));
+        await categoryServiceApi.createServiceOption(
+          selectedService._id,
+          toOptionPayload(optionForm, selectedService.serviceType),
+        );
         setNotice('Đã thêm tùy chọn.');
       }
       setOptionModal(null);
+      setOptionFormError('');
       await loadOptions(selectedService._id);
-    } catch (err) { setError(getError(err)); }
+    } catch (err) { setOptionFormError(getError(err)); }
     finally { setBusy(false); }
   };
 
@@ -685,19 +731,31 @@ export default function AdminServicesPage() {
                           {options.map((opt) => (
                             <tr key={opt._id} className={`rounded-lg transition-colors hover:bg-surface-container-low ${!opt.isActive ? 'text-on-surface-variant' : ''}`}>
                               <td className="max-w-72 rounded-l-lg border-y border-l border-outline-variant/30 px-4 py-4">
-                                <p className="break-words font-bold text-on-surface">{opt.name}</p>
-                                {opt.description && <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">{opt.description}</p>}
+                                <div className="flex items-start gap-3">
+                                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-container-low">
+                                    {opt.image && isImageUrl(opt.image)
+                                      ? <img src={opt.image} alt="" aria-hidden="true" width={48} height={48} loading="lazy" className="h-full w-full object-cover" />
+                                      : <span className="material-symbols-outlined flex h-full w-full items-center justify-center text-on-surface-variant" aria-hidden="true">image</span>}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="break-words font-bold text-on-surface">{opt.name}</p>
+                                    {opt.description && <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">{opt.description}</p>}
+                                  </div>
+                                </div>
                               </td>
                               <td className="border-y border-outline-variant/30 px-4 py-4 text-on-surface-variant">
                                 <p>{OPTION_TYPE_LABELS[opt.optionType]}</p>
                                 {opt.selectionGroup && (
                                   <p className="mt-1 text-xs">
                                     {opt.selectionGroup} · {opt.selectionMode === 'single' ? 'chọn một' : 'chọn nhiều'}
-                                    {opt.isRequired ? ' · bắt buộc' : ''}
                                   </p>
                                 )}
                               </td>
-                              <td className="border-y border-outline-variant/30 px-4 py-4 text-right font-bold text-primary tabular-nums">{money.format(opt.price)}</td>
+                              <td className="border-y border-outline-variant/30 px-4 py-4 text-right font-bold text-primary tabular-nums">
+                                {selectedService.serviceType === 'variable_price'
+                                  ? <span className="text-on-surface-variant">Không áp dụng</span>
+                                  : money.format(opt.price)}
+                              </td>
                               <td className="border-y border-outline-variant/30 px-4 py-4">
                                 {opt.isActive
                                   ? <span className="rounded-full bg-success-green/10 px-2.5 py-1 text-[12px] font-bold text-success-green">Hoạt động</span>
@@ -795,6 +853,12 @@ export default function AdminServicesPage() {
           </fieldset>
 
           <ToggleRow checked={serviceForm.isActive} onChange={(value) => setServiceForm({ ...serviceForm, isActive: value })} label="Hiển thị dịch vụ" name="service-active" />
+          <ToggleRow
+            checked={serviceForm.requiresOptionSelection}
+            onChange={(value) => setServiceForm({ ...serviceForm, requiresOptionSelection: value })}
+            label="Bắt buộc chọn ít nhất một tùy chọn"
+            name="service-requires-option"
+          />
           <FormActions busy={busy} onCancel={requestCloseServiceModal} />
         </form>
       </Modal>
@@ -802,8 +866,19 @@ export default function AdminServicesPage() {
       {/* Option Modal */}
       <Modal open={Boolean(optionModal)} title={optionModal === 'edit' ? 'Sửa tùy chọn' : 'Thêm tùy chọn dịch vụ'} onClose={requestCloseOptionModal} closeOnEsc={!busy && !discardTarget} closeOnOverlayClick={!busy && !discardTarget}>
         <form onSubmit={saveOption} className="space-y-4">
+          {optionFormError && (
+            <div role="alert" className="rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
+              {optionFormError}
+            </div>
+          )}
           <FormInput label="Tên tùy chọn" name="option-name" required value={optionForm.name} onChange={(v) => setOptionForm({ ...optionForm, name: v })} />
           <FormTextArea label="Mô tả" name="option-description" value={optionForm.description} onChange={(v) => setOptionForm({ ...optionForm, description: v })} />
+          <ImageInput
+            value={optionForm.image}
+            onChange={(value) => setOptionForm({ ...optionForm, image: value })}
+            label="Ảnh tùy chọn"
+            inputName="option-image"
+          />
           <label className="block">
             <span className="mb-1 block text-sm font-semibold">Loại tùy chọn</span>
             <select name="option-type" value={optionForm.optionType} onChange={(e) => setOptionForm({ ...optionForm, optionType: e.target.value as ServiceOptionType })}
@@ -816,16 +891,22 @@ export default function AdminServicesPage() {
               label="Nhóm lựa chọn"
               name="option-selection-group"
               value={optionForm.selectionGroup}
-              onChange={(v) => setOptionForm({ ...optionForm, selectionGroup: v })}
+              onChange={(v) => {
+                setOptionForm({ ...optionForm, selectionGroup: v });
+                setOptionFormError('');
+              }}
               placeholder="Ví dụ: Quy mô căn hộ"
-              required={optionForm.selectionMode === 'single' || optionForm.isRequired}
+              required={optionForm.selectionMode === 'single'}
             />
             <label className="block">
               <span className="mb-1 block text-sm font-semibold">Cách lựa chọn</span>
               <select
                 name="option-selection-mode"
                 value={optionForm.selectionMode}
-                onChange={(e) => setOptionForm({ ...optionForm, selectionMode: e.target.value as ServiceOptionSelectionMode })}
+                onChange={(e) => {
+                  setOptionForm({ ...optionForm, selectionMode: e.target.value as ServiceOptionSelectionMode });
+                  setOptionFormError('');
+                }}
                 className="w-full rounded-xl border border-outline-variant bg-surface p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 <option value="multiple">Được chọn nhiều</option>
@@ -833,11 +914,14 @@ export default function AdminServicesPage() {
               </select>
             </label>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormInput label="Thứ tự hiển thị" name="option-sort-order" type="number" value={optionForm.sortOrder} onChange={(v) => setOptionForm({ ...optionForm, sortOrder: v })} />
-            <ToggleRow checked={optionForm.isRequired} onChange={(v) => setOptionForm({ ...optionForm, isRequired: v })} label="Bắt buộc lựa chọn" name="option-required" />
-          </div>
-          <FormInput label="Giá (VNĐ)" name="option-price" type="number" required value={optionForm.price} onChange={(v) => setOptionForm({ ...optionForm, price: v })} />
+          <FormInput label="Thứ tự hiển thị" name="option-sort-order" type="number" value={optionForm.sortOrder} onChange={(v) => setOptionForm({ ...optionForm, sortOrder: v })} />
+          {selectedService?.serviceType === 'fixed_price' ? (
+            <FormInput label="Giá (VNĐ)" name="option-price" type="number" required value={optionForm.price} onChange={(v) => setOptionForm({ ...optionForm, price: v })} />
+          ) : (
+            <p className="rounded-lg bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant">
+              Dịch vụ giá linh hoạt không áp dụng giá riêng cho tùy chọn.
+            </p>
+          )}
           <ToggleRow checked={optionForm.isActive} onChange={(v) => setOptionForm({ ...optionForm, isActive: v })} label="Hiển thị tùy chọn" name="option-active" />
           <FormActions busy={busy} onCancel={requestCloseOptionModal} />
         </form>

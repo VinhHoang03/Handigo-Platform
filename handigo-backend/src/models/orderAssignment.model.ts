@@ -4,6 +4,7 @@ import { baseFields, IBaseDocument } from "./common";
 export interface IOrderAssignment extends Document, IBaseDocument {
   orderId: Types.ObjectId;
   providerId: Types.ObjectId;
+  assignmentType: "dispatch" | "appointment";
   status: "pending" | "accepted" | "rejected" | "timeout" | "cancelled";
   assignedAt: Date;
   responseDeadline: Date;
@@ -15,6 +16,11 @@ const OrderAssignmentSchema = new Schema<IOrderAssignment>(
   {
     orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true },
     providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
+    assignmentType: {
+      type: String,
+      enum: ["dispatch", "appointment"],
+      default: "dispatch",
+    },
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected", "timeout", "cancelled"],

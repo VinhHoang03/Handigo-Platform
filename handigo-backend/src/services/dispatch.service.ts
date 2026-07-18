@@ -10,6 +10,7 @@ import { emitToUser } from "../sockets/socketServer";
 import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
 import { createLogger } from "../utils/logger";
 import { cancelSystemOrderWithSettlement } from "./orderCancellation.service";
+import { createNotificationRecord } from "./notification.service";
 
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
 const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
@@ -406,6 +407,33 @@ export const DispatchService = {
     const order = await Order.findById(orderId);
     if (!order || order.status !== "created") return;
 
+    if (assignment.assignmentType === "appointment") {
+      if (order.recurringGroupId) {
+        await Order.updateMany(
+          { recurringGroupId: order.recurringGroupId, status: "created" },
+          {
+            $set: {
+              bookingStatus: "rejected",
+              preferredProviderId: null,
+            },
+          },
+          { runValidators: true },
+        );
+      } else {
+        order.bookingStatus = "rejected";
+        order.preferredProviderId = null;
+        await order.save();
+      }
+      await createNotificationRecord({
+        userId: order.customerId,
+        type: "ORDER",
+        title: "Yêu cầu lịch hẹn đã hết hạn",
+        content: `Chuyên gia chưa phản hồi đơn ${order.orderCode}. Vui lòng chọn chuyên gia khác.`,
+        data: { orderId: order._id },
+      });
+      return;
+    }
+
     const triedState = await getTriedProviderState(assignment.orderId);
 
     await DispatchService.dispatchOrder(
@@ -428,6 +456,58 @@ export const DispatchService = {
         scheduledDispatchLeadMinutes,
       } = await getMatchingConfig();
       const now = new Date();
+      const recurringPaymentsToOpen = await Order.find({
+        orderType: "recurring",
+        status: "accepted",
+        bookingStatus: "reserved",
+        scheduledAt: { $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
+      })
+        .select("_id customerId orderCode scheduledAt")
+        .limit(100);
+
+      for (const recurringOrder of recurringPaymentsToOpen) {
+        if (!recurringOrder.scheduledAt) continue;
+        const paymentDueAt = new Date(
+          Math.min(
+            now.getTime() + 12 * 60 * 60 * 1000,
+            recurringOrder.scheduledAt.getTime(),
+          ),
+        );
+        const openedOrder = await Order.findOneAndUpdate(
+          { _id: recurringOrder._id, bookingStatus: "reserved" },
+          { $set: { bookingStatus: "awaiting_payment", paymentDueAt } },
+          { returnDocument: "after", runValidators: true },
+        );
+        if (!openedOrder) continue;
+        await createNotificationRecord({
+          userId: openedOrder.customerId,
+          type: "PAYMENT",
+          title: "Đến hạn thanh toán buổi định kỳ",
+          content: `Vui lòng thanh toán đơn ${openedOrder.orderCode} để giữ lịch sắp tới.`,
+          data: { orderId: openedOrder._id, paymentDueAt },
+        });
+      }
+
+      const expiredPaymentOrders = await Order.find({
+        status: "accepted",
+        bookingStatus: "awaiting_payment",
+        paymentDueAt: { $lte: now },
+      })
+        .select("_id")
+        .limit(100)
+        .lean();
+
+      for (const order of expiredPaymentOrders) {
+        await Order.updateOne(
+          { _id: order._id, bookingStatus: "awaiting_payment" },
+          { $set: { bookingStatus: "expired" } },
+        );
+        await cancelSystemOrderWithSettlement(
+          order._id.toString(),
+          "Đã hết thời hạn thanh toán giữ lịch.",
+        );
+      }
+
       const expiredAssignments = await OrderAssignment.find({
         status: "pending",
         responseDeadline: { $lte: now },

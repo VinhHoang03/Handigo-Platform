@@ -13,6 +13,7 @@ import { cancelOrderWithSettlement } from "./orderCancellation.service";
 import { Payment } from "../models/payment.model";
 import { assertProviderWalletEligible } from "./providerWalletEligibility.service";
 import type { UserRole } from "../models/user.model";
+import { createNotificationRecord } from "./notification.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,9 @@ export const AssignmentService = {
       );
     }
 
-    const assignedOrder = await Order.findById(assignment.orderId).select("addressId");
+    const assignedOrder = await Order.findById(assignment.orderId).select(
+      "addressId customerId orderCode orderType scheduledAt status recurringGroupId occurrenceNumber",
+    );
     const assignedAddress = assignedOrder
       ? await Address.findById(assignedOrder.addressId).select("ward province")
       : null;
@@ -105,6 +108,124 @@ export const AssignmentService = {
     }
 
     await assertProviderWalletEligible(provider.userId);
+
+    if (assignment.assignmentType === "appointment") {
+      if (!assignedOrder || !assignedOrder.scheduledAt || assignedOrder.status !== "created") {
+        throw new AppError("Lịch hẹn không còn khả dụng.", 409);
+      }
+
+      const appointmentOrders = assignedOrder.recurringGroupId
+        ? await Order.find({
+            recurringGroupId: assignedOrder.recurringGroupId,
+            status: "created",
+            isDeleted: false,
+          }).select("scheduledAt")
+        : [assignedOrder];
+      for (const appointmentOrder of appointmentOrders) {
+        if (!appointmentOrder.scheduledAt) continue;
+        const conflictStart = new Date(
+          appointmentOrder.scheduledAt.getTime() - 60 * 60 * 1000,
+        );
+        const slotEnd = new Date(
+          appointmentOrder.scheduledAt.getTime() + 60 * 60 * 1000,
+        );
+        const hasConflict = await Order.exists({
+          _id: { $nin: appointmentOrders.map((item) => item._id) },
+          providerId: provider._id,
+          status: { $in: ["accepted", "in_progress"] },
+          scheduledAt: { $gt: conflictStart, $lt: slotEnd },
+          isDeleted: false,
+        });
+        if (hasConflict) {
+          throw new AppError(
+            `Bạn đã có lịch vào ${appointmentOrder.scheduledAt.toLocaleString("vi-VN")}.`,
+            409,
+          );
+        }
+      }
+
+      const respondedAt = new Date();
+      const paymentDueAt = new Date(respondedAt.getTime() + 15 * 60 * 1000);
+      const claimedAssignment = await OrderAssignment.findOneAndUpdate(
+        {
+          _id: assignment._id,
+          providerId: provider._id,
+          status: "pending",
+          responseDeadline: { $gt: respondedAt },
+          isDeleted: false,
+        },
+        { $set: { status: "accepted", respondedAt } },
+        { returnDocument: "after", runValidators: true },
+      );
+      if (!claimedAssignment) {
+        throw new AppError("Yêu cầu lịch hẹn không còn khả dụng.", 409);
+      }
+
+      let order;
+      if (assignedOrder.recurringGroupId) {
+        await Order.updateMany(
+          {
+            recurringGroupId: assignedOrder.recurringGroupId,
+            status: "created",
+            providerId: null,
+          },
+          {
+            $set: {
+              providerId: provider._id,
+              status: "accepted",
+              bookingStatus: "reserved",
+              paymentDueAt: null,
+            },
+          },
+          { runValidators: true },
+        );
+        order = await Order.findOneAndUpdate(
+          { _id: assignment.orderId, status: "accepted" },
+          { $set: { bookingStatus: "awaiting_payment", paymentDueAt } },
+          { returnDocument: "after", runValidators: true },
+        );
+      } else {
+        order = await Order.findOneAndUpdate(
+          { _id: assignment.orderId, status: "created", providerId: null },
+          {
+            $set: {
+              providerId: provider._id,
+              status: "accepted",
+              bookingStatus: "awaiting_payment",
+              paymentDueAt,
+            },
+          },
+          { returnDocument: "after", runValidators: true },
+        );
+      }
+      if (!order) {
+        await OrderAssignment.findByIdAndUpdate(claimedAssignment._id, {
+          $set: { status: "cancelled" },
+        });
+        throw new AppError("Lịch hẹn vừa được xử lý bởi yêu cầu khác.", 409);
+      }
+
+      emitToUser(providerUserId, "assignment:closed", {
+        assignmentId: assignment._id.toString(),
+        reason: "accepted",
+      });
+      await createNotificationRecord({
+        userId: order.customerId,
+        type: "ORDER",
+        title: assignedOrder.recurringGroupId
+          ? "Chuyên gia đã nhận chuỗi lịch"
+          : "Chuyên gia đã nhận lịch",
+        content: assignedOrder.recurringGroupId
+          ? `Chuỗi lịch đã được xác nhận. Vui lòng thanh toán buổi đầu tiên trong 15 phút.`
+          : `Vui lòng thanh toán đơn ${order.orderCode} trong 15 phút để giữ lịch.`,
+        data: { orderId: order._id, paymentDueAt },
+      });
+
+      return {
+        assignment: claimedAssignment as any,
+        order: order as any,
+      };
+    }
 
     // 4. Khóa provider trước để không thể nhận đồng thời hai đơn.
     const claimedProvider = await Provider.findOneAndUpdate(
@@ -252,6 +373,49 @@ export const AssignmentService = {
       assignmentId: assignment._id.toString(),
       reason: "rejected",
     });
+
+    if (assignment.assignmentType === "appointment") {
+      const appointmentOrder = await Order.findById(assignment.orderId).select(
+        "recurringGroupId",
+      );
+      if (appointmentOrder?.recurringGroupId) {
+        await Order.updateMany(
+          {
+            recurringGroupId: appointmentOrder.recurringGroupId,
+            status: "created",
+          },
+          {
+            $set: {
+              bookingStatus: "rejected",
+              preferredProviderId: null,
+              paymentDueAt: null,
+            },
+          },
+          { runValidators: true },
+        );
+      }
+      const order = await Order.findOneAndUpdate(
+        { _id: assignment.orderId, status: "created" },
+        {
+          $set: {
+            bookingStatus: "rejected",
+            preferredProviderId: null,
+            paymentDueAt: null,
+          },
+        },
+        { returnDocument: "after", runValidators: true },
+      );
+      if (order) {
+        await createNotificationRecord({
+          userId: order.customerId,
+          type: "ORDER",
+          title: "Chuyên gia chưa thể nhận lịch",
+          content: `Lịch hẹn ${order.orderCode} cần chọn một chuyên gia khác.`,
+          data: { orderId: order._id },
+        });
+      }
+      return;
+    }
 
     // 4. Re-dispatch to next provider (import lazily to avoid circular dep)
     const order = await Order.findById(assignment.orderId);

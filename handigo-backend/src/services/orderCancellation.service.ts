@@ -662,7 +662,7 @@ export const cancelOrderWithSettlement = async (
         session,
       );
 
-      if (claimedOrder.providerId) {
+      if (claimedOrder.providerId && claimedOrder.orderType === "normal") {
         await Provider.updateOne(
           { _id: claimedOrder.providerId },
           { $set: { availabilityStatus: "online" } },
