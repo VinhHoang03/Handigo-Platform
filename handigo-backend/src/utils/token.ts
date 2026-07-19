@@ -11,8 +11,18 @@ export const getRefreshSecret = (): string => {
   return process.env.REFRESH_TOKEN_SECRET || `${getAccessSecret()}:refresh`;
 };
 
+const getTokenExpiresIn = (
+  configuredValue: string | undefined,
+  fallback: NonNullable<SignOptions["expiresIn"]>,
+): NonNullable<SignOptions["expiresIn"]> => {
+  const normalizedValue = configuredValue?.trim();
+  return normalizedValue
+    ? (normalizedValue as NonNullable<SignOptions["expiresIn"]>)
+    : fallback;
+};
+
 export const signAccessToken = (user: IUser): string => {
-  const expiresIn = process.env.JWT_EXPIRES_IN as SignOptions["expiresIn"];
+  const expiresIn = getTokenExpiresIn(process.env.JWT_EXPIRES_IN, "1d");
 
   return jwt.sign(
     {
@@ -26,8 +36,10 @@ export const signAccessToken = (user: IUser): string => {
 };
 
 export const signRefreshToken = (user: IUser, sessionId: string): string => {
-  const expiresIn = process.env
-    .REFRESH_TOKEN_EXPIRES_IN as SignOptions["expiresIn"];
+  const expiresIn = getTokenExpiresIn(
+    process.env.REFRESH_TOKEN_EXPIRES_IN,
+    "7d",
+  );
 
   return jwt.sign(
     {

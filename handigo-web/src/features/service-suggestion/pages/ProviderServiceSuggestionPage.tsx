@@ -122,7 +122,7 @@ export default function ProviderServiceSuggestionPage() {
             <span className="mb-2 block text-sm font-bold text-on-surface">
               Loại đề xuất
             </span>
-            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+            <div className="flex gap-3 sm:max-w-md">
               {[
                 { value: "service", label: "Service mới", icon: "home_repair_service" },
                 { value: "category", label: "Category mới", icon: "category" },
@@ -131,7 +131,7 @@ export default function ProviderServiceSuggestionPage() {
                   key={item.value}
                   type="button"
                   onClick={() => setSuggestionType(item.value as SuggestionType)}
-                  className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-bold transition ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-bold transition ${
                     suggestionType === item.value
                       ? "border-primary bg-primary text-on-primary"
                       : "border-outline-variant/50 bg-surface-container-low text-on-surface-variant hover:text-primary"

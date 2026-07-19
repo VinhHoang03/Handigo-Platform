@@ -219,6 +219,14 @@ function App() {
               }
             />
             <Route
+              path="/customer/bank-accounts"
+              element={
+                <RouteGuard roles={["CUSTOMER"]}>
+                  <ProviderBankAccountsPage role="CUSTOMER" />
+                </RouteGuard>
+              }
+            />
+            <Route
               path="/customer/support"
               element={
                 <RouteGuard roles={["CUSTOMER"]}>

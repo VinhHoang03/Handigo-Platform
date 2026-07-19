@@ -7,6 +7,7 @@ export default function NewsPage() {
   const [category, setCategory] = useState("Tất cả");
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
   const visibleArticles = category === "Tất cả" ? newsArticles : newsArticles.filter((article) => article.category === category);
 
   return (
@@ -32,7 +33,7 @@ export default function NewsPage() {
       </section>
 
       <section className="mx-auto max-w-5xl px-6 py-12">
-        <div className="rounded-3xl bg-surface-container p-8 text-center sm:p-12"><span className="material-symbols-outlined text-4xl text-primary">mail</span><h2 className="mt-3 text-3xl font-bold text-primary">Đăng ký nhận bản tin sớm nhất</h2><p className="mx-auto mt-3 max-w-2xl text-on-surface-variant">Nhận mẹo chăm sóc nhà cửa, ưu đãi và thông báo tính năng mới từ Handigo.</p>{subscribed ? <p className="mt-6 font-semibold text-secondary">Đăng ký nhận tin thành công.</p> : <form className="mx-auto mt-7 flex max-w-xl flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); if (email.trim()) setSubscribed(true); }}><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Địa chỉ email của bạn" className="min-h-12 flex-1 rounded-xl border border-outline-variant bg-white px-4"/><button className="rounded-xl bg-primary px-6 py-3 font-semibold text-white">Đăng ký ngay</button></form>}</div>
+        <div className="rounded-3xl bg-surface-container p-8 text-center sm:p-12"><span className="material-symbols-outlined text-4xl text-primary">mail</span><h2 className="mt-3 text-3xl font-bold text-primary">Đăng ký nhận bản tin sớm nhất</h2><p className="mx-auto mt-3 max-w-2xl text-on-surface-variant">Nhận mẹo chăm sóc nhà cửa, ưu đãi và thông báo tính năng mới từ Handigo.</p>{subscribed ? <p className="mt-6 font-semibold text-secondary">Đăng ký nhận tin thành công.</p> : <><form className="mx-auto mt-7 flex max-w-xl gap-3" noValidate onSubmit={(event) => { event.preventDefault(); const normalizedEmail = email.trim(); if (!normalizedEmail) { setSubscriptionError("Vui lòng nhập địa chỉ email."); return; } if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) { setSubscriptionError("Địa chỉ email không hợp lệ."); return; } setSubscriptionError(null); setSubscribed(true); }}><input type="email" value={email} onChange={(event) => { setEmail(event.target.value); if (subscriptionError) setSubscriptionError(null); }} placeholder="Địa chỉ email của bạn" aria-invalid={Boolean(subscriptionError)} aria-describedby={subscriptionError ? "newsletter-error" : undefined} className={`min-h-12 min-w-48 flex-1 rounded-xl border bg-white px-4 ${subscriptionError ? "border-error" : "border-outline-variant"}`}/><button className="shrink-0 whitespace-nowrap rounded-xl bg-primary px-6 py-3 font-semibold text-white">Đăng ký ngay</button></form>{subscriptionError && <p id="newsletter-error" role="alert" className="mx-auto mt-3 max-w-xl text-left text-sm font-medium text-error">{subscriptionError}</p>}</>}</div>
       </section>
     </PublicContentLayout>
   );

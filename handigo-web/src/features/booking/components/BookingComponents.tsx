@@ -182,7 +182,8 @@ export const OrderSummaryCard: React.FC<{
   actionTo?: string;
   onAction?: () => void;
   isLoading?: boolean;
-}> = ({ step, actionLabel, actionTo, onAction, isLoading }) => {
+  summaryContent?: ReactNode;
+}> = ({ step, actionLabel, actionTo, onAction, isLoading, summaryContent }) => {
   const { categoryId, serviceId, selectedOptionIds } = useBookingStore();
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
@@ -292,6 +293,8 @@ export const OrderSummaryCard: React.FC<{
               {total.toLocaleString()}đ
             </span>
           </div>
+
+          {summaryContent}
         </div>
 
         <div className="mt-lg space-y-sm">

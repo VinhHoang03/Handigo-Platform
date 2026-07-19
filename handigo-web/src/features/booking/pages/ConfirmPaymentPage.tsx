@@ -5,8 +5,10 @@ import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/booking.api';
 import { bookingVoucherApi } from '@/features/booking/api/voucher.api';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
+import { walletApi } from '@/features/wallet/api/wallet.api';
 import type { Address, Service, ServiceOption } from '../../../types/booking';
 import type { AvailableVoucher } from '../types/voucher.types';
+import type { WalletOverview } from '@/features/wallet/types/wallet.types';
 import { getMissingRequiredGroup } from '../utils/serviceOptionSelection';
 
 const paymentMethods = [
@@ -40,6 +42,7 @@ const ConfirmPaymentPage = () => {
   const [voucherCode, setVoucherCode] = useState('');
   const [voucherError, setVoucherError] = useState('');
   const [pendingOrderId, setPendingOrderId] = useState('');
+  const [wallet, setWallet] = useState<WalletOverview | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -76,12 +79,23 @@ const ConfirmPaymentPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    walletApi.getMine()
+      .then((currentWallet) => {
+        if (isMounted) setWallet(currentWallet);
+      })
+      .catch(() => {
+        if (isMounted) setWallet(null);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
 
   const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
-  const effectivePaymentMethod =
-    service?.serviceType === 'variable_price' && paymentMethod !== 'bank'
-      ? 'bank'
-      : paymentMethod;
+  const effectivePaymentMethod = paymentMethod;
 
   const handleConfirm = async () => {
     if (!serviceId) {
@@ -221,55 +235,6 @@ const ConfirmPaymentPage = () => {
         <div className="lg:col-span-8 space-y-gutter">
           <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
             <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">local_offer</span>
-              Voucher
-            </h2>
-            <label className="block text-sm font-semibold">
-              Chọn voucher khả dụng
-              <select
-                value={voucherCode}
-                onChange={(event) => {
-                  setVoucherCode(event.target.value);
-                  setVoucherError('');
-                }}
-                disabled={isSubmitting}
-                className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
-              >
-                <option value="">Không sử dụng voucher</option>
-                {availableVouchers.map((voucher) => (
-                  <option key={voucher.id} value={voucher.code}>
-                    {voucher.code} · {voucher.discountType === 'PERCENT'
-                      ? `Giảm ${voucher.discountValue}%`
-                      : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}đ`}
-                    {voucher.minOrderAmount ? ` · Đơn từ ${voucher.minOrderAmount.toLocaleString('vi-VN')}đ` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={voucherCode}
-                onChange={(event) => {
-                  setVoucherCode(event.target.value.toUpperCase());
-                  setVoucherError('');
-                }}
-                maxLength={50}
-                disabled={isSubmitting}
-                placeholder="Hoặc nhập mã voucher"
-                className="min-h-11 flex-1 rounded-xl border border-outline-variant px-3 uppercase"
-              />
-              {voucherCode && (
-                <button type="button" onClick={() => setVoucherCode('')} disabled={isSubmitting} className="rounded-xl border border-outline-variant px-4 font-semibold text-on-surface-variant">
-                  Gỡ
-                </button>
-              )}
-            </div>
-            {voucherError && <p className="mt-3 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">{voucherError}</p>}
-            <p className="mt-3 text-xs text-on-surface-variant">Voucher được backend kiểm tra và áp dụng sau khi tạo đơn, trước khi khởi tạo giao dịch thanh toán.</p>
-          </section>
-
-          <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
-            <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">receipt_long</span>
               Chi tiết dịch vụ
             </h2>
@@ -311,10 +276,9 @@ const ConfirmPaymentPage = () => {
               {paymentMethods
                 .filter(([, , , value]) => {
                   if (service?.serviceType === 'variable_price') {
-                    // Dịch vụ cần khảo sát chỉ thanh toán tiền cọc qua PayOS.
-                    return value === 'bank';
+                    // Dịch vụ cần khảo sát không hỗ trợ thanh toán tiền mặt.
+                    return value !== 'cash';
                   }
-                  // Fixed price: All 3 methods (Wallet, Bank, Cash)
                   return true;
                 })
                 .map(([icon, title, subtitle, value]) => (
@@ -336,7 +300,13 @@ const ConfirmPaymentPage = () => {
                       </div>
                       <div>
                         <p className="font-body-md text-body-md font-semibold">{title}</p>
-                        <p className="font-label-sm text-label-sm text-on-surface-variant">{subtitle}</p>
+                        <p className="font-label-sm text-label-sm text-on-surface-variant">
+                          {value === 'wallet'
+                            ? wallet
+                              ? `Số dư khả dụng: ${wallet.balance.toLocaleString('vi-VN')}đ`
+                              : 'Đang tải số dư ví...'
+                            : subtitle}
+                        </p>
                       </div>
                     </div>
                     <div className="w-6 h-6 border-2 border-outline-variant rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">
@@ -361,6 +331,50 @@ const ConfirmPaymentPage = () => {
             actionLabel="Xác nhận & Thanh toán"
             onAction={handleConfirm}
             isLoading={isSubmitting}
+            summaryContent={
+              <div className="border-t border-dashed border-outline-variant pt-md">
+                <label className="block text-sm font-semibold text-on-surface">
+                  Voucher
+                  <select
+                    value={voucherCode}
+                    onChange={(event) => {
+                      setVoucherCode(event.target.value);
+                      setVoucherError('');
+                    }}
+                    disabled={isSubmitting}
+                    className="mt-2 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3"
+                  >
+                    <option value="">Không sử dụng voucher</option>
+                    {availableVouchers.map((voucher) => (
+                      <option key={voucher.id} value={voucher.code}>
+                        {voucher.code} · {voucher.discountType === 'PERCENT'
+                          ? `Giảm ${voucher.discountValue}%`
+                          : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}đ`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={voucherCode}
+                    onChange={(event) => {
+                      setVoucherCode(event.target.value.toUpperCase());
+                      setVoucherError('');
+                    }}
+                    maxLength={50}
+                    disabled={isSubmitting}
+                    placeholder="Hoặc nhập mã voucher"
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-outline-variant px-3 uppercase"
+                  />
+                  {voucherCode && (
+                    <button type="button" onClick={() => setVoucherCode('')} disabled={isSubmitting} className="rounded-xl border border-outline-variant px-3 font-semibold text-on-surface-variant">
+                      Gỡ
+                    </button>
+                  )}
+                </div>
+                {voucherError && <p className="mt-2 text-sm font-medium text-error">{voucherError}</p>}
+              </div>
+            }
           />
         </div>
       </div>
