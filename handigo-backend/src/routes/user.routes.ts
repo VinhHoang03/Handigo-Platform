@@ -2,10 +2,13 @@ import express from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
+import { uploadRateLimit } from "../middlewares/rateLimit.middleware";
+import { uploadUserAvatar } from "../middlewares/userAvatarUpload.middleware";
 import { updateUserProfileSchema } from "../validations/user.validator";
 import {
   getProfile,
   updateProfile,
+  uploadAvatar,
   getAllUsers,
   getUserById,
   updateUser,
@@ -21,6 +24,13 @@ router.put(
   authMiddleware,
   validate(updateUserProfileSchema),
   updateProfile,
+);
+router.post(
+  "/avatar",
+  authMiddleware,
+  uploadRateLimit,
+  uploadUserAvatar,
+  uploadAvatar,
 );
 
 // Các endpoint legacy chỉ dành cho quản trị viên.

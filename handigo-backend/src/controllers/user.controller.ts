@@ -40,6 +40,14 @@ export const updateProfile = async (req: Request, res: Response) => {
   }
 };
 
+export const uploadAvatar = async (_req: Request, res: Response) => {
+  return res.status(201).json({
+    success: true,
+    data: { url: res.locals.imageUrl },
+    message: "Tải ảnh đại diện lên thành công",
+  });
+};
+
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const users = await getAllUsersService(req.query);

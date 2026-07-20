@@ -78,26 +78,31 @@ export function AddressBookManager({
       const data = await getUserAddresses();
       setAddresses(data);
       setError("");
-
-      if (selectable && data.length > 0) {
-        const selectedAddress = data.find((item) => item.id === selectedAddressId);
-        const nextAddress = selectedAddress || data.find((item) => item.isDefault) || data[0];
-        if (nextAddress.id !== selectedAddressId) {
-          onSelectAddress?.(nextAddress);
-        }
-      }
     } catch {
       setError("Không tải được danh sách địa chỉ đã lưu.");
     } finally {
       setIsLoading(false);
     }
-  }, [onSelectAddress, selectable, selectedAddressId]);
+  }, []);
 
   useEffect(() => {
-    // Tải dữ liệu từ API khi component được gắn hoặc tiêu chí chọn thay đổi.
+    // Chỉ tải từ API khi component được gắn; đổi lựa chọn dùng danh sách hiện có.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadAddresses();
   }, [loadAddresses]);
+
+  useEffect(() => {
+    if (!selectable || addresses.length === 0) return;
+
+    const selectedAddress = addresses.find(
+      (item) => item.id === selectedAddressId,
+    );
+    const nextAddress =
+      selectedAddress || addresses.find((item) => item.isDefault) || addresses[0];
+    if (nextAddress.id !== selectedAddressId) {
+      onSelectAddress?.(nextAddress);
+    }
+  }, [addresses, onSelectAddress, selectable, selectedAddressId]);
 
   const openCreate = () => {
     setEditingAddress(null);

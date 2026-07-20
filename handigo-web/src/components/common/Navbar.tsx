@@ -114,7 +114,8 @@ export function Navbar({
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const currentRole = role ?? normalizeRole(user?.role);
+  const authenticatedRole = normalizeRole(user?.role);
+  const currentRole = isAuthenticated ? authenticatedRole : role;
   const scrolled = isScrolled ?? internalScrolled;
   const navItems = useMemo(() => createNavbarItems(currentRole), [currentRole]);
   const avatar =
@@ -313,7 +314,7 @@ export function Navbar({
         )}
 
         <div className="flex items-center gap-2">
-          {currentRole !== "ADMIN" && (
+          {isAuthenticated && currentRole === "CUSTOMER" && (
             <button
               type="button"
               onClick={handleBookService}
@@ -405,19 +406,6 @@ export function Navbar({
                             receipt_long
                           </span>
                           Đơn dịch vụ của tôi
-                        </Link>
-                      )}
-                      {(currentRole === "CUSTOMER" ||
-                        currentRole === "PROVIDER") && (
-                        <Link
-                          to={currentRole === "CUSTOMER" ? "/customer/support" : "/provider/support"}
-                          onClick={() => setIsAccountOpen(false)}
-                          className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
-                        >
-                          <span className="material-symbols-outlined text-xl">
-                            support_agent
-                          </span>
-                          Hỗ trợ và khiếu nại
                         </Link>
                       )}
                       {(currentRole === "CUSTOMER" ||

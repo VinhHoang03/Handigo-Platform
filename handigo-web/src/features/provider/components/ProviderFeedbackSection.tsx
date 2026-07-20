@@ -48,7 +48,7 @@ export function ProviderFeedbackSection({ enabled = true }: { enabled?: boolean 
       ) : feedbacks.length === 0 ? (
         <p className="rounded-xl border border-dashed border-outline-variant p-6 text-center text-on-surface-variant">Chưa có đánh giá từ khách hàng.</p>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 lg:grid-cols-1 2xl:grid-cols-2">
           {feedbacks.map((feedback) => {
             const customer = customerOf(feedback) as PersonRef | undefined;
             const performedAt = performedAtOf(feedback);

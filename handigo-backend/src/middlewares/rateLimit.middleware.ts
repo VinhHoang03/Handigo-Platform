@@ -119,6 +119,13 @@ export const resourceIntensiveRateLimit = createRateLimit({
   keyGenerator: getAuthenticatedUserOrIp,
 });
 
+export const chatbotRateLimit = createRateLimit({
+  windowMs: 60_000,
+  maxRequests: 10,
+  message: "Bạn gửi tin nhắn quá nhanh. Vui lòng chờ rồi thử lại.",
+  keyGenerator: getAuthenticatedUserOrIp,
+});
+
 export const routingRateLimit = createRateLimit({
   windowMs: 60_000,
   maxRequests: 10,

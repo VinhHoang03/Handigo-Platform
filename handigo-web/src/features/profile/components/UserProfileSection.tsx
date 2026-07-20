@@ -1,6 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import {
-  Camera,
   Eye,
   EyeOff,
   MapPin,
@@ -10,6 +9,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { AvatarEditor } from "@/features/profile/components/AvatarEditor";
 import type {
   GenderValue,
   UserAddress,
@@ -40,6 +40,7 @@ interface UserProfileSectionProps {
   showAddresses?: boolean;
   addressManager?: ReactNode;
   onSaveProfile: (payload: UserProfileFormValue) => Promise<void> | void;
+  onSaveAvatar?: (url: string) => Promise<void> | void;
   onAddAddress?: () => void;
   onEditAddress?: (address: UserAddress) => void;
   onDeleteAddress?: (address: UserAddress) => Promise<void> | void;
@@ -250,6 +251,7 @@ export function UserProfileSection({
   showAddresses = true,
   addressManager,
   onSaveProfile,
+  onSaveAvatar,
   onAddAddress,
   onEditAddress,
   onDeleteAddress,
@@ -318,17 +320,16 @@ export function UserProfileSection({
     }
   };
 
-  const handleAvatarFileChange = (file?: File) => {
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setProfileForm((current) => ({
-        ...current,
-        avatar: String(reader.result || ""),
-      }));
-    };
-    reader.readAsDataURL(file);
+  const handleAvatarSave = async (url: string) => {
+    if (onSaveAvatar) {
+      await onSaveAvatar(url);
+    } else {
+      await onSaveProfile({
+        ...toProfileForm(user),
+        avatar: url,
+      });
+    }
+    setProfileForm((current) => ({ ...current, avatar: url }));
   };
 
   const handleDeleteAddress = async (address: UserAddress) => {
@@ -377,31 +378,12 @@ export function UserProfileSection({
           <form onSubmit={handleProfileSubmit} className="min-w-0 space-y-5">
             {showAvatar && (
               <div className="flex items-center gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-low p-4">
-                <div className="relative shrink-0">
-                  <img
-                    src={avatarSrc}
-                    alt="Ảnh đại diện"
-                    className="h-20 w-20 rounded-full border-4 border-primary/10 object-cover shadow-sm"
-                  />
-                  {isEditing && (
-                    <label
-                      htmlFor="shared-avatar-file"
-                      className="absolute bottom-0 right-0 grid h-8 w-8 cursor-pointer place-items-center rounded-full bg-primary text-on-primary shadow-md transition hover:bg-primary/90"
-                      title="Đổi ảnh đại diện"
-                    >
-                      <Camera size={16} />
-                      <input
-                        id="shared-avatar-file"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(event) =>
-                          handleAvatarFileChange(event.target.files?.[0])
-                        }
-                      />
-                    </label>
-                  )}
-                </div>
+                <AvatarEditor
+                  src={avatarSrc}
+                  fullName={user.fullName}
+                  disabled={isSaving}
+                  onSave={handleAvatarSave}
+                />
                 <div className="min-w-0">
                   <p className="truncate font-bold text-on-surface">
                     {user.fullName}

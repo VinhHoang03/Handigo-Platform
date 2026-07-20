@@ -1,4 +1,5 @@
 import React from "react";
+import { AvatarEditor } from "@/features/profile/components/AvatarEditor";
 import type {
   BankAccount,
   PerformanceStat,
@@ -16,14 +17,15 @@ export const ProfileSection: React.FC<{
   title: string;
   actionLabel?: string;
   onAction?: () => void;
+  actions?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ title, actionLabel, onAction, children }) => (
+}> = ({ title, actionLabel, onAction, actions, children }) => (
   <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <h3 className="text-pretty font-headline-md text-headline-md text-on-surface">
         {title}
       </h3>
-      {actionLabel && (
+      {actions ?? (actionLabel && (
         <button
           type="button"
           className="text-sm font-bold text-primary hover:underline"
@@ -31,23 +33,24 @@ export const ProfileSection: React.FC<{
         >
           {actionLabel}
         </button>
-      )}
+      ))}
     </div>
     {children}
   </section>
 );
 
-export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
-  profile,
-}) => (
+export const ProviderHero: React.FC<{
+  profile: ProviderProfile;
+  onAvatarSave: (url: string) => Promise<void> | void;
+  isSaving?: boolean;
+}> = ({ profile, onAvatarSave, isSaving }) => (
   <section className="glass-card flex flex-col items-center gap-6 overflow-hidden rounded-xl p-6 md:flex-row">
-    <img
-      alt={`${profile.fullName} profile`}
-      width={128}
-      height={128}
-      fetchPriority="high"
-      className="h-32 w-32 shrink-0 rounded-full object-cover ring-4 ring-primary-container/20"
+    <AvatarEditor
       src={profile.avatarUrl}
+      fullName={profile.fullName}
+      size="lg"
+      disabled={isSaving}
+      onSave={onAvatarSave}
     />
 
     <div className="flex-1 text-center md:text-left">

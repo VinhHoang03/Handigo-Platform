@@ -17,6 +17,8 @@ import {
   money,
 } from "../utils/serviceDisplay";
 import { ReliableImage } from "@/components/common/ReliableImage";
+import { Modal } from "@/components/common/Modal";
+import { LocationPickerMap } from "@/components/common/LocationPickerMap";
 import {
   groupServiceOptions,
   isRequiredOptionSelectionMissing,
@@ -57,6 +59,17 @@ const getErrorMessage = (
 const CURRENT_LOCATION_VALUE = "__current_location__";
 const CURRENT_LOCATION_NOTE = "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
 const CURRENT_LOCATION_DUPLICATE_RADIUS_METERS = 50;
+
+interface CurrentLocationDraft {
+  recipientName: string;
+  recipientPhone: string;
+  fullAddress: string;
+  province: string;
+  ward: string;
+  latitude: number;
+  longitude: number;
+  placeId?: string;
+}
 
 const getDistanceMeters = (
   latitudeA: number,
@@ -140,6 +153,12 @@ export default function CustomerServiceDetailPage() {
   const [isLocating, setIsLocating] = useState(false);
   const [requiresPhoneUpdate, setRequiresPhoneUpdate] = useState(false);
   const [providerAvailability, setProviderAvailability] = useState<ProviderAvailabilityStatus>("idle");
+  const [currentLocationDraft, setCurrentLocationDraft] =
+    useState<CurrentLocationDraft | null>(null);
+  const [currentLocationError, setCurrentLocationError] = useState("");
+  const [isResolvingCurrentAddress, setIsResolvingCurrentAddress] =
+    useState(false);
+  const [isSavingCurrentLocation, setIsSavingCurrentLocation] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isAuthInitializing = useAuthStore((state) => state.isInitializing);
 
@@ -295,18 +314,8 @@ export default function CustomerServiceDetailPage() {
             coords.latitude,
             coords.longitude,
           );
-          const existingAddress = findExistingCurrentLocation(
-            addresses,
-            currentAddress,
-          );
 
-          if (existingAddress) {
-            setProviderAvailability("idle");
-            setAddressId(existingAddress._id);
-            return;
-          }
-
-          const createdAddress = await bookingApi.createAddress({
+          setCurrentLocationDraft({
             recipientName,
             recipientPhone,
             fullAddress: currentAddress.fullAddress,
@@ -315,16 +324,8 @@ export default function CustomerServiceDetailPage() {
             latitude: currentAddress.latitude,
             longitude: currentAddress.longitude,
             placeId: currentAddress.placeId,
-            note: CURRENT_LOCATION_NOTE,
-            isDefault: false,
           });
-
-          setAddresses((current) => [
-            createdAddress,
-            ...current.filter((address) => address._id !== createdAddress._id),
-          ]);
-          setProviderAvailability("idle");
-          setAddressId(createdAddress._id);
+          setCurrentLocationError("");
         } catch (createError) {
           setAddressSelectionError(
             getErrorMessage(
@@ -342,6 +343,90 @@ export default function CustomerServiceDetailPage() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
     );
+  };
+
+  const handleCurrentLocationPositionChange = async (
+    latitude: number,
+    longitude: number,
+  ) => {
+    if (!currentLocationDraft) return;
+
+    setCurrentLocationError("");
+    setIsResolvingCurrentAddress(true);
+    try {
+      const currentAddress = await bookingApi.reverseGeocode(
+        latitude,
+        longitude,
+      );
+      setCurrentLocationDraft((current) =>
+        current
+          ? {
+              ...current,
+              fullAddress: currentAddress.fullAddress,
+              province: currentAddress.province,
+              ward: currentAddress.ward,
+              latitude: currentAddress.latitude,
+              longitude: currentAddress.longitude,
+              placeId: currentAddress.placeId,
+            }
+          : null,
+      );
+    } catch (resolveError) {
+      setCurrentLocationDraft((current) =>
+        current
+          ? { ...current, latitude, longitude, placeId: undefined }
+          : null,
+      );
+      setCurrentLocationError(
+        getErrorMessage(
+          resolveError,
+          "Đã ghim tọa độ nhưng không thể xác định địa chỉ tại vị trí này. Vui lòng thử vị trí khác.",
+        ),
+      );
+    } finally {
+      setIsResolvingCurrentAddress(false);
+    }
+  };
+
+  const handleConfirmCurrentLocation = async () => {
+    if (!currentLocationDraft) return;
+
+    setCurrentLocationError("");
+    setIsSavingCurrentLocation(true);
+    try {
+      const existingAddress = findExistingCurrentLocation(
+        addresses,
+        currentLocationDraft,
+      );
+
+      if (existingAddress) {
+        setAddressId(existingAddress._id);
+        setCurrentLocationDraft(null);
+        return;
+      }
+
+      const createdAddress = await bookingApi.createAddress({
+        ...currentLocationDraft,
+        note: CURRENT_LOCATION_NOTE,
+        isDefault: false,
+      });
+
+      setAddresses((current) => [
+        createdAddress,
+        ...current.filter((address) => address._id !== createdAddress._id),
+      ]);
+      setAddressId(createdAddress._id);
+      setCurrentLocationDraft(null);
+    } catch (createError) {
+      setCurrentLocationError(
+        getErrorMessage(
+          createError,
+          "Không thể lưu vị trí đã chọn. Vui lòng thử lại.",
+        ),
+      );
+    } finally {
+      setIsSavingCurrentLocation(false);
+    }
   };
 
   const handleAddressChange = (value: string) => {
@@ -754,6 +839,71 @@ export default function CustomerServiceDetailPage() {
           />
         </aside>
       </div>
+
+      <Modal
+        open={Boolean(currentLocationDraft)}
+        title="Chọn vị trí thực hiện"
+        size="lg"
+        closeOnOverlayClick={!isSavingCurrentLocation}
+        closeOnEsc={!isSavingCurrentLocation}
+        onClose={() => {
+          if (!isSavingCurrentLocation) setCurrentLocationDraft(null);
+        }}
+      >
+        {currentLocationDraft && (
+          <div className="space-y-4">
+            <LocationPickerMap
+              latitude={currentLocationDraft.latitude}
+              longitude={currentLocationDraft.longitude}
+              disabled={isSavingCurrentLocation || isResolvingCurrentAddress}
+              isResolvingAddress={isResolvingCurrentAddress}
+              onPositionChange={(latitude, longitude) =>
+                void handleCurrentLocationPositionChange(latitude, longitude)
+              }
+            />
+
+            <div className="rounded-2xl border border-outline-variant/40 bg-surface-container-low p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+                Địa chỉ theo vị trí ghim
+              </p>
+              <p className="mt-1.5 text-sm font-semibold leading-6 text-on-surface">
+                {currentLocationDraft.fullAddress}
+              </p>
+            </div>
+
+            {currentLocationError && (
+              <div className="rounded-2xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
+                {currentLocationError}
+              </div>
+            )}
+
+            <div className="flex flex-col justify-end gap-3 pt-1 sm:flex-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={isSavingCurrentLocation}
+                onClick={() => setCurrentLocationDraft(null)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={
+                  isSavingCurrentLocation ||
+                  isResolvingCurrentAddress ||
+                  Boolean(currentLocationError)
+                }
+                onClick={() => void handleConfirmCurrentLocation()}
+              >
+                {isSavingCurrentLocation
+                  ? "Đang lưu vị trí..."
+                  : "Xác nhận vị trí này"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </CustomerServiceLayout>
   );
 }

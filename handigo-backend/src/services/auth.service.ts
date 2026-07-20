@@ -21,6 +21,7 @@ import {
   isValidPersonName,
   normalizeExternalPersonName,
 } from "../utils/profileValidation";
+import { markProviderOffline } from "./providerPresence.service";
 
 const SALT_ROUNDS = 10;
 
@@ -283,6 +284,7 @@ export const verifyRegisterOtp = async (
 
   if (!isProviderRegistration) return null;
 
+  await markProviderOffline(user._id.toString());
   const tokens = await issueSessionTokens(user);
   return { ...tokens, user: toAuthUserResponse(user) };
 };
@@ -329,6 +331,9 @@ export const login = async (
     throw new AppError("Invalid email or password", 401);
   }
 
+  if (user.role === "PROVIDER") {
+    await markProviderOffline(user._id.toString());
+  }
   const tokens = await issueSessionTokens(user);
 
   return {
@@ -461,14 +466,14 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
         authenticatedUser.fullName || name,
       );
     }
-    if (picture) {
-      authenticatedUser.avatar = picture;
-    }
     await authenticatedUser.save();
   }
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
 
+  if (authenticatedUser.role === "PROVIDER") {
+    await markProviderOffline(authenticatedUser._id.toString());
+  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
@@ -556,6 +561,9 @@ export const facebookLogin = async (accessToken: string) => {
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
 
+  if (authenticatedUser.role === "PROVIDER") {
+    await markProviderOffline(authenticatedUser._id.toString());
+  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
@@ -665,7 +673,7 @@ export const logout = async (refreshToken?: string): Promise<void> => {
       return;
     }
 
-    await Session.findOneAndUpdate(
+    const revokedSession = await Session.findOneAndUpdate(
       {
         _id: decoded.sessionId,
         userId: decoded.id,
@@ -674,6 +682,10 @@ export const logout = async (refreshToken?: string): Promise<void> => {
       },
       { revokedAt: new Date() },
     );
+
+    if (revokedSession) {
+      await markProviderOffline(decoded.id);
+    }
   } catch (error) {
     return;
   }

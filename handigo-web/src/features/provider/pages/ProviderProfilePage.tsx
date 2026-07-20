@@ -10,7 +10,10 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { UserProfileSection } from "@/features/profile/components/UserProfileSection";
 import { changePasswordApi } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import { updateUserProfile } from "@/features/profile/api/userProfile.api";
+import {
+  updateUserAvatar,
+  updateUserProfile,
+} from "@/features/profile/api/userProfile.api";
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
 import { ServiceAdditionApplicationDialog } from "@/features/provider-application/components/ServiceAdditionApplicationDialog";
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
@@ -199,6 +202,38 @@ function ProviderProfileContent() {
         getErrorMessage(
           saveError,
           "Không thể cập nhật thông tin cá nhân. Vui lòng thử lại.",
+        ),
+      );
+      throw saveError;
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleAvatarSave(url: string) {
+    if (!profile) return;
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const nextUser = await updateUserAvatar(url);
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              user: {
+                ...current.user,
+                avatar: nextUser.avatar ?? null,
+              },
+            }
+          : current,
+      );
+      syncAuthUser(nextUser);
+    } catch (saveError) {
+      setError(
+        getErrorMessage(
+          saveError,
+          "Không thể cập nhật ảnh đại diện. Vui lòng thử lại.",
         ),
       );
       throw saveError;
@@ -646,7 +681,11 @@ function ProviderProfileContent() {
     >
       <div className="grid grid-cols-12 items-start gap-gutter">
         <div className="col-span-12">
-          <ProviderHero profile={profileView} />
+          <ProviderHero
+            profile={profileView}
+            isSaving={isSaving}
+            onAvatarSave={handleAvatarSave}
+          />
         </div>
 
         <div className="col-span-12">
@@ -692,14 +731,17 @@ function ProviderProfileContent() {
               void handleDeleteCertificate(certificateId)
             }
           />
+
+          <ProviderFeedbackSection enabled={canReceiveJobs} />
         </div>
 
         <div className="col-span-12 flex min-w-0 flex-col gap-gutter xl:col-span-5">
           <VerificationPanel items={verificationItems} />
-          <ServiceAreaPanel area={serviceArea} onEdit={openServiceAreaEdit} />
           <AccountFunctionsPanel
             onPasswordClick={() => setIsPwdConfirmOpen(true)}
           />
+          <ServiceAreaPanel area={serviceArea} onEdit={openServiceAreaEdit} />
+
           <ProfileSection title="Lịch sử đơn/hồ sơ">
             <ProviderApplicationHistory
               key={applicationHistoryKey}
@@ -718,9 +760,6 @@ function ProviderProfileContent() {
           </ProfileSection>
         </div>
 
-        <div className="col-span-12">
-          <ProviderFeedbackSection enabled={canReceiveJobs} />
-        </div>
       </div>
 
       <ProfessionalProfileDialog

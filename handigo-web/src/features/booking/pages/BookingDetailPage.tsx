@@ -33,6 +33,108 @@ const customerCancellationReasons = [
   "Lý do khác",
 ];
 
+type TimelineStep = {
+  icon: string;
+  title: string;
+  description: string;
+  time: string;
+  state: "done" | "active" | "pending" | "cancelled";
+};
+
+const formatTimelineTime = (value?: string | null) =>
+  value ? new Date(value).toLocaleString("vi-VN") : "";
+
+const buildOrderTimeline = (order: Order): TimelineStep[] => {
+  if (order.status === "cancelled") {
+    return [
+      {
+        icon: "close",
+        title: "Đơn hàng đã hủy",
+        description: order.cancellation?.reason
+          ? `Lý do: ${order.cancellation.reason}`
+          : `Đơn ${order.orderCode} đã kết thúc và không tiếp tục được thực hiện.`,
+        time: formatTimelineTime(
+          order.cancellation?.cancelledAt || order.updatedAt,
+        ),
+        state: "cancelled",
+      },
+    ];
+  }
+
+  const statusOrder: Record<Order["status"], number> = {
+    created: 0,
+    accepted: 1,
+    in_progress: 2,
+    completed: 3,
+    cancelled: -1,
+  };
+  const currentStatusIndex = statusOrder[order.status];
+  const serviceName = order.serviceId?.name || "dịch vụ";
+  const providerName = order.providerId?.userId?.fullName || order.providerId?.name;
+  const hasPaid = ["paid", "partially_paid"].includes(order.paymentStatus);
+  const scheduledTime = formatTimelineTime(order.scheduledAt);
+
+  return [
+    {
+      icon: "check",
+      title: "Đã tạo đơn hàng",
+      description: `Yêu cầu ${serviceName} đã được ghi nhận với mã ${order.orderCode}.`,
+      time: formatTimelineTime(order.createdAt),
+      state: currentStatusIndex > 0 ? "done" : "active",
+    },
+    {
+      icon: "person_check",
+      title: providerName ? `${providerName} đã nhận đơn` : "Chờ chuyên gia nhận đơn",
+      description: providerName
+        ? `${providerName} đã xác nhận tiếp nhận yêu cầu ${serviceName}.`
+        : hasPaid
+          ? "Hệ thống đang điều phối bác thợ phù hợp nhất đến bạn."
+          : "Vui lòng hoàn tất thanh toán để hệ thống bắt đầu điều phối thợ.",
+      time:
+        !providerName && order.matchingStartedAt
+          ? `Bắt đầu điều phối: ${formatTimelineTime(order.matchingStartedAt)}`
+          : "",
+      state:
+        currentStatusIndex > 1
+          ? "done"
+          : currentStatusIndex === 1
+            ? "active"
+            : "pending",
+    },
+    {
+      icon: "construction",
+      title: "Đang thực hiện",
+      description:
+        currentStatusIndex >= 2
+          ? `${providerName || "Chuyên gia"} đang thực hiện ${serviceName}.`
+          : providerName
+            ? `${providerName} sẽ thực hiện dịch vụ theo lịch đã xác nhận.`
+            : "Dịch vụ sẽ bắt đầu sau khi kết nối được chuyên gia.",
+      time:
+        currentStatusIndex < 2 && scheduledTime
+          ? `Lịch dự kiến: ${scheduledTime}`
+          : "",
+      state:
+        currentStatusIndex > 2
+          ? "done"
+          : currentStatusIndex === 2
+            ? "active"
+            : "pending",
+    },
+    {
+      icon: "verified",
+      title: "Hoàn thành",
+      description:
+        order.status === "completed"
+          ? `${serviceName} đã được hoàn tất thành công.`
+          : "Hoàn tất sau khi dịch vụ được thực hiện và xác nhận.",
+      time:
+        order.status === "completed" ? formatTimelineTime(order.updatedAt) : "",
+      state: currentStatusIndex === 3 ? "done" : "pending",
+    },
+  ];
+};
+
 const BookingDetailPage = () => {
   const { bookingId: id } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
@@ -391,78 +493,7 @@ const BookingDetailPage = () => {
     );
   }
 
-  const statusOrder: Record<Order["status"], number> = {
-    created: 0,
-    accepted: 1,
-    in_progress: 2,
-    completed: 3,
-    cancelled: -1,
-  };
-  const currentStatusIndex = statusOrder[order.status];
-  const timeline =
-    order.status === "cancelled"
-      ? [
-          {
-            icon: "close",
-            title: "Đơn hàng đã hủy",
-            description:
-              "Đơn hàng đã kết thúc và không tiếp tục được thực hiện.",
-            time: new Date(order.updatedAt).toLocaleString("vi-VN"),
-            state: "cancelled",
-          },
-        ]
-      : [
-          {
-            icon: "check",
-            title: "Đã tạo đơn hàng",
-            description: "Yêu cầu dịch vụ đã được gửi thành công.",
-            time: new Date(order.createdAt).toLocaleString("vi-VN"),
-            state: currentStatusIndex > 0 ? "done" : "active",
-          },
-          {
-            icon: "person_check",
-            title: "Chuyên gia đã nhận đơn",
-            description:
-              currentStatusIndex >= 1
-                ? "Chuyên gia đã xác nhận tiếp nhận đơn hàng."
-                : "Đang chờ chuyên gia phù hợp tiếp nhận.",
-            time: "",
-            state:
-              currentStatusIndex > 1
-                ? "done"
-                : currentStatusIndex === 1
-                  ? "active"
-                  : "pending",
-          },
-          {
-            icon: "construction",
-            title: "Đang thực hiện",
-            description:
-              currentStatusIndex >= 2
-                ? "Chuyên gia đang thực hiện dịch vụ."
-                : "Dịch vụ sẽ bắt đầu sau khi chuyên gia xác nhận.",
-            time: "",
-            state:
-              currentStatusIndex > 2
-                ? "done"
-                : currentStatusIndex === 2
-                  ? "active"
-                  : "pending",
-          },
-          {
-            icon: "verified",
-            title: "Hoàn thành",
-            description:
-              order.status === "completed"
-                ? "Dịch vụ đã hoàn tất thành công."
-                : "Dự kiến hoàn tất sau khi thực hiện.",
-            time:
-              order.status === "completed"
-                ? new Date(order.updatedAt).toLocaleString("vi-VN")
-                : "",
-            state: currentStatusIndex === 3 ? "done" : "pending",
-          },
-        ];
+  const timeline = buildOrderTimeline(order);
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -658,6 +689,9 @@ const BookingDetailPage = () => {
 
   const providerInfo = getProviderInfo();
   const paymentStatusDisplay = getPaymentStatusDisplay(order);
+  const hasSuccessfulPayment = ["paid", "partially_paid"].includes(
+    order.paymentStatus,
+  );
   const paidAmount = payments
     .filter((payment) => payment.status === "paid")
     .reduce((total, payment) => total + payment.amount, 0);
@@ -1256,21 +1290,25 @@ const BookingDetailPage = () => {
                 )}
               </div>
             ) : (
-              <div className="py-md text-center">
-                <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-sm">
-                  <span className="material-symbols-outlined animate-spin">
-                    search
+              <div className="rounded-2xl bg-surface-container-low p-md text-center">
+                <div className="mx-auto mb-sm grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-primary">
+                  <span
+                    className={`material-symbols-outlined ${hasSuccessfulPayment ? "animate-pulse" : ""}`}
+                  >
+                    {hasSuccessfulPayment ? "person_search" : "payments"}
                   </span>
                 </div>
-                <p className="text-on-surface-variant text-sm px-md">
-                  Bác thợ phù hợp nhất đang được điều phối đến bạn.
+                <p className="text-sm font-semibold leading-5 text-on-surface">
+                  {hasSuccessfulPayment
+                    ? "Bác thợ phù hợp nhất đang được điều phối đến bạn."
+                    : "Vui lòng thanh toán để hệ thống điều phối thợ."}
                 </p>
               </div>
             )}
           </section>
 
           <section className="glass-card rounded-3xl border border-outline-variant/30 p-md shadow-sm sm:p-lg">
-            <div className="mb-lg flex items-center justify-between gap-sm">
+            <div className="mb-md flex items-center justify-between gap-sm">
               <h3 className="font-label-sm text-label-sm font-bold uppercase tracking-wider text-on-surface-variant">
                 Theo dõi tiến độ
               </h3>
@@ -1280,7 +1318,7 @@ const BookingDetailPage = () => {
                 {getStatusLabel(order.status)}
               </span>
             </div>
-            <div className="relative">
+            <div>
               {timeline.map((step, index) => {
                 const isDone = step.state === "done";
                 const isActive = step.state === "active";
@@ -1290,47 +1328,50 @@ const BookingDetailPage = () => {
                 return (
                   <div
                     key={step.title}
-                    className={`flex min-w-0 gap-sm pb-lg last:pb-0 ${step.state === "pending" ? "opacity-50" : ""}`}
+                    className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-sm pb-5 last:pb-0"
                   >
-                    <div className="flex flex-col items-center relative">
-                      <div
-                        className={`z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all ${
+                    <div className="relative flex justify-center">
+                      <span
+                        className={`relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border text-sm transition-colors ${
                           isCancelled
-                            ? "bg-error text-on-error"
+                            ? "border-error bg-error text-on-error"
                             : isDone
-                              ? "bg-primary text-on-primary shadow-lg shadow-primary/20 scale-100"
+                              ? "border-primary bg-primary text-on-primary"
                               : isActive
-                                ? "border-[3px] border-primary bg-surface text-primary shadow-md"
-                                : "bg-surface-container-highest text-on-surface-variant"
+                                ? "border-2 border-primary bg-surface-container-lowest text-primary ring-[3px] ring-primary-fixed"
+                                : "border-outline-variant bg-surface-container-lowest text-on-surface-variant"
                         }`}
                       >
                         <span
-                          className={`material-symbols-outlined text-[16px] ${isActive ? "animate-pulse font-bold" : ""}`}
+                          className="material-symbols-outlined text-[16px] leading-none"
                         >
                           {step.icon}
                         </span>
-                      </div>
+                      </span>
                       {!isLast && (
-                        <div
-                          className={`absolute bottom-0 top-9 w-0.5 ${isDone ? "bg-primary" : "bg-outline-variant/50"}`}
+                        <span
+                          aria-hidden="true"
+                          className={`absolute bottom-[-20px] left-1/2 top-8 w-px -translate-x-1/2 ${isDone ? "bg-primary" : "bg-outline-variant"}`}
                         />
                       )}
                     </div>
-                    <div className="min-w-0 flex-grow pt-1">
-                      <div className="flex flex-col">
+                    <div
+                      className={`min-w-0 ${isActive ? "-mt-1 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2" : "pt-0.5"}`}
+                    >
+                      <div>
                         <h4
-                          className={`text-sm font-bold ${isCancelled ? "text-error" : isActive ? "text-primary" : "text-on-surface"}`}
+                          className={`text-sm leading-5 ${isCancelled ? "font-bold text-error" : isActive ? "font-bold text-primary" : isDone ? "font-semibold text-on-surface" : "font-semibold text-on-surface-variant"}`}
                         >
                           {step.title}
                         </h4>
                         {step.time && (
-                          <span className="mt-0.5 break-words text-xs text-on-surface-variant">
+                          <span className="mt-0.5 block break-words text-[11px] font-medium leading-4 text-on-surface-variant">
                             {step.time}
                           </span>
                         )}
                       </div>
                       <p
-                        className={`mt-1 break-words text-sm leading-5 ${isActive ? "font-medium text-primary" : "text-on-surface-variant"}`}
+                        className={`mt-1 break-words text-xs leading-5 ${isActive ? "font-medium text-on-surface" : "text-on-surface-variant"}`}
                       >
                         {step.description}
                       </p>
