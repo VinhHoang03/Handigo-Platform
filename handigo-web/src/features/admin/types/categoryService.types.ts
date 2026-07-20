@@ -24,6 +24,7 @@ export interface Service {
   description?: string | null;
   serviceType: 'fixed_price' | 'variable_price';
   fixedPrice?: number | null;
+  minOptionPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
   requiresOptionSelection: boolean;
@@ -87,6 +88,7 @@ export interface ServiceOption {
   price: number;
   selectionGroup?: string | null;
   selectionMode?: ServiceOptionSelectionMode;
+  allowsQuantity?: boolean;
   sortOrder?: number;
   isActive: boolean;
   createdAt: string;
@@ -101,6 +103,7 @@ export interface ServiceOptionPayload {
   price: number;
   selectionGroup?: string | null;
   selectionMode?: ServiceOptionSelectionMode;
+  allowsQuantity?: boolean;
   sortOrder?: number;
   isActive?: boolean;
 }

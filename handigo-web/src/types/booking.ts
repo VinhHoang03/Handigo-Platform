@@ -16,6 +16,7 @@ export interface Service {
   description?: string;
   serviceType: "fixed_price" | "variable_price";
   fixedPrice?: number;
+  minOptionPrice?: number | null;
   depositAmount?: number;
   image?: string;
   requiresOptionSelection: boolean;
@@ -43,6 +44,7 @@ export interface ServiceOption {
   isFixedPrice?: boolean;
   selectionGroup?: string | null;
   selectionMode?: "single" | "multiple";
+  allowsQuantity?: boolean;
   sortOrder?: number;
   isActive: boolean;
 }
@@ -143,6 +145,8 @@ export interface Order {
     name: string;
     optionType: string;
     price: number;
+    quantity?: number;
+    subtotal?: number;
   }>;
   addressId: Address;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
@@ -253,6 +257,7 @@ export interface BookingState {
   categoryId?: string;
   serviceId?: string;
   selectedOptionIds: string[];
+  selectedOptionQuantities: Record<string, number>;
   addressId?: string;
   preferredProviderId?: string;
   preferredProviderName?: string;
@@ -271,8 +276,10 @@ export interface BookingState {
     categoryId: string,
     serviceId: string,
     selectedOptionIds?: string[],
+    selectedOptionQuantities?: Record<string, number>,
   ) => void;
   toggleOption: (option: ServiceOption, options: ServiceOption[]) => void;
+  setOptionQuantity: (optionId: string, quantity: number) => void;
   setAddressId: (id: string) => void;
   setPreferredProviderId: (id?: string, name?: string) => void;
   setOrderType: (type: BookingState["orderType"]) => void;

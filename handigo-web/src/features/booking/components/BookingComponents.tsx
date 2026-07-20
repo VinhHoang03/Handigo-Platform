@@ -187,6 +187,7 @@ export const OrderSummaryCard: React.FC<{
     categoryId,
     serviceId,
     selectedOptionIds,
+    selectedOptionQuantities,
     orderType,
     scheduledAt,
     preferredProviderName,
@@ -223,13 +224,13 @@ export const OrderSummaryCard: React.FC<{
   const calculateTotal = () => {
     let total = 0;
     if (service?.serviceType === 'fixed_price') {
-      total = service?.fixedPrice || 0;
+      total = 0;
     } else if (service?.serviceType === 'variable_price') {
       total = service?.depositAmount || 0;
     }
     if (service?.serviceType !== 'variable_price') {
       selectedOptions.forEach(opt => {
-        total += getOptionPrice(opt);
+        total += getOptionPrice(opt) * (selectedOptionQuantities?.[opt._id] ?? 1);
       });
     }
     return total;
@@ -264,7 +265,7 @@ export const OrderSummaryCard: React.FC<{
               </p>
               <p className="text-sm font-bold text-primary mt-1">
                 {service?.serviceType === 'fixed_price'
-                  ? `${(service.fixedPrice || 0).toLocaleString()}đ`
+                  ? 'Giá theo tùy chọn'
                   : service?.serviceType === 'variable_price'
                     ? `Phí cọc: ${(service.depositAmount || 0).toLocaleString()}đ`
                     : '0đ'}
@@ -298,21 +299,24 @@ export const OrderSummaryCard: React.FC<{
           )}
 
           <div className="border-t border-dashed border-outline-variant pt-md space-y-sm text-sm">
-            <div className="flex justify-between">
-              <span className="text-on-surface-variant">
-                {service?.serviceType === 'variable_price' ? 'Phí đặt cọc' : 'Phí dịch vụ'}
-              </span>
-              <span className="font-medium">
-                {service?.serviceType === 'fixed_price'
-                  ? `${(service?.fixedPrice || 0).toLocaleString()}đ`
-                  : `${(service?.depositAmount || 0).toLocaleString()}đ`}
-              </span>
-            </div>
+            {service?.serviceType === 'variable_price' && (
+              <div className="flex justify-between">
+                <span className="text-on-surface-variant">Phí đặt cọc</span>
+                <span className="font-medium">{(service?.depositAmount || 0).toLocaleString()}đ</span>
+              </div>
+            )}
             {selectedOptions.map(opt => (
               <div key={opt._id} className="flex justify-between">
-                <span className="text-on-surface-variant">{opt.name}</span>
+                <span className="text-on-surface-variant">
+                  {opt.name}
+                  {(selectedOptionQuantities?.[opt._id] ?? 1) > 1
+                    ? ` × ${selectedOptionQuantities?.[opt._id]}`
+                    : ''}
+                </span>
                 {service?.serviceType !== 'variable_price' && (
-                  <span className="font-medium">+{getOptionPrice(opt).toLocaleString()}đ</span>
+                  <span className="font-medium">
+                    {(getOptionPrice(opt) * (selectedOptionQuantities?.[opt._id] ?? 1)).toLocaleString()}đ
+                  </span>
                 )}
               </div>
             ))}

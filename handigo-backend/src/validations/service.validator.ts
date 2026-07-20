@@ -29,14 +29,6 @@ const validateActivePricing = (
 ) => {
   if (data.isActive === false) return;
 
-  if (data.serviceType === "fixed_price" && (!data.fixedPrice || data.fixedPrice <= 0)) {
-    context.addIssue({
-      code: "custom",
-      path: ["fixedPrice"],
-      message: "Dịch vụ giá cố định đang hoạt động phải có giá lớn hơn 0",
-    });
-  }
-
   if (data.serviceType === "variable_price" && data.depositAmount == null) {
     context.addIssue({
       code: "custom",

@@ -545,7 +545,7 @@ const BookingDetailPage = () => {
 
     if (currentOrder.paymentStatus === "partially_paid") {
       return {
-        label: "Đã thanh toán một phần",
+        label: "Đã thanh toán tiền cọc",
         className: "text-amber-600",
       };
     }

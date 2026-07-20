@@ -6,6 +6,7 @@ import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { Address, Category, Service, ServiceOption } from "@/types/booking";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import { NearbyProviderSelector } from "../components/NearbyProviderSelector";
+import type { ProviderAvailabilityStatus } from "../components/NearbyProviderSelector";
 import { customerServiceApi } from "../api/customerService.api";
 import {
   getCategoryId,
@@ -130,6 +131,7 @@ export default function CustomerServiceDetailPage() {
   const [relatedServices, setRelatedServices] = useState<Service[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
+  const [selectedOptionQuantities, setSelectedOptionQuantities] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
   const [error, setError] = useState("");
@@ -137,6 +139,7 @@ export default function CustomerServiceDetailPage() {
   const [optionSelectionError, setOptionSelectionError] = useState("");
   const [isLocating, setIsLocating] = useState(false);
   const [requiresPhoneUpdate, setRequiresPhoneUpdate] = useState(false);
+  const [providerAvailability, setProviderAvailability] = useState<ProviderAvailabilityStatus>("idle");
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isAuthInitializing = useAuthStore((state) => state.isInitializing);
 
@@ -227,14 +230,14 @@ export default function CustomerServiceDetailPage() {
   const basePrice = service ? getServicePrice(service) : 0;
   const optionGroups = groupServiceOptions(options);
   const selectedOptionTotal = selectedOptions.reduce(
-    (total, option) => total + getOptionPrice(option),
+    (total, option) => total + getOptionPrice(option) * (selectedOptionQuantities[option._id] ?? 1),
     0,
   );
 
   const estimatePrice = useMemo(() => {
     if (!service) return 0;
     if (service.serviceType === "fixed_price") {
-      return (service.fixedPrice || 0) + selectedOptionTotal;
+      return selectedOptionTotal;
     }
     return basePrice;
   }, [basePrice, selectedOptionTotal, service]);
@@ -242,6 +245,7 @@ export default function CustomerServiceDetailPage() {
   const handleToggleOption = (option: ServiceOption) => {
     setOptionSelectionError("");
     setSelectedOptionIds((current) => toggleServiceOption(current, option, options));
+    setSelectedOptionQuantities((current) => ({ ...current, [option._id]: current[option._id] ?? 1 }));
   };
 
   const handleUseCurrentLocation = () => {
@@ -297,6 +301,7 @@ export default function CustomerServiceDetailPage() {
           );
 
           if (existingAddress) {
+            setProviderAvailability("idle");
             setAddressId(existingAddress._id);
             return;
           }
@@ -318,6 +323,7 @@ export default function CustomerServiceDetailPage() {
             createdAddress,
             ...current.filter((address) => address._id !== createdAddress._id),
           ]);
+          setProviderAvailability("idle");
           setAddressId(createdAddress._id);
         } catch (createError) {
           setAddressSelectionError(
@@ -344,6 +350,7 @@ export default function CustomerServiceDetailPage() {
       return;
     }
     setAddressSelectionError("");
+    setProviderAvailability("idle");
     setAddressId(value);
   };
 
@@ -357,12 +364,25 @@ export default function CustomerServiceDetailPage() {
       setAddressSelectionError("Vui lòng chọn địa chỉ thực hiện trước khi đặt lịch.");
       return;
     }
+    if (providerAvailability !== "available") {
+      setAddressSelectionError(
+        providerAvailability === "loading" || providerAvailability === "idle"
+          ? "Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp."
+          : "Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.",
+      );
+      return;
+    }
     if (isRequiredOptionSelectionMissing(service, selectedOptionIds)) {
       setOptionSelectionError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.");
       return;
     }
 
-    selectService(getCategoryId(service), service._id, selectedOptionIds);
+    selectService(
+      getCategoryId(service),
+      service._id,
+      selectedOptionIds,
+      selectedOptionQuantities,
+    );
     navigate("/customer/bookings/new/location", {
       state: { fromServiceDetail: true },
     });
@@ -497,14 +517,14 @@ export default function CustomerServiceDetailPage() {
                       {group.options.map((option) => {
                         const checked = selectedOptionIds.includes(option._id);
                         return (
-                          <button
-                            key={option._id}
-                            type="button"
-                            role={group.selectionMode === "single" ? "radio" : "checkbox"}
-                            aria-checked={checked}
-                            onClick={() => handleToggleOption(option)}
-                            className={`rounded-xl border-2 bg-white p-5 text-left transition ${checked ? "border-primary bg-surface-container-low shadow-sm" : "border-outline-variant hover:border-primary/50"}`}
-                          >
+                          <div key={option._id} className="space-y-2">
+                            <button
+                              type="button"
+                              role={group.selectionMode === "single" ? "radio" : "checkbox"}
+                              aria-checked={checked}
+                              onClick={() => handleToggleOption(option)}
+                              className={`w-full rounded-xl border-2 bg-white p-5 text-left transition ${checked ? "border-primary bg-surface-container-low shadow-sm" : "border-outline-variant hover:border-primary/50"}`}
+                            >
                             <div className="flex gap-4">
                               <ReliableImage
                                 src={option.image}
@@ -527,7 +547,24 @@ export default function CustomerServiceDetailPage() {
                                 </p>
                               </div>
                             </div>
-                          </button>
+                            </button>
+                            {checked && option.allowsQuantity && (
+                              <label className="flex items-center justify-end gap-2 text-sm font-semibold">
+                                Số lượng
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={99}
+                                  value={selectedOptionQuantities[option._id] ?? 1}
+                                  onChange={(event) => setSelectedOptionQuantities((current) => ({
+                                    ...current,
+                                    [option._id]: Math.min(Math.max(Math.trunc(Number(event.target.value)) || 1, 1), 99),
+                                  }))}
+                                  className="w-20 rounded-lg border border-outline-variant px-3 py-2 text-center"
+                                />
+                              </label>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -595,7 +632,11 @@ export default function CustomerServiceDetailPage() {
             <div className="mb-5 flex items-center justify-between">
               <span className="text-on-surface-variant">Giá tạm tính</span>
               <span className="text-2xl font-bold text-primary">
-                {estimatePrice > 0 ? money.format(estimatePrice) : "Báo giá"}
+                {estimatePrice > 0
+                  ? money.format(estimatePrice)
+                  : service.serviceType === "fixed_price"
+                    ? "Chọn tùy chọn"
+                    : "Báo giá"}
               </span>
             </div>
 
@@ -689,7 +730,12 @@ export default function CustomerServiceDetailPage() {
             <button
               type="button"
               onClick={handleBookNow}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 text-lg font-bold text-on-primary shadow-md transition hover:opacity-90 active:scale-95"
+              disabled={
+                isAuthenticated &&
+                addresses.some((address) => address._id === addressId) &&
+                providerAvailability !== "available"
+              }
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 text-lg font-bold text-on-primary shadow-md transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
             >
               Đặt lịch ngay
               <span className="material-symbols-outlined">arrow_forward</span>
@@ -704,6 +750,7 @@ export default function CustomerServiceDetailPage() {
               addresses.some((address) => address._id === addressId)
             }
             allowSelection={false}
+            onAvailabilityChange={setProviderAvailability}
           />
         </aside>
       </div>

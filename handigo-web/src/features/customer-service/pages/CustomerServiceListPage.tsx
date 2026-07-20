@@ -304,14 +304,14 @@ export default function CustomerServiceListPage() {
                       <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
                         <div>
                           {!isQuoteOnly && (
-                            <span className="block text-xs text-outline">
-                              {service.serviceType === "fixed_price"
-                                ? "Giá"
-                                : "Từ"}
-                            </span>
+                            <span className="block text-xs text-outline">Từ</span>
                           )}
                           <span className="text-lg font-bold text-primary">
-                            {isQuoteOnly ? "Báo giá" : money.format(price)}
+                            {isQuoteOnly
+                              ? service.serviceType === "fixed_price"
+                                ? "Theo tùy chọn"
+                                : "Báo giá"
+                              : money.format(price)}
                           </span>
                         </div>
                         <span className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary transition group-hover:bg-primary group-hover:text-on-primary">

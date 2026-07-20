@@ -7,6 +7,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   categoryId: undefined,
   serviceId: undefined,
   selectedOptionIds: [],
+  selectedOptionQuantities: {},
   addressId: undefined,
   preferredProviderId: undefined,
   preferredProviderName: undefined,
@@ -22,32 +23,50 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     categoryId: id,
     serviceId: undefined,
     selectedOptionIds: [],
+    selectedOptionQuantities: {},
     preferredProviderId: undefined,
     preferredProviderName: undefined,
   }),
   setServiceId: (id) => set({
     serviceId: id,
     selectedOptionIds: [],
+    selectedOptionQuantities: {},
     preferredProviderId: undefined,
     preferredProviderName: undefined,
   }),
-  selectService: (categoryId, serviceId, selectedOptionIds = []) =>
+  selectService: (categoryId, serviceId, selectedOptionIds = [], selectedOptionQuantities = {}) =>
     set((state) => ({
       categoryId,
       serviceId,
       selectedOptionIds,
+      selectedOptionQuantities: Object.fromEntries(
+        selectedOptionIds.map((id) => [id, selectedOptionQuantities[id] ?? 1]),
+      ),
       ...(state.serviceId !== serviceId && {
         preferredProviderId: undefined,
         preferredProviderName: undefined,
       }),
     })),
   toggleOption: (option, options) =>
-    set((state) => ({
-      selectedOptionIds: toggleServiceOption(
+    set((state) => {
+      const selectedOptionIds = toggleServiceOption(
         state.selectedOptionIds,
         option,
         options,
-      ),
+      );
+      return {
+        selectedOptionIds,
+        selectedOptionQuantities: Object.fromEntries(
+          selectedOptionIds.map((id) => [id, state.selectedOptionQuantities?.[id] ?? 1]),
+        ),
+      };
+    }),
+  setOptionQuantity: (optionId, quantity) =>
+    set((state) => ({
+      selectedOptionQuantities: {
+        ...(state.selectedOptionQuantities ?? {}),
+        [optionId]: Math.min(Math.max(Math.trunc(quantity) || 1, 1), 99),
+      },
     })),
   setAddressId: (id) =>
     set((state) => ({
@@ -73,6 +92,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
       categoryId: undefined,
       serviceId: undefined,
       selectedOptionIds: [],
+      selectedOptionQuantities: {},
       addressId: undefined,
       preferredProviderId: undefined,
       preferredProviderName: undefined,
