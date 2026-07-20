@@ -297,10 +297,6 @@ export default function CustomerServiceListPage() {
                       <h3 className="line-clamp-2 text-xl font-bold leading-tight text-on-surface transition-colors group-hover:text-primary">
                         {service.name}
                       </h3>
-                      <p className="mt-2 line-clamp-2 min-h-10 text-sm text-on-surface-variant">
-                        {service.description ||
-                          "Dịch vụ tại nhà được kiểm duyệt bởi Handigo."}
-                      </p>
                       <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
                         <div>
                           {!isQuoteOnly && (

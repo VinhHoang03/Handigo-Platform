@@ -4,6 +4,8 @@ import {
   type ProviderAvailabilityStatus,
 } from "../api/providerDashboard.api";
 
+let hasInitializedProviderAvailability = false;
+
 const getCurrentCoordinates = () =>
   new Promise<GeolocationCoordinates>((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -27,9 +29,12 @@ export function useProviderAvailability(enabled = true) {
     if (!enabled) return;
 
     let cancelled = false;
+    const availabilityRequest = hasInitializedProviderAvailability
+      ? providerDashboardApi.overview()
+      : providerDashboardApi.updateAvailability("offline");
+    hasInitializedProviderAvailability = true;
 
-    providerDashboardApi
-      .overview()
+    availabilityRequest
       .then((overview) => {
         if (!cancelled) {
           setAvailabilityStatus(overview.availabilityStatus || "offline");
@@ -46,10 +51,32 @@ export function useProviderAvailability(enabled = true) {
     };
   }, [enabled]);
 
-  const toggleAvailability = useCallback(async () => {
+  useEffect(() => {
     if (!enabled) return;
 
+    const keepOffline = () => {
+      setAvailabilityStatus("offline");
+    };
+    const persistOfflineAfterReconnect = () => {
+      keepOffline();
+      void providerDashboardApi.updateAvailability("offline").catch(() => undefined);
+    };
+
+    window.addEventListener("offline", keepOffline);
+    window.addEventListener("online", persistOfflineAfterReconnect);
+
+    return () => {
+      window.removeEventListener("offline", keepOffline);
+      window.removeEventListener("online", persistOfflineAfterReconnect);
+    };
+  }, [enabled]);
+
+  const toggleAvailability = useCallback(async () => {
+    if (!enabled || isUpdating) return;
+
+    const previousStatus = availabilityStatus;
     const nextStatus = availabilityStatus === "online" ? "offline" : "online";
+    setAvailabilityStatus(nextStatus);
     setIsUpdating(true);
 
     try {
@@ -61,6 +88,7 @@ export function useProviderAvailability(enabled = true) {
             coordinates.longitude,
           );
         } catch {
+          setAvailabilityStatus(previousStatus);
           window.alert(
             "Vui lòng cho phép truy cập vị trí để bật trạng thái sẵn sàng nhận đơn.",
           );
@@ -70,10 +98,13 @@ export function useProviderAvailability(enabled = true) {
 
       const result = await providerDashboardApi.updateAvailability(nextStatus);
       setAvailabilityStatus(result.availabilityStatus);
+    } catch {
+      setAvailabilityStatus(previousStatus);
+      window.alert("Không thể cập nhật trạng thái hoạt động. Vui lòng thử lại.");
     } finally {
       setIsUpdating(false);
     }
-  }, [availabilityStatus, enabled]);
+  }, [availabilityStatus, enabled, isUpdating]);
 
   return {
     availabilityStatus,
