@@ -16,6 +16,7 @@ import { handleWalletDepositPayosWebhook } from "./wallet.service";
 import { buildTransactionCode } from "../utils/transaction";
 import { DispatchService } from "./dispatch.service";
 import { createLogger } from "../utils/logger";
+import { markOrderVoucherAsUsed } from "./voucher.service";
 
 const DEFAULT_RETURN_URL = process.env.PAYOS_RETURN_URL || "http://localhost:5173/payment/success";
 const DEFAULT_CANCEL_URL = process.env.PAYOS_CANCEL_URL || "http://localhost:5173/payment/cancel";
@@ -35,12 +36,118 @@ const rethrowDuplicatePaymentError = (error: unknown): never => {
   throw error;
 };
 
+const getPendingPayosLink = (payment: InstanceType<typeof Payment>) => {
+  const gatewayResponse = payment.gatewayResponse as
+    | {
+        paymentLink?: {
+          checkoutUrl?: string;
+          qrCode?: string;
+        };
+      }
+    | null
+    | undefined;
+  return gatewayResponse?.paymentLink;
+};
+
+const reconcilePendingPayosPayment = async (
+  payment: InstanceType<typeof Payment>,
+) => {
+  if (!payment.gatewayOrderCode) {
+    throw new AppError("Giao dịch PayOS đang chờ xử lý nhưng thiếu mã đối soát", 409);
+  }
+
+  let paymentLink;
+  try {
+    paymentLink = await payos.paymentRequests.get(
+      Number(payment.gatewayOrderCode),
+    );
+  } catch (error: unknown) {
+    paymentLogger.error("Không thể kiểm tra trạng thái giao dịch PayOS.", error, {
+      paymentId: payment._id.toString(),
+      orderId: payment.orderId.toString(),
+    });
+    throw new AppError(
+      "Không thể kiểm tra trạng thái giao dịch PayOS. Vui lòng thử lại sau.",
+      502,
+    );
+  }
+
+  if (["CANCELLED", "EXPIRED", "FAILED"].includes(paymentLink.status)) {
+    const failureReason =
+      paymentLink.status === "CANCELLED"
+        ? "Khách hàng đã hủy thanh toán trên PayOS"
+        : paymentLink.status === "EXPIRED"
+          ? "Liên kết thanh toán PayOS đã hết hạn"
+          : "Thanh toán PayOS thất bại";
+
+    const transition = await Payment.updateOne(
+      { _id: payment._id, status: "pending", isDeleted: false },
+      {
+        $set: {
+          status: "failed",
+          failedAt: new Date(),
+          failureReason,
+          gatewayResponse: {
+            ...((payment.gatewayResponse as Record<string, unknown>) || {}),
+            statusCheck: {
+              status: paymentLink.status,
+              cancellationReason: paymentLink.cancellationReason,
+              canceledAt: paymentLink.canceledAt,
+              checkedAt: new Date(),
+            },
+          },
+        },
+      },
+    );
+    if (transition.modifiedCount === 0) {
+      const currentPayment = await Payment.findById(payment._id).select("status");
+      if (currentPayment?.status !== "failed") {
+        throw new AppError(
+          "Trạng thái giao dịch vừa được cập nhật. Vui lòng tải lại đơn hàng.",
+          409,
+        );
+      }
+    }
+    return null;
+  }
+
+  if (paymentLink.status !== "PENDING") {
+    throw new AppError(
+      "Giao dịch PayOS đang được xử lý. Vui lòng chờ hệ thống cập nhật trạng thái.",
+      409,
+    );
+  }
+
+  return getPendingPayosLink(payment);
+};
+
 const triggerDispatch = (orderId: string) => {
   DispatchService.dispatchReadyOrder(orderId).catch((error: unknown) =>
     paymentLogger.error("Không thể khởi động điều phối sau thanh toán.", error, {
       orderId,
     }),
   );
+};
+
+const assertAppointmentPaymentReady = (
+  order: InstanceType<typeof Order>,
+  paymentType?: PaymentType,
+) => {
+  if (paymentType === "remaining") return;
+  if (!["scheduled", "recurring"].includes(order.orderType)) return;
+  if (
+    order.status !== "accepted" ||
+    order.bookingStatus !== "awaiting_payment" ||
+    !order.providerId
+  ) {
+    throw new AppError(
+      "Chỉ có thể thanh toán sau khi chuyên gia xác nhận lịch hẹn.",
+      409,
+    );
+  }
+  if (order.paymentDueAt && order.paymentDueAt <= new Date()) {
+    throw new AppError("Thời hạn thanh toán giữ lịch đã kết thúc.", 409);
+  }
 };
 
 const buildPayosOrderCode = () =>
@@ -93,7 +200,7 @@ const getPaymentAmount = async (
   const depositAmount = order.depositAmount || 0;
 
   if (depositAmount <= 0) {
-    throw new AppError("Dá»‹ch vá»¥ kháº£o sÃ¡t chÆ°a cáº¥u hÃ¬nh tiá»n Ä‘áº·t cá»c", 400);
+    throw new AppError("Dịch vụ khảo sát chưa cấu hình tiền đặt cọc", 400);
   }
 
   return depositAmount;
@@ -129,6 +236,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       if (!transactionalOrder || transactionalOrder.isDeleted) {
         throw new AppError("Không tìm thấy đơn hàng", 404);
       }
+      assertAppointmentPaymentReady(transactionalOrder, paymentType);
 
       chargedAmount = await getPaymentAmount(transactionalOrder, paymentType, session);
       if (chargedAmount <= 0) {
@@ -203,12 +311,18 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       } else {
         transactionalOrder.paymentStatus = "paid";
       }
+      transactionalOrder.paymentMethod = "wallet";
 
       shouldDispatch = paymentType !== "remaining" && transactionalOrder.status === "created";
       if (shouldDispatch) {
         transactionalOrder.readyForMatching = true;
       }
+      if (["scheduled", "recurring"].includes(transactionalOrder.orderType)) {
+        transactionalOrder.bookingStatus = "confirmed";
+        transactionalOrder.readyForMatching = false;
+      }
 
+      await markOrderVoucherAsUsed(transactionalOrder, session);
       await transactionalOrder.save({ session });
       paymentOrder = transactionalOrder;
       return createdPayment;
@@ -270,6 +384,7 @@ const reserveExternalPayment = async (
       }
 
       const paymentType = getPaymentType(order, input.paymentType);
+      assertAppointmentPaymentReady(order, paymentType);
 
       if (paymentType === "remaining") {
         if (!order.inspectionRequired || !order.currentQuotationId) {
@@ -338,8 +453,13 @@ const reserveExternalPayment = async (
       );
 
       if (method === "cash") {
-        order.readyForMatching = true;
+        order.paymentMethod = "cash";
+        order.readyForMatching = !["scheduled", "recurring"].includes(order.orderType);
+        if (["scheduled", "recurring"].includes(order.orderType)) {
+          order.bookingStatus = "confirmed";
+        }
       } else {
+        order.paymentMethod = "bank";
         if (paymentType !== "remaining") {
           order.readyForMatching = false;
         }
@@ -368,14 +488,15 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   const order = await Order.findById(input.orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
+    throw new AppError("Không tìm thấy đơn hàng", 404);
   }
 
   if (order.customerId.toString() !== user.id && user.role !== "ADMIN") {
-    throw new AppError("Báº¡n khÃ´ng cÃ³ quyá»n thanh toÃ¡n Ä‘Æ¡n hÃ ng nÃ y", 403);
+    throw new AppError("Bạn không có quyền thanh toán đơn hàng này", 403);
   }
 
   const paymentType = getPaymentType(order, input.paymentType);
+  assertAppointmentPaymentReady(order, paymentType);
 
   if (paymentType === "remaining") {
     if (!order.inspectionRequired || !order.currentQuotationId) {
@@ -393,13 +514,13 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   }
 
   if (order.inspectionRequired && input.method === "CASH") {
-    throw new AppError("ÄÆ¡n kháº£o sÃ¡t pháº£i thanh toÃ¡n tiá»n Ä‘áº·t cá»c qua PayOS", 400);
+    throw new AppError("Đơn khảo sát phải thanh toán tiền đặt cọc qua PayOS", 400);
   }
 
   const amount = await getPaymentAmount(order, paymentType);
 
   if (amount <= 0) {
-    throw new AppError("Sá»‘ tiá»n thanh toÃ¡n khÃ´ng há»£p lá»‡", 400);
+    throw new AppError("Số tiền thanh toán không hợp lệ", 400);
   }
 
   const duplicatePayment = await Payment.findOne({
@@ -409,8 +530,30 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     isDeleted: false,
   });
 
-  if (duplicatePayment) {
-    throw new AppError("ÄÆ¡n hÃ ng Ä‘Ã£ cÃ³ giao dá»‹ch thanh toÃ¡n cÃ¹ng loáº¡i", 409);
+  if (
+    duplicatePayment?.method === "payos" &&
+    duplicatePayment.status === "pending"
+  ) {
+    const pendingPayosLink = await reconcilePendingPayosPayment(duplicatePayment);
+    if (pendingPayosLink) {
+      if (input.method !== "PAYOS") {
+        throw new AppError(
+          "Giao dịch PayOS vẫn đang chờ thanh toán. Hãy hủy giao dịch PayOS trước khi chọn phương thức khác.",
+          409,
+        );
+      }
+      if (!pendingPayosLink.checkoutUrl) {
+        throw new AppError("Giao dịch PayOS không có liên kết thanh toán hợp lệ", 409);
+      }
+      return {
+        payment: duplicatePayment,
+        checkoutUrl: pendingPayosLink.checkoutUrl,
+        qrCode: pendingPayosLink.qrCode,
+        paymentType,
+      };
+    }
+  } else if (duplicatePayment) {
+    throw new AppError("Đơn hàng đã có giao dịch thanh toán cùng loại", 409);
   }
 
   if (input.method === "WALLET") {
@@ -451,7 +594,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
       cancelUrl: input.cancelUrl || DEFAULT_CANCEL_URL,
       items: [
         {
-          name: reservedPaymentType === "inspection_deposit" ? "Äáº·t cá»c dá»‹ch vá»¥ FixNow" : "Thanh toÃ¡n dá»‹ch vá»¥ FixNow",
+          name: reservedPaymentType === "inspection_deposit" ? "Đặt cọc dịch vụ FixNow" : "Thanh toán dịch vụ FixNow",
           quantity: 1,
           price: reservedAmount,
         },
@@ -467,13 +610,13 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   } catch (error: any) {
     payment.status = "failed";
     payment.failedAt = new Date();
-    payment.failureReason = error.message || "KhÃ´ng thá»ƒ táº¡o liÃªn káº¿t thanh toÃ¡n PayOS";
+    payment.failureReason = error.message || "Không thể tạo liên kết thanh toán PayOS";
     payment.gatewayResponse = {
       ...((payment.gatewayResponse as Record<string, unknown>) || {}),
       error: payment.failureReason,
     };
     await payment.save();
-    throw new AppError("KhÃ´ng thá»ƒ táº¡o liÃªn káº¿t thanh toÃ¡n PayOS", 502);
+    throw new AppError("Không thể tạo liên kết thanh toán PayOS", 502);
   }
 
   return {
@@ -488,20 +631,20 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   const order = await Order.findById(orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
+    throw new AppError("Không tìm thấy đơn hàng", 404);
   }
 
   if (order.inspectionRequired) {
-    throw new AppError("Dá»‹ch vá»¥ bÃ¡o giÃ¡ khÃ´ng trá»« phÃ­ ná»n táº£ng tá»« vÃ­ thá»£", 400);
+    throw new AppError("Dịch vụ báo giá không trừ phí nền tảng từ ví thợ", 400);
   }
 
   const provider = await Provider.findOne({ userId: providerUserId });
   if (!provider) {
-    throw new AppError("KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ thá»£", 404);
+    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   }
 
   if (order.providerId && order.providerId.toString() !== provider._id.toString()) {
-    throw new AppError("Thá»£ khÃ´ng khá»›p vá»›i Ä‘Æ¡n hÃ ng", 403);
+    throw new AppError("Thợ không khớp với đơn hàng", 403);
   }
 
   const existingTransaction = await WalletTransaction.findOne({
@@ -518,7 +661,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   const platformFee = Math.max(order.pricing?.platformCommissionAmount || 0, 0);
 
   if (platformFee <= 0) {
-    throw new AppError("PhÃ­ ná»n táº£ng khÃ´ng há»£p lá»‡", 400);
+    throw new AppError("Phí nền tảng không hợp lệ", 400);
   }
 
   const wallet = await Wallet.findOneAndUpdate(
@@ -528,7 +671,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
   );
 
   if (!wallet) {
-    throw new AppError("Sá»‘ dÆ° vÃ­ khÃ´ng Ä‘á»§ Ä‘á»ƒ nháº­n Ä‘Æ¡n", 400);
+    throw new AppError("Số dư ví không đủ để nhận đơn", 400);
   }
 
   const transaction = await WalletTransaction.create({
@@ -541,7 +684,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
     balanceAfter: wallet.balance,
     status: "success",
     transactionCode: buildTransactionCode("PLATFORM_FEE"),
-    description: "Trá»« phÃ­ ná»n táº£ng khi thá»£ nháº­n Ä‘Æ¡n giÃ¡ cá»‘ Ä‘á»‹nh",
+    description: "Trừ phí nền tảng khi thợ nhận đơn giá cố định",
     metadata: {
       orderCode: order.orderCode,
     },
@@ -568,6 +711,7 @@ export const chargeProviderPlatformFeeOnAccept = async (orderId: string, provide
 const syncPaidPayosPaymentToOrder = async (
   payment: InstanceType<typeof Payment>,
   session: ClientSession,
+  markVoucherUsed = false,
 ) => {
   const order = await Order.findById(payment.orderId).session(session);
   if (!order || order.isDeleted) {
@@ -601,6 +745,13 @@ const syncPaidPayosPaymentToOrder = async (
     payment.paymentType !== "remaining" && order.status === "created";
   if (shouldDispatch) {
     order.readyForMatching = true;
+  }
+  if (["scheduled", "recurring"].includes(order.orderType)) {
+    order.bookingStatus = "confirmed";
+    order.readyForMatching = false;
+  }
+  if (markVoucherUsed) {
+    await markOrderVoucherAsUsed(order, session);
   }
   await order.save({ session });
   return shouldDispatch;
@@ -707,7 +858,7 @@ export const handlePayosWebhook = async (payload: any) => {
       await payment.save({ session });
       if (isSuccess) {
         shouldDispatch =
-          (await syncPaidPayosPaymentToOrder(payment, session)) ||
+          (await syncPaidPayosPaymentToOrder(payment, session, true)) ||
           shouldDispatch;
       }
 
@@ -753,12 +904,12 @@ export const getPaymentById = async (paymentId: string, user: RequestUser) => {
   const payment = await Payment.findById(paymentId);
 
   if (!payment || payment.isDeleted) {
-    throw new AppError("KhÃ´ng tÃ¬m tháº¥y giao dá»‹ch", 404);
+    throw new AppError("Không tìm thấy giao dịch", 404);
   }
 
   const order = await Order.findById(payment.orderId);
   if (!order || !(await canAccessOrder(order, user))) {
-    throw new AppError("Báº¡n khÃ´ng cÃ³ quyá»n xem giao dá»‹ch nÃ y", 403);
+    throw new AppError("Bạn không có quyền xem giao dịch này", 403);
   }
 
   return payment;
@@ -768,11 +919,11 @@ export const getPaymentsByOrder = async (orderId: string, user: RequestUser) => 
   const order = await Order.findById(orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
+    throw new AppError("Không tìm thấy đơn hàng", 404);
   }
 
   if (!(await canAccessOrder(order, user))) {
-    throw new AppError("Báº¡n khÃ´ng cÃ³ quyá»n xem giao dá»‹ch cá»§a Ä‘Æ¡n hÃ ng nÃ y", 403);
+    throw new AppError("Bạn không có quyền xem giao dịch của đơn hàng này", 403);
   }
 
   const payments = await Payment.find({ orderId }).sort({ createdAt: -1 });
@@ -874,25 +1025,25 @@ export const refundInspectionDepositIfNoProvider = async (orderId: string) => {
 export const compensateProviderFromInspectionDeposit = async (
   orderId: string,
   providerUserId: string,
-  reason = "KhÃ¡ch hÃ ng khÃ´ng thá»±c hiá»‡n Ä‘Æ¡n kháº£o sÃ¡t",
+  reason = "Khách hàng không thực hiện đơn khảo sát",
 ) => {
   const order = await Order.findById(orderId);
 
   if (!order || order.isDeleted) {
-    throw new AppError("KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng", 404);
+    throw new AppError("Không tìm thấy đơn hàng", 404);
   }
 
   if (!order.inspectionRequired) {
-    throw new AppError("Chá»‰ Ä‘Æ¡n kháº£o sÃ¡t má»›i cÃ³ thá»ƒ chuyá»ƒn cá»c bá»“i thÆ°á»ng", 400);
+    throw new AppError("Chỉ đơn khảo sát mới có thể chuyển cọc bồi thường", 400);
   }
 
   const provider = await Provider.findOne({ userId: providerUserId });
   if (!provider) {
-    throw new AppError("KhÃ´ng tÃ¬m tháº¥y há»“ sÆ¡ thá»£", 404);
+    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   }
 
   if (!order.providerId || order.providerId.toString() !== provider._id.toString()) {
-    throw new AppError("Thá»£ khÃ´ng khá»›p vá»›i Ä‘Æ¡n hÃ ng", 403);
+    throw new AppError("Thợ không khớp với đơn hàng", 403);
   }
 
   const payment = await Payment.findOne({
@@ -903,11 +1054,11 @@ export const compensateProviderFromInspectionDeposit = async (
   });
 
   if (!payment) {
-    throw new AppError("ÄÆ¡n hÃ ng chÆ°a cÃ³ tiá»n cá»c há»£p lá»‡", 400);
+    throw new AppError("Đơn hàng chưa có tiền cọc hợp lệ", 400);
   }
 
   if (payment.compensatedToProviderId) {
-    throw new AppError("Tiá»n cá»c Ä‘Ã£ Ä‘Æ°á»£c chuyá»ƒn bá»“i thÆ°á»ng cho thá»£", 409);
+    throw new AppError("Tiền cọc đã được chuyển bồi thường cho thợ", 409);
   }
 
   const existingTransaction = await WalletTransaction.findOne({
@@ -941,7 +1092,7 @@ export const compensateProviderFromInspectionDeposit = async (
     balanceAfter: wallet.balance,
     status: "success",
     transactionCode: buildTransactionCode("COMPENSATION"),
-    description: "Bá»“i thÆ°á»ng tiá»n cá»c do khÃ¡ch khÃ´ng thá»±c hiá»‡n Ä‘Æ¡n kháº£o sÃ¡t",
+    description: "Bồi thường tiền cọc do khách không thực hiện đơn khảo sát",
     metadata: {
       reason,
       orderCode: order.orderCode,

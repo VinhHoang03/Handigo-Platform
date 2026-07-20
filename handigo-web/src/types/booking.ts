@@ -18,6 +18,7 @@ export interface Service {
   fixedPrice?: number;
   depositAmount?: number;
   image?: string;
+  requiresOptionSelection: boolean;
   isActive: boolean;
 }
 
@@ -26,6 +27,7 @@ export interface ServiceOption {
   serviceId: string;
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType:
     | "room_count"
     | "area_size"
@@ -41,7 +43,6 @@ export interface ServiceOption {
   isFixedPrice?: boolean;
   selectionGroup?: string | null;
   selectionMode?: "single" | "multiple";
-  isRequired?: boolean;
   sortOrder?: number;
   isActive: boolean;
 }
@@ -78,6 +79,7 @@ export interface Address {
   ward: string;
   latitude?: number;
   longitude?: number;
+  placeId?: string;
   isDefault: boolean;
   note?: string;
 }
@@ -105,6 +107,22 @@ export interface OrderDiscountSnapshot {
   discountType: "fixed" | "percentage";
   discountValue: number;
   discountAmount: number;
+}
+
+export interface OrderReassignment {
+  status:
+    | "awaiting_customer"
+    | "matching"
+    | "matched"
+    | "declined"
+    | "expired"
+    | "failed";
+  requestedByProviderId: string;
+  previousProviderIds: string[];
+  reason: string;
+  requestedAt: string;
+  expiresAt: string;
+  respondedAt?: string | null;
 }
 
 export interface Order {
@@ -145,6 +163,21 @@ export interface Order {
   addressId: Address;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string | null;
+  bookingStatus?:
+    | "not_required"
+    | "awaiting_provider"
+    | "awaiting_payment"
+    | "reserved"
+    | "confirmed"
+    | "rejected"
+    | "expired";
+  paymentDueAt?: string | null;
+  matchingStartedAt?: string | null;
+  matchingExpiresAt?: string | null;
+  recurringGroupId?: string | null;
+  recurrenceUnit?: "weekly" | "monthly" | null;
+  occurrenceNumber?: number | null;
+  totalOccurrences?: number | null;
   status: "created" | "accepted" | "in_progress" | "completed" | "cancelled";
   paymentMethod: "wallet" | "bank" | "cash";
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
@@ -154,6 +187,7 @@ export interface Order {
   pricing: OrderPricing;
   promotionSnapshot?: OrderDiscountSnapshot | null;
   voucherSnapshot?: OrderDiscountSnapshot | null;
+  reassignment?: OrderReassignment | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -204,6 +238,8 @@ export interface BookingState {
   preferredProviderName?: string;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
+  recurrenceUnit?: "weekly" | "monthly";
+  recurrenceCount?: 1 | 2 | 3 | 4 | 8 | 12;
   problemDescription?: string;
   customerAttachments: string[];
   paymentMethod: "wallet" | "bank" | "cash";
@@ -221,6 +257,8 @@ export interface BookingState {
   setPreferredProviderId: (id?: string, name?: string) => void;
   setOrderType: (type: BookingState["orderType"]) => void;
   setScheduledAt: (date: string) => void;
+  setRecurrenceUnit: (unit: "weekly" | "monthly") => void;
+  setRecurrenceCount: (count: 1 | 2 | 3 | 4 | 8 | 12) => void;
   setProblemDescription: (desc: string) => void;
   setCustomerAttachments: (attachments: string[]) => void;
   setPaymentMethod: (method: BookingState["paymentMethod"]) => void;

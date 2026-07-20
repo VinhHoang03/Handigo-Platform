@@ -13,7 +13,6 @@ const optionalText = (max: number) =>
   z.string().trim().max(max).optional();
 
 const imageUrlSchema = z.string().trim().url().max(2000);
-const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "ID không hợp lệ");
 
 const endOfToday = () => {
   const today = new Date();
@@ -72,7 +71,6 @@ export const updateProviderProfileSchema = z.object({
   bio: optionalText(2000),
   mainServiceText: optionalText(200),
   serviceArea: providerServiceAreaSchema.optional(),
-  serviceIds: z.array(objectIdSchema).min(1).optional(),
   workingAreas: providerWorkingAreasSchema.optional(),
 }).superRefine((payload, context) => {
   if (payload.birthday && new Date(payload.birthday) > endOfToday()) {

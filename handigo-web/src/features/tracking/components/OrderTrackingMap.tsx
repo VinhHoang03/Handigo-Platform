@@ -29,6 +29,7 @@ type LocationEvent = Coordinate & {
 interface OrderTrackingMapProps {
   order: Order;
   viewerRole: "CUSTOMER" | "PROVIDER";
+  compact?: boolean;
 }
 
 type TrackingPointKey = "customer" | "provider";
@@ -231,7 +232,11 @@ const createPopupContent = (point: TrackingPoint) => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
+export function OrderTrackingMap({
+  order,
+  viewerRole,
+  compact = false,
+}: OrderTrackingMapProps) {
   const address = getOrderAddress(order);
   const addressLine = getAddressLine(address);
   const trackingEnabled = Boolean(order.providerId);
@@ -716,7 +721,11 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
       </div>
 
       {/* ── Map area ── */}
-      <div className="relative h-[400px] w-full overflow-hidden bg-surface-container-low sm:h-[460px]">
+      <div
+        className={`relative w-full overflow-hidden bg-surface-container-low ${
+          compact ? "h-[320px] sm:h-[360px]" : "h-[400px] sm:h-[460px]"
+        }`}
+      >
         {hasMapCoordinate ? (
           <div
             ref={mapContainerRef}
@@ -725,28 +734,28 @@ export function OrderTrackingMap({ order, viewerRole }: OrderTrackingMapProps) {
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center p-8 text-center">
-            <div className="max-w-sm rounded-2xl bg-white/95 px-6 py-6 shadow-lg ring-1 ring-outline-variant/30">
+            <div className="flex max-w-2xl items-center gap-4 rounded-2xl bg-white/95 px-6 py-6 text-left shadow-lg ring-1 ring-outline-variant/30">
               {isGeocoding ? (
                 <>
                   <span
-                    className="material-symbols-outlined animate-spin text-primary"
+                    className="material-symbols-outlined shrink-0 animate-spin text-primary"
                     style={{ fontSize: 40 }}
                   >
                     progress_activity
                   </span>
-                  <p className="mt-3 text-sm font-semibold text-on-surface">
+                  <p className="text-sm font-semibold text-on-surface">
                     Đang xác định toạ độ địa chỉ...
                   </p>
                 </>
               ) : (
                 <>
                   <span
-                    className="material-symbols-outlined text-amber-500"
+                    className="material-symbols-outlined shrink-0 text-amber-500"
                     style={{ fontSize: 40 }}
                   >
                     location_off
                   </span>
-                  <p className="mt-3 text-sm font-semibold text-on-surface leading-relaxed">
+                  <p className="text-sm font-semibold leading-relaxed text-on-surface">
                     {mapText.missingCoordinate}
                   </p>
                 </>

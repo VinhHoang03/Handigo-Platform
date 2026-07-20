@@ -8,6 +8,8 @@ import type {
   NotificationType,
 } from "@/features/notification/types/notification.types";
 import type { AppRole } from "./Navbar";
+import { Modal } from "./Modal";
+import { bookingApi } from "@/features/booking/api/booking.api";
 
 const typeIcons: Record<NotificationType, string> = {
   ORDER: "receipt_long",
@@ -50,6 +52,12 @@ export function NotificationBell({ role }: { role?: AppRole }) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [reassignmentAction, setReassignmentAction] = useState<{
+    orderId: string;
+    expiresAt?: string;
+  } | null>(null);
+  const [reassignmentBusy, setReassignmentBusy] = useState(false);
+  const [reassignmentError, setReassignmentError] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const queryRef = useRef(query);
   const notificationPath = getNotificationPath(role);
@@ -113,6 +121,21 @@ export function NotificationBell({ role }: { role?: AppRole }) {
         if (current.some((item) => item.id === notification.id)) return current;
         return [notification, ...current].slice(0, 20);
       });
+
+      if (
+        role === "CUSTOMER" &&
+        notification.data?.action === "order_reassignment_required" &&
+        typeof notification.data.orderId === "string"
+      ) {
+        setReassignmentError("");
+        setReassignmentAction({
+          orderId: notification.data.orderId,
+          expiresAt:
+            typeof notification.data.expiresAt === "string"
+              ? notification.data.expiresAt
+              : undefined,
+        });
+      }
     };
 
     socket.on("notification:new", handleNewNotification);
@@ -121,7 +144,26 @@ export function NotificationBell({ role }: { role?: AppRole }) {
       socket.off("notification:new", handleNewNotification);
       dispose();
     };
-  }, [canUseUserNotifications]);
+  }, [canUseUserNotifications, role]);
+
+  const respondToReassignment = async (
+    decision: "accept" | "decline",
+  ) => {
+    if (!reassignmentAction) return;
+    try {
+      setReassignmentBusy(true);
+      setReassignmentError("");
+      await bookingApi.respondToReassignment(
+        reassignmentAction.orderId,
+        decision,
+      );
+      setReassignmentAction(null);
+    } catch (err) {
+      setReassignmentError(getErrorMessage(err));
+    } finally {
+      setReassignmentBusy(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -377,6 +419,53 @@ export function NotificationBell({ role }: { role?: AppRole }) {
             )}
           </div>
         </div>
+      )}
+
+      {reassignmentAction && (
+        <Modal
+          open
+          title="Bạn có muốn tìm kỹ thuật viên khác?"
+          onClose={() => {
+            if (!reassignmentBusy) setReassignmentAction(null);
+          }}
+          size="sm"
+          closeOnEsc={!reassignmentBusy}
+          closeOnOverlayClick={!reassignmentBusy}
+        >
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-on-surface-variant">
+              Kỹ thuật viên đã hủy đơn sau khi nhận. Handigo có thể giữ nguyên đơn và khoản thanh toán để tìm người thay thế. Nếu bạn từ chối, đơn sẽ được hủy và hoàn tiền theo phương thức đã thanh toán.
+            </p>
+            {reassignmentAction.expiresAt && (
+              <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                Phản hồi trước {new Date(reassignmentAction.expiresAt).toLocaleString("vi-VN")}.
+              </p>
+            )}
+            {reassignmentError && (
+              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                {reassignmentError}
+              </p>
+            )}
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={reassignmentBusy}
+                onClick={() => void respondToReassignment("decline")}
+                className="rounded-xl border border-red-200 px-4 py-3 font-bold text-red-600 disabled:opacity-50"
+              >
+                Hủy đơn và hoàn tiền
+              </button>
+              <button
+                type="button"
+                disabled={reassignmentBusy}
+                onClick={() => void respondToReassignment("accept")}
+                className="rounded-xl bg-primary px-4 py-3 font-bold text-on-primary disabled:opacity-50"
+              >
+                {reassignmentBusy ? "Đang xử lý..." : "Tìm kỹ thuật viên khác"}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

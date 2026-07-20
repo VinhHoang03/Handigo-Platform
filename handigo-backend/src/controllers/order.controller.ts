@@ -5,6 +5,7 @@ import { AssignmentService } from "../services/assignment.service";
 import { DispatchService } from "../services/dispatch.service";
 import { OrderService } from "../services/order.service";
 import { AppError } from "../utils/appError";
+import { respondToProviderReassignment } from "../services/orderReassignment.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
@@ -112,6 +113,39 @@ export const getOrderById = async (
   }
 };
 
+export const getRecurringSeries = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const orders = await OrderService.getRecurringSeries(
+      param(req, "orderId"),
+      uid(req),
+    );
+    return ok(res, { items: orders });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const selectAppointmentProvider = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const order = await OrderService.selectAppointmentProvider(
+      param(req, "orderId"),
+      uid(req),
+      String(req.body.providerId || ""),
+    );
+    return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const cancelOrder = async (
   req: Request,
   res: Response,
@@ -132,6 +166,57 @@ export const cancelOrder = async (
       reason,
     );
     return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const discardUnpaidOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await OrderService.discardUnpaidOrder(
+      param(req, "orderId"),
+      uid(req),
+    );
+    return ok(res, result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const respondToReassignment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const order = await respondToProviderReassignment(
+      param(req, "orderId"),
+      uid(req),
+      req.body.decision,
+    );
+    return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const cancelRecurringSeries = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { reason } = req.body;
+    const result = await OrderService.cancelRecurringSeries(
+      param(req, "orderId"),
+      uid(req),
+      reason,
+    );
+    return ok(res, result);
   } catch (error) {
     return next(error);
   }

@@ -5,6 +5,24 @@ import { Provider, type IIdentityDocument, type IProviderCertificate } from "../
 import { ProviderApplication } from "../models/providerApplication.model";
 import { Session } from "../models/session.model";
 import { Service } from "../models/service.model";
+import { createNotificationRecord } from "./notification.service";
+
+const notifyInitialApplicationSubmitted = async (
+  userId: string,
+  applicationId: Types.ObjectId,
+) => {
+  await createNotificationRecord({
+    userId,
+    type: "SYSTEM",
+    title: "Hồ sơ Provider đã được gửi thành công",
+    content:
+      "Hồ sơ của bạn đã được gửi thành công. Bạn sẽ nhận được thông tin phản hồi ngay sau khi quản trị viên kiểm duyệt xong. Sau khi được phê duyệt, bạn có thể bắt đầu nhận việc.",
+    data: {
+      providerApplicationId: applicationId,
+      status: "pending",
+    },
+  });
+};
 
 type IdentityDocumentPayload = {
   type: "cccd" | "passport";
@@ -30,14 +48,16 @@ type CertificatePayload = {
   issuedAt?: string;
   expiresAt?: string;
   imageUrls: string[];
+  description?: string;
 };
 
 interface CreateProviderApplicationPayload {
-  description: string;
-  experienceYears: number;
+  applicationType?: "initial" | "service_addition";
+  description?: string;
+  experienceYears?: number;
   serviceIds: string[];
-  workingAreas: string[];
-  identityDocument: IdentityDocumentPayload;
+  workingAreas?: string[];
+  identityDocument?: IdentityDocumentPayload;
   certificates?: CertificatePayload[];
 }
 
@@ -48,6 +68,7 @@ interface SaveProviderApplicationDraftPayload {
   workingAreas?: string[];
   identityDocument?: Partial<IdentityDocumentPayload>;
   certificates?: Array<Partial<CertificatePayload>>;
+  onboardingStep?: 1 | 2 | 3;
 }
 
 interface ReviewProviderApplicationPayload {
@@ -60,6 +81,7 @@ interface ApplicationQuery {
   status?: string;
   keyword?: string;
   categoryId?: string;
+  applicationType?: "initial" | "service_addition";
   page?: string | number;
   limit?: string | number;
 }
@@ -99,6 +121,27 @@ const assertServicesActive = async (serviceIds: string[]) => {
   }
 
   return uniqueIds;
+};
+
+const assertNewProviderServices = async (
+  userId: string,
+  serviceIds: string[],
+) => {
+  const provider = await Provider.findOne({ userId, isDeleted: false }).select(
+    "serviceIds",
+  );
+  if (!provider) {
+    throw new AppError("Không tìm thấy hồ sơ provider", 404);
+  }
+
+  const currentServiceIds = new Set(provider.serviceIds.map(String));
+  const duplicatedService = serviceIds.some((id) => currentServiceIds.has(id));
+  if (duplicatedService) {
+    throw new AppError(
+      "Đơn chỉ được chứa các dịch vụ chưa có trong hồ sơ provider",
+      409,
+    );
+  }
 };
 
 const toDate = (value?: string | Date) => {
@@ -150,6 +193,7 @@ const buildPendingCertificates = (
     issuedAt: toDate(certificate.issuedAt),
     expiresAt: toDate(certificate.expiresAt),
     imageUrls: certificate.imageUrls,
+    description: certificate.description,
     status: "pending",
     reviewedBy: null,
     reviewedAt: null,
@@ -206,6 +250,7 @@ const buildDraftCertificates = (
       issuedAt: toDate(certificate.issuedAt),
       expiresAt: toDate(certificate.expiresAt),
       imageUrls: certificate.imageUrls || [],
+      description: certificate.description,
       status: "pending",
       reviewedBy: null,
       reviewedAt: null,
@@ -259,6 +304,7 @@ const approveCertificates = (
     issuedAt: certificate.issuedAt,
     expiresAt: certificate.expiresAt,
     imageUrls: certificate.imageUrls || [],
+    description: certificate.description,
     status: "approved",
     reviewedBy: new Types.ObjectId(adminId),
     reviewedAt: new Date(),
@@ -270,6 +316,7 @@ export const createApplication = async (
   payload: CreateProviderApplicationPayload,
 ) => {
   assertObjectId(userId, "user id");
+  const applicationType = payload.applicationType || "initial";
   const serviceIds = await assertServicesActive(payload.serviceIds);
 
   const user = await User.findOne({ _id: userId, isDeleted: false });
@@ -282,8 +329,28 @@ export const createApplication = async (
     throw new AppError("Account is not active", 403);
   }
 
-  if (user.role !== "CUSTOMER") {
-    throw new AppError("Only customers can apply to become providers", 403);
+  const canSubmitInitial =
+    user.role === "CUSTOMER" ||
+    (user.role === "PROVIDER" &&
+      user.providerOnboardingStatus === "PROFILE_INCOMPLETE");
+  const canSubmitServiceAddition =
+    user.role === "PROVIDER" &&
+    (!user.providerOnboardingStatus ||
+      user.providerOnboardingStatus === "APPROVED");
+  if (
+    (applicationType === "initial" && !canSubmitInitial) ||
+    (applicationType === "service_addition" && !canSubmitServiceAddition)
+  ) {
+    throw new AppError(
+      applicationType === "initial"
+        ? "Chỉ khách hàng mới có thể đăng ký trở thành provider"
+        : "Chỉ provider mới có thể đăng ký thêm dịch vụ",
+      403,
+    );
+  }
+
+  if (applicationType === "service_addition") {
+    await assertNewProviderServices(userId, serviceIds);
   }
 
   const pendingApplication = await ProviderApplication.findOne({
@@ -296,29 +363,23 @@ export const createApplication = async (
     throw new AppError("Bạn đã có hồ sơ đang chờ xét duyệt", 400);
   }
 
-  const rejectedApplication = await ProviderApplication.findOne({
+  const draftApplication = applicationType === "initial"
+    ? await ProviderApplication.findOne({
     userId,
-    status: "rejected",
-    isDeleted: false,
-  });
-
-  if (rejectedApplication) {
-    throw new AppError(
-      "Vui lòng chỉnh sửa và gửi lại hồ sơ đã bị từ chối",
-      409,
-    );
-  }
-
-  const draftApplication = await ProviderApplication.findOne({
-    userId,
+    applicationType: { $in: ["initial", null] },
     status: "draft",
     isDeleted: false,
-  });
+      })
+    : null;
 
   if (draftApplication) {
     const submittedAt = new Date();
-    draftApplication.description = payload.description;
-    draftApplication.experienceYears = payload.experienceYears;
+    if (!payload.identityDocument || !payload.workingAreas) {
+      throw new AppError("Hồ sơ đăng ký provider chưa đầy đủ", 400);
+    }
+    draftApplication.applicationType = "initial";
+    draftApplication.description = payload.description || "";
+    draftApplication.experienceYears = payload.experienceYears || 0;
     draftApplication.serviceIds = serviceIds.map((id) => new Types.ObjectId(id));
     draftApplication.workingAreas = payload.workingAreas;
     draftApplication.identityDocument = buildPendingIdentityDocument(payload.identityDocument);
@@ -333,20 +394,33 @@ export const createApplication = async (
       action: "submitted",
       status: "pending",
       actorId: new Types.ObjectId(userId),
-      actorRole: "CUSTOMER",
+      actorRole: user.role,
       occurredAt: submittedAt,
     });
-    return draftApplication.save();
+    const savedApplication = await draftApplication.save();
+    if (user.role === "PROVIDER") {
+      user.providerOnboardingStatus = "PENDING_REVIEW";
+      user.providerOnboardingStep = 3;
+      await user.save();
+    }
+    await notifyInitialApplicationSubmitted(
+      userId,
+      savedApplication._id as Types.ObjectId,
+    );
+    return savedApplication;
   }
 
   const submittedAt = new Date();
-  return ProviderApplication.create({
+  const application = await ProviderApplication.create({
     userId,
-    description: payload.description,
-    experienceYears: payload.experienceYears,
+    applicationType,
+    description: payload.description || "",
+    experienceYears: payload.experienceYears || 0,
     serviceIds,
-    workingAreas: payload.workingAreas,
-    identityDocument: buildPendingIdentityDocument(payload.identityDocument),
+    workingAreas: payload.workingAreas || [],
+    identityDocument: payload.identityDocument
+      ? buildPendingIdentityDocument(payload.identityDocument)
+      : undefined,
     certificates: buildPendingCertificates(payload.certificates),
     status: "pending",
     submittedAt,
@@ -355,11 +429,23 @@ export const createApplication = async (
         action: "submitted",
         status: "pending",
         actorId: new Types.ObjectId(userId),
-        actorRole: "CUSTOMER",
+        actorRole: user.role,
         occurredAt: submittedAt,
       },
     ],
   });
+  if (applicationType === "initial" && user.role === "PROVIDER") {
+    user.providerOnboardingStatus = "PENDING_REVIEW";
+    user.providerOnboardingStep = 3;
+    await user.save();
+  }
+  if (applicationType === "initial") {
+    await notifyInitialApplicationSubmitted(
+      userId,
+      application._id as Types.ObjectId,
+    );
+  }
+  return application;
 };
 
 export const saveDraftApplication = async (
@@ -378,8 +464,12 @@ export const saveDraftApplication = async (
     throw new AppError("Account is not active", 403);
   }
 
-  if (user.role !== "CUSTOMER") {
-    throw new AppError("Only customers can apply to become providers", 403);
+  const canSaveInitialDraft =
+    user.role === "CUSTOMER" ||
+    (user.role === "PROVIDER" &&
+      user.providerOnboardingStatus === "PROFILE_INCOMPLETE");
+  if (!canSaveInitialDraft) {
+    throw new AppError("Bạn không có quyền lưu nháp hồ sơ Provider", 403);
   }
 
   const pendingApplication = await ProviderApplication.findOne({
@@ -409,9 +499,15 @@ export const saveDraftApplication = async (
     : [];
 
   const application = await ProviderApplication.findOneAndUpdate(
-    { userId, status: "draft", isDeleted: false },
     {
       userId,
+      applicationType: { $in: ["initial", null] },
+      status: "draft",
+      isDeleted: false,
+    },
+    {
+      userId,
+      applicationType: "initial",
       description: payload.description || "",
       experienceYears: payload.experienceYears ?? 0,
       serviceIds: serviceIds.map((id) => new Types.ObjectId(id)),
@@ -428,6 +524,11 @@ export const saveDraftApplication = async (
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
+
+  if (user.role === "PROVIDER") {
+    user.providerOnboardingStep = payload.onboardingStep || user.providerOnboardingStep || 1;
+    await user.save();
+  }
 
   return getMyApplication(String(application.userId));
 };
@@ -530,11 +631,41 @@ export const resubmitApplication = async (
     throw new AppError("Chỉ hồ sơ bị từ chối mới có thể gửi lại", 400);
   }
 
-  application.description = payload.description;
-  application.experienceYears = payload.experienceYears;
+  const applicationType = application.applicationType || "initial";
+  const user = await User.findOne({ _id: userId, isDeleted: false }).select(
+    "role status providerOnboardingStatus",
+  );
+  const canResubmitInitial =
+    user?.role === "CUSTOMER" ||
+    (user?.role === "PROVIDER" && user.providerOnboardingStatus === "REJECTED");
+  const canResubmitServiceAddition =
+    user?.role === "PROVIDER" &&
+    (!user.providerOnboardingStatus || user.providerOnboardingStatus === "APPROVED");
+  if (
+    !user ||
+    user.status !== "active" ||
+    (applicationType === "initial" && !canResubmitInitial) ||
+    (applicationType === "service_addition" && !canResubmitServiceAddition)
+  ) {
+    throw new AppError("Bạn không có quyền gửi lại hồ sơ này", 403);
+  }
+  if ((payload.applicationType || "initial") !== applicationType) {
+    throw new AppError("Không thể thay đổi loại hồ sơ khi gửi lại", 400);
+  }
+  if (applicationType === "service_addition") {
+    await assertNewProviderServices(userId, serviceIds);
+  }
+  if (applicationType === "initial" && (!payload.identityDocument || !payload.workingAreas)) {
+    throw new AppError("Hồ sơ đăng ký provider chưa đầy đủ", 400);
+  }
+
+  application.description = payload.description || "";
+  application.experienceYears = payload.experienceYears || 0;
   application.serviceIds = serviceIds.map((id) => new Types.ObjectId(id));
-  application.workingAreas = payload.workingAreas;
-  application.identityDocument = buildPendingIdentityDocument(payload.identityDocument);
+  application.workingAreas = payload.workingAreas || [];
+  application.identityDocument = payload.identityDocument
+    ? buildPendingIdentityDocument(payload.identityDocument)
+    : undefined;
   application.certificates = buildPendingCertificates(payload.certificates);
   application.status = "resubmitted";
   application.resubmittedAt = resubmittedAt;
@@ -542,11 +673,22 @@ export const resubmitApplication = async (
     action: "resubmitted",
     status: "resubmitted",
     actorId: new Types.ObjectId(userId),
-    actorRole: "CUSTOMER",
+    actorRole: user.role,
     occurredAt: resubmittedAt,
   });
 
   await application.save();
+  if (applicationType === "initial" && user.role === "PROVIDER") {
+    user.providerOnboardingStatus = "PENDING_REVIEW";
+    user.providerOnboardingStep = 3;
+    await user.save();
+  }
+  if (applicationType === "initial") {
+    await notifyInitialApplicationSubmitted(
+      userId,
+      application._id as Types.ObjectId,
+    );
+  }
   return getMyApplicationById(userId, applicationId);
 };
 
@@ -586,6 +728,12 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
       isDeleted: false,
     }).select("_id");
     filter.serviceIds = { $in: services.map((service) => service._id) };
+  }
+
+  if (query.applicationType) {
+    filter.applicationType = query.applicationType === "initial"
+      ? { $in: ["initial", null] }
+      : query.applicationType;
   }
 
   const [items, total] = await Promise.all([
@@ -673,6 +821,16 @@ export const reviewApplication = async (
           notes: payload.rejectionNotes || null,
         });
         await application.save({ session });
+        await User.updateOne(
+          { _id: application.userId, role: "PROVIDER", isDeleted: false },
+          {
+            $set: {
+              providerOnboardingStatus: "REJECTED",
+              providerOnboardingStep: 3,
+            },
+          },
+          { runValidators: true, session },
+        );
         return;
       }
 
@@ -693,6 +851,29 @@ export const reviewApplication = async (
       const certificates = approveCertificates(application.certificates, adminId);
 
       await application.save({ session });
+
+      if (application.applicationType === "service_addition") {
+        const provider = await Provider.findOne({
+          userId: application.userId,
+          isDeleted: false,
+        }).session(session);
+        if (!provider) {
+          throw new AppError("Không tìm thấy hồ sơ provider", 404);
+        }
+
+        const currentServiceIds = new Set(provider.serviceIds.map(String));
+        const newServiceIds = application.serviceIds.filter(
+          (serviceId) => !currentServiceIds.has(String(serviceId)),
+        );
+        if (!newServiceIds.length) {
+          throw new AppError("Các dịch vụ trong đơn đã có trong hồ sơ provider", 409);
+        }
+
+        provider.serviceIds.push(...newServiceIds);
+        provider.certificates.push(...certificates);
+        await provider.save({ session, validateBeforeSave: true });
+        return;
+      }
 
       await Provider.findOneAndUpdate(
         { userId: application.userId },
@@ -722,7 +903,13 @@ export const reviewApplication = async (
 
       const updatedUser = await User.findOneAndUpdate(
         { _id: application.userId, isDeleted: false },
-        { $set: { role: "PROVIDER" } },
+        {
+          $set: {
+            role: "PROVIDER",
+            providerOnboardingStatus: "APPROVED",
+            providerOnboardingStep: null,
+          },
+        },
         { new: true, runValidators: true, session },
       );
       if (!updatedUser) {

@@ -27,14 +27,19 @@ export const getOptionsByServiceId = async (
 interface ServiceOptionInput {
   name?: string;
   description?: string | null;
+  image?: string | null;
   optionType?: "room_count" | "area_size" | "package" | "add_on" | "other";
   price?: number;
   selectionGroup?: string | null;
   selectionMode?: "single" | "multiple";
-  isRequired?: boolean;
   sortOrder?: number;
   isActive?: boolean;
 }
+
+const getSelectionGroupFilter = (selectionGroup: string) => ({
+  $regex: `^${selectionGroup.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+  $options: "i",
+});
 
 const ensureConsistentSelectionGroup = async (
   serviceId: Types.ObjectId | string,
@@ -43,9 +48,9 @@ const ensureConsistentSelectionGroup = async (
 ) => {
   const selectionGroup = data.selectionGroup?.trim();
   if (!selectionGroup) {
-    if (data.isRequired || data.selectionMode === "single") {
+    if (data.selectionMode === "single") {
       throw new AppError(
-        "Vui lòng nhập tên nhóm khi tùy chọn bắt buộc hoặc chỉ được chọn một.",
+        "Vui lòng nhập tên nhóm khi tùy chọn chỉ được chọn một.",
         400,
       );
     }
@@ -54,18 +59,17 @@ const ensureConsistentSelectionGroup = async (
 
   const sibling = await ServiceOption.findOne({
     serviceId,
-    selectionGroup,
+    selectionGroup: getSelectionGroupFilter(selectionGroup),
     isDeleted: false,
     ...(excludeOptionId ? { _id: { $ne: excludeOptionId } } : {}),
-  }).select("selectionMode isRequired");
+  }).select("selectionMode");
 
   if (
     sibling &&
-    (sibling.selectionMode !== (data.selectionMode ?? "multiple") ||
-      sibling.isRequired !== (data.isRequired ?? false))
+    sibling.selectionMode !== (data.selectionMode ?? "multiple")
   ) {
     throw new AppError(
-      "Các tùy chọn trong cùng một nhóm phải có cùng kiểu chọn và quy tắc bắt buộc.",
+      "Các tùy chọn trong cùng một nhóm phải có cùng cách lựa chọn.",
       400,
     );
   }
@@ -81,6 +85,7 @@ export const createOption = async (serviceId: string, data: ServiceOptionInput) 
   await ensureConsistentSelectionGroup(serviceId, data);
   return ServiceOption.create({
     ...data,
+    price: service.serviceType === "variable_price" ? 0 : data.price,
     selectionGroup: data.selectionGroup?.trim() || null,
     serviceId,
   });
@@ -90,14 +95,22 @@ export const updateOption = async (optionId: string, data: ServiceOptionInput) =
   ensureValidId(optionId, "option id");
   const option = await ServiceOption.findOne({ _id: optionId, isDeleted: false });
   if (!option) throw new AppError("Không tìm thấy tùy chọn dịch vụ.", 404);
+  const service = await Service.findOne({
+    _id: option.serviceId,
+    isDeleted: false,
+  }).select("serviceType");
+  if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
   const nextData = {
     ...data,
+    price:
+      service.serviceType === "variable_price"
+        ? 0
+        : data.price ?? option.price,
     selectionGroup:
       data.selectionGroup === undefined
         ? option.selectionGroup
         : data.selectionGroup?.trim() || null,
     selectionMode: data.selectionMode ?? option.selectionMode,
-    isRequired: data.isRequired ?? option.isRequired,
   };
   const staysInCurrentGroup =
     normalizeGroup(nextData.selectionGroup) === normalizeGroup(option.selectionGroup);
@@ -111,14 +124,13 @@ export const updateOption = async (optionId: string, data: ServiceOptionInput) =
     await ServiceOption.updateMany(
       {
         serviceId: option.serviceId,
-        selectionGroup: nextData.selectionGroup,
+        selectionGroup: getSelectionGroupFilter(nextData.selectionGroup),
         isDeleted: false,
         _id: { $ne: option._id },
       },
       {
         $set: {
           selectionMode: nextData.selectionMode,
-          isRequired: nextData.isRequired,
         },
       },
       { runValidators: true },

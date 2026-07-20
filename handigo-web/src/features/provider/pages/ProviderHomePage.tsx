@@ -53,11 +53,7 @@ const getRevenueRange = (period: RevenuePeriod) => {
     start.setDate(today.getDate() - daysSinceMonday);
   } else {
     start.setDate(1);
-    dayCount = new Date(
-      today.getFullYear(),
-      today.getMonth() + 1,
-      0,
-    ).getDate();
+    dayCount = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   }
 
   const dates = Array.from({ length: dayCount }, (_, index) => {
@@ -100,8 +96,14 @@ function formatDateTime(value?: string | null) {
 function shortAddress(order: Order) {
   const address = order.addressId;
   if (!address) return "";
+
+  const fullAddress = (address as { fullAddress?: string }).fullAddress?.trim();
+  if (fullAddress) {
+    return fullAddress;
+  }
+
   return [
-    (address as { fullAddress?: string }).fullAddress,
+    address.detailAddress,
     address.ward,
     address.district,
     address.province,
@@ -215,7 +217,9 @@ const ProviderHomePage = () => {
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>("week");
-  const [revenueEarnings, setRevenueEarnings] = useState<ProviderEarningPoint[]>([]);
+  const [revenueEarnings, setRevenueEarnings] = useState<
+    ProviderEarningPoint[]
+  >([]);
   const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
   const [earningsError, setEarningsError] = useState<string | null>(null);
   const [todaySchedule, setTodaySchedule] = useState<Order[]>([]);
@@ -377,10 +381,7 @@ const ProviderHomePage = () => {
         : String(date.getDate()),
     amount: earningsByDay.get(dateKey(date)) ?? 0,
   }));
-  const maxRevenue = Math.max(
-    ...revenueChart.map((item) => item.amount),
-    0,
-  );
+  const maxRevenue = Math.max(...revenueChart.map((item) => item.amount), 0);
   const revenueTotal = revenueChart.reduce(
     (total, item) => total + item.amount,
     0,
@@ -452,9 +453,7 @@ const ProviderHomePage = () => {
           <div className="space-y-gutter lg:col-span-8">
             <div className="glass-card rounded-3xl p-md">
               <div className="mb-md flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                <h3 className="font-headline-md text-on-surface">
-                  Doanh thu
-                </h3>
+                <h3 className="font-headline-md text-on-surface">Doanh thu</h3>
                 <div className="flex items-center justify-between gap-3 sm:justify-end">
                   <div className="text-left sm:text-right">
                     <p className="text-sm font-bold text-primary">
@@ -606,7 +605,9 @@ const ProviderHomePage = () => {
                 </div>
               ) : todaySchedule.length === 0 ? (
                 <div className="rounded-2xl border-2 border-dashed border-outline-variant/40 px-4 py-10 text-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-4xl">event_available</span>
+                  <span className="material-symbols-outlined text-4xl">
+                    event_available
+                  </span>
                   <p className="mt-2 text-sm font-semibold">
                     Hôm nay chưa có lịch làm việc.
                   </p>

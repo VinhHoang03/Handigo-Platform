@@ -28,11 +28,48 @@ export const createOrderSchema = z.object({
     .string()
     .datetime({ offset: true, message: "Thời gian thực hiện không hợp lệ" })
     .optional(),
+  recurrenceUnit: z.enum(["weekly", "monthly"]).optional(),
+  recurrenceCount: z.coerce.number().int().min(1).max(12).optional(),
   problemDescription: z.string().trim().max(2000).optional(),
   customerAttachments: z.array(z.string().url()).max(4).optional(),
   promotionId: objectIdSchema.optional(),
   voucherId: objectIdSchema.optional(),
+  voucherCode: z.string().trim().min(1).max(50).optional(),
   paymentMethod: z.enum(["wallet", "bank", "cash"]),
+}).superRefine((payload, context) => {
+  if (payload.orderType !== "recurring") return;
+  if (!payload.recurrenceUnit) {
+    context.addIssue({
+      code: "custom",
+      path: ["recurrenceUnit"],
+      message: "Vui lòng chọn chu kỳ định kỳ",
+    });
+  }
+  if (!payload.recurrenceCount) {
+    context.addIssue({
+      code: "custom",
+      path: ["recurrenceCount"],
+      message: "Vui lòng chọn số buổi định kỳ",
+    });
+  } else if (
+    payload.recurrenceUnit === "weekly" &&
+    ![1, 2, 3, 4].includes(payload.recurrenceCount)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["recurrenceCount"],
+      message: "Lịch hằng tuần chỉ hỗ trợ từ 1 đến 4 buổi",
+    });
+  } else if (
+    payload.recurrenceUnit === "monthly" &&
+    ![4, 8, 12].includes(payload.recurrenceCount)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["recurrenceCount"],
+      message: "Lịch hằng tháng phải gồm 4, 8 hoặc 12 buổi",
+    });
+  }
 });
 
 export const cancelOrderSchema = z.object({
@@ -41,6 +78,12 @@ export const cancelOrderSchema = z.object({
     .trim()
     .min(3, "Lý do hủy phải có ít nhất 3 ký tự")
     .max(500, "Lý do hủy không được vượt quá 500 ký tự"),
+});
+
+export const reassignmentResponseSchema = z.object({
+  decision: z.enum(["accept", "decline"], {
+    message: "Quyết định tìm kỹ thuật viên thay thế không hợp lệ",
+  }),
 });
 
 export const orderIdParamSchema = z.object({
@@ -184,4 +227,8 @@ export const rejectAssignmentSchema = z.object({
     .trim()
     .max(500, "Lý do từ chối không được vượt quá 500 ký tự")
     .optional(),
+});
+
+export const selectAppointmentProviderSchema = z.object({
+  providerId: objectIdSchema,
 });

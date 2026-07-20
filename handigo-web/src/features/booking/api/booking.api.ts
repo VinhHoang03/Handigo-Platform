@@ -22,9 +22,12 @@ export interface CreateOrderPayload {
   preferredProviderId?: string;
   orderType?: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
+  recurrenceUnit?: "weekly" | "monthly";
+  recurrenceCount?: 1 | 2 | 3 | 4 | 8 | 12;
   problemDescription?: string;
   paymentMethod: "wallet" | "bank" | "cash";
   customerAttachments?: string[];
+  voucherCode?: string;
 }
 
 export interface CreateAddressPayload {
@@ -177,11 +180,50 @@ export const bookingApi = {
     return response.data.data;
   },
 
+  getRecurringSeries: async (orderId: string) => {
+    const response = await api.get<{
+      success: boolean;
+      data: { items: Order[] };
+    }>(`/orders/${orderId}/series`);
+    return response.data.data.items;
+  },
+
+  selectAppointmentProvider: async (orderId: string, providerId: string) => {
+    const response = await api.patch<{ success: boolean; data: Order }>(
+      `/orders/${orderId}/appointment-provider`,
+      { providerId },
+    );
+    return response.data.data;
+  },
+
   cancelOrder: async (orderId: string, reason: string) => {
     const response = await api.patch<{ success: boolean; data: Order }>(
       `/orders/${orderId}/cancel`,
       { reason },
     );
+    return response.data.data;
+  },
+
+  discardUnpaidOrder: async (orderId: string) => {
+    await api.delete(`/orders/${orderId}/unpaid`);
+  },
+
+  respondToReassignment: async (
+    orderId: string,
+    decision: "accept" | "decline",
+  ) => {
+    const response = await api.patch<{ success: boolean; data: Order }>(
+      `/orders/${orderId}/reassignment-response`,
+      { decision },
+    );
+    return response.data.data;
+  },
+
+  cancelRecurringSeries: async (orderId: string, reason: string) => {
+    const response = await api.patch<{
+      success: boolean;
+      data: { cancelledCount: number; orders: Order[] };
+    }>(`/orders/${orderId}/cancel-series`, { reason });
     return response.data.data;
   },
 

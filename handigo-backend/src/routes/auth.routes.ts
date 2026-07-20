@@ -4,7 +4,6 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   authMessageRateLimit,
-  loginRateLimit,
   otpRateLimit,
 } from "../middlewares/rateLimit.middleware";
 import {
@@ -21,10 +20,6 @@ import {
 
 const router = Router();
 
-router.use(
-  ["/login", "/google-login", "/facebook-login"],
-  loginRateLimit,
-);
 router.use(
   ["/verify-register-otp", "/reset-password"],
   otpRateLimit,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileWarning, Flag, Headphones, Plus, RefreshCw } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
@@ -81,7 +82,21 @@ const getTitle = (item: Complaint | SupportTicket | Report) =>
   "subject" in item ? item.subject : item.title;
 
 export default function CaseManagementPage({ role }: CaseManagementPageProps) {
-  const [tab, setTab] = useState<CaseTab>("complaint");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const requestedCreateKind = searchParams.get("create");
+  const requestedOrderId = searchParams.get("orderId") || undefined;
+  const initialTab: CaseTab = requestedTab === "ticket" || requestedTab === "report"
+    ? requestedTab
+    : "complaint";
+  const initialCreateKind: CreateCaseKind | null =
+    requestedCreateKind === "complaint" ||
+    requestedCreateKind === "ticket" ||
+    requestedCreateKind === "report"
+      ? requestedCreateKind
+      : null;
+
+  const [tab, setTab] = useState<CaseTab>(initialTab);
   const [query, setQuery] = useState<CaseListQuery>({ page: 1, limit: 10 });
   const [items, setItems] = useState<Array<Complaint | SupportTicket | Report>>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -91,7 +106,7 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
-  const [createKind, setCreateKind] = useState<CreateCaseKind | null>(null);
+  const [createKind, setCreateKind] = useState<CreateCaseKind | null>(initialCreateKind);
   const [selected, setSelected] = useState<SelectedCase | null>(null);
 
   const load = useCallback(async () => {
@@ -120,11 +135,45 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
   }, [load]);
 
   useEffect(() => {
-    const request = role === "CUSTOMER"
-      ? bookingApi.getMyOrders(1, 50)
-      : providerOrderApi.getProviderOrders(1, 50);
-    request.then((result) => setOrders(result.items)).catch(() => setOrders([]));
-  }, [role]);
+    let cancelled = false;
+
+    const loadOrders = async () => {
+      try {
+        const result = role === "CUSTOMER"
+          ? await bookingApi.getMyOrders(1, 50)
+          : await providerOrderApi.getProviderOrders(1, 50);
+        let nextOrders = result.items;
+
+        if (
+          role === "CUSTOMER" &&
+          requestedOrderId &&
+          !nextOrders.some((order) => order._id === requestedOrderId)
+        ) {
+          const requestedOrder = await bookingApi.getOrderById(requestedOrderId);
+          nextOrders = [requestedOrder, ...nextOrders];
+        }
+
+        if (!cancelled) setOrders(nextOrders);
+      } catch {
+        if (!cancelled) setOrders([]);
+      }
+    };
+
+    void loadOrders();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedOrderId, role]);
+
+  const closeCreateModal = () => {
+    setCreateKind(null);
+    if (!searchParams.has("create") && !searchParams.has("orderId")) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("create");
+    nextParams.delete("orderId");
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const switchTab = (nextTab: CaseTab) => {
     setTab(nextTab);
@@ -262,7 +311,7 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
 
       <Pagination page={query.page || 1} totalPages={totalPages} onChange={(page) => setQuery((current) => ({ ...current, page }))} />
 
-      {createKind && <CreateCaseModal open kind={createKind} role={role} orders={orders} onClose={() => setCreateKind(null)} onCreated={() => void load()} />}
+      {createKind && <CreateCaseModal open kind={createKind} role={role} orders={orders} initialOrderId={requestedOrderId} onClose={closeCreateModal} onCreated={() => void load()} />}
       <CaseDetailModal selected={selected} loading={detailLoading} busy={busy} actionError={actionError} onClose={() => { setSelected(null); setActionError(""); }} onCancel={cancelSelected} onAddEvidence={addEvidence} onRespond={respond} />
     </DashboardShell>
   );

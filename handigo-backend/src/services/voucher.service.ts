@@ -62,6 +62,76 @@ const calculateDiscountAmount = (promotion: IPromotion, amountBeforeVoucher: num
   return Math.min(Math.max(Math.floor(limitedDiscount), 0), amountBeforeVoucher);
 };
 
+export const resolveVoucherForAmount = async (
+  code: string,
+  amountBeforeVoucher: number,
+  session?: ClientSession,
+) => {
+  const normalizedCode = normalizeCode(code);
+  const query = Promotion.findOne({ code: normalizedCode });
+  if (session) query.session(session);
+  const promotion = await query;
+
+  if (!promotion) {
+    throw new AppError("Voucher không tồn tại", 404);
+  }
+  if (!isPromotionActive(promotion)) {
+    throw new AppError("Voucher không hoạt động hoặc đã hết hạn", 400);
+  }
+  if (
+    promotion.usageLimit !== null &&
+    promotion.usageLimit !== undefined &&
+    promotion.usedCount >= promotion.usageLimit
+  ) {
+    throw new AppError("Voucher đã hết lượt sử dụng", 400);
+  }
+  if (amountBeforeVoucher < (promotion.minOrderAmount ?? 0)) {
+    throw new AppError("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng voucher", 400);
+  }
+
+  const discountAmount = calculateDiscountAmount(promotion, amountBeforeVoucher);
+  return {
+    promotion,
+    discountAmount,
+    snapshot: {
+      voucherId: promotion._id as Types.ObjectId,
+      name: promotion.name,
+      code: normalizedCode,
+      discountType: normalizeDiscountType(promotion.discountType),
+      discountValue: promotion.discountValue,
+      discountAmount,
+    },
+  };
+};
+
+export const markOrderVoucherAsUsed = async (
+  order: InstanceType<typeof Order>,
+  session: ClientSession,
+) => {
+  const voucherId = order.voucherSnapshot?.voucherId;
+  if (!voucherId || order.voucherUsedAt) return false;
+
+  const usedAt = new Date();
+  const claimedOrder = await Order.findOneAndUpdate(
+    {
+      _id: order._id,
+      voucherUsedAt: null,
+      "voucherSnapshot.voucherId": voucherId,
+    },
+    { $set: { voucherUsedAt: usedAt } },
+    { new: true, session },
+  );
+  if (!claimedOrder) return false;
+
+  await Promotion.updateOne(
+    { _id: voucherId },
+    { $inc: { usedCount: 1 } },
+    { session },
+  );
+  order.voucherUsedAt = usedAt;
+  return true;
+};
+
 const buildVoucherInfo = (promotion: IPromotion, discountAmount?: number) => ({
   id: promotion._id,
   code: promotion.code,
@@ -251,54 +321,10 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
 
       await assertNoLockedPayment(order._id as Types.ObjectId, session);
 
-      const code = normalizeCode(input.code);
-      const promotion = await Promotion.findOne({ code }).session(session);
-
-      if (!promotion) {
-        throw new AppError("Voucher không tồn tại", 404);
-      }
-
-      const now = new Date();
-      if (!isPromotionActive(promotion, now)) {
-        throw new AppError("Voucher không hoạt động hoặc đã hết hạn", 400);
-      }
-
-      const originalAmount = getOriginalAmount(order);
-      const minOrderAmount = promotion.minOrderAmount ?? 0;
-
-      if (originalAmount < minOrderAmount) {
-        throw new AppError("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng voucher", 400);
-      }
-
       const amountBeforeVoucher = getAmountBeforeVoucher(order);
-      const discountAmount = calculateDiscountAmount(promotion, amountBeforeVoucher);
+      const { promotion, discountAmount, snapshot } =
+        await resolveVoucherForAmount(input.code, amountBeforeVoucher, session);
       const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
-      const usageFilter: Record<string, unknown> = {
-        _id: promotion._id,
-        isDeleted: false,
-        isActive: true,
-        startAt: { $lte: now },
-        endAt: { $gte: now },
-        $or: [
-          { status: "ACTIVE" },
-          { status: "active" },
-          { status: { $exists: false } },
-        ],
-      };
-
-      if (promotion.usageLimit !== null && promotion.usageLimit !== undefined) {
-        usageFilter.$expr = { $lt: ["$usedCount", "$usageLimit"] };
-      }
-
-      const updatedPromotion = await Promotion.findOneAndUpdate(
-        usageFilter,
-        { $inc: { usedCount: 1 } },
-        { new: true, session },
-      );
-
-      if (!updatedPromotion) {
-        throw new AppError("Voucher đã hết lượt sử dụng", 400);
-      }
 
       const updatedOrder = await Order.findOneAndUpdate(
         {
@@ -308,14 +334,7 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
         },
         {
           $set: {
-            voucherSnapshot: {
-              voucherId: promotion._id as Types.ObjectId,
-              name: promotion.name,
-              code,
-              discountType: normalizeDiscountType(promotion.discountType),
-              discountValue: promotion.discountValue,
-              discountAmount,
-            },
+            voucherSnapshot: snapshot,
             "pricing.voucherDiscountAmount": discountAmount,
             "pricing.totalPaidAmount": finalAmount,
           },
@@ -327,7 +346,7 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
         throw new AppError("Đơn hàng vừa được xử lý bởi yêu cầu khác", 409);
       }
 
-      return buildVoucherResponse(updatedOrder, updatedPromotion, discountAmount);
+      return buildVoucherResponse(updatedOrder, promotion, discountAmount);
     });
   } finally {
     await session.endSession();
@@ -384,14 +403,6 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
 
       if (!updatedOrder) {
         throw new AppError("Đơn hàng vừa được xử lý bởi yêu cầu khác", 409);
-      }
-
-      if (voucherId) {
-        await Promotion.updateOne(
-          { _id: voucherId, usedCount: { $gt: 0 } },
-          { $inc: { usedCount: -1 } },
-          { session },
-        );
       }
 
       return {

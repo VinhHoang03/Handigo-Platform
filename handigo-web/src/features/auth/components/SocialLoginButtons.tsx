@@ -26,7 +26,7 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
   const handleAuthenticatedUser = (
     user: Awaited<ReturnType<typeof googleLogin>>,
   ) => {
-    if (user) navigate(getRoleHomePath(user.role), { replace: true });
+    if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
   };
 
   const startGoogleLogin = useGoogleLogin({
@@ -64,18 +64,10 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
             onError?.("Bạn đã hủy đăng nhập Facebook.");
             return;
           }
-          void facebookLogin(accessToken, rememberMe)
-            .then((user) => {
-              if (user) navigate(getRoleHomePath(user.role), { replace: true });
-              else onError?.("Đăng nhập Facebook thất bại.");
-            })
-            .catch((error: unknown) => {
-              onError?.(
-                error instanceof Error
-                  ? error.message
-                  : "Đăng nhập Facebook thất bại.",
-              );
-            });
+          void facebookLogin(accessToken, rememberMe).then((user) => {
+            if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
+            else onError?.("Đăng nhập Facebook thất bại.");
+          });
         },
         { scope: "public_profile,email" },
       );

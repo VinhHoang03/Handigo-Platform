@@ -26,12 +26,14 @@ const startServer = async () => {
         startRefundReconciliationMonitor,
         stopRefundReconciliationMonitor,
       },
+      { startReassignmentMonitor, stopReassignmentMonitor },
     ] = await Promise.all([
       import("./app"),
       import("./configs/db"),
       import("./sockets/initSocket"),
       import("./services/dispatch.service"),
       import("./services/orderCancellation.service"),
+      import("./services/orderReassignment.service"),
     ]);
 
     await connectDB();
@@ -45,6 +47,7 @@ const startServer = async () => {
     const io = initSocket(server);
     DispatchService.startTimeoutMonitor();
     startRefundReconciliationMonitor();
+    startReassignmentMonitor();
 
     server.listen(PORT, "0.0.0.0", () => {
       serverLogger.info("Máy chủ đang chạy.", { port: PORT });
@@ -59,6 +62,7 @@ const startServer = async () => {
       serverLogger.info("Nhận tín hiệu dừng máy chủ.", { signal });
       DispatchService.stopTimeoutMonitor();
       stopRefundReconciliationMonitor();
+      stopReassignmentMonitor();
       io.disconnectSockets(true);
 
       const forceShutdownTimer = setTimeout(() => {

@@ -12,6 +12,7 @@ export interface IServiceOption extends Document, IBaseDocument {
   serviceId: Types.ObjectId;
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType: ServiceOptionType;
   price: Money;
   selectionGroup?: string | null;
@@ -26,6 +27,7 @@ const ServiceOptionSchema = new Schema<IServiceOption>(
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
     name: { type: String, required: true, trim: true },
     description: { type: String, default: null, trim: true },
+    image: { type: String, default: null, trim: true },
     optionType: {
       type: String,
       enum: ["room_count", "area_size", "package", "add_on", "other"],

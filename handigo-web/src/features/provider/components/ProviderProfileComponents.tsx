@@ -18,9 +18,9 @@ export const ProfileSection: React.FC<{
   onAction?: () => void;
   children: React.ReactNode;
 }> = ({ title, actionLabel, onAction, children }) => (
-  <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+  <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h3 className="font-headline-md text-headline-md text-on-surface">
+      <h3 className="text-pretty font-headline-md text-headline-md text-on-surface">
         {title}
       </h3>
       {actionLabel && (
@@ -40,9 +40,12 @@ export const ProfileSection: React.FC<{
 export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
   profile,
 }) => (
-  <section className="glass-card flex flex-col items-center gap-8 overflow-hidden rounded-xl p-6 md:flex-row md:p-8">
+  <section className="glass-card flex flex-col items-center gap-6 overflow-hidden rounded-xl p-6 md:flex-row">
     <img
       alt={`${profile.fullName} profile`}
+      width={128}
+      height={128}
+      fetchPriority="high"
       className="h-32 w-32 shrink-0 rounded-full object-cover ring-4 ring-primary-container/20"
       src={profile.avatarUrl}
     />
@@ -70,6 +73,7 @@ export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
       <div className="mt-4 flex flex-wrap justify-center gap-4 md:justify-start">
         <div className="flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-high/50 px-3 py-1.5">
           <span
+            aria-hidden="true"
             className="material-symbols-outlined text-primary"
             style={{ fontVariationSettings: "'FILL' 1" }}
           >
@@ -81,7 +85,7 @@ export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
           </span>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-outline-variant/30 bg-surface-container-high/50 px-3 py-1.5">
-          <span className="material-symbols-outlined text-primary">
+          <span aria-hidden="true" className="material-symbols-outlined text-primary">
             task_alt
           </span>
           <span className="font-bold">{profile.totalBookings}+</span>
@@ -185,6 +189,7 @@ function VerificationRow({ item }: { item: VerificationPanelItem }) {
   const content = (
     <>
       <span
+        aria-hidden="true"
         className={`material-symbols-outlined ${iconClass}`}
         style={{ fontVariationSettings: "'FILL' 1" }}
       >
@@ -205,7 +210,7 @@ function VerificationRow({ item }: { item: VerificationPanelItem }) {
         </span>
       </span>
       {item.onClick && (
-        <span className="material-symbols-outlined text-outline-variant">
+        <span aria-hidden="true" className="material-symbols-outlined text-outline-variant">
           chevron_right
         </span>
       )}
@@ -231,7 +236,7 @@ export const VerificationPanel: React.FC<{
   items: VerificationPanelItem[];
 }> = ({ items }) => (
   <aside className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
-    <h3 className="mb-6 font-headline-md text-headline-md text-on-surface">
+    <h3 className="mb-6 text-pretty font-headline-md text-headline-md text-on-surface">
       Xác thực tài khoản
     </h3>
     <div className="space-y-4">
@@ -244,8 +249,8 @@ export const VerificationPanel: React.FC<{
 
 export const ServiceAreaPanel: React.FC<{ area: ServiceArea; onEdit?: () => void }> = ({ area, onEdit }) => (
   <aside className="overflow-hidden rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
-    <div className="mb-4 flex items-center justify-between">
-      <h3 className="font-bold">Khu vực phục vụ</h3>
+    <div className="mb-6 flex items-center justify-between gap-3">
+      <h3 className="text-pretty font-headline-md text-headline-md text-on-surface">Khu vực phục vụ</h3>
       {onEdit && <button type="button" className="text-sm font-bold text-primary hover:underline" onClick={onEdit}>Chỉnh sửa</button>}
     </div>
     {area.workingAreas?.length ? (
@@ -320,7 +325,7 @@ export const AccountFunctionsPanel: React.FC<{
 
   return (
     <aside className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
-      <h3 className="mb-4 font-headline-md text-headline-md text-on-surface">
+      <h3 className="mb-6 text-pretty font-headline-md text-headline-md text-on-surface">
         Chức năng tài khoản
       </h3>
       <div className="space-y-2">
@@ -328,11 +333,11 @@ export const AccountFunctionsPanel: React.FC<{
           <button
             key={item.label}
             type="button"
-            className="group flex w-full items-center justify-between rounded-lg p-3 text-left transition-all hover:bg-surface-container-low"
+            className="group flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             onClick={item.onClick}
           >
             <span className="flex min-w-0 items-center gap-3">
-              <span className="material-symbols-outlined text-on-surface-variant transition-colors group-hover:text-primary">
+              <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant transition-colors group-hover:text-primary">
                 {item.icon}
               </span>
               <span className="min-w-0">
@@ -342,7 +347,7 @@ export const AccountFunctionsPanel: React.FC<{
                 </span>
               </span>
             </span>
-            <span className="material-symbols-outlined text-outline-variant">
+            <span aria-hidden="true" className="material-symbols-outlined text-outline-variant">
               chevron_right
             </span>
           </button>

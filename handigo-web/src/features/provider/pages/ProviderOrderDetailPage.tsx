@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { providerOrderApi } from '../api/providerOrder.api';
@@ -25,6 +25,7 @@ import { ProviderOrderFeedbackThread } from '../components/ProviderOrderFeedback
 import { OrderTrackingMap } from '@/features/tracking/components/OrderTrackingMap';
 
 export default function ProviderOrderDetailPage() {
+  const navigate = useNavigate();
   const { orderId } = useParams();
   const { isOnline, toggleAvailability } = useProviderAvailability();
   const [order, setOrder] = useState<Order | null>(null);
@@ -77,12 +78,17 @@ export default function ProviderOrderDetailPage() {
     void Promise.resolve().then(loadData);
   }, [loadData]);
 
-  const runAction = async (action: () => Promise<void>, fallbackMessage: string) => {
+  const runAction = async (
+    action: () => Promise<void>,
+    fallbackMessage: string,
+    reload = true,
+  ) => {
     try {
       setBusy(true);
       setError(null);
       await action();
-      await loadData();
+      if (reload) await loadData();
+      return true;
     } catch (err: unknown) {
       const message =
         typeof err === 'object' &&
@@ -94,6 +100,7 @@ export default function ProviderOrderDetailPage() {
           ? ((err.response.data as { message?: string }).message ?? fallbackMessage)
           : fallbackMessage;
       setError(message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -158,13 +165,16 @@ export default function ProviderOrderDetailPage() {
     const reason = cancelReason.trim();
     const explanation = cancelExplanation.trim();
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
-    await runAction(async () => {
+    const succeeded = await runAction(async () => {
       await providerOrderApi.cancelOrder(order._id, cancellationReason);
-      setCancelConfirmOpen(false);
-      setCancelOpen(false);
-      setCancelReason('');
-      setCancelExplanation('');
-    }, 'Không thể hủy đơn.');
+    }, 'Không thể hủy đơn.', false);
+    if (!succeeded) return;
+
+    setCancelConfirmOpen(false);
+    setCancelOpen(false);
+    setCancelReason('');
+    setCancelExplanation('');
+    navigate('/provider/orders', { replace: true });
   };
 
   const handleCreateQuotation = async (payload: Parameters<typeof providerOrderApi.createQuotation>[1]) => {

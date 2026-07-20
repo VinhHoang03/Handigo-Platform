@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   Clock3,
   Eye,
@@ -97,7 +103,11 @@ function StatusBadge({ status }: { status: SupportTicketStatus }) {
   }[status];
 
   return (
-    <span className={"inline-flex rounded-full px-3 py-1 text-xs font-bold " + className}>
+    <span
+      className={
+        "inline-flex rounded-full px-3 py-1 text-xs font-bold " + className
+      }
+    >
       {STATUS_LABELS[status]}
     </span>
   );
@@ -111,7 +121,11 @@ function PriorityBadge({ priority }: { priority: SupportTicketPriority }) {
     URGENT: "text-error",
   }[priority];
 
-  return <span className={"text-xs font-bold " + className}>{PRIORITY_LABELS[priority]}</span>;
+  return (
+    <span className={"text-xs font-bold " + className}>
+      {PRIORITY_LABELS[priority]}
+    </span>
+  );
 }
 
 function SummaryCard({
@@ -128,7 +142,11 @@ function SummaryCard({
   return (
     <article className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-4">
       <div className="flex items-start gap-3">
-        <span className="material-symbols-outlined grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{icon}</span>
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <span className="material-symbols-outlined block text-[22px] leading-none">
+            {icon}
+          </span>
+        </span>
         <div>
           <p className="text-sm text-on-surface-variant">{label}</p>
           <p className="mt-1 text-2xl font-bold">{value}</p>
@@ -169,7 +187,10 @@ interface TicketDetailProps {
   busy: boolean;
   actionError: string;
   onAssign: (adminId: string) => Promise<boolean>;
-  onStatusChange: (status: SupportTicketStatus, note?: string) => Promise<boolean>;
+  onStatusChange: (
+    status: SupportTicketStatus,
+    note?: string,
+  ) => Promise<boolean>;
   onRespond: (message: string) => Promise<boolean>;
   onCreateViolation: () => void;
 }
@@ -184,16 +205,23 @@ function TicketDetail({
   onRespond,
   onCreateViolation,
 }: TicketDetailProps) {
-  const [assignedAdminId, setAssignedAdminId] = useState(ticket.assignedAdminId?._id ?? "");
+  const [assignedAdminId, setAssignedAdminId] = useState(
+    ticket.assignedAdminId?._id ?? "",
+  );
   const [nextStatus, setNextStatus] = useState<SupportTicketStatus | "">("");
   const [resolutionNote, setResolutionNote] = useState("");
   const [reply, setReply] = useState("");
   const isTerminal = ["closed", "cancelled"].includes(ticket.status);
-  const canRespond = !["resolved", "closed", "cancelled"].includes(ticket.status);
+  const canRespond = !["resolved", "closed", "cancelled"].includes(
+    ticket.status,
+  );
 
   const submitStatus = async () => {
     if (!nextStatus) return;
-    const succeeded = await onStatusChange(nextStatus, resolutionNote.trim() || undefined);
+    const succeeded = await onStatusChange(
+      nextStatus,
+      resolutionNote.trim() || undefined,
+    );
     if (succeeded) {
       setNextStatus("");
       setResolutionNote("");
@@ -215,17 +243,22 @@ function TicketDetail({
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={ticket.status} />
             <PriorityBadge priority={ticket.priority} />
-            <span className="text-xs text-on-surface-variant">#{ticket._id.slice(-8).toUpperCase()}</span>
+            <span className="text-xs text-on-surface-variant">
+              #{ticket._id.slice(-8).toUpperCase()}
+            </span>
           </div>
           <h3 className="mt-3 text-xl font-bold">{ticket.subject}</h3>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-on-surface-variant">
-            <span>{ticket.requesterId.fullName} · {ticket.requesterId.email}</span>
+            <span>
+              {ticket.requesterId.fullName} · {ticket.requesterId.email}
+            </span>
             <span>Tạo lúc {dateTime.format(new Date(ticket.createdAt))}</span>
             <span>Đã chờ {ticketAge(ticket.createdAt)}</span>
           </div>
           {ticket.orderId && (
             <p className="mt-2 text-sm">
-              Đơn liên quan: <b>{ticket.orderId.orderCode}</b> · {ticket.orderId.status} · {ticket.orderId.paymentStatus}
+              Đơn liên quan: <b>{ticket.orderId.orderCode}</b> ·{" "}
+              {ticket.orderId.status} · {ticket.orderId.paymentStatus}
             </p>
           )}
         </section>
@@ -237,20 +270,33 @@ function TicketDetail({
               <b className="text-on-surface">{ticket.requesterId.fullName}</b>
               <span>{dateTime.format(new Date(ticket.createdAt))}</span>
             </div>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-6">{ticket.description}</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6">
+              {ticket.description}
+            </p>
             <Attachments attachments={ticket.attachments} />
           </article>
           {ticket.responses.map((response, index) => {
             const isAdmin = response.responderRole === "ADMIN";
             return (
-              <article key={response.respondedAt + index} className={"rounded-2xl border p-4 " + (isAdmin ? "ml-8 rounded-tr-sm border-primary/20 bg-primary/5" : "mr-8 rounded-tl-sm border-outline-variant/40 bg-surface")}>
+              <article
+                key={response.respondedAt + index}
+                className={
+                  "rounded-2xl border p-4 " +
+                  (isAdmin
+                    ? "ml-8 rounded-tr-sm border-primary/20 bg-primary/5"
+                    : "mr-8 rounded-tl-sm border-outline-variant/40 bg-surface")
+                }
+              >
                 <div className="flex items-center justify-between gap-3 text-xs text-on-surface-variant">
                   <b className={isAdmin ? "text-primary" : "text-on-surface"}>
-                    {response.responderId?.fullName || (isAdmin ? "Quản trị viên" : "Người dùng")}
+                    {response.responderId?.fullName ||
+                      (isAdmin ? "Quản trị viên" : "Người dùng")}
                   </b>
                   <span>{dateTime.format(new Date(response.respondedAt))}</span>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6">{response.message}</p>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6">
+                  {response.message}
+                </p>
                 <Attachments attachments={response.attachments} />
               </article>
             );
@@ -258,12 +304,31 @@ function TicketDetail({
         </section>
 
         {canRespond && (
-          <form onSubmit={submitReply} className="rounded-2xl border border-outline-variant/40 p-4">
-            <label htmlFor="support-reply" className="font-bold">Phản hồi người dùng</label>
-            <textarea id="support-reply" value={reply} onChange={(event) => setReply(event.target.value)} rows={4} maxLength={3000} placeholder="Nhập hướng dẫn hoặc thông tin cần bổ sung..." className="mt-3 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3" />
+          <form
+            onSubmit={submitReply}
+            className="rounded-2xl border border-outline-variant/40 p-4"
+          >
+            <label htmlFor="support-reply" className="font-bold">
+              Phản hồi người dùng
+            </label>
+            <textarea
+              id="support-reply"
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+              rows={4}
+              maxLength={3000}
+              placeholder="Nhập hướng dẫn hoặc thông tin cần bổ sung..."
+              className="mt-3 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3"
+            />
             <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-xs text-on-surface-variant">{reply.length}/3000 ký tự</span>
-              <button type="submit" disabled={busy || !reply.trim()} className="btn-primary">
+              <span className="text-xs text-on-surface-variant">
+                {reply.length}/3000 ký tự
+              </span>
+              <button
+                type="submit"
+                disabled={busy || !reply.trim()}
+                className="btn-primary"
+              >
                 <Send size={17} /> {busy ? "Đang gửi..." : "Gửi phản hồi"}
               </button>
             </div>
@@ -272,10 +337,18 @@ function TicketDetail({
       </div>
 
       <aside className="space-y-5">
-        {actionError && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{actionError}</p>}
+        {actionError && (
+          <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">
+            {actionError}
+          </p>
+        )}
 
         {!ticket.createdViolationId && ticket.status !== "cancelled" && (
-          <button type="button" onClick={onCreateViolation} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-white">
+          <button
+            type="button"
+            onClick={onCreateViolation}
+            className="w-full rounded-xl bg-error px-4 py-3 font-bold text-white"
+          >
             Tạo vi phạm và áp dụng penalty
           </button>
         )}
@@ -285,11 +358,30 @@ function TicketDetail({
             <UserRoundCheck size={19} className="text-primary" />
             <h3 className="font-bold">Phân công xử lý</h3>
           </div>
-          <select value={assignedAdminId} onChange={(event) => setAssignedAdminId(event.target.value)} disabled={isTerminal || busy} className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3">
+          <select
+            value={assignedAdminId}
+            onChange={(event) => setAssignedAdminId(event.target.value)}
+            disabled={isTerminal || busy}
+            className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3"
+          >
             <option value="">Chọn quản trị viên</option>
-            {admins.map((admin) => <option key={admin._id} value={admin._id}>{admin.fullName} · {admin.email}</option>)}
+            {admins.map((admin) => (
+              <option key={admin._id} value={admin._id}>
+                {admin.fullName} · {admin.email}
+              </option>
+            ))}
           </select>
-          <button type="button" onClick={() => assignedAdminId && void onAssign(assignedAdminId)} disabled={isTerminal || busy || !assignedAdminId || assignedAdminId === ticket.assignedAdminId?._id} className="mt-3 w-full rounded-xl border border-primary px-4 py-2.5 font-semibold text-primary disabled:opacity-40">
+          <button
+            type="button"
+            onClick={() => assignedAdminId && void onAssign(assignedAdminId)}
+            disabled={
+              isTerminal ||
+              busy ||
+              !assignedAdminId ||
+              assignedAdminId === ticket.assignedAdminId?._id
+            }
+            className="mt-3 w-full rounded-xl border border-primary px-4 py-2.5 font-semibold text-primary disabled:opacity-40"
+          >
             Xác nhận phân công
           </button>
         </section>
@@ -299,14 +391,41 @@ function TicketDetail({
             <MessageSquareReply size={19} className="text-primary" />
             <h3 className="font-bold">Cập nhật trạng thái</h3>
           </div>
-          <select value={nextStatus} onChange={(event) => setNextStatus(event.target.value as SupportTicketStatus | "")} disabled={busy || !STATUS_TRANSITIONS[ticket.status].length} className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3">
+          <select
+            value={nextStatus}
+            onChange={(event) =>
+              setNextStatus(event.target.value as SupportTicketStatus | "")
+            }
+            disabled={busy || !STATUS_TRANSITIONS[ticket.status].length}
+            className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3"
+          >
             <option value="">Chọn trạng thái tiếp theo</option>
-            {STATUS_TRANSITIONS[ticket.status].map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
+            {STATUS_TRANSITIONS[ticket.status].map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
           </select>
           {nextStatus === "resolved" && (
-            <textarea value={resolutionNote} onChange={(event) => setResolutionNote(event.target.value)} rows={4} maxLength={3000} placeholder="Kết quả xử lý (tối thiểu 10 ký tự)..." className="mt-3 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3" />
+            <textarea
+              value={resolutionNote}
+              onChange={(event) => setResolutionNote(event.target.value)}
+              rows={4}
+              maxLength={3000}
+              placeholder="Kết quả xử lý (tối thiểu 10 ký tự)..."
+              className="mt-3 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3"
+            />
           )}
-          <button type="button" onClick={() => void submitStatus()} disabled={busy || !nextStatus || (nextStatus === "resolved" && resolutionNote.trim().length < 10)} className="mt-3 w-full btn-primary disabled:opacity-40">
+          <button
+            type="button"
+            onClick={() => void submitStatus()}
+            disabled={
+              busy ||
+              !nextStatus ||
+              (nextStatus === "resolved" && resolutionNote.trim().length < 10)
+            }
+            className="mt-3 w-full btn-primary disabled:opacity-40"
+          >
             {busy ? "Đang cập nhật..." : "Cập nhật trạng thái"}
           </button>
         </section>
@@ -323,14 +442,18 @@ function TicketDetail({
 }
 
 export default function AdminSupportPage() {
-  const [query, setQuery] = useState<SupportTicketQuery>({ page: 1, limit: 10 });
+  const [query, setQuery] = useState<SupportTicketQuery>({
+    page: 1,
+    limit: 10,
+  });
   const [searchInput, setSearchInput] = useState("");
   const [items, setItems] = useState<AdminSupportTicket[]>([]);
   const [summary, setSummary] = useState<SupportSummary>(EMPTY_SUMMARY);
   const [totalPages, setTotalPages] = useState(1);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<AdminSupportTicket | null>(null);
-  const [violationTicket, setViolationTicket] = useState<AdminSupportTicket | null>(null);
+  const [violationTicket, setViolationTicket] =
+    useState<AdminSupportTicket | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -360,7 +483,8 @@ export default function AdminSupportPage() {
   }, [load]);
 
   useEffect(() => {
-    adminSupportApi.getActiveAdmins()
+    adminSupportApi
+      .getActiveAdmins()
       .then((result) => setAdmins(result.items))
       .catch(() => setAdmins([]));
   }, []);
@@ -371,7 +495,9 @@ export default function AdminSupportPage() {
       setActionError("");
       setSelected(await adminSupportApi.getTicket(ticketId));
     } catch (requestError) {
-      setError(getErrorMessage(requestError, "Không thể tải chi tiết yêu cầu."));
+      setError(
+        getErrorMessage(requestError, "Không thể tải chi tiết yêu cầu."),
+      );
     } finally {
       setDetailLoading(false);
     }
@@ -385,7 +511,9 @@ export default function AdminSupportPage() {
       await load();
       return true;
     } catch (requestError) {
-      setActionError(getErrorMessage(requestError, "Không thể cập nhật yêu cầu hỗ trợ."));
+      setActionError(
+        getErrorMessage(requestError, "Không thể cập nhật yêu cầu hỗ trợ."),
+      );
       return false;
     } finally {
       setBusy(false);
@@ -404,55 +532,153 @@ export default function AdminSupportPage() {
   const setFilter = <K extends keyof SupportTicketQuery>(
     key: K,
     value: SupportTicketQuery[K],
-  ) => setQuery((current) => ({ ...current, [key]: value || undefined, page: 1 }));
+  ) =>
+    setQuery((current) => ({ ...current, [key]: value || undefined, page: 1 }));
 
-  const summaryCards = useMemo(() => [
-    { icon: "inbox", label: "Đang tồn", value: summary.active, description: "Ticket cần tiếp tục xử lý" },
-    { icon: "priority_high", label: "Khẩn cấp", value: summary.urgentActive, description: "Ưu tiên xử lý ngay" },
-    { icon: "person_off", label: "Chưa phân công", value: summary.unassignedActive, description: "Chưa có người phụ trách" },
-    { icon: "task_alt", label: "Hoàn tất hôm nay", value: summary.resolvedToday, description: "Đã xử lý hoặc đóng" },
-    { icon: "schedule", label: "Thời gian xử lý TB", value: formatDuration(summary.averageResolutionMs), description: "Từ lúc tạo đến khi xử lý" },
-  ], [summary]);
+  const summaryCards = useMemo(
+    () => [
+      {
+        icon: "inbox",
+        label: "Đang tồn",
+        value: summary.active,
+        description: "Ticket cần tiếp tục xử lý",
+      },
+      {
+        icon: "priority_high",
+        label: "Khẩn cấp",
+        value: summary.urgentActive,
+        description: "Ưu tiên xử lý ngay",
+      },
+      {
+        icon: "person_off",
+        label: "Chưa phân công",
+        value: summary.unassignedActive,
+        description: "Chưa có người phụ trách",
+      },
+      {
+        icon: "task_alt",
+        label: "Hoàn tất hôm nay",
+        value: summary.resolvedToday,
+        description: "Đã xử lý hoặc đóng",
+      },
+      {
+        icon: "schedule",
+        label: "Thời gian xử lý TB",
+        value: formatDuration(summary.averageResolutionMs),
+        description: "Từ lúc tạo đến khi xử lý",
+      },
+    ],
+    [summary],
+  );
 
   return (
     <DashboardShell role="ADMIN">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-headline-lg font-bold">Yêu cầu hỗ trợ</h1>
-          <p className="mt-1 text-on-surface-variant">Tiếp nhận, phân công và theo dõi xử lý vấn đề của khách hàng và provider.</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 font-semibold text-primary disabled:opacity-50">
-          <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> Làm mới
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 font-semibold text-primary disabled:opacity-50"
+        >
+          <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> Làm
+          mới
         </button>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {summaryCards.map((card) => <SummaryCard key={card.label} {...card} />)}
+        {summaryCards.map((card) => (
+          <SummaryCard key={card.label} {...card} />
+        ))}
       </section>
 
       <section className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-4">
         <form onSubmit={submitSearch} className="flex gap-2">
           <label className="relative flex-1">
             <span className="sr-only">Tìm kiếm yêu cầu hỗ trợ</span>
-            <Search size={18} className="pointer-events-none absolute left-3 top-3 text-on-surface-variant" />
-            <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} maxLength={100} placeholder="Tìm theo tiêu đề hoặc nội dung..." className="min-h-11 w-full rounded-xl border border-outline-variant bg-surface pl-10 pr-3" />
+            <Search
+              size={18}
+              className="pointer-events-none absolute left-3 top-3 text-on-surface-variant"
+            />
+            <input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              maxLength={100}
+              placeholder="Tìm theo tiêu đề hoặc nội dung..."
+              className="min-h-11 w-full rounded-xl border border-outline-variant bg-surface pl-10 pr-3"
+            />
           </label>
-          <button type="submit" className="rounded-xl bg-primary px-5 font-semibold text-on-primary">Tìm</button>
+          <button
+            type="submit"
+            className="rounded-xl bg-primary px-5 font-semibold text-on-primary"
+          >
+            Tìm
+          </button>
         </form>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <select value={query.status ?? ""} onChange={(event) => setFilter("status", event.target.value as SupportTicketStatus | undefined)} className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3">
+          <select
+            value={query.status ?? ""}
+            onChange={(event) =>
+              setFilter(
+                "status",
+                event.target.value as SupportTicketStatus | undefined,
+              )
+            }
+            className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3"
+          >
             <option value="">Tất cả trạng thái</option>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
-          <select value={query.category ?? ""} onChange={(event) => setFilter("category", event.target.value as SupportTicketCategory | undefined)} className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3">
+          <select
+            value={query.category ?? ""}
+            onChange={(event) =>
+              setFilter(
+                "category",
+                event.target.value as SupportTicketCategory | undefined,
+              )
+            }
+            className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3"
+          >
             <option value="">Tất cả danh mục</option>
-            {Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
-          <select value={query.priority ?? ""} onChange={(event) => setFilter("priority", event.target.value as SupportTicketPriority | undefined)} className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3">
+          <select
+            value={query.priority ?? ""}
+            onChange={(event) =>
+              setFilter(
+                "priority",
+                event.target.value as SupportTicketPriority | undefined,
+              )
+            }
+            className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3"
+          >
             <option value="">Tất cả mức ưu tiên</option>
-            {Object.entries(PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
-          <select value={query.assignment ?? ""} onChange={(event) => setFilter("assignment", event.target.value as "assigned" | "unassigned" | undefined)} className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3">
+          <select
+            value={query.assignment ?? ""}
+            onChange={(event) =>
+              setFilter(
+                "assignment",
+                event.target.value as "assigned" | "unassigned" | undefined,
+              )
+            }
+            className="min-h-11 rounded-xl border border-outline-variant bg-surface px-3"
+          >
             <option value="">Tất cả phân công</option>
             <option value="unassigned">Chưa phân công</option>
             <option value="assigned">Đã phân công</option>
@@ -460,7 +686,13 @@ export default function AdminSupportPage() {
         </div>
       </section>
 
-      <AsyncState loading={loading} error={error} empty={!items.length} emptyMessage="Không có yêu cầu hỗ trợ phù hợp." onRetry={load}>
+      <AsyncState
+        loading={loading}
+        error={error}
+        empty={!items.length}
+        emptyMessage="Không có yêu cầu hỗ trợ phù hợp."
+        onRetry={load}
+      >
         <div className="overflow-x-auto rounded-2xl border border-outline-variant/40 bg-surface-container-lowest">
           <table className="w-full min-w-[980px] text-left">
             <thead className="bg-surface-container-low text-sm">
@@ -476,21 +708,47 @@ export default function AdminSupportPage() {
             </thead>
             <tbody>
               {items.map((ticket) => (
-                <tr key={ticket._id} className="border-t border-outline-variant/30 align-top">
+                <tr
+                  key={ticket._id}
+                  className="border-t border-outline-variant/30 align-top"
+                >
                   <td className="max-w-sm p-4">
                     <p className="truncate font-bold">{ticket.subject}</p>
-                    <p className="mt-1 text-xs text-on-surface-variant">{CATEGORY_LABELS[ticket.category]} · #{ticket._id.slice(-8).toUpperCase()}</p>
+                    <p className="mt-1 text-xs text-on-surface-variant">
+                      {CATEGORY_LABELS[ticket.category]} · #
+                      {ticket._id.slice(-8).toUpperCase()}
+                    </p>
                   </td>
                   <td className="p-4">
-                    <p className="font-semibold">{ticket.requesterId.fullName}</p>
-                    <p className="text-xs text-on-surface-variant">{ticket.requesterId.email}</p>
+                    <p className="font-semibold">
+                      {ticket.requesterId.fullName}
+                    </p>
+                    <p className="text-xs text-on-surface-variant">
+                      {ticket.requesterId.email}
+                    </p>
                   </td>
-                  <td className="p-4"><PriorityBadge priority={ticket.priority} /></td>
-                  <td className="p-4"><StatusBadge status={ticket.status} /></td>
-                  <td className="p-4 text-sm">{ticket.assignedAdminId?.fullName || <span className="text-error">Chưa phân công</span>}</td>
-                  <td className="p-4 text-sm"><Clock3 size={15} className="mr-1 inline" />{ticketAge(ticket.createdAt)}</td>
+                  <td className="p-4">
+                    <PriorityBadge priority={ticket.priority} />
+                  </td>
+                  <td className="p-4">
+                    <StatusBadge status={ticket.status} />
+                  </td>
+                  <td className="p-4 text-sm">
+                    {ticket.assignedAdminId?.fullName || (
+                      <span className="text-error">Chưa phân công</span>
+                    )}
+                  </td>
+                  <td className="p-4 text-sm">
+                    <Clock3 size={15} className="mr-1 inline" />
+                    {ticketAge(ticket.createdAt)}
+                  </td>
                   <td className="p-4 text-right">
-                    <button type="button" onClick={() => void openTicket(ticket._id)} className="inline-grid h-9 w-9 place-items-center rounded-lg border border-outline-variant text-primary hover:bg-primary/5" title="Xem và xử lý">
+                    <button
+                      type="button"
+                      onClick={() => void openTicket(ticket._id)}
+                      className="inline-grid h-9 w-9 place-items-center rounded-lg border border-outline-variant text-primary hover:bg-primary/5"
+                      title="Xem và xử lý"
+                    >
                       <Eye size={18} />
                     </button>
                   </td>
@@ -501,11 +759,26 @@ export default function AdminSupportPage() {
         </div>
       </AsyncState>
 
-      <Pagination page={query.page ?? 1} totalPages={totalPages} onChange={(page) => setQuery((current) => ({ ...current, page }))} />
+      <Pagination
+        page={query.page ?? 1}
+        totalPages={totalPages}
+        onChange={(page) => setQuery((current) => ({ ...current, page }))}
+      />
 
-      <Modal open={Boolean(selected) || detailLoading} title="Chi tiết yêu cầu hỗ trợ" onClose={() => { setSelected(null); setActionError(""); }} size="xl" closeOnOverlayClick={!busy}>
+      <Modal
+        open={Boolean(selected) || detailLoading}
+        title="Chi tiết yêu cầu hỗ trợ"
+        onClose={() => {
+          setSelected(null);
+          setActionError("");
+        }}
+        size="xl"
+        closeOnOverlayClick={!busy}
+      >
         {detailLoading && !selected ? (
-          <div className="p-10 text-center text-on-surface-variant">Đang tải chi tiết...</div>
+          <div className="p-10 text-center text-on-surface-variant">
+            Đang tải chi tiết...
+          </div>
         ) : selected ? (
           <TicketDetail
             key={selected._id + selected.updatedAt}
@@ -513,9 +786,19 @@ export default function AdminSupportPage() {
             admins={admins}
             busy={busy}
             actionError={actionError}
-            onAssign={(adminId) => runAction(() => adminSupportApi.assignTicket(selected._id, adminId))}
-            onStatusChange={(status, note) => runAction(() => adminSupportApi.updateStatus(selected._id, status, note))}
-            onRespond={(message) => runAction(() => adminSupportApi.respond(selected._id, message))}
+            onAssign={(adminId) =>
+              runAction(() =>
+                adminSupportApi.assignTicket(selected._id, adminId),
+              )
+            }
+            onStatusChange={(status, note) =>
+              runAction(() =>
+                adminSupportApi.updateStatus(selected._id, status, note),
+              )
+            }
+            onRespond={(message) =>
+              runAction(() => adminSupportApi.respond(selected._id, message))
+            }
             onCreateViolation={() => setViolationTicket(selected)}
           />
         ) : null}

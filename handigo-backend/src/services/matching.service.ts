@@ -32,6 +32,8 @@ export interface FindNearestProvidersOptions {
   excludeProviderIds?: Types.ObjectId[];
   /** Chỉ kiểm tra một provider cụ thể trong luồng khách hàng ưu tiên thợ. */
   onlyProviderId?: Types.ObjectId;
+  /** Lịch hẹn có thể chọn provider đang ngoại tuyến, miễn là không trùng lịch. */
+  requireOnline?: boolean;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -67,6 +69,7 @@ export const MatchingService = {
       limit = 10,
       excludeProviderIds = [],
       onlyProviderId,
+      requireOnline = true,
     } = options;
 
     const serviceObjectId = new Types.ObjectId(serviceId);
@@ -120,7 +123,7 @@ export const MatchingService = {
             ),
           },
           serviceIds: serviceObjectId,
-          availabilityStatus: "online",
+          ...(requireOnline && { availabilityStatus: "online" }),
           verified: true,
           isDeleted: false,
           ...(onlyProviderId && { _id: onlyProviderId }),
@@ -183,7 +186,7 @@ export const MatchingService = {
     const providers = await Provider.find({
       userId: { $in: eligibleProviderUserIds },
       serviceIds: serviceObjectId,
-      availabilityStatus: "online",
+      ...(requireOnline && { availabilityStatus: "online" }),
       verified: true,
       isDeleted: false,
       ...(onlyProviderId && { _id: onlyProviderId }),

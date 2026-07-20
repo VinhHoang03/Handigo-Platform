@@ -37,6 +37,7 @@ export function PendingAssignmentCard({
 
   const customer = getCustomer(order);
   const isExpired = countdown === 'Hết hạn';
+  const isAppointment = assignment.assignmentType === 'appointment';
 
   return (
     <div className="glass-card overflow-hidden rounded-3xl border border-primary/15">
@@ -44,7 +45,9 @@ export function PendingAssignmentCard({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">notifications_active</span>
-            <span className="font-label-md text-primary">Đơn mới được phân công</span>
+            <span className="font-label-md text-primary">
+              {isAppointment ? 'Yêu cầu lịch hẹn' : 'Đơn mới được phân công'}
+            </span>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -84,6 +87,17 @@ export function PendingAssignmentCard({
           </div>
         </div>
 
+        {order.orderType === 'recurring' && (
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-sm text-sm">
+            <p className="font-bold text-on-surface">
+              Nhận toàn bộ {order.totalOccurrences} buổi định kỳ
+            </p>
+            <p className="mt-1 text-on-surface-variant">
+              Chu kỳ lặp theo {order.recurrenceUnit === 'monthly' ? 'tháng' : 'tuần'}.
+            </p>
+          </div>
+        )}
+
         <div className="rounded-2xl bg-surface-container-low p-sm">
           <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
             Địa chỉ
@@ -111,7 +125,11 @@ export function PendingAssignmentCard({
             onClick={() => onAccept(assignment._id)}
             className="btn-primary flex-1"
           >
-            Nhận đơn
+            {order.orderType === 'recurring'
+              ? 'Xác nhận toàn bộ lịch'
+              : isAppointment
+                ? 'Xác nhận lịch'
+                : 'Nhận đơn'}
           </button>
           <button
             type="button"
