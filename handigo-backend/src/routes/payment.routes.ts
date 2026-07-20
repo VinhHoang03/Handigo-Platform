@@ -5,6 +5,7 @@ import {
   getPaymentHistory,
   getPaymentsByOrder,
   payosWebhook,
+  reconcilePayosPaymentByOrder,
 } from "../controllers/payment.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
@@ -22,6 +23,12 @@ router.post(
 );
 router.post("/webhook", payosWebhook);
 router.get("/history", authMiddleware, getPaymentHistory);
+router.post(
+  "/order/:orderId/reconcile",
+  authMiddleware,
+  paymentRateLimit,
+  reconcilePayosPaymentByOrder,
+);
 router.get("/order/:orderId", authMiddleware, getPaymentsByOrder);
 router.get("/:id", authMiddleware, getPaymentById);
 

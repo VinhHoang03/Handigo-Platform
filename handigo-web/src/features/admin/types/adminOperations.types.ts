@@ -71,6 +71,14 @@ export interface AdminPayment {
   refundedAt?: string | null;
   failureReason?: string | null;
   refundReason?: string | null;
+  metadata?: {
+    refund?: {
+      policyVersion?: string;
+      rate?: number;
+      amount?: number;
+      status?: string;
+    };
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

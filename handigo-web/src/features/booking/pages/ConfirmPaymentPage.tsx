@@ -15,6 +15,7 @@ import { serviceCatalogApi } from "@/features/customer-service/api/serviceCatalo
 import type { Address, Service, ServiceOption } from "../../../types/booking";
 import type { AvailableVoucher } from "../types/voucher.types";
 import { isRequiredOptionSelectionMissing } from "../utils/serviceOptionSelection";
+import { tokenStorage } from "@/api/tokenStorage";
 
 const paymentMethods = [
   [
@@ -208,6 +209,7 @@ const ConfirmPaymentPage = () => {
         }
 
         sessionStorage.setItem("latestBookingOrderId", orderId);
+        tokenStorage.prepareExternalRedirect();
         window.location.href = payment.checkoutUrl;
         return;
       }

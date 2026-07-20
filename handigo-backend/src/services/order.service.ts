@@ -10,7 +10,10 @@ import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import { DispatchService } from "./dispatch.service";
-import { cancelOrderWithSettlement } from "./orderCancellation.service";
+import {
+  cancelOrderWithSettlement,
+  getCancellationPreview,
+} from "./orderCancellation.service";
 import { Payment } from "../models/payment.model";
 import { recordCompletedOrderSettlement } from "./wallet.service";
 import { MatchingService } from "./matching.service";
@@ -999,6 +1002,95 @@ export const OrderService = {
       role,
       reason,
     });
+  },
+
+  async previewCancellation(
+    orderId: string,
+    userId: string,
+    role: "customer" | "provider" | "admin",
+    scope: "single" | "series" = "single",
+  ) {
+    if (scope === "single") {
+      const preview = await getCancellationPreview({
+        orderId,
+        actorId: userId,
+        role,
+      });
+      return {
+        scope,
+        orderCount: 1,
+        policyVersion: preview.policyVersion,
+        paidAmount: preview.paidAmount,
+        refundAmount: preview.refundAmount,
+        cancellationFee: preview.cancellationFee,
+        providerCompensation: preview.providerCompensation,
+        platformRetainedAmount: preview.platformRetainedAmount,
+        canCancel: preview.canCancel,
+        items: [preview],
+      };
+    }
+
+    if (role !== "customer") {
+      throw new AppError("Chỉ khách hàng được xem trước hủy chuỗi lịch.", 403);
+    }
+
+    const anchorOrder = await Order.findById(orderId).lean();
+    if (!anchorOrder || anchorOrder.isDeleted) {
+      throw new AppError("Đơn hàng không tồn tại.", 404);
+    }
+    if (anchorOrder.customerId.toString() !== userId) {
+      throw new AppError("Bạn không có quyền hủy chuỗi lịch này.", 403);
+    }
+    if (
+      anchorOrder.orderType !== "recurring" ||
+      !anchorOrder.recurringGroupId ||
+      !anchorOrder.scheduledAt
+    ) {
+      throw new AppError("Đơn hàng không thuộc lịch định kỳ.", 400);
+    }
+
+    const orders = await Order.find({
+      recurringGroupId: anchorOrder.recurringGroupId,
+      customerId: anchorOrder.customerId,
+      scheduledAt: { $gte: anchorOrder.scheduledAt },
+      status: { $in: ["created", "accepted"] },
+      isDeleted: false,
+    })
+      .select("_id")
+      .sort({ scheduledAt: 1 })
+      .lean();
+    if (orders.length === 0) {
+      throw new AppError("Không còn buổi nào có thể hủy trong chuỗi lịch này.", 409);
+    }
+
+    const items = await Promise.all(
+      orders.map((order) =>
+        getCancellationPreview({
+          orderId: order._id.toString(),
+          actorId: userId,
+          role,
+        }),
+      ),
+    );
+
+    return {
+      scope,
+      orderCount: items.length,
+      policyVersion: items[0].policyVersion,
+      paidAmount: items.reduce((sum, item) => sum + item.paidAmount, 0),
+      refundAmount: items.reduce((sum, item) => sum + item.refundAmount, 0),
+      cancellationFee: items.reduce((sum, item) => sum + item.cancellationFee, 0),
+      providerCompensation: items.reduce(
+        (sum, item) => sum + item.providerCompensation,
+        0,
+      ),
+      platformRetainedAmount: items.reduce(
+        (sum, item) => sum + item.platformRetainedAmount,
+        0,
+      ),
+      canCancel: items.every((item) => item.canCancel),
+      items,
+    };
   },
 
   async cancelRecurringSeries(

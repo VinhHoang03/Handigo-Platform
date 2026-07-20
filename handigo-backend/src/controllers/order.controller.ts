@@ -170,6 +170,26 @@ export const cancelOrder = async (
   }
 };
 
+export const previewCancellation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const role = toOrderActorRole(requireRequestUser(req).role);
+    const scope = req.query.scope === "series" ? "series" : "single";
+    const preview = await OrderService.previewCancellation(
+      param(req, "orderId"),
+      uid(req),
+      role,
+      scope,
+    );
+    return ok(res, preview);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const cancelRecurringSeries = async (
   req: Request,
   res: Response,
