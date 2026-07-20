@@ -143,6 +143,11 @@ const ProviderAssignmentModal = lazy(() =>
     }),
   ),
 );
+const ChatbotGate = lazy(() =>
+  import("./features/chatbot/components/ChatbotGate").then(
+    ({ ChatbotGate }) => ({ default: ChatbotGate }),
+  ),
+);
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const AboutPage = lazy(() => import("./features/content/pages/AboutPage"));
 const NewsPage = lazy(() => import("./features/content/pages/NewsPage"));
@@ -523,6 +528,9 @@ function App() {
             </Routes>
           </Suspense>
           <ProviderAssignmentModalGate />
+          <Suspense fallback={null}>
+            <ChatbotGate />
+          </Suspense>
         </AuthBootstrap>
       </Router>
       <ToastContainer />
