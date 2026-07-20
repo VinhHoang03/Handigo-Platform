@@ -12,6 +12,7 @@ import { providerApplicationApi } from "@/features/provider-application/api/prov
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import {
   getUserProfile,
+  updateUserAvatar,
   updateUserProfile,
 } from "@/features/profile/api/userProfile.api";
 import { getErrorMessage } from "@/utils/apiError";
@@ -287,6 +288,24 @@ export default function CustomerProfilePage() {
     setDismissedProviderBanner(providerBannerMode);
   };
 
+  const handleSaveAvatar = async (url: string) => {
+    setIsSaving(true);
+    setErrorMsg("");
+
+    try {
+      const nextProfile = await updateUserAvatar(url);
+      setProfile(nextProfile);
+      syncAuthUser(nextProfile);
+    } catch (error) {
+      setErrorMsg(
+        getErrorMessage(error, "Cập nhật ảnh đại diện thất bại. Vui lòng thử lại."),
+      );
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <DashboardShell
       role="CUSTOMER"
@@ -411,6 +430,7 @@ export default function CustomerProfilePage() {
             error={errorMsg}
             defaultAvatar={DEFAULT_AVATAR}
             onSaveProfile={handleSaveProfile}
+            onSaveAvatar={handleSaveAvatar}
             addressManager={
               <AddressBookManager
                 defaultRecipient={{

@@ -37,7 +37,6 @@ export const providerNavItems: DashboardNavItem[] = [
     label: "Đề xuất dịch vụ",
     path: "/provider/service-suggestions",
   },
-  { icon: "support_agent", label: "Hỗ trợ", path: "/provider/support" },
   { icon: "settings", label: "Hồ sơ dịch vụ", path: "/provider/profile" },
 ];
 

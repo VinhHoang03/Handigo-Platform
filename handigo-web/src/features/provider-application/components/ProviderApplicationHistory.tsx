@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Download, Eye, FileText, Pencil } from "lucide-react";
+import { Download, FileText, Pencil } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
 import { Pagination } from "@/components/common/Pagination";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -49,8 +49,16 @@ const applicationTypeLabel: Record<
   ProviderApplication["applicationType"],
   string
 > = {
-  initial: "Đăng ký trở thành provider",
+  initial: "Đăng ký trở thành nhà cung cấp dịch vụ",
   service_addition: "Bổ sung dịch vụ mới",
+};
+
+const statusLabel: Record<ProviderApplication["status"], string> = {
+  draft: "Bản nháp",
+  pending: "Chờ duyệt",
+  resubmitted: "Gửi lại",
+  approved: "Đã duyệt",
+  rejected: "Từ chối",
 };
 
 const getServiceNames = (application: ProviderApplication) =>
@@ -92,9 +100,6 @@ const getApplicationSummary = (application: ProviderApplication) => {
   return {
     submitted: submittedDate(application),
     serviceNames,
-    servicePreview: serviceNames.length
-      ? serviceNames.slice(0, 3).join(", ")
-      : "Chưa có dịch vụ",
     typeLabel: applicationTypeLabel[application.applicationType],
   };
 };
@@ -187,7 +192,11 @@ function IdentityDetail({ application }: { application: ProviderApplication }) {
         </p>
         <div className="flex flex-wrap gap-2">
           {assets.map((asset) => (
-            <DownloadButton key={asset.url} url={asset.url} label={asset.label} />
+            <DownloadButton
+              key={asset.url}
+              url={asset.url}
+              label={asset.label}
+            />
           ))}
         </div>
       </div>
@@ -243,7 +252,7 @@ function CertificateDetail({
                 rel="noreferrer"
                 className="btn-secondary min-h-10 px-3 py-2 text-sm"
               >
-                <Eye size={16} /> Xem
+                Xem
               </a>
               <DownloadButton url={url} label="chứng chỉ" />
             </div>
@@ -254,7 +263,11 @@ function CertificateDetail({
   );
 }
 
-function ApplicationDetail({ application }: { application: ProviderApplication }) {
+function ApplicationDetail({
+  application,
+}: {
+  application: ProviderApplication;
+}) {
   const serviceNames = getServiceNames(application).join(", ");
 
   return (
@@ -270,7 +283,7 @@ function ApplicationDetail({ application }: { application: ProviderApplication }
       <p className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
         {application.applicationType === "service_addition"
           ? "Đăng ký thêm dịch vụ"
-          : "Đăng ký trở thành provider"}
+          : "Đăng ký trở thành nhà cung cấp dịch vụ"}
       </p>
 
       {(application.rejectionReason || application.rejectionNotes) && (
@@ -455,203 +468,44 @@ export function ProviderApplicationHistory({
 
   return (
     <div className="space-y-4">
-      <div
-        className={
-          canEditRejected && !compact
-            ? "hidden overflow-hidden rounded-xl border border-outline-variant/30 md:block"
-            : "hidden"
-        }
-      >
-        <table className="w-full text-left text-sm">
-          <thead className="bg-surface-container text-on-surface-variant">
-            <tr>
-              <th className="p-3">Tên hồ sơ đăng ký</th>
-              <th className="p-3">Ngày gửi</th>
-              {!hideLastUpdated && <th className="p-3">Cập nhật gần nhất</th>}
-              <th className="p-3">Trạng thái</th>
-              <th className="p-3 text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((application) => {
-              const summary = getApplicationSummary(application);
-
-              return (
-                <tr key={application._id} className="border-t border-outline-variant/30">
-                  <td className="max-w-64 break-words p-3 font-semibold">
-                    {applicationName(application)}
-                  </td>
-                  <td className="p-3">
-                    {summary.submitted ? formatDate(summary.submitted) : "Chưa gửi"}
-                  </td>
-                  {!hideLastUpdated && (
-                    <td className="p-3">{formatDate(application.updatedAt)}</td>
-                  )}
-                  <td className="p-3">
-                    <StatusBadge value={application.status} />
-                  </td>
-                  <td className="p-3">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        className="btn-secondary min-h-9 px-3 py-1 text-xs"
-                        onClick={() => void openDetail(application)}
-                      >
-                        <Eye size={15} /> Chi tiết
-                      </button>
-                      {application.status === "rejected" && (
-                        <button
-                          type="button"
-                          className="btn-secondary min-h-9 px-3 py-1 text-xs"
-                          onClick={() => void openDetail(application)}
-                        >
-                          Xem lý do
-                        </button>
-                      )}
-                      {canEditRejected &&
-                        canEditApplication(application) &&
-                        ["draft", "rejected"].includes(application.status) && (
-                          <button
-                            type="button"
-                            className="btn-primary min-h-9 px-3 py-1 text-xs"
-                            onClick={() => onEdit?.(application)}
-                          >
-                            <Pencil size={15} />{" "}
-                            {application.status === "draft"
-                              ? "Tiếp tục"
-                              : "Sửa và gửi lại"}
-                          </button>
-                        )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className={`space-y-4 ${canEditRejected && !compact ? "md:hidden" : ""}`}>
+      <div className={`space-y-2.5 ${compact ? "max-w-none" : ""}`}>
         {items.map((application) => {
           const summary = getApplicationSummary(application);
+          const submittedText = summary.submitted
+            ? formatDate(summary.submitted)
+            : "Chưa gửi";
 
           return (
-            <article
+            <button
+              type="button"
               key={application._id}
-              className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm transition hover:border-primary/25 hover:shadow-md"
+              className="group block w-full rounded-2xl border border-outline-variant/25 bg-surface-container-lowest px-4 py-3 text-left shadow-sm transition hover:border-primary/25 hover:bg-white hover:shadow-[0_10px_24px_rgba(19,27,46,0.08)]"
+              onClick={() => void openDetail(application)}
             >
-              <div className="border-b border-outline-variant/20 bg-[linear-gradient(135deg,rgba(18,99,160,0.10),rgba(18,99,160,0.02))] px-4 py-4 sm:px-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-2">
-                    <p className="inline-flex w-fit rounded-full border border-primary/15 bg-white/75 px-3 py-1 text-xs font-bold text-primary">
-                      {summary.typeLabel}
-                    </p>
-                    <p className="min-w-0 break-words text-base font-bold text-on-surface">
-                      {applicationName(application)}
-                    </p>
-                  </div>
-                  <StatusBadge value={application.status} />
-                </div>
-              </div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate pr-2 text-sm font-bold text-on-surface sm:text-[15px]">
+                    {applicationName(application)}
+                  </p>
 
-              <div className="space-y-4 px-4 py-4 sm:px-5">
-                <div
-                  className={`grid gap-3 text-sm ${
-                    hideLastUpdated ? "sm:grid-cols-3" : "sm:grid-cols-2 xl:grid-cols-4"
-                  }`}
-                >
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-on-surface-variant">
-                      Loại đơn
-                    </p>
-                    <p className="mt-1 font-semibold text-on-surface">
-                      {summary.typeLabel}
-                    </p>
+                  <div className="mt-2 grid gap-x-3 gap-y-1 text-xs text-on-surface-variant sm:grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)]">
+                    <p className="truncate">{summary.typeLabel}</p>
+                    <p className="truncate">{summary.serviceNames.length} dịch vụ</p>
+                    <p className="truncate">{submittedText}</p>
                   </div>
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-on-surface-variant">
-                      Ngày gửi
-                    </p>
-                    <p className="mt-1 font-semibold text-on-surface">
-                      {summary.submitted ? formatDate(summary.submitted) : "Chưa gửi"}
-                    </p>
-                  </div>
+
                   {!hideLastUpdated && (
-                    <div className="rounded-xl bg-surface-container-low p-3">
-                      <p className="text-xs uppercase tracking-[0.12em] text-on-surface-variant">
-                        Cập nhật gần nhất
-                      </p>
-                      <p className="mt-1 font-semibold text-on-surface">
-                        {formatDate(application.updatedAt)}
-                      </p>
-                    </div>
+                    <p className="mt-1 text-[11px] text-on-surface-variant/80">
+                      Cập nhật gần nhất: {formatDate(application.updatedAt)}
+                    </p>
                   )}
-                  <div className="rounded-xl bg-surface-container-low p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-on-surface-variant">
-                      Số dịch vụ
-                    </p>
-                    <p className="mt-1 font-semibold text-on-surface">
-                      {summary.serviceNames.length}
-                    </p>
-                  </div>
                 </div>
 
-                <div className="rounded-xl border border-outline-variant/20 bg-white/80 p-4 text-sm">
-                  <p className="text-xs uppercase tracking-[0.12em] text-on-surface-variant">
-                    Dịch vụ trong đơn
-                  </p>
-                  <p className="mt-2 font-medium text-on-surface">
-                    {summary.servicePreview}
-                  </p>
-
-                  {application.workingAreas.length > 0 && (
-                    <p className="mt-2 text-on-surface-variant">
-                      Khu vực: {application.workingAreas.join(", ")}
-                    </p>
-                  )}
-
-                  {application.status === "rejected" &&
-                    (application.rejectionReason || application.rejectionNotes) && (
-                      <p className="mt-3 rounded-lg bg-error-container/60 px-3 py-2 text-on-error-container">
-                        {application.rejectionReason || application.rejectionNotes}
-                      </p>
-                    )}
-                </div>
-
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    className="btn-secondary flex-1"
-                    onClick={() => void openDetail(application)}
-                  >
-                    <Eye size={16} /> Xem chi tiết
-                  </button>
-                  {application.status === "rejected" && (
-                    <button
-                      type="button"
-                      className="btn-secondary flex-1"
-                      onClick={() => void openDetail(application)}
-                    >
-                      Xem lý do
-                    </button>
-                  )}
-                  {canEditRejected &&
-                    canEditApplication(application) &&
-                    ["draft", "rejected"].includes(application.status) && (
-                      <button
-                        type="button"
-                        className="btn-primary flex-1"
-                        onClick={() => onEdit?.(application)}
-                      >
-                        <Pencil size={16} />{" "}
-                        {application.status === "draft"
-                          ? "Tiếp tục"
-                          : "Sửa và gửi lại"}
-                      </button>
-                    )}
+                <div className="shrink-0 pt-0.5">
+                  <StatusBadge value={statusLabel[application.status]} />
                 </div>
               </div>
-            </article>
+            </button>
           );
         })}
       </div>
@@ -664,7 +518,28 @@ export function ProviderApplicationHistory({
         size="lg"
         onClose={() => setSelected(null)}
       >
-        {selected && <ApplicationDetail application={selected} />}
+        {selected && (
+          <div className="space-y-4">
+            {canEditRejected &&
+              canEditApplication(selected) &&
+              ["draft", "rejected"].includes(selected.status) && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="btn-primary min-h-10 px-4 py-2 text-sm"
+                    onClick={() => onEdit?.(selected)}
+                  >
+                    <Pencil size={16} />{" "}
+                    {selected.status === "draft"
+                      ? "Tiếp tục hồ sơ"
+                      : "Sửa và gửi lại"}
+                  </button>
+                </div>
+              )}
+
+            <ApplicationDetail application={selected} />
+          </div>
+        )}
       </Modal>
     </div>
   );

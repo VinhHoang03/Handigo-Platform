@@ -165,10 +165,6 @@ export interface Order {
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
   depositPaidAt?: string | null;
   matchingStartedAt?: string | null;
-  cancellation?: {
-    reason: string;
-    cancelledAt: string;
-  } | null;
   inspectionRequired?: boolean;
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
