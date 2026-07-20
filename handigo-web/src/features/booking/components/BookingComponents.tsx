@@ -67,34 +67,59 @@ export const BookingStepper: React.FC<{ currentStep: 1 | 2 | 3 }> = ({ currentSt
   ] as const;
 
   return (
-    <div className="flex items-center justify-between max-w-[620px] mx-auto relative py-md">
-      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-outline-variant -translate-y-1/2" />
-      <div
-        className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 transition-all"
-        style={{ width: currentStep === 1 ? '25%' : currentStep === 2 ? '62%' : '100%' }}
-      />
+    <nav aria-label="Tiến trình đặt dịch vụ" className="mx-auto w-full max-w-[720px] py-2">
+      <div className="relative">
+        <div
+          aria-hidden="true"
+          className="absolute left-[16.6667%] right-[16.6667%] top-[15px] h-px bg-outline-variant/70"
+        >
+          <div
+            className="h-full bg-primary transition-[width] duration-300 ease-out"
+            style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+          />
+        </div>
 
-      {steps.map((step) => {
-        const isDone = step.id < currentStep;
-        const isActive = step.id === currentStep;
+        <ol className="relative grid grid-cols-3">
+          {steps.map((step) => {
+            const isDone = step.id < currentStep;
+            const isActive = step.id === currentStep;
 
-        return (
-          <div key={step.id} className="relative z-10 flex flex-col items-center gap-2 text-center">
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${isDone || isActive
-                ? 'bg-primary text-white'
-                : 'bg-surface-container-highest border-2 border-outline-variant text-on-surface-variant'
-                } ${isActive ? 'ring-[3px] ring-primary-fixed/70' : ''}`}
-            >
-              {isDone ? <span className="material-symbols-outlined text-sm">check</span> : step.id}
-            </div>
-            <span className={`font-label-md text-label-md ${isDone || isActive ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
-              {step.label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+            return (
+              <li
+                key={step.id}
+                aria-current={isActive ? 'step' : undefined}
+                className="relative z-10 flex min-w-0 flex-col items-center text-center"
+              >
+                <span
+                  className={`grid h-[30px] w-[30px] place-items-center rounded-full border text-xs font-bold leading-none transition-colors ${
+                    isDone
+                      ? 'border-primary bg-primary text-on-primary'
+                      : isActive
+                        ? 'border-primary bg-surface-container-lowest text-primary ring-[3px] ring-primary-fixed'
+                        : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'
+                  }`}
+                >
+                  {isDone ? (
+                    <span className="material-symbols-outlined text-[16px] leading-none">check</span>
+                  ) : (
+                    step.id
+                  )}
+                </span>
+                <span
+                  className={`mt-1 block min-h-8 px-1 font-label-sm text-label-sm sm:min-h-0 sm:whitespace-nowrap ${
+                    isDone || isActive
+                      ? 'font-semibold text-primary'
+                      : 'font-semibold text-on-surface-variant'
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </nav>
   );
 };
 
