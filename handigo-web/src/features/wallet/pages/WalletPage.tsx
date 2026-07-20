@@ -328,7 +328,9 @@ export function WalletPage({ role }: { role: WalletRole }) {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {stats.map((item) => (
               <div key={item.label} className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
-                <span className="material-symbols-outlined flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">{item.icon}</span>
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <span className="material-symbols-outlined block text-2xl leading-none">{item.icon}</span>
+                </div>
                 <p className="mt-4 text-sm text-on-surface-variant">{item.label}</p>
                 <p className={`${item.strong ? 'text-headline-md' : 'text-title-lg'} mt-1 font-bold text-on-surface`}>{money.format(item.value)}</p>
               </div>

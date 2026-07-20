@@ -15,6 +15,12 @@ const REQUIRED_PRODUCTION_ENV = [
   "EMAIL_PASSWORD",
 ] as const;
 
+const PAYOS_PAYOUT_ENV = [
+  "PAYOS_PAYOUT_CLIENT_ID",
+  "PAYOS_PAYOUT_API_KEY",
+  "PAYOS_PAYOUT_CHECKSUM_KEY",
+] as const;
+
 export const validateProductionConfig = () => {
   if (process.env.NODE_ENV !== "production") return;
 
@@ -33,6 +39,17 @@ export const validateProductionConfig = () => {
   }
   if (!hasFrontendUrl) {
     missingVariables.push("FRONTEND_URL hoặc FRONTEND_URLS");
+  }
+  const configuredPayoutVariables = PAYOS_PAYOUT_ENV.filter((key) =>
+    process.env[key]?.trim(),
+  );
+  if (
+    configuredPayoutVariables.length > 0 &&
+    configuredPayoutVariables.length < PAYOS_PAYOUT_ENV.length
+  ) {
+    PAYOS_PAYOUT_ENV.filter((key) => !process.env[key]?.trim()).forEach((key) =>
+      missingVariables.push(key),
+    );
   }
 
   if (missingVariables.length > 0) {

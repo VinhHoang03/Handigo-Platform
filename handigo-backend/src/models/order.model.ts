@@ -40,6 +40,17 @@ export interface IOrderCancellation {
   cancelledByRole: "customer" | "provider" | "admin";
   reason: string;
   cancelledAt: Date;
+  refundPolicy?: {
+    policyVersion: string;
+    refundRate: number;
+    paidAmount: Money;
+    refundAmount: Money;
+    cancellationFee: Money;
+    providerCompensation: Money;
+    platformRetainedAmount: Money;
+    hoursBeforeStart?: number | null;
+    policyReason: string;
+  } | null;
 }
 
 export interface IOrderConfirmation {
@@ -256,6 +267,23 @@ const OrderSchema = new Schema<IOrder>(
           },
           reason: { type: String, required: true },
           cancelledAt: { type: Date, required: true },
+          refundPolicy: {
+            type: new Schema(
+              {
+                policyVersion: { type: String, required: true },
+                refundRate: { type: Number, required: true, min: 0, max: 100 },
+                paidAmount: { type: Number, required: true, min: 0 },
+                refundAmount: { type: Number, required: true, min: 0 },
+                cancellationFee: { type: Number, required: true, min: 0 },
+                providerCompensation: { type: Number, required: true, min: 0 },
+                platformRetainedAmount: { type: Number, required: true, min: 0 },
+                hoursBeforeStart: { type: Number, default: null },
+                policyReason: { type: String, required: true },
+              },
+              { _id: false },
+            ),
+            default: null,
+          },
         },
         { _id: false },
       ),

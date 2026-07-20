@@ -10,10 +10,10 @@ import { Address } from "../models/address.model";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { emitToUser } from "../sockets/socketServer";
 import { cancelOrderWithSettlement } from "./orderCancellation.service";
-import { Payment } from "../models/payment.model";
 import { assertProviderWalletEligible } from "./providerWalletEligibility.service";
 import type { UserRole } from "../models/user.model";
 import { createNotificationRecord } from "./notification.service";
+import { requestDirectProviderReassignment } from "./orderReassignment.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,7 +82,9 @@ export const AssignmentService = {
     }
     if (assignment.responseDeadline < new Date()) {
       throw new AppError(
-        "Thời gian phản hồi đã hết hạn. Hệ thống đang chuyển đơn sang provider khác.",
+        assignment.assignmentType === "direct_request"
+          ? "Yêu cầu trực tiếp đã hết thời gian phản hồi."
+          : "Thời gian phản hồi đã hết hạn. Hệ thống đang chuyển đơn sang provider khác.",
         400,
       );
     }
@@ -274,6 +276,9 @@ export const AssignmentService = {
         $set: {
           providerId: provider._id,
           status: "accepted",
+          ...(assignment.assignmentType === "direct_request" && {
+            bookingStatus: "not_required",
+          }),
         },
       },
       { returnDocument: "after", runValidators: true },
@@ -314,6 +319,16 @@ export const AssignmentService = {
       assignmentId: assignment._id.toString(),
       reason: "accepted",
     });
+
+    if (assignment.assignmentType === "direct_request") {
+      await createNotificationRecord({
+        userId: order.customerId,
+        type: "ORDER",
+        title: "Provider đã nhận yêu cầu trực tiếp",
+        content: `Provider bạn chọn đã nhận đơn ${order.orderCode}.`,
+        data: { orderId: order._id },
+      });
+    }
 
     return {
       assignment: claimedAssignment as any,
@@ -426,6 +441,15 @@ export const AssignmentService = {
       return;
     }
 
+    if (assignment.assignmentType === "direct_request") {
+      await requestDirectProviderReassignment(
+        assignment.orderId.toString(),
+        provider._id as Types.ObjectId,
+        rejectReason,
+      );
+      return;
+    }
+
     // 4. Re-dispatch to next provider (import lazily to avoid circular dep)
     const order = await Order.findById(assignment.orderId);
     if (!order || order.status !== "created") return;
@@ -503,6 +527,16 @@ export const AssignmentService = {
       );
     }
 
+    if (
+      ["scheduled", "recurring"].includes(order.orderType) &&
+      order.bookingStatus !== "confirmed"
+    ) {
+      throw new AppError(
+        "Khách hàng chưa thanh toán giữ lịch. Bạn chỉ có thể gửi báo giá sau khi lịch hẹn được xác nhận.",
+        409,
+      );
+    }
+
     if (!["accepted", "in_progress"].includes(order.status)) {
       throw new AppError(
         "Chỉ có thể tạo báo giá khi đơn hàng đang ở trạng thái accepted hoặc in_progress.",
@@ -517,13 +551,6 @@ export const AssignmentService = {
     );
     const discountAmount = payload.discountAmount ?? 0;
     const finalAmount = Math.max(subtotalAmount - discountAmount, 0);
-    if (finalAmount < order.depositAmount) {
-      throw new AppError(
-        "Tổng báo giá không được thấp hơn khoản đặt cọc khách hàng đã thanh toán.",
-        400,
-      );
-    }
-
     const quotationCode = `QUO-${randomBytes(6).toString("hex").toUpperCase()}`;
 
     // Create quotation
@@ -565,8 +592,8 @@ export const AssignmentService = {
   },
 
   /**
-   * Customer confirms (approves) the repair quotation.
-   * After this, the repair work begins (order moves to in_progress).
+   * Khách hàng đồng ý báo giá sửa chữa.
+   * Sau khi xác nhận, provider có thể chủ động bắt đầu công việc.
    */
   async confirmRepairQuotation(
     quotationId: string,
@@ -596,19 +623,13 @@ export const AssignmentService = {
         if (order.currentQuotationId?.toString() !== quotation.id) {
           throw new AppError("Báo giá này không còn là báo giá hiện tại.", 409);
         }
+        if (!order.inspectionRequired || !["accepted", "in_progress"].includes(order.status)) {
+          throw new AppError(
+            "Không thể xác nhận báo giá ở trạng thái hiện tại của đơn hàng.",
+            409,
+          );
+        }
 
-        const [paymentSummary] = await Payment.aggregate<{ total: number }>([
-          {
-            $match: {
-              orderId: order._id,
-              status: "paid",
-              isDeleted: { $ne: true },
-            },
-          },
-          { $group: { _id: null, total: { $sum: "$amount" } } },
-        ]).session(session);
-        const paidAmount = paymentSummary?.total || 0;
-        const requiredAmount = quotation.finalAmount;
         const confirmedAt = new Date();
 
         quotation.status = "approved";
@@ -616,17 +637,6 @@ export const AssignmentService = {
         quotation.approvedAt = confirmedAt;
         await quotation.save({ session });
 
-        order.status = "in_progress";
-        order.pricing.totalPaidAmount = requiredAmount;
-        order.pricing.platformCommissionRate = 0;
-        order.pricing.platformCommissionAmount = 0;
-        order.pricing.providerEarningAmount = requiredAmount;
-        order.paymentStatus =
-          paidAmount >= requiredAmount
-            ? "paid"
-            : paidAmount > 0
-              ? "partially_paid"
-              : "unpaid";
         order.confirmation.customerConfirmedAt = confirmedAt;
         await order.save({ session });
 

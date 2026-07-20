@@ -207,6 +207,18 @@ function ProviderProfileContent() {
     }
   }
 
+  async function handleAvatarSave(url: string) {
+    if (!profile) return;
+    const currentUser = toUserProfileData(profile);
+    await handleUserProfileSave({
+      fullName: currentUser.fullName,
+      phone: currentUser.phone || undefined,
+      avatar: url,
+      birthday: currentUser.birthday,
+      gender: currentUser.gender,
+    });
+  }
+
   async function handleProfessionalSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -646,7 +658,11 @@ function ProviderProfileContent() {
     >
       <div className="grid grid-cols-12 items-start gap-gutter">
         <div className="col-span-12">
-          <ProviderHero profile={profileView} />
+          <ProviderHero
+            profile={profileView}
+            isSaving={isSaving}
+            onAvatarSave={handleAvatarSave}
+          />
         </div>
 
         <div className="col-span-12">

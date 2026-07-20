@@ -50,6 +50,9 @@ lerna-debug.log*
 handigo-backend/uploads/
 uploads/
 
+# Dữ liệu mẫu cục bộ của backend
+handigo-backend/sample-data/
+
 # Local development files
 *.local
 *.tmp

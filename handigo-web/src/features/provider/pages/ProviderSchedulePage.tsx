@@ -4,7 +4,7 @@ import { DashboardShell } from '@/components/common/DashboardShell';
 import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../api/providerOrder.api';
 import { useProviderAvailability } from '../hooks/useProviderAvailability';
-import { formatMoney, getCustomer, providerStatusLabels, providerStatusStyles } from '../utils/providerOrder.utils';
+import { formatProviderOrderAmount, getCustomer, providerStatusLabels, providerStatusStyles } from '../utils/providerOrder.utils';
 
 const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 const orderDate = (order: Order) => new Date(order.scheduledAt || order.createdAt);
@@ -154,7 +154,7 @@ export default function ProviderSchedulePage() {
                         {customer?.fullName && <p className="mt-2 text-sm text-on-surface-variant">{customer.fullName}</p>}
                         {formatAddress(order) && <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">{formatAddress(order)}</p>}
                         <div className="mt-3 flex items-center justify-between border-t border-outline-variant/20 pt-3">
-                          <span className="font-bold text-primary">{formatMoney(order.pricing?.totalPaidAmount)}</span>
+                          <span className="font-bold text-primary">{formatProviderOrderAmount(order)}</span>
                           <Link to={`/provider/orders/${order._id}`} className="text-xs font-bold text-primary hover:underline">Chi tiết</Link>
                         </div>
                       </article>

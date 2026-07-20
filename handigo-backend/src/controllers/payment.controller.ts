@@ -7,6 +7,7 @@ import {
   paymentHistoryQuerySchema,
   paymentIdParamSchema,
 } from "../validations/payment.validator";
+import { retryPayosRefundByPaymentId } from "../services/orderCancellation.service";
 
 export const createPayment = async (req: Request, res: Response) => {
   try {
@@ -69,6 +70,25 @@ export const getPaymentsByOrder = async (req: Request, res: Response) => {
   }
 };
 
+export const reconcilePayosPaymentByOrder = async (req: Request, res: Response) => {
+  try {
+    const params = orderIdParamSchema.parse(req.params);
+    const user = requireRequestUser(req);
+    const result = await paymentService.reconcilePayosPaymentForOrder(
+      params.orderId,
+      user,
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+      message: "Đối soát thanh toán PayOS thành công",
+    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
 export const getPaymentHistory = async (req: Request, res: Response) => {
   try {
     const query = paymentHistoryQuerySchema.parse(req.query);
@@ -79,6 +99,21 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
       success: true,
       data: history,
       message: "Lấy lịch sử thanh toán thành công",
+    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
+export const retryPayosRefund = async (req: Request, res: Response) => {
+  try {
+    const params = paymentIdParamSchema.parse(req.params);
+    const refund = await retryPayosRefundByPaymentId(params.id);
+
+    return res.json({
+      success: true,
+      data: refund,
+      message: "Đã đưa yêu cầu hoàn tiền PayOS vào hàng đợi xử lý lại",
     });
   } catch (error: unknown) {
     return sendControllerError(res, error);

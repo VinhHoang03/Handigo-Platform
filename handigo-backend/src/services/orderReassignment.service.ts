@@ -147,6 +147,68 @@ export const requestProviderReassignment = async (
   return result;
 };
 
+export const requestDirectProviderReassignment = async (
+  orderId: string,
+  providerId: Types.ObjectId,
+  reasonInput?: string,
+): Promise<IOrder | null> => {
+  requireObjectId(orderId, "ID đơn hàng");
+  const now = new Date();
+  const reason =
+    reasonInput?.trim() || "Provider đã từ chối yêu cầu nhận đơn trực tiếp.";
+  const reassignment = {
+    status: "awaiting_customer" as const,
+    requestedByProviderId: providerId,
+    previousProviderIds: [providerId],
+    reason,
+    requestedAt: now,
+    expiresAt: new Date(now.getTime() + CUSTOMER_RESPONSE_TIMEOUT_MS),
+    respondedAt: null,
+  };
+
+  const order = await Order.findOneAndUpdate(
+    {
+      _id: orderId,
+      status: "created",
+      providerId: null,
+      preferredProviderId: providerId,
+    },
+    {
+      $set: {
+        bookingStatus: "rejected",
+        preferredProviderId: null,
+        readyForMatching: false,
+        matchingStartedAt: null,
+        reassignment,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!order) return null;
+
+  try {
+    await createNotificationRecord({
+      userId: order.customerId,
+      type: "ORDER",
+      title: "Provider đã từ chối yêu cầu",
+      content: `Provider bạn chọn đã từ chối đơn ${order.orderCode}. Handigo có thể tự điều phối thợ gần nhất hoặc hoàn tiền về ví Handigo nếu bạn từ chối.`,
+      data: {
+        orderId: order._id,
+        action: "order_reassignment_required",
+        expiresAt: reassignment.expiresAt,
+      },
+    });
+  } catch (error) {
+    reassignmentLogger.error(
+      "Không thể gửi thông báo provider từ chối yêu cầu trực tiếp.",
+      error,
+      { orderId },
+    );
+  }
+
+  return order;
+};
+
 export const respondToProviderReassignment = async (
   orderId: string,
   customerId: string,
@@ -203,6 +265,7 @@ export const respondToProviderReassignment = async (
       $set: {
         "reassignment.status": "matching",
         "reassignment.respondedAt": now,
+        bookingStatus: "not_required",
         readyForMatching: true,
         matchingStartedAt: null,
       },

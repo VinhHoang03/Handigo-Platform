@@ -38,6 +38,7 @@ export function PendingAssignmentCard({
   const customer = getCustomer(order);
   const isExpired = countdown === 'Hết hạn';
   const isAppointment = assignment.assignmentType === 'appointment';
+  const isDirectRequest = assignment.assignmentType === 'direct_request';
 
   return (
     <div className="glass-card overflow-hidden rounded-3xl border border-primary/15">
@@ -46,7 +47,11 @@ export function PendingAssignmentCard({
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">notifications_active</span>
             <span className="font-label-md text-primary">
-              {isAppointment ? 'Yêu cầu lịch hẹn' : 'Đơn mới được phân công'}
+              {isAppointment
+                ? 'Yêu cầu lịch hẹn'
+                : isDirectRequest
+                  ? 'Khách hàng chọn bạn'
+                  : 'Đơn mới được phân công'}
             </span>
           </div>
           <span
@@ -129,7 +134,9 @@ export function PendingAssignmentCard({
               ? 'Xác nhận toàn bộ lịch'
               : isAppointment
                 ? 'Xác nhận lịch'
-                : 'Nhận đơn'}
+                : isDirectRequest
+                  ? 'Nhận yêu cầu'
+                  : 'Nhận đơn'}
           </button>
           <button
             type="button"

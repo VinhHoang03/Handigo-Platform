@@ -4,6 +4,7 @@ import type {
   AdminOrderAnalytics,
   AdminOverview,
   AdminPayment,
+  AdminRefund,
   AdminProviderAnalytics,
   AdminWalletDetail,
   AdminWalletQuery,
@@ -32,6 +33,8 @@ export const adminOperationsApi = {
     unwrap<Paginated<AdminPayment>>(await api.get("/payments/history", { params: query })),
   payment: async (id: string) =>
     unwrap<AdminPayment>(await api.get(`/payments/${id}`)),
+  retryPaymentRefund: async (paymentId: string) =>
+    unwrap<AdminRefund>(await api.post(`/payments/${paymentId}/refund/retry`)),
 
   wallets: async (query: AdminWalletQuery) =>
     unwrap<Paginated<AdminWalletRow>>(await api.get("/wallets/admin", { params: query })),

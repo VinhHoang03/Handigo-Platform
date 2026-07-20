@@ -6,6 +6,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc && tsc-alias",
+    "test:refund-policy": "ts-node src/scripts/testRefundPolicy.ts",
+    "test:refund-processing": "ts-node src/scripts/testRefundProcessing.ts",
     "ocr:test": "ts-node src/scripts/testGoogleVisionOcr.ts",
     "seed:categories": "ts-node src/scripts/seedCategories.ts",
     "migrate:provider-service-ids": "ts-node src/scripts/migrateProviderServiceIds.ts",

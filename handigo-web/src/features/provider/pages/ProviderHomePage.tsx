@@ -10,6 +10,7 @@ import {
   type ProviderEarningPoint,
 } from "../api/providerDashboard.api";
 import { providerProfileApi } from "../api/providerProfile.api";
+import { formatProviderOrderAmount } from "../utils/providerOrder.utils";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -199,7 +200,7 @@ function BookingItem({ order }: { order: Order }) {
 
       <div className="flex items-center justify-between gap-sm sm:block sm:text-right">
         <p className="font-bold text-primary">
-          {formatMoney(order.pricing.providerEarningAmount)}
+          {formatProviderOrderAmount(order)}
         </p>
         <span className="text-[10px] font-bold uppercase tracking-tight">
           {statusLabels[order.status]}

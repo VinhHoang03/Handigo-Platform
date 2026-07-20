@@ -2,6 +2,7 @@ import api from "@/api/client";
 import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutocomplete";
 import type {
   Address,
+  CancellationPreview,
   CreatePaymentResult,
   Order,
   OrderQuotation,
@@ -180,6 +181,22 @@ export const bookingApi = {
     return response.data.data;
   },
 
+  discardUnpaidOrder: async (orderId: string) => {
+    const response = await api.delete<{
+      success: boolean;
+      data: { orderId: string };
+    }>(`/orders/${orderId}/unpaid`);
+    return response.data.data;
+  },
+
+  reconcilePayosPayment: async (orderId: string) => {
+    const response = await api.post<{
+      success: boolean;
+      data: { payment: Payment | null; order: Order | null };
+    }>(`/payments/order/${orderId}/reconcile`);
+    return response.data.data;
+  },
+
   getRecurringSeries: async (orderId: string) => {
     const response = await api.get<{
       success: boolean;
@@ -204,10 +221,6 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  discardUnpaidOrder: async (orderId: string) => {
-    await api.delete(`/orders/${orderId}/unpaid`);
-  },
-
   respondToReassignment: async (
     orderId: string,
     decision: "accept" | "decline",
@@ -216,6 +229,17 @@ export const bookingApi = {
       `/orders/${orderId}/reassignment-response`,
       { decision },
     );
+    return response.data.data;
+  },
+
+  getCancellationPreview: async (
+    orderId: string,
+    scope: "single" | "series" = "single",
+  ) => {
+    const response = await api.get<{
+      success: boolean;
+      data: CancellationPreview;
+    }>(`/orders/${orderId}/cancellation-preview`, { params: { scope } });
     return response.data.data;
   },
 

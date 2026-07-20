@@ -9,12 +9,10 @@ import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
-import { RepairQuotation } from "../models/repairQuotation.model";
 import { createNotificationRecord } from "./notification.service";
 import type { CreatePaymentInput, PaymentHistoryQuery } from "../validations/payment.validator";
 import { handleWalletDepositPayosWebhook } from "./wallet.service";
 import { buildTransactionCode } from "../utils/transaction";
-import { DispatchService } from "./dispatch.service";
 import { createLogger } from "../utils/logger";
 import { markOrderVoucherAsUsed } from "./voucher.service";
 
@@ -49,7 +47,7 @@ const getPendingPayosLink = (payment: InstanceType<typeof Payment>) => {
   return gatewayResponse?.paymentLink;
 };
 
-const reconcilePendingPayosPayment = async (
+const reconcileExistingPendingPayosPayment = async (
   payment: InstanceType<typeof Payment>,
 ) => {
   if (!payment.gatewayOrderCode) {
@@ -122,11 +120,30 @@ const reconcilePendingPayosPayment = async (
 };
 
 const triggerDispatch = (orderId: string) => {
-  DispatchService.dispatchReadyOrder(orderId).catch((error: unknown) =>
-    paymentLogger.error("Không thể khởi động điều phối sau thanh toán.", error, {
-      orderId,
-    }),
-  );
+  import("./dispatch.service")
+    .then(({ DispatchService }) => DispatchService.dispatchReadyOrder(orderId))
+    .catch((error: unknown) =>
+      paymentLogger.error("Không thể khởi động điều phối sau thanh toán.", error, {
+        orderId,
+      }),
+    );
+};
+
+const triggerCancelledOrderSettlement = (orderId: string) => {
+  import("./orderCancellation.service")
+    .then(({ settleCancelledOrderPayments }) =>
+      settleCancelledOrderPayments(
+        orderId,
+        "Thanh toán PayOS được ghi nhận sau khi đơn hàng đã hủy",
+      ),
+    )
+    .catch((error: unknown) =>
+      paymentLogger.error(
+        "Không thể xử lý thanh toán PayOS đến sau khi đơn đã hủy.",
+        error,
+        { orderId },
+      ),
+    );
 };
 
 const assertAppointmentPaymentReady = (
@@ -158,7 +175,10 @@ const getPaymentType = (
   requestedType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING",
 ): PaymentType => {
   if (requestedType === "REMAINING") {
-    return "remaining";
+    throw new AppError(
+      "Dịch vụ báo giá chỉ thanh toán tiền cọc qua Handigo. Chi phí báo giá được khách hàng và provider tự thanh toán trực tiếp.",
+      400,
+    );
   }
 
   if (order.inspectionRequired) {
@@ -171,26 +191,12 @@ const getPaymentType = (
 const getPaymentAmount = async (
   order: any,
   paymentType: PaymentType,
-  session?: ClientSession,
 ) => {
   if (paymentType === "remaining") {
-    const aggregate = Payment.aggregate<{ total: number }>([
-      {
-        $match: {
-          orderId: order._id,
-          status: "paid",
-          isDeleted: { $ne: true },
-        },
-      },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]);
-    if (session) aggregate.session(session);
-    const [summary] = await aggregate;
-    const requiredAmount = Math.max(
-      order.pricing?.totalPaidAmount || order.pricing?.bookingAmount || 0,
-      0,
+    throw new AppError(
+      "Dịch vụ báo giá không thanh toán chi phí báo giá qua Handigo.",
+      400,
     );
-    return Math.max(requiredAmount - (summary?.total || 0), 0);
   }
 
   if (paymentType === "full") {
@@ -238,7 +244,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       }
       assertAppointmentPaymentReady(transactionalOrder, paymentType);
 
-      chargedAmount = await getPaymentAmount(transactionalOrder, paymentType, session);
+      chargedAmount = await getPaymentAmount(transactionalOrder, paymentType);
       if (chargedAmount <= 0) {
         throw new AppError("Số tiền thanh toán không hợp lệ", 400);
       }
@@ -386,26 +392,11 @@ const reserveExternalPayment = async (
       const paymentType = getPaymentType(order, input.paymentType);
       assertAppointmentPaymentReady(order, paymentType);
 
-      if (paymentType === "remaining") {
-        if (!order.inspectionRequired || !order.currentQuotationId) {
-          throw new AppError("Đơn hàng không có báo giá cần thanh toán phần còn lại", 400);
-        }
-
-        const approvedQuotation = await RepairQuotation.exists({
-          _id: order.currentQuotationId,
-          orderId: order._id,
-          status: "approved",
-        }).session(session);
-        if (!approvedQuotation || order.status !== "in_progress") {
-          throw new AppError("Chỉ có thể thanh toán phần còn lại sau khi duyệt báo giá", 400);
-        }
-      }
-
       if (order.inspectionRequired && method === "cash") {
         throw new AppError("Đơn khảo sát phải thanh toán tiền đặt cọc qua PayOS", 400);
       }
 
-      const amount = await getPaymentAmount(order, paymentType, session);
+      const amount = await getPaymentAmount(order, paymentType);
       if (amount <= 0) {
         throw new AppError("Số tiền thanh toán không hợp lệ", 400);
       }
@@ -498,21 +489,6 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   const paymentType = getPaymentType(order, input.paymentType);
   assertAppointmentPaymentReady(order, paymentType);
 
-  if (paymentType === "remaining") {
-    if (!order.inspectionRequired || !order.currentQuotationId) {
-      throw new AppError("Đơn hàng không có báo giá cần thanh toán phần còn lại", 400);
-    }
-
-    const approvedQuotation = await RepairQuotation.exists({
-      _id: order.currentQuotationId,
-      orderId: order._id,
-      status: "approved",
-    });
-    if (!approvedQuotation || order.status !== "in_progress") {
-      throw new AppError("Chỉ có thể thanh toán phần còn lại sau khi duyệt báo giá", 400);
-    }
-  }
-
   if (order.inspectionRequired && input.method === "CASH") {
     throw new AppError("Đơn khảo sát phải thanh toán tiền đặt cọc qua PayOS", 400);
   }
@@ -534,7 +510,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     duplicatePayment?.method === "payos" &&
     duplicatePayment.status === "pending"
   ) {
-    const pendingPayosLink = await reconcilePendingPayosPayment(duplicatePayment);
+    const pendingPayosLink = await reconcileExistingPendingPayosPayment(duplicatePayment);
     if (pendingPayosLink) {
       if (input.method !== "PAYOS") {
         throw new AppError(
@@ -718,6 +694,10 @@ const syncPaidPayosPaymentToOrder = async (
     throw new AppError("Không tìm thấy đơn hàng của giao dịch PayOS", 404);
   }
 
+  if (order.status === "cancelled") {
+    return false;
+  }
+
   if (payment.paymentType === "inspection_deposit") {
     order.depositAmount = payment.amount;
     order.depositPaidAt = payment.paidAt;
@@ -756,6 +736,162 @@ const syncPaidPayosPaymentToOrder = async (
   await order.save({ session });
   return shouldDispatch;
 };
+
+type PayosPaymentLink = {
+  id?: string;
+  status?: string;
+  amountPaid?: number;
+  transactions?: Array<{ reference?: string }>;
+};
+
+const reconcilePendingPayosPayment = async (orderId: string) => {
+  const payment = await Payment.findOne({
+    orderId,
+    method: "payos",
+    status: "pending",
+    isDeleted: false,
+  }).sort({ createdAt: -1 });
+
+  if (!payment) {
+    return {
+      payment: await Payment.findOne({
+        orderId,
+        method: "payos",
+        status: "paid",
+        isDeleted: false,
+      }).sort({ createdAt: -1 }),
+      order: await Order.findById(orderId),
+    };
+  }
+
+  const gatewayOrderCode = Number(payment.gatewayOrderCode);
+  if (!Number.isSafeInteger(gatewayOrderCode) || gatewayOrderCode <= 0) {
+    throw new AppError("Mã giao dịch PayOS không hợp lệ", 409);
+  }
+
+  let paymentLink: PayosPaymentLink;
+  try {
+    paymentLink = await payos.paymentRequests.get(gatewayOrderCode);
+  } catch (error: unknown) {
+    paymentLogger.error("Không thể đối soát giao dịch PayOS.", error, {
+      orderId,
+      paymentId: payment._id.toString(),
+    });
+    throw new AppError("Không thể đối soát giao dịch PayOS", 502);
+  }
+
+  const normalizedStatus = paymentLink.status?.toUpperCase();
+  const amountPaid = Number(paymentLink.amountPaid || 0);
+  const gatewayPaymentLinkId = paymentLink.id?.toString();
+  const gatewayTransactionId = paymentLink.transactions?.[0]?.reference?.toString();
+
+  if (normalizedStatus === "PAID" && amountPaid < payment.amount) {
+    throw new AppError("Số tiền PayOS đã thanh toán không khớp giao dịch", 409);
+  }
+  if (
+    payment.gatewayPaymentLinkId &&
+    gatewayPaymentLinkId &&
+    payment.gatewayPaymentLinkId !== gatewayPaymentLinkId
+  ) {
+    throw new AppError("Mã liên kết PayOS không khớp giao dịch", 409);
+  }
+
+  const session = await mongoose.startSession();
+  let shouldDispatch = false;
+  let transitionedToPaid = false;
+
+  try {
+    await session.withTransaction(async () => {
+      transitionedToPaid = false;
+      shouldDispatch = false;
+      const currentPayment = await Payment.findById(payment._id).session(session);
+      if (!currentPayment || currentPayment.isDeleted) {
+        throw new AppError("Không tìm thấy giao dịch PayOS", 404);
+      }
+
+      if (currentPayment.status === "paid") {
+        shouldDispatch = await syncPaidPayosPaymentToOrder(currentPayment, session);
+        return;
+      }
+      if (currentPayment.status !== "pending") return;
+
+      currentPayment.gatewayResponse = {
+        ...((currentPayment.gatewayResponse as Record<string, unknown>) || {}),
+        reconciledAt: new Date(),
+        reconciliation: paymentLink,
+      };
+
+      if (normalizedStatus === "PAID") {
+        currentPayment.status = "paid";
+        currentPayment.paidAt = new Date();
+        currentPayment.failedAt = null;
+        currentPayment.failureReason = null;
+        currentPayment.gatewayPaymentLinkId =
+          gatewayPaymentLinkId || currentPayment.gatewayPaymentLinkId || null;
+        currentPayment.gatewayTransactionId =
+          gatewayTransactionId || currentPayment.gatewayTransactionId || null;
+        transitionedToPaid = true;
+      } else if (["CANCELLED", "EXPIRED", "FAILED"].includes(normalizedStatus || "")) {
+        currentPayment.status = "failed";
+        currentPayment.failedAt = new Date();
+        currentPayment.failureReason = `PayOS trả về trạng thái ${normalizedStatus}`;
+      }
+
+      await currentPayment.save({ session });
+      if (currentPayment.status === "paid") {
+        shouldDispatch = await syncPaidPayosPaymentToOrder(currentPayment, session);
+      }
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  const reconciledPayment = await Payment.findById(payment._id);
+  const reconciledOrder = await Order.findById(orderId);
+
+  if (transitionedToPaid && reconciledPayment) {
+    await createNotificationRecord({
+      userId: reconciledPayment.customerId,
+      type: "PAYMENT",
+      title: "Thanh toán thành công",
+      content: "Giao dịch PayOS của bạn đã được đối soát thành công.",
+      data: {
+        orderId: reconciledPayment.orderId,
+        paymentId: reconciledPayment._id,
+        amount: reconciledPayment.amount,
+      },
+    });
+  }
+  if (shouldDispatch && reconciledPayment) {
+    triggerDispatch(reconciledPayment.orderId.toString());
+  }
+  if (
+    reconciledPayment?.status === "paid" &&
+    reconciledOrder?.status === "cancelled"
+  ) {
+    triggerCancelledOrderSettlement(reconciledOrder._id.toString());
+  }
+
+  return { payment: reconciledPayment, order: reconciledOrder };
+};
+
+export const reconcilePayosPaymentForOrder = async (
+  orderId: string,
+  user: RequestUser,
+) => {
+  const order = await Order.findById(orderId);
+  if (!order || order.isDeleted) {
+    throw new AppError("Không tìm thấy đơn hàng", 404);
+  }
+  if (!(await canAccessOrder(order, user))) {
+    throw new AppError("Bạn không có quyền đối soát thanh toán của đơn hàng này", 403);
+  }
+
+  return reconcilePendingPayosPayment(orderId);
+};
+
+export const reconcilePayosPaymentForExpiration = async (orderId: string) =>
+  reconcilePendingPayosPayment(orderId);
 
 export const handlePayosWebhook = async (payload: any) => {
   const webhookData = await payos.webhooks.verify(payload);
@@ -895,6 +1031,10 @@ export const handlePayosWebhook = async (payload: any) => {
   }
   if (shouldDispatch) {
     triggerDispatch(resultPayment.orderId.toString());
+  }
+  const resultOrder = await Order.findById(resultPayment.orderId).select("status");
+  if (resultPayment.status === "paid" && resultOrder?.status === "cancelled") {
+    triggerCancelledOrderSettlement(resultPayment.orderId.toString());
   }
 
   return resultPayment;

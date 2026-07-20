@@ -1,4 +1,5 @@
 import React from "react";
+import { AvatarEditor } from "@/features/profile/components/AvatarEditor";
 import type {
   BankAccount,
   PerformanceStat,
@@ -37,17 +38,18 @@ export const ProfileSection: React.FC<{
   </section>
 );
 
-export const ProviderHero: React.FC<{ profile: ProviderProfile }> = ({
-  profile,
-}) => (
+export const ProviderHero: React.FC<{
+  profile: ProviderProfile;
+  onAvatarSave: (url: string) => Promise<void> | void;
+  isSaving?: boolean;
+}> = ({ profile, onAvatarSave, isSaving }) => (
   <section className="glass-card flex flex-col items-center gap-6 overflow-hidden rounded-xl p-6 md:flex-row">
-    <img
-      alt={`${profile.fullName} profile`}
-      width={128}
-      height={128}
-      fetchPriority="high"
-      className="h-32 w-32 shrink-0 rounded-full object-cover ring-4 ring-primary-container/20"
+    <AvatarEditor
       src={profile.avatarUrl}
+      fullName={profile.fullName}
+      size="lg"
+      disabled={isSaving}
+      onSave={onAvatarSave}
     />
 
     <div className="flex-1 text-center md:text-left">

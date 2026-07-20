@@ -11,6 +11,7 @@ import {
 } from "../middlewares/rateLimit.middleware";
 import {
   assignmentIdParamSchema,
+  cancellationPreviewQuerySchema,
   cancelOrderSchema,
   completeOrderSchema,
   createRepairQuotationSchema,
@@ -34,6 +35,7 @@ import {
   getOrderById,
   getRecurringSeries,
   cancelOrder,
+  previewCancellation,
   cancelRecurringSeries,
   startOrder,
   completeOrder,
@@ -150,6 +152,13 @@ router.patch(
   validate(orderIdParamSchema, "params"),
   validate(reassignmentResponseSchema),
   respondToReassignment,
+);
+
+router.get(
+  "/:orderId/cancellation-preview",
+  validate(orderIdParamSchema, "params"),
+  validate(cancellationPreviewQuerySchema, "query"),
+  previewCancellation,
 );
 
 router.patch(

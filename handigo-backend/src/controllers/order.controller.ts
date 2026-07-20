@@ -129,6 +129,22 @@ export const getRecurringSeries = async (
   }
 };
 
+export const discardUnpaidOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await OrderService.discardUnpaidOrder(
+      param(req, "orderId"),
+      uid(req),
+    );
+    return ok(res, result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const selectAppointmentProvider = async (
   req: Request,
   res: Response,
@@ -171,22 +187,6 @@ export const cancelOrder = async (
   }
 };
 
-export const discardUnpaidOrder = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const result = await OrderService.discardUnpaidOrder(
-      param(req, "orderId"),
-      uid(req),
-    );
-    return ok(res, result);
-  } catch (error) {
-    return next(error);
-  }
-};
-
 export const respondToReassignment = async (
   req: Request,
   res: Response,
@@ -199,6 +199,26 @@ export const respondToReassignment = async (
       req.body.decision,
     );
     return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const previewCancellation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const role = toOrderActorRole(requireRequestUser(req).role);
+    const scope = req.query.scope === "series" ? "series" : "single";
+    const preview = await OrderService.previewCancellation(
+      param(req, "orderId"),
+      uid(req),
+      role,
+      scope,
+    );
+    return ok(res, preview);
   } catch (error) {
     return next(error);
   }
@@ -288,7 +308,7 @@ export const rejectAssignment = async (
       rejectReason,
     );
     return ok(res, {
-      message: "Đã từ chối đơn hàng và chuyển sang provider tiếp theo.",
+      message: "Đã từ chối yêu cầu nhận đơn.",
     });
   } catch (error) {
     return next(error);

@@ -15,6 +15,8 @@ import { serviceCatalogApi } from "@/features/customer-service/api/serviceCatalo
 import type { Address, Service, ServiceOption } from "../../../types/booking";
 import type { AvailableVoucher } from "../types/voucher.types";
 import { isRequiredOptionSelectionMissing } from "../utils/serviceOptionSelection";
+import { tokenStorage } from "@/api/tokenStorage";
+import { WalletBalanceText } from "@/features/wallet/components/WalletBalanceText";
 
 const paymentMethods = [
   [
@@ -271,6 +273,7 @@ const ConfirmPaymentPage = () => {
         }
 
         sessionStorage.setItem("latestBookingOrderId", orderId);
+        tokenStorage.prepareExternalRedirect();
         window.location.href = payment.checkoutUrl;
         return;
       }
@@ -350,7 +353,7 @@ const ConfirmPaymentPage = () => {
       preferredProviderId
         ? isAppointment
           ? preferredProviderName || "Chuyên gia đã chọn"
-          : `Ưu tiên ${preferredProviderName || "chuyên gia đã chọn"}`
+          : `Yêu cầu trực tiếp ${preferredProviderName || "provider đã chọn"}`
         : "Handigo tự điều phối",
     ],
   ] as string[][];
@@ -471,6 +474,7 @@ const ConfirmPaymentPage = () => {
                         <p className="font-label-sm text-label-sm text-on-surface-variant">
                           {subtitle}
                         </p>
+                        {value === "wallet" && <WalletBalanceText />}
                       </div>
                     </div>
                     <div className="w-6 h-6 border-2 border-outline-variant rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">

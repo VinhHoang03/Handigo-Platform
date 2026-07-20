@@ -209,11 +209,13 @@ export default function AdminServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
 
-  const search = searchParams.get('search') || '';
+  const searchParam = searchParams.get('search') || '';
   const categoryFilter = searchParams.get('category') || '';
   const statusFilter = searchParams.get('status') || '';
   const selectedServiceId = searchParams.get('serviceId') || '';
 
+  const [searchDraft, setSearchDraft] = useState({ value: searchParam, sourceParam: searchParam });
+  const search = searchDraft.sourceParam === searchParam ? searchDraft.value : searchParam;
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -248,6 +250,10 @@ export default function AdminServicesPage() {
 
   const updateSearchParams = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
+    if (!Object.prototype.hasOwnProperty.call(updates, 'search')) {
+      if (search) next.set('search', search);
+      else next.delete('search');
+    }
     Object.entries(updates).forEach(([key, value]) => {
       if (value) next.set(key, value);
       else next.delete(key);
@@ -256,6 +262,7 @@ export default function AdminServicesPage() {
   };
 
   const clearFilters = () => {
+    setSearchDraft({ value: '', sourceParam: searchParam });
     updateSearchParams({ search: null, category: null, status: null, serviceId: null });
   };
 
@@ -533,7 +540,8 @@ export default function AdminServicesPage() {
               name="service-search"
               autoComplete="off"
               value={search}
-              onChange={(event) => updateSearchParams({ search: event.target.value || null, serviceId: null })}
+              onChange={(event) => setSearchDraft({ value: event.target.value, sourceParam: searchParam })}
+              onBlur={() => updateSearchParams({ search: search || null, serviceId: null })}
               placeholder="Tìm kiếm dịch vụ…"
               className="min-h-11 w-full rounded-lg border border-transparent bg-surface-container-low py-2.5 pl-10 pr-4 text-label-md focus-visible:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
             />

@@ -3,13 +3,20 @@ import { Link, useParams } from "react-router-dom";
 import { BookingShell } from "../components/BookingComponents";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { Modal } from "../../../components/common/Modal";
-import type { Order, OrderQuotation, Payment } from "../../../types/booking";
+import type {
+  CancellationPreview,
+  Order,
+  OrderQuotation,
+  Payment,
+} from "../../../types/booking";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import { OrderFeedbackSection } from "@/features/feedback/components/OrderFeedbackSection";
 import { OrderTrackingMap } from "@/features/tracking/components/OrderTrackingMap";
 import { NearbyProviderSelector } from "@/features/customer-service/components/NearbyProviderSelector";
+import { tokenStorage } from "@/api/tokenStorage";
 import { getErrorMessage } from "@/utils/apiError";
+import { WalletBalanceText } from "@/features/wallet/components/WalletBalanceText";
 
 type PendingAction = {
   type: "confirmQuotation" | "rejectQuotation" | "cancelOrder" | "cancelSeries";
@@ -73,6 +80,8 @@ const BookingDetailPage = () => {
   const [replacementProviderError, setReplacementProviderError] = useState<string | null>(null);
   const [reassignmentModalOpen, setReassignmentModalOpen] = useState(false);
   const [reassignmentError, setReassignmentError] = useState<string | null>(null);
+  const [cancellationPreview, setCancellationPreview] =
+    useState<CancellationPreview | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
@@ -86,7 +95,19 @@ const BookingDetailPage = () => {
 
     setLoading(true);
     try {
-      const data = await bookingApi.getOrderById(id);
+      let data = await bookingApi.getOrderById(id);
+      const shouldReconcilePayos =
+        data?.paymentMethod === "bank" &&
+        (["unpaid", "partially_paid"].includes(data.paymentStatus) ||
+          ["awaiting_payment", "expired"].includes(data.bookingStatus || ""));
+      if (shouldReconcilePayos) {
+        try {
+          const reconciliation = await bookingApi.reconcilePayosPayment(id);
+          if (reconciliation.order) data = reconciliation.order;
+        } catch (error) {
+          console.error("Không thể đối soát thanh toán PayOS:", error);
+        }
+      }
       if (!data) {
         setApiError("Không tìm thấy thông tin đơn hàng.");
       } else {
@@ -172,45 +193,61 @@ const BookingDetailPage = () => {
     setPendingAction({ type: "rejectQuotation", reason: "" });
   };
 
-  const handleCancelOrder = () => {
+  const handleCancelOrder = async () => {
     if (!order || !["created", "accepted"].includes(order.status)) return;
-    setPendingAction({ type: "cancelOrder", reason: "", additionalInfo: "" });
-  };
-
-  const handleRemainingPayment = async () => {
-    if (!order || !quotation) return;
-
     try {
       setBusy(true);
-      setPaymentError(null);
-      const detailUrl = `${window.location.origin}/customer/bookings/${order._id}`;
-      const result = await bookingApi.createPayment({
-        orderId: order._id,
-        method: "PAYOS",
-        paymentType: "REMAINING",
-        returnUrl: detailUrl,
-        cancelUrl: detailUrl,
+      const preview = await bookingApi.getCancellationPreview(order._id);
+      setCancellationPreview(preview);
+      setPendingAction({
+        type: "cancelOrder",
+        reason: "",
+        additionalInfo: "",
+        error: preview.canCancel ? undefined : preview.items[0]?.policyReason,
       });
-      if (!result.checkoutUrl) {
-        throw new Error("PayOS không trả về liên kết thanh toán.");
-      }
-      window.location.assign(result.checkoutUrl);
-    } catch (error) {
-      console.error("Không thể tạo thanh toán phần còn lại:", error);
-      setPaymentError(
-        "Không thể tạo thanh toán phần còn lại. Vui lòng tải lại trang và thử lại.",
-      );
+    } catch {
+      setCancellationPreview(null);
+      setPendingAction({
+        type: "cancelOrder",
+        reason: "",
+        additionalInfo: "",
+        error: "Không thể tải chính sách hoàn tiền. Vui lòng đóng và thử lại.",
+      });
+    } finally {
       setBusy(false);
     }
   };
 
-  const handleCancelSeries = () => {
+  const handleCancelSeries = async () => {
     if (
       !order ||
       order.orderType !== "recurring" ||
       !["created", "accepted"].includes(order.status)
     ) return;
-    setPendingAction({ type: "cancelSeries", reason: "", additionalInfo: "" });
+    try {
+      setBusy(true);
+      const preview = await bookingApi.getCancellationPreview(order._id, "series");
+      setCancellationPreview(preview);
+      setPendingAction({
+        type: "cancelSeries",
+        reason: "",
+        additionalInfo: "",
+        error: preview.canCancel
+          ? undefined
+          : "Có buổi đã đến giờ thực hiện và không thể tự hủy.",
+      });
+    } catch {
+      setCancellationPreview(null);
+      setPendingAction({
+        type: "cancelSeries",
+        reason: "",
+        additionalInfo: "",
+        error:
+          "Không thể tải chính sách hoàn tiền cho chuỗi lịch. Vui lòng đóng và thử lại.",
+      });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const openInitialPaymentModal = () => {
@@ -253,6 +290,7 @@ const BookingDetailPage = () => {
         if (!result.checkoutUrl) {
           throw new Error("PayOS không trả về liên kết thanh toán.");
         }
+        tokenStorage.prepareExternalRedirect();
         window.location.assign(result.checkoutUrl);
         return;
       }
@@ -317,7 +355,10 @@ const BookingDetailPage = () => {
   };
 
   const closeActionDialog = () => {
-    if (!busy) setPendingAction(null);
+    if (!busy) {
+      setPendingAction(null);
+      setCancellationPreview(null);
+    }
   };
 
   const updateActionReason = (reason: string) => {
@@ -372,13 +413,17 @@ const BookingDetailPage = () => {
       }
 
       setPendingAction(null);
+      setCancellationPreview(null);
       await loadData();
-    } catch {
+    } catch (error) {
       setPendingAction((current) =>
         current
           ? {
               ...current,
-              error: "Không thể thực hiện thao tác. Vui lòng thử lại.",
+              error: getErrorMessage(
+                error,
+                "Không thể thực hiện thao tác. Vui lòng thử lại.",
+              ),
             }
           : current,
       );
@@ -532,14 +577,21 @@ const BookingDetailPage = () => {
   const formatCurrency = (amount?: number | null) =>
     `${(typeof amount === "number" && Number.isFinite(amount) ? amount : 0).toLocaleString("vi-VN")}đ`;
 
-  const getPaymentStatusDisplay = (currentOrder: Order) => {
+  const getPaymentStatusDisplay = (
+    currentOrder: Order,
+    hasPaidInitialPayment: boolean,
+  ) => {
     const isFlexiblePrice =
       currentOrder.serviceId?.serviceType !== "fixed_price";
 
     if (currentOrder.status === "cancelled") {
       if (currentOrder.paymentStatus === "refunded") {
+        const refundPolicy = currentOrder.cancellation?.refundPolicy;
         return {
-          label: "Đã hoàn tiền",
+          label:
+            refundPolicy && refundPolicy.paidAmount > refundPolicy.refundAmount
+              ? `Đã hoàn ${formatCurrency(refundPolicy.refundAmount)} (${refundPolicy.refundRate}%)`
+              : "Đã hoàn tiền",
           className: "text-emerald-600",
         };
       }
@@ -567,6 +619,13 @@ const BookingDetailPage = () => {
       };
     }
 
+    if (currentOrder.inspectionRequired && hasPaidInitialPayment) {
+      return {
+        label: "Đã thanh toán tiền cọc",
+        className: "text-emerald-600",
+      };
+    }
+
     if (currentOrder.paymentStatus === "paid") {
       return {
         label: "Đã thanh toán",
@@ -578,6 +637,13 @@ const BookingDetailPage = () => {
       return {
         label: "Đã thanh toán một phần",
         className: "text-amber-600",
+      };
+    }
+
+    if (hasPaidInitialPayment) {
+      return {
+        label: "Đã thanh toán",
+        className: "text-emerald-600",
       };
     }
 
@@ -637,7 +703,8 @@ const BookingDetailPage = () => {
     ? {
         confirmQuotation: {
           title: "Xác nhận báo giá",
-          message: "Bạn có chắc chắn muốn đồng ý báo giá này?",
+          message:
+            "Khi bạn đồng ý, chuyên gia có thể bắt đầu thực hiện công việc. Chi phí báo giá do bạn và chuyên gia tự thanh toán trực tiếp, không qua Handigo.",
           confirmLabel: "Đồng ý",
           tone: "primary",
           requiresReason: false,
@@ -688,18 +755,28 @@ const BookingDetailPage = () => {
   };
 
   const providerInfo = getProviderInfo();
-  const paymentStatusDisplay = getPaymentStatusDisplay(order);
-  const paidAmount = payments
-    .filter((payment) => payment.status === "paid")
-    .reduce((total, payment) => total + payment.amount, 0);
-  const remainingAmount = quotation
-    ? Math.max(quotation.quotation.finalAmount - paidAmount, 0)
-    : 0;
-  const hasPendingRemainingPayment = payments.some(
+  const hasPaidInitialPayment = payments.some(
     (payment) =>
-      payment.paymentType === "remaining" && payment.status === "pending",
+      payment.status === "paid" &&
+      ["full", "inspection_deposit"].includes(payment.paymentType),
   );
+  const quotationPhaseStarted =
+    Boolean(order.inspectionRequired) &&
+    (Boolean(order.hasAdditionalQuotation) || Boolean(quotation));
+  const paymentStatusDisplay = getPaymentStatusDisplay(
+    order,
+    hasPaidInitialPayment,
+  );
+  const paidDepositAmount = payments
+    .filter(
+      (payment) =>
+        payment.status === "paid" &&
+        payment.paymentType === "inspection_deposit",
+    )
+    .reduce((total, payment) => total + payment.amount, 0);
   const canMakeInitialPayment =
+    !hasPaidInitialPayment &&
+    !quotationPhaseStarted &&
     order.paymentStatus === "unpaid" &&
     order.paymentMethod !== "cash" &&
     ["created", "accepted"].includes(order.status) &&
@@ -773,9 +850,15 @@ const BookingDetailPage = () => {
         <div className="mb-lg rounded-2xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-950">
           <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-bold">Kỹ thuật viên đã hủy đơn</p>
+              <p className="font-bold">
+                {order.bookingStatus === "rejected"
+                  ? "Provider bạn chọn đã từ chối nhận đơn"
+                  : "Kỹ thuật viên đã hủy đơn"}
+              </p>
               <p className="mt-1">
-                Hãy cho Handigo biết bạn muốn tìm kỹ thuật viên khác hay hủy đơn và hoàn tiền.
+                {order.bookingStatus === "rejected"
+                  ? "Handigo sẽ tự điều phối thợ gần nhất đến cho bạn nếu bạn đồng ý. Nếu từ chối, khoản đã thanh toán sẽ được hoàn về ví Handigo."
+                  : "Hãy cho Handigo biết bạn muốn tìm kỹ thuật viên khác hay hủy đơn và hoàn tiền."}
               </p>
             </div>
             <button
@@ -832,7 +915,9 @@ const BookingDetailPage = () => {
         </div>
       )}
 
-      {order.bookingStatus === "rejected" && (
+      {order.bookingStatus === "rejected" &&
+        order.orderType !== "normal" &&
+        order.reassignment?.status !== "awaiting_customer" && (
         <div className="mb-lg rounded-2xl border border-error/20 bg-error/5 p-md">
           <p className="font-bold text-error">Chuyên gia chưa thể nhận lịch này</p>
           <p className="mt-1 text-sm text-on-surface-variant">
@@ -1180,48 +1265,29 @@ const BookingDetailPage = () => {
                     </div>
 
                     {quotation.quotation.status === "approved" && (
-                      <div className="mt-md rounded-3xl border border-outline-variant/40 bg-surface-container-low p-md">
-                        <div className="grid gap-sm sm:grid-cols-2">
+                      <div className="mt-md rounded-3xl border border-emerald-200 bg-emerald-50 p-md text-emerald-900">
+                        <p className="font-bold">Bạn đã đồng ý báo giá</p>
+                        <p className="mt-1 text-sm text-emerald-800">
+                          Chuyên gia có thể bắt đầu thực hiện công việc ngay, không cần chờ thanh toán.
+                        </p>
+                        <div className="mt-3 grid gap-2 border-t border-emerald-200 pt-3 sm:grid-cols-2">
                           <div>
-                            <p className="text-xs font-bold uppercase text-on-surface-variant">
-                              Đã thanh toán
+                            <p className="text-xs font-bold uppercase text-emerald-700">
+                              Tiền cọc qua Handigo
                             </p>
-                            <p className="mt-1 text-lg font-bold text-emerald-700">
-                              {formatCurrency(paidAmount)}
+                            <p className="mt-1 font-bold">
+                              {formatCurrency(paidDepositAmount || order.depositAmount)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs font-bold uppercase text-on-surface-variant">
-                              Còn phải thanh toán
+                            <p className="text-xs font-bold uppercase text-emerald-700">
+                              Chi phí theo báo giá
                             </p>
-                            <p className="mt-1 text-lg font-bold text-primary">
-                              {formatCurrency(remainingAmount)}
+                            <p className="mt-1 text-sm font-medium">
+                              Tự thanh toán trực tiếp với chuyên gia, không thanh toán qua Handigo.
                             </p>
                           </div>
                         </div>
-
-                        {remainingAmount > 0 && (
-                          <div className="mt-md">
-                            <button
-                              type="button"
-                              disabled={busy || hasPendingRemainingPayment}
-                              onClick={handleRemainingPayment}
-                              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 font-bold text-on-primary shadow-lg shadow-primary/20 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <span className="material-symbols-outlined text-lg">
-                                payments
-                              </span>
-                              {hasPendingRemainingPayment
-                                ? "Đang chờ xác nhận thanh toán"
-                                : `Thanh toán ${formatCurrency(remainingAmount)}`}
-                            </button>
-                            {paymentError && (
-                              <p className="mt-2 text-sm font-medium text-red-600">
-                                {paymentError}
-                              </p>
-                            )}
-                          </div>
-                        )}
                       </div>
                     )}
 
@@ -1512,6 +1578,7 @@ const BookingDetailPage = () => {
                     <span>
                       <span className="block font-bold text-on-surface">{method.title}</span>
                       <span className="text-sm text-on-surface-variant">{method.description}</span>
+                      {method.value === "WALLET" && <WalletBalanceText />}
                     </span>
                   </label>
                 ))}
@@ -1556,6 +1623,56 @@ const BookingDetailPage = () => {
             <p className="text-body-md text-on-surface-variant">
               {actionDialogConfig.message}
             </p>
+
+            {["cancelOrder", "cancelSeries"].includes(pendingAction.type) &&
+              cancellationPreview && (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-on-surface">
+                        Chính sách hoàn tiền
+                      </p>
+                      <p className="mt-1 text-xs text-on-surface-variant">
+                        {cancellationPreview.scope === "series"
+                          ? `${cancellationPreview.orderCount} buổi được tính riêng theo thời gian bắt đầu.`
+                          : cancellationPreview.items[0]?.policyReason}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-on-primary">
+                      Hoàn {cancellationPreview.items.length === 1
+                        ? `${cancellationPreview.items[0].refundRate}%`
+                        : "theo từng buổi"}
+                    </span>
+                  </div>
+
+                  {cancellationPreview.paidAmount > 0 ? (
+                    <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-white p-2">
+                        <dt className="text-[11px] text-on-surface-variant">Đã thanh toán</dt>
+                        <dd className="mt-1 text-sm font-bold text-on-surface">
+                          {formatCurrency(cancellationPreview.paidAmount)}
+                        </dd>
+                      </div>
+                      <div className="rounded-xl bg-white p-2">
+                        <dt className="text-[11px] text-on-surface-variant">Hoàn lại</dt>
+                        <dd className="mt-1 text-sm font-bold text-primary">
+                          {formatCurrency(cancellationPreview.refundAmount)}
+                        </dd>
+                      </div>
+                      <div className="rounded-xl bg-white p-2">
+                        <dt className="text-[11px] text-on-surface-variant">Phí hủy</dt>
+                        <dd className="mt-1 text-sm font-bold text-error">
+                          {formatCurrency(cancellationPreview.cancellationFee)}
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs text-on-surface-variant">
+                      Chưa ghi nhận khoản thanh toán trực tuyến cần hoàn cho đơn này.
+                    </p>
+                  )}
+                </div>
+              )}
 
             {["cancelOrder", "cancelSeries"].includes(pendingAction.type) ? (
               <div className="space-y-md">
@@ -1630,7 +1747,11 @@ const BookingDetailPage = () => {
               </button>
               <button
                 type="button"
-                disabled={busy}
+                disabled={
+                  busy ||
+                  (["cancelOrder", "cancelSeries"].includes(pendingAction.type) &&
+                    (!cancellationPreview || !cancellationPreview.canCancel))
+                }
                 onClick={executePendingAction}
                 className={`rounded-2xl px-5 py-3 font-bold text-white transition disabled:opacity-50 ${
                   actionDialogConfig.tone === "danger"
@@ -1649,7 +1770,11 @@ const BookingDetailPage = () => {
       {order.reassignment?.status === "awaiting_customer" && (
         <Modal
           open={reassignmentModalOpen}
-          title="Bạn có muốn tìm kỹ thuật viên khác?"
+          title={
+            order.bookingStatus === "rejected"
+              ? "Bạn có muốn Handigo điều phối thợ gần nhất?"
+              : "Bạn có muốn tìm kỹ thuật viên khác?"
+          }
           onClose={() => {
             if (!busy) setReassignmentModalOpen(false);
           }}
@@ -1659,9 +1784,13 @@ const BookingDetailPage = () => {
         >
           <div className="space-y-md">
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p className="font-bold">Kỹ thuật viên không thể tiếp tục thực hiện đơn hàng.</p>
+              <p className="font-bold">
+                {order.bookingStatus === "rejected"
+                  ? "Provider bạn chọn đã từ chối nhận đơn hàng."
+                  : "Kỹ thuật viên không thể tiếp tục thực hiện đơn hàng."}
+              </p>
               <p className="mt-2 leading-6">
-                Nếu tiếp tục, Handigo sẽ giữ nguyên thông tin và khoản thanh toán để tìm kỹ thuật viên khác. Nếu từ chối, đơn sẽ được hủy và khoản đã thanh toán sẽ được hoàn theo phương thức thanh toán đã sử dụng.
+                Nếu tiếp tục, Handigo sẽ giữ nguyên thông tin và khoản thanh toán để tự điều phối thợ phù hợp gần bạn. Nếu từ chối, đơn sẽ được hủy và khoản đã thanh toán sẽ được hoàn về ví Handigo.
               </p>
               <p className="mt-2 text-xs text-amber-800">
                 Phản hồi trước {new Date(order.reassignment.expiresAt).toLocaleString("vi-VN")}.
@@ -1689,7 +1818,11 @@ const BookingDetailPage = () => {
                 onClick={() => void handleReassignmentResponse("accept")}
                 className="rounded-2xl bg-primary px-5 py-3 font-bold text-on-primary transition hover:bg-primary/90 disabled:opacity-50"
               >
-                {busy ? "Đang xử lý..." : "Tìm kỹ thuật viên khác"}
+                {busy
+                  ? "Đang xử lý..."
+                  : order.bookingStatus === "rejected"
+                    ? "Điều phối thợ gần nhất"
+                    : "Tìm kỹ thuật viên khác"}
               </button>
             </div>
           </div>
