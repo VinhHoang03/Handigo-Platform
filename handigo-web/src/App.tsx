@@ -125,9 +125,6 @@ const AdminPaymentsPage = lazy(
 const AdminWalletsPage = lazy(
   () => import("./features/admin/pages/AdminWalletsPage"),
 );
-const CaseManagementPage = lazy(
-  () => import("./features/case-management/pages/CaseManagementPage"),
-);
 const AdminSystemConfigsPage = lazy(
   () => import("./features/admin/pages/AdminSystemConfigsPage"),
 );
@@ -291,7 +288,7 @@ function App() {
                 path="/customer/support"
                 element={
                   <RouteGuard roles={["CUSTOMER"]}>
-                    <CaseManagementPage role="CUSTOMER" />
+                    <SupportPage role="CUSTOMER" />
                   </RouteGuard>
                 }
               />
@@ -379,7 +376,7 @@ function App() {
                 path="/provider/support"
                 element={
                   <RouteGuard roles={["PROVIDER"]}>
-                    <CaseManagementPage role="PROVIDER" />
+                    <SupportPage role="PROVIDER" />
                   </RouteGuard>
                 }
               />

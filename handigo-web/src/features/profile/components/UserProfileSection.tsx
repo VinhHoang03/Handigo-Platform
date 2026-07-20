@@ -40,6 +40,7 @@ interface UserProfileSectionProps {
   showAddresses?: boolean;
   addressManager?: ReactNode;
   onSaveProfile: (payload: UserProfileFormValue) => Promise<void> | void;
+  onSaveAvatar?: (url: string) => Promise<void> | void;
   onAddAddress?: () => void;
   onEditAddress?: (address: UserAddress) => void;
   onDeleteAddress?: (address: UserAddress) => Promise<void> | void;
@@ -250,6 +251,7 @@ export function UserProfileSection({
   showAddresses = true,
   addressManager,
   onSaveProfile,
+  onSaveAvatar,
   onAddAddress,
   onEditAddress,
   onDeleteAddress,
@@ -319,10 +321,14 @@ export function UserProfileSection({
   };
 
   const handleAvatarSave = async (url: string) => {
-    await onSaveProfile({
-      ...toProfileForm(user),
-      avatar: url,
-    });
+    if (onSaveAvatar) {
+      await onSaveAvatar(url);
+    } else {
+      await onSaveProfile({
+        ...toProfileForm(user),
+        avatar: url,
+      });
+    }
     setProfileForm((current) => ({ ...current, avatar: url }));
   };
 
