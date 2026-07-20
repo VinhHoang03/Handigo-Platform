@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useRef, type FormEvent } from "react";
 import type { Category } from "@/features/provider-application/types/providerApplication.types";
 import type { IdentityDocumentType } from "../types/provider.types";
 import type {
@@ -157,28 +157,37 @@ function FileUploadSlot({
   onUpload: (file: File) => void;
   onRemove: () => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase text-on-surface-variant">
           {label}
         </p>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90">
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+        >
           <span className="material-symbols-outlined text-[18px]">upload</span>
           {uploading ? "Đang tải..." : value ? "Thay đổi" : "Tải lên"}
-          <input
-            id={id}
-            type="file"
-            accept={accept}
-            disabled={uploading}
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.currentTarget.value = "";
-              if (file) onUpload(file);
-            }}
-          />
-        </label>
+        </button>
+        <input
+          ref={inputRef}
+          id={id}
+          type="file"
+          accept={accept}
+          disabled={uploading}
+          tabIndex={-1}
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.currentTarget.value = "";
+            if (file) onUpload(file);
+          }}
+        />
       </div>
       {value ? (
         <UploadedAssetPreview url={value} label={label} onRemove={onRemove} />
@@ -345,6 +354,8 @@ export function CertificateInlineForm({
   onCancel: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   return (
     <form
       className="grid grid-cols-1 gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4 md:grid-cols-2"
@@ -387,23 +398,30 @@ export function CertificateInlineForm({
           <p className="text-xs font-bold uppercase text-on-surface-variant">
             Ảnh hoặc tài liệu chứng chỉ
           </p>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+          >
             <span className="material-symbols-outlined text-[18px]">
               upload
             </span>
             {uploading ? "Đang tải..." : "Tải lên"}
-            <input
-              type="file"
-              accept="image/*,.pdf,.doc,.docx"
-              disabled={uploading}
-              className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.currentTarget.value = "";
-                if (file) onUpload(file);
-              }}
-            />
-          </label>
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx"
+            disabled={uploading}
+            tabIndex={-1}
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.currentTarget.value = "";
+              if (file) onUpload(file);
+            }}
+          />
         </div>
         {form.imageUrls.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">

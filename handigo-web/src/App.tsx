@@ -125,9 +125,6 @@ const AdminPaymentsPage = lazy(
 const AdminWalletsPage = lazy(
   () => import("./features/admin/pages/AdminWalletsPage"),
 );
-const CaseManagementPage = lazy(
-  () => import("./features/case-management/pages/CaseManagementPage"),
-);
 const AdminSystemConfigsPage = lazy(
   () => import("./features/admin/pages/AdminSystemConfigsPage"),
 );
@@ -144,6 +141,11 @@ const ProviderAssignmentModal = lazy(() =>
     ({ ProviderAssignmentModal }) => ({
       default: ProviderAssignmentModal,
     }),
+  ),
+);
+const ChatbotGate = lazy(() =>
+  import("./features/chatbot/components/ChatbotGate").then(
+    ({ ChatbotGate }) => ({ default: ChatbotGate }),
   ),
 );
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
@@ -291,7 +293,7 @@ function App() {
                 path="/customer/support"
                 element={
                   <RouteGuard roles={["CUSTOMER"]}>
-                    <CaseManagementPage role="CUSTOMER" />
+                    <SupportPage role="CUSTOMER" />
                   </RouteGuard>
                 }
               />
@@ -379,7 +381,7 @@ function App() {
                 path="/provider/support"
                 element={
                   <RouteGuard roles={["PROVIDER"]}>
-                    <CaseManagementPage role="PROVIDER" />
+                    <SupportPage role="PROVIDER" />
                   </RouteGuard>
                 }
               />
@@ -526,6 +528,9 @@ function App() {
             </Routes>
           </Suspense>
           <ProviderAssignmentModalGate />
+          <Suspense fallback={null}>
+            <ChatbotGate />
+          </Suspense>
         </AuthBootstrap>
       </Router>
       <ToastContainer />

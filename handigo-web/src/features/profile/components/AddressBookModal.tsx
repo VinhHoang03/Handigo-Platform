@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { MapPin, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { LocateFixed, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
+import { LocationPickerMap } from "@/components/common/LocationPickerMap";
 import {
   SearchableSelect,
   type SearchableSelectOption,
@@ -223,6 +224,8 @@ export function AddressBookModal({
   const [isProvinceLoading, setIsProvinceLoading] = useState(false);
   const [isWardLoading, setIsWardLoading] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isResolvingMapAddress, setIsResolvingMapAddress] = useState(false);
+  const mapRequestSequenceRef = useRef(0);
 
   const provinceOptions = useMemo(
     () => toSelectOptions(provinces),
@@ -354,6 +357,86 @@ export function AddressBookModal({
     setLocationHint("");
   };
 
+  const applyResolvedAddress = async (
+    currentAddress: Awaited<ReturnType<typeof bookingApi.reverseGeocode>>,
+  ) => {
+    const provinceSource =
+      provinces.length > 0 ? provinces : await getProvinces();
+    if (provinces.length === 0) {
+      setProvinces(provinceSource);
+    }
+
+    const matchedProvince = findAdministrativeUnitByName(
+      provinceSource,
+      currentAddress.province,
+    );
+    const wardSource = matchedProvince
+      ? await getWardsByProvince(matchedProvince.code)
+      : [];
+    const matchedWard = findAdministrativeUnitByName(
+      wardSource,
+      currentAddress.ward,
+    );
+
+    setAddressForm((current) => ({
+      ...current,
+      addressLine: extractStreetAddressLine(
+        currentAddress.fullAddress,
+        currentAddress.ward,
+        currentAddress.province,
+      ),
+      fullAddress: currentAddress.fullAddress,
+      province: matchedProvince?.name || currentAddress.province,
+      provinceCode: matchedProvince?.code,
+      ward: matchedWard?.name || currentAddress.ward,
+      wardCode: matchedWard?.code,
+      latitude: currentAddress.latitude,
+      longitude: currentAddress.longitude,
+      placeId: currentAddress.placeId,
+    }));
+    setWards(wardSource);
+  };
+
+  const updateAddressFromCoordinate = async (
+    latitude: number,
+    longitude: number,
+    successMessage: string,
+  ) => {
+    const requestSequence = ++mapRequestSequenceRef.current;
+    setLocationError("");
+    setIsResolvingMapAddress(true);
+
+    try {
+      const currentAddress = await bookingApi.reverseGeocode(
+        latitude,
+        longitude,
+      );
+      if (requestSequence !== mapRequestSequenceRef.current) return;
+
+      await applyResolvedAddress(currentAddress);
+      if (requestSequence !== mapRequestSequenceRef.current) return;
+      setLocationHint(successMessage);
+    } catch (error) {
+      if (requestSequence !== mapRequestSequenceRef.current) return;
+      setAddressForm((current) => ({
+        ...current,
+        latitude,
+        longitude,
+        placeId: undefined,
+      }));
+      setLocationError(
+        getErrorMessage(
+          error,
+          "Đã ghim tọa độ nhưng không thể xác định địa chỉ tại vị trí này. Vui lòng kiểm tra lại địa chỉ trước khi lưu.",
+        ),
+      );
+    } finally {
+      if (requestSequence === mapRequestSequenceRef.current) {
+        setIsResolvingMapAddress(false);
+      }
+    }
+  };
+
   const handleUseCurrentLocation = () => {
     setAddressFormError("");
     setLocationError("");
@@ -368,49 +451,10 @@ export function AddressBookModal({
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
-          const currentAddress = await bookingApi.reverseGeocode(
+          await updateAddressFromCoordinate(
             coords.latitude,
             coords.longitude,
-          );
-
-          const provinceSource =
-            provinces.length > 0 ? provinces : await getProvinces();
-          if (provinces.length === 0) {
-            setProvinces(provinceSource);
-          }
-
-          const matchedProvince = findAdministrativeUnitByName(
-            provinceSource,
-            currentAddress.province,
-          );
-          const wardSource = matchedProvince
-            ? await getWardsByProvince(matchedProvince.code)
-            : [];
-          const matchedWard = findAdministrativeUnitByName(
-            wardSource,
-            currentAddress.ward,
-          );
-
-          setAddressForm((current) => ({
-            ...current,
-            addressLine: extractStreetAddressLine(
-              currentAddress.fullAddress,
-              currentAddress.ward,
-              currentAddress.province,
-            ),
-            fullAddress: currentAddress.fullAddress,
-            province: matchedProvince?.name || currentAddress.province,
-            provinceCode: matchedProvince?.code,
-            ward: matchedWard?.name || currentAddress.ward,
-            wardCode: matchedWard?.code,
-            latitude: currentAddress.latitude,
-            longitude: currentAddress.longitude,
-            placeId: currentAddress.placeId,
-          }));
-
-          setWards(wardSource);
-          setLocationHint(
-            "Đã điền địa chỉ từ vị trí hiện tại. Bạn có thể kiểm tra và chỉnh lại các ô nếu cần.",
+            "Đã điền địa chỉ từ vị trí hiện tại. Kéo bản đồ nếu bạn muốn chỉnh ghim chính xác hơn.",
           );
         } catch (error) {
           setLocationError(
@@ -556,27 +600,6 @@ export function AddressBookModal({
             />
           </label>
 
-          <div className="order-3 md:col-span-2">
-            <button
-              type="button"
-              disabled={isLocating || isSaving}
-              onClick={handleUseCurrentLocation}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLocating ? (
-                <RefreshCw size={16} className="animate-spin" />
-              ) : (
-                <MapPin size={16} />
-              )}
-              {isLocating
-                ? "Đang lấy vị trí hiện tại..."
-                : "Dùng vị trí hiện tại"}
-            </button>
-            <p className="mt-2 px-1 text-xs text-on-surface-variant">
-              Hệ thống sẽ tự điền địa chỉ từ vị trí hiện tại.
-            </p>
-          </div>
-
           <SearchableSelect
             id="address-province"
             label="Tỉnh / Thành phố"
@@ -619,13 +642,47 @@ export function AddressBookModal({
             />
           </label>
 
+          <div className="order-7 space-y-3 md:col-span-2">
+            <button
+              type="button"
+              disabled={isLocating || isResolvingMapAddress || isSaving}
+              onClick={handleUseCurrentLocation}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-outline-variant/50 bg-surface px-3.5 py-2 text-sm font-semibold text-on-surface transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLocating || isResolvingMapAddress ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <LocateFixed size={16} />
+              )}
+              {isLocating
+                ? "Đang lấy vị trí hiện tại..."
+                : isResolvingMapAddress
+                  ? "Đang xác định địa chỉ..."
+                  : "Định vị địa chỉ trên bản đồ"}
+            </button>
+
+            <LocationPickerMap
+              latitude={addressForm.latitude}
+              longitude={addressForm.longitude}
+              disabled={Boolean(isSaving || isResolvingMapAddress)}
+              isResolvingAddress={isResolvingMapAddress}
+              onPositionChange={(latitude, longitude) =>
+                void updateAddressFromCoordinate(
+                  latitude,
+                  longitude,
+                  "Đã cập nhật địa chỉ theo vị trí ghim trên bản đồ.",
+                )
+              }
+            />
+          </div>
+
           <FloatingTextarea
             id="address-note"
             label="Ghi chú"
             value={addressForm.note || ""}
             rows={3}
             maxLength={200}
-            containerClassName="order-7 md:col-span-2"
+            containerClassName="order-8 md:col-span-2"
             onValueChange={(value) => handleAddressInputChange("note", value)}
           />
         </div>

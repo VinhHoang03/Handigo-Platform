@@ -17,14 +17,15 @@ export const ProfileSection: React.FC<{
   title: string;
   actionLabel?: string;
   onAction?: () => void;
+  actions?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ title, actionLabel, onAction, children }) => (
+}> = ({ title, actionLabel, onAction, actions, children }) => (
   <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <h3 className="text-pretty font-headline-md text-headline-md text-on-surface">
         {title}
       </h3>
-      {actionLabel && (
+      {actions ?? (actionLabel && (
         <button
           type="button"
           className="text-sm font-bold text-primary hover:underline"
@@ -32,7 +33,7 @@ export const ProfileSection: React.FC<{
         >
           {actionLabel}
         </button>
-      )}
+      ))}
     </div>
     {children}
   </section>

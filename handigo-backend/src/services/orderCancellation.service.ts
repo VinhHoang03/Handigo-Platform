@@ -19,11 +19,7 @@ import {
   calculateRefundPolicy,
   type RefundPolicyResult,
 } from "./refundPolicy.service";
-import {
-  getRefundRetryDecision,
-  isPayosPayoutEnabled,
-  requiresPayosRefundRecoveryCheck,
-} from "./refundProcessing";
+import { getRefundRetryDecision } from "./refundProcessing";
 
 type CancellationRole = "customer" | "provider" | "admin";
 type SystemCancellationType = "payment_timeout" | "provider_unavailable";
@@ -822,7 +818,6 @@ const refundPayosPaymentToWallet = async (
   order: IOrder,
   reason: string,
   refundAmount: number,
-  fallbackReason = "source_account_unavailable",
 ) => {
   const session = await mongoose.startSession();
   let walletRefund: WalletRefundResult | null = null;
@@ -897,7 +892,7 @@ const refundPayosPaymentToWallet = async (
                 sourceMethod: "payos",
                 destination: "handigo_wallet",
                 referenceId: "REFUND" + payment._id.toString(),
-                fallbackReason,
+                fallbackReason: "source_account_unavailable",
                 amount: refundAmount,
                 completedAt: now,
               },
@@ -950,7 +945,7 @@ const refundPayosPaymentToWallet = async (
               orderCode: order.orderCode,
               reason,
               sourceMethod: "payos",
-              fallbackReason,
+              fallbackReason: "source_account_unavailable",
             },
           },
         ],
@@ -991,7 +986,7 @@ const refundPayosPaymentToWallet = async (
         type: "PAYMENT",
         title: "Hoàn tiền thành công",
         content:
-          "Tiền của đơn hàng đã hủy đã được hoàn vào ví Handigo của bạn.",
+          "PayOS không cung cấp tài khoản nguồn. Tiền đã được hoàn vào ví Handigo của bạn.",
         data: {
           orderId: order._id,
           paymentId: payment._id,
@@ -1024,29 +1019,8 @@ const requestPayosRefund = async (
   if (!refund) return;
 
   try {
-    const payoutEnabled = isPayosPayoutEnabled(
-      process.env.PAYOS_PAYOUT_ENABLED,
-    );
     if (refund.payoutId) {
       await reconcilePayosRefund(payment, refund, reason, refund.payoutId);
-      return;
-    }
-
-    if (
-      !payoutEnabled &&
-      !requiresPayosRefundRecoveryCheck(
-        refund.channel,
-        refund.destination,
-        refund.payoutId,
-      )
-    ) {
-      await refundPayosPaymentToWallet(
-        payment,
-        order,
-        reason,
-        refundAmount,
-        "payout_temporarily_disabled",
-      );
       return;
     }
 
@@ -1059,17 +1033,6 @@ const requestPayosRefund = async (
       refund.payoutId = existingPayout.id;
       await refund.save();
       await reconcilePayosRefund(payment, refund, reason, existingPayout.id);
-      return;
-    }
-
-    if (!payoutEnabled) {
-      await refundPayosPaymentToWallet(
-        payment,
-        order,
-        reason,
-        refundAmount,
-        "payout_temporarily_disabled",
-      );
       return;
     }
 

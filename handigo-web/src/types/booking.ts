@@ -181,6 +181,8 @@ export interface Order {
   status: "created" | "accepted" | "in_progress" | "completed" | "cancelled";
   paymentMethod: "wallet" | "bank" | "cash";
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
+  depositPaidAt?: string | null;
+  matchingStartedAt?: string | null;
   inspectionRequired?: boolean;
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
