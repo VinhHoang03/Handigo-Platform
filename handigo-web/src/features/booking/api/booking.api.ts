@@ -2,6 +2,7 @@ import api from "@/api/client";
 import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutocomplete";
 import type {
   Address,
+  CancellationPreview,
   CreatePaymentResult,
   Order,
   OrderQuotation,
@@ -179,6 +180,14 @@ export const bookingApi = {
     return response.data.data;
   },
 
+  reconcilePayosPayment: async (orderId: string) => {
+    const response = await api.post<{
+      success: boolean;
+      data: { payment: Payment | null; order: Order | null };
+    }>(`/payments/order/${orderId}/reconcile`);
+    return response.data.data;
+  },
+
   getRecurringSeries: async (orderId: string) => {
     const response = await api.get<{
       success: boolean;
@@ -200,6 +209,17 @@ export const bookingApi = {
       `/orders/${orderId}/cancel`,
       { reason },
     );
+    return response.data.data;
+  },
+
+  getCancellationPreview: async (
+    orderId: string,
+    scope: "single" | "series" = "single",
+  ) => {
+    const response = await api.get<{
+      success: boolean;
+      data: CancellationPreview;
+    }>(`/orders/${orderId}/cancellation-preview`, { params: { scope } });
     return response.data.data;
   },
 

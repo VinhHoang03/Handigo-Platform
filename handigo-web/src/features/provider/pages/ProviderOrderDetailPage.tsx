@@ -224,7 +224,12 @@ export default function ProviderOrderDetailPage() {
     order.status === 'cancelled' &&
     ['paid', 'partially_paid'].includes(order.paymentStatus)
       ? 'Đang xử lý hoàn tiền'
-      : paymentStatusLabels[order.paymentStatus];
+      : order.status === 'cancelled' &&
+          order.paymentStatus === 'refunded' &&
+          order.cancellation?.refundPolicy &&
+          order.cancellation.refundPolicy.refundRate < 100
+        ? `Đã hoàn ${order.cancellation.refundPolicy.refundRate}% cho khách`
+        : paymentStatusLabels[order.paymentStatus];
   const orderTypeLabels: Record<Order['orderType'], string> = {
     normal: 'Thực hiện sớm nhất',
     urgent: 'Khẩn cấp',
@@ -560,6 +565,13 @@ function PaymentSummaryCard({ order, paymentStatus }: { order: Order; paymentSta
       </div>
       <div className="mt-md space-y-3 text-sm">
         <FinancialRow label="Giá trị đơn hàng" value={formatMoney(order.pricing?.totalPaidAmount)} strong />
+        {(order.cancellation?.refundPolicy?.providerCompensation || 0) > 0 && (
+          <FinancialRow
+            label="Bồi thường phí hủy"
+            value={formatMoney(order.cancellation?.refundPolicy?.providerCompensation)}
+            strong
+          />
+        )}
         {discountCode && <FinancialRow label="Mã giảm giá" value={discountCode} />}
         <FinancialRow label="Số tiền giảm giá" value={`-${formatMoney(discount)}`} tone="discount" />
         <FinancialRow label="Phí nền tảng" value={`-${formatMoney(order.pricing?.platformCommissionAmount)}`} tone="fee" />

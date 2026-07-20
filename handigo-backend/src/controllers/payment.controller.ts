@@ -69,6 +69,25 @@ export const getPaymentsByOrder = async (req: Request, res: Response) => {
   }
 };
 
+export const reconcilePayosPaymentByOrder = async (req: Request, res: Response) => {
+  try {
+    const params = orderIdParamSchema.parse(req.params);
+    const user = requireRequestUser(req);
+    const result = await paymentService.reconcilePayosPaymentForOrder(
+      params.orderId,
+      user,
+    );
+
+    return res.json({
+      success: true,
+      data: result,
+      message: "Đối soát thanh toán PayOS thành công",
+    });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
 export const getPaymentHistory = async (req: Request, res: Response) => {
   try {
     const query = paymentHistoryQuerySchema.parse(req.query);

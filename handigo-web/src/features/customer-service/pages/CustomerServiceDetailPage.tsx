@@ -121,10 +121,8 @@ export default function CustomerServiceDetailPage() {
   const user = useAuthStore((state) => state.user); 
   const {
     addressId,
-    preferredProviderId,
     selectService,
     setAddressId,
-    setPreferredProviderId,
   } = useBookingStore();
   const [service, setService] = useState<Service | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -347,7 +345,6 @@ export default function CustomerServiceDetailPage() {
     }
     setAddressSelectionError("");
     setAddressId(value);
-    setPreferredProviderId(undefined);
   };
 
   const handleBookNow = () => {
@@ -706,8 +703,7 @@ export default function CustomerServiceDetailPage() {
               !isLoadingAddresses &&
               addresses.some((address) => address._id === addressId)
             }
-            selectedProviderId={preferredProviderId}
-            onSelectProvider={setPreferredProviderId}
+            allowSelection={false}
           />
         </aside>
       </div>

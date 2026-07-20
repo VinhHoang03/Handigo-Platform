@@ -14,8 +14,9 @@ interface NearbyProviderSelectorProps {
   requireSelection?: boolean;
   recurrenceUnit?: "weekly" | "monthly";
   recurrenceCount?: number;
+  allowSelection?: boolean;
   selectedProviderId?: string;
-  onSelectProvider: (providerId?: string, providerName?: string) => void;
+  onSelectProvider?: (providerId?: string, providerName?: string) => void;
 }
 
 const formatDistance = (distanceMeters: number) => {
@@ -36,6 +37,7 @@ export function NearbyProviderSelector({
   requireSelection = false,
   recurrenceUnit,
   recurrenceCount,
+  allowSelection = true,
   selectedProviderId,
   onSelectProvider,
 }: NearbyProviderSelectorProps) {
@@ -87,12 +89,13 @@ export function NearbyProviderSelector({
   }, [addressId, enabled, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
 
   useEffect(() => {
-    if (!hasLoaded || !selectedProviderId) return;
+    if (!allowSelection || !hasLoaded || !onSelectProvider || !selectedProviderId) return;
     if (providers.some((provider) => provider.id === selectedProviderId)) return;
     onSelectProvider(undefined);
-  }, [hasLoaded, onSelectProvider, providers, selectedProviderId]);
+  }, [allowSelection, hasLoaded, onSelectProvider, providers, selectedProviderId]);
 
   const selectProvider = (provider: NearbyProvider) => {
+    if (!allowSelection || !onSelectProvider) return;
     const isSelected = selectedProviderId === provider.id;
     onSelectProvider(
       isSelected ? undefined : provider.id,
@@ -138,9 +141,9 @@ export function NearbyProviderSelector({
         </p>
       ) : (
         <div className="space-y-3">
-          {!requireSelection && <button
+          {allowSelection && !requireSelection && <button
             type="button"
-            onClick={() => onSelectProvider(undefined)}
+            onClick={() => onSelectProvider?.(undefined)}
             className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
               !selectedProviderId
                 ? "border-primary bg-primary-container/10"
@@ -164,7 +167,7 @@ export function NearbyProviderSelector({
           </button>}
 
           {providers.map((provider) => {
-            const isSelected = selectedProviderId === provider.id;
+            const isSelected = allowSelection && selectedProviderId === provider.id;
             return (
               <div
                 key={provider.id}
@@ -223,30 +226,34 @@ export function NearbyProviderSelector({
                     "Khu vực hoạt động chưa cập nhật"}
                 </p>
 
-                <button
-                  type="button"
-                  onClick={() => selectProvider(provider)}
-                  className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition ${
-                    isSelected
-                      ? "border-primary bg-primary text-on-primary"
-                      : "border-primary text-primary hover:bg-primary/5"
-                  }`}
-                >
-                  {isSelected
-                    ? requireSelection
-                      ? "Đã chọn chuyên gia"
-                      : "Đã ưu tiên chuyên gia"
-                    : requireSelection
-                      ? "Chọn chuyên gia này"
-                      : "Ưu tiên chuyên gia này"}
-                  <span className="material-symbols-outlined text-[18px]">
-                    {isSelected ? "check_circle" : "add_circle"}
-                  </span>
-                </button>
-                {isSelected && !requireSelection && (
-                  <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-                    Nếu chuyên gia không thể nhận, Handigo sẽ tự tìm người phù hợp khác.
-                  </p>
+                {allowSelection && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => selectProvider(provider)}
+                      className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition ${
+                        isSelected
+                          ? "border-primary bg-primary text-on-primary"
+                          : "border-primary text-primary hover:bg-primary/5"
+                      }`}
+                    >
+                      {isSelected
+                        ? requireSelection
+                          ? "Đã chọn chuyên gia"
+                          : "Đã ưu tiên chuyên gia"
+                        : requireSelection
+                          ? "Chọn chuyên gia này"
+                          : "Ưu tiên chuyên gia này"}
+                      <span className="material-symbols-outlined text-[18px]">
+                        {isSelected ? "check_circle" : "add_circle"}
+                      </span>
+                    </button>
+                    {isSelected && !requireSelection && (
+                      <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+                        Nếu chuyên gia không thể nhận, Handigo sẽ tự tìm người phù hợp khác.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             );

@@ -602,7 +602,7 @@ const CreateBookingStep2Page = () => {
 
         <OrderSummaryCard
           step={2}
-          actionLabel={shouldShowSchedulePicker ? "Xem lại lịch hẹn" : "Tiếp tục bước 3"}
+          actionLabel={shouldShowSchedulePicker ? "Xác nhận" : "Tiếp tục bước 3"}
           onAction={handleContinue}
         />
       </div>

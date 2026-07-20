@@ -3,12 +3,19 @@ import { Link, useParams } from "react-router-dom";
 import { BookingShell } from "../components/BookingComponents";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { Modal } from "../../../components/common/Modal";
-import type { Order, OrderQuotation, Payment } from "../../../types/booking";
+import type {
+  CancellationPreview,
+  Order,
+  OrderQuotation,
+  Payment,
+} from "../../../types/booking";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import { OrderFeedbackSection } from "@/features/feedback/components/OrderFeedbackSection";
 import { OrderTrackingMap } from "@/features/tracking/components/OrderTrackingMap";
 import { NearbyProviderSelector } from "@/features/customer-service/components/NearbyProviderSelector";
+import { tokenStorage } from "@/api/tokenStorage";
+import { getErrorMessage } from "@/utils/apiError";
 
 type PendingAction = {
   type: "confirmQuotation" | "rejectQuotation" | "cancelOrder" | "cancelSeries";
@@ -38,6 +45,8 @@ const BookingDetailPage = () => {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [replacementProviderId, setReplacementProviderId] = useState<string>();
   const [replacementProviderError, setReplacementProviderError] = useState<string | null>(null);
+  const [cancellationPreview, setCancellationPreview] =
+    useState<CancellationPreview | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
@@ -51,7 +60,15 @@ const BookingDetailPage = () => {
 
     setLoading(true);
     try {
-      const data = await bookingApi.getOrderById(id);
+      let data = await bookingApi.getOrderById(id);
+      if (["awaiting_payment", "expired"].includes(data?.bookingStatus || "")) {
+        try {
+          const reconciliation = await bookingApi.reconcilePayosPayment(id);
+          if (reconciliation.order) data = reconciliation.order;
+        } catch (error) {
+          console.error("Không thể đối soát thanh toán PayOS:", error);
+        }
+      }
       if (!data) {
         setApiError("Không tìm thấy thông tin đơn hàng.");
       } else {
@@ -111,9 +128,29 @@ const BookingDetailPage = () => {
     setPendingAction({ type: "rejectQuotation", reason: "" });
   };
 
-  const handleCancelOrder = () => {
+  const handleCancelOrder = async () => {
     if (!order || !["created", "accepted"].includes(order.status)) return;
-    setPendingAction({ type: "cancelOrder", reason: "", additionalInfo: "" });
+    try {
+      setBusy(true);
+      const preview = await bookingApi.getCancellationPreview(order._id);
+      setCancellationPreview(preview);
+      setPendingAction({
+        type: "cancelOrder",
+        reason: "",
+        additionalInfo: "",
+        error: preview.canCancel ? undefined : preview.items[0]?.policyReason,
+      });
+    } catch {
+      setCancellationPreview(null);
+      setPendingAction({
+        type: "cancelOrder",
+        reason: "",
+        additionalInfo: "",
+        error: "Không thể tải chính sách hoàn tiền. Vui lòng đóng và thử lại.",
+      });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleRemainingPayment = async () => {
@@ -133,6 +170,7 @@ const BookingDetailPage = () => {
       if (!result.checkoutUrl) {
         throw new Error("PayOS không trả về liên kết thanh toán.");
       }
+      tokenStorage.prepareExternalRedirect();
       window.location.assign(result.checkoutUrl);
     } catch (error) {
       console.error("Không thể tạo thanh toán phần còn lại:", error);
@@ -143,13 +181,36 @@ const BookingDetailPage = () => {
     }
   };
 
-  const handleCancelSeries = () => {
+  const handleCancelSeries = async () => {
     if (
       !order ||
       order.orderType !== "recurring" ||
       !["created", "accepted"].includes(order.status)
     ) return;
-    setPendingAction({ type: "cancelSeries", reason: "", additionalInfo: "" });
+    try {
+      setBusy(true);
+      const preview = await bookingApi.getCancellationPreview(order._id, "series");
+      setCancellationPreview(preview);
+      setPendingAction({
+        type: "cancelSeries",
+        reason: "",
+        additionalInfo: "",
+        error: preview.canCancel
+          ? undefined
+          : "Có buổi đã đến giờ thực hiện và không thể tự hủy.",
+      });
+    } catch {
+      setCancellationPreview(null);
+      setPendingAction({
+        type: "cancelSeries",
+        reason: "",
+        additionalInfo: "",
+        error:
+          "Không thể tải chính sách hoàn tiền cho chuỗi lịch. Vui lòng đóng và thử lại.",
+      });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleAppointmentPayment = async () => {
@@ -177,6 +238,7 @@ const BookingDetailPage = () => {
         if (!result.checkoutUrl) {
           throw new Error("PayOS không trả về liên kết thanh toán.");
         }
+        tokenStorage.prepareExternalRedirect();
         window.location.assign(result.checkoutUrl);
         return;
       }
@@ -213,7 +275,10 @@ const BookingDetailPage = () => {
   };
 
   const closeActionDialog = () => {
-    if (!busy) setPendingAction(null);
+    if (!busy) {
+      setPendingAction(null);
+      setCancellationPreview(null);
+    }
   };
 
   const updateActionReason = (reason: string) => {
@@ -268,13 +333,17 @@ const BookingDetailPage = () => {
       }
 
       setPendingAction(null);
+      setCancellationPreview(null);
       await loadData();
-    } catch {
+    } catch (error) {
       setPendingAction((current) =>
         current
           ? {
               ...current,
-              error: "Không thể thực hiện thao tác. Vui lòng thử lại.",
+              error: getErrorMessage(
+                error,
+                "Không thể thực hiện thao tác. Vui lòng thử lại.",
+              ),
             }
           : current,
       );
@@ -434,8 +503,12 @@ const BookingDetailPage = () => {
 
     if (currentOrder.status === "cancelled") {
       if (currentOrder.paymentStatus === "refunded") {
+        const refundPolicy = currentOrder.cancellation?.refundPolicy;
         return {
-          label: "Đã hoàn tiền",
+          label:
+            refundPolicy && refundPolicy.paidAmount > refundPolicy.refundAmount
+              ? `Đã hoàn ${formatCurrency(refundPolicy.refundAmount)} (${refundPolicy.refundRate}%)`
+              : "Đã hoàn tiền",
           className: "text-emerald-600",
         };
       }
@@ -1317,6 +1390,56 @@ const BookingDetailPage = () => {
               {actionDialogConfig.message}
             </p>
 
+            {["cancelOrder", "cancelSeries"].includes(pendingAction.type) &&
+              cancellationPreview && (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-on-surface">
+                        Chính sách hoàn tiền
+                      </p>
+                      <p className="mt-1 text-xs text-on-surface-variant">
+                        {cancellationPreview.scope === "series"
+                          ? `${cancellationPreview.orderCount} buổi được tính riêng theo thời gian bắt đầu.`
+                          : cancellationPreview.items[0]?.policyReason}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-on-primary">
+                      Hoàn {cancellationPreview.items.length === 1
+                        ? `${cancellationPreview.items[0].refundRate}%`
+                        : "theo từng buổi"}
+                    </span>
+                  </div>
+
+                  {cancellationPreview.paidAmount > 0 ? (
+                    <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-xl bg-white p-2">
+                        <dt className="text-[11px] text-on-surface-variant">Đã thanh toán</dt>
+                        <dd className="mt-1 text-sm font-bold text-on-surface">
+                          {formatCurrency(cancellationPreview.paidAmount)}
+                        </dd>
+                      </div>
+                      <div className="rounded-xl bg-white p-2">
+                        <dt className="text-[11px] text-on-surface-variant">Hoàn lại</dt>
+                        <dd className="mt-1 text-sm font-bold text-primary">
+                          {formatCurrency(cancellationPreview.refundAmount)}
+                        </dd>
+                      </div>
+                      <div className="rounded-xl bg-white p-2">
+                        <dt className="text-[11px] text-on-surface-variant">Phí hủy</dt>
+                        <dd className="mt-1 text-sm font-bold text-error">
+                          {formatCurrency(cancellationPreview.cancellationFee)}
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs text-on-surface-variant">
+                      Chưa ghi nhận khoản thanh toán trực tuyến cần hoàn cho đơn này.
+                    </p>
+                  )}
+                </div>
+              )}
+
             {["cancelOrder", "cancelSeries"].includes(pendingAction.type) ? (
               <div className="space-y-md">
                 <fieldset className="space-y-2">
@@ -1390,7 +1513,11 @@ const BookingDetailPage = () => {
               </button>
               <button
                 type="button"
-                disabled={busy}
+                disabled={
+                  busy ||
+                  (["cancelOrder", "cancelSeries"].includes(pendingAction.type) &&
+                    (!cancellationPreview || !cancellationPreview.canCancel))
+                }
                 onClick={executePendingAction}
                 className={`rounded-2xl px-5 py-3 font-bold text-white transition disabled:opacity-50 ${
                   actionDialogConfig.tone === "danger"

@@ -222,6 +222,10 @@ export const rejectAssignmentSchema = z.object({
     .optional(),
 });
 
+export const cancellationPreviewQuerySchema = z.object({
+  scope: z.enum(["single", "series"]).optional().default("single"),
+});
+
 export const selectAppointmentProviderSchema = z.object({
   providerId: objectIdSchema,
 });
