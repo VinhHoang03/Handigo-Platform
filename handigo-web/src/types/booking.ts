@@ -169,8 +169,47 @@ export interface Order {
   pricing: OrderPricing;
   promotionSnapshot?: OrderDiscountSnapshot | null;
   voucherSnapshot?: OrderDiscountSnapshot | null;
+  cancellation?: {
+    cancelledBy?: string;
+    cancelledByRole: "customer" | "provider" | "admin";
+    reason: string;
+    cancelledAt: string;
+    refundPolicy?: CancellationRefundPolicy | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CancellationRefundPolicy {
+  policyVersion: string;
+  refundRate: number;
+  paidAmount: number;
+  refundAmount: number;
+  cancellationFee: number;
+  providerCompensation: number;
+  platformRetainedAmount: number;
+  hoursBeforeStart: number | null;
+  policyReason: string;
+}
+
+export interface CancellationPreviewItem extends CancellationRefundPolicy {
+  orderId: string;
+  orderCode: string;
+  scheduledAt: string | null;
+  canCancel: boolean;
+}
+
+export interface CancellationPreview {
+  scope: "single" | "series";
+  orderCount: number;
+  policyVersion: string;
+  paidAmount: number;
+  refundAmount: number;
+  cancellationFee: number;
+  providerCompensation: number;
+  platformRetainedAmount: number;
+  canCancel: boolean;
+  items: CancellationPreviewItem[];
 }
 
 export interface Pagination {

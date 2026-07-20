@@ -11,6 +11,7 @@ import { getAssignmentRealtimePayload } from "./assignmentRealtime.service";
 import { createLogger } from "../utils/logger";
 import { cancelSystemOrderWithSettlement } from "./orderCancellation.service";
 import { createNotificationRecord } from "./notification.service";
+import { reconcilePayosPaymentForExpiration } from "./payment.service";
 
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
 const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
@@ -498,10 +499,31 @@ export const DispatchService = {
         .lean();
 
       for (const order of expiredPaymentOrders) {
-        await Order.updateOne(
-          { _id: order._id, bookingStatus: "awaiting_payment" },
+        try {
+          const reconciliation = await reconcilePayosPaymentForExpiration(
+            order._id.toString(),
+          );
+          if (reconciliation.order?.bookingStatus !== "awaiting_payment") {
+            continue;
+          }
+        } catch (error: unknown) {
+          dispatchLogger.error(
+            "Tạm hoãn hủy lịch vì chưa thể đối soát PayOS.",
+            error,
+            { orderId: order._id.toString() },
+          );
+          continue;
+        }
+
+        const expirationResult = await Order.updateOne(
+          {
+            _id: order._id,
+            bookingStatus: "awaiting_payment",
+            paymentStatus: { $nin: ["paid", "partially_paid"] },
+          },
           { $set: { bookingStatus: "expired" } },
         );
+        if (expirationResult.modifiedCount === 0) continue;
         await cancelSystemOrderWithSettlement(
           order._id.toString(),
           "Đã hết thời hạn thanh toán giữ lịch.",
