@@ -4,17 +4,19 @@ import { categoryServiceApi } from "@/features/admin/api/categoryService.api";
 import type { Category } from "@/features/admin/types/categoryService.types";
 import { useProviderAvailability } from "@/features/provider/hooks/useProviderAvailability";
 import { serviceSuggestionApi } from "../api/serviceSuggestion.api";
-import type { SuggestionType } from "../types/serviceSuggestion.types";
+
+const NEW_CATEGORY_VALUE = "new-category";
 
 const getErrorMessage = (error: unknown) => {
   const err = error as { response?: { data?: { message?: string } } };
-  return err?.response?.data?.message || "Không thể gửi đề xuất. Vui lòng thử lại.";
+  return (
+    err?.response?.data?.message || "Không thể gửi đề xuất. Vui lòng thử lại."
+  );
 };
 
 export default function ProviderServiceSuggestionPage() {
   const { isOnline, toggleAvailability } = useProviderAvailability();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [suggestionType, setSuggestionType] = useState<SuggestionType>("service");
   const [serviceName, setServiceName] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -55,12 +57,12 @@ export default function ProviderServiceSuggestionPage() {
     setError("");
     setMessage("");
 
-    if (suggestionType === "service" && !serviceName.trim()) {
+    if (!serviceName.trim()) {
       setError("Vui lòng nhập tên dịch vụ muốn đề xuất.");
       return;
     }
 
-    if (suggestionType === "category" && !categoryName.trim()) {
+    if (categoryId === NEW_CATEGORY_VALUE && !categoryName.trim()) {
       setError("Vui lòng nhập tên danh mục muốn đề xuất.");
       return;
     }
@@ -68,15 +70,17 @@ export default function ProviderServiceSuggestionPage() {
     setIsSubmitting(true);
     try {
       await serviceSuggestionApi.create({
-        suggestionType,
-        suggestedServiceName:
-          suggestionType === "service" ? serviceName.trim() : null,
+        suggestionType: "service",
+        suggestedServiceName: serviceName.trim(),
         suggestedCategoryName:
-          suggestionType === "category" ? categoryName.trim() : null,
-        categoryId: suggestionType === "service" && categoryId ? categoryId : null,
+          categoryId === NEW_CATEGORY_VALUE ? categoryName.trim() : null,
+        categoryId:
+          categoryId && categoryId !== NEW_CATEGORY_VALUE ? categoryId : null,
         description: description.trim() || null,
       });
-      setMessage("Đã gửi đề xuất. Admin sẽ xem xét và phản hồi trong hệ thống.");
+      setMessage(
+        "Đã gửi đề xuất. Admin sẽ xem xét và phản hồi trong hệ thống.",
+      );
       resetForm();
     } catch (submitError) {
       setError(getErrorMessage(submitError));
@@ -94,13 +98,15 @@ export default function ProviderServiceSuggestionPage() {
     >
       <div className="space-y-6">
         <header className="rounded-xl border border-outline-variant/30 bg-white p-6 shadow-sm">
-          <p className="text-sm font-bold uppercase text-primary">Đề xuất mở rộng dịch vụ</p>
+          <p className="text-sm font-bold uppercase text-primary">
+            Đề xuất mở rộng dịch vụ
+          </p>
           <h1 className="mt-2 text-2xl font-bold text-on-surface">
-            Gửi ý tưởng service hoặc category mới
+            Gửi ý tưởng dịch vụ mới{" "}
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
-            Mô tả rõ nhu cầu thực tế, nhóm khách hàng phù hợp và thông tin giá trị mà
-            dịch vụ hoặc danh mục mới có thể mang lại cho Handigo.
+            Mô tả rõ nhu cầu thực tế, nhóm khách hàng phù hợp và thông tin giá
+            trị mà dịch vụ hoặc danh mục mới có thể mang lại cho Handigo.
           </p>
         </header>
 
@@ -111,78 +117,54 @@ export default function ProviderServiceSuggestionPage() {
           {(message || error) && (
             <div
               className={`lg:col-span-3 rounded-lg px-4 py-3 text-sm font-medium ${
-                error ? "bg-error/10 text-error" : "bg-emerald-100 text-emerald-700"
+                error
+                  ? "bg-error/10 text-error"
+                  : "bg-emerald-100 text-emerald-700"
               }`}
             >
               {error || message}
             </div>
           )}
 
-          <div className="lg:col-span-3">
+          <label className="block lg:col-span-2">
             <span className="mb-2 block text-sm font-bold text-on-surface">
-              Loại đề xuất
+              Tên dịch vụ đề xuất
             </span>
-            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-              {[
-                { value: "service", label: "Service mới", icon: "home_repair_service" },
-                { value: "category", label: "Category mới", icon: "category" },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setSuggestionType(item.value as SuggestionType)}
-                  className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-bold transition ${
-                    suggestionType === item.value
-                      ? "border-primary bg-primary text-on-primary"
-                      : "border-outline-variant/50 bg-surface-container-low text-on-surface-variant hover:text-primary"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </button>
+            <input
+              value={serviceName}
+              onChange={(event) => setServiceName(event.target.value)}
+              className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+              placeholder="Ví dụ: Vệ sinh máy lạnh treo tường"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-on-surface">
+              Danh mục liên quan
+            </span>
+            <select
+              value={categoryId}
+              disabled={isLoadingCategories}
+              onChange={(event) => {
+                setCategoryId(event.target.value);
+                setCategoryName("");
+              }}
+              className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            >
+              <option value="">Chưa xác định</option>
+              {categories.map((category) => (
+                <option key={category._id} value={category._id}>
+                  {category.name}
+                </option>
               ))}
-            </div>
-          </div>
+              <option value={NEW_CATEGORY_VALUE}>Gợi ý danh mục mới</option>
+            </select>
+          </label>
 
-          {suggestionType === "service" ? (
-            <>
-              <label className="block lg:col-span-2">
-                <span className="mb-2 block text-sm font-bold text-on-surface">
-                  Tên service đề xuất
-                </span>
-                <input
-                  value={serviceName}
-                  onChange={(event) => setServiceName(event.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                  placeholder="Ví dụ: Vệ sinh máy lạnh treo tường"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-on-surface">
-                  Danh mục liên quan
-                </span>
-                <select
-                  value={categoryId}
-                  disabled={isLoadingCategories}
-                  onChange={(event) => setCategoryId(event.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                >
-                  <option value="">Chưa xác định</option>
-                  {categories.map((category) => (
-                    <option key={category._id} value={category._id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          ) : (
+          {categoryId === NEW_CATEGORY_VALUE && (
             <label className="block lg:col-span-3">
               <span className="mb-2 block text-sm font-bold text-on-surface">
-                Tên category đề xuất
+                Tên danh mục mới
               </span>
               <input
                 value={categoryName}
@@ -206,10 +188,10 @@ export default function ProviderServiceSuggestionPage() {
             />
           </label>
 
-          <div className="flex justify-end gap-3 lg:col-span-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end lg:col-span-3">
             <button
               type="button"
-              className="rounded-lg bg-surface-container px-5 py-2.5 font-bold"
+              className="min-h-11 w-full rounded-lg bg-surface-container px-5 py-2.5 font-bold sm:w-auto"
               disabled={isSubmitting}
               onClick={resetForm}
             >
@@ -217,7 +199,7 @@ export default function ProviderServiceSuggestionPage() {
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-primary px-5 py-2.5 font-bold text-on-primary disabled:opacity-60"
+              className="min-h-11 w-full rounded-lg bg-primary px-5 py-2.5 font-bold text-on-primary disabled:opacity-60 sm:w-auto"
               disabled={isSubmitting}
             >
               {isSubmitting ? "Đang gửi..." : "Gửi đề xuất"}

@@ -114,7 +114,8 @@ export function Navbar({
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const currentRole = role ?? normalizeRole(user?.role);
+  const authenticatedRole = normalizeRole(user?.role);
+  const currentRole = isAuthenticated ? authenticatedRole : role;
   const scrolled = isScrolled ?? internalScrolled;
   const navItems = useMemo(() => createNavbarItems(currentRole), [currentRole]);
   const avatar =
@@ -313,7 +314,7 @@ export function Navbar({
         )}
 
         <div className="flex items-center gap-2">
-          {currentRole !== "ADMIN" && (
+          {isAuthenticated && currentRole === "CUSTOMER" && (
             <button
               type="button"
               onClick={handleBookService}

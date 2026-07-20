@@ -12,6 +12,11 @@ import {
 } from "../validations/chat.validator";
 import { currentLocationSchema } from "../validations/location.validator";
 import { orderIdParamSchema } from "../validations/order.validator";
+import { markProviderOffline } from "../services/providerPresence.service";
+import { createLogger } from "../utils/logger";
+
+const PROVIDER_OFFLINE_GRACE_MS = 5_000;
+const socketLogger = createLogger("SocketServer");
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -34,6 +39,7 @@ type AuthedSocket = Socket & {
 };
 
 export const initSocket = (server: HttpServer) => {
+  const providerOfflineTimers = new Map<string, NodeJS.Timeout>();
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
@@ -74,7 +80,44 @@ export const initSocket = (server: HttpServer) => {
   });
 
   io.on("connection", (socket: AuthedSocket) => {
-    socket.join(`user:${socket.user!.id}`);
+    const socketUser = socket.user!;
+    const userRoom = `user:${socketUser.id}`;
+    socket.join(userRoom);
+
+    if (socketUser.role === "PROVIDER") {
+      const pendingOfflineTimer = providerOfflineTimers.get(socketUser.id);
+      if (pendingOfflineTimer) {
+        clearTimeout(pendingOfflineTimer);
+        providerOfflineTimers.delete(socketUser.id);
+      }
+    }
+
+    socket.on("disconnect", () => {
+      if (socketUser.role !== "PROVIDER") return;
+
+      const existingTimer = providerOfflineTimers.get(socketUser.id);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      const timer = setTimeout(async () => {
+        providerOfflineTimers.delete(socketUser.id);
+
+        try {
+          const activeSockets = await io.in(userRoom).fetchSockets();
+          if (activeSockets.length === 0) {
+            await markProviderOffline(socketUser.id);
+          }
+        } catch (error) {
+          socketLogger.error(
+            "Không thể cập nhật provider về trạng thái ngoại tuyến.",
+            error,
+            { userId: socketUser.id },
+          );
+        }
+      }, PROVIDER_OFFLINE_GRACE_MS);
+
+      timer.unref();
+      providerOfflineTimers.set(socketUser.id, timer);
+    });
 
     socket.on("conversation:join", async (payload, callback) => {
       try {
