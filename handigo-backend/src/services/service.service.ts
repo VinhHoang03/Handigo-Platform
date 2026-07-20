@@ -69,12 +69,8 @@ const normalizeAndValidatePricing = (data: ServiceInput, defaultActive = true) =
 
   if (data.serviceType === "fixed_price") {
     data.depositAmount = null;
-    if (isActive && (!data.fixedPrice || data.fixedPrice <= 0)) {
-      throw new AppError(
-        "Dịch vụ giá cố định đang hoạt động phải có giá lớn hơn 0.",
-        400,
-      );
-    }
+    data.fixedPrice = null;
+    data.requiresOptionSelection = true;
   }
 
   if (data.serviceType === "variable_price") {
@@ -142,8 +138,38 @@ export const listServices = async (query: ListServicesQuery) => {
     Service.countDocuments(filter),
   ]);
 
+  const minimumOptionPrices = await ServiceOption.aggregate<{
+    _id: Types.ObjectId;
+    minOptionPrice: number;
+  }>([
+    {
+      $match: {
+        serviceId: { $in: items.map((item) => item._id) },
+        price: { $gt: 0 },
+        isActive: true,
+        isDeleted: false,
+      },
+    },
+    {
+      $group: {
+        _id: "$serviceId",
+        minOptionPrice: { $min: "$price" },
+      },
+    },
+  ]);
+  const minimumOptionPriceByServiceId = new Map(
+    minimumOptionPrices.map((item) => [
+      item._id.toString(),
+      item.minOptionPrice,
+    ]),
+  );
+
   return {
-    items,
+    items: items.map((item) => ({
+      ...item.toObject(),
+      minOptionPrice:
+        minimumOptionPriceByServiceId.get(item._id.toString()) ?? null,
+    })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };

@@ -19,6 +19,10 @@ export const createOrderSchema = z.object({
   serviceId: objectIdSchema,
   servicePackageId: objectIdSchema.optional(),
   selectedOptionIds: z.array(objectIdSchema).max(50).optional(),
+  selectedOptions: z.array(z.object({
+    optionId: objectIdSchema,
+    quantity: z.coerce.number().int().min(1).max(99),
+  })).max(50).optional(),
   addressId: objectIdSchema,
   preferredProviderId: objectIdSchema.optional(),
   orderType: z

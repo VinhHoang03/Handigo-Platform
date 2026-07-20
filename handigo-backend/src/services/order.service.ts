@@ -108,6 +108,7 @@ export interface CreateOrderPayload {
   serviceId: string;
   servicePackageId?: string;
   selectedOptionIds?: string[];
+  selectedOptions?: Array<{ optionId: string; quantity: number }>;
   addressId: string;
   orderType?: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | string;
@@ -225,6 +226,24 @@ export const OrderService = {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
 
+    if (!requiresProviderConfirmation) {
+      const availableProviders = await MatchingService.findNearestProviders({
+        latitude: address.latitude,
+        longitude: address.longitude,
+        serviceId: service._id.toString(),
+        province: address.province,
+        ward: address.ward,
+        limit: 1,
+        requireOnline: true,
+      });
+      if (availableProviders.length === 0) {
+        throw new AppError(
+          "Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.",
+          409,
+        );
+      }
+    }
+
     let appointmentProvider: Awaited<
       ReturnType<typeof MatchingService.findNearestProviders>
     >[number] | null = null;
@@ -269,6 +288,7 @@ export const OrderService = {
     const pricingSnapshot = await buildServicePricingSnapshot(
       service,
       payload.selectedOptionIds,
+      payload.selectedOptions,
     );
 
     const inspectionRequired = service.serviceType === "variable_price";
@@ -279,7 +299,7 @@ export const OrderService = {
     const platformCommissionRate = inspectionRequired
       ? 0
       : Math.max(platformCommissionPercent, 0) / 100;
-    // 4. Giá cố định gồm giá cơ bản và phụ phí; giá linh hoạt chỉ thu tiền cọc.
+    // 4. Giá cố định là tổng thành tiền của các tùy chọn; giá linh hoạt chỉ thu tiền cọc.
     const totalAmount = pricingSnapshot.bookingAmount;
 
     const platformCommissionAmount = Math.round(
