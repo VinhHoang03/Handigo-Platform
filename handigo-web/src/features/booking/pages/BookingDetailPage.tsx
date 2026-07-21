@@ -808,6 +808,12 @@ const BookingDetailPage = () => {
         payment.paymentType === "inspection_deposit",
     )
     .reduce((total, payment) => total + payment.amount, 0);
+  const appliedDepositAmount = order.depositPaidAt
+    ? Math.max(paidDepositAmount, order.depositAmount || 0)
+    : paidDepositAmount;
+  const remainingQuotationAmount = quotation
+    ? Math.max(quotation.quotation.finalAmount - appliedDepositAmount, 0)
+    : 0;
   const canMakeInitialPayment =
     !hasPaidInitialPayment &&
     !quotationPhaseStarted &&
@@ -841,7 +847,7 @@ const BookingDetailPage = () => {
         </div>
       </div>
 
-      {order.bookingStatus === "awaiting_provider" && (
+      {order.bookingStatus === "awaiting_provider" && !isWaitingForProvider && (
         <div className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm text-on-surface">
           <p className="font-bold">Đang chờ chuyên gia xác nhận lịch hẹn</p>
           <p className="mt-1 text-on-surface-variant">
@@ -949,7 +955,8 @@ const BookingDetailPage = () => {
         </div>
       )}
 
-      {order.bookingStatus === "rejected" &&
+      {order.status === "created" &&
+        order.bookingStatus === "rejected" &&
         order.orderType !== "normal" &&
         order.reassignment?.status !== "awaiting_customer" && (
         <div className="mb-lg rounded-2xl border border-error/20 bg-error/5 p-md">
@@ -964,6 +971,7 @@ const BookingDetailPage = () => {
               scheduledAt={order.scheduledAt || undefined}
               recurrenceUnit={order.recurrenceUnit || undefined}
               recurrenceCount={order.totalOccurrences || undefined}
+              orderId={order._id}
               requireSelection
               selectedProviderId={replacementProviderId}
               onSelectProvider={(providerId) => {
@@ -1268,12 +1276,35 @@ const BookingDetailPage = () => {
                             {formatCurrency(quotation.quotation.discountAmount)}
                           </p>
                         )}
-                        <p className="text-label-sm text-on-surface-variant font-bold uppercase">
-                          Tổng chi phí dự kiến
-                        </p>
-                        <p className="text-headline-lg font-black text-primary leading-none mt-1">
-                          {formatCurrency(quotation.quotation.finalAmount)}
-                        </p>
+                        <div className="mt-3 space-y-2 border-t border-primary/10 pt-3">
+                          <div className="flex items-center justify-between gap-4 text-sm">
+                            <span className="font-medium text-on-surface-variant">
+                              Tổng chi phí theo báo giá
+                            </span>
+                            <span className="font-bold text-on-surface">
+                              {formatCurrency(quotation.quotation.finalAmount)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 text-sm text-emerald-700">
+                            <span>Tiền cọc đã thanh toán</span>
+                            <span className="font-bold">
+                              -{formatCurrency(appliedDepositAmount)}
+                            </span>
+                          </div>
+                          <div className="flex items-end justify-between gap-4 border-t border-primary/10 pt-3">
+                            <div>
+                              <p className="text-label-sm font-bold uppercase text-on-surface-variant">
+                                Còn cần thanh toán
+                              </p>
+                              <p className="mt-1 text-xs text-on-surface-variant">
+                                Thanh toán trực tiếp theo thỏa thuận với chuyên gia
+                              </p>
+                            </div>
+                            <p className="shrink-0 text-headline-lg font-black leading-none text-primary">
+                              {formatCurrency(remainingQuotationAmount)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                       {quotation.quotation.status === "pending" && (
                         <div className="flex flex-col gap-sm sm:flex-row">
@@ -1304,24 +1335,35 @@ const BookingDetailPage = () => {
                         <p className="mt-1 text-sm text-emerald-800">
                           Chuyên gia có thể bắt đầu thực hiện công việc ngay, không cần chờ thanh toán.
                         </p>
-                        <div className="mt-3 grid gap-2 border-t border-emerald-200 pt-3 sm:grid-cols-2">
+                        <div className="mt-3 grid gap-2 border-t border-emerald-200 pt-3 sm:grid-cols-3">
+                          <div>
+                            <p className="text-xs font-bold uppercase text-emerald-700">
+                              Tổng chi phí
+                            </p>
+                            <p className="mt-1 font-bold">
+                              {formatCurrency(quotation.quotation.finalAmount)}
+                            </p>
+                          </div>
                           <div>
                             <p className="text-xs font-bold uppercase text-emerald-700">
                               Tiền cọc qua Handigo
                             </p>
                             <p className="mt-1 font-bold">
-                              {formatCurrency(paidDepositAmount || order.depositAmount)}
+                              {formatCurrency(appliedDepositAmount)}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs font-bold uppercase text-emerald-700">
-                              Chi phí theo báo giá
+                              Còn cần thanh toán
                             </p>
-                            <p className="mt-1 text-sm font-medium">
-                              Tự thanh toán trực tiếp với chuyên gia, không thanh toán qua Handigo.
+                            <p className="mt-1 font-bold">
+                              {formatCurrency(remainingQuotationAmount)}
                             </p>
                           </div>
                         </div>
+                        <p className="mt-3 text-sm text-emerald-800">
+                          Bạn tự trao đổi phương thức và thanh toán số tiền còn lại trực tiếp với chuyên gia.
+                        </p>
                       </div>
                     )}
 
