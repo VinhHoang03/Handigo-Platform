@@ -4,12 +4,12 @@ import { providerOrderApi } from "../api/providerOrder.api";
 import type { Order, OrderCustomer } from "@/types/booking";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useProviderAvailability } from "../hooks/useProviderAvailability";
 import {
   providerDashboardApi,
   type ProviderEarningPoint,
 } from "../api/providerDashboard.api";
 import { providerProfileApi } from "../api/providerProfile.api";
+import { formatProviderOrderAmount } from "../utils/providerOrder.utils";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -199,7 +199,7 @@ function BookingItem({ order }: { order: Order }) {
 
       <div className="flex items-center justify-between gap-sm sm:block sm:text-right">
         <p className="font-bold text-primary">
-          {formatMoney(order.pricing.providerEarningAmount)}
+          {formatProviderOrderAmount(order)}
         </p>
         <span className="text-[10px] font-bold uppercase tracking-tight">
           {statusLabels[order.status]}
@@ -211,7 +211,6 @@ function BookingItem({ order }: { order: Order }) {
 
 const ProviderHomePage = () => {
   const user = useAuthStore((state) => state.user);
-  const { isOnline, toggleAvailability } = useProviderAvailability();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [totalOrders, setTotalOrders] = useState(0);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -388,12 +387,7 @@ const ProviderHomePage = () => {
   );
 
   return (
-    <DashboardShell
-      role="PROVIDER"
-      showStatusToggle
-      isOnline={isOnline}
-      onStatusToggle={toggleAvailability}
-    >
+    <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <section className="flex flex-col justify-between gap-md md:flex-row md:items-end">
           <div>

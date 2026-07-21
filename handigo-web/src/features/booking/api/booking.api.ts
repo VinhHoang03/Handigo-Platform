@@ -29,6 +29,7 @@ export interface CreateOrderPayload {
   problemDescription?: string;
   paymentMethod: "wallet" | "bank" | "cash";
   customerAttachments?: string[];
+  voucherCode?: string;
 }
 
 export interface CreateAddressPayload {
@@ -181,6 +182,14 @@ export const bookingApi = {
     return response.data.data;
   },
 
+  discardUnpaidOrder: async (orderId: string) => {
+    const response = await api.delete<{
+      success: boolean;
+      data: { orderId: string };
+    }>(`/orders/${orderId}/unpaid`);
+    return response.data.data;
+  },
+
   reconcilePayosPayment: async (orderId: string) => {
     const response = await api.post<{
       success: boolean;
@@ -209,6 +218,17 @@ export const bookingApi = {
     const response = await api.patch<{ success: boolean; data: Order }>(
       `/orders/${orderId}/cancel`,
       { reason },
+    );
+    return response.data.data;
+  },
+
+  respondToReassignment: async (
+    orderId: string,
+    decision: "accept" | "decline",
+  ) => {
+    const response = await api.patch<{ success: boolean; data: Order }>(
+      `/orders/${orderId}/reassignment-response`,
+      { decision },
     );
     return response.data.data;
   },

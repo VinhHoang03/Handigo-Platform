@@ -38,6 +38,7 @@ export const createOrderSchema = z.object({
   customerAttachments: z.array(z.string().url()).max(4).optional(),
   promotionId: objectIdSchema.optional(),
   voucherId: objectIdSchema.optional(),
+  voucherCode: z.string().trim().min(1).max(50).optional(),
   paymentMethod: z.enum(["wallet", "bank", "cash"]),
 }).superRefine((payload, context) => {
   if (payload.orderType !== "recurring") return;
@@ -81,6 +82,12 @@ export const cancelOrderSchema = z.object({
     .trim()
     .min(3, "Lý do hủy phải có ít nhất 3 ký tự")
     .max(500, "Lý do hủy không được vượt quá 500 ký tự"),
+});
+
+export const reassignmentResponseSchema = z.object({
+  decision: z.enum(["accept", "decline"], {
+    message: "Quyết định tìm kỹ thuật viên thay thế không hợp lệ",
+  }),
 });
 
 export const orderIdParamSchema = z.object({

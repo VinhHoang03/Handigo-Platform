@@ -10,7 +10,14 @@ interface Props {
 }
 
 const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID;
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const developmentFacebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID_DEVELOPMENT;
+const resolvedFacebookAppId = import.meta.env.DEV
+  ? developmentFacebookAppId || facebookAppId
+  : facebookAppId;
+const googleClientId = import.meta.env.DEV
+  ? import.meta.env.VITE_GOOGLE_CLIENT_ID_DEVELOPMENT ||
+    import.meta.env.VITE_GOOGLE_CLIENT_ID
+  : import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function SocialLoginButtons({ rememberMe, onError }: Props) {
   const { googleLogin, facebookLogin, isLoading } = useAuth();
@@ -31,10 +38,16 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
         return;
       }
 
-      void googleLogin(accessToken, rememberMe, "accessToken").then((user) => {
-        if (user) handleAuthenticatedUser(user);
-        else onError?.("Đăng nhập Google thất bại.");
-      });
+      void googleLogin(accessToken, rememberMe, "accessToken")
+        .then((user) => {
+          if (user) handleAuthenticatedUser(user);
+          else onError?.("Đăng nhập Google thất bại.");
+        })
+        .catch((error: unknown) => {
+          onError?.(
+            error instanceof Error ? error.message : "Đăng nhập Google thất bại.",
+          );
+        });
     },
     onError: () => onError?.("Đăng nhập Google thất bại."),
     onNonOAuthError: () =>
@@ -98,7 +111,7 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
 
       <button
         type="button"
-        disabled={isLoading || !facebookAppId}
+        disabled={isLoading || !resolvedFacebookAppId}
         onClick={handleFacebook}
         className="social-login-button"
       >

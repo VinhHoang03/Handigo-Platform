@@ -27,6 +27,15 @@ export function formatMoney(value?: number) {
   return currencyFormatter.format(typeof value === 'number' && Number.isFinite(value) ? value : 0);
 }
 
+export function formatProviderOrderAmount(order: Order) {
+  if (order.inspectionRequired) {
+    return typeof order.quotationFinalAmount === 'number'
+      ? formatMoney(order.quotationFinalAmount)
+      : 'Chưa báo giá';
+  }
+  return formatMoney(order.pricing?.providerEarningAmount);
+}
+
 export function formatDateTime(value?: string | null) {
   if (!value) return 'Chưa chọn thời gian';
   const date = new Date(value);

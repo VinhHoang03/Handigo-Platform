@@ -53,6 +53,27 @@ export interface AdminProviderAnalytics {
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 export type PaymentMethod = "payos" | "vnpay" | "cash" | "wallet" | "bank";
 export type PaymentType = "full" | "remaining" | "inspection_deposit";
+export type RefundStatus =
+  | "requested"
+  | "requesting"
+  | "pending"
+  | "succeeded"
+  | "failed"
+  | "manual_review";
+
+export interface AdminRefund {
+  _id: string;
+  paymentId: string;
+  orderId: string;
+  amount: number;
+  status: RefundStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  referenceId: string;
+  payoutId?: string | null;
+  lastError?: string | null;
+  nextRetryAt?: string | null;
+}
 
 export interface AdminPayment {
   _id: string;
@@ -76,7 +97,7 @@ export interface AdminPayment {
       policyVersion?: string;
       rate?: number;
       amount?: number;
-      status?: string;
+      status?: RefundStatus | "retry_required";
     };
   } | null;
   createdAt: string;

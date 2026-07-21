@@ -45,7 +45,7 @@ import {
   ProviderPasswordUpdateDialog,
 } from "../components/ProviderProfileSecurityDialogs";
 import { providerProfileApi } from "../api/providerProfile.api";
-import { useProviderAvailability } from "../hooks/useProviderAvailability";
+import { useProviderAvailabilityStore } from "../store/providerAvailability.store";
 import type {
   ProviderCertificate,
   ProviderProfile,
@@ -81,8 +81,12 @@ function ProviderProfileContent() {
     (state) => state.user?.providerOnboardingStatus,
   );
   const canReceiveJobs = !onboardingStatus || onboardingStatus === "APPROVED";
-  const { availabilityStatus, isOnline, toggleAvailability } =
-    useProviderAvailability(canReceiveJobs);
+  const storedAvailabilityStatus = useProviderAvailabilityStore(
+    (state) => state.availabilityStatus,
+  );
+  const availabilityStatus = canReceiveJobs
+    ? storedAvailabilityStatus
+    : "offline";
   const userProfileSectionRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState<ProviderProfileResponse | null>(null);
@@ -618,12 +622,7 @@ function ProviderProfileContent() {
 
   if (isLoading) {
     return (
-      <DashboardShell
-        role="PROVIDER"
-        showStatusToggle={canReceiveJobs}
-        isOnline={isOnline}
-        onStatusToggle={toggleAvailability}
-      >
+      <DashboardShell role="PROVIDER">
         <div className="rounded-xl bg-white p-8 text-center text-on-surface-variant">
           Đang tải hồ sơ...
         </div>
@@ -633,12 +632,7 @@ function ProviderProfileContent() {
 
   if (error || !profile || !profileView) {
     return (
-      <DashboardShell
-        role="PROVIDER"
-        showStatusToggle={canReceiveJobs}
-        isOnline={isOnline}
-        onStatusToggle={toggleAvailability}
-      >
+      <DashboardShell role="PROVIDER">
         <div className="rounded-xl border border-error/20 bg-error/10 p-8 text-center text-error">
           <p>{error || "Không thể mở hồ sơ provider."}</p>
           <button
@@ -689,12 +683,7 @@ function ProviderProfileContent() {
     ];
 
   return (
-    <DashboardShell
-      role="PROVIDER"
-      showStatusToggle={canReceiveJobs}
-      isOnline={isOnline}
-      onStatusToggle={toggleAvailability}
-    >
+    <DashboardShell role="PROVIDER">
       <div className="grid grid-cols-12 items-start gap-gutter">
         <div className="col-span-12">
           <ProviderHero

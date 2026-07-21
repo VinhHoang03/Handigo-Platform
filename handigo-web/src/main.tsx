@@ -6,10 +6,15 @@ import App from "./App.tsx";
 import api, { refreshAccessToken } from "@/api/client";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 
+const googleClientId = import.meta.env.DEV
+  ? import.meta.env.VITE_GOOGLE_CLIENT_ID_DEVELOPMENT ||
+    import.meta.env.VITE_GOOGLE_CLIENT_ID
+  : import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
 const renderApp = () => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
-      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <GoogleOAuthProvider clientId={googleClientId}>
         <App />
       </GoogleOAuthProvider>
     </StrictMode>,

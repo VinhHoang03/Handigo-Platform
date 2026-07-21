@@ -5,7 +5,6 @@ import { PendingAssignmentCard } from '../components/PendingAssignmentCard';
 import { ProviderOrderCard } from '../components/ProviderOrderCard';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import type { Order } from '@/types/booking';
-import { useProviderAvailability } from '../hooks/useProviderAvailability';
 
 const filters = [
   { label: 'Tất cả', value: 'all' },
@@ -16,7 +15,6 @@ const filters = [
 ];
 
 export default function ProviderOrdersPage() {
-  const { isOnline, toggleAvailability } = useProviderAvailability();
   const [assignments, setAssignments] = useState<OrderAssignment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
@@ -102,12 +100,7 @@ export default function ProviderOrdersPage() {
   };
 
   return (
-    <DashboardShell
-      role="PROVIDER"
-      showStatusToggle
-      isOnline={isOnline}
-      onStatusToggle={toggleAvailability}
-    >
+    <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <header className="space-y-2">
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Đơn dịch vụ</h1>

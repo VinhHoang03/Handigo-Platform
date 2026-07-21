@@ -86,7 +86,7 @@ const buildPayload = (form: BankAccountForm): BankAccountPayload => ({
   status: form.status,
 });
 
-export default function ProviderBankAccountsPage() {
+export default function ProviderBankAccountsPage({ role = 'PROVIDER' }: { role?: 'CUSTOMER' | 'PROVIDER' }) {
   const [items, setItems] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -198,7 +198,7 @@ export default function ProviderBankAccountsPage() {
   };
 
   return (
-    <DashboardShell role="PROVIDER">
+    <DashboardShell role={role}>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>

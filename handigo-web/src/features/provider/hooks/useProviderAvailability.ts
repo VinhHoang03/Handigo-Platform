@@ -1,61 +1,75 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import {
   providerDashboardApi,
   type ProviderAvailabilityStatus,
 } from "../api/providerDashboard.api";
-
-let hasInitializedProviderAvailability = false;
+import { useSystemAlert } from "@/components/common/SystemAlert";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { useProviderAvailabilityStore } from "../store/providerAvailability.store";
 
 const getCurrentCoordinates = () =>
   new Promise<GeolocationCoordinates>((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("Trình duyệt không hỗ trợ định vị."));
+      reject(new Error("GEOLOCATION_NOT_SUPPORTED"));
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => resolve(coords),
-      () => reject(new Error("Không thể lấy vị trí hiện tại.")),
+      (error) => reject(error),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
     );
   });
 
 export function useProviderAvailability(enabled = true) {
-  const [availabilityStatus, setAvailabilityStatus] =
-    useState<ProviderAvailabilityStatus>("offline");
-  const [isUpdating, setIsUpdating] = useState(false);
+  const { showSystemAlert } = useSystemAlert();
+  const providerUserId = useAuthStore(
+    (state) => state.user?.id || state.user?._id || null,
+  );
+  const storedProviderUserId = useProviderAvailabilityStore(
+    (state) => state.providerUserId,
+  );
+  const storedAvailabilityStatus = useProviderAvailabilityStore(
+    (state) => state.availabilityStatus,
+  );
+  const isUpdating = useProviderAvailabilityStore(
+    (state) => state.isUpdating,
+  );
+  const availabilityStatus: ProviderAvailabilityStatus =
+    enabled && storedProviderUserId === providerUserId
+      ? storedAvailabilityStatus
+      : "offline";
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !providerUserId) return;
 
-    let cancelled = false;
-    const availabilityRequest = hasInitializedProviderAvailability
-      ? providerDashboardApi.overview()
-      : providerDashboardApi.updateAvailability("offline");
-    hasInitializedProviderAvailability = true;
+    const store = useProviderAvailabilityStore.getState();
+    if (!store.startInitialization(providerUserId)) return;
 
-    availabilityRequest
+    void providerDashboardApi
+      .overview()
       .then((overview) => {
-        if (!cancelled) {
-          setAvailabilityStatus(overview.availabilityStatus || "offline");
-        }
+        useProviderAvailabilityStore
+          .getState()
+          .completeInitialization(
+            providerUserId,
+            overview.availabilityStatus || "offline",
+          );
       })
       .catch(() => {
-        if (!cancelled) {
-          setAvailabilityStatus("offline");
-        }
+        useProviderAvailabilityStore
+          .getState()
+          .completeInitialization(providerUserId, "offline");
       });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
+  }, [enabled, providerUserId]);
 
   useEffect(() => {
     if (!enabled) return;
 
     const keepOffline = () => {
-      setAvailabilityStatus("offline");
+      useProviderAvailabilityStore
+        .getState()
+        .setAvailabilityStatus("offline");
     };
     const persistOfflineAfterReconnect = () => {
       keepOffline();
@@ -72,39 +86,42 @@ export function useProviderAvailability(enabled = true) {
   }, [enabled]);
 
   const toggleAvailability = useCallback(async () => {
-    if (!enabled || isUpdating) return;
+    const store = useProviderAvailabilityStore.getState();
+    if (!enabled || store.isUpdating) return;
 
-    const previousStatus = availabilityStatus;
-    const nextStatus = availabilityStatus === "online" ? "offline" : "online";
-    setAvailabilityStatus(nextStatus);
-    setIsUpdating(true);
+    const previousStatus = store.availabilityStatus;
+    const nextStatus = previousStatus === "online" ? "offline" : "online";
+    store.setAvailabilityStatus(nextStatus);
+    store.setIsUpdating(true);
 
     try {
       if (nextStatus === "online") {
-        try {
-          const coordinates = await getCurrentCoordinates();
-          await providerDashboardApi.updateCurrentLocation(
-            coordinates.latitude,
-            coordinates.longitude,
-          );
-        } catch {
-          setAvailabilityStatus(previousStatus);
-          window.alert(
-            "Vui lòng cho phép truy cập vị trí để bật trạng thái sẵn sàng nhận đơn.",
-          );
-          return;
-        }
+        void getCurrentCoordinates()
+          .then((coordinates) =>
+            providerDashboardApi.updateCurrentLocation(
+              coordinates.latitude,
+              coordinates.longitude,
+            ),
+          )
+          .catch(() => undefined);
       }
 
       const result = await providerDashboardApi.updateAvailability(nextStatus);
-      setAvailabilityStatus(result.availabilityStatus);
+      useProviderAvailabilityStore
+        .getState()
+        .setAvailabilityStatus(result.availabilityStatus);
     } catch {
-      setAvailabilityStatus(previousStatus);
-      window.alert("Không thể cập nhật trạng thái hoạt động. Vui lòng thử lại.");
+      useProviderAvailabilityStore
+        .getState()
+        .setAvailabilityStatus(previousStatus);
+      showSystemAlert(
+        "Không thể cập nhật trạng thái hoạt động. Vui lòng thử lại.",
+        { title: "Cập nhật trạng thái thất bại", variant: "error" },
+      );
     } finally {
-      setIsUpdating(false);
+      useProviderAvailabilityStore.getState().setIsUpdating(false);
     }
-  }, [availabilityStatus, enabled, isUpdating]);
+  }, [enabled, showSystemAlert]);
 
   return {
     availabilityStatus,

@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { categoryServiceApi } from "@/features/admin/api/categoryService.api";
 import type { Category } from "@/features/admin/types/categoryService.types";
-import { useProviderAvailability } from "@/features/provider/hooks/useProviderAvailability";
 import { serviceSuggestionApi } from "../api/serviceSuggestion.api";
 
 const NEW_CATEGORY_VALUE = "new-category";
@@ -15,7 +14,6 @@ const getErrorMessage = (error: unknown) => {
 };
 
 export default function ProviderServiceSuggestionPage() {
-  const { isOnline, toggleAvailability } = useProviderAvailability();
   const [categories, setCategories] = useState<Category[]>([]);
   const [serviceName, setServiceName] = useState("");
   const [categoryName, setCategoryName] = useState("");
@@ -90,12 +88,7 @@ export default function ProviderServiceSuggestionPage() {
   };
 
   return (
-    <DashboardShell
-      role="PROVIDER"
-      showStatusToggle
-      isOnline={isOnline}
-      onStatusToggle={toggleAvailability}
-    >
+    <DashboardShell role="PROVIDER">
       <div className="space-y-6">
         <header className="rounded-xl border border-outline-variant/30 bg-white p-6 shadow-sm">
           <p className="text-sm font-bold uppercase text-primary">

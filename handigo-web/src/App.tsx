@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { RouteGuard } from "./components/common/RouteGuard";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { ToastProvider, ToastContainer } from "./components/common/Toast";
+import { SystemAlertProvider } from "./components/common/SystemAlert";
 import { useAuthStore } from "./features/auth/store/auth.store";
 import "./App.css";
 
@@ -158,6 +159,9 @@ const NewsDetailPage = lazy(
   () => import("./features/content/pages/NewsDetailPage"),
 );
 const SupportPage = lazy(() => import("./features/content/pages/SupportPage"));
+const CaseManagementPage = lazy(
+  () => import("./features/case-management/pages/CaseManagementPage"),
+);
 
 function PageLoading() {
   return (
@@ -190,8 +194,9 @@ function ProviderAssignmentModalGate() {
 function App() {
   return (
     <ToastProvider>
-      <Router>
-        <AuthBootstrap>
+      <SystemAlertProvider>
+        <Router>
+          <AuthBootstrap>
           <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<HomeRoute />} />
@@ -296,7 +301,7 @@ function App() {
                 path="/customer/support"
                 element={
                   <RouteGuard roles={["CUSTOMER"]}>
-                    <SupportPage role="CUSTOMER" />
+                    <CaseManagementPage role="CUSTOMER" />
                   </RouteGuard>
                 }
               />
@@ -384,7 +389,7 @@ function App() {
                 path="/provider/support"
                 element={
                   <RouteGuard roles={["PROVIDER"]}>
-                    <SupportPage role="PROVIDER" />
+                    <CaseManagementPage role="PROVIDER" />
                   </RouteGuard>
                 }
               />
@@ -542,8 +547,9 @@ function App() {
           <Suspense fallback={null}>
             <ChatbotGate />
           </Suspense>
-        </AuthBootstrap>
-      </Router>
+          </AuthBootstrap>
+        </Router>
+      </SystemAlertProvider>
       <ToastContainer />
     </ToastProvider>
   );

@@ -234,7 +234,7 @@ Backend có `.env.example` với các nhóm cấu hình:
 - Database: `MONGO_URI`
 - CORS/frontend: `FRONTEND_URL`, `FRONTEND_URLS`
 - JWT: `ACCESS_TOKEN_SECRET`, `REFRESH_TOKEN_SECRET`, `JWT_EXPIRES_IN`, `REFRESH_TOKEN_EXPIRES_IN`
-- OAuth: `GOOGLE_CLIENT_ID`, `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`
+- OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_ID_DEVELOPMENT` (tùy chọn cho môi trường development), `GOOGLE_CLIENT_IDS` (tùy chọn, danh sách Client ID phân tách bằng dấu phẩy), `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_APP_ID_DEVELOPMENT` và `FACEBOOK_APP_SECRET_DEVELOPMENT` (tùy chọn cho môi trường development)
 - Cloudinary: `CLOUDINARY_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 - PayOS: `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, return/cancel URL
 - Email: `EMAIL_USER`, `EMAIL_PASSWORD`
@@ -365,7 +365,9 @@ Frontend có `.env.example` với:
 
 - `VITE_API_BASE_URL`
 - `VITE_GOOGLE_CLIENT_ID`
+- `VITE_GOOGLE_CLIENT_ID_DEVELOPMENT` (tùy chọn; được ưu tiên khi chạy Vite development)
 - `VITE_FACEBOOK_APP_ID`
+- `VITE_FACEBOOK_APP_ID_DEVELOPMENT` (tùy chọn; được ưu tiên khi chạy Vite development)
 - `VITE_GOOGLE_MAPS_API_KEY`
 
 ## Thiết kế HTML tĩnh

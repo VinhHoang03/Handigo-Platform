@@ -60,6 +60,22 @@ export interface IOrderConfirmation {
   providerConfirmedAt?: Date | null;
 }
 
+export interface IOrderReassignment {
+  status:
+    | "awaiting_customer"
+    | "matching"
+    | "matched"
+    | "declined"
+    | "expired"
+    | "failed";
+  requestedByProviderId: Types.ObjectId;
+  previousProviderIds: Types.ObjectId[];
+  reason: string;
+  requestedAt: Date;
+  expiresAt: Date;
+  respondedAt?: Date | null;
+}
+
 export interface IOrder extends Document, IBaseDocument {
   orderCode: string;
   customerId: Types.ObjectId;
@@ -103,7 +119,9 @@ export interface IOrder extends Document, IBaseDocument {
   pricing: IOrderPricing;
   promotionSnapshot?: IDiscountSnapshot | null;
   voucherSnapshot?: IDiscountSnapshot | null;
+  voucherUsedAt?: Date | null;
   cancellation?: IOrderCancellation | null;
+  reassignment?: IOrderReassignment | null;
   confirmation: IOrderConfirmation;
 }
 
@@ -237,6 +255,7 @@ const OrderSchema = new Schema<IOrder>(
     pricing: { type: OrderPricingSchema, required: true },
     promotionSnapshot: { type: DiscountSnapshotSchema, default: null },
     voucherSnapshot: { type: DiscountSnapshotSchema, default: null },
+    voucherUsedAt: { type: Date, default: null },
     cancellation: {
       type: new Schema<IOrderCancellation>(
         {
@@ -274,6 +293,38 @@ const OrderSchema = new Schema<IOrder>(
       ),
       default: null,
     },
+    reassignment: {
+      type: new Schema<IOrderReassignment>(
+        {
+          status: {
+            type: String,
+            enum: [
+              "awaiting_customer",
+              "matching",
+              "matched",
+              "declined",
+              "expired",
+              "failed",
+            ],
+            required: true,
+          },
+          requestedByProviderId: {
+            type: Schema.Types.ObjectId,
+            ref: "Provider",
+            required: true,
+          },
+          previousProviderIds: [
+            { type: Schema.Types.ObjectId, ref: "Provider" },
+          ],
+          reason: { type: String, required: true, trim: true },
+          requestedAt: { type: Date, required: true },
+          expiresAt: { type: Date, required: true },
+          respondedAt: { type: Date, default: null },
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
     confirmation: {
       customerConfirmedAt: { type: Date, default: null },
       providerConfirmedAt: { type: Date, default: null },
@@ -295,5 +346,6 @@ OrderSchema.index({
 OrderSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
 OrderSchema.index({ bookingStatus: 1, paymentDueAt: 1 });
 OrderSchema.index({ recurringGroupId: 1, occurrenceNumber: 1 });
+OrderSchema.index({ "reassignment.status": 1, "reassignment.expiresAt": 1 });
 
 export const Order = model<IOrder>("Order", OrderSchema, "orders");

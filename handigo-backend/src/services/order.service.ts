@@ -9,16 +9,26 @@ import { Address } from "../models/address.model";
 import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
-import { DispatchService } from "./dispatch.service";
+import {
+  DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+  DispatchService,
+  getMaxMatchingDurationSeconds,
+} from "./dispatch.service";
 import {
   cancelOrderWithSettlement,
   getCancellationPreview,
 } from "./orderCancellation.service";
 import { Payment } from "../models/payment.model";
+import { RepairQuotation } from "../models/repairQuotation.model";
 import { recordCompletedOrderSettlement } from "./wallet.service";
 import { MatchingService } from "./matching.service";
 import { emitToUser } from "../sockets/socketServer";
 import { createNotificationRecord } from "./notification.service";
+import { requestProviderReassignment } from "./orderReassignment.service";
+import {
+  markOrderVoucherAsUsed,
+  resolveVoucherForAmount,
+} from "./voucher.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -74,6 +84,38 @@ function getPopulatedId(value: unknown): string | null {
   return String(value);
 }
 
+async function attachQuotationFinalAmounts<T extends {
+  currentQuotationId?: unknown;
+}>(orders: T[]): Promise<Array<T & { quotationFinalAmount?: number }>> {
+  const quotationIds = orders
+    .map((order) => getPopulatedId(order.currentQuotationId))
+    .filter((id): id is string => Boolean(id));
+
+  if (quotationIds.length === 0) return orders;
+
+  const quotations = await RepairQuotation.find({
+    _id: { $in: quotationIds },
+  })
+    .select("_id finalAmount")
+    .lean();
+  const amountByQuotationId = new Map(
+    quotations.map((quotation) => [
+      quotation._id.toString(),
+      quotation.finalAmount,
+    ]),
+  );
+
+  return orders.map((order) => {
+    const quotationId = getPopulatedId(order.currentQuotationId);
+    const quotationFinalAmount = quotationId
+      ? amountByQuotationId.get(quotationId)
+      : undefined;
+    return quotationFinalAmount === undefined
+      ? order
+      : { ...order, quotationFinalAmount };
+  });
+}
+
 export async function dispatchOrderForMatching(orderId: string) {
   const order = await Order.findById(orderId).select(
     "addressId serviceId status readyForMatching",
@@ -118,6 +160,7 @@ export interface CreateOrderPayload {
   customerAttachments?: string[];
   promotionId?: string;
   voucherId?: string;
+  voucherCode?: string;
   preferredProviderId?: string;
   paymentMethod: "wallet" | "bank" | "cash";
 }
@@ -244,10 +287,10 @@ export const OrderService = {
       }
     }
 
-    let appointmentProvider: Awaited<
+    let preferredProvider: Awaited<
       ReturnType<typeof MatchingService.findNearestProviders>
     >[number] | null = null;
-    if (requiresProviderConfirmation && scheduledAt && payload.preferredProviderId) {
+    if (payload.preferredProviderId) {
       const candidates = await MatchingService.findNearestProviders({
         latitude: address.latitude,
         longitude: address.longitude,
@@ -258,19 +301,19 @@ export const OrderService = {
         limit: 1,
         requireOnline: false,
       });
-      appointmentProvider = candidates[0] ?? null;
-      if (!appointmentProvider) {
+      preferredProvider = candidates[0] ?? null;
+      if (!preferredProvider) {
         throw new AppError(
           "Chuyên gia không còn phù hợp với dịch vụ hoặc khu vực đã chọn.",
           409,
         );
       }
 
-      for (const occurrenceDate of occurrenceDates) {
+      for (const occurrenceDate of requiresProviderConfirmation ? occurrenceDates : []) {
         const conflictStart = new Date(occurrenceDate.getTime() - 60 * 60 * 1000);
         const slotEnd = new Date(occurrenceDate.getTime() + 60 * 60 * 1000);
         const hasConflict = await Order.exists({
-          providerId: appointmentProvider.providerId,
+          providerId: preferredProvider.providerId,
           status: { $in: ["accepted", "in_progress"] },
           scheduledAt: { $gt: conflictStart, $lt: slotEnd },
           isDeleted: false,
@@ -301,6 +344,9 @@ export const OrderService = {
       : Math.max(platformCommissionPercent, 0) / 100;
     // 4. Giá cố định là tổng thành tiền của các tùy chọn; giá linh hoạt chỉ thu tiền cọc.
     const totalAmount = pricingSnapshot.bookingAmount;
+    const voucherResult = payload.voucherCode
+      ? await resolveVoucherForAmount(payload.voucherCode, totalAmount)
+      : null;
 
     const platformCommissionAmount = Math.round(
       totalAmount * platformCommissionRate,
@@ -310,7 +356,10 @@ export const OrderService = {
     // 6. Persist order
     const recurringGroupId = orderType === "recurring" ? new Types.ObjectId() : null;
     const orderDates = orderType === "normal" ? [null] : occurrenceDates;
-    const orderDocuments = orderDates.map((orderDate, index) => ({
+    const orderDocuments = orderDates.map((orderDate, index) => {
+      const orderVoucher = index === 0 ? voucherResult : null;
+      const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
+      return {
       orderCode: generateOrderCode(),
       customerId: new Types.ObjectId(payload.customerId),
       preferredProviderId: payload.preferredProviderId
@@ -347,20 +396,22 @@ export const OrderService = {
         platformCommissionAmount,
         providerEarningAmount,
         promotionDiscountAmount: 0,
-        voucherDiscountAmount: 0,
-        totalPaidAmount: totalAmount,
+        voucherDiscountAmount,
+        totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
       },
+      voucherSnapshot: orderVoucher?.snapshot ?? null,
       confirmation: {
         customerConfirmedAt: null,
         providerConfirmedAt: null,
       },
-    }));
+      };
+    });
     const createdOrders = await Order.insertMany(
       orderDocuments as Array<Partial<IOrder>>,
     );
     const order = createdOrders[0] as unknown as IOrder;
 
-    if (requiresProviderConfirmation && scheduledAt && appointmentProvider) {
+    if (requiresProviderConfirmation && scheduledAt && preferredProvider) {
       const responseMinutes = Math.max(
         await getNumberConfigValue(
           "APPOINTMENT_RESPONSE_MINUTES",
@@ -376,20 +427,20 @@ export const OrderService = {
       );
       const assignment = await OrderAssignment.create({
         orderId: order._id,
-        providerId: appointmentProvider.providerId,
+        providerId: preferredProvider.providerId,
         assignmentType: "appointment",
         status: "pending",
         assignedAt: new Date(),
         responseDeadline,
       });
 
-      emitToUser(appointmentProvider.userId.toString(), "assignment:new", {
+      emitToUser(preferredProvider.userId.toString(), "assignment:new", {
         assignmentId: assignment._id.toString(),
         orderId: order._id.toString(),
         responseDeadline,
       });
       await createNotificationRecord({
-        userId: appointmentProvider.userId,
+        userId: preferredProvider.userId,
         type: "ORDER",
         title: "Yêu cầu lịch hẹn mới",
         content: `Khách hàng muốn đặt lịch ${scheduledAt.toLocaleString("vi-VN")}.`,
@@ -398,6 +449,60 @@ export const OrderService = {
     }
 
     return order;
+  },
+
+  async discardUnpaidOrder(orderId: string, customerId: string) {
+    const session = await mongoose.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        const order = await Order.findOne({
+          _id: orderId,
+          customerId,
+          status: "created",
+          paymentStatus: "unpaid",
+          readyForMatching: false,
+          isDeleted: false,
+        }).session(session);
+        if (!order) {
+          throw new AppError("Đơn hàng không còn ở trạng thái có thể loại bỏ", 409);
+        }
+
+        const lockedPayment = await Payment.exists({
+          orderId: order._id,
+          status: { $in: ["pending", "paid", "refunded"] },
+          isDeleted: false,
+        }).session(session);
+        if (lockedPayment) {
+          throw new AppError(
+            "Không thể loại bỏ đơn hàng đã có giao dịch thanh toán",
+            409,
+          );
+        }
+
+        await Payment.updateMany(
+          { orderId: order._id, status: "failed" },
+          { $set: { isDeleted: true } },
+          { session },
+        );
+        await OrderAssignment.updateMany(
+          { orderId: order._id, status: "pending" },
+          {
+            $set: {
+              status: "cancelled",
+              respondedAt: new Date(),
+            },
+          },
+          { session },
+        );
+
+        order.isDeleted = true;
+        order.readyForMatching = false;
+        await order.save({ session });
+        return { orderId: order._id.toString() };
+      });
+    } finally {
+      await session.endSession();
+    }
   },
 
   async selectAppointmentProvider(
@@ -414,11 +519,13 @@ export const OrderService = {
       customerId,
       status: "created",
       bookingStatus: "rejected",
-      orderType: { $in: ["scheduled", "recurring"] },
       isDeleted: false,
     });
-    if (!order || !order.scheduledAt) {
-      throw new AppError("Lịch hẹn không ở trạng thái có thể chọn lại chuyên gia.", 409);
+    const isAppointment = Boolean(
+      order && ["scheduled", "recurring"].includes(order.orderType),
+    );
+    if (!order || (isAppointment && !order.scheduledAt)) {
+      throw new AppError("Đơn hàng không ở trạng thái có thể chọn lại provider.", 409);
     }
 
     const address = await Address.findOne({
@@ -472,19 +579,28 @@ export const OrderService = {
       }
     }
 
-    const responseMinutes = Math.max(
-      await getNumberConfigValue(
-        "APPOINTMENT_RESPONSE_MINUTES",
-        DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
-      ),
-      5,
-    );
-    const responseDeadline = new Date(
-      Math.min(
-        Date.now() + responseMinutes * 60 * 1000,
-        order.scheduledAt.getTime(),
-      ),
-    );
+    let responseDeadline: Date;
+    if (isAppointment) {
+      const responseMinutes = Math.max(
+        await getNumberConfigValue(
+          "APPOINTMENT_RESPONSE_MINUTES",
+          DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
+        ),
+        5,
+      );
+      responseDeadline = new Date(
+        order.scheduledAt
+          ? Math.min(
+              Date.now() + responseMinutes * 60 * 1000,
+              order.scheduledAt.getTime(),
+            )
+          : Date.now() + responseMinutes * 60 * 1000,
+      );
+    } else {
+      responseDeadline = new Date(
+        Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+      );
+    }
     const claimedOrder = await Order.findOneAndUpdate(
       { _id: order._id, status: "created", bookingStatus: "rejected" },
       {
@@ -521,21 +637,30 @@ export const OrderService = {
       const assignment = await OrderAssignment.create({
         orderId: order._id,
         providerId: candidate.providerId,
-        assignmentType: "appointment",
+        assignmentType: isAppointment ? "appointment" : "direct_request",
         status: "pending",
         assignedAt: new Date(),
         responseDeadline,
       });
-      emitToUser(candidate.userId.toString(), "assignment:new", {
+      emitToUser(
+        candidate.userId.toString(),
+        isAppointment ? "assignment:new" : "direct-request:new",
+        {
         assignmentId: assignment._id.toString(),
         orderId: order._id.toString(),
         responseDeadline,
-      });
+        },
+      );
       await createNotificationRecord({
         userId: candidate.userId,
         type: "ORDER",
-        title: "Yêu cầu lịch hẹn mới",
-        content: `Khách hàng muốn đặt lịch ${order.scheduledAt.toLocaleString("vi-VN")}.`,
+        title: isAppointment
+          ? "Yêu cầu lịch hẹn mới"
+          : "Khách hàng gửi yêu cầu trực tiếp",
+        content:
+          isAppointment && order.scheduledAt
+            ? `Khách hàng muốn đặt lịch ${order.scheduledAt.toLocaleString("vi-VN")}.`
+            : `Khách hàng đã chọn bạn cho đơn ${order.orderCode}.`,
         data: { orderId: order._id, assignmentId: assignment._id },
       });
     } catch (error) {
@@ -574,7 +699,9 @@ export const OrderService = {
     };
   }> {
     const skip = (page - 1) * limit;
-    const conditions: any[] = [{ customerId: new Types.ObjectId(customerId) }];
+    const conditions: any[] = [
+      { customerId: new Types.ObjectId(customerId), isDeleted: false },
+    ];
 
     if (
       filters.status &&
@@ -641,7 +768,7 @@ export const OrderService = {
       (assignment) => assignment.orderId,
     );
 
-    return Order.find({
+    const orders = await Order.find({
       $or: [{ providerId: provider._id }, { _id: { $in: pendingOrderIds } }],
     })
       .sort({ createdAt: -1 })
@@ -649,7 +776,9 @@ export const OrderService = {
       .populate("customerId", "fullName avatar phone")
       .populate("serviceId", "name image serviceType")
       .populate("addressId")
-      .lean() as Promise<IOrder[]>;
+      .lean();
+
+    return attachQuotationFinalAmounts(orders) as Promise<IOrder[]>;
   },
 
   /**
@@ -713,8 +842,10 @@ export const OrderService = {
       Order.countDocuments(query),
     ]);
 
+    const items = await attachQuotationFinalAmounts(data);
+
     return {
-      items: data as IOrder[],
+      items: items as IOrder[],
       pagination: {
         page,
         limit,
@@ -727,8 +858,11 @@ export const OrderService = {
   /**
    * Get single order detail.
    */
-  async getOrderById(orderId: string, userId: string): Promise<IOrder> {
-    const order = await Order.findById(orderId)
+  async getOrderById(
+    orderId: string,
+    userId: string,
+  ) {
+    const order = await Order.findOne({ _id: orderId, isDeleted: false })
       .populate("customerId", "fullName avatar phone email")
       .populate(
         "serviceId",
@@ -766,7 +900,14 @@ export const OrderService = {
       throw new AppError("Bạn không có quyền xem đơn hàng này.", 403);
     }
 
-    return order as IOrder;
+    const matchingExpiresAt = order.matchingStartedAt
+      ? new Date(
+          order.matchingStartedAt.getTime() +
+            (await getMaxMatchingDurationSeconds()) * 1000,
+        )
+      : null;
+
+    return { ...order, matchingExpiresAt };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {
@@ -791,7 +932,7 @@ export const OrderService = {
   },
 
   /**
-   * Provider starts working on an accepted fixed-price order.
+   * Provider bắt đầu thực hiện đơn đã nhận.
    */
   async startOrder(orderId: string, providerUserId: string): Promise<IOrder> {
     const provider = await getProviderByUserId(providerUserId);
@@ -822,7 +963,11 @@ export const OrderService = {
       ) {
         throw new AppError("Chỉ có thể bắt đầu trước giờ hẹn tối đa 30 phút.", 400);
       }
-      if (order.paymentMethod !== "cash" && order.paymentStatus !== "paid") {
+      if (
+        !order.inspectionRequired &&
+        order.paymentMethod !== "cash" &&
+        order.paymentStatus !== "paid"
+      ) {
         throw new AppError("Lịch hẹn chưa được thanh toán thành công.", 409);
       }
       await Provider.findByIdAndUpdate(provider._id, {
@@ -831,10 +976,33 @@ export const OrderService = {
     }
 
     if (order.inspectionRequired) {
-      throw new AppError(
-        "Đơn hàng báo giá cần tạo báo giá sửa chữa trước khi bắt đầu.",
-        400,
-      );
+      if (!order.currentQuotationId) {
+        throw new AppError(
+          "Đơn hàng báo giá cần có báo giá sửa chữa trước khi bắt đầu.",
+          409,
+        );
+      }
+
+      const approvedQuotation = await RepairQuotation.exists({
+        _id: order.currentQuotationId,
+        orderId: order._id,
+        providerId: provider._id,
+        status: "approved",
+        customerConfirmed: true,
+        isDeleted: { $ne: true },
+      });
+      if (!approvedQuotation) {
+        throw new AppError(
+          "Chỉ có thể bắt đầu khi khách hàng đã đồng ý báo giá hiện tại.",
+          409,
+        );
+      }
+      if (!order.depositPaidAt) {
+        throw new AppError(
+          "Không thể bắt đầu khi tiền cọc chưa được thanh toán thành công.",
+          409,
+        );
+      }
     }
 
     order.status = "in_progress";
@@ -869,13 +1037,17 @@ export const OrderService = {
       );
     }
 
-    if (order.inspectionRequired && order.paymentStatus !== "paid") {
+    if (order.inspectionRequired && !order.depositPaidAt) {
       throw new AppError(
-        "Không thể hoàn thành đơn khi khách hàng chưa thanh toán đủ báo giá.",
+        "Không thể hoàn thành đơn khi tiền cọc chưa được thanh toán thành công.",
         400,
       );
     }
-    if (order.paymentMethod !== "cash" && order.paymentStatus !== "paid") {
+    if (
+      !order.inspectionRequired &&
+      order.paymentMethod !== "cash" &&
+      order.paymentStatus !== "paid"
+    ) {
       throw new AppError(
         "Không thể hoàn thành đơn khi thanh toán điện tử chưa được xác nhận.",
         400,
@@ -925,14 +1097,15 @@ export const OrderService = {
         }
         if (
           transactionalOrder.inspectionRequired &&
-          transactionalOrder.paymentStatus !== "paid"
+          !transactionalOrder.depositPaidAt
         ) {
           throw new AppError(
-            "Không thể hoàn thành đơn khi khách hàng chưa thanh toán đủ báo giá.",
+            "Không thể hoàn thành đơn khi tiền cọc chưa được thanh toán thành công.",
             400,
           );
         }
         if (
+          !transactionalOrder.inspectionRequired &&
           transactionalOrder.paymentMethod !== "cash" &&
           transactionalOrder.paymentStatus !== "paid"
         ) {
@@ -942,7 +1115,9 @@ export const OrderService = {
           );
         }
 
-        const totalAmount = transactionalOrder.pricing.totalPaidAmount;
+        const totalAmount = transactionalOrder.inspectionRequired
+          ? transactionalOrder.depositAmount
+          : transactionalOrder.pricing.totalPaidAmount;
         const commissionRate = transactionalOrder.inspectionRequired
           ? 0
           : Math.max(transactionalOrder.pricing.platformCommissionRate, 0);
@@ -952,6 +1127,7 @@ export const OrderService = {
         );
         transactionalOrder.pricing.platformCommissionAmount =
           platformCommissionAmount;
+        transactionalOrder.pricing.totalPaidAmount = totalAmount;
         transactionalOrder.pricing.providerEarningAmount =
           totalAmount - platformCommissionAmount;
         if (transactionalOrder.inspectionRequired) {
@@ -977,6 +1153,7 @@ export const OrderService = {
             await cashPayment.save({ session });
           }
           transactionalOrder.paymentStatus = "paid";
+          await markOrderVoucherAsUsed(transactionalOrder, session);
         }
 
         await recordCompletedOrderSettlement(
@@ -1016,6 +1193,16 @@ export const OrderService = {
     role: "customer" | "provider" | "admin",
     reason: string,
   ): Promise<IOrder> {
+    if (role === "provider") {
+      const order = await Order.findById(orderId).select("status orderType");
+      if (
+        order?.status === "accepted" &&
+        ["normal", "urgent"].includes(order.orderType)
+      ) {
+        return requestProviderReassignment(orderId, userId, reason);
+      }
+    }
+
     return cancelOrderWithSettlement({
       orderId,
       actorId: userId,

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import type { Order } from '@/types/booking';
 import {
   formatDateTime,
-  formatMoney,
+  formatProviderOrderAmount,
   getCustomer,
   providerStatusLabels,
   providerStatusStyles,
@@ -43,7 +43,7 @@ export function ProviderOrderCard({ order }: { order: Order }) {
       </div>
 
       <div className="flex items-center justify-between gap-sm sm:block sm:text-right">
-        <p className="font-bold text-primary">{formatMoney(order.pricing?.providerEarningAmount)}</p>
+        <p className="font-bold text-primary">{formatProviderOrderAmount(order)}</p>
         <p className="text-xs text-on-surface-variant">{order.orderCode}</p>
       </div>
     </Link>

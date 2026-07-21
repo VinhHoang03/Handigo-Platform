@@ -33,6 +33,7 @@ export function ProviderAssignmentModal() {
   const customer = order ? getCustomer(order) : null;
   const isExpired = countdown === 'Hết hạn';
   const isAppointment = assignment?.assignmentType === 'appointment';
+  const isDirectRequest = assignment?.assignmentType === 'direct_request';
   const enabled = isAuthenticated && user?.role === 'PROVIDER' && Boolean(token);
 
   const loadPendingAssignment = useCallback(async () => {
@@ -84,11 +85,13 @@ export function ProviderAssignmentModal() {
     };
 
     socket.on('assignment:new', handleNewAssignment);
+    socket.on('direct-request:new', handleNewAssignment);
     socket.on('assignment:closed', handleClosedAssignment);
     socket.on('connect', loadPendingAssignment);
 
     return () => {
       socket.off('assignment:new', handleNewAssignment);
+      socket.off('direct-request:new', handleNewAssignment);
       socket.off('assignment:closed', handleClosedAssignment);
       socket.off('connect', loadPendingAssignment);
       dispose();
@@ -128,7 +131,11 @@ export function ProviderAssignmentModal() {
       setAssignment(null);
       navigate(`/provider/orders/${result.order._id}`);
     } catch {
-      setError('Không thể nhận đơn. Đơn có thể đã hết hạn hoặc được chuyển cho thợ khác.');
+      setError(
+        isDirectRequest
+          ? 'Không thể nhận yêu cầu. Yêu cầu có thể đã hết hạn hoặc không còn khả dụng.'
+          : 'Không thể nhận đơn. Đơn có thể đã hết hạn hoặc được chuyển cho thợ khác.',
+      );
     } finally {
       setBusy(false);
     }
@@ -153,7 +160,13 @@ export function ProviderAssignmentModal() {
   return (
     <Modal
       open
-      title={isAppointment ? "Yêu cầu lịch hẹn" : "Đơn mới cần phản hồi"}
+      title={
+        isAppointment
+          ? "Yêu cầu lịch hẹn"
+          : isDirectRequest
+            ? "Khách hàng chọn bạn"
+            : "Đơn mới cần phản hồi"
+      }
       onClose={() => undefined}
       size="sm"
       closeOnEsc={false}
@@ -232,7 +245,9 @@ export function ProviderAssignmentModal() {
                 ? 'Xác nhận toàn bộ lịch'
                 : isAppointment
                   ? 'Xác nhận lịch'
-                  : 'Nhận đơn'}
+                  : isDirectRequest
+                    ? 'Nhận yêu cầu'
+                    : 'Nhận đơn'}
           </button>
           <button
             type="button"
