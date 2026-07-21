@@ -44,7 +44,6 @@ export function RepairQuotationForm({
 }: RepairQuotationFormProps) {
   const [inspectionNote, setInspectionNote] = useState("");
   const [recommendation, setRecommendation] = useState("");
-  const [discountAmount, setDiscountAmount] = useState(0);
   const [items, setItems] = useState([{ ...emptyItem }]);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +51,6 @@ export function RepairQuotationForm({
     (sum, item) => sum + item.quantity * item.unitPrice,
     0,
   );
-  const finalAmount = Math.max(subtotal - discountAmount, 0);
 
   const updateItem = (index: number, patch: Partial<QuotationFormItem>) => {
     setItems((current) =>
@@ -94,24 +92,10 @@ export function RepairQuotationForm({
       setError('Có hạng mục báo giá chưa hợp lệ.');
       return;
     }
-    const validSubtotal = validItems.reduce(
-      (sum, item) => sum + item.quantity * item.unitPrice,
-      0,
-    );
-    if (
-      !Number.isFinite(discountAmount) ||
-      discountAmount < 0 ||
-      discountAmount > validSubtotal
-    ) {
-      setError('Số tiền giảm giá phải từ 0 đến tạm tính.');
-      return;
-    }
-
     setError(null);
     await onSubmit({
       inspectionNote: inspectionNote.trim() || undefined,
       recommendation: recommendation.trim() || undefined,
-      discountAmount: discountAmount || undefined,
       items: validItems.map((item) => ({
         title: item.title.trim(),
         description: item.description.trim() || undefined,
@@ -174,7 +158,12 @@ export function RepairQuotationForm({
 
       <div className="space-y-sm">
         <div className="flex items-center justify-between">
-          <h4 className="font-label-md text-on-surface">Hạng mục báo giá</h4>
+          <div>
+            <h4 className="font-label-md text-on-surface">Hạng mục báo giá</h4>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Thành tiền từng hạng mục = Số lượng × Đơn giá.
+            </p>
+          </div>
           <button
             type="button"
             disabled={items.length >= MAX_QUOTATION_ITEMS}
@@ -185,6 +174,14 @@ export function RepairQuotationForm({
           >
             + Thêm hạng mục
           </button>
+        </div>
+
+        <div className="hidden grid-cols-12 gap-sm px-sm text-xs font-medium text-on-surface-variant md:grid">
+          <span className="md:col-span-4">Tên hạng mục</span>
+          <span className="md:col-span-2">Loại</span>
+          <span className="md:col-span-1">Số lượng</span>
+          <span className="md:col-span-2">Đơn giá (VND)</span>
+          <span className="md:col-span-2">Thành tiền</span>
         </div>
 
         {items.map((item, index) => (
@@ -225,6 +222,8 @@ export function RepairQuotationForm({
               onChange={(event) =>
                 updateItem(index, { quantity: Number(event.target.value) })
               }
+              aria-label="Số lượng"
+              placeholder="Số lượng"
               className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-1"
             />
             <input
@@ -232,16 +231,21 @@ export function RepairQuotationForm({
               min={0}
               step={1}
               value={item.unitPrice}
-              onChange={(event) =>
-                updateItem(index, { unitPrice: Number(event.target.value) })
-              }
-              placeholder="Đơn giá"
+              onChange={(event) => {
+                const unitPrice = event.target.value.replace(/^0+(?=\d)/, "");
+                updateItem(index, { unitPrice: Number(unitPrice) });
+              }}
+              aria-label="Đơn giá (VND)"
+              placeholder="Đơn giá (VND)"
               className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-2"
             />
             <div className="flex items-center justify-between gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-primary">
-                {formatMoney(item.quantity * item.unitPrice)}
-              </span>
+              <div>
+                <span className="block text-xs text-on-surface-variant md:hidden">Thành tiền</span>
+                <span className="text-sm font-semibold text-primary">
+                  {formatMoney(item.quantity * item.unitPrice)}
+                </span>
+              </div>
               {items.length > 1 && (
                 <button
                   type="button"
@@ -260,25 +264,11 @@ export function RepairQuotationForm({
         ))}
       </div>
 
-      <div className="grid gap-md md:grid-cols-[1fr_auto] md:items-end">
-        <label className="space-y-2">
-          <span className="text-label-sm text-on-surface-variant">
-            Giảm giá (VND)
-          </span>
-          <input
-            type="number"
-            min={0}
-            max={subtotal}
-            step={1}
-            value={discountAmount}
-            onChange={(event) => setDiscountAmount(Number(event.target.value))}
-            className="w-full rounded-2xl border border-outline-variant px-4 py-3"
-          />
-        </label>
+      <div className="flex justify-end">
         <div className="rounded-2xl bg-primary/5 px-md py-sm text-right">
-          <p className="text-xs text-on-surface-variant">Tổng báo giá</p>
+          <p className="text-xs text-on-surface-variant">Tổng báo giá (tổng thành tiền các hạng mục)</p>
           <p className="text-headline-md font-bold text-primary">
-            {formatMoney(finalAmount)}
+            {formatMoney(subtotal)}
           </p>
         </div>
       </div>

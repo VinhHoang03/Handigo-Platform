@@ -207,7 +207,17 @@ export const OrderSummaryCard: React.FC<{
   actionTo?: string;
   onAction?: () => void;
   isLoading?: boolean;
-}> = ({ step, actionLabel, actionTo, onAction, isLoading }) => {
+  summaryContent?: ReactNode;
+  discountAmount?: number;
+}> = ({
+  step,
+  actionLabel,
+  actionTo,
+  onAction,
+  isLoading,
+  summaryContent,
+  discountAmount = 0,
+}) => {
   const {
     categoryId,
     serviceId,
@@ -262,6 +272,7 @@ export const OrderSummaryCard: React.FC<{
   };
 
   const total = calculateTotal();
+  const finalTotal = Math.max(total - discountAmount, 0);
 
   const handleAction = () => {
     if (onAction) {
@@ -348,11 +359,27 @@ export const OrderSummaryCard: React.FC<{
           </div>
 
           <div className="pt-md border-t border-outline-variant flex justify-between items-center">
-            <span className="font-bold">Tổng cộng</span>
-            <span className="text-2xl font-bold text-primary">
-              {total.toLocaleString()}đ
-            </span>
+            <div>
+              <span className="font-bold">Tổng cộng</span>
+              {discountAmount > 0 && (
+                <p className="mt-1 text-sm font-semibold text-emerald-600">
+                  Đã giảm {discountAmount.toLocaleString("vi-VN")}đ
+                </p>
+              )}
+            </div>
+            <div className="text-right">
+              {discountAmount > 0 && (
+                <p className="text-sm text-on-surface-variant line-through">
+                  {total.toLocaleString("vi-VN")}đ
+                </p>
+              )}
+              <span className="text-2xl font-bold text-primary">
+                {finalTotal.toLocaleString("vi-VN")}đ
+              </span>
+            </div>
           </div>
+
+          {summaryContent}
         </div>
 
         <div className="mt-lg space-y-sm">

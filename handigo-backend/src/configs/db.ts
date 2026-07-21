@@ -28,6 +28,7 @@ export const connectDB = async (): Promise<void> => {
     dbLogger.info("Đã kết nối MongoDB.");
 
     await dropLegacyIndex("sessions", "refreshToken_1");
+    await dropLegacyIndex("feedbacks", "requestId_1");
   } catch (error) {
     dbLogger.error("Kết nối MongoDB thất bại.", error);
     process.exit(1);

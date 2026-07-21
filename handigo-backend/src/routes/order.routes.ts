@@ -20,6 +20,7 @@ import {
   orderListQuerySchema,
   quotationIdParamSchema,
   recentOrderQuerySchema,
+  reassignmentResponseSchema,
   rejectAssignmentSchema,
   selectAppointmentProviderSchema,
   rejectRepairQuotationSchema,
@@ -27,6 +28,7 @@ import {
 } from "../validations/order.validator";
 import {
   createOrder,
+  discardUnpaidOrder,
   getMyOrders,
   getProviderOrders,
   getProviderRecentOrders,
@@ -48,6 +50,7 @@ import {
   confirmRepairQuotation,
   rejectRepairQuotation,
   selectAppointmentProvider,
+  respondToReassignment,
 } from "../controllers/order.controller";
 import { getOrderTrackingRoute } from "../controllers/orderTracking.controller";
 
@@ -134,6 +137,21 @@ router.patch(
   validate(orderIdParamSchema, "params"),
   validate(cancelOrderSchema),
   cancelOrder,
+);
+
+router.delete(
+  "/:orderId/unpaid",
+  roleMiddleware("CUSTOMER"),
+  validate(orderIdParamSchema, "params"),
+  discardUnpaidOrder,
+);
+
+router.patch(
+  "/:orderId/reassignment-response",
+  roleMiddleware("CUSTOMER"),
+  validate(orderIdParamSchema, "params"),
+  validate(reassignmentResponseSchema),
+  respondToReassignment,
 );
 
 router.get(

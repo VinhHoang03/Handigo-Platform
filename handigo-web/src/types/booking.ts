@@ -111,6 +111,22 @@ export interface OrderDiscountSnapshot {
   discountAmount: number;
 }
 
+export interface OrderReassignment {
+  status:
+    | "awaiting_customer"
+    | "matching"
+    | "matched"
+    | "declined"
+    | "expired"
+    | "failed";
+  requestedByProviderId: string;
+  previousProviderIds: string[];
+  reason: string;
+  requestedAt: string;
+  expiresAt: string;
+  respondedAt?: string | null;
+}
+
 export interface Order {
   _id: string;
   orderCode: string;
@@ -160,6 +176,8 @@ export interface Order {
     | "rejected"
     | "expired";
   paymentDueAt?: string | null;
+  matchingStartedAt?: string | null;
+  matchingExpiresAt?: string | null;
   recurringGroupId?: string | null;
   recurrenceUnit?: "weekly" | "monthly" | null;
   occurrenceNumber?: number | null;
@@ -168,10 +186,10 @@ export interface Order {
   paymentMethod: "wallet" | "bank" | "cash";
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
   depositPaidAt?: string | null;
-  matchingStartedAt?: string | null;
   inspectionRequired?: boolean;
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
+  quotationFinalAmount?: number;
   pricing: OrderPricing;
   promotionSnapshot?: OrderDiscountSnapshot | null;
   voucherSnapshot?: OrderDiscountSnapshot | null;
@@ -182,6 +200,7 @@ export interface Order {
     cancelledAt: string;
     refundPolicy?: CancellationRefundPolicy | null;
   } | null;
+  reassignment?: OrderReassignment | null;
   createdAt: string;
   updatedAt: string;
 }

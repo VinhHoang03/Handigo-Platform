@@ -34,7 +34,7 @@ export const useAuth = () => {
       return response.user;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google login failed');
-      return false;
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +48,7 @@ export const useAuth = () => {
       return response.user;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Facebook login failed');
-      return false;
+      throw err;
     } finally {
       setIsLoading(false);
     }

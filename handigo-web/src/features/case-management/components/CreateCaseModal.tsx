@@ -18,6 +18,7 @@ interface CreateCaseModalProps {
   kind: CreateCaseKind;
   role: "CUSTOMER" | "PROVIDER";
   orders: Order[];
+  initialOrderId?: string;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -57,16 +58,19 @@ export function CreateCaseModal({
   kind,
   role,
   orders,
+  initialOrderId,
   onClose,
   onCreated,
 }: CreateCaseModalProps) {
-  const [orderId, setOrderId] = useState("");
+  const [orderId, setOrderId] = useState(initialOrderId ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<SupportTicketCategory>("ORDER");
   const [priority, setPriority] = useState<SupportTicketPriority>("MEDIUM");
   const [reportType, setReportType] = useState<ReportType>("user_behavior");
-  const [reportTarget, setReportTarget] = useState<"participant" | "order">("participant");
+  const [reportTarget, setReportTarget] = useState<"participant" | "order">(
+    initialOrderId ? "order" : "participant",
+  );
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

@@ -25,18 +25,41 @@ import { markProviderOffline } from "./providerPresence.service";
 
 const SALT_ROUNDS = 10;
 
-const getGoogleClientId = (): string => {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+const getGoogleClientIds = (): string[] => {
+  const configuredClientIds = [
+    process.env.GOOGLE_CLIENT_ID,
+    ...(process.env.NODE_ENV === "production"
+      ? []
+      : [process.env.GOOGLE_CLIENT_ID_DEVELOPMENT]),
+    ...(process.env.GOOGLE_CLIENT_IDS || "").split(","),
+  ]
+    .map((clientId) => clientId?.trim())
+    .filter((clientId): clientId is string => Boolean(clientId));
 
-  if (!clientId) {
-    throw new AppError("GOOGLE_CLIENT_ID is not configured", 500);
+  const clientIds = Array.from(new Set(configuredClientIds));
+
+  if (clientIds.length === 0) {
+    throw new AppError("Chưa cấu hình Google OAuth Client ID", 500);
   }
 
-  return clientId;
+  return clientIds;
 };
 
-const getGoogleClient = (): OAuth2Client => {
-  return new OAuth2Client(getGoogleClientId());
+const getFacebookAppCredentials = () => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const appId = isProduction
+    ? process.env.FACEBOOK_APP_ID
+    : process.env.FACEBOOK_APP_ID_DEVELOPMENT || process.env.FACEBOOK_APP_ID;
+  const appSecret = isProduction
+    ? process.env.FACEBOOK_APP_SECRET
+    : process.env.FACEBOOK_APP_SECRET_DEVELOPMENT ||
+      process.env.FACEBOOK_APP_SECRET;
+
+  if (!appId || !appSecret) {
+    throw new AppError("Chưa cấu hình thông tin ứng dụng Facebook", 500);
+  }
+
+  return { appId, appSecret };
 };
 
 type AuthUserResponse = {
@@ -348,11 +371,11 @@ const isGoogleEmailVerified = (value: unknown): boolean =>
 const getGoogleProfileFromCredential = async (
   credential: string,
 ): Promise<GoogleProfile> => {
-  const clientId = getGoogleClientId();
-  const client = getGoogleClient();
+  const clientIds = getGoogleClientIds();
+  const client = new OAuth2Client();
   const ticket = await client.verifyIdToken({
     idToken: credential,
-    audience: clientId,
+    audience: clientIds,
   });
 
   const payload = ticket.getPayload();
@@ -375,7 +398,7 @@ const getGoogleProfileFromCredential = async (
 const getGoogleProfileFromAccessToken = async (
   accessToken: string,
 ): Promise<GoogleProfile> => {
-  const clientId = getGoogleClientId();
+  const clientIds = getGoogleClientIds();
 
   try {
     const tokenInfoResponse = await axios.get<GoogleTokenInfoResponse>(
@@ -385,7 +408,8 @@ const getGoogleProfileFromAccessToken = async (
     const tokenInfo = tokenInfoResponse.data;
 
     if (
-      tokenInfo.aud !== clientId ||
+      !tokenInfo.aud ||
+      !clientIds.includes(tokenInfo.aud) ||
       !tokenInfo.sub ||
       !tokenInfo.email ||
       !isGoogleEmailVerified(tokenInfo.email_verified)
@@ -483,12 +507,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
 };
 
 export const facebookLogin = async (accessToken: string) => {
-  const appId = process.env.FACEBOOK_APP_ID;
-  const appSecret = process.env.FACEBOOK_APP_SECRET;
-
-  if (!appId || !appSecret) {
-    throw new AppError("Facebook app credentials are not configured", 500);
-  }
+  const { appId, appSecret } = getFacebookAppCredentials();
 
   // Verify token with Facebook Graph API
   const appToken = `${appId}|${appSecret}`;
@@ -496,8 +515,8 @@ export const facebookLogin = async (accessToken: string) => {
     params: { input_token: accessToken, access_token: appToken },
   });
 
-  const { is_valid, user_id, error } = debugRes.data?.data ?? {};
-  if (!is_valid || !user_id) {
+  const { app_id, is_valid, user_id, error } = debugRes.data?.data ?? {};
+  if (!is_valid || !user_id || app_id !== appId) {
     throw new AppError(
       `Invalid Facebook access token: ${error?.message || "unknown error"}`,
       400,
@@ -521,7 +540,11 @@ export const facebookLogin = async (accessToken: string) => {
     );
   }
 
-  const existingUser = await User.findOne({ email });
+  const normalizedEmail = email.toLowerCase();
+  const existingUser = await User.findOne({
+    isDeleted: false,
+    $or: [{ facebookId: user_id }, { email: normalizedEmail }],
+  });
 
   if (existingUser && existingUser.status === "locked") {
     throw new AppError("Account is not allowed to login", 403);
@@ -534,7 +557,8 @@ export const facebookLogin = async (accessToken: string) => {
     const passwordHash = await bcrypt.hash(randomPassword, SALT_ROUNDS);
 
     authenticatedUser = await User.create({
-      email,
+      email: normalizedEmail,
+      facebookId: user_id,
       fullName: normalizeExternalPersonName(name),
       passwordHash,
       avatar: picture?.data?.url ?? null,
@@ -544,6 +568,10 @@ export const facebookLogin = async (accessToken: string) => {
     });
   } else {
     let shouldSave = false;
+    if (authenticatedUser.facebookId !== user_id) {
+      authenticatedUser.facebookId = user_id;
+      shouldSave = true;
+    }
     if (!authenticatedUser.isEmailVerified) {
       authenticatedUser.isEmailVerified = true;
       shouldSave = true;

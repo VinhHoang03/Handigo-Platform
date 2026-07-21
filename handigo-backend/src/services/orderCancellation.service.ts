@@ -1,5 +1,7 @@
 import mongoose, { ClientSession, Types } from "mongoose";
-import { payos } from "../configs/payos.config";
+import { randomUUID } from "crypto";
+import type { Payout } from "@payos/node";
+import { payos, payoutPayos } from "../configs/payos.config";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Payment, IPayment } from "../models/payment.model";
@@ -7,6 +9,8 @@ import { Promotion } from "../models/promotion.model";
 import { Provider } from "../models/provider.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
+import { Refund, IRefund } from "../models/refund.model";
+import User from "../models/user.model";
 import { AppError } from "../utils/appError";
 import { createLogger } from "../utils/logger";
 import { buildTransactionCode } from "../utils/transaction";
@@ -15,8 +19,10 @@ import {
   calculateRefundPolicy,
   type RefundPolicyResult,
 } from "./refundPolicy.service";
+import { getRefundRetryDecision } from "./refundProcessing";
 
 type CancellationRole = "customer" | "provider" | "admin";
+type SystemCancellationType = "payment_timeout" | "provider_unavailable";
 
 interface CancelOrderInput {
   orderId: string;
@@ -24,11 +30,25 @@ interface CancelOrderInput {
   role: CancellationRole;
   reason: string;
   system?: boolean;
+  systemCancellationType?: SystemCancellationType;
 }
 
 interface WalletRefundResult {
   paymentId: Types.ObjectId;
   amount: number;
+}
+
+interface LegacyRefundMetadata {
+  status?: string;
+  amount?: number;
+  referenceId?: string;
+  channel?: string;
+  destination?: string;
+  payoutId?: string;
+  approvalState?: string;
+  retryCount?: number;
+  nextRetryAt?: Date;
+  completedAt?: Date;
 }
 
 export interface CancellationPreview extends RefundPolicyResult {
@@ -39,6 +59,11 @@ export interface CancellationPreview extends RefundPolicyResult {
 
 const CANCELLABLE_STATUSES = ["created", "accepted"] as const;
 const REFUND_RECONCILIATION_INTERVAL_MS = 30_000;
+const REFUND_LEASE_MS = 60_000;
+const REFUND_PENDING_RECHECK_MS = 30_000;
+const REFUND_WORKER_ID = randomUUID();
+const PAYOS_SOURCE_ACCOUNT_UNAVAILABLE_MESSAGE =
+  "Chưa xác định được tài khoản nguồn để hoàn tiền PayOS";
 const cancellationLogger = createLogger("OrderCancellationService");
 let refundMonitor: NodeJS.Timeout | null = null;
 
@@ -460,21 +485,205 @@ const storePayosRefundMetadata = async (
   await payment.save();
 };
 
-const isPayoutSucceeded = (payout: any) =>
+const isDuplicateKeyError = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  (error as { code?: number }).code === 11000;
+
+const ensurePayosRefundRecord = async (
+  payment: IPayment,
+  order: IOrder,
+  reason: string,
+  amount: number,
+) => {
+  const referenceId = "REFUND" + payment._id.toString();
+  let refund: IRefund | null = null;
+  try {
+    refund = await Refund.findOneAndUpdate(
+      { paymentId: payment._id },
+      {
+        $setOnInsert: {
+          paymentId: payment._id,
+          orderId: order._id,
+          customerId: payment.customerId,
+          amount,
+          reason,
+          currency: "VND",
+          sourceMethod: "payos",
+          status: "requested",
+          referenceId,
+          nextRetryAt: new Date(),
+        },
+      },
+      { new: true, upsert: true, runValidators: true },
+    );
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) throw error;
+    refund = await Refund.findOne({ paymentId: payment._id });
+  }
+  if (!refund) {
+    throw new AppError("Không thể tạo yêu cầu hoàn tiền PayOS", 500);
+  }
+
+  const currentRefund = (
+    payment.metadata as { refund?: LegacyRefundMetadata } | null
+  )?.refund;
+  if (!currentRefund?.status) {
+    await storePayosRefundMetadata(payment._id as Types.ObjectId, {
+      status: "requested",
+      referenceId,
+      amount,
+      sourceMethod: "payos",
+      requestedAt: new Date(),
+    });
+  }
+
+  return refund;
+};
+
+const claimRefund = async (refundId: Types.ObjectId) => {
+  const now = new Date();
+  return Refund.findOneAndUpdate(
+    {
+      _id: refundId,
+      isDeleted: false,
+      status: { $in: ["requested", "requesting", "pending", "failed"] },
+      $and: [
+        {
+          $or: [
+            { nextRetryAt: null },
+            { nextRetryAt: { $exists: false } },
+            { nextRetryAt: { $lte: now } },
+          ],
+        },
+        {
+          $or: [
+            { leaseExpiresAt: null },
+            { leaseExpiresAt: { $exists: false } },
+            { leaseExpiresAt: { $lte: now } },
+          ],
+        },
+      ],
+    },
+    {
+      $set: {
+        status: "requesting",
+        leaseOwner: REFUND_WORKER_ID,
+        leaseExpiresAt: new Date(now.getTime() + REFUND_LEASE_MS),
+        lastAttemptAt: now,
+        lastError: null,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+};
+
+const notifyAdminsAboutManualRefund = async (refund: IRefund) => {
+  if (refund.adminAlertedAt) return;
+
+  const admins = await User.find({
+    role: "ADMIN",
+    status: "active",
+    isDeleted: false,
+  }).select("_id");
+
+  await Promise.all(
+    admins.map((admin) =>
+      createNotificationRecord({
+        userId: admin._id,
+        type: "PAYMENT",
+        title: "Hoàn tiền PayOS cần xử lý thủ công",
+        content: `Hoàn tiền ${refund.referenceId} đã vượt quá số lần thử tự động.`,
+        data: {
+          refundId: refund._id,
+          paymentId: refund.paymentId,
+          orderId: refund.orderId,
+          amount: refund.amount,
+          status: refund.status,
+        },
+      }),
+    ),
+  );
+
+  await Refund.updateOne(
+    { _id: refund._id, adminAlertedAt: null },
+    { $set: { adminAlertedAt: new Date() } },
+  );
+};
+
+const recordRefundFailure = async (refund: IRefund, error: unknown) => {
+  const failedRefund = await Refund.findOneAndUpdate(
+    { _id: refund._id, leaseOwner: REFUND_WORKER_ID },
+    {
+      $inc: { attemptCount: 1 },
+      $set: {
+        lastError: error instanceof Error ? error.message : "Lỗi không xác định",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!failedRefund) return;
+
+  const decision = getRefundRetryDecision(
+    failedRefund.attemptCount,
+    failedRefund.maxAttempts,
+  );
+  const updatedRefund = await Refund.findByIdAndUpdate(
+    failedRefund._id,
+    {
+      $set: {
+        status: decision.status,
+        nextRetryAt: decision.nextRetryAt,
+        manualReviewAt:
+          decision.status === "manual_review" ? new Date() : null,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!updatedRefund) return;
+
+  await storePayosRefundMetadata(updatedRefund.paymentId, {
+    status: updatedRefund.status,
+    referenceId: updatedRefund.referenceId,
+    sourceMethod: "payos",
+    destination: updatedRefund.destination,
+    amount: updatedRefund.amount,
+    retryCount: updatedRefund.attemptCount,
+    nextRetryAt: updatedRefund.nextRetryAt,
+    reason: updatedRefund.lastError,
+  });
+
+  if (updatedRefund.status === "manual_review") {
+    await notifyAdminsAboutManualRefund(updatedRefund);
+  }
+};
+
+const isPayoutSucceeded = (payout: Payout) =>
   payout?.approvalState === "COMPLETED" &&
   Array.isArray(payout.transactions) &&
-  payout.transactions.some((item: any) => item.state === "SUCCEEDED");
+  payout.transactions.some((item) => item.state === "SUCCEEDED");
 
-const isPayoutFailed = (payout: any) =>
+const isPayoutFailed = (payout: Payout) =>
   ["REJECTED", "CANCELLED", "FAILED"].includes(payout?.approvalState) ||
   (Array.isArray(payout?.transactions) &&
-    payout.transactions.some((item: any) =>
+    payout.transactions.some((item) =>
       ["CANCELLED", "REVERSED", "FAILED"].includes(item.state),
     ));
 
+const buildPayoutAuditSnapshot = (payout: Payout) => ({
+  approvalState: payout?.approvalState || null,
+  transactionStates: Array.isArray(payout?.transactions)
+    ? payout.transactions.map((item) => item.state).filter(Boolean)
+    : [],
+  capturedAt: new Date(),
+});
+
 const finalizePayosRefund = async (
   payment: IPayment,
-  payout: any,
+  payout: Payout,
   reason: string,
   finalizedRefundAmount?: number,
 ) => {
@@ -486,6 +695,8 @@ const finalizePayosRefund = async (
   const refundMetadata = {
     ...existingRefund,
     status: "succeeded",
+    sourceMethod: "payos",
+    destination: "source_account",
     payoutId: payout.id,
     referenceId: payout.referenceId,
     completedAt: now,
@@ -498,6 +709,25 @@ const finalizePayosRefund = async (
   await storePayosRefundMetadata(
     payment._id as Types.ObjectId,
     refundMetadata,
+  );
+  await Refund.updateOne(
+    { paymentId: payment._id },
+    {
+      $set: {
+        status: "succeeded",
+        channel: "payos_payout",
+        destination: "source_account",
+        payoutId: payout.id,
+        approvalState: payout.approvalState,
+        providerResponse: buildPayoutAuditSnapshot(payout),
+        completedAt: now,
+        nextRetryAt: null,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        lastError: null,
+      },
+    },
+    { runValidators: true },
   );
 
   const refundedPayment = await Payment.findOneAndUpdate(
@@ -540,23 +770,47 @@ const finalizePayosRefund = async (
 
 const reconcilePayosRefund = async (
   payment: IPayment,
+  refund: IRefund,
   reason: string,
   payoutId: string,
 ) => {
-  const payout = await payos.payouts.get(payoutId);
+  const payout = await payoutPayos.payouts.get(payoutId);
 
   if (isPayoutSucceeded(payout)) {
-    await finalizePayosRefund(payment, payout, reason);
+    await finalizePayosRefund(payment, payout, reason, refund.amount);
     return;
   }
 
+  if (isPayoutFailed(payout)) {
+    throw new AppError("Payout PayOS hoàn tiền đã thất bại", 502);
+  }
+
   await storePayosRefundMetadata(payment._id as Types.ObjectId, {
-    status: isPayoutFailed(payout) ? "failed" : "pending",
+    status: "pending",
+    sourceMethod: "payos",
+    destination: "source_account",
     payoutId: payout.id,
     referenceId: payout.referenceId,
     approvalState: payout.approvalState,
     checkedAt: new Date(),
   });
+  await Refund.updateOne(
+    { _id: refund._id, leaseOwner: REFUND_WORKER_ID },
+    {
+      $set: {
+        status: "pending",
+        channel: "payos_payout",
+        destination: "source_account",
+        payoutId: payout.id,
+        approvalState: payout.approvalState,
+        providerResponse: buildPayoutAuditSnapshot(payout),
+        nextRetryAt: new Date(Date.now() + REFUND_PENDING_RECHECK_MS),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      },
+    },
+    { runValidators: true },
+  );
 };
 
 const refundPayosPaymentToWallet = async (
@@ -566,115 +820,183 @@ const refundPayosPaymentToWallet = async (
   refundAmount: number,
 ) => {
   const session = await mongoose.startSession();
-  let creditedAmount = 0;
+  let walletRefund: WalletRefundResult | null = null;
 
   try {
     await session.withTransaction(async () => {
-      creditedAmount = 0;
-      const currentPayment = await Payment.findById(payment._id).session(session);
-      if (!currentPayment || currentPayment.status === "refunded") return;
-      if (currentPayment.status !== "paid") {
-        throw new AppError("Giao dịch không ở trạng thái có thể hoàn tiền", 409);
-      }
-
-      const existingWalletRefund = await WalletTransaction.findOne({
-        relatedPaymentId: currentPayment._id,
+      const existingRefund = await WalletTransaction.findOne({
+        relatedPaymentId: payment._id,
         type: "refund",
         status: "success",
       }).session(session);
-      const completedAt = new Date();
-      const refundMetadata = buildRefundMetadata(
-        order,
-        refundAmount,
-        "succeeded",
-        {
-          completedAt,
-          sourceMethod: "payos",
-          destination: "handigo_wallet",
-        },
-      );
 
-      currentPayment.status = "refunded";
-      currentPayment.refundedAt = completedAt;
-      currentPayment.refundReason = reason;
-      currentPayment.metadata = mergePaymentMetadata(currentPayment, {
-        refund: refundMetadata,
-      });
-      await currentPayment.save({ session });
-
-      if (refundAmount > 0 && !existingWalletRefund) {
-        let wallet = await Wallet.findOneAndUpdate(
-          { userId: currentPayment.customerId, isDeleted: false },
-          { $inc: { balance: refundAmount } },
-          { new: true, session, runValidators: true },
+      if (existingRefund) {
+        await Payment.updateOne(
+          { _id: payment._id, status: "paid" },
+          {
+            $set: {
+              status: "refunded",
+              refundedAt: existingRefund.createdAt,
+              refundReason: reason,
+            },
+          },
+          { session, runValidators: true },
         );
-        if (!wallet) {
-          [wallet] = await Wallet.create(
-            [
-              {
-                userId: currentPayment.customerId,
-                balance: refundAmount,
-                pendingBalance: 0,
-                currency: "VND",
-              },
-            ],
-            { session },
-          );
-        }
-        if (!wallet) {
-          throw new AppError("Không thể tạo ví hoàn tiền cho khách hàng", 500);
-        }
+        await refreshCancelledOrderPaymentStatus(order._id as Types.ObjectId, session);
+        return;
+      }
 
-        await WalletTransaction.create(
-          [
-            {
-              walletId: wallet._id,
-              userId: currentPayment.customerId,
-              relatedOrderId: order._id,
-              relatedPaymentId: currentPayment._id,
-              type: "refund",
-              direction: "in",
-              amount: refundAmount,
-              balanceAfter: wallet.balance,
-              status: "success",
-              transactionCode: buildTransactionCode("REFUND"),
-              description: "Hoàn tiền PayOS vào ví Handigo",
-              metadata: {
-                orderCode: order.orderCode,
+      const transactionalPayment = await Payment.findById(payment._id)
+        .select("status metadata")
+        .session(session);
+      if (!transactionalPayment || transactionalPayment.status !== "paid") return;
+
+      const currentRefund = (
+        transactionalPayment.metadata as {
+          refund?: { payoutId?: string; status?: string; reason?: string };
+        } | null
+      )?.refund;
+      if (currentRefund?.payoutId) {
+        throw new AppError(
+          "Không thể hoàn vào ví vì payment đã có lệnh payout PayOS",
+          409,
+        );
+      }
+      if (
+        currentRefund?.status === "retry_required" &&
+        currentRefund.reason !== PAYOS_SOURCE_ACCOUNT_UNAVAILABLE_MESSAGE
+      ) {
+        throw new AppError(
+          "Không thể hoàn vào ví vì trạng thái payout trước đó chưa chắc chắn",
+          409,
+        );
+      }
+
+      const now = new Date();
+      const claimedPayment = await Payment.findOneAndUpdate(
+        {
+          _id: payment._id,
+          status: "paid",
+          "metadata.refund.payoutId": { $exists: false },
+        },
+        {
+          $set: {
+            status: "refunded",
+            refundedAt: now,
+            refundReason: reason,
+            metadata: {
+              ...((transactionalPayment.metadata as Record<string, unknown>) || {}),
+              refund: {
+                status: "succeeded",
+                channel: "handigo_wallet",
                 sourceMethod: "payos",
                 destination: "handigo_wallet",
-                policyVersion: refundMetadata.policyVersion,
-                refundRate: refundMetadata.rate,
+                referenceId: "REFUND" + payment._id.toString(),
+                fallbackReason: "source_account_unavailable",
+                amount: refundAmount,
+                completedAt: now,
               },
+            },
+          },
+        },
+        { new: true, session, runValidators: true },
+      );
+      if (!claimedPayment) {
+        await refreshCancelledOrderPaymentStatus(order._id as Types.ObjectId, session);
+        return;
+      }
+
+      let wallet = await Wallet.findOne({
+        userId: payment.customerId,
+        isDeleted: false,
+      }).session(session);
+      if (!wallet) {
+        [wallet] = await Wallet.create(
+          [
+            {
+              userId: payment.customerId,
+              balance: 0,
+              pendingBalance: 0,
+              currency: "VND",
             },
           ],
           { session },
         );
-        creditedAmount = refundAmount;
       }
 
-      await refreshCancelledOrderPaymentStatus(order._id, session);
+      wallet.balance += refundAmount;
+      await wallet.save({ session });
+
+      await WalletTransaction.create(
+        [
+          {
+            walletId: wallet._id,
+            userId: payment.customerId,
+            relatedOrderId: order._id,
+            relatedPaymentId: payment._id,
+            type: "refund",
+            direction: "in",
+            amount: refundAmount,
+            balanceAfter: wallet.balance,
+            status: "success",
+            transactionCode: buildTransactionCode("REFUND"),
+            description: "Hoàn tiền PayOS về ví Handigo",
+            metadata: {
+              orderCode: order.orderCode,
+              reason,
+              sourceMethod: "payos",
+              fallbackReason: "source_account_unavailable",
+            },
+          },
+        ],
+        { session },
+      );
+
+      walletRefund = {
+        paymentId: payment._id as Types.ObjectId,
+        amount: refundAmount,
+      };
+      await refreshCancelledOrderPaymentStatus(order._id as Types.ObjectId, session);
     });
   } finally {
     await session.endSession();
   }
 
-  if (creditedAmount > 0) {
+  await Refund.updateOne(
+    { paymentId: payment._id },
+    {
+      $set: {
+        status: "succeeded",
+        channel: "handigo_wallet",
+        destination: "handigo_wallet",
+        completedAt: new Date(),
+        nextRetryAt: null,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        lastError: null,
+      },
+    },
+    { runValidators: true },
+  );
+
+  if (walletRefund) {
     try {
       await createNotificationRecord({
         userId: payment.customerId,
         type: "PAYMENT",
         title: "Hoàn tiền thành công",
-        content: "Tiền hoàn đã được cộng vào ví Handigo của bạn.",
+        content:
+          "PayOS không cung cấp tài khoản nguồn. Tiền đã được hoàn vào ví Handigo của bạn.",
         data: {
           orderId: order._id,
           paymentId: payment._id,
-          amount: creditedAmount,
-          destination: "handigo_wallet",
+          amount: refundAmount,
+          refundChannel: "handigo_wallet",
         },
       });
     } catch (error) {
-      cancellationLogger.error("Không thể tạo thông báo hoàn tiền vào ví.", error, {
+      cancellationLogger.error("Không thể gửi thông báo hoàn tiền về ví.", error, {
+        orderId: order._id.toString(),
         paymentId: payment._id.toString(),
       });
     }
@@ -687,33 +1009,80 @@ const requestPayosRefund = async (
   reason: string,
   refundAmount: number,
 ) => {
-  const existingRefund = (payment.metadata as any)?.refund;
-  if (existingRefund?.payoutId) {
-    await reconcilePayosRefund(payment, reason, existingRefund.payoutId);
-    return;
-  }
+  const queuedRefund = await ensurePayosRefundRecord(
+    payment,
+    order,
+    reason,
+    refundAmount,
+  );
+  const refund = await claimRefund(queuedRefund._id as Types.ObjectId);
+  if (!refund) return;
 
-  if (
-    existingRefund &&
-    existingRefund.sourceMethod === "payos" &&
-    existingRefund.destination !== "handigo_wallet"
-  ) {
-    const referenceId = "REFUND" + payment._id.toString();
-    const payoutPage = await payos.payouts.list({ referenceId, limit: 1 });
-    const existingPayout = payoutPage.data[0];
-    if (existingPayout) {
-      await storePayosRefundMetadata(payment._id as Types.ObjectId, {
-        payoutId: existingPayout.id,
-        referenceId: existingPayout.referenceId,
-        approvalState: existingPayout.approvalState,
-        checkedAt: new Date(),
-      });
-      await reconcilePayosRefund(payment, reason, existingPayout.id);
+  try {
+    if (refund.payoutId) {
+      await reconcilePayosRefund(payment, refund, reason, refund.payoutId);
       return;
     }
-  }
 
-  await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
+    const payoutPage = await payoutPayos.payouts.list({
+      referenceId: refund.referenceId,
+      limit: 1,
+    });
+    const existingPayout = payoutPage.data[0];
+    if (existingPayout) {
+      refund.payoutId = existingPayout.id;
+      await refund.save();
+      await reconcilePayosRefund(payment, refund, reason, existingPayout.id);
+      return;
+    }
+
+    const paymentLink = await payos.paymentRequests.get(
+      Number(payment.gatewayOrderCode),
+    );
+    const sourceTransaction = paymentLink.transactions.find(
+      (item) =>
+        item.counterAccountBankId &&
+        item.counterAccountNumber &&
+        item.amount >= refundAmount,
+    );
+
+    if (!sourceTransaction) {
+      await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
+      return;
+    }
+
+    await storePayosRefundMetadata(payment._id as Types.ObjectId, {
+      status: "requesting",
+      referenceId: refund.referenceId,
+      sourceMethod: "payos",
+      destination: "source_account",
+      amount: refundAmount,
+      requestedAt: new Date(),
+    });
+    refund.channel = "payos_payout";
+    refund.destination = "source_account";
+    await refund.save();
+
+    const payout = await payoutPayos.payouts.create(
+      {
+        referenceId: refund.referenceId,
+        amount: refundAmount,
+        description: "Hoan tien Handigo",
+        toBin: sourceTransaction.counterAccountBankId as string,
+        toAccountNumber: sourceTransaction.counterAccountNumber as string,
+      },
+      refund.referenceId,
+    );
+
+    refund.payoutId = payout.id;
+    refund.approvalState = payout.approvalState;
+    refund.providerResponse = buildPayoutAuditSnapshot(payout);
+    await refund.save();
+    await reconcilePayosRefund(payment, refund, reason, payout.id);
+  } catch (error) {
+    await recordRefundFailure(refund, error);
+    throw error;
+  }
 };
 
 const settlePendingPayosPayment = async (
@@ -854,19 +1223,9 @@ export const settleCancelledOrderPayments = async (
         );
       }
     } catch (error) {
-      const currentRefund = (payment.metadata as any)?.refund;
-      const retryCount = Number(currentRefund?.retryCount || 0) + 1;
-      const retryDelayMs = Math.min(retryCount * 5 * 60_000, 60 * 60_000);
       cancellationLogger.error("Không thể xử lý hoàn tiền PayOS.", error, {
         orderId: order._id.toString(),
         paymentId: payment._id.toString(),
-      });
-      await storePayosRefundMetadata(payment._id as Types.ObjectId, {
-        status: "retry_required",
-        retryCount,
-        nextRetryAt: new Date(Date.now() + retryDelayMs),
-        checkedAt: new Date(),
-        reason: error instanceof Error ? error.message : "Lỗi không xác định",
       });
     }
   }
@@ -878,17 +1237,41 @@ const notifyCancellation = async (
   order: IOrder,
   walletRefunds: WalletRefundResult[],
   reason: string,
+  systemCancellationType?: SystemCancellationType,
 ) => {
+  const customerNotification =
+    systemCancellationType === "payment_timeout"
+      ? {
+          title: "Đơn hàng đã hủy do quá hạn thanh toán",
+          content:
+            "Đơn " +
+            order.orderCode +
+            " đã tự động hủy vì bạn chưa thanh toán trong thời hạn giữ lịch.",
+        }
+      : systemCancellationType === "provider_unavailable"
+        ? {
+            title: "Đơn hàng đã hủy vì chưa tìm được chuyên gia",
+            content:
+              "Handigo chưa tìm được chuyên gia nhận đơn " +
+              order.orderCode +
+              " trong thời gian quy định. Vui lòng đặt lại khi phù hợp.",
+          }
+        : {
+            title: "Đơn hàng đã được hủy",
+            content: "Đơn " + order.orderCode + " đã được hủy. Lý do: " + reason,
+          };
+
   await createNotificationRecord({
     userId: order.customerId,
     type: "ORDER",
-    title: "Đơn hàng đã được hủy",
-    content: "Đơn " + order.orderCode + " đã được hủy. Lý do: " + reason,
+    title: customerNotification.title,
+    content: customerNotification.content,
     data: {
       orderId: order._id,
       orderCode: order.orderCode,
       status: "cancelled",
       reason,
+      systemCancellationType,
     },
   });
 
@@ -1037,8 +1420,8 @@ export const cancelOrderWithSettlement = async (
       );
 
       if (
-        refundPolicy.refundRate === 100 &&
-        claimedOrder.voucherSnapshot?.voucherId
+        claimedOrder.voucherSnapshot?.voucherId &&
+        claimedOrder.voucherUsedAt
       ) {
         await Promotion.updateOne(
           {
@@ -1095,7 +1478,12 @@ export const cancelOrderWithSettlement = async (
 
   if (newlyCancelled) {
     try {
-      await notifyCancellation(cancelledOrder, walletRefunds, reason);
+      await notifyCancellation(
+        cancelledOrder,
+        walletRefunds,
+        reason,
+        input.systemCancellationType,
+      );
     } catch (error) {
       cancellationLogger.error("Không thể tạo thông báo hủy đơn.", error, {
         orderId: input.orderId,
@@ -1114,13 +1502,187 @@ export const cancelOrderWithSettlement = async (
 export const cancelSystemOrderWithSettlement = async (
   orderId: string,
   reason: string,
+  systemCancellationType?: SystemCancellationType,
 ) =>
   cancelOrderWithSettlement({
     orderId,
     role: "admin",
     reason,
     system: true,
+    systemCancellationType,
   });
+
+export const backfillLegacyPayosRefunds = async (limit = 500) => {
+  const payments = await Payment.find({
+    method: "payos",
+    status: { $in: ["paid", "refunded"] },
+    "metadata.refund.status": { $exists: true },
+    isDeleted: false,
+  })
+    .sort({ updatedAt: 1 })
+    .limit(limit);
+
+  let createdCount = 0;
+  for (const payment of payments) {
+    if (await Refund.exists({ paymentId: payment._id })) continue;
+
+    const order = await Order.findById(payment.orderId).select(
+      "customerId orderCode cancellation",
+    );
+    if (!order) continue;
+
+    const legacyRefund =
+      (
+        payment.metadata as { refund?: LegacyRefundMetadata } | null
+      )?.refund || {};
+    const legacyStatus = String(legacyRefund.status || "requested");
+    const status =
+      payment.status === "refunded" || legacyStatus === "succeeded"
+        ? "succeeded"
+        : legacyStatus === "pending"
+          ? "pending"
+          : "failed";
+    const referenceId =
+      String(legacyRefund.referenceId || "") ||
+      "REFUND" + payment._id.toString();
+
+    const result = await Refund.updateOne(
+      { paymentId: payment._id },
+      {
+        $setOnInsert: {
+          paymentId: payment._id,
+          orderId: payment.orderId,
+          customerId: payment.customerId,
+          amount: Number(legacyRefund.amount ?? payment.amount),
+          reason:
+            payment.refundReason ||
+            order.cancellation?.reason ||
+            "Hoàn tiền đơn hàng đã hủy",
+          currency: "VND",
+          sourceMethod: "payos",
+          channel:
+            legacyRefund.channel === "handigo_wallet"
+              ? "handigo_wallet"
+              : legacyRefund.payoutId
+                ? "payos_payout"
+                : null,
+          destination:
+            legacyRefund.destination === "handigo_wallet"
+              ? "handigo_wallet"
+              : legacyRefund.payoutId
+                ? "source_account"
+                : null,
+          status,
+          referenceId,
+          payoutId: legacyRefund.payoutId || null,
+          approvalState: legacyRefund.approvalState || null,
+          attemptCount: Number(legacyRefund.retryCount || 0),
+          nextRetryAt:
+            status === "succeeded"
+              ? null
+              : legacyRefund.nextRetryAt || new Date(),
+          completedAt:
+            status === "succeeded"
+              ? legacyRefund.completedAt || payment.refundedAt || new Date()
+              : null,
+        },
+      },
+      { upsert: true, runValidators: true },
+    );
+    if (result.upsertedCount > 0) createdCount += 1;
+  }
+
+  return { scannedCount: payments.length, createdCount };
+};
+
+const processRefundJob = async (refund: IRefund) => {
+  const [payment, order] = await Promise.all([
+    Payment.findById(refund.paymentId),
+    Order.findById(refund.orderId),
+  ]);
+
+  if (payment?.status === "refunded") {
+    await Refund.updateOne(
+      { _id: refund._id },
+      {
+        $set: {
+          status: "succeeded",
+          completedAt: payment.refundedAt || new Date(),
+          nextRetryAt: null,
+          leaseOwner: null,
+          leaseExpiresAt: null,
+        },
+      },
+      { runValidators: true },
+    );
+    return;
+  }
+
+  if (!payment || !order || order.status !== "cancelled" || payment.status !== "paid") {
+    const claimedRefund = await claimRefund(refund._id as Types.ObjectId);
+    if (claimedRefund) {
+      await recordRefundFailure(
+        claimedRefund,
+        new AppError("Dữ liệu payment hoặc order không hợp lệ để hoàn tiền", 409),
+      );
+    }
+    return;
+  }
+
+  await requestPayosRefund(payment, order, refund.reason, refund.amount);
+};
+
+export const retryPayosRefundByPaymentId = async (paymentId: string) => {
+  assertObjectId(paymentId, "ID giao dịch");
+  const refund = await Refund.findOneAndUpdate(
+    {
+      paymentId,
+      status: { $in: ["failed", "manual_review"] },
+      isDeleted: false,
+    },
+    {
+      $set: {
+        status: "requested",
+        attemptCount: 0,
+        nextRetryAt: new Date(),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        lastError: null,
+        manualReviewAt: null,
+        adminAlertedAt: null,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!refund) {
+    throw new AppError(
+      "Không tìm thấy yêu cầu hoàn tiền PayOS cần thử lại",
+      404,
+    );
+  }
+
+  await storePayosRefundMetadata(refund.paymentId, {
+    status: "requested",
+    referenceId: refund.referenceId,
+    sourceMethod: "payos",
+    destination: refund.destination,
+    amount: refund.amount,
+    retryCount: 0,
+    nextRetryAt: refund.nextRetryAt,
+    reason: null,
+  });
+
+  try {
+    await processRefundJob(refund);
+  } catch (error) {
+    cancellationLogger.error("Thử lại hoàn tiền PayOS chưa thành công.", error, {
+      refundId: refund._id.toString(),
+      paymentId,
+    });
+  }
+
+  return Refund.findById(refund._id);
+};
 
 export const startRefundReconciliationMonitor = () => {
   if (refundMonitor) {
@@ -1129,49 +1691,37 @@ export const startRefundReconciliationMonitor = () => {
 
   const scan = async () => {
     const now = new Date();
-    const payments = await Payment.find({
-      method: "payos",
-      status: { $in: ["pending", "paid"] },
-      $or: [
+    await backfillLegacyPayosRefunds(100);
+    const refunds = await Refund.find({
+      status: { $in: ["requested", "requesting", "pending", "failed"] },
+      isDeleted: false,
+      $and: [
         {
-          "metadata.refund.status": "pending",
-          "metadata.refund.payoutId": { $exists: true },
+          $or: [
+            { nextRetryAt: null },
+            { nextRetryAt: { $exists: false } },
+            { nextRetryAt: { $lte: now } },
+          ],
         },
         {
-          "metadata.refund.status": "retry_required",
-          "metadata.refund.nextRetryAt": { $lte: now },
-        },
-        {
-          "metadata.refund.status": "requesting",
-          "metadata.refund.nextRetryAt": { $lte: now },
+          $or: [
+            { leaseExpiresAt: null },
+            { leaseExpiresAt: { $exists: false } },
+            { leaseExpiresAt: { $lte: now } },
+          ],
         },
       ],
     })
       .sort({ updatedAt: 1 })
       .limit(100);
 
-    for (const payment of payments) {
-      const refund = (payment.metadata as any)?.refund;
-      if (!refund) {
-        continue;
-      }
-
+    for (const refund of refunds) {
       try {
-        if (refund.payoutId) {
-          await reconcilePayosRefund(
-            payment,
-            payment.refundReason || "Hoàn tiền đơn hàng đã hủy",
-            refund.payoutId,
-          );
-        } else {
-          await settleCancelledOrderPayments(
-            payment.orderId,
-            payment.refundReason || "Hoàn tiền đơn hàng đã hủy",
-          );
-        }
+        await processRefundJob(refund);
       } catch (error) {
         cancellationLogger.error("Đối soát payout PayOS thất bại.", error, {
-          paymentId: payment._id.toString(),
+          refundId: refund._id.toString(),
+          paymentId: refund.paymentId.toString(),
           payoutId: refund.payoutId,
         });
       }

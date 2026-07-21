@@ -16,6 +16,7 @@ import type { Address, Service, ServiceOption } from "../../../types/booking";
 import type { AvailableVoucher } from "../types/voucher.types";
 import { isRequiredOptionSelectionMissing } from "../utils/serviceOptionSelection";
 import { tokenStorage } from "@/api/tokenStorage";
+import { WalletBalanceText } from "@/features/wallet/components/WalletBalanceText";
 
 const paymentMethods = [
   [
@@ -35,6 +36,9 @@ const paymentMethods = [
 
 const getOptionPrice = (option: ServiceOption) =>
   option.price ?? option.fixedPrice ?? 0;
+
+const PENDING_ORDER_ID_KEY = "pendingBookingOrderId";
+const PENDING_ORDER_FINGERPRINT_KEY = "pendingBookingFingerprint";
 
 const formatAddress = (address: Address | null) => {
   if (!address) return "";
@@ -69,6 +73,17 @@ const ConfirmPaymentPage = () => {
     reset,
   } = useBookingStore();
 
+  const bookingFingerprint = JSON.stringify({
+    serviceId,
+    selectedOptionIds: [...selectedOptionIds].sort(),
+    addressId,
+    orderType,
+    preferredProviderId,
+    scheduledAt,
+    recurrenceUnit,
+    recurrenceCount,
+  });
+
   const [service, setService] = useState<Service | null>(null);
   const [address, setAddress] = useState<Address | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
@@ -78,8 +93,15 @@ const ConfirmPaymentPage = () => {
     AvailableVoucher[]
   >([]);
   const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<AvailableVoucher | null>(
+    null,
+  );
   const [voucherError, setVoucherError] = useState("");
-  const [pendingOrderId, setPendingOrderId] = useState("");
+  const [pendingOrderId, setPendingOrderId] = useState(() =>
+    sessionStorage.getItem(PENDING_ORDER_FINGERPRINT_KEY) === bookingFingerprint
+      ? sessionStorage.getItem(PENDING_ORDER_ID_KEY) || ""
+      : "",
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -122,11 +144,52 @@ const ConfirmPaymentPage = () => {
   const selectedOptions = options.filter((opt) =>
     selectedOptionIds.includes(opt._id),
   );
+  const orderAmount =
+    service?.serviceType === "variable_price"
+      ? service.depositAmount || 0
+      : (service?.fixedPrice || 0) +
+        selectedOptions.reduce((sum, option) => sum + getOptionPrice(option), 0);
+  const voucherDiscountAmount = appliedVoucher
+    ? Math.min(
+        appliedVoucher.discountType === "PERCENT"
+          ? Math.floor((orderAmount * appliedVoucher.discountValue) / 100)
+          : appliedVoucher.discountValue,
+        appliedVoucher.maxDiscountAmount ?? Number.POSITIVE_INFINITY,
+        orderAmount,
+      )
+    : 0;
   const effectivePaymentMethod =
-    service?.serviceType === "variable_price" && paymentMethod !== "bank"
+    service?.serviceType === "variable_price" && paymentMethod === "cash"
       ? "bank"
       : paymentMethod;
   const isAppointment = orderType === "scheduled" || orderType === "recurring";
+
+  const applyVoucherCode = (code: string) => {
+    const normalizedCode = code.trim().toUpperCase();
+    if (!normalizedCode) {
+      setAppliedVoucher(null);
+      setVoucherError("");
+      return;
+    }
+
+    const voucher = availableVouchers.find(
+      (item) => item.code.toUpperCase() === normalizedCode,
+    );
+    if (!voucher) {
+      setAppliedVoucher(null);
+      setVoucherError("Voucher không tồn tại hoặc không còn khả dụng.");
+      return;
+    }
+    if (orderAmount < (voucher.minOrderAmount ?? 0)) {
+      setAppliedVoucher(null);
+      setVoucherError("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng voucher.");
+      return;
+    }
+
+    setVoucherCode(voucher.code);
+    setAppliedVoucher(voucher);
+    setVoucherError("");
+  };
 
   const handleConfirm = async () => {
     if (!serviceId) {
@@ -148,10 +211,15 @@ const ConfirmPaymentPage = () => {
       setPaymentError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.");
       return;
     }
+    if (voucherCode.trim() && !appliedVoucher) {
+      setVoucherError("Vui lòng áp dụng voucher hợp lệ trước khi thanh toán.");
+      return;
+    }
 
     setIsSubmitting(true);
     setPaymentError("");
     setVoucherError("");
+    let orderId = pendingOrderId;
     try {
       const payload: CreateOrderPayload = {
         serviceId,
@@ -171,27 +239,23 @@ const ConfirmPaymentPage = () => {
         problemDescription,
         customerAttachments,
         paymentMethod: effectivePaymentMethod,
+        voucherCode: appliedVoucher?.code,
       };
 
-      let orderId = pendingOrderId;
       if (!orderId) {
         const createdOrder = await bookingApi.createOrder(payload);
         orderId = createdOrder._id;
         setPendingOrderId(orderId);
-      }
-
-      const currentOrder = await bookingApi.getOrderById(orderId);
-      const currentVoucherCode = currentOrder.voucherSnapshot?.code || "";
-      const desiredVoucherCode = voucherCode.trim().toUpperCase();
-
-      if (currentVoucherCode && currentVoucherCode !== desiredVoucherCode) {
-        await bookingVoucherApi.remove(orderId);
-      }
-      if (desiredVoucherCode && currentVoucherCode !== desiredVoucherCode) {
-        await bookingVoucherApi.apply(orderId, desiredVoucherCode);
+        sessionStorage.setItem(PENDING_ORDER_ID_KEY, orderId);
+        sessionStorage.setItem(
+          PENDING_ORDER_FINGERPRINT_KEY,
+          bookingFingerprint,
+        );
       }
 
       if (orderType === "scheduled" || orderType === "recurring") {
+        sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
+        sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
         reset();
         navigate(`/customer/bookings/${orderId}`);
         return;
@@ -224,7 +288,10 @@ const ConfirmPaymentPage = () => {
           ? {
               orderId,
               method: "WALLET",
-              paymentType: "FULL",
+              paymentType:
+                service?.serviceType === "variable_price"
+                  ? "INSPECTION_DEPOSIT"
+                  : "FULL",
             }
           : {
               orderId,
@@ -235,6 +302,8 @@ const ConfirmPaymentPage = () => {
 
       const orderDetail = await bookingApi.getOrderById(orderId);
 
+      sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
+      sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
       reset();
       navigate("/customer/bookings/success", { state: { order: orderDetail } });
     } catch (error) {
@@ -251,6 +320,16 @@ const ConfirmPaymentPage = () => {
           ?.message ||
         requestError.response?.data?.message ||
         "Không thể tạo đơn đặt lịch. Vui lòng thử lại hoặc chọn địa chỉ khác.";
+      if (orderId && !isAppointment) {
+        try {
+          await bookingApi.discardUnpaidOrder(orderId);
+          setPendingOrderId("");
+          sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
+          sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
+        } catch {
+          // Giữ lại mã đơn để lần thử sau tiếp tục trên cùng một đơn hợp lệ.
+        }
+      }
       console.error("Không thể tạo đơn đặt lịch.", error);
       if (message.toLowerCase().includes("voucher")) {
         setVoucherError(message);
@@ -279,7 +358,7 @@ const ConfirmPaymentPage = () => {
       preferredProviderId
         ? isAppointment
           ? preferredProviderName || "Chuyên gia đã chọn"
-          : `Ưu tiên ${preferredProviderName || "chuyên gia đã chọn"}`
+          : `Yêu cầu trực tiếp ${preferredProviderName || "provider đã chọn"}`
         : "Handigo tự điều phối",
     ],
   ] as string[][];
@@ -302,74 +381,6 @@ const ConfirmPaymentPage = () => {
               </div>
             </section>
           )}
-          <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
-            <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">
-                local_offer
-              </span>
-              Voucher
-            </h2>
-            <label className="block text-sm font-semibold">
-              Chọn voucher khả dụng
-              <select
-                name="availableVoucher"
-                autoComplete="off"
-                value={voucherCode}
-                onChange={(event) => {
-                  setVoucherCode(event.target.value);
-                  setVoucherError("");
-                }}
-                disabled={isSubmitting}
-                className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
-              >
-                <option value="">Không sử dụng voucher</option>
-                {availableVouchers.map((voucher) => (
-                  <option key={voucher.id} value={voucher.code}>
-                    {voucher.code} ·{" "}
-                    {voucher.discountType === "PERCENT"
-                      ? `Giảm ${voucher.discountValue}%`
-                      : `Giảm ${voucher.discountValue.toLocaleString("vi-VN")}đ`}
-                    {voucher.minOrderAmount
-                      ? ` · Đơn từ ${voucher.minOrderAmount.toLocaleString("vi-VN")}đ`
-                      : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="mt-3 flex gap-2">
-              <input
-                name="voucherCode"
-                aria-label="Nhập mã voucher"
-                autoComplete="off"
-                spellCheck={false}
-                value={voucherCode}
-                onChange={(event) => {
-                  setVoucherCode(event.target.value.toUpperCase());
-                  setVoucherError("");
-                }}
-                maxLength={50}
-                disabled={isSubmitting}
-                placeholder="Hoặc nhập mã voucher"
-                className="min-h-11 flex-1 rounded-xl border border-outline-variant px-3 uppercase"
-              />
-              {voucherCode && (
-                <button
-                  type="button"
-                  onClick={() => setVoucherCode("")}
-                  disabled={isSubmitting}
-                  className="rounded-xl border border-outline-variant px-4 font-semibold text-on-surface-variant"
-                >
-                  Gỡ
-                </button>
-              )}
-            </div>
-            {voucherError && (
-              <p className="mt-3 rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
-                {voucherError}
-              </p>
-            )}
-          </section>
-
           <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
             <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">
@@ -437,10 +448,9 @@ const ConfirmPaymentPage = () => {
               {paymentMethods
                 .filter(([, , , value]) => {
                   if (service?.serviceType === "variable_price") {
-                    // Dịch vụ cần khảo sát chỉ thanh toán tiền cọc qua PayOS.
-                    return value === "bank";
+                    // Dịch vụ cần khảo sát cho phép đặt cọc qua PayOS hoặc Ví Handigo.
+                    return value !== "cash";
                   }
-                  // Fixed price: All 3 methods (Wallet, Bank, Cash)
                   return true;
                 })
                 .map(([icon, title, subtitle, value]) => (
@@ -471,6 +481,7 @@ const ConfirmPaymentPage = () => {
                         <p className="font-label-sm text-label-sm text-on-surface-variant">
                           {subtitle}
                         </p>
+                        {value === "wallet" && <WalletBalanceText />}
                       </div>
                     </div>
                     <div className="w-6 h-6 border-2 border-outline-variant rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">
@@ -491,6 +502,7 @@ const ConfirmPaymentPage = () => {
         <div className="lg:col-span-4">
           <OrderSummaryCard
             step={3}
+            discountAmount={voucherDiscountAmount}
             actionLabel={
               orderType === "scheduled" || orderType === "recurring"
                 ? "Gửi yêu cầu lịch hẹn"
@@ -498,6 +510,72 @@ const ConfirmPaymentPage = () => {
             }
             onAction={handleConfirm}
             isLoading={isSubmitting}
+            summaryContent={
+              <div className="border-t border-dashed border-outline-variant pt-md">
+                <label className="block text-sm font-semibold text-on-surface">
+                  Voucher
+                  <select
+                    value={voucherCode}
+                    onChange={(event) => {
+                      const code = event.target.value;
+                      setVoucherCode(code);
+                      applyVoucherCode(code);
+                    }}
+                    disabled={isSubmitting}
+                    className="mt-2 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3"
+                  >
+                    <option value="">Không sử dụng voucher</option>
+                    {availableVouchers.map((voucher) => (
+                      <option key={voucher.id} value={voucher.code}>
+                        {voucher.code} · {voucher.discountType === 'PERCENT'
+                          ? `Giảm ${voucher.discountValue}%`
+                          : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}đ`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={voucherCode}
+                    onChange={(event) => {
+                      setVoucherCode(event.target.value.toUpperCase());
+                      setAppliedVoucher(null);
+                      setVoucherError('');
+                    }}
+                    maxLength={50}
+                    disabled={isSubmitting}
+                    placeholder="Hoặc nhập mã voucher"
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-outline-variant px-3 uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyVoucherCode(voucherCode)}
+                    disabled={isSubmitting || !voucherCode.trim()}
+                    className="rounded-xl bg-primary px-3 font-semibold text-on-primary disabled:opacity-50"
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+                {appliedVoucher && (
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                    <span>Đã áp dụng {appliedVoucher.code}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVoucherCode('');
+                        setAppliedVoucher(null);
+                        setVoucherError('');
+                      }}
+                      disabled={isSubmitting}
+                      className="underline"
+                    >
+                      Gỡ
+                    </button>
+                  </div>
+                )}
+                {voucherError && <p className="mt-2 text-sm font-medium text-error">{voucherError}</p>}
+              </div>
+            }
           />
         </div>
       </div>

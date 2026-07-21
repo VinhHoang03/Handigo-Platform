@@ -5,6 +5,7 @@ import { AssignmentService } from "../services/assignment.service";
 import { DispatchService } from "../services/dispatch.service";
 import { OrderService } from "../services/order.service";
 import { AppError } from "../utils/appError";
+import { respondToProviderReassignment } from "../services/orderReassignment.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
@@ -128,6 +129,22 @@ export const getRecurringSeries = async (
   }
 };
 
+export const discardUnpaidOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const result = await OrderService.discardUnpaidOrder(
+      param(req, "orderId"),
+      uid(req),
+    );
+    return ok(res, result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const selectAppointmentProvider = async (
   req: Request,
   res: Response,
@@ -163,6 +180,23 @@ export const cancelOrder = async (
       uid(req),
       role,
       reason,
+    );
+    return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const respondToReassignment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const order = await respondToProviderReassignment(
+      param(req, "orderId"),
+      uid(req),
+      req.body.decision,
     );
     return ok(res, order);
   } catch (error) {
@@ -274,7 +308,7 @@ export const rejectAssignment = async (
       rejectReason,
     );
     return ok(res, {
-      message: "Đã từ chối đơn hàng và chuyển sang provider tiếp theo.",
+      message: "Đã từ chối yêu cầu nhận đơn.",
     });
   } catch (error) {
     return next(error);

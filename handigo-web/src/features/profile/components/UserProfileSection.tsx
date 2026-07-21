@@ -59,6 +59,12 @@ const toDateInput = (value?: string | null) => {
   return date.toISOString().slice(0, 10);
 };
 
+const getTodayDate = () => {
+  const today = new Date();
+  const timezoneOffset = today.getTimezoneOffset() * 60_000;
+  return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
+
 const toProfileForm = (user: UserProfileData): UserProfileFormValue => ({
   fullName: user.fullName || "",
   phone: user.phone || "",
@@ -120,6 +126,7 @@ function TextField({
   label,
   value,
   type = "text",
+  max,
   required,
   highlighted,
   error,
@@ -129,6 +136,7 @@ function TextField({
   label: string;
   value: string;
   type?: string;
+  max?: string;
   required?: boolean;
   highlighted?: boolean;
   error?: string;
@@ -143,6 +151,7 @@ function TextField({
         id={id}
         type={type}
         value={value}
+        max={max}
         required={required}
         onChange={(event) => onChange(event.target.value)}
         className={[
@@ -268,6 +277,7 @@ export function UserProfileSection({
   const [fieldErrors, setFieldErrors] = useState<{
     fullName?: string;
     phone?: string;
+    birthday?: string;
   }>({});
 
   const avatarSrc = isEditing
@@ -281,7 +291,11 @@ export function UserProfileSection({
 
     const normalizedName = profileForm.fullName.trim().replace(/\s+/g, " ");
     const normalizedPhone = normalizeVietnamesePhone(profileForm.phone || "");
-    const nextFieldErrors: { fullName?: string; phone?: string } = {};
+    const nextFieldErrors: {
+      fullName?: string;
+      phone?: string;
+      birthday?: string;
+    } = {};
 
     if (!normalizedName) {
       nextFieldErrors.fullName = "Vui lòng nhập họ và tên.";
@@ -292,6 +306,10 @@ export function UserProfileSection({
 
     if (normalizedPhone && !isValidVietnamesePhone(normalizedPhone)) {
       nextFieldErrors.phone = "Số điện thoại Việt Nam không hợp lệ.";
+    }
+
+    if (profileForm.birthday && profileForm.birthday > getTodayDate()) {
+      nextFieldErrors.birthday = "Ngày sinh không được sau ngày hiện tại.";
     }
 
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -468,12 +486,18 @@ export function UserProfileSection({
                     label="Ngày sinh"
                     type="date"
                     value={profileForm.birthday || ""}
-                    onChange={(value) =>
+                    max={getTodayDate()}
+                    error={fieldErrors.birthday}
+                    onChange={(value) => {
                       setProfileForm((current) => ({
                         ...current,
                         birthday: value,
-                      }))
-                    }
+                      }));
+                      setFieldErrors((current) => ({
+                        ...current,
+                        birthday: undefined,
+                      }));
+                    }}
                   />
                 </>
               ) : (
