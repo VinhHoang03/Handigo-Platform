@@ -233,7 +233,7 @@ export default function ProviderOrderDetailPage() {
       .join(', ');
   const paymentStatusLabels: Record<Order['paymentStatus'], string> = {
     unpaid: 'Chưa thanh toán',
-    partially_paid: 'Đã thanh toán một phần',
+    partially_paid: 'Đã thanh toán tiền cọc',
     paid: 'Đã thanh toán',
     refunded: 'Đã hoàn tiền',
   };

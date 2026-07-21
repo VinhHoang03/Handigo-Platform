@@ -786,21 +786,10 @@ const BookingDetailPage = () => {
   };
 
   const providerInfo = getProviderInfo();
-<<<<<<< HEAD
-  const hasPaidInitialPayment = payments.some(
-=======
-  const paymentStatusDisplay = getPaymentStatusDisplay(order);
   const hasSuccessfulPayment = ["paid", "partially_paid"].includes(
     order.paymentStatus,
   );
-  const paidAmount = payments
-    .filter((payment) => payment.status === "paid")
-    .reduce((total, payment) => total + payment.amount, 0);
-  const remainingAmount = quotation
-    ? Math.max(quotation.quotation.finalAmount - paidAmount, 0)
-    : 0;
-  const hasPendingRemainingPayment = payments.some(
->>>>>>> 9456ae5f99676b2c297cbda84135dd406ad56bce
+  const hasPaidInitialPayment = payments.some(
     (payment) =>
       payment.status === "paid" &&
       ["full", "inspection_deposit"].includes(payment.paymentType),

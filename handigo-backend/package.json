@@ -13,6 +13,7 @@
     "migrate:provider-service-ids": "ts-node src/scripts/migrateProviderServiceIds.ts",
     "migrate:provider-applications": "ts-node src/scripts/migrateProviderApplicationReviewHistory.ts",
     "migrate:single-user-role": "ts-node src/scripts/migrateSingleUserRole.ts",
+    "migrate:fixed-option-pricing": "ts-node src/scripts/migrateFixedServiceOptionPricing.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

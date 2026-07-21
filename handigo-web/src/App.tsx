@@ -155,6 +155,9 @@ const NewsDetailPage = lazy(
   () => import("./features/content/pages/NewsDetailPage"),
 );
 const SupportPage = lazy(() => import("./features/content/pages/SupportPage"));
+const CaseManagementPage = lazy(
+  () => import("./features/case-management/pages/CaseManagementPage"),
+);
 
 function PageLoading() {
   return (
@@ -293,7 +296,7 @@ function App() {
                 path="/customer/support"
                 element={
                   <RouteGuard roles={["CUSTOMER"]}>
-                    <SupportPage role="CUSTOMER" />
+                    <CaseManagementPage role="CUSTOMER" />
                   </RouteGuard>
                 }
               />
@@ -381,7 +384,7 @@ function App() {
                 path="/provider/support"
                 element={
                   <RouteGuard roles={["PROVIDER"]}>
-                    <SupportPage role="PROVIDER" />
+                    <CaseManagementPage role="PROVIDER" />
                   </RouteGuard>
                 }
               />

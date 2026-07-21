@@ -12,7 +12,10 @@ import { groupServiceOptions, isRequiredOptionSelectionMissing } from '../utils/
 const getOptionPrice = (option: ServiceOption): number => option.price ?? option.fixedPrice ?? 0;
 
 const CreateBookingStep1Page = () => {
-  const { categoryId, setCategoryId, serviceId, setServiceId, toggleOption, selectedOptionIds } = useBookingStore();
+  const {
+    categoryId, setCategoryId, serviceId, setServiceId, toggleOption,
+    selectedOptionIds, selectedOptionQuantities, setOptionQuantity,
+  } = useBookingStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
@@ -204,6 +207,21 @@ const CreateBookingStep1Page = () => {
                                 {option.name}
                                 {!isVariablePrice && ` (+${getOptionPrice(option).toLocaleString()}đ)`}
                               </span>
+                              {option.allowsQuantity && selectedOptionIds.includes(option._id) && (
+                                <span className="ml-1 flex items-center gap-1 border-l border-outline-variant pl-2">
+                                  <span className="text-xs text-on-surface-variant">SL</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={99}
+                                    value={selectedOptionQuantities?.[option._id] ?? 1}
+                                    onChange={(event) => setOptionQuantity(option._id, Number(event.target.value))}
+                                    onClick={(event) => event.stopPropagation()}
+                                    aria-label={`Số lượng ${option.name}`}
+                                    className="w-14 rounded-md border border-outline-variant px-2 py-1 text-center"
+                                  />
+                                </span>
+                              )}
                             </label>
                           ))}
                         </div>

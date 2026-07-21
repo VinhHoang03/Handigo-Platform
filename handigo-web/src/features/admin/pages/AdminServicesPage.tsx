@@ -63,13 +63,14 @@ type OptionForm = {
   price: string;
   selectionGroup: string;
   selectionMode: ServiceOptionSelectionMode;
+  allowsQuantity: boolean;
   sortOrder: string;
   isActive: boolean;
 };
 
 const emptyOptionForm: OptionForm = {
   name: '', description: '', image: '', optionType: 'other', price: '', selectionGroup: '',
-  selectionMode: 'multiple', sortOrder: '0', isActive: true,
+  selectionMode: 'multiple', allowsQuantity: false, sortOrder: '0', isActive: true,
 };
 
 const toOptionPayload = (
@@ -83,6 +84,7 @@ const toOptionPayload = (
   price: serviceType === 'variable_price' ? 0 : Number(f.price) || 0,
   selectionGroup: f.selectionGroup.trim() || null,
   selectionMode: f.selectionMode,
+  allowsQuantity: f.allowsQuantity,
   sortOrder: Number(f.sortOrder) || 0,
   isActive: f.isActive,
 });
@@ -94,9 +96,9 @@ const toServicePayload = (f: ServiceForm): ServicePayload => ({
   image: f.image.trim() || undefined,
   description: f.description.trim() || undefined,
   serviceType: f.serviceType,
-  fixedPrice: f.serviceType === 'fixed_price' ? Number(f.fixedPrice) : null,
+  fixedPrice: null,
   depositAmount: f.serviceType === 'variable_price' ? Number(f.depositAmount) : null,
-  requiresOptionSelection: f.requiresOptionSelection,
+  requiresOptionSelection: f.serviceType === 'fixed_price' ? true : f.requiresOptionSelection,
   isActive: f.isActive,
 });
 
@@ -378,6 +380,7 @@ export default function AdminServicesPage() {
       price: String(opt.price),
       selectionGroup: opt.selectionGroup || '',
       selectionMode: opt.selectionMode ?? 'multiple',
+      allowsQuantity: opt.allowsQuantity ?? false,
       sortOrder: String(opt.sortOrder ?? 0),
       isActive: opt.isActive,
     };
@@ -487,8 +490,7 @@ export default function AdminServicesPage() {
 
   const getPriceLabel = (service: Service) => {
     if (service.serviceType === 'variable_price') return 'Giá linh hoạt';
-    if (service.fixedPrice != null) return money.format(service.fixedPrice);
-    return 'Giá cố định';
+    return 'Theo tùy chọn';
   };
 
   return (
@@ -758,6 +760,9 @@ export default function AdminServicesPage() {
                                     {opt.selectionGroup} · {opt.selectionMode === 'single' ? 'chọn một' : 'chọn nhiều'}
                                   </p>
                                 )}
+                                {opt.allowsQuantity && (
+                                  <p className="mt-1 text-xs text-primary">Có chọn số lượng</p>
+                                )}
                               </td>
                               <td className="border-y border-outline-variant/30 px-4 py-4 text-right font-bold text-primary tabular-nums">
                                 {selectedService.serviceType === 'variable_price'
@@ -827,14 +832,9 @@ export default function AdminServicesPage() {
                 </select>
               </label>
               {serviceForm.serviceType === 'fixed_price' && (
-                <FormInput
-                  label="Giá cơ bản (VNĐ)"
-                  name="service-fixed-price"
-                  type="number"
-                  required
-                  value={serviceForm.fixedPrice}
-                  onChange={(value) => setServiceForm({ ...serviceForm, fixedPrice: value })}
-                />
+                <p className="rounded-lg bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
+                  Giá dịch vụ được tính từ các tùy chọn bên dưới, không sử dụng giá cơ bản.
+                </p>
               )}
               {serviceForm.serviceType === 'variable_price' && (
                 <FormInput
@@ -861,12 +861,14 @@ export default function AdminServicesPage() {
           </fieldset>
 
           <ToggleRow checked={serviceForm.isActive} onChange={(value) => setServiceForm({ ...serviceForm, isActive: value })} label="Hiển thị dịch vụ" name="service-active" />
-          <ToggleRow
-            checked={serviceForm.requiresOptionSelection}
-            onChange={(value) => setServiceForm({ ...serviceForm, requiresOptionSelection: value })}
-            label="Bắt buộc chọn ít nhất một tùy chọn"
-            name="service-requires-option"
-          />
+          {serviceForm.serviceType === 'variable_price' && (
+            <ToggleRow
+              checked={serviceForm.requiresOptionSelection}
+              onChange={(value) => setServiceForm({ ...serviceForm, requiresOptionSelection: value })}
+              label="Bắt buộc chọn ít nhất một tùy chọn"
+              name="service-requires-option"
+            />
+          )}
           <FormActions busy={busy} onCancel={requestCloseServiceModal} />
         </form>
       </Modal>
@@ -930,6 +932,12 @@ export default function AdminServicesPage() {
               Dịch vụ giá linh hoạt không áp dụng giá riêng cho tùy chọn.
             </p>
           )}
+          <ToggleRow
+            checked={optionForm.allowsQuantity}
+            onChange={(v) => setOptionForm({ ...optionForm, allowsQuantity: v })}
+            label="Cho phép khách chọn số lượng"
+            name="option-allows-quantity"
+          />
           <ToggleRow checked={optionForm.isActive} onChange={(v) => setOptionForm({ ...optionForm, isActive: v })} label="Hiển thị tùy chọn" name="option-active" />
           <FormActions busy={busy} onCancel={requestCloseOptionModal} />
         </form>
