@@ -7,7 +7,6 @@ import { RepairQuotationForm } from '../components/RepairQuotationForm';
 import { PendingAssignmentCard } from '../components/PendingAssignmentCard';
 import type { OrderAssignment, QuotationDetail } from '../types/providerOrder.types';
 import type { Order } from '@/types/booking';
-import { useProviderAvailability } from '../hooks/useProviderAvailability';
 import {
   formatDateTime,
   formatMoney,
@@ -27,7 +26,6 @@ import { OrderTrackingMap } from '@/features/tracking/components/OrderTrackingMa
 export default function ProviderOrderDetailPage() {
   const navigate = useNavigate();
   const { orderId } = useParams();
-  const { isOnline, toggleAvailability } = useProviderAvailability();
   const [order, setOrder] = useState<Order | null>(null);
   const [assignment, setAssignment] = useState<OrderAssignment | null>(null);
   const [quotation, setQuotation] = useState<QuotationDetail | null>(null);
@@ -193,7 +191,7 @@ export default function ProviderOrderDetailPage() {
 
   if (loading) {
     return (
-      <DashboardShell role="PROVIDER" showStatusToggle isOnline={isOnline} onStatusToggle={toggleAvailability}>
+      <DashboardShell role="PROVIDER">
         <div className="flex min-h-[400px] flex-col items-center justify-center gap-sm">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
           <p className="text-on-surface-variant">Đang tải chi tiết đơn...</p>
@@ -204,7 +202,7 @@ export default function ProviderOrderDetailPage() {
 
   if (!order) {
     return (
-      <DashboardShell role="PROVIDER" showStatusToggle isOnline={isOnline} onStatusToggle={toggleAvailability}>
+      <DashboardShell role="PROVIDER">
         <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
           <span className="material-symbols-outlined mb-2 text-6xl text-error/60">error_outline</span>
           <h2 className="font-headline-md">{error || 'Không tìm thấy đơn dịch vụ'}</h2>
@@ -263,7 +261,7 @@ export default function ProviderOrderDetailPage() {
     !quotation;
 
   return (
-    <DashboardShell role="PROVIDER" showStatusToggle isOnline={isOnline} onStatusToggle={toggleAvailability}>
+    <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <Link to="/provider/orders" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
           <span className="material-symbols-outlined text-base">arrow_back</span>

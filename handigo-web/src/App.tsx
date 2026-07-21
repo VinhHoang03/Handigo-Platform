@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { RouteGuard } from "./components/common/RouteGuard";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { ToastProvider, ToastContainer } from "./components/common/Toast";
+import { SystemAlertProvider } from "./components/common/SystemAlert";
 import { useAuthStore } from "./features/auth/store/auth.store";
 import "./App.css";
 
@@ -193,8 +194,9 @@ function ProviderAssignmentModalGate() {
 function App() {
   return (
     <ToastProvider>
-      <Router>
-        <AuthBootstrap>
+      <SystemAlertProvider>
+        <Router>
+          <AuthBootstrap>
           <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<HomeRoute />} />
@@ -545,8 +547,9 @@ function App() {
           <Suspense fallback={null}>
             <ChatbotGate />
           </Suspense>
-        </AuthBootstrap>
-      </Router>
+          </AuthBootstrap>
+        </Router>
+      </SystemAlertProvider>
       <ToastContainer />
     </ToastProvider>
   );

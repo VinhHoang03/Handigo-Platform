@@ -7,6 +7,7 @@ import {
   roleSwitchConfig,
 } from "@/components/common/dashboard/dashboardNavigation";
 import type { DashboardRole } from "@/components/common/dashboard/dashboard.types";
+import { useProviderAvailability } from "@/features/provider/hooks/useProviderAvailability";
 
 interface DashboardShellProps {
   role: DashboardRole;
@@ -15,9 +16,6 @@ interface DashboardShellProps {
   onSwitch?: () => void;
   switchVariant?: "outline" | "gradient";
   userAvatar?: string;
-  showStatusToggle?: boolean;
-  isOnline?: boolean;
-  onStatusToggle?: () => void;
   hideSidebar?: boolean;
 }
 
@@ -28,13 +26,17 @@ export function DashboardShell({
   onSwitch,
   switchVariant,
   userAvatar,
-  showStatusToggle,
-  isOnline,
-  onStatusToggle,
   hideSidebar,
 }: DashboardShellProps) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const canManageProviderAvailability =
+    role === "PROVIDER" &&
+    (!user?.providerOnboardingStatus ||
+      user.providerOnboardingStatus === "APPROVED");
+  const { isOnline, toggleAvailability } = useProviderAvailability(
+    canManageProviderAvailability,
+  );
   const switchConfig = roleSwitchConfig[role];
   const defaultSwitchLabel =
     role === "PROVIDER" ? undefined : switchConfig.label;
@@ -55,9 +57,9 @@ export function DashboardShell({
       onSwitch={onSwitch ?? defaultOnSwitch}
       switchVariant={switchVariant ?? defaultSwitchVariant}
       userAvatar={avatar}
-      showStatusToggle={showStatusToggle}
+      showStatusToggle={canManageProviderAvailability}
       isOnline={isOnline}
-      onStatusToggle={onStatusToggle}
+      onStatusToggle={toggleAvailability}
       hideSidebar={hideSidebar}
     >
       {children}
