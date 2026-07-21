@@ -567,7 +567,7 @@ export default function SupportPage({ role }: SupportPageProps) {
         )}
       </section>
 
-      <section className={`mx-auto max-w-7xl ${role ? "py-4" : "px-6 py-14"}`}>
+      <section className={`mx-auto max-w-7xl ${role ? "py-4" : "px-6 pb-5 pt-8"}`}>
         <h2 className="mb-7 font-headline-lg text-3xl font-bold text-primary">
           Danh mục hỗ trợ
         </h2>
@@ -594,7 +594,7 @@ export default function SupportPage({ role }: SupportPageProps) {
           </section>
         </>
       ) : (
-        <section className="mx-auto grid max-w-7xl gap-8 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="mx-auto grid max-w-7xl gap-8 px-6 pb-4 pt-3 lg:grid-cols-[minmax(0,1fr)_360px]">
           <PublicSupportForm />
           <aside className="space-y-6">
             <div className="rounded-3xl bg-surface-container p-6">

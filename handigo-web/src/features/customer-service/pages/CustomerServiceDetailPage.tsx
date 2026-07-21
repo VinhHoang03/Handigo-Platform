@@ -57,7 +57,6 @@ const getErrorMessage = (
 };
 
 const CURRENT_LOCATION_VALUE = "__current_location__";
-const CURRENT_LOCATION_NOTE = "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
 const CURRENT_LOCATION_DUPLICATE_RADIUS_METERS = 50;
 
 interface CurrentLocationDraft {
@@ -407,7 +406,6 @@ export default function CustomerServiceDetailPage() {
 
       const createdAddress = await bookingApi.createAddress({
         ...currentLocationDraft,
-        note: CURRENT_LOCATION_NOTE,
         isDefault: false,
       });
 
@@ -751,36 +749,72 @@ export default function CustomerServiceDetailPage() {
             </div>
 
             <div className="mb-5">
-              <label
-                htmlFor="service-detail-address"
-                className="mb-2 block text-xs font-bold uppercase text-on-surface-variant"
-              >
+              <p className="mb-2 text-xs font-bold uppercase text-on-surface-variant">
                 Địa chỉ thực hiện
-              </label>
-              <div className="relative">
-                <select
-                  id="service-detail-address"
-                  value={addressId || ""}
+              </p>
+              <div
+                className="grid max-h-72 gap-2 overflow-y-auto pr-1"
+                role="radiogroup"
+                aria-label="Chọn địa chỉ thực hiện"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={false}
                   disabled={isLoadingAddresses || isLocating}
-                  onChange={(event) => handleAddressChange(event.target.value)}
-                  className="w-full appearance-none rounded-lg border border-outline-variant bg-surface-container-low px-3 py-3 pr-10 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => handleAddressChange(CURRENT_LOCATION_VALUE)}
+                  className="relative flex min-h-20 w-full items-start gap-3 rounded-xl border border-outline-variant/50 bg-surface-container-low p-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <option value="" disabled>
-                    {isLoadingAddresses ? "Đang tải địa chỉ..." : "Chọn địa chỉ"}
-                  </option>
-                                    <option value={CURRENT_LOCATION_VALUE}>
+                  <span className="material-symbols-outlined mt-0.5 shrink-0 text-xl leading-none text-primary">
+                    my_location
+                  </span>
+                  <span className="min-w-0 text-sm font-semibold leading-5 text-on-surface">
                     {isLocating ? "Đang lấy vị trí hiện tại..." : "Vị trí hiện tại"}
-                  </option>
-                  {addresses.map((address) => (
-                    <option key={address._id} value={address._id}>
-                      {address.isDefault ? "Mặc định - " : ""}
-                      {formatAddressLabel(address)}
-                    </option>
-                  ))}
-                </select>
-                <span className="pointer-events-none material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                  expand_more
-                </span>
+                  </span>
+                </button>
+
+                {addresses.map((address) => {
+                  const isSelected = address._id === addressId;
+
+                  return (
+                    <button
+                      key={address._id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      disabled={isLoadingAddresses || isLocating}
+                      onClick={() => handleAddressChange(address._id)}
+                      className={`relative flex min-h-20 w-full items-start gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isSelected
+                          ? "border-primary bg-primary/5"
+                          : "border-outline-variant/50 bg-surface-container-low hover:border-primary/50 hover:bg-primary/5"
+                      } ${address.isDefault ? "pb-8" : ""}`}
+                    >
+                      <span className="material-symbols-outlined mt-0.5 shrink-0 text-xl leading-none text-primary">
+                        location_on
+                      </span>
+                      <span className="min-w-0 flex-1 text-sm font-semibold leading-5 text-on-surface">
+                        {formatAddressLabel(address)}
+                      </span>
+                      {isSelected && (
+                        <span className="material-symbols-outlined shrink-0 text-xl leading-none text-primary">
+                          check_circle
+                        </span>
+                      )}
+                      {address.isDefault && (
+                        <span className="absolute bottom-2 right-3 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                          Mặc định
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+
+                {isLoadingAddresses && (
+                  <p className="rounded-xl bg-surface-container-low px-3 py-4 text-center text-sm text-on-surface-variant">
+                    Đang tải địa chỉ...
+                  </p>
+                )}
               </div>
               {addressSelectionError && (
                 <div className="mt-2 rounded-lg bg-error/10 px-3 py-2 text-xs font-semibold text-error">
@@ -798,18 +832,6 @@ export default function CustomerServiceDetailPage() {
                   )}
                 </div>
               )}
-              <p className="mt-2 text-[11px] text-on-surface-variant">
-                Địa chỉ vị trí hiện tại từ{" "}
-                <a
-                  href="https://www.openstreetmap.org/copyright"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold underline underline-offset-2"
-                >
-                  © OpenStreetMap contributors
-                </a>
-                .
-              </p>
             </div>
 
             <button

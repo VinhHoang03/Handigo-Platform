@@ -1,3 +1,5 @@
+import type { NewsContentBlock } from "../api/news.api";
+
 export interface NewsArticle {
   id: string;
   category: string;
@@ -6,6 +8,7 @@ export interface NewsArticle {
   date: string;
   readTime: string;
   image: string;
+  content?: NewsContentBlock[];
 }
 
 export const newsArticles: NewsArticle[] = [
@@ -17,6 +20,36 @@ export const newsArticles: NewsArticle[] = [
     date: "15/10/2023",
     readTime: "5 phút đọc",
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuApTWKCLRA9GfoY3JJgnDQw4T4PThmhb4Jwm4k8EQ9xSWlxmy7k6VMNGlVM0HemUpcZeyUzt5PWCGG822byqENES4l8NSeA8qn3xy5bEtmTUeSzhfLfRilVzAXmtYKq_i8iM3yclOlds4hueR3PH1Y1HyyDbf62y7FzvZ11i_s6Nygyu1xIoQfMuNQP6GzfGmdsixjj36eQJl7UUedqEZrn4FEVmxE4N21fMfYuiLPS4KQgXO1Es2Klv87-9cFRTvJboXGMF8Zme7JP",
+    content: [
+      {
+        type: "paragraph",
+        text: "Việc bảo dưỡng điều hòa định kỳ không chỉ kéo dài tuổi thọ thiết bị mà còn giúp tiết kiệm đáng kể chi phí điện năng hằng tháng.",
+      },
+      {
+        type: "heading",
+        text: "Tại sao cần vệ sinh điều hòa thường xuyên?",
+      },
+      {
+        type: "paragraph",
+        text: "Màng lọc bên trong dàn lạnh sẽ bám bụi sau một thời gian sử dụng. Điều này cản trở luồng gió và tạo điều kiện cho vi khuẩn, nấm mốc phát triển.",
+      },
+      {
+        type: "heading",
+        text: "Các bước bảo dưỡng đơn giản tại nhà",
+      },
+      {
+        type: "list",
+        items: [
+          "Ngắt hoàn toàn nguồn điện trước khi vệ sinh.",
+          "Tháo lưới lọc bụi, rửa sạch và để khô tự nhiên.",
+          "Loại bỏ lá cây và vật cản xung quanh dàn nóng.",
+        ],
+      },
+      {
+        type: "quote",
+        text: "Không tự tháo linh kiện điện hoặc xử lý gas lạnh nếu không có dụng cụ chuyên dụng.",
+      },
+    ],
   },
   {
     id: "kiem-tra-he-thong-dien-mua-mua",

@@ -11,6 +11,8 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   addressId: undefined,
   preferredProviderId: undefined,
   preferredProviderName: undefined,
+  requestedProviderId: undefined,
+  requestedProviderName: undefined,
   orderType: 'scheduled',
   scheduledAt: undefined,
   recurrenceUnit: 'weekly',
@@ -26,6 +28,8 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     selectedOptionQuantities: {},
     preferredProviderId: undefined,
     preferredProviderName: undefined,
+    requestedProviderId: undefined,
+    requestedProviderName: undefined,
   }),
   setServiceId: (id) => set({
     serviceId: id,
@@ -33,6 +37,8 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     selectedOptionQuantities: {},
     preferredProviderId: undefined,
     preferredProviderName: undefined,
+    requestedProviderId: undefined,
+    requestedProviderName: undefined,
   }),
   selectService: (categoryId, serviceId, selectedOptionIds = [], selectedOptionQuantities = {}) =>
     set((state) => ({
@@ -45,6 +51,8 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
       ...(state.serviceId !== serviceId && {
         preferredProviderId: undefined,
         preferredProviderName: undefined,
+        requestedProviderId: undefined,
+        requestedProviderName: undefined,
       }),
     })),
   toggleOption: (option, options) =>
@@ -80,6 +88,10 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     preferredProviderId: id,
     preferredProviderName: id ? name : undefined,
   }),
+  setRequestedProvider: (id, name) => set({
+    requestedProviderId: id,
+    requestedProviderName: id ? name : undefined,
+  }),
   setOrderType: (type) => set({ orderType: type }),
   setScheduledAt: (date) => set({ scheduledAt: date }),
   setRecurrenceUnit: (unit) => set({ recurrenceUnit: unit }),
@@ -96,6 +108,8 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
       addressId: undefined,
       preferredProviderId: undefined,
       preferredProviderName: undefined,
+      requestedProviderId: undefined,
+      requestedProviderName: undefined,
       orderType: 'scheduled',
       scheduledAt: undefined,
       recurrenceUnit: 'weekly',

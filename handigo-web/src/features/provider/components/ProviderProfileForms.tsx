@@ -6,6 +6,7 @@ import type {
   IdentityForm,
 } from "../utils/providerProfilePage";
 import { isImageUrl } from "../utils/providerProfilePage";
+import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 
 export function ProfileTextInput({
   id,
@@ -340,6 +341,7 @@ export function CertificateInlineForm({
   error,
   isSaving,
   uploading,
+  showVisibility = true,
   onChange,
   onUpload,
   onCancel,
@@ -349,6 +351,7 @@ export function CertificateInlineForm({
   error?: string;
   isSaving?: boolean;
   uploading?: boolean;
+  showVisibility?: boolean;
   onChange: (form: CertificateForm) => void;
   onUpload: (file: File) => void;
   onCancel: () => void;
@@ -364,6 +367,21 @@ export function CertificateInlineForm({
       {error && (
         <div className="rounded-lg bg-error/10 p-3 text-sm text-error md:col-span-2">
           {error}
+        </div>
+      )}
+      {showVisibility && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-outline-variant/30 bg-white/80 p-4 md:col-span-2">
+          <div>
+            <p className="font-bold text-on-surface">Hiển thị công khai</p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Chỉ chứng chỉ đã được duyệt mới xuất hiện trên hồ sơ công khai.
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={form.isPublic}
+            ariaLabel="Hiển thị công khai chứng chỉ"
+            onChange={(isPublic) => onChange({ ...form, isPublic })}
+          />
         </div>
       )}
       <ProfileTextInput
