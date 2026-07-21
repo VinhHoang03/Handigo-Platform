@@ -27,7 +27,7 @@ export const CategoriesSection = () => {
           <CategoryCard
             key={category._id}
             icon={category.icon || 'category'}
-            imageUrl={category.image || (/^https?:\/\//i.test(category.icon || '') ? category.icon : undefined)}
+            imageUrl={category.image}
             title={category.name}
             desc={category.description || 'Xem các dịch vụ phù hợp trong danh mục'}
             color={['primary', 'secondary', 'tertiary'][index % 3]}

@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import { Types } from "mongoose";
 import User, { IUser } from "../models/user.model";
 import { Session } from "../models/session.model";
+import { Wallet } from "../models/wallet.model";
 import { generateOtp, getOtpExpireDate, hashOtp } from "../utils/otp";
 import { sendOtpEmail } from "../utils/mail";
 import {
@@ -20,21 +21,45 @@ import {
   isValidPersonName,
   normalizeExternalPersonName,
 } from "../utils/profileValidation";
+import { markProviderOffline } from "./providerPresence.service";
 
 const SALT_ROUNDS = 10;
 
-const getGoogleClientId = (): string => {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+const getGoogleClientIds = (): string[] => {
+  const configuredClientIds = [
+    process.env.GOOGLE_CLIENT_ID,
+    ...(process.env.NODE_ENV === "production"
+      ? []
+      : [process.env.GOOGLE_CLIENT_ID_DEVELOPMENT]),
+    ...(process.env.GOOGLE_CLIENT_IDS || "").split(","),
+  ]
+    .map((clientId) => clientId?.trim())
+    .filter((clientId): clientId is string => Boolean(clientId));
 
-  if (!clientId) {
-    throw new AppError("GOOGLE_CLIENT_ID is not configured", 500);
+  const clientIds = Array.from(new Set(configuredClientIds));
+
+  if (clientIds.length === 0) {
+    throw new AppError("Chưa cấu hình Google OAuth Client ID", 500);
   }
 
-  return clientId;
+  return clientIds;
 };
 
-const getGoogleClient = (): OAuth2Client => {
-  return new OAuth2Client(getGoogleClientId());
+const getFacebookAppCredentials = () => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const appId = isProduction
+    ? process.env.FACEBOOK_APP_ID
+    : process.env.FACEBOOK_APP_ID_DEVELOPMENT || process.env.FACEBOOK_APP_ID;
+  const appSecret = isProduction
+    ? process.env.FACEBOOK_APP_SECRET
+    : process.env.FACEBOOK_APP_SECRET_DEVELOPMENT ||
+      process.env.FACEBOOK_APP_SECRET;
+
+  if (!appId || !appSecret) {
+    throw new AppError("Chưa cấu hình thông tin ứng dụng Facebook", 500);
+  }
+
+  return { appId, appSecret };
 };
 
 type AuthUserResponse = {
@@ -46,6 +71,8 @@ type AuthUserResponse = {
   role: string;
   status: string;
   isEmailVerified: boolean;
+  providerOnboardingStatus?: string | null;
+  providerOnboardingStep?: number | null;
 };
 
 type RefreshTokenPayload = jwt.JwtPayload & {
@@ -143,6 +170,38 @@ const issueSessionTokens = async (
   };
 };
 
+const toAuthUserResponse = (user: IUser): AuthUserResponse => ({
+  id: user._id.toString(),
+  email: user.email,
+  fullName: user.fullName,
+  phone: user.phone,
+  avatar: user.avatar,
+  role: user.role,
+  status: user.status,
+  isEmailVerified: user.isEmailVerified,
+  providerOnboardingStatus: user.providerOnboardingStatus,
+  providerOnboardingStep: user.providerOnboardingStep,
+});
+
+
+const ensureWalletForUser = async (userId: Types.ObjectId | string): Promise<void> => {
+  await Wallet.updateOne(
+    { userId },
+    {
+      $setOnInsert: {
+        userId,
+        balance: 0,
+        pendingBalance: 0,
+        currency: "VND",
+      },
+      $set: {
+        isDeleted: false,
+        deletedAt: null,
+      },
+    },
+    { upsert: true },
+  );
+};
 const createAndSendRegisterOtp = async (user: IUser): Promise<void> => {
   const otp = generateOtp();
   user.registerOtp = hashOtp(otp);
@@ -157,6 +216,7 @@ export const register = async (payload: {
   password: string;
   fullName: string;
   phone?: string;
+  registrationType?: "CUSTOMER" | "PROVIDER";
 }): Promise<void> => {
   const existingUser = await User.findOne({ email: payload.email });
 
@@ -181,7 +241,9 @@ export const register = async (payload: {
     existingUser.fullName = payload.fullName;
     existingUser.phone = payload.phone;
     existingUser.status = "active";
+    existingUser.registrationIntent = payload.registrationType || "CUSTOMER";
     try {
+      await ensureWalletForUser(existingUser._id as Types.ObjectId);
       await createAndSendRegisterOtp(existingUser);
     } catch (error: any) {
       if (error?.code === 11000 && error?.keyPattern?.phone) {
@@ -200,6 +262,7 @@ export const register = async (payload: {
       fullName: payload.fullName,
       phone: payload.phone,
       role: "CUSTOMER",
+      registrationIntent: payload.registrationType || "CUSTOMER",
       status: "active",
       isEmailVerified: false,
     });
@@ -210,13 +273,14 @@ export const register = async (payload: {
     throw error;
   }
 
+  await ensureWalletForUser(user._id as Types.ObjectId);
   await createAndSendRegisterOtp(user);
 };
 
 export const verifyRegisterOtp = async (
   email: string,
   otp: string,
-): Promise<void> => {
+): Promise<(AuthTokens & { user: AuthUserResponse }) | null> => {
   const user = await User.findOne({ email });
 
   if (!user) {
@@ -229,10 +293,23 @@ export const verifyRegisterOtp = async (
 
   ensureOtpValid(otp, user.registerOtp, user.registerOtpExpire);
 
+  const isProviderRegistration = user.registrationIntent === "PROVIDER";
   user.isEmailVerified = true;
+  user.role = isProviderRegistration ? "PROVIDER" : "CUSTOMER";
+  user.providerOnboardingStatus = isProviderRegistration
+    ? "PROFILE_INCOMPLETE"
+    : null;
+  user.providerOnboardingStep = isProviderRegistration ? 1 : null;
+  user.registrationIntent = undefined;
   user.registerOtp = undefined;
   user.registerOtpExpire = undefined;
   await user.save();
+
+  if (!isProviderRegistration) return null;
+
+  await markProviderOffline(user._id.toString());
+  const tokens = await issueSessionTokens(user);
+  return { ...tokens, user: toAuthUserResponse(user) };
 };
 
 export const resendRegisterOtp = async (email: string): Promise<void> => {
@@ -277,20 +354,14 @@ export const login = async (
     throw new AppError("Invalid email or password", 401);
   }
 
+  if (user.role === "PROVIDER") {
+    await markProviderOffline(user._id.toString());
+  }
   const tokens = await issueSessionTokens(user);
 
   return {
     ...tokens,
-    user: {
-      id: user._id.toString(),
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      avatar: user.avatar,
-      role: user.role,
-      status: user.status,
-      isEmailVerified: user.isEmailVerified,
-    },
+    user: toAuthUserResponse(user),
   };
 };
 
@@ -300,11 +371,11 @@ const isGoogleEmailVerified = (value: unknown): boolean =>
 const getGoogleProfileFromCredential = async (
   credential: string,
 ): Promise<GoogleProfile> => {
-  const clientId = getGoogleClientId();
-  const client = getGoogleClient();
+  const clientIds = getGoogleClientIds();
+  const client = new OAuth2Client();
   const ticket = await client.verifyIdToken({
     idToken: credential,
-    audience: clientId,
+    audience: clientIds,
   });
 
   const payload = ticket.getPayload();
@@ -327,7 +398,7 @@ const getGoogleProfileFromCredential = async (
 const getGoogleProfileFromAccessToken = async (
   accessToken: string,
 ): Promise<GoogleProfile> => {
-  const clientId = getGoogleClientId();
+  const clientIds = getGoogleClientIds();
 
   try {
     const tokenInfoResponse = await axios.get<GoogleTokenInfoResponse>(
@@ -337,7 +408,8 @@ const getGoogleProfileFromAccessToken = async (
     const tokenInfo = tokenInfoResponse.data;
 
     if (
-      tokenInfo.aud !== clientId ||
+      !tokenInfo.aud ||
+      !clientIds.includes(tokenInfo.aud) ||
       !tokenInfo.sub ||
       !tokenInfo.email ||
       !isGoogleEmailVerified(tokenInfo.email_verified)
@@ -418,36 +490,24 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
         authenticatedUser.fullName || name,
       );
     }
-    if (picture) {
-      authenticatedUser.avatar = picture;
-    }
     await authenticatedUser.save();
   }
 
+  await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
+
+  if (authenticatedUser.role === "PROVIDER") {
+    await markProviderOffline(authenticatedUser._id.toString());
+  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
     ...tokens,
-    user: {
-      id: authenticatedUser._id.toString(),
-      email: authenticatedUser.email,
-      fullName: authenticatedUser.fullName,
-      phone: authenticatedUser.phone,
-      avatar: authenticatedUser.avatar,
-      role: authenticatedUser.role,
-      status: authenticatedUser.status,
-      isEmailVerified: authenticatedUser.isEmailVerified,
-    },
+    user: toAuthUserResponse(authenticatedUser),
   };
 };
 
 export const facebookLogin = async (accessToken: string) => {
-  const appId = process.env.FACEBOOK_APP_ID;
-  const appSecret = process.env.FACEBOOK_APP_SECRET;
-
-  if (!appId || !appSecret) {
-    throw new AppError("Facebook app credentials are not configured", 500);
-  }
+  const { appId, appSecret } = getFacebookAppCredentials();
 
   // Verify token with Facebook Graph API
   const appToken = `${appId}|${appSecret}`;
@@ -455,8 +515,8 @@ export const facebookLogin = async (accessToken: string) => {
     params: { input_token: accessToken, access_token: appToken },
   });
 
-  const { is_valid, user_id, error } = debugRes.data?.data ?? {};
-  if (!is_valid || !user_id) {
+  const { app_id, is_valid, user_id, error } = debugRes.data?.data ?? {};
+  if (!is_valid || !user_id || app_id !== appId) {
     throw new AppError(
       `Invalid Facebook access token: ${error?.message || "unknown error"}`,
       400,
@@ -480,7 +540,11 @@ export const facebookLogin = async (accessToken: string) => {
     );
   }
 
-  const existingUser = await User.findOne({ email });
+  const normalizedEmail = email.toLowerCase();
+  const existingUser = await User.findOne({
+    isDeleted: false,
+    $or: [{ facebookId: user_id }, { email: normalizedEmail }],
+  });
 
   if (existingUser && existingUser.status === "locked") {
     throw new AppError("Account is not allowed to login", 403);
@@ -493,7 +557,8 @@ export const facebookLogin = async (accessToken: string) => {
     const passwordHash = await bcrypt.hash(randomPassword, SALT_ROUNDS);
 
     authenticatedUser = await User.create({
-      email,
+      email: normalizedEmail,
+      facebookId: user_id,
       fullName: normalizeExternalPersonName(name),
       passwordHash,
       avatar: picture?.data?.url ?? null,
@@ -503,6 +568,10 @@ export const facebookLogin = async (accessToken: string) => {
     });
   } else {
     let shouldSave = false;
+    if (authenticatedUser.facebookId !== user_id) {
+      authenticatedUser.facebookId = user_id;
+      shouldSave = true;
+    }
     if (!authenticatedUser.isEmailVerified) {
       authenticatedUser.isEmailVerified = true;
       shouldSave = true;
@@ -518,20 +587,16 @@ export const facebookLogin = async (accessToken: string) => {
     }
   }
 
+  await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
+
+  if (authenticatedUser.role === "PROVIDER") {
+    await markProviderOffline(authenticatedUser._id.toString());
+  }
   const tokens = await issueSessionTokens(authenticatedUser);
 
   return {
     ...tokens,
-    user: {
-      id: authenticatedUser._id.toString(),
-      email: authenticatedUser.email,
-      fullName: authenticatedUser.fullName,
-      phone: authenticatedUser.phone,
-      avatar: authenticatedUser.avatar,
-      role: authenticatedUser.role,
-      status: authenticatedUser.status,
-      isEmailVerified: authenticatedUser.isEmailVerified,
-    },
+    user: toAuthUserResponse(authenticatedUser),
   };
 };
 
@@ -636,7 +701,7 @@ export const logout = async (refreshToken?: string): Promise<void> => {
       return;
     }
 
-    await Session.findOneAndUpdate(
+    const revokedSession = await Session.findOneAndUpdate(
       {
         _id: decoded.sessionId,
         userId: decoded.id,
@@ -645,6 +710,10 @@ export const logout = async (refreshToken?: string): Promise<void> => {
       },
       { revokedAt: new Date() },
     );
+
+    if (revokedSession) {
+      await markProviderOffline(decoded.id);
+    }
   } catch (error) {
     return;
   }

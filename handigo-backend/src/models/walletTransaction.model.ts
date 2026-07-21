@@ -73,6 +73,42 @@ WalletTransactionSchema.index({ transactionCode: 1 });
 WalletTransactionSchema.index({ gatewayOrderCode: 1 });
 WalletTransactionSchema.index({ gatewayPaymentLinkId: 1 });
 WalletTransactionSchema.index({ relatedOrderId: 1, type: 1, status: 1 });
+WalletTransactionSchema.index(
+  { type: 1, gatewayOrderCode: 1 },
+  {
+    name: "wallet_deposit_gateway_order_code_unique",
+    unique: true,
+    partialFilterExpression: {
+      type: "deposit",
+      gatewayOrderCode: { $type: "string" },
+      isDeleted: false,
+    },
+  },
+);
+WalletTransactionSchema.index(
+  { type: 1, gatewayPaymentLinkId: 1 },
+  {
+    name: "wallet_deposit_payment_link_unique",
+    unique: true,
+    partialFilterExpression: {
+      type: "deposit",
+      gatewayPaymentLinkId: { $type: "string" },
+      isDeleted: false,
+    },
+  },
+);
+WalletTransactionSchema.index(
+  { type: 1, gatewayTransactionId: 1 },
+  {
+    name: "wallet_deposit_transaction_reference_unique",
+    unique: true,
+    partialFilterExpression: {
+      type: "deposit",
+      gatewayTransactionId: { $type: "string" },
+      isDeleted: false,
+    },
+  },
+);
 
 export const WalletTransaction = model<IWalletTransaction>(
   "WalletTransaction",

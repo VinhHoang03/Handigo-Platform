@@ -10,6 +10,7 @@ export interface IService extends Document, IBaseDocument {
   fixedPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  requiresOptionSelection: boolean;
   isActive: boolean;
 }
 
@@ -27,6 +28,7 @@ const ServiceSchema = new Schema<IService>(
     fixedPrice: { type: Number, default: null, min: 0 },
     depositAmount: { type: Number, default: null, min: 0 },
     image: { type: String, default: null },
+    requiresOptionSelection: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     ...baseFields,
   },

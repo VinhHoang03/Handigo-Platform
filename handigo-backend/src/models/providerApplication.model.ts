@@ -9,11 +9,13 @@ export type ProviderApplicationStatus =
   | "approved"
   | "rejected";
 
+export type ProviderApplicationType = "initial" | "service_addition";
+
 export interface IProviderApplicationReviewHistory {
   action: "submitted" | "rejected" | "resubmitted" | "approved";
   status: ProviderApplicationStatus;
   actorId: Types.ObjectId;
-  actorRole: "CUSTOMER" | "ADMIN";
+  actorRole: "CUSTOMER" | "PROVIDER" | "ADMIN";
   occurredAt: Date;
   rejectionReason?: string | null;
   notes?: string | null;
@@ -21,6 +23,7 @@ export interface IProviderApplicationReviewHistory {
 
 export interface IProviderApplication extends Document, IBaseDocument {
   userId: Types.ObjectId;
+  applicationType: ProviderApplicationType;
   description: string;
   experienceYears: number;
   serviceIds: Types.ObjectId[];
@@ -86,6 +89,7 @@ const ProviderCertificateSchema = new Schema<IProviderCertificate>(
     expiresAt: { type: Date },
     imageUrls: { type: [String], default: [] },
     description: { type: String, trim: true, maxlength: 2000 },
+    isPublic: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
@@ -112,7 +116,11 @@ const ProviderApplicationReviewHistorySchema =
         required: true,
       },
       actorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-      actorRole: { type: String, enum: ["CUSTOMER", "ADMIN"], required: true },
+      actorRole: {
+        type: String,
+        enum: ["CUSTOMER", "PROVIDER", "ADMIN"],
+        required: true,
+      },
       occurredAt: { type: Date, required: true },
       rejectionReason: { type: String, trim: true, maxlength: 200, default: null },
       notes: { type: String, trim: true, maxlength: 2000, default: null },
@@ -123,6 +131,12 @@ const ProviderApplicationReviewHistorySchema =
 const ProviderApplicationSchema = new Schema<IProviderApplication>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    applicationType: {
+      type: String,
+      enum: ["initial", "service_addition"],
+      default: "initial",
+      required: true,
+    },
     description: { type: String, default: "" },
     experienceYears: { type: Number, required: true, min: 0, default: 0 },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: "Service" }],
@@ -154,6 +168,7 @@ ProviderApplicationSchema.index(
     partialFilterExpression: { status: { $in: ["pending", "resubmitted"] } },
   },
 );
+ProviderApplicationSchema.index({ userId: 1, applicationType: 1, createdAt: -1 });
 
 export const ProviderApplication = model<IProviderApplication>(
   "ProviderApplication",

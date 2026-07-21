@@ -33,8 +33,6 @@ export const homeApi = {
     const response = await api.get<{ success: boolean; data: FeaturedProvider[] }>('/providers/featured');
     return response.data.data;
   },
-  updateCurrentLocation: async (latitude: number, longitude: number) =>
-    api.put('/locations/me', { latitude, longitude }),
   latestFeedbacks: async () => {
     const response = await api.get<{ success: boolean; data: LatestFeedback[] }>('/feedback/latest');
     return response.data.data.map((feedback) => ({

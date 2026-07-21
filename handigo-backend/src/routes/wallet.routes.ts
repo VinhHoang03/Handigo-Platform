@@ -14,40 +14,42 @@ import {
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
+import { paymentRateLimit } from "../middlewares/rateLimit.middleware";
 import { adminWalletAdjustmentSchema, walletDepositSchema } from "../validations/wallet.validator";
 
 const router = Router();
 
-router.get("/me", authMiddleware, roleMiddleware("PROVIDER"), getMyWallet);
+router.get("/me", authMiddleware, roleMiddleware("CUSTOMER", "PROVIDER"), getMyWallet);
 router.post(
   "/me/deposit",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
+  paymentRateLimit,
   validate(walletDepositSchema),
   createMyWalletDeposit,
 );
 router.patch(
   "/me/deposit/:orderCode/cancel",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   cancelMyWalletDeposit,
 );
 router.patch(
   "/me/deposit/:orderCode/sync",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   syncMyWalletDeposit,
 );
 router.get(
   "/me/transactions",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   getMyWalletTransactions,
 );
 router.get(
   "/me/summary",
   authMiddleware,
-  roleMiddleware("PROVIDER"),
+  roleMiddleware("CUSTOMER", "PROVIDER"),
   getMyWalletSummary,
 );
 

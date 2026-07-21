@@ -7,6 +7,7 @@ import { customerServiceApi } from "@/features/customer-service/api/customerServ
 import { getServiceImage } from "@/features/customer-service/utils/serviceDisplay";
 import type { Service } from "@/types/booking";
 import { BrandLogo } from "./BrandLogo";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { NotificationBell } from "./NotificationBell";
 import { MessageCenter } from "@/features/chat/components/MessageCenter";
 
@@ -40,7 +41,7 @@ const normalizeRole = (
 const getProfilePath = (role?: AppRole) => {
   if (role === "PROVIDER") return "/provider/profile";
   if (role === "CUSTOMER") return "/customer/profile";
-  return "/admin/users";
+  return "/admin";
 };
 
 const getWalletPath = (role?: AppRole) => {
@@ -59,7 +60,11 @@ const getRoleLabel = (role?: AppRole) => {
 const createNavbarItems = (role?: AppRole): NavbarItem[] => {
   const items: NavbarItem[] = [
     { label: "Trang chủ", path: "/" },
-    { label: "Dịch vụ", path: "/customer/services", activePrefix: "/customer/services" },
+    {
+      label: "Dịch vụ",
+      path: "/customer/services",
+      activePrefix: "/customer/services",
+    },
     { label: "Giới thiệu", path: "/gioi-thieu" },
     { label: "Tin tức", path: "/tin-tuc", activePrefix: "/tin-tuc" },
     { label: "Hỗ trợ", path: "/ho-tro" },
@@ -81,7 +86,7 @@ const createNavbarItems = (role?: AppRole): NavbarItem[] => {
       ...items,
       {
         label: "Quản lý hệ thống",
-        path: "/admin/users",
+        path: "/admin",
         activePrefix: "/admin",
       },
     ];
@@ -101,13 +106,16 @@ export function Navbar({
   const [internalScrolled, setInternalScrolled] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const currentRole = role ?? normalizeRole(user?.role);
+  const authenticatedRole = normalizeRole(user?.role);
+  const currentRole = isAuthenticated ? authenticatedRole : role;
   const scrolled = isScrolled ?? internalScrolled;
   const navItems = useMemo(() => createNavbarItems(currentRole), [currentRole]);
   const avatar =
@@ -152,8 +160,19 @@ export function Navbar({
   }, []);
 
   const handleLogout = async () => {
-    await authService.logout();
-    navigate("/", { replace: true });
+    try {
+      setIsLoggingOut(true);
+      await authService.logout();
+      navigate("/", { replace: true });
+    } finally {
+      setIsLoggingOut(false);
+      setIsLogoutConfirmOpen(false);
+    }
+  };
+
+  const requestLogout = () => {
+    setIsAccountOpen(false);
+    setIsLogoutConfirmOpen(true);
   };
 
   const handleBookService = () => {
@@ -295,16 +314,18 @@ export function Navbar({
         )}
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleBookService}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
-          >
-            <span className="material-symbols-outlined text-lg">
-              cleaning_services
-            </span>
-            Đặt dịch vụ
-          </button>
+          {isAuthenticated && currentRole === "CUSTOMER" && (
+            <button
+              type="button"
+              onClick={handleBookService}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
+            >
+              <span className="material-symbols-outlined text-lg">
+                cleaning_services
+              </span>
+              Đặt dịch vụ
+            </button>
+          )}
 
           {isAuthenticated && user ? (
             <>
@@ -376,16 +397,28 @@ export function Navbar({
                           : "Hồ sơ cá nhân"}
                       </Link>
                       {currentRole === "CUSTOMER" && (
-                        <Link
-                          to="/customer/bookings"
-                          onClick={() => setIsAccountOpen(false)}
-                          className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
-                        >
-                          <span className="material-symbols-outlined text-xl">
-                            receipt_long
-                          </span>
-                          Đơn dịch vụ của tôi
-                        </Link>
+                        <>
+                          <Link
+                            to="/customer/bookings"
+                            onClick={() => setIsAccountOpen(false)}
+                            className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
+                          >
+                            <span className="material-symbols-outlined text-xl">
+                              receipt_long
+                            </span>
+                            Đơn dịch vụ của tôi
+                          </Link>
+                          <Link
+                            to="/customer/support"
+                            onClick={() => setIsAccountOpen(false)}
+                            className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
+                          >
+                            <span className="material-symbols-outlined text-xl">
+                              support_agent
+                            </span>
+                            Khiếu nại, hỗ trợ & báo cáo
+                          </Link>
+                        </>
                       )}
                       {(currentRole === "CUSTOMER" ||
                         currentRole === "PROVIDER") && (
@@ -402,7 +435,7 @@ export function Navbar({
                       )}
                       <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={requestLogout}
                         className="mt-1 flex w-full items-center gap-3 px-4 py-2 text-sm text-error hover:bg-error/10"
                       >
                         <span className="material-symbols-outlined text-xl">
@@ -434,6 +467,15 @@ export function Navbar({
         </div>
       </div>
 
+      <ConfirmDialog
+        open={isLogoutConfirmOpen}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản hiện tại?"
+        busy={isLoggingOut}
+        variant="danger"
+        onCancel={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={() => void handleLogout()}
+      />
     </nav>
   );
 }

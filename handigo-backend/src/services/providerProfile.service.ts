@@ -13,8 +13,14 @@ import {
 import { AppError } from "../utils/appError";
 import { Service } from "../models/service.model";
 import { Address } from "../models/address.model";
+import { Order } from "../models/order.model";
 import { Feedback } from "../models/feedback.model";
+import { Category } from "../models/category.model";
 import { MatchingService } from "./matching.service";
+import {
+  ProviderApplication,
+  type IProviderApplication,
+} from "../models/providerApplication.model";
 import {
   CreateCertificatePayload,
   SubmitIdentityPayload,
@@ -57,21 +63,6 @@ const getProviderForUser = async (userId: string) => {
   }
 
   return provider;
-};
-
-const getActiveServiceIds = async (serviceIds: string[]) => {
-  const uniqueIds = [...new Set(serviceIds)];
-  const services = await Service.find({
-    _id: { $in: uniqueIds },
-    isActive: true,
-    isDeleted: false,
-  }).select("_id");
-
-  if (services.length !== uniqueIds.length) {
-    throw new AppError("Một hoặc nhiều dịch vụ không còn hoạt động", 400);
-  }
-
-  return uniqueIds.map((id) => new Types.ObjectId(id));
 };
 
 const toIdString = (value: unknown) => {
@@ -137,10 +128,70 @@ const formatCertificate = (certificate: IProviderCertificate) => ({
   expiresAt: certificate.expiresAt,
   imageUrls: certificate.imageUrls || [],
   description: certificate.description,
+  isPublic: Boolean(certificate.isPublic),
   status: certificate.status,
   reviewedAt: certificate.reviewedAt,
   rejectionReason: certificate.rejectionReason || null,
 });
+
+const formatPendingProviderProfile = async (
+  application: IProviderApplication,
+) => {
+  const user = await User.findById(application.userId).select(safeUserSelect);
+
+  if (
+    !user ||
+    user.isDeleted ||
+    user.role !== "PROVIDER" ||
+    user.providerOnboardingStatus !== "PENDING_REVIEW"
+  ) {
+    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+  }
+
+  const services = (application.serviceIds as unknown[])
+    .filter((service) => typeof service === "object" && service !== null)
+    .map((service) => {
+      const item = service as {
+        _id: Types.ObjectId;
+        name?: string;
+        slug?: string;
+      };
+
+      return {
+        id: item._id.toString(),
+        name: item.name || "",
+        slug: item.slug || "",
+      };
+    });
+
+  return {
+    user: {
+      id: user._id.toString(),
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      avatar: user.avatar,
+      birthday: user.birthday,
+      gender: user.gender,
+      createdAt: user.createdAt,
+    },
+    provider: {
+      id: application._id.toString(),
+      description: application.description,
+      experienceYears: application.experienceYears,
+      availabilityStatus: "offline" as const,
+      verified: false,
+      serviceIds: application.serviceIds.map(toIdString),
+      services,
+      workingAreas: application.workingAreas || [],
+      averageRating: 0,
+      totalFeedbacks: 0,
+      totalCompletedOrders: 0,
+      identityDocument: formatIdentityDocument(application.identityDocument),
+      certificates: (application.certificates || []).map(formatCertificate),
+    },
+  };
+};
 
 const formatProviderProfile = async (provider: IProvider) => {
   const user = await User.findById(provider.userId).select(safeUserSelect);
@@ -226,6 +277,9 @@ export const getNearbyProvidersForCustomer = async (
   userId: string,
   serviceId: string,
   addressId: string,
+  scheduledAtValue?: string,
+  recurrenceUnitValue?: string,
+  recurrenceCountValue?: number,
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(serviceId, "service id");
@@ -251,6 +305,22 @@ export const getNearbyProvidersForCustomer = async (
     throw new AppError("Không tìm thấy địa chỉ của bạn.", 404);
   }
 
+  const scheduledAt = scheduledAtValue ? new Date(scheduledAtValue) : null;
+  if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date())) {
+    throw new AppError("Thời gian lịch hẹn không hợp lệ.", 400);
+  }
+  const recurrenceUnit = ["weekly", "monthly"].includes(recurrenceUnitValue || "")
+    ? (recurrenceUnitValue as "weekly" | "monthly")
+    : undefined;
+  const validRecurrenceCounts = recurrenceUnit === "weekly"
+    ? [1, 2, 3, 4]
+    : recurrenceUnit === "monthly"
+      ? [4, 8, 12]
+      : [];
+  const recurrenceCount = validRecurrenceCounts.includes(recurrenceCountValue || 0)
+    ? recurrenceCountValue
+    : undefined;
+
   const candidates = await MatchingService.findNearestProviders({
     latitude: address.latitude,
     longitude: address.longitude,
@@ -258,6 +328,7 @@ export const getNearbyProvidersForCustomer = async (
     province: address.province,
     ward: address.ward,
     limit: 5,
+    requireOnline: !scheduledAt,
   });
 
   if (candidates.length === 0) return [];
@@ -265,7 +336,42 @@ export const getNearbyProvidersForCustomer = async (
   const candidateByProviderId = new Map(
     candidates.map((candidate) => [candidate.providerId.toString(), candidate]),
   );
-  const providerIds = candidates.map((candidate) => candidate.providerId);
+  let providerIds = candidates.map((candidate) => candidate.providerId);
+  if (scheduledAt && providerIds.length > 0) {
+    const occurrenceDates = recurrenceUnit && recurrenceCount
+      ? Array.from({ length: recurrenceCount }, (_, index) => {
+          const occurrence = new Date(scheduledAt);
+          if (recurrenceUnit === "weekly") {
+            occurrence.setDate(scheduledAt.getDate() + index * 7);
+          } else {
+            const targetDay = scheduledAt.getDate();
+            occurrence.setDate(1);
+            occurrence.setMonth(scheduledAt.getMonth() + index);
+            const lastDay = new Date(
+              occurrence.getFullYear(),
+              occurrence.getMonth() + 1,
+              0,
+            ).getDate();
+            occurrence.setDate(Math.min(targetDay, lastDay));
+          }
+          return occurrence;
+        })
+      : [scheduledAt];
+    const conflictingProviderIds = await Order.distinct("providerId", {
+      providerId: { $in: providerIds },
+      status: { $in: ["accepted", "in_progress"] },
+      $or: occurrenceDates.map((date) => ({
+        scheduledAt: {
+          $gt: new Date(date.getTime() - 60 * 60 * 1000),
+          $lt: new Date(date.getTime() + 60 * 60 * 1000),
+        },
+      })),
+      isDeleted: false,
+    });
+    const conflictingIds = new Set(conflictingProviderIds.map(String));
+    providerIds = providerIds.filter((id) => !conflictingIds.has(id.toString()));
+  }
+  const availableProviderIdSet = new Set(providerIds.map(String));
   const providers = await Provider.find({
     _id: { $in: providerIds },
     isDeleted: false,
@@ -275,6 +381,7 @@ export const getNearbyProvidersForCustomer = async (
     .lean();
 
   return providers
+    .filter((provider) => availableProviderIdSet.has(provider._id.toString()))
     .map((provider) => {
       const candidate = candidateByProviderId.get(provider._id.toString());
       const user = provider.userId as unknown as {
@@ -340,18 +447,32 @@ export const getPublicProviderProfile = async (providerId: string) => {
     _id: Types.ObjectId;
     name?: string;
     slug?: string;
+    categoryId?: Types.ObjectId;
   }>;
+  const categoryIds = services.flatMap((service) =>
+    service.categoryId ? [service.categoryId] : [],
+  );
 
-  const latestFeedbacks = await Feedback.find({
-    providerId: provider._id,
-    isVisible: true,
-    isDeleted: false,
-  })
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .populate("customerId", "fullName avatar")
-    .populate("serviceId", "name image")
-    .lean();
+  const [latestFeedbacks, categories] = await Promise.all([
+    Feedback.find({
+      providerId: provider._id,
+      isVisible: true,
+      isDeleted: false,
+    })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate("customerId", "fullName avatar")
+      .populate("serviceId", "name image")
+      .lean(),
+    Category.find({
+      _id: { $in: categoryIds },
+      isActive: true,
+      isDeleted: false,
+    })
+      .select("name slug icon")
+      .sort({ name: 1 })
+      .lean(),
+  ]);
 
   return {
     user: {
@@ -372,6 +493,23 @@ export const getPublicProviderProfile = async (providerId: string) => {
         id: service._id.toString(),
         name: service.name || "",
         slug: service.slug || "",
+        categoryId: service.categoryId?.toString() || "",
+      })),
+      serviceCategories: categories.map((category) => ({
+        id: category._id.toString(),
+        name: category.name,
+        slug: category.slug,
+        icon: category.icon,
+        services: services
+          .filter(
+            (service) =>
+              service.categoryId?.toString() === category._id.toString(),
+          )
+          .map((service) => ({
+            id: service._id.toString(),
+            name: service.name || "",
+            slug: service.slug || "",
+          })),
       })),
       workingAreas: provider.workingAreas || [],
       serviceArea: provider.serviceArea,
@@ -381,7 +519,10 @@ export const getPublicProviderProfile = async (providerId: string) => {
       identityVerified:
         provider.identityDocument?.verificationStatus === "verified",
       certificates: (provider.certificates || [])
-        .filter((certificate) => certificate.status === "approved")
+        .filter(
+          (certificate) =>
+            certificate.status === "approved" && certificate.isPublic,
+        )
         .map(formatCertificate),
     },
     feedbacks: latestFeedbacks.map((feedback) => {
@@ -420,8 +561,29 @@ export const getPublicProviderProfile = async (providerId: string) => {
 };
 
 export const getMyProviderProfile = async (userId: string) => {
-  const provider = await getProviderForUser(userId);
-  return formatProviderProfile(provider);
+  assertObjectId(userId, "user id");
+
+  const provider = await Provider.findOne({
+    userId: new Types.ObjectId(userId),
+    isDeleted: false,
+  }).populate(servicePopulate);
+
+  if (provider) return formatProviderProfile(provider);
+
+  const pendingApplication = await ProviderApplication.findOne({
+    userId: new Types.ObjectId(userId),
+    applicationType: { $in: ["initial", null] },
+    status: { $in: ["pending", "resubmitted"] },
+    isDeleted: false,
+  })
+    .sort({ updatedAt: -1 })
+    .populate(servicePopulate);
+
+  if (!pendingApplication) {
+    throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+  }
+
+  return formatPendingProviderProfile(pendingApplication);
 };
 
 export const updateMyProviderProfile = async (
@@ -453,9 +615,6 @@ export const updateMyProviderProfile = async (
       province: payload.serviceArea.province,
       ward: payload.serviceArea.ward,
     };
-  }
-  if (payload.serviceIds !== undefined) {
-    provider.serviceIds = await getActiveServiceIds(payload.serviceIds);
   }
   if (payload.workingAreas !== undefined) {
     provider.workingAreas = [...new Set(payload.workingAreas)];
@@ -522,6 +681,7 @@ export const createMyCertificate = async (
     expiresAt: toDate(payload.expiresAt),
     imageUrls: payload.imageUrls,
     description: payload.description,
+    isPublic: payload.isPublic ?? false,
     status: "pending",
     reviewedBy: null,
     reviewedAt: null,
@@ -556,11 +716,23 @@ export const updateMyCertificate = async (
   if (payload.expiresAt !== undefined) certificate.expiresAt = toDate(payload.expiresAt);
   if (payload.imageUrls !== undefined) certificate.imageUrls = payload.imageUrls;
   if (payload.description !== undefined) certificate.description = payload.description;
+  if (payload.isPublic !== undefined) certificate.isPublic = payload.isPublic;
 
-  certificate.status = "pending";
-  certificate.reviewedBy = null;
-  certificate.reviewedAt = null;
-  certificate.rejectionReason = null;
+  const reviewSensitiveFields = [
+    "title",
+    "certificateNumber",
+    "issuer",
+    "issuedAt",
+    "expiresAt",
+    "imageUrls",
+    "description",
+  ];
+  if (reviewSensitiveFields.some((field) => field in payload)) {
+    certificate.status = "pending";
+    certificate.reviewedBy = null;
+    certificate.reviewedAt = null;
+    certificate.rejectionReason = null;
+  }
 
   await provider.save();
   await provider.populate(servicePopulate);

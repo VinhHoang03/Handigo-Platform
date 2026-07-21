@@ -10,7 +10,14 @@ interface Props {
 }
 
 const facebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID;
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const developmentFacebookAppId = import.meta.env.VITE_FACEBOOK_APP_ID_DEVELOPMENT;
+const resolvedFacebookAppId = import.meta.env.DEV
+  ? developmentFacebookAppId || facebookAppId
+  : facebookAppId;
+const googleClientId = import.meta.env.DEV
+  ? import.meta.env.VITE_GOOGLE_CLIENT_ID_DEVELOPMENT ||
+    import.meta.env.VITE_GOOGLE_CLIENT_ID
+  : import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function SocialLoginButtons({ rememberMe, onError }: Props) {
   const { googleLogin, facebookLogin, isLoading } = useAuth();
@@ -19,7 +26,7 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
   const handleAuthenticatedUser = (
     user: Awaited<ReturnType<typeof googleLogin>>,
   ) => {
-    if (user) navigate(getRoleHomePath(user.role), { replace: true });
+    if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
   };
 
   const startGoogleLogin = useGoogleLogin({
@@ -31,10 +38,16 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
         return;
       }
 
-      void googleLogin(accessToken, rememberMe, "accessToken").then((user) => {
-        if (user) handleAuthenticatedUser(user);
-        else onError?.("Đăng nhập Google thất bại.");
-      });
+      void googleLogin(accessToken, rememberMe, "accessToken")
+        .then((user) => {
+          if (user) handleAuthenticatedUser(user);
+          else onError?.("Đăng nhập Google thất bại.");
+        })
+        .catch((error: unknown) => {
+          onError?.(
+            error instanceof Error ? error.message : "Đăng nhập Google thất bại.",
+          );
+        });
     },
     onError: () => onError?.("Đăng nhập Google thất bại."),
     onNonOAuthError: () =>
@@ -52,7 +65,7 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
             return;
           }
           void facebookLogin(accessToken, rememberMe).then((user) => {
-            if (user) navigate(getRoleHomePath(user.role), { replace: true });
+            if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
             else onError?.("Đăng nhập Facebook thất bại.");
           });
         },
@@ -98,7 +111,7 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
 
       <button
         type="button"
-        disabled={isLoading || !facebookAppId}
+        disabled={isLoading || !resolvedFacebookAppId}
         onClick={handleFacebook}
         className="social-login-button"
       >

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
 import { Modal } from '@/components/common/Modal';
-import { tokenStorage } from '@/api/tokenStorage';
 import { useAuthStore } from '@/features/auth/store/auth.store';
+import { createAuthenticatedSocket } from '@/realtime/authenticatedSocket';
 import { providerOrderApi } from '../api/providerOrder.api';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import {
@@ -33,6 +32,8 @@ export function ProviderAssignmentModal() {
   const order = assignment ? getOrderFromAssignment(assignment) : null;
   const customer = order ? getCustomer(order) : null;
   const isExpired = countdown === 'Hết hạn';
+  const isAppointment = assignment?.assignmentType === 'appointment';
+  const isDirectRequest = assignment?.assignmentType === 'direct_request';
   const enabled = isAuthenticated && user?.role === 'PROVIDER' && Boolean(token);
 
   const loadPendingAssignment = useCallback(async () => {
@@ -60,11 +61,7 @@ export function ProviderAssignmentModal() {
 
     void Promise.resolve().then(loadPendingAssignment);
 
-    const socketToken = token || tokenStorage.get();
-    if (!socketToken) return undefined;
-    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000', {
-      auth: { token: socketToken },
-    });
+    const { socket, dispose } = createAuthenticatedSocket();
 
     const handleNewAssignment = (payload: AssignmentRealtimePayload) => {
       const nextAssignment = payload?.assignment;
@@ -88,14 +85,16 @@ export function ProviderAssignmentModal() {
     };
 
     socket.on('assignment:new', handleNewAssignment);
+    socket.on('direct-request:new', handleNewAssignment);
     socket.on('assignment:closed', handleClosedAssignment);
     socket.on('connect', loadPendingAssignment);
 
     return () => {
       socket.off('assignment:new', handleNewAssignment);
+      socket.off('direct-request:new', handleNewAssignment);
       socket.off('assignment:closed', handleClosedAssignment);
       socket.off('connect', loadPendingAssignment);
-      socket.disconnect();
+      dispose();
     };
   }, [enabled, loadPendingAssignment, token]);
 
@@ -132,7 +131,11 @@ export function ProviderAssignmentModal() {
       setAssignment(null);
       navigate(`/provider/orders/${result.order._id}`);
     } catch {
-      setError('Không thể nhận đơn. Đơn có thể đã hết hạn hoặc được chuyển cho thợ khác.');
+      setError(
+        isDirectRequest
+          ? 'Không thể nhận yêu cầu. Yêu cầu có thể đã hết hạn hoặc không còn khả dụng.'
+          : 'Không thể nhận đơn. Đơn có thể đã hết hạn hoặc được chuyển cho thợ khác.',
+      );
     } finally {
       setBusy(false);
     }
@@ -157,7 +160,13 @@ export function ProviderAssignmentModal() {
   return (
     <Modal
       open
-      title="Đơn mới cần phản hồi"
+      title={
+        isAppointment
+          ? "Yêu cầu lịch hẹn"
+          : isDirectRequest
+            ? "Khách hàng chọn bạn"
+            : "Đơn mới cần phản hồi"
+      }
       onClose={() => undefined}
       size="sm"
       closeOnEsc={false}
@@ -188,6 +197,16 @@ export function ProviderAssignmentModal() {
           <InfoTile label="Thời gian" value={formatDateTime(order.scheduledAt || order.createdAt)} />
           <InfoTile label="Thu nhập dự kiến" value={formatMoney(order.pricing?.providerEarningAmount)} highlight />
         </div>
+
+        {order.orderType === 'recurring' && (
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-sm text-sm text-on-surface">
+            <p className="font-bold">Lịch định kỳ gồm {order.totalOccurrences} buổi</p>
+            <p className="mt-1 text-on-surface-variant">
+              Xác nhận yêu cầu này đồng nghĩa với nhận toàn bộ chuỗi lịch lặp theo{' '}
+              {order.recurrenceUnit === 'monthly' ? 'tháng' : 'tuần'}.
+            </p>
+          </div>
+        )}
 
         <div className="rounded-2xl bg-surface-container-low p-sm">
           <p className="text-[10px] font-bold uppercase text-on-surface-variant">Địa chỉ</p>
@@ -220,7 +239,15 @@ export function ProviderAssignmentModal() {
             onClick={handleAccept}
             className="btn-primary flex-1 disabled:opacity-50"
           >
-            {busy ? 'Đang xử lý...' : 'Nhận đơn'}
+            {busy
+              ? 'Đang xử lý...'
+              : order.orderType === 'recurring'
+                ? 'Xác nhận toàn bộ lịch'
+                : isAppointment
+                  ? 'Xác nhận lịch'
+                  : isDirectRequest
+                    ? 'Nhận yêu cầu'
+                    : 'Nhận đơn'}
           </button>
           <button
             type="button"

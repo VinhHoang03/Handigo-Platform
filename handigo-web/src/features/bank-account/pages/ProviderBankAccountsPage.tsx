@@ -86,7 +86,7 @@ const buildPayload = (form: BankAccountForm): BankAccountPayload => ({
   status: form.status,
 });
 
-export default function ProviderBankAccountsPage() {
+export default function ProviderBankAccountsPage({ role = 'PROVIDER' }: { role?: 'CUSTOMER' | 'PROVIDER' }) {
   const [items, setItems] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -198,7 +198,7 @@ export default function ProviderBankAccountsPage() {
   };
 
   return (
-    <DashboardShell role="PROVIDER">
+    <DashboardShell role={role}>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -299,7 +299,9 @@ export default function ProviderBankAccountsPage() {
 function Stat({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
-      <span className="material-symbols-outlined flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+        <span className="material-symbols-outlined block text-2xl leading-none">{icon}</span>
+      </div>
       <div className="min-w-0">
         <p className="text-sm text-on-surface-variant">{label}</p>
         <p className="truncate text-headline-md font-bold text-on-surface">{value}</p>

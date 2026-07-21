@@ -1,17 +1,23 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { AsyncState } from '@/components/common/AsyncState';
-import { DashboardShell } from '@/components/common/DashboardShell';
-import { Modal } from '@/components/common/Modal';
-import { Pagination } from '@/components/common/Pagination';
-import { notificationApi } from '../api/notification.api';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
+import { AsyncState } from "@/components/common/AsyncState";
+import { DashboardShell } from "@/components/common/DashboardShell";
+import { Modal } from "@/components/common/Modal";
+import { Pagination } from "@/components/common/Pagination";
+import { notificationApi } from "../api/notification.api";
 import type {
   AppNotification,
   NotificationQuery,
   NotificationTargetRole,
   NotificationType,
-} from '../types/notification.types';
+} from "../types/notification.types";
 
-type NotificationRole = 'CUSTOMER' | 'PROVIDER' | 'ADMIN';
+type NotificationRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
 type SendFormState = {
   targetRole: NotificationTargetRole;
@@ -20,60 +26,73 @@ type SendFormState = {
 };
 
 const emptySendForm: SendFormState = {
-  targetRole: 'ALL',
-  title: '',
-  content: '',
+  targetRole: "ALL",
+  title: "",
+  content: "",
 };
 
-const dateTime = new Intl.DateTimeFormat('vi-VN', {
-  dateStyle: 'short',
-  timeStyle: 'short',
+const dateTime = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
 });
 
 const typeLabels: Record<NotificationType, string> = {
-  ORDER: 'Đơn hàng',
-  PAYMENT: 'Thanh toán',
-  QUOTATION: 'Báo giá',
-  WITHDRAWAL: 'Rút tiền',
-  PROMOTION: 'Khuyến mãi',
-  SYSTEM: 'Hệ thống',
+  ORDER: "Đơn hàng",
+  PAYMENT: "Thanh toán",
+  QUOTATION: "Báo giá",
+  WITHDRAWAL: "Rút tiền",
+  PROMOTION: "Khuyến mãi",
+  SYSTEM: "Hệ thống",
 };
 
 const typeIcons: Record<NotificationType, string> = {
-  ORDER: 'receipt_long',
-  PAYMENT: 'payments',
-  QUOTATION: 'request_quote',
-  WITHDRAWAL: 'account_balance_wallet',
-  PROMOTION: 'local_offer',
-  SYSTEM: 'campaign',
+  ORDER: "receipt_long",
+  PAYMENT: "payments",
+  QUOTATION: "request_quote",
+  WITHDRAWAL: "account_balance_wallet",
+  PROMOTION: "local_offer",
+  SYSTEM: "campaign",
 };
 
 const getErrorMessage = (error: unknown) => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string } } }).response;
+  if (typeof error === "object" && error && "response" in error) {
+    const response = (error as { response?: { data?: { message?: string } } })
+      .response;
     if (response?.data?.message) return response.data.message;
   }
-  return error instanceof Error ? error.message : 'Có lỗi xảy ra, vui lòng thử lại.';
+  return error instanceof Error
+    ? error.message
+    : "Có lỗi xảy ra, vui lòng thử lại.";
 };
 
-export default function NotificationsPage({ role }: { role: NotificationRole }) {
-  const [query, setQuery] = useState<NotificationQuery>({ page: 1, limit: 8, type: '', isRead: '', targetRole: '' });
+export default function NotificationsPage({
+  role,
+}: {
+  role: NotificationRole;
+}) {
+  const [query, setQuery] = useState<NotificationQuery>({
+    page: 1,
+    limit: 8,
+    type: "",
+    isRead: "",
+    targetRole: "",
+  });
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [sendForm, setSendForm] = useState<SendFormState>(emptySendForm);
 
-  const isAdmin = role === 'ADMIN';
+  const isAdmin = role === "ADMIN";
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const listResult = isAdmin
         ? await notificationApi.adminList(query)
@@ -91,32 +110,37 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
     }
   }, [isAdmin, query]);
 
-  const loadUserNotifications = useCallback(async (nextQuery: NotificationQuery, append = false) => {
-    if (isAdmin) return;
+  const loadUserNotifications = useCallback(
+    async (nextQuery: NotificationQuery, append = false) => {
+      if (isAdmin) return;
 
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
-    setError('');
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      setError("");
 
-    try {
-      const [listResult, countResult] = await Promise.all([
-        notificationApi.list(nextQuery),
-        notificationApi.unreadCount(),
-      ]);
+      try {
+        const [listResult, countResult] = await Promise.all([
+          notificationApi.list(nextQuery),
+          notificationApi.unreadCount(),
+        ]);
 
-      setItems((current) => (append ? [...current, ...listResult.items] : listResult.items));
-      setTotalPages(listResult.pagination.totalPages || 1);
-      setUnreadCount(countResult.count);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [isAdmin]);
+        setItems((current) =>
+          append ? [...current, ...listResult.items] : listResult.items,
+        );
+        setTotalPages(listResult.pagination.totalPages || 1);
+        setUnreadCount(countResult.count);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [isAdmin],
+  );
 
   useEffect(() => {
     if (!isAdmin) return undefined;
@@ -140,14 +164,21 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
       void loadUserNotifications(nextQuery, false);
     }, 150);
     return () => window.clearTimeout(timer);
-  }, [isAdmin, loadUserNotifications, query.isRead, query.limit, query.targetRole, query.type]);
+  }, [
+    isAdmin,
+    loadUserNotifications,
+    query.isRead,
+    query.limit,
+    query.targetRole,
+    query.type,
+  ]);
 
   const stats = useMemo(() => {
     const readOnPage = items.filter((item) => item.isRead).length;
     return [
-      { icon: 'notifications', label: 'Chưa đọc', value: unreadCount },
-      { icon: 'drafts', label: 'Đã đọc trên trang', value: readOnPage },
-      { icon: 'inbox', label: 'Tổng trên trang', value: items.length },
+      { icon: "notifications", label: "Chưa đọc", value: unreadCount },
+      { icon: "drafts", label: "Đã đọc trên trang", value: readOnPage },
+      { icon: "inbox", label: "Tổng trên trang", value: items.length },
     ];
   }, [items, unreadCount]);
 
@@ -173,11 +204,11 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
   const markOne = async (notification: AppNotification) => {
     if (notification.isRead) return;
     setBusy(true);
-    setError('');
-    setNotice('');
+    setError("");
+    setNotice("");
     try {
       await notificationApi.markAsRead(notification.id);
-      setNotice('Đã đánh dấu thông báo là đã đọc.');
+      setNotice("Đã đánh dấu thông báo là đã đọc.");
       await refresh();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -188,8 +219,8 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
 
   const markAll = async () => {
     setBusy(true);
-    setError('');
-    setNotice('');
+    setError("");
+    setNotice("");
     try {
       const result = await notificationApi.markAllAsRead();
       setNotice(`Đã đánh dấu ${result.modifiedCount} thông báo là đã đọc.`);
@@ -204,18 +235,20 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
   const submitSystemNotification = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    setError('');
-    setNotice('');
+    setError("");
+    setNotice("");
     try {
       const result = await notificationApi.sendSystem({
         targetRole: sendForm.targetRole,
         title: sendForm.title.trim(),
         content: sendForm.content.trim(),
-        type: 'SYSTEM',
+        type: "SYSTEM",
       });
       setSendOpen(false);
       setSendForm(emptySendForm);
-      setNotice(`Đã gửi thông báo hệ thống tới ${result.sentCount} người dùng.`);
+      setNotice(
+        `Đã gửi thông báo hệ thống tới ${result.sentCount} người dùng.`,
+      );
       await load();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -229,8 +262,9 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
       <div className="space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h1 className="text-headline-lg font-bold text-on-background">Thông báo</h1>
-            <p className="text-on-surface-variant">Theo dõi các cập nhật mới nhất từ hệ thống Handigo.</p>
+            <h1 className="text-headline-lg font-bold text-on-background">
+              Thông báo
+            </h1>
           </div>
           <div className="flex flex-wrap gap-3">
             <button
@@ -238,7 +272,9 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
               onClick={() => void refresh()}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low"
             >
-              <span className="material-symbols-outlined text-[20px]">refresh</span>
+              <span className="material-symbols-outlined text-[20px]">
+                refresh
+              </span>
               Tải lại
             </button>
             {!isAdmin && (
@@ -248,7 +284,9 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
                 disabled={busy || unreadCount === 0}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[20px]">done_all</span>
+                <span className="material-symbols-outlined text-[20px]">
+                  done_all
+                </span>
                 Đánh dấu tất cả
               </button>
             )}
@@ -258,7 +296,9 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
                 onClick={() => setSendOpen(true)}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm"
               >
-                <span className="material-symbols-outlined text-[20px]">campaign</span>
+                <span className="material-symbols-outlined text-[20px]">
+                  campaign
+                </span>
                 Gửi thông báo
               </button>
             )}
@@ -267,12 +307,19 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
 
         <div className="grid gap-4 md:grid-cols-3">
           {stats.map((item) => (
-            <Stat key={item.label} icon={item.icon} label={item.label} value={item.value} />
+            <Stat
+              key={item.label}
+              icon={item.icon}
+              label={item.label}
+              value={item.value}
+            />
           ))}
         </div>
 
         {(notice || error) && (
-          <div className={`rounded-xl px-4 py-3 ${error ? 'bg-error/10 text-error' : 'bg-emerald-100 text-emerald-700'}`}>
+          <div
+            className={`rounded-xl px-4 py-3 ${error ? "bg-error/10 text-error" : "bg-emerald-100 text-emerald-700"}`}
+          >
             {error || notice}
           </div>
         )}
@@ -280,16 +327,27 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
         <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-title-lg font-bold text-on-surface">Danh sách thông báo</h2>
+              <h2 className="text-title-lg font-bold text-on-surface">
+                Danh sách thông báo
+              </h2>
               <p className="text-sm text-on-surface-variant">
-                {isAdmin ? 'Sắp xếp theo thời gian mới nhất.' : 'Thông báo mới nhất hiển thị trước, có thể tải thêm thông báo cũ hơn.'}
+                {isAdmin
+                  ? "Sắp xếp theo thời gian mới nhất."
+                  : "Thông báo mới nhất hiển thị trước, có thể tải thêm thông báo cũ hơn."}
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               {isAdmin && (
                 <select
-                  value={query.targetRole || ''}
-                  onChange={(event) => setQuery({ ...query, targetRole: event.target.value as NotificationQuery['targetRole'], page: 1 })}
+                  value={query.targetRole || ""}
+                  onChange={(event) =>
+                    setQuery({
+                      ...query,
+                      targetRole: event.target
+                        .value as NotificationQuery["targetRole"],
+                      page: 1,
+                    })
+                  }
                   className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="">Tất cả người nhận</option>
@@ -298,20 +356,32 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
                 </select>
               )}
               <select
-                value={query.type || ''}
-                onChange={(event) => setQuery({ ...query, type: event.target.value as NotificationQuery['type'], page: 1 })}
+                value={query.type || ""}
+                onChange={(event) =>
+                  setQuery({
+                    ...query,
+                    type: event.target.value as NotificationQuery["type"],
+                    page: 1,
+                  })
+                }
                 className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none focus:ring-2 focus:ring-primary/30"
               >
                 <option value="">Tất cả loại</option>
                 {Object.entries(typeLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
                 ))}
               </select>
               <select
-                value={query.isRead === '' ? '' : String(query.isRead)}
+                value={query.isRead === "" ? "" : String(query.isRead)}
                 onChange={(event) => {
                   const value = event.target.value;
-                  setQuery({ ...query, isRead: value === '' ? '' : value === 'true', page: 1 });
+                  setQuery({
+                    ...query,
+                    isRead: value === "" ? "" : value === "true",
+                    page: 1,
+                  });
                 }}
                 className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none focus:ring-2 focus:ring-primary/30"
               >
@@ -326,9 +396,11 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
             <div className="mb-5 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setQuery({ ...query, isRead: '', page: 1 })}
+                onClick={() => setQuery({ ...query, isRead: "", page: 1 })}
                 className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                  query.isRead === '' ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:text-primary'
+                  query.isRead === ""
+                    ? "bg-primary text-on-primary"
+                    : "bg-surface-container-low text-on-surface-variant hover:text-primary"
                 }`}
               >
                 Tất cả
@@ -337,7 +409,9 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
                 type="button"
                 onClick={() => setQuery({ ...query, isRead: false, page: 1 })}
                 className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                  query.isRead === false ? 'bg-primary text-on-primary' : 'bg-surface-container-low text-on-surface-variant hover:text-primary'
+                  query.isRead === false
+                    ? "bg-primary text-on-primary"
+                    : "bg-surface-container-low text-on-surface-variant hover:text-primary"
                 }`}
               >
                 Chưa đọc ({unreadCount})
@@ -347,15 +421,24 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
 
           <AsyncState
             loading={loading}
-            error={error && !items.length ? error : ''}
+            error={error && !items.length ? error : ""}
             empty={!items.length}
             emptyMessage="Chưa có thông báo."
             onRetry={refresh}
           >
-            <NotificationList items={items} busy={busy} showRecipient={isAdmin} onMarkRead={markOne} />
+            <NotificationList
+              items={items}
+              busy={busy}
+              showRecipient={isAdmin}
+              onMarkRead={markOne}
+            />
           </AsyncState>
           {isAdmin ? (
-            <Pagination page={query.page || 1} totalPages={totalPages} onChange={(page) => setQuery({ ...query, page })} />
+            <Pagination
+              page={query.page || 1}
+              totalPages={totalPages}
+              onChange={(page) => setQuery({ ...query, page })}
+            />
           ) : (
             <div className="mt-5 flex justify-center">
               {(query.page || 1) < totalPages ? (
@@ -365,11 +448,15 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
                   disabled={loadingMore}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <span className="material-symbols-outlined text-[20px]">expand_more</span>
-                  {loadingMore ? 'Đang tải...' : 'Xem thông báo trước đó'}
+                  <span className="material-symbols-outlined text-[20px]">
+                    expand_more
+                  </span>
+                  {loadingMore ? "Đang tải..." : "Xem thông báo trước đó"}
                 </button>
               ) : items.length > 0 ? (
-                <p className="text-sm text-on-surface-variant">Đã hiển thị toàn bộ thông báo.</p>
+                <p className="text-sm text-on-surface-variant">
+                  Đã hiển thị toàn bộ thông báo.
+                </p>
               ) : null}
             </div>
           )}
@@ -388,10 +475,22 @@ export default function NotificationsPage({ role }: { role: NotificationRole }) 
   );
 }
 
-function Stat({ icon, label, value }: { icon: string; label: string; value: number }) {
+function Stat({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: number;
+}) {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
-      <span className="material-symbols-outlined flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</span>
+      <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <span className="material-symbols-outlined block text-[24px] leading-none">
+          {icon}
+        </span>
+      </span>
       <div>
         <p className="text-sm text-on-surface-variant">{label}</p>
         <p className="text-headline-md font-bold text-on-surface">{value}</p>
@@ -414,15 +513,24 @@ function NotificationList({
   return (
     <div className="divide-y divide-outline-variant/10">
       {items.map((item) => (
-        <article key={item.id} className={`flex gap-4 py-4 ${item.isRead ? '' : 'bg-primary/5 px-3 sm:-mx-3'}`}>
-          <span className={`material-symbols-outlined mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${item.isRead ? 'bg-surface-container-low text-on-surface-variant' : 'bg-primary/10 text-primary'}`}>
-            {typeIcons[item.type]}
+        <article
+          key={item.id}
+          className={`flex gap-4 py-4 ${item.isRead ? "" : "bg-primary/5 px-3 sm:-mx-3"}`}
+        >
+          <span
+            className={`mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${item.isRead ? "bg-surface-container-low text-on-surface-variant" : "bg-primary/10 text-primary"}`}
+          >
+            <span className="material-symbols-outlined block text-[24px] leading-none">
+              {typeIcons[item.type]}
+            </span>
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-on-surface">{item.title}</h3>
+                  <h3 className="font-semibold text-on-surface">
+                    {item.title}
+                  </h3>
                   <span className="inline-flex rounded-full bg-surface-container-low px-2 py-0.5 text-xs font-semibold text-on-surface-variant">
                     {typeLabels[item.type]}
                   </span>
@@ -432,17 +540,23 @@ function NotificationList({
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-sm leading-6 text-on-surface-variant">{item.content}</p>
+                <p className="mt-1 text-sm leading-6 text-on-surface-variant">
+                  {item.content}
+                </p>
                 {showRecipient && item.recipient && (
                   <p className="mt-2 text-sm text-on-surface-variant">
-                    Người nhận:{' '}
+                    Người nhận:{" "}
                     <span className="font-semibold text-on-surface">
-                      {item.recipient.fullName || item.recipient.email || item.recipient.id}
+                      {item.recipient.fullName ||
+                        item.recipient.email ||
+                        item.recipient.id}
                     </span>
                     {item.recipient.role && ` (${item.recipient.role})`}
                   </p>
                 )}
-                <p className="mt-2 text-xs text-on-surface-variant">{dateTime.format(new Date(item.createdAt))}</p>
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  {dateTime.format(new Date(item.createdAt))}
+                </p>
               </div>
               {!showRecipient && (
                 <button
@@ -451,7 +565,9 @@ function NotificationList({
                   disabled={busy || item.isRead}
                   className="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <span className="material-symbols-outlined text-[18px]">done</span>
+                  <span className="material-symbols-outlined text-[18px]">
+                    done
+                  </span>
                   Đã đọc
                 </button>
               )}
@@ -479,13 +595,23 @@ function SendNotificationModal({
   onSubmit: (event: FormEvent) => void;
 }) {
   return (
-    <Modal open={open} title="Gửi thông báo hệ thống" onClose={onClose} size="md">
+    <Modal
+      open={open}
+      title="Gửi thông báo hệ thống"
+      onClose={onClose}
+      size="md"
+    >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Người nhận</span>
           <select
             value={form.targetRole}
-            onChange={(event) => onChange({ ...form, targetRole: event.target.value as NotificationTargetRole })}
+            onChange={(event) =>
+              onChange({
+                ...form,
+                targetRole: event.target.value as NotificationTargetRole,
+              })
+            }
             className="w-full rounded-xl border border-outline-variant bg-surface p-3 outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="ALL">Tất cả khách hàng và nhà cung cấp</option>
@@ -493,7 +619,12 @@ function SendNotificationModal({
             <option value="PROVIDER">Nhà cung cấp</option>
           </select>
         </label>
-        <FormInput label="Tiêu đề" required value={form.title} onChange={(value) => onChange({ ...form, title: value })} />
+        <FormInput
+          label="Tiêu đề"
+          required
+          value={form.title}
+          onChange={(value) => onChange({ ...form, title: value })}
+        />
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Nội dung</span>
           <textarea
@@ -501,14 +632,27 @@ function SendNotificationModal({
             rows={5}
             maxLength={2000}
             value={form.content}
-            onChange={(event) => onChange({ ...form, content: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...form, content: event.target.value })
+            }
             className="w-full rounded-xl border border-outline-variant bg-surface p-3 outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} disabled={busy} className="rounded-xl bg-surface-container-high px-5 py-2.5">Hủy</button>
-          <button type="submit" disabled={busy} className="rounded-xl bg-primary px-5 py-2.5 font-semibold text-on-primary disabled:opacity-50">
-            {busy ? 'Đang gửi...' : 'Gửi'}
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl bg-surface-container-high px-5 py-2.5"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-xl bg-primary px-5 py-2.5 font-semibold text-on-primary disabled:opacity-50"
+          >
+            {busy ? "Đang gửi..." : "Gửi"}
           </button>
         </div>
       </form>

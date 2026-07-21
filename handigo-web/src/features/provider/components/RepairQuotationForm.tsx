@@ -26,6 +26,11 @@ const emptyItem: QuotationFormItem = {
   note: "",
 };
 
+const MAX_QUOTATION_ITEMS = 100;
+const MAX_GENERAL_TEXT_LENGTH = 2000;
+const MAX_ITEM_TITLE_LENGTH = 200;
+const MAX_ITEM_NOTE_LENGTH = 1000;
+
 interface RepairQuotationFormProps {
   onSubmit: (payload: CreateQuotationPayload) => Promise<void>;
   onCancel: () => void;
@@ -39,7 +44,6 @@ export function RepairQuotationForm({
 }: RepairQuotationFormProps) {
   const [inspectionNote, setInspectionNote] = useState("");
   const [recommendation, setRecommendation] = useState("");
-  const [discountAmount, setDiscountAmount] = useState(0);
   const [items, setItems] = useState([{ ...emptyItem }]);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +51,6 @@ export function RepairQuotationForm({
     (sum, item) => sum + item.quantity * item.unitPrice,
     0,
   );
-  const finalAmount = Math.max(subtotal - discountAmount, 0);
 
   const updateItem = (index: number, patch: Partial<QuotationFormItem>) => {
     setItems((current) =>
@@ -66,12 +69,33 @@ export function RepairQuotationForm({
       setError("Vui lòng thêm ít nhất một hạng mục báo giá hợp lệ.");
       return;
     }
-
+    if (
+      inspectionNote.trim().length > MAX_GENERAL_TEXT_LENGTH ||
+      recommendation.trim().length > MAX_GENERAL_TEXT_LENGTH
+    ) {
+      setError('Ghi chú khảo sát và đề xuất không được vượt quá 2000 ký tự.');
+      return;
+    }
+    if (
+      validItems.some(
+        (item) =>
+          item.title.trim().length > MAX_ITEM_TITLE_LENGTH ||
+          item.description.trim().length > MAX_GENERAL_TEXT_LENGTH ||
+          item.note.trim().length > MAX_ITEM_NOTE_LENGTH ||
+          !Number.isInteger(item.quantity) ||
+          item.quantity < 1 ||
+          item.quantity > 1000 ||
+          !Number.isFinite(item.unitPrice) ||
+          item.unitPrice < 0,
+      )
+    ) {
+      setError('Có hạng mục báo giá chưa hợp lệ.');
+      return;
+    }
     setError(null);
     await onSubmit({
       inspectionNote: inspectionNote.trim() || undefined,
       recommendation: recommendation.trim() || undefined,
-      discountAmount: discountAmount || undefined,
       items: validItems.map((item) => ({
         title: item.title.trim(),
         description: item.description.trim() || undefined,
@@ -111,6 +135,7 @@ export function RepairQuotationForm({
           <textarea
             value={inspectionNote}
             onChange={(event) => setInspectionNote(event.target.value)}
+            maxLength={MAX_GENERAL_TEXT_LENGTH}
             rows={4}
             className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
             placeholder="Mô tả tình trạng thiết bị sau khi kiểm tra..."
@@ -123,6 +148,7 @@ export function RepairQuotationForm({
           <textarea
             value={recommendation}
             onChange={(event) => setRecommendation(event.target.value)}
+            maxLength={MAX_GENERAL_TEXT_LENGTH}
             rows={4}
             className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
             placeholder="Phương án sửa chữa đề xuất..."
@@ -132,16 +158,30 @@ export function RepairQuotationForm({
 
       <div className="space-y-sm">
         <div className="flex items-center justify-between">
-          <h4 className="font-label-md text-on-surface">Hạng mục báo giá</h4>
+          <div>
+            <h4 className="font-label-md text-on-surface">Hạng mục báo giá</h4>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Thành tiền từng hạng mục = Số lượng × Đơn giá.
+            </p>
+          </div>
           <button
             type="button"
+            disabled={items.length >= MAX_QUOTATION_ITEMS}
             onClick={() =>
               setItems((current) => [...current, { ...emptyItem }])
             }
-            className="text-sm font-medium text-primary hover:underline"
+            className="text-sm font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Thêm hạng mục
           </button>
+        </div>
+
+        <div className="hidden grid-cols-12 gap-sm px-sm text-xs font-medium text-on-surface-variant md:grid">
+          <span className="md:col-span-4">Tên hạng mục</span>
+          <span className="md:col-span-2">Loại</span>
+          <span className="md:col-span-1">Số lượng</span>
+          <span className="md:col-span-2">Đơn giá (VND)</span>
+          <span className="md:col-span-2">Thành tiền</span>
         </div>
 
         {items.map((item, index) => (
@@ -151,6 +191,7 @@ export function RepairQuotationForm({
           >
             <input
               value={item.title}
+              maxLength={MAX_ITEM_TITLE_LENGTH}
               onChange={(event) =>
                 updateItem(index, { title: event.target.value })
               }
@@ -175,26 +216,36 @@ export function RepairQuotationForm({
             <input
               type="number"
               min={1}
+              max={1000}
+              step={1}
               value={item.quantity}
               onChange={(event) =>
                 updateItem(index, { quantity: Number(event.target.value) })
               }
+              aria-label="Số lượng"
+              placeholder="Số lượng"
               className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-1"
             />
             <input
               type="number"
               min={0}
+              step={1}
               value={item.unitPrice}
-              onChange={(event) =>
-                updateItem(index, { unitPrice: Number(event.target.value) })
-              }
-              placeholder="Đơn giá"
+              onChange={(event) => {
+                const unitPrice = event.target.value.replace(/^0+(?=\d)/, "");
+                updateItem(index, { unitPrice: Number(unitPrice) });
+              }}
+              aria-label="Đơn giá (VND)"
+              placeholder="Đơn giá (VND)"
               className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-2"
             />
             <div className="flex items-center justify-between gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-primary">
-                {formatMoney(item.quantity * item.unitPrice)}
-              </span>
+              <div>
+                <span className="block text-xs text-on-surface-variant md:hidden">Thành tiền</span>
+                <span className="text-sm font-semibold text-primary">
+                  {formatMoney(item.quantity * item.unitPrice)}
+                </span>
+              </div>
               {items.length > 1 && (
                 <button
                   type="button"
@@ -213,23 +264,11 @@ export function RepairQuotationForm({
         ))}
       </div>
 
-      <div className="grid gap-md md:grid-cols-[1fr_auto] md:items-end">
-        <label className="space-y-2">
-          <span className="text-label-sm text-on-surface-variant">
-            Giảm giá (VND)
-          </span>
-          <input
-            type="number"
-            min={0}
-            value={discountAmount}
-            onChange={(event) => setDiscountAmount(Number(event.target.value))}
-            className="w-full rounded-2xl border border-outline-variant px-4 py-3"
-          />
-        </label>
+      <div className="flex justify-end">
         <div className="rounded-2xl bg-primary/5 px-md py-sm text-right">
-          <p className="text-xs text-on-surface-variant">Tổng báo giá</p>
+          <p className="text-xs text-on-surface-variant">Tổng báo giá (tổng thành tiền các hạng mục)</p>
           <p className="text-headline-md font-bold text-primary">
-            {formatMoney(finalAmount)}
+            {formatMoney(subtotal)}
           </p>
         </div>
       </div>

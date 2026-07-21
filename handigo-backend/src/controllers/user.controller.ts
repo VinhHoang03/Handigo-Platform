@@ -1,7 +1,11 @@
 import { Request, Response } from "express";
 import { requireAuthenticatedUser } from "../middlewares/authContext";
 import {
+  deleteUserService,
+  getAllUsersService,
+  getUserByIdService,
   getProfileService,
+  updateUserService,
   updateProfileService,
 } from "../services/user.service";
 
@@ -10,11 +14,13 @@ export const getProfile = async (req: Request, res: Response) => {
     const userId = requireAuthenticatedUser(req).id;
     const user = await getProfileService(userId);
     return res.json({
-      message: "User profile",
+      message: "Thông tin hồ sơ người dùng",
       user,
     });
   } catch (error: any) {
-    return res.status(404).json({ message: error.message || "Không tìm thấy người dùng" });
+    return res.status(error?.statusCode || 500).json({
+      message: error?.message || "Không thể tải hồ sơ người dùng",
+    });
   }
 };
 
@@ -24,7 +30,7 @@ export const updateProfile = async (req: Request, res: Response) => {
     const user = await updateProfileService(userId, req.body);
 
     res.json({
-      message: "Profile updated successfully",
+      message: "Cập nhật hồ sơ thành công",
       data: user,
     });
   } catch (error: any) {
@@ -34,41 +40,58 @@ export const updateProfile = async (req: Request, res: Response) => {
   }
 };
 
+export const uploadAvatar = async (_req: Request, res: Response) => {
+  return res.status(201).json({
+    success: true,
+    data: { url: res.locals.imageUrl },
+    message: "Tải ảnh đại diện lên thành công",
+  });
+};
+
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const users = await require("../services/user.service").getAllUsersService(req.query);
-    return res.json({ message: "List of users", data: users });
+    const users = await getAllUsersService(req.query);
+    return res.json({ message: "Danh sách người dùng", data: users });
   } catch (error: any) {
-    return res.status(500).json({ message: error.message || "Failed to fetch users" });
+    return res.status(error?.statusCode || 500).json({
+      message: error?.message || "Không thể tải danh sách người dùng",
+    });
   }
 };
 
 export const getUserById = async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
-    const user = await require("../services/user.service").getUserByIdService(id);
-    return res.json({ message: "User detailed", data: user });
+    const id = req.params.id as string;
+    const user = await getUserByIdService(id);
+    return res.json({ message: "Chi tiết người dùng", data: user });
   } catch (error: any) {
-    return res.status(404).json({ message: error.message || "Không tìm thấy người dùng" });
+    return res.status(error?.statusCode || 500).json({
+      message: error?.message || "Không thể tải thông tin người dùng",
+    });
   }
 };
 
 export const updateUser = async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
-    const user = await require("../services/user.service").updateUserService(id, req.body);
-    return res.json({ message: "User updated", data: user });
+    const id = req.params.id as string;
+    const user = await updateUserService(id, req.body);
+    return res.json({ message: "Cập nhật người dùng thành công", data: user });
   } catch (error: any) {
-    return res.status(500).json({ message: error.message || "Failed to update user" });
+    return res.status(error?.statusCode || 500).json({
+      message: error?.message || "Không thể cập nhật người dùng",
+    });
   }
 };
 
 export const deleteUser = async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
-    await require("../services/user.service").deleteUserService(id);
-    return res.json({ message: "User deleted" });
+    const id = req.params.id as string;
+    const adminId = requireAuthenticatedUser(req).id;
+    await deleteUserService(id, adminId);
+    return res.json({ message: "Xóa người dùng thành công" });
   } catch (error: any) {
-    return res.status(500).json({ message: error.message || "Failed to delete user" });
+    return res.status(error?.statusCode || 500).json({
+      message: error?.message || "Không thể xóa người dùng",
+    });
   }
 };

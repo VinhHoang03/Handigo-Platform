@@ -25,6 +25,14 @@ const toSelectOptions = (
     searchText: `${item.codeName} ${item.divisionType}`,
   }));
 
+const getProvinceName = (area: string) => {
+  const separatorIndex = area.lastIndexOf(",");
+  return separatorIndex >= 0 ? area.slice(separatorIndex + 1).trim() : "";
+};
+
+const normalizeName = (value: string) =>
+  value.normalize("NFC").trim().toLocaleLowerCase("vi");
+
 export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
   const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
   const [wards, setWards] = useState<AdministrativeUnit[]>([]);
@@ -41,8 +49,29 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
     [provinces],
   );
   const wardOptions = useMemo(() => toSelectOptions(wards), [wards]);
-  const selectedArea = [wardName, provinceName].filter(Boolean).join(", ");
-  const canAdd = Boolean(provinceCode && wardCode && selectedArea);
+  const lockedProvinceName = useMemo(
+    () => getProvinceName(areas[0] || ""),
+    [areas],
+  );
+  const lockedProvince = useMemo(
+    () =>
+      provinces.find(
+        (province) =>
+          normalizeName(province.name) === normalizeName(lockedProvinceName),
+      ),
+    [lockedProvinceName, provinces],
+  );
+  const effectiveProvinceCode = lockedProvince?.code ?? provinceCode;
+  const effectiveProvinceName = lockedProvince?.name ?? provinceName;
+  const selectedArea = [wardName, effectiveProvinceName]
+    .filter(Boolean)
+    .join(", ");
+  const isSelectedProvinceValid =
+    !lockedProvinceName ||
+    normalizeName(effectiveProvinceName) === normalizeName(lockedProvinceName);
+  const canAdd = Boolean(
+    effectiveProvinceCode && wardCode && selectedArea && isSelectedProvinceValid,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +96,7 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!provinceCode) {
+    if (!effectiveProvinceCode) {
       return undefined;
     }
 
@@ -77,7 +106,7 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
       try {
         setLoadingWards(true);
         setError("");
-        const data = await getWardsByProvince(provinceCode);
+        const data = await getWardsByProvince(effectiveProvinceCode);
         if (!cancelled) setWards(data);
       } catch {
         if (!cancelled) setError("Khong tai duoc danh sach phuong/xa.");
@@ -90,7 +119,7 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [provinceCode]);
+  }, [effectiveProvinceCode]);
 
   const handleAdd = () => {
     if (!canAdd) return;
@@ -108,9 +137,9 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
         </p>
       </div>
 
-      {error && (
+      {(error || (lockedProvinceName && provinces.length > 0 && !lockedProvince)) && (
         <p className="rounded-2xl bg-error/10 p-3 text-sm text-error">
-          {error}
+          {error || "Không tìm thấy tỉnh/thành phố của khu vực đã chọn."}
         </p>
       )}
 
@@ -118,9 +147,10 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
         <SearchableSelect
           id="provider-working-province"
           label="Tỉnh /Thành phố"
-          value={provinceCode}
+          value={effectiveProvinceCode}
           options={provinceOptions}
           loading={loadingProvinces}
+          disabled={Boolean(lockedProvinceName)}
           placeholder="Tìm tỉnh/thành"
           emptyText="Không tìm thấy tỉnh/thành."
           onChange={(option) => {
@@ -137,7 +167,7 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
           value={wardCode}
           options={wardOptions}
           loading={loadingWards}
-          disabled={!provinceCode}
+          disabled={!effectiveProvinceCode}
           placeholder="Tìm phường/xã"
           emptyText="Không tìm thấy phường/xã."
           onChange={(option) => {
@@ -154,6 +184,13 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
           <Plus size={18} /> Thêm
         </button>
       </div>
+
+      {lockedProvinceName && (
+        <p className="rounded-xl bg-primary/5 px-4 py-3 text-sm text-on-surface-variant">
+          Các khu vực phục vụ phải cùng tỉnh/thành phố. Bạn chỉ có thể chọn
+          thêm phường/xã thuộc <strong className="text-primary">{lockedProvinceName}</strong>.
+        </p>
+      )}
 
       {areas.length > 0 ? (
         <div className="flex flex-wrap gap-2">

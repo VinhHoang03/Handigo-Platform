@@ -67,34 +67,59 @@ export const BookingStepper: React.FC<{ currentStep: 1 | 2 | 3 }> = ({ currentSt
   ] as const;
 
   return (
-    <div className="flex items-center justify-between max-w-[620px] mx-auto relative py-md">
-      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-outline-variant -translate-y-1/2" />
-      <div
-        className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 transition-all"
-        style={{ width: currentStep === 1 ? '25%' : currentStep === 2 ? '62%' : '100%' }}
-      />
+    <nav aria-label="Tiến trình đặt dịch vụ" className="mx-auto w-full max-w-[720px] py-2">
+      <div className="relative">
+        <div
+          aria-hidden="true"
+          className="absolute left-[16.6667%] right-[16.6667%] top-[15px] h-px bg-outline-variant/70"
+        >
+          <div
+            className="h-full bg-primary transition-[width] duration-300 ease-out"
+            style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+          />
+        </div>
 
-      {steps.map((step) => {
-        const isDone = step.id < currentStep;
-        const isActive = step.id === currentStep;
+        <ol className="relative grid grid-cols-3">
+          {steps.map((step) => {
+            const isDone = step.id < currentStep;
+            const isActive = step.id === currentStep;
 
-        return (
-          <div key={step.id} className="relative z-10 flex flex-col items-center gap-2 text-center">
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${isDone || isActive
-                ? 'bg-primary text-white'
-                : 'bg-surface-container-highest border-2 border-outline-variant text-on-surface-variant'
-                } ${isActive ? 'ring-[3px] ring-primary-fixed/70' : ''}`}
-            >
-              {isDone ? <span className="material-symbols-outlined text-sm">check</span> : step.id}
-            </div>
-            <span className={`font-label-md text-label-md ${isDone || isActive ? 'text-primary font-bold' : 'text-on-surface-variant'}`}>
-              {step.label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+            return (
+              <li
+                key={step.id}
+                aria-current={isActive ? 'step' : undefined}
+                className="relative z-10 flex min-w-0 flex-col items-center text-center"
+              >
+                <span
+                  className={`grid h-[30px] w-[30px] place-items-center rounded-full border text-xs font-bold leading-none transition-colors ${
+                    isDone
+                      ? 'border-primary bg-primary text-on-primary'
+                      : isActive
+                        ? 'border-primary bg-surface-container-lowest text-primary ring-[3px] ring-primary-fixed'
+                        : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant'
+                  }`}
+                >
+                  {isDone ? (
+                    <span className="material-symbols-outlined text-[16px] leading-none">check</span>
+                  ) : (
+                    step.id
+                  )}
+                </span>
+                <span
+                  className={`mt-1 block min-h-8 px-1 font-label-sm text-label-sm sm:min-h-0 sm:whitespace-nowrap ${
+                    isDone || isActive
+                      ? 'font-semibold text-primary'
+                      : 'font-semibold text-on-surface-variant'
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </nav>
   );
 };
 
@@ -182,8 +207,26 @@ export const OrderSummaryCard: React.FC<{
   actionTo?: string;
   onAction?: () => void;
   isLoading?: boolean;
-}> = ({ step, actionLabel, actionTo, onAction, isLoading }) => {
-  const { categoryId, serviceId, selectedOptionIds } = useBookingStore();
+  summaryContent?: ReactNode;
+  discountAmount?: number;
+}> = ({
+  step,
+  actionLabel,
+  actionTo,
+  onAction,
+  isLoading,
+  summaryContent,
+  discountAmount = 0,
+}) => {
+  const {
+    categoryId,
+    serviceId,
+    selectedOptionIds,
+    selectedOptionQuantities,
+    orderType,
+    scheduledAt,
+    preferredProviderName,
+  } = useBookingStore();
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const navigate = useNavigate();
@@ -216,19 +259,20 @@ export const OrderSummaryCard: React.FC<{
   const calculateTotal = () => {
     let total = 0;
     if (service?.serviceType === 'fixed_price') {
-      total = service?.fixedPrice || 0;
+      total = 0;
     } else if (service?.serviceType === 'variable_price') {
       total = service?.depositAmount || 0;
     }
     if (service?.serviceType !== 'variable_price') {
       selectedOptions.forEach(opt => {
-        total += getOptionPrice(opt);
+        total += getOptionPrice(opt) * (selectedOptionQuantities?.[opt._id] ?? 1);
       });
     }
     return total;
   };
 
   const total = calculateTotal();
+  const finalTotal = Math.max(total - discountAmount, 0);
 
   const handleAction = () => {
     if (onAction) {
@@ -257,7 +301,7 @@ export const OrderSummaryCard: React.FC<{
               </p>
               <p className="text-sm font-bold text-primary mt-1">
                 {service?.serviceType === 'fixed_price'
-                  ? `${(service.fixedPrice || 0).toLocaleString()}đ`
+                  ? 'Giá theo tùy chọn'
                   : service?.serviceType === 'variable_price'
                     ? `Phí cọc: ${(service.depositAmount || 0).toLocaleString()}đ`
                     : '0đ'}
@@ -265,40 +309,84 @@ export const OrderSummaryCard: React.FC<{
             </div>
           </div>
 
-          <div className="border-t border-dashed border-outline-variant pt-md space-y-sm text-sm">
-            <div className="flex justify-between">
-              <span className="text-on-surface-variant">
-                {service?.serviceType === 'variable_price' ? 'Phí đặt cọc' : 'Phí dịch vụ'}
-              </span>
-              <span className="font-medium">
-                {service?.serviceType === 'fixed_price'
-                  ? `${(service?.fixedPrice || 0).toLocaleString()}đ`
-                  : `${(service?.depositAmount || 0).toLocaleString()}đ`}
-              </span>
+          {step >= 2 && orderType !== 'normal' && (
+            <div className="space-y-sm border-t border-dashed border-outline-variant pt-md text-sm">
+              <div className="flex items-start gap-sm">
+                <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-primary">calendar_today</span>
+                <div>
+                  <p className="text-xs text-on-surface-variant">Lịch thực hiện</p>
+                  <p className="font-bold text-on-surface">
+                    {scheduledAt?.includes('T')
+                      ? new Date(scheduledAt).toLocaleString('vi-VN')
+                      : 'Chưa chọn đủ ngày giờ'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-sm">
+                <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-primary">person</span>
+                <div>
+                  <p className="text-xs text-on-surface-variant">Chuyên gia</p>
+                  <p className="font-bold text-on-surface">
+                    {preferredProviderName || 'Chưa chọn chuyên gia'}
+                  </p>
+                </div>
+              </div>
             </div>
+          )}
+
+          <div className="border-t border-dashed border-outline-variant pt-md space-y-sm text-sm">
+            {service?.serviceType === 'variable_price' && (
+              <div className="flex justify-between">
+                <span className="text-on-surface-variant">Phí đặt cọc</span>
+                <span className="font-medium">{(service?.depositAmount || 0).toLocaleString()}đ</span>
+              </div>
+            )}
             {selectedOptions.map(opt => (
               <div key={opt._id} className="flex justify-between">
-                <span className="text-on-surface-variant">{opt.name}</span>
+                <span className="text-on-surface-variant">
+                  {opt.name}
+                  {(selectedOptionQuantities?.[opt._id] ?? 1) > 1
+                    ? ` × ${selectedOptionQuantities?.[opt._id]}`
+                    : ''}
+                </span>
                 {service?.serviceType !== 'variable_price' && (
-                  <span className="font-medium">+{getOptionPrice(opt).toLocaleString()}đ</span>
+                  <span className="font-medium">
+                    {(getOptionPrice(opt) * (selectedOptionQuantities?.[opt._id] ?? 1)).toLocaleString()}đ
+                  </span>
                 )}
               </div>
             ))}
           </div>
 
           <div className="pt-md border-t border-outline-variant flex justify-between items-center">
-            <span className="font-bold">Tổng cộng</span>
-            <span className="text-2xl font-bold text-primary">
-              {total.toLocaleString()}đ
-            </span>
+            <div>
+              <span className="font-bold">Tổng cộng</span>
+              {discountAmount > 0 && (
+                <p className="mt-1 text-sm font-semibold text-emerald-600">
+                  Đã giảm {discountAmount.toLocaleString("vi-VN")}đ
+                </p>
+              )}
+            </div>
+            <div className="text-right">
+              {discountAmount > 0 && (
+                <p className="text-sm text-on-surface-variant line-through">
+                  {total.toLocaleString("vi-VN")}đ
+                </p>
+              )}
+              <span className="text-2xl font-bold text-primary">
+                {finalTotal.toLocaleString("vi-VN")}đ
+              </span>
+            </div>
           </div>
+
+          {summaryContent}
         </div>
 
         <div className="mt-lg space-y-sm">
           {step > 1 && (
             <button
               onClick={() => navigate(-1)}
-              className="w-full py-3 border border-primary text-primary rounded-2xl font-bold hover:bg-primary/5 transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="w-full py-3 border border-primary text-primary rounded-2xl font-bold hover:bg-primary/5 transition-[background-color,transform] active:scale-95 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
             >
               <span className="material-symbols-outlined text-sm">arrow_back</span>
               Quay lại
@@ -307,13 +395,17 @@ export const OrderSummaryCard: React.FC<{
           <button
             onClick={handleAction}
             disabled={isLoading || (step === 1 && !serviceId)}
-            className="w-full bg-primary text-white py-md rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:-translate-y-1 active:translate-y-0 transition-all flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary text-white py-md rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:-translate-y-1 active:translate-y-0 transition-[transform,box-shadow] flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
           >
             {isLoading ? (
               <span className="animate-spin material-symbols-outlined">progress_activity</span>
             ) : (
               <>
-                {step === 3 ? <span className="material-symbols-outlined">lock</span> : null}
+                {step === 3 ? (
+                  <span className="material-symbols-outlined">
+                    {orderType === 'normal' ? 'lock' : 'event_available'}
+                  </span>
+                ) : null}
                 {actionLabel}
                 <span className="material-symbols-outlined">arrow_forward</span>
               </>
@@ -321,8 +413,10 @@ export const OrderSummaryCard: React.FC<{
           </button>
         </div>
 
-        <p className="text-center text-xs text-on-surface-variant mt-md">
-          Thanh toán an toàn và bảo mật bởi HandiGo.
+        <p className="text-center text-xs leading-5 text-on-surface-variant mt-md">
+          {orderType !== 'normal' && step >= 2
+            ? 'Chưa thu tiền khi gửi yêu cầu. Bạn chỉ thanh toán sau khi chuyên gia xác nhận lịch.'
+            : 'Thanh toán an toàn và bảo mật bởi HandiGo.'}
         </p>
       </div>
     </aside>

@@ -260,6 +260,10 @@
     @apply flex min-h-14 w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left text-on-surface transition hover:bg-primary/5 focus:bg-primary/5 focus:ring-2 focus:ring-primary/15;
   }
 
+  .places-address-option[data-active="true"] {
+    @apply bg-primary/5 ring-2 ring-primary/15;
+  }
+
   .places-address-option__icon {
     @apply mt-0.5 text-[20px] text-primary;
   }

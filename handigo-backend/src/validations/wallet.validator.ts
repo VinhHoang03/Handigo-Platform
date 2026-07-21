@@ -20,14 +20,23 @@ export const paginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const walletTransactionQuerySchema = paginationQuerySchema.extend({
-  type: walletTransactionTypeSchema.optional(),
-  fromDate: z.coerce.date().optional(),
-  toDate: z.coerce.date().optional(),
-});
+export const walletTransactionQuerySchema = paginationQuerySchema
+  .extend({
+    type: walletTransactionTypeSchema.optional(),
+    fromDate: z.coerce.date().optional(),
+    toDate: z.coerce.date().optional(),
+  })
+  .refine(
+    (query) =>
+      !query.fromDate || !query.toDate || query.fromDate <= query.toDate,
+    {
+      path: ["toDate"],
+      message: "Ngày kết thúc phải từ ngày bắt đầu trở đi",
+    },
+  );
 
 export const adminWalletListQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().optional(),
+  search: z.string().trim().max(100).optional(),
   sortByBalance: z.enum(["asc", "desc"]).default("desc"),
 });
 
@@ -42,7 +51,11 @@ export const walletDepositOrderCodeParamSchema = z.object({
 export const adminWalletAdjustmentSchema = z.object({
   amount: z.coerce.number().positive("Số tiền phải lớn hơn 0"),
   direction: z.enum(["in", "out"]),
-  reason: z.string().trim().min(1, "Lý do điều chỉnh là bắt buộc"),
+  reason: z
+    .string()
+    .trim()
+    .min(1, "Lý do điều chỉnh là bắt buộc")
+    .max(500, "Lý do điều chỉnh không được vượt quá 500 ký tự"),
 });
 
 export const walletDepositSchema = z.object({

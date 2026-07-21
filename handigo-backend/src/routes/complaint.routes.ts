@@ -6,6 +6,7 @@ import { validate } from "../middlewares/validate.middleware";
 import {
   addComplaintEvidenceSchema,
   complaintIdSchema,
+  complaintListQuerySchema,
   createComplaintSchema,
 } from "../validations/complaint.validator";
 
@@ -19,7 +20,11 @@ router.post(
   validate(createComplaintSchema),
   complaintController.createComplaint,
 );
-router.get("/me", complaintController.getMyComplaints);
+router.get(
+  "/me",
+  validate(complaintListQuerySchema, "query"),
+  complaintController.getMyComplaints,
+);
 router.get("/:id", validate(complaintIdSchema, "params"), complaintController.getComplaintForUser);
 router.patch(
   "/:id/cancel",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { providerOrderApi } from '../api/providerOrder.api';
@@ -25,6 +25,7 @@ import { ProviderOrderFeedbackThread } from '../components/ProviderOrderFeedback
 import { OrderTrackingMap } from '@/features/tracking/components/OrderTrackingMap';
 
 export default function ProviderOrderDetailPage() {
+  const navigate = useNavigate();
   const { orderId } = useParams();
   const { isOnline, toggleAvailability } = useProviderAvailability();
   const [order, setOrder] = useState<Order | null>(null);
@@ -57,7 +58,14 @@ export default function ProviderOrderDetailPage() {
       });
       setAssignment(matchedAssignment ?? null);
 
-      if (orderData.inspectionRequired && orderData.status !== 'created') {
+      const isUnconfirmedAppointment =
+        ['scheduled', 'recurring'].includes(orderData.orderType) &&
+        orderData.bookingStatus !== 'confirmed';
+      if (
+        orderData.inspectionRequired &&
+        orderData.status !== 'created' &&
+        !isUnconfirmedAppointment
+      ) {
         const quotationData = await providerOrderApi.getQuotation(orderId);
         setQuotation(quotationData);
       } else {
@@ -77,12 +85,17 @@ export default function ProviderOrderDetailPage() {
     void Promise.resolve().then(loadData);
   }, [loadData]);
 
-  const runAction = async (action: () => Promise<void>, fallbackMessage: string) => {
+  const runAction = async (
+    action: () => Promise<void>,
+    fallbackMessage: string,
+    reload = true,
+  ) => {
     try {
       setBusy(true);
       setError(null);
       await action();
-      await loadData();
+      if (reload) await loadData();
+      return true;
     } catch (err: unknown) {
       const message =
         typeof err === 'object' &&
@@ -94,6 +107,7 @@ export default function ProviderOrderDetailPage() {
           ? ((err.response.data as { message?: string }).message ?? fallbackMessage)
           : fallbackMessage;
       setError(message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -158,13 +172,16 @@ export default function ProviderOrderDetailPage() {
     const reason = cancelReason.trim();
     const explanation = cancelExplanation.trim();
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
-    await runAction(async () => {
+    const succeeded = await runAction(async () => {
       await providerOrderApi.cancelOrder(order._id, cancellationReason);
-      setCancelConfirmOpen(false);
-      setCancelOpen(false);
-      setCancelReason('');
-      setCancelExplanation('');
-    }, 'Không thể hủy đơn.');
+    }, 'Không thể hủy đơn.', false);
+    if (!succeeded) return;
+
+    setCancelConfirmOpen(false);
+    setCancelOpen(false);
+    setCancelReason('');
+    setCancelExplanation('');
+    navigate('/provider/orders', { replace: true });
   };
 
   const handleCreateQuotation = async (payload: Parameters<typeof providerOrderApi.createQuotation>[1]) => {
@@ -216,18 +233,32 @@ export default function ProviderOrderDetailPage() {
       .join(', ');
   const paymentStatusLabels: Record<Order['paymentStatus'], string> = {
     unpaid: 'Chưa thanh toán',
-    partially_paid: 'Đã thanh toán một phần',
+    partially_paid: 'Đã thanh toán tiền cọc',
     paid: 'Đã thanh toán',
     refunded: 'Đã hoàn tiền',
   };
+  const paymentStatusLabel =
+    order.status === 'cancelled' &&
+    ['paid', 'partially_paid'].includes(order.paymentStatus)
+      ? 'Đang xử lý hoàn tiền'
+      : order.status === 'cancelled' &&
+          order.paymentStatus === 'refunded' &&
+          order.cancellation?.refundPolicy &&
+          order.cancellation.refundPolicy.refundRate < 100
+        ? `Đã hoàn ${order.cancellation.refundPolicy.refundRate}% cho khách`
+        : paymentStatusLabels[order.paymentStatus];
   const orderTypeLabels: Record<Order['orderType'], string> = {
     normal: 'Thực hiện sớm nhất',
     urgent: 'Khẩn cấp',
     scheduled: 'Theo lịch hẹn',
     recurring: 'Định kỳ',
   };
+  const isUnconfirmedAppointment =
+    ['scheduled', 'recurring'].includes(order.orderType) &&
+    order.bookingStatus !== 'confirmed';
   const showQuotationForm =
     order.inspectionRequired &&
+    !isUnconfirmedAppointment &&
     ['accepted', 'in_progress'].includes(order.status) &&
     !quotation;
 
@@ -278,7 +309,8 @@ export default function ProviderOrderDetailPage() {
           />
           <PaymentSummaryCard
             order={order}
-            paymentStatus={paymentStatusLabels[order.paymentStatus]}
+            paymentStatus={paymentStatusLabel}
+            quotation={quotation}
           />
           <OrderProgressCard order={order} />
         </div>
@@ -288,7 +320,13 @@ export default function ProviderOrderDetailPage() {
         <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-2">
             {order.inspectionRequired ? (
               <>
-                {quotation && (
+                {isUnconfirmedAppointment ? (
+                  <div className="glass-card flex h-full flex-col items-center justify-center p-md text-center text-on-surface-variant lg:col-span-2">
+                    <span className="material-symbols-outlined mb-2 text-4xl">event_busy</span>
+                    <p className="font-bold text-on-surface">Đang chờ khách hàng thanh toán giữ lịch</p>
+                    <p className="mt-1 text-sm">Form báo giá sẽ hiển thị sau khi lịch hẹn được thanh toán và xác nhận.</p>
+                  </div>
+                ) : quotation && (
                   <section className="glass-card h-full space-y-md rounded-3xl p-md">
                     <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
                       <h2 className="min-w-0 break-words font-headline-md text-on-surface">Báo giá sửa chữa</h2>
@@ -322,6 +360,27 @@ export default function ProviderOrderDetailPage() {
                       </span>
                     </div>
 
+                    {quotation.quotation.status === 'approved' && (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                        <p className="font-bold">Khách hàng đã đồng ý báo giá</p>
+                        <p className="mt-1 text-emerald-800">
+                          {order.status === 'accepted'
+                            ? 'Bạn có thể bắt đầu công việc ngay, không cần chờ khách hàng thanh toán.'
+                            : 'Công việc đang được thực hiện.'}
+                        </p>
+                        {order.status === 'accepted' && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={handleStart}
+                            className="btn-primary mt-3 w-full py-3 text-base font-bold"
+                          >
+                            {busy ? 'Đang xử lý...' : 'Bắt đầu làm việc'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                   </section>
                 )}
 
@@ -335,14 +394,14 @@ export default function ProviderOrderDetailPage() {
                   </div>
                 )}
 
-                {!quotation && !showQuotationForm && (
+                {!isUnconfirmedAppointment && !quotation && !showQuotationForm && (
                   <div className="glass-card flex h-full flex-col items-center justify-center p-md text-center text-on-surface-variant">
                     <span className="material-symbols-outlined text-4xl mb-2">hourglass_empty</span>
                     <p>Chờ khách hàng hoặc bước tiếp theo</p>
                   </div>
                 )}
 
-                {(quotation || order.status === 'completed') && (
+                {['in_progress', 'completed'].includes(order.status) && (
                   <FixedPriceActionForm
                     order={order}
                     onStart={handleStart}
@@ -543,9 +602,29 @@ function CustomerInformationCard({
   );
 }
 
-function PaymentSummaryCard({ order, paymentStatus }: { order: Order; paymentStatus: string }) {
+function PaymentSummaryCard({
+  order,
+  paymentStatus,
+  quotation,
+}: {
+  order: Order;
+  paymentStatus: string;
+  quotation: QuotationDetail | null;
+}) {
   const discount = (order.pricing?.promotionDiscountAmount || 0) + (order.pricing?.voucherDiscountAmount || 0);
   const discountCode = order.voucherSnapshot?.code || order.promotionSnapshot?.code;
+  const isQuotationOrder = Boolean(order.inspectionRequired);
+  const quotationAmount = quotation?.quotation.finalAmount;
+  const orderValue = isQuotationOrder
+    ? quotationAmount === undefined
+      ? 'Chưa báo giá'
+      : formatMoney(quotationAmount)
+    : formatMoney(order.pricing?.totalPaidAmount);
+  const providerEarning = isQuotationOrder
+    ? quotationAmount === undefined
+      ? 'Chưa báo giá'
+      : formatMoney(quotationAmount)
+    : formatMoney(order.pricing?.providerEarningAmount);
   return (
     <section className="glass-card order-3 h-full rounded-3xl border border-outline-variant/30 p-md sm:p-lg md:col-span-2 lg:order-2 lg:col-span-1">
       <CardTitle icon="account_balance_wallet" title="Thanh toán và thu nhập" />
@@ -554,16 +633,29 @@ function PaymentSummaryCard({ order, paymentStatus }: { order: Order; paymentSta
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{paymentStatus}</span>
       </div>
       <div className="mt-md space-y-3 text-sm">
-        <FinancialRow label="Giá trị đơn hàng" value={formatMoney(order.pricing?.totalPaidAmount)} strong />
-        {discountCode && <FinancialRow label="Mã giảm giá" value={discountCode} />}
-        <FinancialRow label="Số tiền giảm giá" value={`-${formatMoney(discount)}`} tone="discount" />
-        <FinancialRow label="Phí nền tảng" value={`-${formatMoney(order.pricing?.platformCommissionAmount)}`} tone="fee" />
-        <FinancialRow label="Tỷ lệ phí nền tảng" value={`${Math.round((order.pricing?.platformCommissionRate || 0) * 100)}%`} />
-        <FinancialRow label="Phương thức thanh toán" value={getPaymentMethodLabel(order.paymentMethod)} />
+        {isQuotationOrder && (
+          <FinancialRow label="Tiền cọc đơn hàng" value={formatMoney(order.depositAmount)} />
+        )}
+        <FinancialRow label="Giá trị đơn hàng" value={orderValue} strong />
+        {(order.cancellation?.refundPolicy?.providerCompensation || 0) > 0 && (
+          <FinancialRow
+            label="Bồi thường phí hủy"
+            value={formatMoney(order.cancellation?.refundPolicy?.providerCompensation)}
+            strong
+          />
+        )}
+        {!isQuotationOrder && discountCode && <FinancialRow label="Mã giảm giá" value={discountCode} />}
+        {!isQuotationOrder && <FinancialRow label="Số tiền giảm giá" value={`-${formatMoney(discount)}`} tone="discount" />}
+        {!isQuotationOrder && <FinancialRow label="Phí nền tảng" value={`-${formatMoney(order.pricing?.platformCommissionAmount)}`} tone="fee" />}
+        {!isQuotationOrder && <FinancialRow label="Tỷ lệ phí nền tảng" value={`${Math.round((order.pricing?.platformCommissionRate || 0) * 100)}%`} />}
+        <FinancialRow
+          label={isQuotationOrder ? 'Phương thức thanh toán tiền cọc' : 'Phương thức thanh toán'}
+          value={getPaymentMethodLabel(order.paymentMethod)}
+        />
       </div>
       <div className="mt-md rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Thu nhập thực nhận</p>
-        <p className="mt-1 text-2xl font-bold text-emerald-700">{formatMoney(order.pricing?.providerEarningAmount)}</p>
+        <p className="mt-1 text-2xl font-bold text-emerald-700">{providerEarning}</p>
       </div>
     </section>
   );

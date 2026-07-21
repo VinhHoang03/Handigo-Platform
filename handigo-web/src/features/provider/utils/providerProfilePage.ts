@@ -42,6 +42,7 @@ export type CertificateForm = {
   expiresAt: string;
   imageUrls: string[];
   description: string;
+  isPublic: boolean;
 };
 
 export type PasswordForm = {
@@ -79,6 +80,7 @@ export const emptyCertificateForm: CertificateForm = {
   expiresAt: "",
   imageUrls: [],
   description: "",
+  isPublic: false,
 };
 
 export const emptyPasswordForm: PasswordForm = {
@@ -172,6 +174,7 @@ export const toCertificateForm = (
   expiresAt: toDateInput(certificate.expiresAt),
   imageUrls: certificate.imageUrls,
   description: certificate.description || "",
+  isPublic: certificate.isPublic,
 });
 
 export const toUserProfileData = (

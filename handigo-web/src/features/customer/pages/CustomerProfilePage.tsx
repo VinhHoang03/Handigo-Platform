@@ -12,6 +12,7 @@ import { providerApplicationApi } from "@/features/provider-application/api/prov
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import {
   getUserProfile,
+  updateUserAvatar,
   updateUserProfile,
 } from "@/features/profile/api/userProfile.api";
 import { getErrorMessage } from "@/utils/apiError";
@@ -28,15 +29,20 @@ const WAITING_PROVIDER_STATUSES: ProviderApplication["status"][] = [
   "resubmitted",
 ];
 
+type ProviderBannerMode = "rejected" | "waiting" | "cta";
+
 const getProviderBannerMode = (
   application: ProviderApplication | null,
-): "rejected" | "waiting" | "cta" => {
+): ProviderBannerMode => {
   if (application?.status === "rejected") return "rejected";
   if (application && WAITING_PROVIDER_STATUSES.includes(application.status)) {
     return "waiting";
   }
   return "cta";
 };
+
+const getProviderBannerStorageKey = (profileId?: string) =>
+  `handigo:customer-profile:provider-banner:${profileId || "current"}`;
 
 function AccountActionRow({
   icon,
@@ -52,7 +58,7 @@ function AccountActionRow({
   return (
     <button
       type="button"
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low p-4 text-left transition hover:border-primary/30 hover:bg-surface-container"
+      className="flex w-full items-center justify-between gap-3 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4 text-left transition hover:border-primary/40 hover:bg-surface-container"
       onClick={onClick}
     >
       <span className="flex min-w-0 items-center gap-3">
@@ -89,6 +95,8 @@ export default function CustomerProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [dismissedProviderBanner, setDismissedProviderBanner] =
+    useState<ProviderBannerMode | null>(null);
 
   const [isPwdConfirmOpen, setIsPwdConfirmOpen] = useState(false);
   const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
@@ -130,6 +138,18 @@ export default function CustomerProfilePage() {
 
     try {
       const nextProfile = await getUserProfile();
+      try {
+        const dismissedMode = window.localStorage.getItem(
+          getProviderBannerStorageKey(nextProfile.id),
+        );
+        setDismissedProviderBanner(
+          ["rejected", "waiting", "cta"].includes(dismissedMode || "")
+            ? (dismissedMode as ProviderBannerMode)
+            : null,
+        );
+      } catch {
+        setDismissedProviderBanner(null);
+      }
       setProfile(nextProfile);
       syncAuthUser(nextProfile);
     } catch {
@@ -251,6 +271,43 @@ export default function CustomerProfilePage() {
   const canRegisterProvider =
     String(profile.role || "").toUpperCase() === "CUSTOMER";
   const providerBannerMode = getProviderBannerMode(providerApplication);
+  const showProviderBanner =
+    canRegisterProvider &&
+    !isProviderApplicationLoading &&
+    dismissedProviderBanner !== providerBannerMode;
+
+  const dismissProviderBanner = () => {
+    try {
+      window.localStorage.setItem(
+        getProviderBannerStorageKey(profile.id),
+        providerBannerMode,
+      );
+    } catch {
+      // Trạng thái trong phiên hiện tại vẫn được cập nhật nếu bộ nhớ trình duyệt bị chặn.
+    }
+    setDismissedProviderBanner(providerBannerMode);
+  };
+
+  const handleSaveAvatar = async (url: string) => {
+    setIsSaving(true);
+    setErrorMsg("");
+
+    try {
+      const nextProfile = await updateUserAvatar(url);
+      setProfile(nextProfile);
+      syncAuthUser(nextProfile);
+    } catch (error) {
+      setErrorMsg(
+        getErrorMessage(
+          error,
+          "Cập nhật ảnh đại diện thất bại. Vui lòng thử lại.",
+        ),
+      );
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <DashboardShell
@@ -259,11 +316,19 @@ export default function CustomerProfilePage() {
       hideSidebar
     >
       <div className="mx-auto w-full max-w-7xl space-y-6">
-        {canRegisterProvider &&
-          !isProviderApplicationLoading &&
+        {showProviderBanner &&
           providerBannerMode === "rejected" &&
           providerApplication && (
-            <section className="flex flex-col justify-between gap-4 rounded-xl border border-error/25 bg-error-container p-5 text-on-error-container md:flex-row md:items-center">
+            <section className="relative flex flex-col justify-between gap-4 overflow-hidden rounded-3xl border border-error/25 bg-error-container p-5 pr-14 text-on-error-container shadow-sm md:flex-row md:items-center md:p-6 md:pr-16">
+              <button
+                type="button"
+                aria-label="Đóng thông báo"
+                title="Không hiển thị lại"
+                onClick={dismissProviderBanner}
+                className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full text-on-error-container transition hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/30"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
               <div className="flex items-start gap-4">
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-error/10 text-error">
                   <span className="material-symbols-outlined text-2xl">
@@ -271,13 +336,17 @@ export default function CustomerProfilePage() {
                   </span>
                 </div>
                 <p className="text-sm font-semibold leading-6">
-                  Hồ sơ đăng ký Provider của bạn đã bị từ chối. Vui lòng xem chi tiết hồ sơ để biết lý do và thực hiện chỉnh sửa trước khi gửi lại.
+                  Hồ sơ đăng ký Provider của bạn đã bị từ chối. Vui lòng xem chi
+                  tiết hồ sơ để biết lý do và thực hiện chỉnh sửa trước khi gửi
+                  lại.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() =>
-                  navigate(`/register-provider?applicationId=${providerApplication._id}`)
+                  navigate(
+                    `/register-provider?applicationId=${providerApplication._id}`,
+                  )
                 }
                 className="rounded-lg bg-error px-5 py-2.5 font-bold text-on-error shadow-sm transition hover:bg-error/90"
               >
@@ -286,77 +355,98 @@ export default function CustomerProfilePage() {
             </section>
           )}
 
-        {canRegisterProvider &&
-          !isProviderApplicationLoading &&
-          providerBannerMode === "waiting" && (
-            <section className="flex min-h-14 items-center gap-3 overflow-hidden rounded-xl border border-primary/15 bg-primary px-4 py-3 text-on-primary">
-              <span className="material-symbols-outlined shrink-0 text-xl">
-                pending_actions
-              </span>
-              <div
-                className="min-w-0 flex-1 overflow-hidden"
-                aria-live="polite"
-              >
-                <p className="provider-status-marquee w-max whitespace-nowrap text-sm font-medium">
-                  Đơn đăng ký trở thành thợ cung cấp dịch vụ của bạn đã được gửi
-                  thành công. Chúng tôi đang tiến hành xem xét hồ sơ và sẽ phản
-                  hồi trong thời gian sớm nhất.
+        {showProviderBanner && providerBannerMode === "waiting" && (
+          <section className="relative flex items-start gap-4 overflow-hidden rounded-3xl border border-primary/20 bg-primary p-5 pr-14 text-on-primary shadow-sm sm:items-center sm:p-6 sm:pr-16">
+            <button
+              type="button"
+              aria-label="Đóng thông báo"
+              title="Không hiển thị lại"
+              onClick={dismissProviderBanner}
+              className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full text-on-primary transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
+            <span className="material-symbols-outlined shrink-0 rounded-2xl bg-white/15 p-3 text-2xl">
+              pending_actions
+            </span>
+            <div className="min-w-0 flex-1" aria-live="polite">
+              <p className="font-headline-sm text-lg font-bold">
+                Hồ sơ đang được xem xét
+              </p>
+              <p className="mt-1 text-sm leading-5 text-on-primary/85">
+                Đơn đăng ký trở thành thợ cung cấp dịch vụ của bạn đã được gửi
+                thành công. Chúng tôi đang tiến hành xem xét hồ sơ và sẽ phản
+                hồi trong thời gian sớm nhất.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {showProviderBanner && providerBannerMode === "cta" && (
+          <section className="relative flex flex-col justify-between gap-5 overflow-hidden rounded-3xl border border-primary/15 bg-primary p-5 pr-14 text-on-primary shadow-sm md:flex-row md:items-center md:p-6 md:pr-16">
+            <span
+              aria-hidden="true"
+              className="absolute -bottom-16 -right-10 h-40 w-40 rounded-full bg-white/10"
+            />
+            <button
+              type="button"
+              aria-label="Đóng thông báo"
+              title="Không hiển thị lại"
+              onClick={dismissProviderBanner}
+              className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full text-on-primary transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
+            <div className="flex items-center gap-4">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15">
+                <span className="material-symbols-outlined text-2xl">
+                  engineering
+                </span>
+              </div>
+              <div>
+                <p className="font-headline-sm font-bold">
+                  Trở thành thợ dịch vụ
+                </p>
+                <p className="mt-1 text-sm text-on-primary/80">
+                  Gửi hồ sơ để mở rộng vai trò provider trên cùng tài khoản.
                 </p>
               </div>
-            </section>
-          )}
-
-        {canRegisterProvider &&
-          !isProviderApplicationLoading &&
-          providerBannerMode === "cta" && (
-            <section className="flex flex-col justify-between gap-4 rounded-xl border border-primary/15 bg-primary p-5 text-on-primary md:flex-row md:items-center">
-              <div className="flex items-center gap-4">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15">
-                  <span className="material-symbols-outlined text-2xl">
-                    engineering
-                  </span>
-                </div>
-                <div>
-                  <p className="font-headline-sm font-bold">
-                    Trở thành thợ dịch vụ
-                  </p>
-                  <p className="mt-1 text-sm text-on-primary/80">
-                    Gửi hồ sơ để mở rộng vai trò provider trên cùng tài khoản.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate("/register-provider")}
-                className="rounded-lg bg-white px-5 py-2.5 font-bold text-primary shadow-sm transition hover:bg-white/90"
-              >
-                Đăng ký ngay
-              </button>
-            </section>
-          )}
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/register-provider")}
+              className="relative z-10 rounded-lg bg-white px-5 py-2.5 font-bold text-primary shadow-sm transition hover:bg-white/90"
+            >
+              Đăng ký ngay
+            </button>
+          </section>
+        )}
 
         <div
           role="tablist"
           aria-label="Các mục hồ sơ khách hàng"
-          className="flex gap-2 overflow-x-auto rounded-xl border border-outline-variant/20 bg-white p-2 shadow-sm"
+          className="flex gap-2 overflow-x-auto rounded-2xl border border-outline-variant/30 bg-surface-container-low p-2 shadow-sm sm:grid sm:grid-cols-3"
         >
           {[
-            ["profile", "Hồ sơ"],
-            ["security", "Bảo mật"],
-            ["applications", "Hồ sơ Provider"],
-          ].map(([value, label]) => (
+            ["profile", "Hồ sơ", "person"],
+            ["security", "Bảo mật", "shield"],
+            ["applications", "Đơn của tôi", "engineering"],
+          ].map(([value, label, icon]) => (
             <button
               key={value}
               type="button"
               role="tab"
               aria-selected={activeTab === value}
-              className={`min-h-11 shrink-0 rounded-lg px-4 py-2 text-sm font-bold transition ${
+              className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
                 activeTab === value
                   ? "bg-primary text-on-primary"
                   : "text-on-surface-variant hover:bg-surface-container-low"
               }`}
               onClick={() => setActiveTab(value as typeof activeTab)}
             >
+              <span className="material-symbols-outlined text-[18px]">
+                {icon}
+              </span>
               {label}
             </button>
           ))}
@@ -370,6 +460,7 @@ export default function CustomerProfilePage() {
             error={errorMsg}
             defaultAvatar={DEFAULT_AVATAR}
             onSaveProfile={handleSaveProfile}
+            onSaveAvatar={handleSaveAvatar}
             addressManager={
               <AddressBookManager
                 defaultRecipient={{
@@ -382,7 +473,7 @@ export default function CustomerProfilePage() {
         )}
 
         {activeTab === "security" && (
-          <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+          <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm md:p-8">
             <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
               Chức năng tài khoản
             </h3>
@@ -408,7 +499,7 @@ export default function CustomerProfilePage() {
         )}
 
         {activeTab === "profile" && (
-          <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm md:p-8">
+          <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm md:p-8">
             <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
               Cài đặt thông báo
             </h3>
@@ -435,7 +526,7 @@ export default function CustomerProfilePage() {
         )}
 
         {activeTab === "applications" && (
-          <section className="rounded-xl border border-outline-variant/20 bg-white p-4 shadow-sm sm:p-6 md:p-8">
+          <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm sm:p-6 md:p-8">
             <div className="mb-5">
               <h3 className="font-headline-md text-headline-md text-on-surface">
                 Hồ sơ đăng ký Provider

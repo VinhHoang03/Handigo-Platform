@@ -2,23 +2,34 @@ import api from "@/api/client";
 import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutocomplete";
 import type {
   Address,
+  CancellationPreview,
   CreatePaymentResult,
   Order,
   OrderQuotation,
   Pagination,
   Payment,
 } from "@/types/booking";
+import type { WalletTransaction } from "@/features/wallet/types/wallet.types";
+
+export interface OrderPaymentsResult {
+  payments: Payment[];
+  platformFeeTransaction: WalletTransaction | null;
+}
 
 export interface CreateOrderPayload {
   serviceId: string;
   selectedOptionIds?: string[];
+  selectedOptions?: Array<{ optionId: string; quantity: number }>;
   addressId: string;
   preferredProviderId?: string;
   orderType?: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
+  recurrenceUnit?: "weekly" | "monthly";
+  recurrenceCount?: 1 | 2 | 3 | 4 | 8 | 12;
   problemDescription?: string;
   paymentMethod: "wallet" | "bank" | "cash";
   customerAttachments?: string[];
+  voucherCode?: string;
 }
 
 export interface CreateAddressPayload {
@@ -29,8 +40,19 @@ export interface CreateAddressPayload {
   ward: string;
   latitude?: number;
   longitude?: number;
+  placeId?: string;
   isDefault?: boolean;
   note?: string | null;
+}
+
+interface ReverseGeocodedAddress {
+  fullAddress: string;
+  province: string;
+  ward: string;
+  latitude: number;
+  longitude: number;
+  placeId?: string;
+  attribution: string;
 }
 
 export const bookingApi = {
@@ -70,8 +92,19 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  uploadOrderAttachment: async (file: File) => {
+  reverseGeocode: async (latitude: number, longitude: number) => {
+    const response = await api.get<{
+      success: boolean;
+      data: ReverseGeocodedAddress;
+    }>("/locations/reverse-geocode", {
+      params: { latitude, longitude },
+    });
+    return response.data.data;
+  },
+
+  uploadOrderAttachment: async (file: File, purpose?: 'order_problem') => {
     const formData = new FormData();
+    if (purpose) formData.append('purpose', purpose);
     formData.append("image", file);
     const response = await api.post<{
       success: boolean;
@@ -92,7 +125,7 @@ export const bookingApi = {
 
   createPayment: async (payload: {
     orderId: string;
-    method: "PAYOS" | "CASH";
+    method: "PAYOS" | "CASH" | "WALLET";
     paymentType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING";
     returnUrl?: string;
     cancelUrl?: string;
@@ -108,6 +141,21 @@ export const bookingApi = {
     const response = await api.get<{ success: boolean; data: Payment }>(
       `/payments/${paymentId}`,
     );
+    return response.data.data;
+  },
+
+  getPaymentsByOrder: async (orderId: string) => {
+    const response = await api.get<{
+      success: boolean;
+      data: OrderPaymentsResult;
+    }>(
+      `/payments/order/${orderId}`,
+    );
+
+    if (!response.data.data || !Array.isArray(response.data.data.payments)) {
+      throw new Error("Dữ liệu lịch sử thanh toán không hợp lệ.");
+    }
+
     return response.data.data;
   },
 
@@ -134,11 +182,73 @@ export const bookingApi = {
     return response.data.data;
   },
 
+  discardUnpaidOrder: async (orderId: string) => {
+    const response = await api.delete<{
+      success: boolean;
+      data: { orderId: string };
+    }>(`/orders/${orderId}/unpaid`);
+    return response.data.data;
+  },
+
+  reconcilePayosPayment: async (orderId: string) => {
+    const response = await api.post<{
+      success: boolean;
+      data: { payment: Payment | null; order: Order | null };
+    }>(`/payments/order/${orderId}/reconcile`);
+    return response.data.data;
+  },
+
+  getRecurringSeries: async (orderId: string) => {
+    const response = await api.get<{
+      success: boolean;
+      data: { items: Order[] };
+    }>(`/orders/${orderId}/series`);
+    return response.data.data.items;
+  },
+
+  selectAppointmentProvider: async (orderId: string, providerId: string) => {
+    const response = await api.patch<{ success: boolean; data: Order }>(
+      `/orders/${orderId}/appointment-provider`,
+      { providerId },
+    );
+    return response.data.data;
+  },
+
   cancelOrder: async (orderId: string, reason: string) => {
     const response = await api.patch<{ success: boolean; data: Order }>(
       `/orders/${orderId}/cancel`,
       { reason },
     );
+    return response.data.data;
+  },
+
+  respondToReassignment: async (
+    orderId: string,
+    decision: "accept" | "decline",
+  ) => {
+    const response = await api.patch<{ success: boolean; data: Order }>(
+      `/orders/${orderId}/reassignment-response`,
+      { decision },
+    );
+    return response.data.data;
+  },
+
+  getCancellationPreview: async (
+    orderId: string,
+    scope: "single" | "series" = "single",
+  ) => {
+    const response = await api.get<{
+      success: boolean;
+      data: CancellationPreview;
+    }>(`/orders/${orderId}/cancellation-preview`, { params: { scope } });
+    return response.data.data;
+  },
+
+  cancelRecurringSeries: async (orderId: string, reason: string) => {
+    const response = await api.patch<{
+      success: boolean;
+      data: { cancelledCount: number; orders: Order[] };
+    }>(`/orders/${orderId}/cancel-series`, { reason });
     return response.data.data;
   },
 

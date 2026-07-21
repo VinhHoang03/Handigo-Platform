@@ -12,8 +12,14 @@ export interface IServiceOption extends Document, IBaseDocument {
   serviceId: Types.ObjectId;
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType: ServiceOptionType;
   price: Money;
+  selectionGroup?: string | null;
+  selectionMode: "single" | "multiple";
+  allowsQuantity: boolean;
+  isRequired: boolean;
+  sortOrder: number;
   isActive: boolean;
 }
 
@@ -22,6 +28,7 @@ const ServiceOptionSchema = new Schema<IServiceOption>(
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
     name: { type: String, required: true, trim: true },
     description: { type: String, default: null, trim: true },
+    image: { type: String, default: null, trim: true },
     optionType: {
       type: String,
       enum: ["room_count", "area_size", "package", "add_on", "other"],
@@ -29,12 +36,21 @@ const ServiceOptionSchema = new Schema<IServiceOption>(
       default: "other",
     },
     price: { type: Number, required: true, min: 0 },
+    selectionGroup: { type: String, default: null, trim: true, maxlength: 120 },
+    selectionMode: {
+      type: String,
+      enum: ["single", "multiple"],
+      default: "multiple",
+    },
+    allowsQuantity: { type: Boolean, default: false },
+    isRequired: { type: Boolean, default: false },
+    sortOrder: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true },
     ...baseFields,
   },
   { timestamps: true },
 );
 
-ServiceOptionSchema.index({ serviceId: 1 });
+ServiceOptionSchema.index({ serviceId: 1, sortOrder: 1, createdAt: 1 });
 
 export const ServiceOption = model<IServiceOption>("ServiceOption", ServiceOptionSchema, "serviceoptions");

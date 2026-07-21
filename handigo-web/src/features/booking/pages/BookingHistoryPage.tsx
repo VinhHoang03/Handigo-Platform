@@ -16,6 +16,7 @@ const filters = [
 const BookingHistoryPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -40,8 +41,9 @@ const BookingHistoryPage = () => {
       setOrders((current) => append ? [...current, ...data.items] : data.items);
       setTotal(data.pagination.total);
       setPage(targetPage);
-    } catch (error) {
-      console.error('Failed to fetch orders:', error);
+      setError('');
+    } catch {
+      setError('Không thể tải lịch sử đặt dịch vụ. Vui lòng thử lại.');
     } finally {
       setTimeout(() => setLoading(false), 0);
     }
@@ -142,7 +144,18 @@ const BookingHistoryPage = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-md">
-        {loading ? (
+        {error && !loading ? (
+          <div className="rounded-2xl border border-error/20 bg-error/10 p-md text-center text-error">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => void fetchOrders(activeFilter, debouncedSearch, 1)}
+              className="mt-3 rounded-xl bg-error px-4 py-2 font-semibold text-on-error"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : loading ? (
           <div className="text-center py-xl flex flex-col items-center gap-2">
             <span className="animate-spin material-symbols-outlined text-primary text-4xl">progress_activity</span>
             <p className="text-on-surface-variant animate-pulse">Đang tải danh sách...</p>

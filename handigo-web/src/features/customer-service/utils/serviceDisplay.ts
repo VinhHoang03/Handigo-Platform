@@ -43,16 +43,10 @@ export const getServiceImage = (service?: Service | null, index = 0) =>
 export const getOptionPrice = (option: ServiceOption) =>
   option.price ?? option.fixedPrice ?? 0;
 
-export const getServicePrice = (service: Service, options: ServiceOption[] = []) => {
+export const getServicePrice = (service: Service) => {
   if (service.serviceType === "fixed_price") {
-    return service.fixedPrice || 0;
+    return service.minOptionPrice || 0;
   }
 
-  const optionPrices = options
-    .map(getOptionPrice)
-    .filter((price) => price > 0);
-
-  return optionPrices.length
-    ? Math.min(...optionPrices)
-    : service.depositAmount || 0;
+  return service.depositAmount || 0;
 };

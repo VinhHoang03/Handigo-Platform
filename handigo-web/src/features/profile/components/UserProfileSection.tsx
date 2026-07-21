@@ -1,9 +1,15 @@
+import { useState, type FormEvent, type ReactNode } from "react";
 import {
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
-import { Camera, Eye, EyeOff, MapPin, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+  Eye,
+  EyeOff,
+  MapPin,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
+import { AvatarEditor } from "@/features/profile/components/AvatarEditor";
 import type {
   GenderValue,
   UserAddress,
@@ -21,7 +27,7 @@ const DEFAULT_AVATAR =
 
 interface UserProfileSectionProps {
   user: UserProfileData;
-  addresses: UserAddress[];
+  addresses?: UserAddress[];
   isSaving?: boolean;
   isAddressLoading?: boolean;
   isAddressSaving?: boolean;
@@ -34,6 +40,7 @@ interface UserProfileSectionProps {
   showAddresses?: boolean;
   addressManager?: ReactNode;
   onSaveProfile: (payload: UserProfileFormValue) => Promise<void> | void;
+  onSaveAvatar?: (url: string) => Promise<void> | void;
   onAddAddress?: () => void;
   onEditAddress?: (address: UserAddress) => void;
   onDeleteAddress?: (address: UserAddress) => Promise<void> | void;
@@ -50,6 +57,12 @@ const toDateInput = (value?: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toISOString().slice(0, 10);
+};
+
+const getTodayDate = () => {
+  const today = new Date();
+  const timezoneOffset = today.getTimezoneOffset() * 60_000;
+  return new Date(today.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
 
 const toProfileForm = (user: UserProfileData): UserProfileFormValue => ({
@@ -113,6 +126,7 @@ function TextField({
   label,
   value,
   type = "text",
+  max,
   required,
   highlighted,
   error,
@@ -122,6 +136,7 @@ function TextField({
   label: string;
   value: string;
   type?: string;
+  max?: string;
   required?: boolean;
   highlighted?: boolean;
   error?: string;
@@ -136,6 +151,7 @@ function TextField({
         id={id}
         type={type}
         value={value}
+        max={max}
         required={required}
         onChange={(event) => onChange(event.target.value)}
         className={[
@@ -143,11 +159,13 @@ function TextField({
           error
             ? "border-error focus:border-error focus:ring-error/15"
             : highlighted
-            ? "border-primary shadow-[0_0_0_4px_rgba(79,70,229,0.14)]"
-            : "border-outline-variant/40",
+              ? "border-primary shadow-[0_0_0_4px_rgba(79,70,229,0.14)]"
+              : "border-outline-variant/40",
         ].join(" ")}
       />
-      {error && <span className="block text-xs font-medium text-error">{error}</span>}
+      {error && (
+        <span className="block text-xs font-medium text-error">{error}</span>
+      )}
     </label>
   );
 }
@@ -163,10 +181,10 @@ function AddressRow({
   onEdit?: (address: UserAddress) => void;
   onDelete?: (address: UserAddress) => void;
 }) {
-  const title =
-    address.note?.trim() ||
-    [address.ward, address.province].filter(Boolean).join(", ") ||
-    "Địa chỉ";
+  const hasNote = Boolean(
+    address.note?.trim() &&
+      address.note.trim() !== "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.",
+  );
 
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low p-3">
@@ -176,11 +194,10 @@ function AddressRow({
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-bold text-on-surface">{title}</p>
-            {address.isDefault && (
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
-                Mặc định
-              </span>
+            {hasNote && (
+              <p className="font-bold text-on-surface">
+                {address.note?.trim()}
+              </p>
             )}
           </div>
           <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">
@@ -194,30 +211,37 @@ function AddressRow({
           )}
         </div>
       </div>
-      <div className="flex shrink-0 gap-1">
-        {onEdit && (
-          <button
-            type="button"
-            className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant transition hover:bg-primary/10 hover:text-primary disabled:opacity-40"
-            disabled={disabled}
-            title="Sửa địa chỉ"
-            aria-label="Sửa địa chỉ"
-            onClick={() => onEdit(address)}
-          >
-            <Pencil size={17} />
-          </button>
-        )}
-        {onDelete && (
-          <button
-            type="button"
-            className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant transition hover:bg-error/10 hover:text-error disabled:opacity-40"
-            disabled={disabled}
-            title="Xóa địa chỉ"
-            aria-label="Xóa địa chỉ"
-            onClick={() => onDelete(address)}
-          >
-            <Trash2 size={17} />
-          </button>
+      <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex gap-1">
+          {onEdit && (
+            <button
+              type="button"
+              className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant transition hover:bg-primary/10 hover:text-primary disabled:opacity-40"
+              disabled={disabled}
+              title="Sửa địa chỉ"
+              aria-label="Sửa địa chỉ"
+              onClick={() => onEdit(address)}
+            >
+              <Pencil size={17} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant transition hover:bg-error/10 hover:text-error disabled:opacity-40"
+              disabled={disabled}
+              title="Xóa địa chỉ"
+              aria-label="Xóa địa chỉ"
+              onClick={() => onDelete(address)}
+            >
+              <Trash2 size={17} />
+            </button>
+          )}
+        </div>
+        {address.isDefault && (
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase text-primary">
+            Mặc định
+          </span>
         )}
       </div>
     </div>
@@ -226,7 +250,7 @@ function AddressRow({
 
 export function UserProfileSection({
   user,
-  addresses,
+  addresses = [],
   isSaving,
   isAddressLoading,
   isAddressSaving,
@@ -239,6 +263,7 @@ export function UserProfileSection({
   showAddresses = true,
   addressManager,
   onSaveProfile,
+  onSaveAvatar,
   onAddAddress,
   onEditAddress,
   onDeleteAddress,
@@ -252,6 +277,7 @@ export function UserProfileSection({
   const [fieldErrors, setFieldErrors] = useState<{
     fullName?: string;
     phone?: string;
+    birthday?: string;
   }>({});
 
   const avatarSrc = isEditing
@@ -265,16 +291,25 @@ export function UserProfileSection({
 
     const normalizedName = profileForm.fullName.trim().replace(/\s+/g, " ");
     const normalizedPhone = normalizeVietnamesePhone(profileForm.phone || "");
-    const nextFieldErrors: { fullName?: string; phone?: string } = {};
+    const nextFieldErrors: {
+      fullName?: string;
+      phone?: string;
+      birthday?: string;
+    } = {};
 
     if (!normalizedName) {
       nextFieldErrors.fullName = "Vui lòng nhập họ và tên.";
     } else if (!/^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u.test(normalizedName)) {
-      nextFieldErrors.fullName = "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
+      nextFieldErrors.fullName =
+        "Họ và tên chỉ được chứa chữ cái và khoảng trắng.";
     }
 
     if (normalizedPhone && !isValidVietnamesePhone(normalizedPhone)) {
       nextFieldErrors.phone = "Số điện thoại Việt Nam không hợp lệ.";
+    }
+
+    if (profileForm.birthday && profileForm.birthday > getTodayDate()) {
+      nextFieldErrors.birthday = "Ngày sinh không được sau ngày hiện tại.";
     }
 
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -286,7 +321,9 @@ export function UserProfileSection({
       await onSaveProfile({
         fullName: normalizedName,
         phone: normalizedPhone || undefined,
-        avatar: showAvatar ? profileForm.avatar?.trim() || null : user.avatar || null,
+        avatar: showAvatar
+          ? profileForm.avatar?.trim() || null
+          : user.avatar || null,
         birthday: profileForm.birthday || null,
         gender: profileForm.gender || null,
       });
@@ -304,17 +341,16 @@ export function UserProfileSection({
     }
   };
 
-  const handleAvatarFileChange = (file?: File) => {
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setProfileForm((current) => ({
-        ...current,
-        avatar: String(reader.result || ""),
-      }));
-    };
-    reader.readAsDataURL(file);
+  const handleAvatarSave = async (url: string) => {
+    if (onSaveAvatar) {
+      await onSaveAvatar(url);
+    } else {
+      await onSaveProfile({
+        ...toProfileForm(user),
+        avatar: url,
+      });
+    }
+    setProfileForm((current) => ({ ...current, avatar: url }));
   };
 
   const handleDeleteAddress = async (address: UserAddress) => {
@@ -352,233 +388,242 @@ export function UserProfileSection({
         </div>
       )}
 
-      <div className={showProfile && showAddresses ? "grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]" : "grid grid-cols-1 gap-7"}>
-        {showProfile && <form onSubmit={handleProfileSubmit} className="min-w-0 space-y-5">
-          {showAvatar && (
-            <div className="flex items-center gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-low p-4">
-              <div className="relative shrink-0">
-                <img
+      <div
+        className={
+          showProfile && showAddresses
+            ? "grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"
+            : "grid grid-cols-1 gap-7"
+        }
+      >
+        {showProfile && (
+          <form onSubmit={handleProfileSubmit} className="min-w-0 space-y-5">
+            {showAvatar && (
+              <div className="flex items-center gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-low p-4">
+                <AvatarEditor
                   src={avatarSrc}
-                  alt="Ảnh đại diện"
-                  className="h-20 w-20 rounded-full border-4 border-primary/10 object-cover shadow-sm"
+                  fullName={user.fullName}
+                  disabled={isSaving}
+                  onSave={handleAvatarSave}
                 />
-                {isEditing && (
-                  <label
-                    htmlFor="shared-avatar-file"
-                    className="absolute bottom-0 right-0 grid h-8 w-8 cursor-pointer place-items-center rounded-full bg-primary text-on-primary shadow-md transition hover:bg-primary/90"
-                    title="Đổi ảnh đại diện"
-                  >
-                    <Camera size={16} />
-                    <input
-                      id="shared-avatar-file"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) =>
-                        handleAvatarFileChange(event.target.files?.[0])
-                      }
-                    />
-                  </label>
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate font-bold text-on-surface">
-                  {user.fullName}
-                </p>
-                {user.isEmailVerified && (
-                  <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-secondary-container/30 px-2 py-1 text-xs font-bold text-on-secondary-container">
-                    <span className="material-symbols-outlined text-sm">
-                      verified
+                <div className="min-w-0">
+                  <p className="truncate font-bold text-on-surface">
+                    {user.fullName}
+                  </p>
+                  {user.isEmailVerified && (
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-secondary-container/30 px-2 py-1 text-xs font-bold text-on-secondary-container">
+                      <span className="material-symbols-outlined text-sm">
+                        verified
+                      </span>
+                      Email đã xác minh
                     </span>
-                    Email đã xác minh
-                  </span>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="space-y-4">
-            {isEditing ? (
-              <>
-                <TextField
-                  id="user-profile-full-name"
-                  label="Họ và tên"
-                  value={profileForm.fullName}
-                  required
-                  error={fieldErrors.fullName}
-                  onChange={(value) =>
-                    {
+            <div className="space-y-4">
+              {isEditing ? (
+                <>
+                  <TextField
+                    id="user-profile-full-name"
+                    label="Họ và tên"
+                    value={profileForm.fullName}
+                    required
+                    error={fieldErrors.fullName}
+                    onChange={(value) => {
                       setProfileForm((current) => ({
                         ...current,
                         fullName: value,
                       }));
-                      setFieldErrors((current) => ({ ...current, fullName: undefined }));
-                    }
-                  }
-                />
-                <TextField
-                  id="user-profile-phone"
-                  label="Số điện thoại"
-                  type="tel"
-                  value={profileForm.phone || ""}
-                  highlighted={highlightPhone}
-                  error={fieldErrors.phone}
-                  onChange={(value) =>
-                    {
-                      setProfileForm((current) => ({ ...current, phone: value }));
-                      setFieldErrors((current) => ({ ...current, phone: undefined }));
-                    }
-                  }
-                />
-                <label className="block space-y-2">
-                  <span className="block text-xs font-bold uppercase text-on-surface-variant">
-                    Giới tính
-                  </span>
-                  <select
-                    id="user-profile-gender"
-                    value={profileForm.gender || ""}
-                    onChange={(event) =>
+                      setFieldErrors((current) => ({
+                        ...current,
+                        fullName: undefined,
+                      }));
+                    }}
+                  />
+                  <TextField
+                    id="user-profile-phone"
+                    label="Số điện thoại"
+                    type="tel"
+                    value={profileForm.phone || ""}
+                    highlighted={highlightPhone}
+                    error={fieldErrors.phone}
+                    onChange={(value) => {
                       setProfileForm((current) => ({
                         ...current,
-                        gender: (event.target.value || null) as
-                          | GenderValue
-                          | null,
-                      }))
-                    }
-                    className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-                  >
-                    <option value="">Chưa cập nhật</option>
-                    <option value="male">Nam</option>
-                    <option value="female">Nữ</option>
-                    <option value="other">Khác</option>
-                  </select>
-                </label>
-                <TextField
-                  id="user-profile-birthday"
-                  label="Ngày sinh"
-                  type="date"
-                  value={profileForm.birthday || ""}
-                  onChange={(value) =>
-                    setProfileForm((current) => ({
-                      ...current,
-                      birthday: value,
-                    }))
-                  }
-                />
-              </>
-            ) : (
-              <>
-                <DisplayField label="Họ và tên" value={user.fullName} />
-                <DisplayField
-                  label="Số điện thoại"
-                  value={user.phone || ""}
-                  highlighted={highlightPhone}
-                />
-                <DisplayField
-                  label="Giới tính"
-                  value={user.gender ? genderLabels[user.gender] : ""}
-                />
-                <DisplayField label="Ngày sinh" value={formatDate(user.birthday)} />
-              </>
-            )}
+                        phone: value,
+                      }));
+                      setFieldErrors((current) => ({
+                        ...current,
+                        phone: undefined,
+                      }));
+                    }}
+                  />
+                  <label className="block space-y-2">
+                    <span className="block text-xs font-bold uppercase text-on-surface-variant">
+                      Giới tính
+                    </span>
+                    <select
+                      id="user-profile-gender"
+                      value={profileForm.gender || ""}
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          gender: (event.target.value ||
+                            null) as GenderValue | null,
+                        }))
+                      }
+                      className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 text-sm text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                    >
+                      <option value="">Chưa cập nhật</option>
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                      <option value="other">Khác</option>
+                    </select>
+                  </label>
+                  <TextField
+                    id="user-profile-birthday"
+                    label="Ngày sinh"
+                    type="date"
+                    value={profileForm.birthday || ""}
+                    max={getTodayDate()}
+                    error={fieldErrors.birthday}
+                    onChange={(value) => {
+                      setProfileForm((current) => ({
+                        ...current,
+                        birthday: value,
+                      }));
+                      setFieldErrors((current) => ({
+                        ...current,
+                        birthday: undefined,
+                      }));
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <DisplayField label="Họ và tên" value={user.fullName} />
+                  <DisplayField
+                    label="Số điện thoại"
+                    value={user.phone || ""}
+                    highlighted={highlightPhone}
+                  />
+                  <DisplayField
+                    label="Giới tính"
+                    value={user.gender ? genderLabels[user.gender] : ""}
+                  />
+                  <DisplayField
+                    label="Ngày sinh"
+                    value={formatDate(user.birthday)}
+                  />
+                </>
+              )}
 
-            <DisplayField
-              label="Email"
-              value={isEmailVisible ? user.email : maskEmail(user.email)}
-              action={
+              <DisplayField
+                label="Email"
+                value={isEmailVisible ? user.email : maskEmail(user.email)}
+                action={
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface hover:text-primary"
+                    title={isEmailVisible ? "Ẩn email" : "Hiện email"}
+                    aria-label={isEmailVisible ? "Ẩn email" : "Hiện email"}
+                    onClick={() => setIsEmailVisible((visible) => !visible)}
+                  >
+                    {isEmailVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                }
+              />
+            </div>
+
+            {isEditing && (
+              <div className="flex flex-col justify-end gap-3 border-t border-outline-variant/20 pt-5 sm:flex-row">
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface hover:text-primary"
-                  title={isEmailVisible ? "Ẩn email" : "Hiện email"}
-                  aria-label={isEmailVisible ? "Ẩn email" : "Hiện email"}
-                  onClick={() => setIsEmailVisible((visible) => !visible)}
+                  className="btn-secondary"
+                  disabled={isSaving}
+                  onClick={() => {
+                    setProfileForm(toProfileForm(user));
+                    setLocalProfileError("");
+                    setFieldErrors({});
+                    setIsEditing(false);
+                  }}
                 >
-                  {isEmailVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+                  <X size={17} />
+                  Hủy thay đổi
                 </button>
-              }
-            />
-          </div>
-
-          {isEditing && (
-            <div className="flex flex-col justify-end gap-3 border-t border-outline-variant/20 pt-5 sm:flex-row">
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={isSaving}
-                onClick={() => {
-                  setProfileForm(toProfileForm(user));
-                  setLocalProfileError("");
-                  setFieldErrors({});
-                  setIsEditing(false);
-                }}
-              >
-                <X size={17} />
-                Hủy thay đổi
-              </button>
-              <button type="submit" className="btn-primary" disabled={isSaving}>
-                <Save size={17} />
-                {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-              </button>
-            </div>
-          )}
-        </form>}
-
-        {showAddresses && (addressManager || <div className="min-w-0 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="font-headline-sm text-headline-sm text-on-surface">
-                Địa chỉ đã lưu
-              </h4>
-              <p className="mt-1 text-sm text-on-surface-variant">
-                Dùng cho đặt lịch và hồ sơ tài khoản.
-              </p>
-            </div>
-            {onAddAddress && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"
-                onClick={onAddAddress}
-              >
-                <Plus size={16} />
-                Thêm địa chỉ mới
-              </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={isSaving}
+                >
+                  <Save size={17} />
+                  {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                </button>
+              </div>
             )}
-          </div>
+          </form>
+        )}
 
-          {addressError && (
-            <div className="mb-4 rounded-lg bg-error/10 p-3 text-sm font-medium text-error">
-              {addressError}
-            </div>
-          )}
+        {showAddresses &&
+          (addressManager || (
+            <div className="min-w-0 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-headline-sm text-headline-sm text-on-surface">
+                    Địa chỉ đã lưu
+                  </h4>
+                  <p className="mt-1 text-sm text-on-surface-variant">
+                    Dùng cho đặt lịch và hồ sơ tài khoản.
+                  </p>
+                </div>
+                {onAddAddress && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"
+                    onClick={onAddAddress}
+                  >
+                    <Plus size={16} />
+                    Thêm địa chỉ mới
+                  </button>
+                )}
+              </div>
 
-          {isAddressLoading ? (
-            <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4 text-on-surface-variant">
-              Đang tải địa chỉ...
+              {addressError && (
+                <div className="mb-4 rounded-lg bg-error/10 p-3 text-sm font-medium text-error">
+                  {addressError}
+                </div>
+              )}
+
+              {isAddressLoading ? (
+                <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4 text-on-surface-variant">
+                  Đang tải địa chỉ...
+                </div>
+              ) : addresses.length > 0 ? (
+                <div className="space-y-3">
+                  {addresses.map((address) => (
+                    <AddressRow
+                      key={address.id}
+                      address={address}
+                      disabled={isAddressSaving}
+                      onEdit={onEditAddress}
+                      onDelete={
+                        onDeleteAddress
+                          ? (item) => {
+                              void handleDeleteAddress(item);
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-low p-5 text-center text-on-surface-variant">
+                  Chưa có địa chỉ đã lưu.
+                </div>
+              )}
             </div>
-          ) : addresses.length > 0 ? (
-            <div className="space-y-3">
-              {addresses.map((address) => (
-                <AddressRow
-                  key={address.id}
-                  address={address}
-                  disabled={isAddressSaving}
-                  onEdit={onEditAddress}
-                  onDelete={
-                    onDeleteAddress
-                      ? (item) => {
-                          void handleDeleteAddress(item);
-                        }
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-low p-5 text-center text-on-surface-variant">
-              Chưa có địa chỉ đã lưu.
-            </div>
-          )}
-        </div>)}
+          ))}
       </div>
     </section>
   );

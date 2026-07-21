@@ -3,6 +3,10 @@ import * as authController from "../controllers/auth.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
+  authMessageRateLimit,
+  otpRateLimit,
+} from "../middlewares/rateLimit.middleware";
+import {
   changePasswordSchema,
   forgotPasswordSchema,
   facebookLoginSchema,
@@ -15,6 +19,15 @@ import {
 } from "../validations/auth.validator";
 
 const router = Router();
+
+router.use(
+  ["/verify-register-otp", "/reset-password"],
+  otpRateLimit,
+);
+router.use(
+  ["/register", "/resend-register-otp", "/forgot-password"],
+  authMessageRateLimit,
+);
 
 router.post("/register", validate(registerSchema), authController.register);
 router.post(

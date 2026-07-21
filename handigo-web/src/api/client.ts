@@ -14,6 +14,9 @@ const REFRESH_TOKEN_PATH = "/auth/refresh-token";
 const REFRESH_THRESHOLD_MS = 60_000;
 let refreshPromise: Promise<string> | null = null;
 const REFRESH_LOCK_NAME = "handigo-refresh-token";
+const apiBaseUrl = import.meta.env.DEV
+  ? "/api"
+  : import.meta.env.VITE_API_BASE_URL;
 
 const isNetworkError = (error: unknown) => {
   return axios.isAxiosError(error) && !error.response;
@@ -42,7 +45,7 @@ const shouldRefreshToken = (token: string) => {
 };
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000",
+  baseURL: apiBaseUrl,
   headers: {
     "Content-Type": "application/json",
   },
@@ -104,7 +107,8 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
-      originalRequest.url !== REFRESH_TOKEN_PATH
+      originalRequest.url !== REFRESH_TOKEN_PATH &&
+      originalRequest.url !== "/auth/login"
     ) {
       originalRequest._retry = true;
 

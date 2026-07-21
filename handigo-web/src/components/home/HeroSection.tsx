@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { tokenStorage } from "@/api/tokenStorage";
-import { homeApi, type CatalogSearchResult } from "@/features/home/api/home.api";
+import {
+  homeApi,
+  type CatalogSearchResult,
+} from "@/features/home/api/home.api";
 import { MaterialIcon } from "../common/MaterialIcon";
 
 const heroImage =
@@ -20,7 +22,8 @@ const HeroSearch = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CatalogSearchResult[]>([]);
-  const [selectedResult, setSelectedResult] = useState<CatalogSearchResult | null>(null);
+  const [selectedResult, setSelectedResult] =
+    useState<CatalogSearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [locationLabel, setLocationLabel] = useState("Vị trí của bạn");
@@ -61,7 +64,9 @@ const HeroSearch = () => {
       navigate(`/customer/services?categoryId=${result.id}`);
       return;
     }
-    navigate(`/customer/services/${result.type === "option" ? result.serviceId : result.id}`);
+    navigate(
+      `/customer/services/${result.type === "option" ? result.serviceId : result.id}`,
+    );
   };
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -75,7 +80,8 @@ const HeroSearch = () => {
       return;
     }
     const keyword = query.trim().replace(/\s+/g, " ");
-    if (keyword) navigate(`/customer/services?search=${encodeURIComponent(keyword)}`);
+    if (keyword)
+      navigate(`/customer/services?search=${encodeURIComponent(keyword)}`);
   };
 
   const locate = () => {
@@ -86,12 +92,9 @@ const HeroSearch = () => {
 
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setLocationLabel("Đã xác định vị trí hiện tại");
+      () => {
+        setLocationLabel("Đã xác định vị trí");
         setIsLocating(false);
-        if (tokenStorage.get()) {
-          void homeApi.updateCurrentLocation(coords.latitude, coords.longitude);
-        }
       },
       () => {
         setLocationLabel("Không thể lấy vị trí");
@@ -102,13 +105,16 @@ const HeroSearch = () => {
   };
 
   return (
-    <form onSubmit={submitSearch} className="flex flex-col items-stretch gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lg md:flex-row">
+    <form
+      onSubmit={submitSearch}
+      className="flex flex-col items-stretch gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lg md:flex-row"
+    >
       <div className="relative flex-1">
         <div className="flex h-full items-center gap-3 rounded-xl bg-surface-container-low px-4 py-3 focus-within:ring-4 focus-within:ring-primary/10">
           <MaterialIcon className="text-primary">search</MaterialIcon>
           <input
             className="w-full border-none bg-transparent font-body-md text-body-md outline-none focus:ring-0"
-            placeholder="Tìm dịch vụ (sửa điện, nước...)"
+            placeholder="Tìm dịch vụ"
             value={query}
             autoComplete="off"
             onFocus={() => setIsOpen(true)}
@@ -120,7 +126,11 @@ const HeroSearch = () => {
               setIsSearching(false);
             }}
           />
-          {isSearching && <MaterialIcon className="animate-spin text-sm text-primary">progress_activity</MaterialIcon>}
+          {isSearching && (
+            <MaterialIcon className="animate-spin text-sm text-primary">
+              progress_activity
+            </MaterialIcon>
+          )}
         </div>
         {isOpen && query.trim() && (
           <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-80 overflow-y-auto rounded-xl border border-outline-variant/40 bg-white p-2 shadow-xl">
@@ -132,15 +142,28 @@ const HeroSearch = () => {
                 onClick={() => openResult(result)}
                 className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-surface-container-low"
               >
-                <MaterialIcon className="mt-0.5 text-primary">{result.type === "category" ? "category" : result.type === "service" ? "home_repair_service" : "tune"}</MaterialIcon>
+                <MaterialIcon className="mt-0.5 text-primary">
+                  {result.type === "category"
+                    ? "category"
+                    : result.type === "service"
+                      ? "home_repair_service"
+                      : "tune"}
+                </MaterialIcon>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-on-surface">{result.name}</span>
-                  <span className="block truncate text-xs text-on-surface-variant">{resultTypeLabel[result.type]}{result.description ? ` · ${result.description}` : ""}</span>
+                  <span className="block truncate text-sm font-semibold text-on-surface">
+                    {result.name}
+                  </span>
+                  <span className="block truncate text-xs text-on-surface-variant">
+                    {resultTypeLabel[result.type]}
+                    {result.description ? ` · ${result.description}` : ""}
+                  </span>
                 </span>
               </button>
             ))}
             {!isSearching && results.length === 0 && (
-              <p className="px-3 py-2 text-sm text-on-surface-variant">Không tìm thấy kết quả phù hợp.</p>
+              <p className="px-3 py-2 text-sm text-on-surface-variant">
+                Không tìm thấy kết quả phù hợp.
+              </p>
             )}
           </div>
         )}
@@ -151,11 +174,20 @@ const HeroSearch = () => {
         onClick={locate}
         className="flex flex-1 items-center gap-3 rounded-xl bg-surface-container-low px-4 py-3 text-left focus:ring-4 focus:ring-primary/10"
       >
-        <MaterialIcon className={isLocating ? "animate-spin text-primary" : "text-primary"}>{isLocating ? "progress_activity" : "location_on"}</MaterialIcon>
-        <span className="font-body-md text-body-md text-on-surface-variant">{locationLabel}</span>
+        <MaterialIcon
+          className={isLocating ? "animate-spin text-primary" : "text-primary"}
+        >
+          {isLocating ? "progress_activity" : "location_on"}
+        </MaterialIcon>
+        <span className="font-body-md text-body-md text-on-surface-variant">
+          {locationLabel}
+        </span>
       </button>
 
-      <button type="submit" className="flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 font-label-md text-label-md text-white shadow-md shadow-primary/20 transition-all hover:bg-primary-container">
+      <button
+        type="submit"
+        className="flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 font-label-md text-label-md text-white shadow-md shadow-primary/20 transition-all hover:bg-primary-container"
+      >
         Tìm thợ ngay
       </button>
     </form>
@@ -166,11 +198,21 @@ const SocialProof = () => (
   <div className="flex items-center gap-4 pt-4 md:gap-6">
     <div className="flex -space-x-3">
       {[0, 1, 2].map((item) => (
-        <img key={item} alt="Ảnh đại diện người dùng" className="h-8 w-8 rounded-full border-2 border-surface md:h-10 md:w-10" src={avatarImage} />
+        <img
+          key={item}
+          alt="Ảnh đại diện người dùng"
+          className="h-8 w-8 rounded-full border-2 border-surface md:h-10 md:w-10"
+          src={avatarImage}
+        />
       ))}
-      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-surface bg-primary-container text-[8px] font-bold text-on-primary-container md:h-10 md:w-10 md:text-[10px]">+2k</div>
+      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-surface bg-primary-container text-[8px] font-bold text-on-primary-container md:h-10 md:w-10 md:text-[10px]">
+        +2k
+      </div>
     </div>
-    <p className="font-label-sm text-label-sm text-on-surface-variant">Hơn <span className="font-bold text-on-surface">50,000+</span> việc đã hoàn thành thành công</p>
+    <p className="font-label-sm text-label-sm text-on-surface-variant">
+      Hơn <span className="font-bold text-on-surface">50,000+</span> việc đã
+      hoàn thành thành công
+    </p>
   </div>
 );
 
@@ -178,11 +220,24 @@ const HeroVisual = () => (
   <div className="relative py-5">
     <div className="absolute left-1/2 top-1/2 -z-10 h-[120%] w-[120%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-tr from-primary/10 via-secondary-container/10 to-transparent blur-3xl" />
     <div className="aspect-[16/10] w-full">
-      <img alt="Minh họa dịch vụ tại nhà" className="floating-anim h-full w-full object-contain drop-shadow-2xl" src={heroImage} />
+      <img
+        alt="Minh họa dịch vụ tại nhà"
+        className="floating-anim h-full w-full object-contain drop-shadow-2xl"
+        src={heroImage}
+      />
     </div>
     <div className="glass-card absolute -left-4 top-1/4 flex animate-bounce items-center gap-2 rounded-xl p-2 shadow-xl md:-left-8 md:gap-4 md:rounded-2xl md:p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary md:h-12 md:w-12"><MaterialIcon filled>engineering</MaterialIcon></div>
-      <div><p className="font-label-md text-label-md text-on-surface">Thợ đang đến</p><p className="font-label-sm text-label-sm text-on-surface-variant">Chỉ còn 5 phút</p></div>
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary md:h-12 md:w-12">
+        <MaterialIcon filled>engineering</MaterialIcon>
+      </div>
+      <div>
+        <p className="font-label-md text-label-md text-on-surface">
+          Thợ đang đến
+        </p>
+        <p className="font-label-sm text-label-sm text-on-surface-variant">
+          Chỉ còn 5 phút
+        </p>
+      </div>
     </div>
   </div>
 );
@@ -190,8 +245,14 @@ const HeroVisual = () => (
 export const HeroSection = () => (
   <section className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-4 md:px-8 lg:grid-cols-2">
     <div className="space-y-8">
-      <h1 className="font-headline-xl text-3xl leading-tight tracking-tight text-on-surface md:text-5xl lg:text-headline-xl">Đặt dịch vụ tại nhà <br /><span className="text-primary">nhanh chóng &amp; uy tín</span></h1>
-      <p className="max-w-[500px] font-body-lg text-body-lg text-on-surface-variant">Kết nối với hàng nghìn thợ chuyên nghiệp đã qua kiểm duyệt. Khắc phục sự cố ngôi nhà của bạn chỉ với vài cú chạm.</p>
+      <h1 className="font-headline-xl text-3xl leading-tight tracking-tight text-on-surface md:text-5xl lg:text-headline-xl">
+        Đặt dịch vụ tại nhà <br />
+        <span className="text-primary">nhanh chóng &amp; uy tín</span>
+      </h1>
+      <p className="max-w-[500px] font-body-lg text-body-lg text-on-surface-variant">
+        Kết nối với hàng nghìn thợ chuyên nghiệp đã qua kiểm duyệt. Khắc phục sự
+        cố ngôi nhà của bạn chỉ với vài cú chạm.
+      </p>
       <HeroSearch />
       <SocialProof />
     </div>

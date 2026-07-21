@@ -1,10 +1,14 @@
 import express from "express";
 import { authMiddleware } from "../middlewares/auth.middleware";
+import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
+import { uploadRateLimit } from "../middlewares/rateLimit.middleware";
+import { uploadUserAvatar } from "../middlewares/userAvatarUpload.middleware";
 import { updateUserProfileSchema } from "../validations/user.validator";
 import {
   getProfile,
   updateProfile,
+  uploadAvatar,
   getAllUsers,
   getUserById,
   updateUser,
@@ -21,12 +25,19 @@ router.put(
   validate(updateUserProfileSchema),
   updateProfile,
 );
+router.post(
+  "/avatar",
+  authMiddleware,
+  uploadRateLimit,
+  uploadUserAvatar,
+  uploadAvatar,
+);
 
-// Standard CRUD endpoints
-// Notice: In a real app, these should ideally be protected by admin roles using `roleMiddleware` or similar.
-router.get("/", authMiddleware, getAllUsers);
-router.get("/:id", authMiddleware, getUserById);
-router.put("/:id", authMiddleware, updateUser);
-router.delete("/:id", authMiddleware, deleteUser);
+// Các endpoint legacy chỉ dành cho quản trị viên.
+router.use(authMiddleware, roleMiddleware("ADMIN"));
+router.get("/", getAllUsers);
+router.get("/:id", getUserById);
+router.put("/:id", validate(updateUserProfileSchema), updateUser);
+router.delete("/:id", deleteUser);
 
 export default router;

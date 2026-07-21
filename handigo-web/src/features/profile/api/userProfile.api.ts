@@ -59,3 +59,22 @@ export const updateUserProfile = async (
   );
   return mapUser(response.data.data);
 };
+
+export const updateUserAvatar = async (avatar: string): Promise<UserProfileData> => {
+  const response = await api.put<{ message: string; data: BackendUser }>(
+    "/users/profile",
+    { avatar },
+  );
+  return mapUser(response.data.data);
+};
+
+export const uploadUserAvatar = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append("image", file);
+  const response = await api.post<{ data: { url: string } }>(
+    "/users/avatar",
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return response.data.data.url;
+};

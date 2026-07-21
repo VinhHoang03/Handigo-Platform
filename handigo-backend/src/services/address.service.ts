@@ -18,6 +18,9 @@ type AddressPayload = {
   note?: string | null;
 };
 
+const CURRENT_LOCATION_NOTE =
+  "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
+
 const pickAddressPayload = (data: AddressPayload): AddressPayload => {
   const payload: AddressPayload = {};
   const fields: (keyof AddressPayload)[] = [
@@ -47,8 +50,82 @@ const pickAddressPayload = (data: AddressPayload): AddressPayload => {
   return payload;
 };
 
+const normalizeAddressPart = (value?: string) =>
+  value?.trim().toLocaleLowerCase("vi-VN").replace(/\s+/g, " ") || "";
+
+const hasSameAdministrativeUnit = (
+  currentCode: number | undefined,
+  candidateCode: number | undefined,
+  currentName: string,
+  candidateName: string | undefined,
+) => {
+  if (currentCode && candidateCode) return currentCode === candidateCode;
+  return normalizeAddressPart(currentName) === normalizeAddressPart(candidateName);
+};
+
+const findDuplicateAddress = async (userId: string, payload: AddressPayload) => {
+  const addresses = await Address.find({ userId })
+    .select("fullAddress province provinceCode ward wardCode placeId")
+    .lean();
+
+  return addresses.find((address) => {
+    if (
+      payload.placeId &&
+      address.placeId &&
+      normalizeAddressPart(address.placeId) === normalizeAddressPart(payload.placeId)
+    ) {
+      return true;
+    }
+
+    return (
+      normalizeAddressPart(address.fullAddress) === normalizeAddressPart(payload.fullAddress) &&
+      hasSameAdministrativeUnit(
+        address.provinceCode,
+        payload.provinceCode,
+        address.province,
+        payload.province,
+      ) &&
+      hasSameAdministrativeUnit(
+        address.wardCode,
+        payload.wardCode,
+        address.ward,
+        payload.ward,
+      )
+    );
+  });
+};
+
 export const createAddress = async (userId: string, data: AddressPayload) => {
   const payload = pickAddressPayload(data);
+
+  if (payload.note === CURRENT_LOCATION_NOTE) {
+    const locationConditions: Record<string, unknown>[] = [];
+    if (payload.placeId) {
+      locationConditions.push({ placeId: payload.placeId });
+    }
+    if (payload.fullAddress && payload.province && payload.ward) {
+      locationConditions.push({
+        fullAddress: payload.fullAddress,
+        province: payload.province,
+        ward: payload.ward,
+      });
+    }
+
+    if (locationConditions.length > 0) {
+      const existingAddress = await Address.findOne({
+        userId,
+        note: CURRENT_LOCATION_NOTE,
+        $or: locationConditions,
+      });
+      if (existingAddress) return existingAddress;
+    }
+  }
+
+  const duplicateAddress = await findDuplicateAddress(userId, payload);
+  if (duplicateAddress) {
+    if (payload.note === CURRENT_LOCATION_NOTE) return duplicateAddress;
+    throw new AppError("Địa chỉ này đã tồn tại trong sổ địa chỉ.", 409);
+  }
 
   if (payload.isDefault) {
     await Address.updateMany(
@@ -128,9 +205,6 @@ export const setDefaultAddress = async (userId: string, addressId: string) => {
 export const getServiceHistory = async (_userId: string) => {
   return [];
 };
-
-const normalizeAddressPart = (value?: string) =>
-  value?.trim().toLocaleLowerCase("vi-VN").replace(/\s+/g, " ") || "";
 
 export const checkAddressUpdate = async (
   addressId: string,

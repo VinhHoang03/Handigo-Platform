@@ -2,6 +2,7 @@ import { QueryFilter, Types } from "mongoose";
 import { Category } from "../models/category.model";
 import { Order } from "../models/order.model";
 import { IService, Service } from "../models/service.model";
+import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
 
 interface ServiceInput {
@@ -13,6 +14,7 @@ interface ServiceInput {
   fixedPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  requiresOptionSelection?: boolean;
   isActive?: boolean;
 }
 
@@ -50,13 +52,36 @@ const ensureValidId = (id: string, field = "service") => {
   }
 };
 
-const ensureCategoryExists = async (categoryId: string) => {
+const ensureCategoryExists = async (categoryId: string, requireActive = false) => {
   ensureValidId(categoryId, "category");
   const category = await Category.findOne({
     _id: categoryId,
     isDeleted: false,
   });
-  if (!category) throw new AppError("Category not found", 404);
+  if (!category) throw new AppError("Không tìm thấy danh mục.", 404);
+  if (requireActive && !category.isActive) {
+    throw new AppError("Không thể kích hoạt dịch vụ trong danh mục đang tạm ngừng.", 400);
+  }
+};
+
+const normalizeAndValidatePricing = (data: ServiceInput, defaultActive = true) => {
+  const isActive = data.isActive ?? defaultActive;
+
+  if (data.serviceType === "fixed_price") {
+    data.depositAmount = null;
+    data.fixedPrice = null;
+    data.requiresOptionSelection = true;
+  }
+
+  if (data.serviceType === "variable_price") {
+    data.fixedPrice = null;
+    if (isActive && data.depositAmount == null) {
+      throw new AppError(
+        "Dịch vụ giá linh hoạt đang hoạt động phải có tiền đặt cọc.",
+        400,
+      );
+    }
+  }
 };
 
 const ensureUniqueSlug = async (
@@ -113,8 +138,38 @@ export const listServices = async (query: ListServicesQuery) => {
     Service.countDocuments(filter),
   ]);
 
+  const minimumOptionPrices = await ServiceOption.aggregate<{
+    _id: Types.ObjectId;
+    minOptionPrice: number;
+  }>([
+    {
+      $match: {
+        serviceId: { $in: items.map((item) => item._id) },
+        price: { $gt: 0 },
+        isActive: true,
+        isDeleted: false,
+      },
+    },
+    {
+      $group: {
+        _id: "$serviceId",
+        minOptionPrice: { $min: "$price" },
+      },
+    },
+  ]);
+  const minimumOptionPriceByServiceId = new Map(
+    minimumOptionPrices.map((item) => [
+      item._id.toString(),
+      item.minOptionPrice,
+    ]),
+  );
+
   return {
-    items,
+    items: items.map((item) => ({
+      ...item.toObject(),
+      minOptionPrice:
+        minimumOptionPriceByServiceId.get(item._id.toString()) ?? null,
+    })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
@@ -130,7 +185,8 @@ export const getServiceById = async (id: string) => {
 };
 
 export const createService = async (data: ServiceInput) => {
-  await ensureCategoryExists(data.categoryId!);
+  normalizeAndValidatePricing(data);
+  await ensureCategoryExists(data.categoryId!, data.isActive ?? true);
   const slug = data.slug || slugify(data.name || "");
   if (!slug) throw new AppError("Unable to generate a valid slug", 400);
   await ensureUniqueSlug(data.categoryId!, slug);
@@ -144,13 +200,28 @@ export const updateService = async (id: string, data: ServiceInput) => {
   if (!service) throw new AppError("Service not found", 404);
 
   const categoryId = data.categoryId || service.categoryId.toString();
-  if (data.categoryId) await ensureCategoryExists(data.categoryId);
+  const nextData: ServiceInput = {
+    categoryId,
+    name: data.name ?? service.name,
+    slug: data.slug ?? service.slug,
+    description: data.description === undefined ? service.description : data.description,
+    serviceType: data.serviceType ?? service.serviceType,
+    fixedPrice: data.fixedPrice === undefined ? service.fixedPrice : data.fixedPrice,
+    depositAmount:
+      data.depositAmount === undefined ? service.depositAmount : data.depositAmount,
+    image: data.image === undefined ? service.image : data.image,
+    requiresOptionSelection:
+      data.requiresOptionSelection ?? service.requiresOptionSelection,
+    isActive: data.isActive ?? service.isActive,
+  };
+  normalizeAndValidatePricing(nextData, service.isActive);
+  await ensureCategoryExists(categoryId, nextData.isActive);
 
   const slug = data.slug || (data.name ? slugify(data.name) : service.slug);
   await ensureUniqueSlug(categoryId, slug, id);
 
   Object.assign(service, {
-    ...data,
+    ...nextData,
     categoryId,
     slug,
     ...(data.image !== undefined ? { image: normalizeImageUrl(data.image) } : {}),
@@ -167,4 +238,8 @@ export const deleteService = async (id: string) => {
   service.deletedAt = new Date();
   service.isActive = false;
   await service.save();
+  await ServiceOption.updateMany(
+    { serviceId: service._id, isDeleted: false },
+    { $set: { isActive: false } },
+  );
 };

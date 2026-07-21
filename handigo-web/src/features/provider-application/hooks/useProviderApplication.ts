@@ -4,6 +4,7 @@ import type {
   Category,
   ProviderApplication,
   ProviderApplicationPayload,
+  ProviderApplicationDraftPayload,
 } from '../types/providerApplication.types';
 
 export function useProviderApplication(applicationId?: string | null) {
@@ -59,8 +60,10 @@ export function useProviderApplication(applicationId?: string | null) {
     try {
       setSubmitting(true);
       setSubmitError('');
-      return await (applicationId
-        ? providerApplicationService.resubmit(applicationId, payload)
+      const resubmitId =
+        applicationId || (application?.status === 'rejected' ? application._id : null);
+      return await (resubmitId
+        ? providerApplicationService.resubmit(resubmitId, payload)
         : providerApplicationService.submit(payload));
     } catch (error) {
       setSubmitError(
@@ -72,7 +75,7 @@ export function useProviderApplication(applicationId?: string | null) {
     }
   };
 
-  const saveDraft = useCallback(async (payload: ProviderApplicationPayload) => {
+  const saveDraft = useCallback(async (payload: ProviderApplicationDraftPayload) => {
     try {
       setSavingDraft(true);
       setDraftError('');

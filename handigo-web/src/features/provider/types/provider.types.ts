@@ -126,6 +126,7 @@ export interface ProviderCertificate {
   expiresAt?: string;
   imageUrls: string[];
   description?: string;
+  isPublic: boolean;
   status: CertificateStatus;
   reviewedAt?: string;
   rejectionReason?: string | null;
@@ -139,6 +140,7 @@ export interface UpsertCertificatePayload {
   expiresAt?: string;
   imageUrls: string[];
   description?: string;
+  isPublic?: boolean;
 }
 
 export interface UpdateProviderProfilePayload {
@@ -151,7 +153,6 @@ export interface UpdateProviderProfilePayload {
   bio?: string;
   mainServiceText?: string;
   serviceArea?: ProviderServiceArea;
-  serviceIds?: string[];
   workingAreas?: string[];
 }
 

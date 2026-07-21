@@ -76,7 +76,11 @@ export const authService = {
 
   verifyRegisterOtp: async (payload: VerifyRegisterOtpRequest) => {
     try {
-      return await verifyRegisterOtpApi(payload);
+      const response = await verifyRegisterOtpApi(payload);
+      if (response.user && response.token) {
+        useAuthStore.getState().setAuth(response.user, response.token, true);
+      }
+      return response;
     } catch (error) {
       const message = getErrorMessage(error, 'Không thể xác thực mã OTP');
       throw new Error(message, { cause: error });

@@ -26,8 +26,8 @@ export const registerApi = async (data: RegisterRequest): Promise<MessageRespons
 
 export const verifyRegisterOtpApi = async (
   data: VerifyRegisterOtpRequest,
-): Promise<MessageResponse> => {
-  const response = await api.post<MessageResponse>('/auth/verify-register-otp', data);
+): Promise<MessageResponse & Partial<AuthResponse>> => {
+  const response = await api.post<MessageResponse & Partial<AuthResponse>>('/auth/verify-register-otp', data);
   return response.data;
 };
 

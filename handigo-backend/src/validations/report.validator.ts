@@ -50,3 +50,12 @@ export const reviewReportSchema = z.object({
 export const reportIdSchema = z.object({
   id: objectIdSchema,
 });
+
+export const reportListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  status: z.enum(REPORT_STATUSES).optional(),
+  reportType: z.enum(REPORT_TYPES).optional(),
+  targetType: z.enum(REPORT_TARGET_TYPES).optional(),
+  keyword: z.string().trim().max(100).optional(),
+});

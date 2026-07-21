@@ -7,7 +7,7 @@ import type {
 export const dashboardHomePath: Record<DashboardRole, string> = {
   CUSTOMER: "/customer",
   PROVIDER: "/provider",
-  ADMIN: "/admin/users",
+  ADMIN: "/admin",
 };
 
 export const dashboardSubtitle: Record<DashboardRole, string> = {
@@ -37,11 +37,16 @@ export const providerNavItems: DashboardNavItem[] = [
     label: "Đề xuất dịch vụ",
     path: "/provider/service-suggestions",
   },
-  { icon: "mail", label: "Tin nhắn", path: "#" },
+  {
+    icon: "support_agent",
+    label: "Khiếu nại, hỗ trợ & báo cáo",
+    path: "/provider/support",
+  },
   { icon: "settings", label: "Hồ sơ dịch vụ", path: "/provider/profile" },
 ];
 
 export const adminNavItems: DashboardNavItem[] = [
+  { icon: "dashboard", label: "Tổng quan", path: "/admin" },
   { icon: "people", label: "Người dùng", path: "/admin/users" },
   {
     icon: "verified_user",
@@ -62,9 +67,13 @@ export const adminNavItems: DashboardNavItem[] = [
     label: "Rút tiền",
     path: "/admin/withdrawals",
   },
-  { icon: "support_agent", label: "Yêu cầu hỗ trợ", path: "#" },
+  { icon: "support_agent", label: "Yêu cầu hỗ trợ", path: "/admin/support" },
+  { icon: "gavel", label: "Khiếu nại & vi phạm", path: "/admin/cases" },
+  { icon: "receipt_long", label: "Thanh toán", path: "/admin/payments" },
+  { icon: "account_balance_wallet", label: "Ví provider", path: "/admin/wallets" },
   { icon: "notifications", label: "Thông báo", path: "/admin/notifications" },
-  { icon: "payments", label: "Doanh thu hệ thống", path: "#" },
+  { icon: "newspaper", label: "Tin tức", path: "/admin/news" },
+  { icon: "payments", label: "Doanh thu hệ thống", path: "/admin/revenue" },
   {
     icon: "settings",
     label: "Cấu hình hệ thống",

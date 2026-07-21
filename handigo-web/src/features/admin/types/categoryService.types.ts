@@ -24,8 +24,10 @@ export interface Service {
   description?: string | null;
   serviceType: 'fixed_price' | 'variable_price';
   fixedPrice?: number | null;
+  minOptionPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  requiresOptionSelection: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -69,18 +71,25 @@ export interface ServicePayload {
   fixedPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  requiresOptionSelection?: boolean;
   isActive?: boolean;
 }
 
 export type ServiceOptionType = "room_count" | "area_size" | "package" | "add_on" | "other";
+export type ServiceOptionSelectionMode = "single" | "multiple";
 
 export interface ServiceOption {
   _id: string;
   serviceId: string;
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType: ServiceOptionType;
   price: number;
+  selectionGroup?: string | null;
+  selectionMode?: ServiceOptionSelectionMode;
+  allowsQuantity?: boolean;
+  sortOrder?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -89,7 +98,12 @@ export interface ServiceOption {
 export interface ServiceOptionPayload {
   name: string;
   description?: string | null;
+  image?: string | null;
   optionType: ServiceOptionType;
   price: number;
+  selectionGroup?: string | null;
+  selectionMode?: ServiceOptionSelectionMode;
+  allowsQuantity?: boolean;
+  sortOrder?: number;
   isActive?: boolean;
 }

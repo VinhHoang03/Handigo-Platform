@@ -71,6 +71,41 @@ const validateDateOfBirth = (
 const optionalText = (max: number) => z.string().trim().max(max).optional();
 const imageUrlSchema = z.string().trim().url().max(2000);
 
+const workingAreaSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .refine((area) => {
+    const separatorIndex = area.lastIndexOf(",");
+    return separatorIndex > 0 && Boolean(area.slice(separatorIndex + 1).trim());
+  }, "Khu vực hoạt động phải có định dạng 'Phường/Xã, Tỉnh/Thành phố'");
+
+export const validateWorkingAreasSameProvince = (
+  areas: string[],
+  ctx: z.RefinementCtx,
+) => {
+  const provinces = areas.map((area) =>
+    area.slice(area.lastIndexOf(",") + 1).trim().normalize("NFC").toLocaleLowerCase("vi"),
+  );
+
+  if (new Set(provinces).size > 1) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Tất cả khu vực hoạt động phải thuộc cùng một tỉnh/thành phố",
+    });
+  }
+};
+
+export const providerWorkingAreasSchema = z
+  .array(workingAreaSchema)
+  .min(1)
+  .superRefine(validateWorkingAreasSameProvince);
+
+const draftWorkingAreasSchema = z
+  .array(workingAreaSchema)
+  .superRefine(validateWorkingAreasSameProvince);
+
 const identityFields = {
   type: z.enum(["cccd", "passport"]),
   documentNumber: z.string().trim().max(50),
@@ -122,6 +157,7 @@ const certificateSchema = z
     issuedAt: dateStringSchema.optional(),
     expiresAt: dateStringSchema.optional(),
     imageUrls: z.array(imageUrlSchema).min(1),
+    description: optionalText(2000),
   })
   .superRefine(validateDateRange);
 
@@ -141,20 +177,35 @@ const draftCertificateSchema = z.object({
   imageUrls: z.array(imageUrlSchema).default([]),
 });
 
-export const createProviderApplicationSchema = z.object({
+const initialProviderApplicationSchema = z.object({
+  applicationType: z.literal("initial").default("initial"),
   description: z.string().trim().min(1).max(2000),
   experienceYears: z.number().int().min(0),
   serviceIds: z.array(objectIdSchema).min(1),
-  workingAreas: z.array(z.string().trim().min(1).max(120)).min(1),
+  workingAreas: providerWorkingAreasSchema,
   identityDocument: identityDocumentSchema,
   certificates: z.array(certificateSchema).default([]),
 });
 
+const serviceAdditionApplicationSchema = z.object({
+  applicationType: z.literal("service_addition"),
+  description: z.string().trim().max(2000).optional().default(""),
+  experienceYears: z.number().int().min(0).optional().default(0),
+  serviceIds: z.array(objectIdSchema).min(1),
+  certificates: z.array(certificateSchema).min(1),
+});
+
+export const createProviderApplicationSchema = z.union([
+  initialProviderApplicationSchema,
+  serviceAdditionApplicationSchema,
+]);
+
 export const saveProviderApplicationDraftSchema = z.object({
+  onboardingStep: z.number().int().min(1).max(3).optional(),
   description: z.string().trim().max(2000).optional(),
   experienceYears: z.number().int().min(0).optional(),
   serviceIds: z.array(objectIdSchema).optional(),
-  workingAreas: z.array(z.string().trim().min(1).max(120)).optional(),
+  workingAreas: draftWorkingAreasSchema.optional(),
   identityDocument: draftIdentityDocumentSchema.optional(),
   certificates: z.array(draftCertificateSchema).optional(),
 });
@@ -182,3 +233,18 @@ export const reviewProviderApplicationSchema = z
       });
     }
   });
+
+export const providerApplicationIdParamSchema = z.object({
+  id: objectIdSchema,
+});
+
+export const providerApplicationListQuerySchema = z.object({
+  status: z
+    .enum(["draft", "pending", "resubmitted", "approved", "rejected"])
+    .optional(),
+  keyword: z.string().trim().max(100).optional(),
+  categoryId: objectIdSchema.optional(),
+  applicationType: z.enum(["initial", "service_addition"]).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});

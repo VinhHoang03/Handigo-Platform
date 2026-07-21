@@ -13,6 +13,8 @@ export interface ISelectedOptionSnapshot {
   name: string;
   optionType: string;
   price: Money;
+  quantity?: number;
+  subtotal?: Money;
 }
 
 export interface IOrderPricing {
@@ -40,6 +42,17 @@ export interface IOrderCancellation {
   cancelledByRole: "customer" | "provider" | "admin";
   reason: string;
   cancelledAt: Date;
+  refundPolicy?: {
+    policyVersion: string;
+    refundRate: number;
+    paidAmount: Money;
+    refundAmount: Money;
+    cancellationFee: Money;
+    providerCompensation: Money;
+    platformRetainedAmount: Money;
+    hoursBeforeStart?: number | null;
+    policyReason: string;
+  } | null;
 }
 
 export interface IOrderConfirmation {
@@ -47,10 +60,27 @@ export interface IOrderConfirmation {
   providerConfirmedAt?: Date | null;
 }
 
+export interface IOrderReassignment {
+  status:
+    | "awaiting_customer"
+    | "matching"
+    | "matched"
+    | "declined"
+    | "expired"
+    | "failed";
+  requestedByProviderId: Types.ObjectId;
+  previousProviderIds: Types.ObjectId[];
+  reason: string;
+  requestedAt: Date;
+  expiresAt: Date;
+  respondedAt?: Date | null;
+}
+
 export interface IOrder extends Document, IBaseDocument {
   orderCode: string;
   customerId: Types.ObjectId;
   providerId?: Types.ObjectId | null;
+  preferredProviderId?: Types.ObjectId | null;
   serviceId: Types.ObjectId;
   servicePackageId?: Types.ObjectId | null;
   selectedOptionIds: Types.ObjectId[];
@@ -58,6 +88,19 @@ export interface IOrder extends Document, IBaseDocument {
   addressId: Types.ObjectId;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | null;
+  bookingStatus:
+    | "not_required"
+    | "awaiting_provider"
+    | "awaiting_payment"
+    | "reserved"
+    | "confirmed"
+    | "rejected"
+    | "expired";
+  paymentDueAt?: Date | null;
+  recurringGroupId?: Types.ObjectId | null;
+  recurrenceUnit?: "weekly" | "monthly" | null;
+  occurrenceNumber?: number | null;
+  totalOccurrences?: number | null;
   status: OrderStatusValue;
   paymentMethod: "wallet" | "bank" | "cash";
   paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
@@ -65,6 +108,7 @@ export interface IOrder extends Document, IBaseDocument {
   depositAmount: Money;
   depositPaidAt?: Date | null;
   readyForMatching: boolean;
+  matchingStartedAt?: Date | null;
   platformFeeChargedAt?: Date | null;
   hasAdditionalQuotation: boolean;
   currentQuotationId?: Types.ObjectId | null;
@@ -75,7 +119,9 @@ export interface IOrder extends Document, IBaseDocument {
   pricing: IOrderPricing;
   promotionSnapshot?: IDiscountSnapshot | null;
   voucherSnapshot?: IDiscountSnapshot | null;
+  voucherUsedAt?: Date | null;
   cancellation?: IOrderCancellation | null;
+  reassignment?: IOrderReassignment | null;
   confirmation: IOrderConfirmation;
 }
 
@@ -89,6 +135,8 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
     name: { type: String, required: true },
     optionType: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
+    quantity: { type: Number, required: true, min: 1, default: 1 },
+    subtotal: { type: Number, min: 0 },
   },
   { _id: false },
 );
@@ -128,6 +176,11 @@ const OrderSchema = new Schema<IOrder>(
     orderCode: { type: String, required: true, unique: true, trim: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     providerId: { type: Schema.Types.ObjectId, ref: "Provider", default: null },
+    preferredProviderId: {
+      type: Schema.Types.ObjectId,
+      ref: "Provider",
+      default: null,
+    },
     serviceId: { type: Schema.Types.ObjectId, ref: "Service", required: true },
     servicePackageId: {
       type: Schema.Types.ObjectId,
@@ -146,6 +199,28 @@ const OrderSchema = new Schema<IOrder>(
       default: "normal",
     },
     scheduledAt: { type: Date, default: null },
+    bookingStatus: {
+      type: String,
+      enum: [
+        "not_required",
+        "awaiting_provider",
+        "awaiting_payment",
+        "reserved",
+        "confirmed",
+        "rejected",
+        "expired",
+      ],
+      default: "not_required",
+    },
+    paymentDueAt: { type: Date, default: null },
+    recurringGroupId: { type: Schema.Types.ObjectId, default: null },
+    recurrenceUnit: {
+      type: String,
+      enum: ["weekly", "monthly", null],
+      default: null,
+    },
+    occurrenceNumber: { type: Number, min: 1, default: null },
+    totalOccurrences: { type: Number, min: 1, max: 12, default: null },
     status: {
       type: String,
       enum: ["created", "accepted", "in_progress", "completed", "cancelled"],
@@ -165,6 +240,7 @@ const OrderSchema = new Schema<IOrder>(
     depositAmount: { type: Number, default: 0, min: 0 },
     depositPaidAt: { type: Date, default: null },
     readyForMatching: { type: Boolean, default: false },
+    matchingStartedAt: { type: Date, default: null },
     platformFeeChargedAt: { type: Date, default: null },
     hasAdditionalQuotation: { type: Boolean, default: false },
     currentQuotationId: {
@@ -179,6 +255,7 @@ const OrderSchema = new Schema<IOrder>(
     pricing: { type: OrderPricingSchema, required: true },
     promotionSnapshot: { type: DiscountSnapshotSchema, default: null },
     voucherSnapshot: { type: DiscountSnapshotSchema, default: null },
+    voucherUsedAt: { type: Date, default: null },
     cancellation: {
       type: new Schema<IOrderCancellation>(
         {
@@ -194,6 +271,55 @@ const OrderSchema = new Schema<IOrder>(
           },
           reason: { type: String, required: true },
           cancelledAt: { type: Date, required: true },
+          refundPolicy: {
+            type: new Schema(
+              {
+                policyVersion: { type: String, required: true },
+                refundRate: { type: Number, required: true, min: 0, max: 100 },
+                paidAmount: { type: Number, required: true, min: 0 },
+                refundAmount: { type: Number, required: true, min: 0 },
+                cancellationFee: { type: Number, required: true, min: 0 },
+                providerCompensation: { type: Number, required: true, min: 0 },
+                platformRetainedAmount: { type: Number, required: true, min: 0 },
+                hoursBeforeStart: { type: Number, default: null },
+                policyReason: { type: String, required: true },
+              },
+              { _id: false },
+            ),
+            default: null,
+          },
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
+    reassignment: {
+      type: new Schema<IOrderReassignment>(
+        {
+          status: {
+            type: String,
+            enum: [
+              "awaiting_customer",
+              "matching",
+              "matched",
+              "declined",
+              "expired",
+              "failed",
+            ],
+            required: true,
+          },
+          requestedByProviderId: {
+            type: Schema.Types.ObjectId,
+            ref: "Provider",
+            required: true,
+          },
+          previousProviderIds: [
+            { type: Schema.Types.ObjectId, ref: "Provider" },
+          ],
+          reason: { type: String, required: true, trim: true },
+          requestedAt: { type: Date, required: true },
+          expiresAt: { type: Date, required: true },
+          respondedAt: { type: Date, default: null },
         },
         { _id: false },
       ),
@@ -211,6 +337,15 @@ const OrderSchema = new Schema<IOrder>(
 OrderSchema.index({ customerId: 1, createdAt: -1 });
 OrderSchema.index({ providerId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1 });
-OrderSchema.index({ readyForMatching: 1, status: 1 });
+OrderSchema.index({
+  readyForMatching: 1,
+  status: 1,
+  matchingStartedAt: 1,
+  scheduledAt: 1,
+});
+OrderSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
+OrderSchema.index({ bookingStatus: 1, paymentDueAt: 1 });
+OrderSchema.index({ recurringGroupId: 1, occurrenceNumber: 1 });
+OrderSchema.index({ "reassignment.status": 1, "reassignment.expiresAt": 1 });
 
 export const Order = model<IOrder>("Order", OrderSchema, "orders");

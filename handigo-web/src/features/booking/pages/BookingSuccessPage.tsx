@@ -28,6 +28,8 @@ const BookingSuccessPage = () => {
   useEffect(() => {
     if (stateOrder) {
       sessionStorage.removeItem('latestBookingOrderId');
+      sessionStorage.removeItem('pendingBookingOrderId');
+      sessionStorage.removeItem('pendingBookingFingerprint');
       reset();
       return;
     }
@@ -42,6 +44,8 @@ const BookingSuccessPage = () => {
         if (!isMounted) return;
         setOrder(data);
         sessionStorage.removeItem('latestBookingOrderId');
+        sessionStorage.removeItem('pendingBookingOrderId');
+        sessionStorage.removeItem('pendingBookingFingerprint');
         reset();
       })
       .catch(error => {

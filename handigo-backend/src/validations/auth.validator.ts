@@ -3,29 +3,44 @@ import { personNameSchema, vietnamesePhoneSchema } from "./user.validator";
 
 const passwordSchema = z
   .string()
-  .min(8, "Mật khẩu phải có ít nhất 8 ký tự");
+  .min(8, "Mật khẩu phải có ít nhất 8 ký tự")
+  .refine((value) => Buffer.byteLength(value, "utf8") <= 72, {
+    message: "Mật khẩu không được vượt quá 72 byte",
+  });
+
+const emailSchema = z
+  .email()
+  .trim()
+  .toLowerCase()
+  .max(254, "Email không hợp lệ");
+
+const otpSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, "Mã OTP phải gồm đúng 6 chữ số");
 
 export const registerSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: emailSchema,
   password: passwordSchema,
   fullName: personNameSchema,
   phone: z.preprocess(
     (value) => typeof value === "string" && !value.trim() ? undefined : value,
     vietnamesePhoneSchema.optional(),
   ),
+  registrationType: z.enum(["CUSTOMER", "PROVIDER"]).default("CUSTOMER"),
 });
 
 export const verifyRegisterOtpSchema = z.object({
-  email: z.email().trim().toLowerCase(),
-  otp: z.string().trim().length(6, "Mã OTP phải gồm 6 chữ số"),
+  email: emailSchema,
+  otp: otpSchema,
 });
 
 export const resendRegisterOtpSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: emailSchema,
 });
 
 export const loginSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: emailSchema,
   password: z.string().min(1, "Vui lòng nhập mật khẩu"),
   remember: z.boolean().optional(),
 });
@@ -47,16 +62,21 @@ export const facebookLoginSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: emailSchema,
 });
 
 export const resetPasswordSchema = z.object({
-  email: z.email().trim().toLowerCase(),
-  otp: z.string().trim().length(6, "Mã OTP phải gồm 6 chữ số"),
+  email: emailSchema,
+  otp: otpSchema,
   newPassword: passwordSchema,
 });
 
-export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
-  newPassword: passwordSchema,
-});
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
+    newPassword: passwordSchema,
+  })
+  .refine((payload) => payload.currentPassword !== payload.newPassword, {
+    path: ["newPassword"],
+    message: "Mật khẩu mới phải khác mật khẩu hiện tại",
+  });
