@@ -116,8 +116,21 @@ const configDefinitions: ConfigDefinition[] = [
     unit: "giây",
     isPublic: false,
     description:
-      "Số giây hệ thống chờ provider phản hồi trước khi thử provider tiếp theo.",
-    effect: "Có hiệu lực với các lượt gán provider mới sau khi lưu.",
+      "Số giây hệ thống chờ nhóm provider hiện tại phản hồi trước khi mở nhóm tiếp theo.",
+    effect: "Có hiệu lực với các nhóm phân phối mới sau khi lưu.",
+    isEffective: true,
+  },
+  {
+    key: "MATCHING_BATCH_SIZE",
+    label: "Số provider nhận đơn cùng lúc",
+    group: "booking",
+    type: "NUMBER",
+    defaultValue: 3,
+    unit: "provider",
+    isPublic: false,
+    description:
+      "Số provider phù hợp nhận cùng một lượt đề nghị; người xác nhận hợp lệ đầu tiên sẽ được nhận đơn.",
+    effect: "Nên đặt từ 3 đến 5 để cân bằng tốc độ, công bằng và số lượng thông báo.",
     isEffective: true,
   },
   {
@@ -129,7 +142,7 @@ const configDefinitions: ConfigDefinition[] = [
     unit: "lần",
     isPublic: false,
     description:
-      "Số provider tối đa hệ thống sẽ thử trước khi hủy đơn vì không tìm được provider phù hợp.",
+      "Tổng số provider tối đa hệ thống sẽ mời qua tất cả các nhóm trước khi hủy đơn.",
     effect: "Có hiệu lực với các lượt matching mới sau khi lưu.",
     isEffective: true,
   },

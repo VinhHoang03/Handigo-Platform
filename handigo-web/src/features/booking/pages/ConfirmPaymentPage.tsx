@@ -362,7 +362,7 @@ const ConfirmPaymentPage = () => {
     ...(addressText ? [["location_on", "Địa chỉ", addressText]] : []),
     [
       "person_search",
-      isAppointment ? "Chuyên gia đặt trước" : "Điều phối chuyên gia",
+      isAppointment && preferredProviderId ? "Chuyên gia đặt trước" : "Điều phối chuyên gia",
       preferredProviderId
         ? isAppointment
           ? preferredProviderName || "Chuyên gia đã chọn"

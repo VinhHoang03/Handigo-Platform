@@ -40,6 +40,54 @@ export interface CreateQuotationPayload {
   discountAmount?: number;
 }
 
+const closeCompetingAssignments = async (
+  orderId: Types.ObjectId,
+  acceptedAssignmentId: Types.ObjectId,
+) => {
+  const competingAssignments = await OrderAssignment.find({
+    orderId,
+    _id: { $ne: acceptedAssignmentId },
+    status: "pending",
+    isDeleted: false,
+  })
+    .select("_id providerId")
+    .lean();
+  if (competingAssignments.length === 0) return;
+
+  const respondedAt = new Date();
+  await OrderAssignment.updateMany(
+    {
+      _id: { $in: competingAssignments.map((item) => item._id) },
+      status: "pending",
+    },
+    { $set: { status: "cancelled", respondedAt } },
+    { runValidators: true },
+  );
+
+  const providers = await Provider.find({
+    _id: { $in: competingAssignments.map((item) => item.providerId) },
+    isDeleted: false,
+  })
+    .select("_id userId")
+    .lean();
+  const userIdByProviderId = new Map(
+    providers.map((provider) => [
+      provider._id.toString(),
+      provider.userId.toString(),
+    ]),
+  );
+  for (const competingAssignment of competingAssignments) {
+    const userId = userIdByProviderId.get(
+      competingAssignment.providerId.toString(),
+    );
+    if (!userId) continue;
+    emitToUser(userId, "assignment:closed", {
+      assignmentId: competingAssignment._id.toString(),
+      reason: "accepted_by_other",
+    });
+  }
+};
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const AssignmentService = {
@@ -163,10 +211,34 @@ export const AssignmentService = {
         throw new AppError("Yêu cầu lịch hẹn không còn khả dụng.", 409);
       }
 
-      let order;
+      const order = await Order.findOneAndUpdate(
+        { _id: assignment.orderId, status: "created", providerId: null },
+        {
+          $set: {
+            providerId: provider._id,
+            status: "accepted",
+            bookingStatus: "awaiting_payment",
+            paymentDueAt,
+            readyForMatching: false,
+          },
+        },
+        { returnDocument: "after", runValidators: true },
+      );
+      if (!order) {
+        await OrderAssignment.findByIdAndUpdate(claimedAssignment._id, {
+          $set: { status: "cancelled" },
+        });
+        emitToUser(providerUserId, "assignment:closed", {
+          assignmentId: assignment._id.toString(),
+          reason: "accepted_by_other",
+        });
+        throw new AppError("Lịch hẹn vừa được xử lý bởi yêu cầu khác.", 409);
+      }
+
       if (assignedOrder.recurringGroupId) {
         await Order.updateMany(
           {
+            _id: { $ne: order._id },
             recurringGroupId: assignedOrder.recurringGroupId,
             status: "created",
             providerId: null,
@@ -177,35 +249,17 @@ export const AssignmentService = {
               status: "accepted",
               bookingStatus: "reserved",
               paymentDueAt: null,
+              readyForMatching: false,
             },
           },
           { runValidators: true },
         );
-        order = await Order.findOneAndUpdate(
-          { _id: assignment.orderId, status: "accepted" },
-          { $set: { bookingStatus: "awaiting_payment", paymentDueAt } },
-          { returnDocument: "after", runValidators: true },
-        );
-      } else {
-        order = await Order.findOneAndUpdate(
-          { _id: assignment.orderId, status: "created", providerId: null },
-          {
-            $set: {
-              providerId: provider._id,
-              status: "accepted",
-              bookingStatus: "awaiting_payment",
-              paymentDueAt,
-            },
-          },
-          { returnDocument: "after", runValidators: true },
-        );
       }
-      if (!order) {
-        await OrderAssignment.findByIdAndUpdate(claimedAssignment._id, {
-          $set: { status: "cancelled" },
-        });
-        throw new AppError("Lịch hẹn vừa được xử lý bởi yêu cầu khác.", 409);
-      }
+
+      await closeCompetingAssignments(
+        assignment.orderId,
+        claimedAssignment._id as Types.ObjectId,
+      );
 
       emitToUser(providerUserId, "assignment:closed", {
         assignmentId: assignment._id.toString(),
@@ -293,6 +347,10 @@ export const AssignmentService = {
           { $set: { availabilityStatus: "online" } },
         ),
       ]);
+      emitToUser(providerUserId, "assignment:closed", {
+        assignmentId: assignment._id.toString(),
+        reason: "accepted_by_other",
+      });
       throw new AppError("Đơn hàng đã được xử lý bởi provider khác.", 409);
     }
 
@@ -305,14 +363,9 @@ export const AssignmentService = {
       order.reassignment.status = "matched";
     }
 
-    // 7. Cancel any other pending assignments for the same order
-    await OrderAssignment.updateMany(
-      {
-        orderId: assignment.orderId,
-        _id: { $ne: claimedAssignment._id },
-        status: "pending",
-      },
-      { status: "cancelled" },
+    await closeCompetingAssignments(
+      assignment.orderId,
+      claimedAssignment._id as Types.ObjectId,
     );
 
     emitToUser(providerUserId, "assignment:closed", {
@@ -400,9 +453,9 @@ export const AssignmentService = {
 
     if (assignment.assignmentType === "appointment") {
       const appointmentOrder = await Order.findById(assignment.orderId).select(
-        "recurringGroupId",
+        "recurringGroupId preferredProviderId",
       );
-      if (appointmentOrder?.recurringGroupId) {
+      if (appointmentOrder?.preferredProviderId && appointmentOrder.recurringGroupId) {
         await Order.updateMany(
           {
             recurringGroupId: appointmentOrder.recurringGroupId,
@@ -418,27 +471,29 @@ export const AssignmentService = {
           { runValidators: true },
         );
       }
-      const order = await Order.findOneAndUpdate(
-        { _id: assignment.orderId, status: "created" },
-        {
-          $set: {
-            bookingStatus: "rejected",
-            preferredProviderId: null,
-            paymentDueAt: null,
+      if (appointmentOrder?.preferredProviderId) {
+        const order = await Order.findOneAndUpdate(
+          { _id: assignment.orderId, status: "created" },
+          {
+            $set: {
+              bookingStatus: "rejected",
+              preferredProviderId: null,
+              paymentDueAt: null,
+            },
           },
-        },
-        { returnDocument: "after", runValidators: true },
-      );
-      if (order) {
-        await createNotificationRecord({
-          userId: order.customerId,
-          type: "ORDER",
-          title: "Chuyên gia chưa thể nhận lịch",
-          content: `Lịch hẹn ${order.orderCode} cần chọn một chuyên gia khác.`,
-          data: { orderId: order._id },
-        });
+          { returnDocument: "after", runValidators: true },
+        );
+        if (order) {
+          await createNotificationRecord({
+            userId: order.customerId,
+            type: "ORDER",
+            title: "Chuyên gia chưa thể nhận lịch",
+            content: `Lịch hẹn ${order.orderCode} cần chọn một chuyên gia khác.`,
+            data: { orderId: order._id },
+          });
+        }
+        return;
       }
-      return;
     }
 
     if (assignment.assignmentType === "direct_request") {
@@ -450,44 +505,19 @@ export const AssignmentService = {
       return;
     }
 
+    const hasPendingAssignment = await OrderAssignment.exists({
+      orderId: assignment.orderId,
+      status: "pending",
+      isDeleted: false,
+    });
+    if (hasPendingAssignment) return;
+
     // 4. Re-dispatch to next provider (import lazily to avoid circular dep)
     const order = await Order.findById(assignment.orderId);
     if (!order || order.status !== "created") return;
 
-    const address = await (
-      await import("../models/address.model.js")
-    ).Address.findById(order.addressId);
-    const service = await (
-      await import("../models/service.model.js")
-    ).Service.findById(order.serviceId);
-
-    // Collect all tried providers from existing assignment history
-    const isReassignment = order.reassignment?.status === "matching";
-    const triedAssignments = await OrderAssignment.find({
-      orderId: rejectedAssignment.orderId,
-      status: { $in: ["rejected", "timeout"] },
-      ...(isReassignment && order.reassignment?.respondedAt
-        ? { assignedAt: { $gte: order.reassignment.respondedAt } }
-        : {}),
-    }).lean();
-    const triedProviderIds = [
-      ...(isReassignment ? order.reassignment?.previousProviderIds || [] : []),
-      ...triedAssignments.map((item) => item.providerId),
-    ];
-
     const { DispatchService } = await import("./dispatch.service.js");
-    await DispatchService.dispatchOrder(
-      order._id.toString(),
-      {
-        latitude: address?.latitude,
-        longitude: address?.longitude,
-        serviceId: service?._id?.toString() || order.serviceId.toString(),
-        province: address?.province || "",
-        ward: address?.ward || "",
-      },
-      triedProviderIds,
-      triedAssignments.length + 1,
-    );
+    await DispatchService.redispatch(order._id.toString());
   },
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -760,10 +790,23 @@ export const AssignmentService = {
     })
       .populate({
         path: "orderId",
+        select: [
+          "orderCode",
+          "serviceId",
+          "addressId",
+          "orderType",
+          "scheduledAt",
+          "recurringGroupId",
+          "recurrenceUnit",
+          "occurrenceNumber",
+          "totalOccurrences",
+          "pricing",
+          "inspectionRequired",
+          "createdAt",
+        ].join(" "),
         populate: [
-          { path: "customerId", select: "fullName avatar phone" },
           { path: "serviceId", select: "name image serviceType depositAmount fixedPrice" },
-          { path: "addressId" },
+          { path: "addressId", select: "ward province" },
         ],
       })
       .sort({ assignedAt: -1 })
