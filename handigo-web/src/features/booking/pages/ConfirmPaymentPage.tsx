@@ -17,6 +17,7 @@ import type { AvailableVoucher } from "../types/voucher.types";
 import { isRequiredOptionSelectionMissing } from "../utils/serviceOptionSelection";
 import { tokenStorage } from "@/api/tokenStorage";
 import { WalletBalanceText } from "@/features/wallet/components/WalletBalanceText";
+import { useSystemAlert } from "@/components/common/SystemAlert";
 
 const paymentMethods = [
   [
@@ -54,6 +55,7 @@ const formatAddress = (address: Address | null) => {
 };
 
 const ConfirmPaymentPage = () => {
+  const { showSystemAlert } = useSystemAlert();
   const {
     categoryId,
     serviceId,
@@ -193,11 +195,17 @@ const ConfirmPaymentPage = () => {
 
   const handleConfirm = async () => {
     if (!serviceId) {
-      alert("Vui lòng chọn dịch vụ trước khi thanh toán.");
+      showSystemAlert("Vui lòng chọn dịch vụ trước khi thanh toán.", {
+        title: "Chưa chọn dịch vụ",
+        variant: "error",
+      });
       return;
     }
     if (!addressId) {
-      alert("Vui lòng chọn địa chỉ thực hiện.");
+      showSystemAlert("Vui lòng chọn địa chỉ thực hiện.", {
+        title: "Chưa chọn địa chỉ",
+        variant: "error",
+      });
       return;
     }
     if (

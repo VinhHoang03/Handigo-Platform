@@ -4,7 +4,6 @@ import { providerOrderApi } from "../api/providerOrder.api";
 import type { Order, OrderCustomer } from "@/types/booking";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import { useProviderAvailability } from "../hooks/useProviderAvailability";
 import {
   providerDashboardApi,
   type ProviderEarningPoint,
@@ -212,7 +211,6 @@ function BookingItem({ order }: { order: Order }) {
 
 const ProviderHomePage = () => {
   const user = useAuthStore((state) => state.user);
-  const { isOnline, toggleAvailability } = useProviderAvailability();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [totalOrders, setTotalOrders] = useState(0);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
@@ -389,12 +387,7 @@ const ProviderHomePage = () => {
   );
 
   return (
-    <DashboardShell
-      role="PROVIDER"
-      showStatusToggle
-      isOnline={isOnline}
-      onStatusToggle={toggleAvailability}
-    >
+    <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <section className="flex flex-col justify-between gap-md md:flex-row md:items-end">
           <div>

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../api/providerOrder.api';
-import { useProviderAvailability } from '../hooks/useProviderAvailability';
 import { formatProviderOrderAmount, getCustomer, providerStatusLabels, providerStatusStyles } from '../utils/providerOrder.utils';
 
 const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -23,7 +22,6 @@ export default function ProviderSchedulePage() {
     date.setHours(0, 0, 0, 0);
     return date;
   }, []);
-  const { isOnline, toggleAvailability } = useProviderAvailability();
   const [visibleMonth, setVisibleMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -72,7 +70,7 @@ export default function ProviderSchedulePage() {
   };
 
   return (
-    <DashboardShell role="PROVIDER" showStatusToggle isOnline={isOnline} onStatusToggle={toggleAvailability}>
+    <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <header>
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Lịch làm việc</h1>
