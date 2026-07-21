@@ -420,6 +420,7 @@ function ProviderProfileContent() {
         expiresAt: optional(certificateForm.expiresAt),
         imageUrls: certificateForm.imageUrls,
         description: optional(certificateForm.description),
+        isPublic: certificateForm.isPublic,
       };
 
       const nextProfile = certificateForm.id
@@ -452,6 +453,21 @@ function ProviderProfileContent() {
     try {
       const nextProfile =
         await providerProfileApi.deleteCertificate(certificateId);
+      setProfile(nextProfile);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleCertificateVisibility(
+    certificate: ProviderCertificate,
+  ) {
+    setIsSaving(true);
+    try {
+      const nextProfile = await providerProfileApi.updateCertificate(
+        certificate.id,
+        { isPublic: !certificate.isPublic },
+      );
       setProfile(nextProfile);
     } finally {
       setIsSaving(false);
@@ -727,6 +743,9 @@ function ProviderProfileContent() {
             onCancelForm={closeCertificateForm}
             onOpenCreate={openCreateCertificateForm}
             onEditCertificate={openEditCertificateForm}
+            onToggleVisibility={(certificate) =>
+              void handleCertificateVisibility(certificate)
+            }
             onDeleteCertificate={(certificateId) =>
               void handleDeleteCertificate(certificateId)
             }

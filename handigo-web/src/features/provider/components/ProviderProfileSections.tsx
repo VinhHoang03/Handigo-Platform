@@ -174,6 +174,7 @@ export function ProviderCertificatesSection({
   onCancelForm,
   onOpenCreate,
   onEditCertificate,
+  onToggleVisibility,
   onDeleteCertificate,
 }: {
   certificates: ProviderCertificate[];
@@ -188,6 +189,7 @@ export function ProviderCertificatesSection({
   onCancelForm: () => void;
   onOpenCreate: () => void;
   onEditCertificate: (certificate: ProviderCertificate) => void;
+  onToggleVisibility: (certificate: ProviderCertificate) => void;
   onDeleteCertificate: (certificateId: string) => void;
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -244,6 +246,19 @@ export function ProviderCertificatesSection({
 
               {isMenuOpen && (
                 <div className="absolute right-0 top-[calc(100%+8px)] z-20 min-w-36 overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-1.5 shadow-[0_16px_40px_rgba(19,27,46,0.16)]">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-on-surface transition hover:bg-primary/5"
+                    onClick={() => {
+                      setOpenMenuId(null);
+                      onToggleVisibility(certificate);
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      {certificate.isPublic ? "visibility_off" : "visibility"}
+                    </span>
+                    {certificate.isPublic ? "Chuyển riêng tư" : "Công khai"}
+                  </button>
                   <button
                     type="button"
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-on-surface transition hover:bg-primary/5"
@@ -316,13 +331,25 @@ export function ProviderCertificatesSection({
                   <p className="mt-1 line-clamp-1 text-sm text-on-surface-variant">
                     {certificate.issuer || "Chưa cập nhật đơn vị cấp"}
                   </p>
+                  <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${certificate.isPublic ? "bg-secondary-container/30 text-secondary" : "bg-surface-container text-on-surface-variant"}`}>
+                    <span className="material-symbols-outlined text-[14px]">
+                      {certificate.isPublic ? "public" : "lock"}
+                    </span>
+                    {certificate.isPublic ? "Công khai" : "Riêng tư"}
+                  </span>
                 </div>
               </div>
             </button>
           </article>
         );
       }),
-    [certificates, onDeleteCertificate, onEditCertificate, openMenuId],
+    [
+      certificates,
+      onDeleteCertificate,
+      onEditCertificate,
+      onToggleVisibility,
+      openMenuId,
+    ],
   );
 
   return (

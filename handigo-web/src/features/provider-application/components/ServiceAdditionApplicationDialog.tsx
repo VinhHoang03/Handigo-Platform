@@ -26,6 +26,7 @@ const toCertificateForm = (
   expiresAt: certificate.expiresAt?.slice(0, 10) || "",
   imageUrls: certificate.imageUrls || [],
   description: certificate.description || "",
+  isPublic: false,
 });
 
 const toCertificatePayload = (
@@ -246,6 +247,7 @@ export function ServiceAdditionApplicationDialog({
               form={certificateForm}
               isSaving={false}
               uploading={isUploading}
+              showVisibility={false}
               onChange={setCertificateForm}
               onUpload={(file) => void uploadCertificate(file)}
               onCancel={() => setIsCertificateFormOpen(false)}

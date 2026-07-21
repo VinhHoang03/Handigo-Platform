@@ -305,6 +305,7 @@ const approveCertificates = (
     expiresAt: certificate.expiresAt,
     imageUrls: certificate.imageUrls || [],
     description: certificate.description,
+    isPublic: false,
     status: "approved",
     reviewedBy: new Types.ObjectId(adminId),
     reviewedAt: new Date(),

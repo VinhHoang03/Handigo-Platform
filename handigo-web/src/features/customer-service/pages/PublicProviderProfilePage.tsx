@@ -1,21 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { CategoryIcon } from "@/components/common/CategoryIcon";
+import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import {
   customerServiceApi,
   type PublicProviderProfile,
 } from "../api/customerService.api";
-
-const coverImage =
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80";
-
-const portfolioImages = [
-  "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=600&q=80",
-  "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=600&q=80",
-];
 
 const getAvatar = (profile: PublicProviderProfile) =>
   profile.user.avatar ||
@@ -51,6 +42,14 @@ export default function PublicProviderProfilePage() {
   const [profile, setProfile] = useState<PublicProviderProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const selectService = useBookingStore((state) => state.selectService);
+  const setPreferredProviderId = useBookingStore(
+    (state) => state.setPreferredProviderId,
+  );
+  const setRequestedProvider = useBookingStore(
+    (state) => state.setRequestedProvider,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -79,6 +78,27 @@ export default function PublicProviderProfilePage() {
   }, [providerId]);
 
   const areas = useMemo(() => (profile ? getAreaText(profile) : []), [profile]);
+  const effectiveSelectedServiceId = profile?.provider.services.some(
+    (service) => service.id === selectedServiceId,
+  )
+    ? selectedServiceId
+    : (profile?.provider.services[0]?.id ?? "");
+
+  const handleBookProvider = () => {
+    if (!profile) return;
+
+    const selectedService = profile.provider.services.find(
+      (service) => service.id === effectiveSelectedServiceId,
+    );
+    if (!selectedService?.categoryId) return;
+
+    selectService(selectedService.categoryId, selectedService.id);
+    setRequestedProvider(profile.provider.id, profile.user.fullName);
+    setPreferredProviderId(profile.provider.id, profile.user.fullName);
+    navigate("/customer/bookings/new/location", {
+      state: { fromProviderProfile: true },
+    });
+  };
 
   if (isLoading) {
     return (
@@ -102,163 +122,115 @@ export default function PublicProviderProfilePage() {
 
   return (
     <CustomerServiceLayout>
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="-mt-4">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 font-semibold text-on-surface shadow-sm hover:bg-surface-container-low"
+          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-on-surface shadow-sm hover:bg-surface-container-low"
         >
-          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          <span className="material-symbols-outlined text-[18px]">
+            arrow_back
+          </span>
           Quay lại
         </button>
-        <div className="flex gap-2">
-          <button className="grid h-10 w-10 place-items-center rounded-full bg-white text-on-surface shadow-sm hover:bg-surface-container-low">
-            <span className="material-symbols-outlined">favorite</span>
-          </button>
-          <button className="grid h-10 w-10 place-items-center rounded-full bg-white text-on-surface shadow-sm hover:bg-surface-container-low">
-            <span className="material-symbols-outlined">share</span>
-          </button>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
         <div className="space-y-10 lg:col-span-8">
-          <section className="relative">
-            <div className="h-64 overflow-hidden rounded-2xl shadow-sm md:h-80">
+          <section className="flex flex-col items-center gap-4 rounded-2xl border border-outline-variant/20 bg-white p-4 text-center shadow-sm sm:flex-row sm:text-left md:p-5">
+            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border border-outline-variant/30 shadow-sm md:h-28 md:w-28">
               <img
-                src={coverImage}
-                alt="Không gian dịch vụ chuyên nghiệp"
+                src={getAvatar(profile)}
+                alt={profile.user.fullName}
                 className="h-full w-full object-cover"
               />
             </div>
-            <div className="relative -mt-16 flex flex-col gap-5 px-5 md:flex-row md:items-end">
-              <div className="h-32 w-32 overflow-hidden rounded-full border-4 border-white bg-white shadow-lg md:h-40 md:w-40">
-                <img
-                  src={getAvatar(profile)}
-                  alt={profile.user.fullName}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="pb-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-3xl font-bold text-on-background md:text-4xl">
-                    {profile.user.fullName}
-                  </h1>
-                  {profile.provider.verified && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
-                      <span className="material-symbols-outlined text-[14px]">verified</span>
-                      Đã xác minh
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                <h1 className="break-words text-2xl font-bold text-on-background md:text-3xl">
+                  {profile.user.fullName}
+                </h1>
+                {profile.provider.verified && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
+                    <span className="material-symbols-outlined text-[14px]">
+                      verified
                     </span>
-                  )}
-                </div>
-                <p className="mt-2 max-w-xl text-on-surface-variant">
-                  {profile.provider.mainServiceText ||
-                    profile.provider.bio ||
-                    profile.provider.description}
-                </p>
+                    Đã xác minh
+                  </span>
+                )}
               </div>
             </div>
           </section>
 
           <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Metric label="Đánh giá" value={profile.provider.averageRating.toFixed(1)} icon="star" />
-            <Metric label="Công việc" value={`${profile.provider.totalCompletedOrders}`} />
-            <Metric label="Phản hồi" value={`${profile.provider.totalFeedbacks}`} />
-            <Metric label="Kinh nghiệm" value={`${profile.provider.experienceYears}+ năm`} />
+            <Metric
+              label="Đánh giá"
+              value={profile.provider.averageRating.toFixed(1)}
+              icon="star"
+            />
+            <Metric
+              label="Công việc"
+              value={`${profile.provider.totalCompletedOrders}`}
+            />
+            <Metric
+              label="Phản hồi"
+              value={`${profile.provider.totalFeedbacks}`}
+            />
+            <Metric
+              label="Kinh nghiệm"
+              value={`${profile.provider.experienceYears}+ năm`}
+            />
           </section>
 
           <InfoSection title="Giới thiệu">
             <p>{profile.provider.bio || profile.provider.description}</p>
           </InfoSection>
 
-          <section>
-            <h2 className="mb-4 text-2xl font-bold text-on-background">
-              Dịch vụ cung cấp
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {profile.provider.services.map((service) => (
-                <span
-                  key={service.id}
-                  className="inline-flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-white px-4 py-3 font-semibold"
-                >
-                  <span className="material-symbols-outlined text-primary">home_repair_service</span>
-                  {service.name}
-                </span>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-on-background">
-                Dự án đã thực hiện
-              </h2>
-            </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              {portfolioImages.map((image) => (
-                <img
-                  key={image}
-                  src={image}
-                  alt="Dự án đã thực hiện"
-                  className="aspect-square rounded-xl object-cover shadow-sm"
-                />
-              ))}
-              <div className="grid aspect-square place-items-center rounded-xl bg-surface-container-high font-bold text-on-surface-variant">
-                +{Math.max(profile.provider.totalCompletedOrders - 5, 0)} ảnh khác
-              </div>
-            </div>
-          </section>
-
-          <InfoSection title="Chứng chỉ & xác minh">
-            <VerificationRow
-              icon="badge"
-              title="Định danh cá nhân"
-              description={
-                profile.provider.identityVerified
-                  ? "Thông tin định danh đã được hệ thống Handigo kiểm duyệt."
-                  : "Thông tin định danh đang được cập nhật."
-              }
-            />
-            {profile.provider.certificates.length === 0 ? (
-              <VerificationRow
-                icon="workspace_premium"
-                title="Chứng chỉ nghề nghiệp"
-                description="Chuyên gia chưa công khai chứng chỉ nghề nghiệp."
-              />
-            ) : (
-              profile.provider.certificates.map((certificate) => (
+          {profile.provider.certificates.length > 0 && (
+            <InfoSection title="Chứng chỉ">
+              {profile.provider.certificates.map((certificate) => (
                 <VerificationRow
                   key={certificate.id}
                   icon="workspace_premium"
                   title={certificate.title}
                   description={[
                     certificate.issuer,
-                    certificate.issuedAt ? `Cấp ngày ${formatDate(certificate.issuedAt)}` : "",
+                    certificate.issuedAt
+                      ? `Cấp ngày ${formatDate(certificate.issuedAt)}`
+                      : "",
                   ]
                     .filter(Boolean)
                     .join(" - ")}
                 />
-              ))
-            )}
-          </InfoSection>
+              ))}
+            </InfoSection>
+          )}
 
           <section>
             <h2 className="mb-4 text-2xl font-bold text-on-background">
               Khu vực hoạt động
             </h2>
             <div className="mb-4 flex items-center gap-2 text-on-surface-variant">
-              <span className="material-symbols-outlined text-primary">location_on</span>
+              <span className="material-symbols-outlined text-primary">
+                location_on
+              </span>
               Hỗ trợ nhanh tại các khu vực:
             </div>
             <div className="flex flex-wrap gap-2">
               {areas.length ? (
                 areas.map((area) => (
-                  <span key={area} className="rounded-full border border-outline-variant/30 bg-white px-4 py-2 font-semibold">
+                  <span
+                    key={area}
+                    className="rounded-full border border-outline-variant/30 bg-white px-4 py-2 font-semibold"
+                  >
                     {area}
                   </span>
                 ))
               ) : (
-                <span className="text-on-surface-variant">Chưa cập nhật khu vực hoạt động.</span>
+                <span className="text-on-surface-variant">
+                  Chưa cập nhật khu vực hoạt động.
+                </span>
               )}
             </div>
           </section>
@@ -285,12 +257,17 @@ export default function PublicProviderProfilePage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <img
-                        src={getCustomerAvatar(feedback.customer.fullName, feedback.customer.avatar)}
+                        src={getCustomerAvatar(
+                          feedback.customer.fullName,
+                          feedback.customer.avatar,
+                        )}
                         alt={feedback.customer.fullName}
                         className="h-10 w-10 rounded-full object-cover"
                       />
                       <div>
-                        <p className="font-bold">{feedback.customer.fullName}</p>
+                        <p className="font-bold">
+                          {feedback.customer.fullName}
+                        </p>
                         <p className="text-xs uppercase text-on-surface-variant">
                           {formatDate(feedback.createdAt)}
                         </p>
@@ -298,43 +275,130 @@ export default function PublicProviderProfilePage() {
                     </div>
                     <RatingStars rating={feedback.rating} />
                   </div>
-                  <p className="text-on-surface-variant">
-                    {feedback.comment || "Khách hàng không để lại bình luận."}
-                  </p>
+                  <p className="text-on-surface-variant">{feedback.comment}</p>
                 </article>
               ))
             )}
           </section>
         </div>
 
-        <aside className="lg:sticky lg:top-28 lg:col-span-4">
+        <aside className="space-y-4 lg:sticky lg:top-28 lg:col-span-4 lg:self-start">
           <div className="rounded-2xl border border-outline-variant/20 bg-white p-6 shadow-lg">
             <h3 className="text-xl font-bold text-on-background">
               Đặt dịch vụ với chuyên gia này
             </h3>
             <p className="mt-2 text-sm text-on-surface-variant">
-              Chọn dịch vụ phù hợp từ hồ sơ chuyên gia, sau đó Handigo sẽ điều phối theo khu vực và lịch trống.
+              Chọn dịch vụ bạn cần. Handigo sẽ giữ đúng chuyên gia này khi họ
+              phù hợp với khu vực và lịch đã chọn.
             </p>
+            {profile.provider.services.length > 0 ? (
+              <label className="mt-5 block">
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                  Dịch vụ cần đặt
+                </span>
+                <select
+                  value={effectiveSelectedServiceId}
+                  onChange={(event) => setSelectedServiceId(event.target.value)}
+                  className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                >
+                  {profile.provider.services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="mt-5 rounded-xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
+                Chuyên gia chưa có dịch vụ đang hoạt động để đặt lịch.
+              </p>
+            )}
             <div className="mt-5 space-y-3">
               <TrustItem icon="verified_user" text="Hồ sơ đã xác minh" />
-              <TrustItem icon="security" text="Thanh toán an toàn" />
-              <TrustItem icon="star" text={`${profile.provider.averageRating.toFixed(1)} điểm đánh giá`} />
+              <TrustItem
+                icon="star"
+                text={`${profile.provider.averageRating.toFixed(1)} điểm đánh giá`}
+              />
             </div>
-            <Link
-              to="/customer/services"
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-md hover:opacity-90"
+            <button
+              type="button"
+              onClick={handleBookProvider}
+              disabled={!effectiveSelectedServiceId}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Xem dịch vụ phù hợp
+              Đặt lịch với {profile.user.fullName}
               <span className="material-symbols-outlined">arrow_forward</span>
-            </Link>
+            </button>
           </div>
+
+          <section className="rounded-2xl border border-outline-variant/20 bg-white p-6 shadow-sm">
+            <h3 className="text-xl font-bold text-on-background">
+              Danh mục dịch vụ
+            </h3>
+            <div className="mt-4 space-y-2">
+              {profile.provider.serviceCategories.map((category) => (
+                <div
+                  key={category.id}
+                  tabIndex={0}
+                  className="group rounded-xl border border-outline-variant/30 bg-surface-container-lowest outline-none transition hover:border-primary/40 focus:border-primary focus:ring-4 focus:ring-primary/10"
+                >
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                      <CategoryIcon
+                        icon={category.icon}
+                        name={category.name}
+                        className="h-5 w-5"
+                      />
+                    </span>
+                    <span className="min-w-0 flex-1 font-bold text-on-surface">
+                      {category.name}
+                    </span>
+                    <span className="material-symbols-outlined text-on-surface-variant transition-transform group-hover:rotate-180 group-focus:rotate-180">
+                      expand_more
+                    </span>
+                  </div>
+                  <div className="grid grid-rows-[0fr] transition-all duration-200 group-hover:grid-rows-[1fr] group-focus:grid-rows-[1fr]">
+                    <div className="overflow-hidden">
+                      <ul className="space-y-2 border-t border-outline-variant/20 px-4 py-3">
+                        {category.services.map((service) => (
+                          <li
+                            key={service.id}
+                            className="flex items-start gap-2 text-sm text-on-surface-variant"
+                          >
+                            <span className="material-symbols-outlined mt-0.5 text-[16px] text-primary">
+                              check_circle
+                            </span>
+                            {service.name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {profile.provider.serviceCategories.length === 0 && (
+                <p className="rounded-xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
+                  Chuyên gia chưa đăng ký danh mục dịch vụ.
+                </p>
+              )}
+            </div>
+          </section>
         </aside>
+      </div>
       </div>
     </CustomerServiceLayout>
   );
 }
 
-function Metric({ label, value, icon }: { label: string; value: string; icon?: string }) {
+function Metric({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon?: string;
+}) {
   return (
     <div className="rounded-2xl border border-outline-variant/10 bg-white p-5 text-center shadow-sm">
       <p className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
@@ -343,7 +407,10 @@ function Metric({ label, value, icon }: { label: string; value: string; icon?: s
       <div className="flex items-center justify-center gap-1 text-2xl font-bold text-primary">
         {value}
         {icon && (
-          <span className="material-symbols-outlined text-star-gold" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <span
+            className="material-symbols-outlined text-star-gold"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
             {icon}
           </span>
         )}
@@ -352,11 +419,19 @@ function Metric({ label, value, icon }: { label: string; value: string; icon?: s
   );
 }
 
-function InfoSection({ title, children }: { title: string; children: ReactNode }) {
+function InfoSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-2xl border border-outline-variant/10 bg-white p-6 shadow-sm">
       <h2 className="mb-4 text-2xl font-bold text-on-background">{title}</h2>
-      <div className="space-y-3 leading-7 text-on-surface-variant">{children}</div>
+      <div className="space-y-3 leading-7 text-on-surface-variant">
+        {children}
+      </div>
     </section>
   );
 }
@@ -390,7 +465,9 @@ function RatingStars({ rating }: { rating: number }) {
         <span
           key={star}
           className="material-symbols-outlined text-sm"
-          style={{ fontVariationSettings: star <= rating ? "'FILL' 1" : "'FILL' 0" }}
+          style={{
+            fontVariationSettings: star <= rating ? "'FILL' 1" : "'FILL' 0",
+          }}
         >
           star
         </span>
