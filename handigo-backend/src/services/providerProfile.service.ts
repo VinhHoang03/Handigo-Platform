@@ -13,10 +13,11 @@ import {
 import { AppError } from "../utils/appError";
 import { Service } from "../models/service.model";
 import { Address } from "../models/address.model";
-import { Order } from "../models/order.model";
 import { Feedback } from "../models/feedback.model";
 import { Category } from "../models/category.model";
 import { MatchingService } from "./matching.service";
+import { Order } from "../models/order.model";
+import { OrderAssignment } from "../models/orderAssignment.model";
 import {
   ProviderApplication,
   type IProviderApplication,
@@ -280,10 +281,12 @@ export const getNearbyProvidersForCustomer = async (
   scheduledAtValue?: string,
   recurrenceUnitValue?: string,
   recurrenceCountValue?: number,
+  orderIdValue?: string,
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(serviceId, "service id");
   assertObjectId(addressId, "address id");
+  if (orderIdValue) assertObjectId(orderIdValue, "order id");
 
   const [service, address] = await Promise.all([
     Service.findOne({
@@ -320,25 +323,8 @@ export const getNearbyProvidersForCustomer = async (
   const recurrenceCount = validRecurrenceCounts.includes(recurrenceCountValue || 0)
     ? recurrenceCountValue
     : undefined;
-
-  const candidates = await MatchingService.findNearestProviders({
-    latitude: address.latitude,
-    longitude: address.longitude,
-    serviceId: service._id.toString(),
-    province: address.province,
-    ward: address.ward,
-    limit: 5,
-    requireOnline: !scheduledAt,
-  });
-
-  if (candidates.length === 0) return [];
-
-  const candidateByProviderId = new Map(
-    candidates.map((candidate) => [candidate.providerId.toString(), candidate]),
-  );
-  let providerIds = candidates.map((candidate) => candidate.providerId);
-  if (scheduledAt && providerIds.length > 0) {
-    const occurrenceDates = recurrenceUnit && recurrenceCount
+  const occurrenceDates = scheduledAt
+    ? recurrenceUnit && recurrenceCount
       ? Array.from({ length: recurrenceCount }, (_, index) => {
           const occurrence = new Date(scheduledAt);
           if (recurrenceUnit === "weekly") {
@@ -356,21 +342,54 @@ export const getNearbyProvidersForCustomer = async (
           }
           return occurrence;
         })
-      : [scheduledAt];
-    const conflictingProviderIds = await Order.distinct("providerId", {
-      providerId: { $in: providerIds },
-      status: { $in: ["accepted", "in_progress"] },
-      $or: occurrenceDates.map((date) => ({
-        scheduledAt: {
-          $gt: new Date(date.getTime() - 60 * 60 * 1000),
-          $lt: new Date(date.getTime() + 60 * 60 * 1000),
-        },
-      })),
+      : [scheduledAt]
+    : [];
+
+  let excludeProviderIds: Types.ObjectId[] = [];
+  if (orderIdValue) {
+    const order = await Order.findOne({
+      _id: orderIdValue,
+      customerId: new Types.ObjectId(userId),
       isDeleted: false,
-    });
-    const conflictingIds = new Set(conflictingProviderIds.map(String));
-    providerIds = providerIds.filter((id) => !conflictingIds.has(id.toString()));
+    })
+      .select("_id recurringGroupId")
+      .lean();
+    if (!order) {
+      throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+    }
+
+    const relatedOrderIds = order.recurringGroupId
+      ? await Order.find({
+          recurringGroupId: order.recurringGroupId,
+          customerId: new Types.ObjectId(userId),
+          isDeleted: false,
+        }).distinct("_id")
+      : [order._id];
+    excludeProviderIds = await OrderAssignment.find({
+      orderId: { $in: relatedOrderIds },
+      status: { $in: ["rejected", "timeout"] },
+      isDeleted: false,
+    }).distinct("providerId");
   }
+
+  const candidates = await MatchingService.findNearestProviders({
+    latitude: address.latitude,
+    longitude: address.longitude,
+    serviceId: service._id.toString(),
+    province: address.province,
+    ward: address.ward,
+    limit: 5,
+    requireOnline: !scheduledAt,
+    scheduledDates: occurrenceDates,
+    excludeProviderIds,
+  });
+
+  if (candidates.length === 0) return [];
+
+  const candidateByProviderId = new Map(
+    candidates.map((candidate) => [candidate.providerId.toString(), candidate]),
+  );
+  const providerIds = candidates.map((candidate) => candidate.providerId);
   const availableProviderIdSet = new Set(providerIds.map(String));
   const providers = await Provider.find({
     _id: { $in: providerIds },

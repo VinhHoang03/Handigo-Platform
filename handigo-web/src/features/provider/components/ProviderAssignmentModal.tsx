@@ -71,7 +71,7 @@ export function ProviderAssignmentModal() {
         new Date(nextAssignment.responseDeadline).getTime() > Date.now()
       ) {
         setError(null);
-        setAssignment(nextAssignment);
+        setAssignment((current) => current ?? nextAssignment);
         return;
       }
 
@@ -225,6 +225,11 @@ export function ProviderAssignmentModal() {
             <p className="mt-1 line-clamp-3 text-sm">{order.problemDescription}</p>
           </div>
         )}
+
+        <div className="flex items-start gap-2 rounded-2xl bg-surface-container-low p-sm text-sm text-on-surface-variant">
+          <span className="material-symbols-outlined text-base text-primary">shield_lock</span>
+          <span>Thông tin liên hệ và địa chỉ chi tiết sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
+        </div>
 
         {error && (
           <div className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">

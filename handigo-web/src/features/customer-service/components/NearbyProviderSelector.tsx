@@ -14,6 +14,7 @@ interface NearbyProviderSelectorProps {
   requireSelection?: boolean;
   recurrenceUnit?: "weekly" | "monthly";
   recurrenceCount?: number;
+  orderId?: string;
   allowSelection?: boolean;
   selectedProviderId?: string;
   requestedProviderId?: string;
@@ -46,6 +47,7 @@ export function NearbyProviderSelector({
   requireSelection = false,
   recurrenceUnit,
   recurrenceCount,
+  orderId,
   allowSelection = true,
   selectedProviderId,
   requestedProviderId,
@@ -80,6 +82,7 @@ export function NearbyProviderSelector({
           scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
           recurrenceUnit,
           recurrenceCount,
+          orderId,
         );
         if (isMounted) {
           setProviders(data);
@@ -103,7 +106,7 @@ export function NearbyProviderSelector({
     return () => {
       isMounted = false;
     };
-  }, [addressId, enabled, onAvailabilityChange, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
+  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
 
   useEffect(() => {
     if (!allowSelection || !hasLoaded || !onSelectProvider || !selectedProviderId) return;
@@ -192,7 +195,7 @@ export function NearbyProviderSelector({
                 Chuyên gia đã chọn chưa phù hợp với khu vực hoặc lịch này. Vui lòng đổi lịch hoặc chọn chuyên gia khác.
               </p>
             )}
-          {allowSelection && !requireSelection && <button
+          {allowSelection && <button
             type="button"
             onClick={() => onSelectProvider?.(undefined)}
             className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
@@ -209,7 +212,7 @@ export function NearbyProviderSelector({
                 Handigo tự điều phối chuyên gia
               </span>
               <span className="block text-xs text-on-surface-variant">
-                Hệ thống sẽ điều phối người phù hợp nhất khi bạn đặt lịch.
+                Hệ thống sẽ lần lượt gửi yêu cầu đến các chuyên gia phù hợp.
               </span>
             </span>
             {!selectedProviderId && (
