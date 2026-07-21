@@ -49,8 +49,15 @@ const getAddressDisplay = (address: UserAddress) =>
     .filter(Boolean)
     .join(", ");
 
+const CURRENT_LOCATION_LEGACY_NOTE = "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
+
+const getVisibleAddressNote = (address: UserAddress) => {
+  const note = address.note?.trim();
+  return note === CURRENT_LOCATION_LEGACY_NOTE ? "" : note || "";
+};
+
 const getAddressTitle = (address: UserAddress) =>
-  address.note?.trim() ||
+  getVisibleAddressNote(address) ||
   getAddressDisplay(address) ||
   [address.ward, address.province].filter(Boolean).join(", ") ||
   "Địa chỉ";
@@ -255,7 +262,7 @@ export function AddressBookManager({
                         </span>
                       )}
                     </span>
-                    {address.note?.trim() && (
+                    {getVisibleAddressNote(address) && (
                       <span className="mt-1 block text-sm text-on-surface-variant">
                         {getAddressDisplay(address)}
                       </span>

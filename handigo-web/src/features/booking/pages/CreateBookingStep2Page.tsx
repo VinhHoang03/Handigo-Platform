@@ -112,6 +112,7 @@ const CreateBookingStep2Page = () => {
   const {
     serviceId, addressId, setAddressId,
     preferredProviderId, setPreferredProviderId,
+    requestedProviderId,
     orderType, setOrderType,
     scheduledAt, setScheduledAt, problemDescription, setProblemDescription,
     recurrenceUnit = 'weekly', setRecurrenceUnit,
@@ -571,6 +572,7 @@ const CreateBookingStep2Page = () => {
                       recurrenceCount={orderType === 'recurring' ? recurrenceCount : undefined}
                       requireSelection
                       selectedProviderId={preferredProviderId}
+                      requestedProviderId={requestedProviderId}
                       onSelectProvider={(providerId, providerName) => {
                         setPreferredProviderId(providerId, providerName);
                         clearFormError('preferredProviderId');
@@ -591,6 +593,7 @@ const CreateBookingStep2Page = () => {
                 serviceId={serviceId}
                 addressId={addressId}
                 selectedProviderId={preferredProviderId}
+                requestedProviderId={requestedProviderId}
                 onSelectProvider={(providerId, providerName) => {
                   setPreferredProviderId(providerId, providerName);
                   clearFormError('preferredProviderId');

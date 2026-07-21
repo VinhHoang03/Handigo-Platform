@@ -172,7 +172,10 @@ function AddressRow({
   onEdit?: (address: UserAddress) => void;
   onDelete?: (address: UserAddress) => void;
 }) {
-  const hasNote = Boolean(address.note?.trim());
+  const hasNote = Boolean(
+    address.note?.trim() &&
+      address.note.trim() !== "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.",
+  );
 
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low p-3">

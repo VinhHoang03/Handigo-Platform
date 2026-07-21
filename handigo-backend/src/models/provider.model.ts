@@ -59,6 +59,7 @@ export interface IProviderCertificate {
   expiresAt?: Date;
   imageUrls: string[];
   description?: string;
+  isPublic?: boolean;
   status: CertificateStatus;
   reviewedBy?: Types.ObjectId | null;
   reviewedAt?: Date | null;
@@ -140,6 +141,7 @@ const ProviderCertificateSchema = new Schema<IProviderCertificate>(
     expiresAt: { type: Date },
     imageUrls: { type: [String], default: [] },
     description: { type: String, trim: true, maxlength: 2000 },
+    isPublic: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

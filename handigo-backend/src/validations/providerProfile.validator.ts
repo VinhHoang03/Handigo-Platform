@@ -137,6 +137,7 @@ const certificateFields = {
   expiresAt: dateStringSchema.optional(),
   imageUrls: z.array(imageUrlSchema).max(10).default([]),
   description: optionalText(2000),
+  isPublic: z.boolean().optional(),
 };
 
 export const createCertificateSchema = z

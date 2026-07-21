@@ -67,6 +67,7 @@ export const adminNavItems: DashboardNavItem[] = [
   { icon: "receipt_long", label: "Thanh toán", path: "/admin/payments" },
   { icon: "account_balance_wallet", label: "Ví provider", path: "/admin/wallets" },
   { icon: "notifications", label: "Thông báo", path: "/admin/notifications" },
+  { icon: "newspaper", label: "Tin tức", path: "/admin/news" },
   { icon: "payments", label: "Doanh thu hệ thống", path: "/admin/revenue" },
   {
     icon: "settings",

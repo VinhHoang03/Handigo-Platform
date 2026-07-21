@@ -128,6 +128,9 @@ const AdminWalletsPage = lazy(
 const AdminSystemConfigsPage = lazy(
   () => import("./features/admin/pages/AdminSystemConfigsPage"),
 );
+const AdminNewsPage = lazy(
+  () => import("./features/admin/pages/AdminNewsPage"),
+);
 const AdminServiceSuggestionsPage = lazy(
   () =>
     import("./features/service-suggestion/pages/AdminServiceSuggestionsPage"),
@@ -521,6 +524,14 @@ function App() {
                 element={
                   <RouteGuard roles={["ADMIN"]}>
                     <AdminSystemConfigsPage />
+                  </RouteGuard>
+                }
+              />
+              <Route
+                path="/admin/news"
+                element={
+                  <RouteGuard roles={["ADMIN"]}>
+                    <AdminNewsPage />
                   </RouteGuard>
                 }
               />

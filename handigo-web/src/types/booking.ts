@@ -258,6 +258,8 @@ export interface BookingState {
   addressId?: string;
   preferredProviderId?: string;
   preferredProviderName?: string;
+  requestedProviderId?: string;
+  requestedProviderName?: string;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
   recurrenceUnit?: "weekly" | "monthly";
@@ -277,6 +279,7 @@ export interface BookingState {
   toggleOption: (option: ServiceOption, options: ServiceOption[]) => void;
   setAddressId: (id: string) => void;
   setPreferredProviderId: (id?: string, name?: string) => void;
+  setRequestedProvider: (id?: string, name?: string) => void;
   setOrderType: (type: BookingState["orderType"]) => void;
   setScheduledAt: (date: string) => void;
   setRecurrenceUnit: (unit: "weekly" | "monthly") => void;

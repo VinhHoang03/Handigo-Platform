@@ -49,6 +49,18 @@ export interface PublicProviderProfile {
       id: string;
       name: string;
       slug?: string;
+      categoryId: string;
+    }>;
+    serviceCategories: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      icon?: string | null;
+      services: Array<{
+        id: string;
+        name: string;
+        slug?: string;
+      }>;
     }>;
     workingAreas: string[];
     serviceArea?: {
@@ -67,6 +79,7 @@ export interface PublicProviderProfile {
       expiresAt?: string;
       imageUrls: string[];
       description?: string;
+      isPublic: boolean;
       status: "approved" | "pending" | "rejected";
     }>;
   };

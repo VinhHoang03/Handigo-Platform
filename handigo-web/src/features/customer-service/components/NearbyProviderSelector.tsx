@@ -16,6 +16,7 @@ interface NearbyProviderSelectorProps {
   recurrenceCount?: number;
   allowSelection?: boolean;
   selectedProviderId?: string;
+  requestedProviderId?: string;
   onSelectProvider?: (providerId?: string, providerName?: string) => void;
 }
 
@@ -39,6 +40,7 @@ export function NearbyProviderSelector({
   recurrenceCount,
   allowSelection = true,
   selectedProviderId,
+  requestedProviderId,
   onSelectProvider,
 }: NearbyProviderSelectorProps) {
   const [providers, setProviders] = useState<NearbyProvider[]>([]);
@@ -94,6 +96,34 @@ export function NearbyProviderSelector({
     onSelectProvider(undefined);
   }, [allowSelection, hasLoaded, onSelectProvider, providers, selectedProviderId]);
 
+  useEffect(() => {
+    if (
+      !allowSelection ||
+      !hasLoaded ||
+      !onSelectProvider ||
+      !requestedProviderId ||
+      selectedProviderId
+    ) {
+      return;
+    }
+    const requestedProvider = providers.find(
+      (provider) => provider.id === requestedProviderId,
+    );
+    if (requestedProvider) {
+      onSelectProvider(
+        requestedProvider.id,
+        requestedProvider.user.fullName,
+      );
+    }
+  }, [
+    allowSelection,
+    hasLoaded,
+    onSelectProvider,
+    providers,
+    requestedProviderId,
+    selectedProviderId,
+  ]);
+
   const selectProvider = (provider: NearbyProvider) => {
     if (!allowSelection || !onSelectProvider) return;
     const isSelected = selectedProviderId === provider.id;
@@ -141,6 +171,12 @@ export function NearbyProviderSelector({
         </p>
       ) : (
         <div className="space-y-3">
+          {requestedProviderId &&
+            !providers.some((provider) => provider.id === requestedProviderId) && (
+              <p className="rounded-lg bg-tertiary-fixed/45 px-3 py-2 text-sm font-semibold text-on-tertiary-fixed-variant">
+                Chuyên gia đã chọn chưa phù hợp với khu vực hoặc lịch này. Vui lòng đổi lịch hoặc chọn chuyên gia khác.
+              </p>
+            )}
           {allowSelection && !requireSelection && <button
             type="button"
             onClick={() => onSelectProvider?.(undefined)}
