@@ -18,7 +18,15 @@ interface NearbyProviderSelectorProps {
   selectedProviderId?: string;
   requestedProviderId?: string;
   onSelectProvider?: (providerId?: string, providerName?: string) => void;
+  onAvailabilityChange?: (status: ProviderAvailabilityStatus) => void;
 }
+
+export type ProviderAvailabilityStatus =
+  | "idle"
+  | "loading"
+  | "available"
+  | "unavailable"
+  | "error";
 
 const formatDistance = (distanceMeters: number) => {
   if (distanceMeters < 0) return "Chưa xác định khoảng cách";
@@ -42,6 +50,7 @@ export function NearbyProviderSelector({
   selectedProviderId,
   requestedProviderId,
   onSelectProvider,
+  onAvailabilityChange,
 }: NearbyProviderSelectorProps) {
   const [providers, setProviders] = useState<NearbyProvider[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +61,7 @@ export function NearbyProviderSelector({
     let isMounted = true;
 
     if (!enabled || !serviceId || !addressId || (requireSelection && !scheduledAt)) {
+      onAvailabilityChange?.("idle");
       return () => {
         isMounted = false;
       };
@@ -61,6 +71,7 @@ export function NearbyProviderSelector({
       setIsLoading(true);
       setHasLoaded(false);
       setError("");
+      onAvailabilityChange?.("loading");
 
       try {
         const data = await customerServiceApi.nearbyProviders(
@@ -70,11 +81,15 @@ export function NearbyProviderSelector({
           recurrenceUnit,
           recurrenceCount,
         );
-        if (isMounted) setProviders(data);
+        if (isMounted) {
+          setProviders(data);
+          onAvailabilityChange?.(data.length > 0 ? "available" : "unavailable");
+        }
       } catch {
         if (!isMounted) return;
         setProviders([]);
         setError("Không tải được chuyên gia phù hợp với địa chỉ này.");
+        onAvailabilityChange?.("error");
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -88,7 +103,7 @@ export function NearbyProviderSelector({
     return () => {
       isMounted = false;
     };
-  }, [addressId, enabled, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
+  }, [addressId, enabled, onAvailabilityChange, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
 
   useEffect(() => {
     if (!allowSelection || !hasLoaded || !onSelectProvider || !selectedProviderId) return;

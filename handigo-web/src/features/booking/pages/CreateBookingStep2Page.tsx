@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AddressBookManager } from '@/features/profile/components/AddressBookManager';
 import { NearbyProviderSelector } from '@/features/customer-service/components/NearbyProviderSelector';
+import type { ProviderAvailabilityStatus } from '@/features/customer-service/components/NearbyProviderSelector';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import { useBookingStore } from '../hooks/useBookingStore';
@@ -123,6 +124,7 @@ const CreateBookingStep2Page = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Step2FormErrors>({});
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
+  const [providerAvailability, setProviderAvailability] = useState<ProviderAvailabilityStatus>('idle');
   const todayInputValue = useMemo(() => getTodayInputValue(), []);
   const upcomingDates = useMemo(() => getUpcomingDates(), []);
   const recurringPreview = useMemo(
@@ -188,6 +190,7 @@ const CreateBookingStep2Page = () => {
   const handleOrderTypeChange = (type: 'normal' | 'scheduled' | 'recurring') => {
     setOrderType(type);
     setPreferredProviderId(undefined);
+    setProviderAvailability('idle');
     if (type === 'normal') setScheduledAt('');
   };
 
@@ -205,6 +208,7 @@ const CreateBookingStep2Page = () => {
   const handleSelectAddress = useCallback(
     (address: UserAddress | null) => {
       setAddressId(address?.id || '');
+      setProviderAvailability('idle');
       clearFormError('addressId');
     },
     [clearFormError, setAddressId],
@@ -232,6 +236,10 @@ const CreateBookingStep2Page = () => {
     }
     if (shouldShowSchedulePicker && !preferredProviderId) {
       nextErrors.preferredProviderId = 'Vui lòng chọn chuyên gia còn trống cho lịch hẹn.';
+    } else if (!shouldShowSchedulePicker && providerAvailability !== 'available') {
+      nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
+        ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
+        : 'Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.';
     }
 
     setFormErrors(nextErrors);
@@ -577,6 +585,7 @@ const CreateBookingStep2Page = () => {
                         setPreferredProviderId(providerId, providerName);
                         clearFormError('preferredProviderId');
                       }}
+                      onAvailabilityChange={setProviderAvailability}
                     />
                     {formErrors.preferredProviderId && (
                       <p role="alert" className="mt-xs text-xs font-medium text-red-600">
@@ -598,6 +607,7 @@ const CreateBookingStep2Page = () => {
                   setPreferredProviderId(providerId, providerName);
                   clearFormError('preferredProviderId');
                 }}
+                onAvailabilityChange={setProviderAvailability}
               />
             </div>}
           </section>

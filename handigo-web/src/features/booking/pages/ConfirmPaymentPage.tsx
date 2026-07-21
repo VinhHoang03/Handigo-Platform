@@ -54,6 +54,7 @@ const ConfirmPaymentPage = () => {
     categoryId,
     serviceId,
     selectedOptionIds,
+    selectedOptionQuantities,
     addressId,
     orderType,
     preferredProviderId,
@@ -155,6 +156,10 @@ const ConfirmPaymentPage = () => {
       const payload: CreateOrderPayload = {
         serviceId,
         selectedOptionIds,
+        selectedOptions: selectedOptionIds.map((optionId) => ({
+          optionId,
+          quantity: selectedOptionQuantities?.[optionId] ?? 1,
+        })),
         addressId,
         preferredProviderId,
         orderType,
@@ -405,8 +410,10 @@ const ConfirmPaymentPage = () => {
                       className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium"
                     >
                       {opt.name}
+                      {(selectedOptionQuantities?.[opt._id] ?? 1) > 1 &&
+                        ` × ${selectedOptionQuantities?.[opt._id]}`}
                       {service?.serviceType !== "variable_price" &&
-                        ` (+${getOptionPrice(opt).toLocaleString()}đ)`}
+                        ` (${(getOptionPrice(opt) * (selectedOptionQuantities?.[opt._id] ?? 1)).toLocaleString()}đ)`}
                     </span>
                   ))}
                 </div>

@@ -16,6 +16,7 @@ const serviceOptionFields = {
   price: z.number().nonnegative("Giá tùy chọn không được âm"),
   selectionGroup: z.string().trim().min(1, "Tên nhóm lựa chọn là bắt buộc").max(120).nullable().optional(),
   selectionMode: z.enum(["single", "multiple"]).optional(),
+  allowsQuantity: z.boolean().optional(),
   sortOrder: z.number().int().nonnegative("Thứ tự hiển thị không được âm").optional(),
   isActive: z.boolean().optional(),
 };

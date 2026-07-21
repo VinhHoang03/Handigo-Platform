@@ -19,6 +19,7 @@ export interface OrderPaymentsResult {
 export interface CreateOrderPayload {
   serviceId: string;
   selectedOptionIds?: string[];
+  selectedOptions?: Array<{ optionId: string; quantity: number }>;
   addressId: string;
   preferredProviderId?: string;
   orderType?: "normal" | "urgent" | "scheduled" | "recurring";

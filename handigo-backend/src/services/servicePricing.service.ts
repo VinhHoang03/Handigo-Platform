@@ -13,6 +13,7 @@ const normalizeGroup = (value?: string | null) =>
 export const buildServicePricingSnapshot = async (
   service: IService,
   selectedOptionIdsInput: unknown = [],
+  selectedOptionsInput?: unknown,
 ) => {
   if (
     !Array.isArray(selectedOptionIdsInput) ||
@@ -20,7 +21,26 @@ export const buildServicePricingSnapshot = async (
   ) {
     throw new AppError("Danh sách tùy chọn dịch vụ không hợp lệ.", 400);
   }
-  const selectedOptionIds = selectedOptionIdsInput as string[];
+  const legacySelectedOptionIds = selectedOptionIdsInput as string[];
+  if (
+    selectedOptionsInput !== undefined &&
+    (!Array.isArray(selectedOptionsInput) ||
+      selectedOptionsInput.some(
+        (item) =>
+          typeof item !== "object" ||
+          item === null ||
+          typeof (item as { optionId?: unknown }).optionId !== "string" ||
+          !Number.isInteger((item as { quantity?: unknown }).quantity) ||
+          Number((item as { quantity?: unknown }).quantity) < 1 ||
+          Number((item as { quantity?: unknown }).quantity) > 99,
+      ))
+  ) {
+    throw new AppError("Số lượng tùy chọn dịch vụ không hợp lệ.", 400);
+  }
+  const selectedOptionsPayload = (selectedOptionsInput ?? legacySelectedOptionIds.map(
+    (optionId) => ({ optionId, quantity: 1 }),
+  )) as Array<{ optionId: string; quantity: number }>;
+  const selectedOptionIds = selectedOptionsPayload.map((item) => item.optionId);
   if (selectedOptionIds.some((id) => !Types.ObjectId.isValid(id))) {
     throw new AppError("Danh sách tùy chọn dịch vụ không hợp lệ.", 400);
   }
@@ -36,6 +56,9 @@ export const buildServicePricingSnapshot = async (
     isDeleted: false,
   }).sort({ sortOrder: 1, createdAt: 1 });
   const selectedIdSet = new Set(uniqueOptionIds);
+  const quantityByOptionId = new Map(
+    selectedOptionsPayload.map((item) => [item.optionId, item.quantity]),
+  );
   const selectedOptions = availableOptions.filter((option) =>
     selectedIdSet.has(option._id.toString()),
   );
@@ -43,6 +66,18 @@ export const buildServicePricingSnapshot = async (
   if (selectedOptions.length !== uniqueOptionIds.length) {
     throw new AppError(
       "Có tùy chọn không thuộc dịch vụ này hoặc đã ngừng hoạt động.",
+      400,
+    );
+  }
+
+  const optionWithInvalidQuantity = selectedOptions.find(
+    (option) =>
+      !option.allowsQuantity &&
+      (quantityByOptionId.get(option._id.toString()) ?? 1) !== 1,
+  );
+  if (optionWithInvalidQuantity) {
+    throw new AppError(
+      `Tùy chọn “${optionWithInvalidQuantity.name}” không cho phép chọn số lượng.`,
       400,
     );
   }
@@ -74,14 +109,20 @@ export const buildServicePricingSnapshot = async (
     }
   }
 
-  const selectedOptionsSnapshot = selectedOptions.map((option) => ({
-    optionId: option._id as Types.ObjectId,
-    name: option.name,
-    optionType: option.optionType,
-    price: service.serviceType === "variable_price" ? 0 : option.price,
-  }));
+  const selectedOptionsSnapshot = selectedOptions.map((option) => {
+    const price = service.serviceType === "variable_price" ? 0 : option.price;
+    const quantity = quantityByOptionId.get(option._id.toString()) ?? 1;
+    return {
+      optionId: option._id as Types.ObjectId,
+      name: option.name,
+      optionType: option.optionType,
+      price,
+      quantity,
+      subtotal: price * quantity,
+    };
+  });
   const optionAmount = selectedOptionsSnapshot.reduce(
-    (sum, option) => sum + option.price,
+    (sum, option) => sum + option.subtotal,
     0,
   );
   const defaultDepositAmount = await getNumberConfigValue(
@@ -94,8 +135,15 @@ export const buildServicePricingSnapshot = async (
   );
   const bookingAmount =
     service.serviceType === "fixed_price"
-      ? Math.max(service.fixedPrice ?? 0, 0) + optionAmount
+      ? optionAmount
       : depositAmount;
+
+  if (service.serviceType === "fixed_price" && bookingAmount <= 0) {
+    throw new AppError(
+      "Vui lòng chọn ít nhất một tùy chọn có giá cho dịch vụ này.",
+      400,
+    );
+  }
 
   return {
     optionIds: selectedOptions.map((option) => option._id as Types.ObjectId),

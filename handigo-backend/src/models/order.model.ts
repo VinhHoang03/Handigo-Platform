@@ -13,6 +13,8 @@ export interface ISelectedOptionSnapshot {
   name: string;
   optionType: string;
   price: Money;
+  quantity?: number;
+  subtotal?: Money;
 }
 
 export interface IOrderPricing {
@@ -115,6 +117,8 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
     name: { type: String, required: true },
     optionType: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
+    quantity: { type: Number, required: true, min: 1, default: 1 },
+    subtotal: { type: Number, min: 0 },
   },
   { _id: false },
 );

@@ -45,7 +45,7 @@ export const getOptionPrice = (option: ServiceOption) =>
 
 export const getServicePrice = (service: Service) => {
   if (service.serviceType === "fixed_price") {
-    return service.fixedPrice || 0;
+    return service.minOptionPrice || 0;
   }
 
   return service.depositAmount || 0;
