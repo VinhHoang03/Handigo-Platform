@@ -1,6 +1,22 @@
 # Phase 5 — Kiểm tra a11y + responsive toàn bộ
 
-**Ưu tiên:** Trung bình · **Trạng thái:** ◐ Đang dở — quét cơ học xong (class chết, handler giả, reduced-motion, tràn ngang public 360px); phần trang sau đăng nhập chờ tài khoản test · **Phụ thuộc:** Phase 1–4
+**Ưu tiên:** Trung bình · **Trạng thái:** ✅ Xong phần tự động hoá được (xem ghi chú cuối file) · **Phụ thuộc:** Phase 1–4
+
+> **Kết quả vòng kiểm chứng sau đăng nhập (2026-07-22 tối):** tạo 3 tài khoản
+> test đánh dấu rõ trong DB dev (đã xoá sạch sau khi test — users/providers/
+> wallets/sessions đều 0 sót). Quét bằng Playwright cả 3 vai trò:
+> **customer** (bookings, wallet, profile, bookings/new, support),
+> **provider** (home, orders, profile, bank-accounts, feedbacks, service-suggestions),
+> **admin** (dashboard, services, system-configs, promotions, withdrawals,
+> support, users, news, revenue). Tất cả: **0 lỗi console** (ngoài 401
+> refresh-token dự kiến), **0 tràn ngang**, bảng admin có dữ liệu thật render
+> đúng, InitialsAvatar hiển thị đúng ở navbar/hồ sơ.
+> Quét cơ học: class chết đã sửa (`accent-cyan`), `.glass-card` mồ côi đã xoá,
+> handler giả = 0, `prefers-reduced-motion` bổ sung cho animation trang trí,
+> tràn ngang 360px = 0 trên các trang public.
+> **Chưa làm (cần môi trường/người thật):** test tay luồng tiền PayOS sandbox
+> (đặt đơn → thanh toán → hoàn tiền, duyệt rút tiền) — khuyến nghị bấm tay
+> trước khi merge; chạy axe-core có hệ thống; đo tương phản từng cặp token.
 
 Rà soát cuối cùng sau khi 50 trang đã refactor xong. Đây là phase **kiểm chứng**,
 không phải phase thiết kế lại.

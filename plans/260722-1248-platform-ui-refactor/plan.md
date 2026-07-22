@@ -50,7 +50,7 @@ tách các file quá lớn. Landing page đã hoàn thành ở commit `87cd616`.
 | 2 | [Khách hàng](phase-02-customer.md) (+ `chat`, `chatbot`, `case-management`) | ✅ Xong (`d0cad37`, BookingDetail trong `c547c3e`) | Phase 0 |
 | 3 | [Thợ](phase-03-provider.md) (+ trang gợi ý dịch vụ của thợ) | ✅ Xong (`d30254e`) | Phase 0 |
 | 4 | [Quản trị](phase-04-admin.md) (+ trang duyệt gợi ý dịch vụ) | ✅ Xong (`c288b5b`) | Phase 0 |
-| 5 | [A11y + Responsive](phase-05-accessibility-responsive.md) | ◐ Đang dở — xem ghi chú bên dưới | Phase 1–4 |
+| 5 | [A11y + Responsive](phase-05-accessibility-responsive.md) | ✅ Xong phần tự động hoá được (chi tiết trong phase file) | Phase 1–4 |
 
 ### Kết quả thực hiện Phase 2–4 + phần đầu Phase 5 (2026-07-22 chiều tối)
 
