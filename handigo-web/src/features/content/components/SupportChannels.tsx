@@ -44,7 +44,7 @@ export function SupportChannels({ compact = false }: { compact?: boolean }) {
               {channel.href ? (
                 <a
                   href={channel.href}
-                  className="mt-1 block break-words font-semibold text-secondary hover:underline"
+                  className="mt-1 flex min-h-11 items-center break-words font-semibold text-secondary hover:underline"
                 >
                   {channel.value}
                 </a>
