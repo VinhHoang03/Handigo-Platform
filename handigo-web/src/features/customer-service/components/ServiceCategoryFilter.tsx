@@ -30,7 +30,7 @@ export function ServiceCategoryFilter({
   );
 
   return (
-    <aside className="md:sticky md:top-32 md:col-span-1 md:self-start">
+    <aside className="sticky top-32 self-start">
       <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:max-h-[calc(100vh-9rem)] md:overflow-y-auto">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-bold text-on-surface">Bộ lọc</h2>

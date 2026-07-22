@@ -96,6 +96,12 @@ export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img
   </article>
 );
 
-export const SocialLink = ({ icon }: { icon: string }) => (
-  <Link className="grid h-11 w-11 place-items-center rounded-full bg-surface-container-high text-primary transition-colors hover:bg-primary hover:text-on-primary" to="#"><MaterialIcon className="text-lg">{icon}</MaterialIcon></Link>
+export const SocialLink = ({ icon, label }: { icon: string; label: string }) => (
+  <Link
+    to="#"
+    aria-label={label}
+    className="grid h-11 w-11 place-items-center rounded-full bg-surface-container-high text-primary transition-colors hover:bg-primary hover:text-on-primary"
+  >
+    <MaterialIcon className="text-lg">{icon}</MaterialIcon>
+  </Link>
 );

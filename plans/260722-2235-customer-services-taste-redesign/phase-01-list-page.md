@@ -1,6 +1,6 @@
 # Phase 1 — Trang danh sách dịch vụ
 
-**Ưu tiên:** Cao · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Cao · **Trạng thái:** ✅ Hoàn thành (2026-07-22) · **Phụ thuộc:** Phase 0
 
 Trang này có một việc duy nhất: giúp khách **tìm và so sánh** dịch vụ. Mọi thứ
 không phục vụ việc đó đều là nhiễu.
@@ -95,15 +95,15 @@ features/customer-service/
 
 ## Todo
 
-- [ ] Bộ lọc mobile không còn chặn nội dung (sheet hoặc chip cuộn ngang)
-- [ ] Ô tìm kiếm thành hành động chính, có nút xoá
-- [ ] Gỡ hoặc nối thật mục sắp xếp "Phổ biến nhất"
-- [ ] Bỏ 16 request `/options` khi gõ tìm kiếm
-- [ ] Thẻ dùng nhãn giá mới, siết mật độ
-- [ ] Trạng thái rỗng nêu bộ lọc hiện tại + nút xoá lọc
-- [ ] Số đếm khớp số thẻ render
-- [ ] Tách `useServiceCatalog` để page dưới 200 dòng
-- [ ] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
+- [x] Bộ lọc mobile không còn chặn nội dung (sheet hoặc chip cuộn ngang)
+- [x] Ô tìm kiếm thành hành động chính, có nút xoá
+- [x] Gỡ hoặc nối thật mục sắp xếp "Phổ biến nhất"
+- [x] Bỏ 16 request `/options` khi gõ tìm kiếm
+- [x] Thẻ dùng nhãn giá mới, siết mật độ
+- [x] Trạng thái rỗng nêu bộ lọc hiện tại + nút xoá lọc
+- [x] Số đếm khớp số thẻ render
+- [x] Tách `useServiceCatalog` để page dưới 200 dòng
+- [x] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
 
 ## Tiêu chí hoàn thành
 

@@ -30,9 +30,9 @@ export const HomeFooter = () => (
           Giải pháp công nghệ kết nối thợ chuyên nghiệp hàng đầu Việt Nam.
         </p>
         <div className="flex gap-4">
-          <SocialLink icon="social_leaderboard" />
-          <SocialLink icon="smart_display" />
-          <SocialLink icon="language" />
+          <SocialLink icon="social_leaderboard" label="Handigo trên mạng xã hội" />
+          <SocialLink icon="smart_display" label="Kênh video của Handigo" />
+          <SocialLink icon="language" label="Website Handigo" />
         </div>
       </div>
       <FooterColumn
