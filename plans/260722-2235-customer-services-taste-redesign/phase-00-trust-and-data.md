@@ -1,6 +1,6 @@
 # Phase 0 — Nợ tin cậy và dữ liệu
 
-**Ưu tiên:** Cao nhất · **Trạng thái:** ☐ Chưa bắt đầu · **Chặn:** Phase 1–2
+**Ưu tiên:** Cao nhất · **Trạng thái:** ✅ Hoàn thành (2026-07-22) · **Chặn:** Phase 1–2
 
 Phase này không làm đẹp gì cả. Nó gỡ những chỗ trang đang **nói sai** với khách.
 Làm trước vì Phase 1 và 2 đều dựng lại các thành phần chứa những lỗi này.
@@ -136,16 +136,16 @@ features/customer-service/pages/
 
 ## Todo
 
-- [ ] `getServicePriceLabel()` phân biệt giá / cọc / báo giá
+- [x] `getServicePriceLabel()` phân biệt giá / cọc / báo giá
 - [x] Kiểm backend tự đọc `depositAmount` khi tạo đơn — **đã xác nhận**, client không gửi số tiền nào
-- [ ] `useServicePricing`: `variable_price` trả `estimatePrice = 0`, không trả tiền cọc
-- [ ] Đổi tên `getServicePrice` → `getServiceSortValue`, chỉ dùng cho sắp xếp
-- [ ] Gỡ `4.8`, `128 đánh giá`, `300+ đơn hàng` khỏi `ServiceGallery`
-- [ ] Sửa lưới ảnh: một ảnh thì hiện một ảnh
-- [ ] Gỡ nút `favorite`; nút chia sẻ nối `navigator.share` hoặc gỡ
-- [ ] Lọc danh mục rỗng + in số dịch vụ trong sidebar
-- [ ] Thay ảnh dự phòng Unsplash bằng ô giữ chỗ theo token
-- [ ] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
+- [x] `useServicePricing`: `variable_price` trả `estimatePrice = 0`, không trả tiền cọc
+- [x] Đổi tên `getServicePrice` → `getServiceSortValue`, chỉ dùng cho sắp xếp
+- [x] Gỡ `4.8`, `128 đánh giá`, `300+ đơn hàng` khỏi `ServiceGallery`
+- [x] Sửa lưới ảnh: một ảnh thì hiện một ảnh
+- [x] Gỡ nút `favorite`; nút chia sẻ nối `navigator.share` hoặc gỡ
+- [x] Lọc danh mục rỗng + in số dịch vụ trong sidebar
+- [x] Thay ảnh dự phòng Unsplash bằng ô giữ chỗ theo token
+- [x] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
 
 ## Tiêu chí hoàn thành
 

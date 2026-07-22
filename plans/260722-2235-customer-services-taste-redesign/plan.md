@@ -61,7 +61,7 @@ lẫn "chuyên gia" lẫn "thợ" trong cùng một màn hình.
 
 | # | Phase | Trạng thái | Phụ thuộc |
 |---|---|---|---|
-| 0 | [Nợ tin cậy + dữ liệu](phase-00-trust-and-data.md) | ☐ | — |
+| 0 | [Nợ tin cậy + dữ liệu](phase-00-trust-and-data.md) | ✅ | — |
 | 1 | [Trang danh sách](phase-01-list-page.md) | ☐ | Phase 0 |
 | 2 | [Trang chi tiết](phase-02-detail-page.md) | ☐ | Phase 0 |
 | 3 | [Kiểm chứng](phase-03-verification.md) | ☐ | Phase 1–2 |

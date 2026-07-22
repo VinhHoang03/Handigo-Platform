@@ -6,14 +6,29 @@ interface ServiceCategoryFilterProps {
   categories: Category[];
   selectedCategoryId: string;
   onSelect: (categoryId: string) => void;
+  /** Số dịch vụ theo từng `categoryId`, đếm từ dữ liệu đã tải. */
+  serviceCounts: Record<string, number>;
+  totalCount: number;
 }
 
-/** Sidebar bộ lọc danh mục dịch vụ, dùng ở trang danh sách dịch vụ khách hàng. */
+/**
+ * Sidebar bộ lọc danh mục dịch vụ.
+ *
+ * Chỉ hiện danh mục **đang có dịch vụ**. DB có 11 danh mục nhưng 4 trong số đó
+ * chưa có dịch vụ nào; bấm vào chỉ ra danh sách trắng, tức là mời người dùng đi
+ * vào ngõ cụt. Số dịch vụ in kèm để biết trước sẽ thấy bao nhiêu kết quả.
+ */
 export function ServiceCategoryFilter({
   categories,
   selectedCategoryId,
   onSelect,
+  serviceCounts,
+  totalCount,
 }: ServiceCategoryFilterProps) {
+  const visibleCategories = categories.filter(
+    (category) => (serviceCounts[category._id] || 0) > 0,
+  );
+
   return (
     <aside className="md:sticky md:top-32 md:col-span-1 md:self-start">
       <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:max-h-[calc(100vh-9rem)] md:overflow-y-auto">
@@ -37,12 +52,13 @@ export function ServiceCategoryFilter({
                 : "text-on-surface hover:bg-surface-container-low"
             }`}
           >
-            <span className="material-symbols-outlined text-[20px]">
+            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
               apps
             </span>
-            Tất cả dịch vụ
+            <span className="flex-1">Tất cả dịch vụ</span>
+            <span className="text-xs tabular-nums opacity-70">{totalCount}</span>
           </button>
-          {categories.map((category) => {
+          {visibleCategories.map((category) => {
             const categoryImage = category.image;
 
             return (
@@ -74,7 +90,10 @@ export function ServiceCategoryFilter({
                     className="h-5 w-5 shrink-0"
                   />
                 )}
-                {category.name}
+                <span className="flex-1">{category.name}</span>
+                <span className="text-xs tabular-nums opacity-70">
+                  {serviceCounts[category._id]}
+                </span>
               </button>
             );
           })}

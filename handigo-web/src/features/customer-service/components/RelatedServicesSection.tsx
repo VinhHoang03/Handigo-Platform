@@ -15,14 +15,14 @@ export function RelatedServicesSection({ relatedServices }: RelatedServicesSecti
     <section>
       <h2 className="mb-4 text-2xl font-bold">Dịch vụ liên quan</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {relatedServices.map((item, index) => (
+        {relatedServices.map((item) => (
           <Link
             key={item._id}
             to={`/customer/services/${item._id}`}
             className="group overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest transition hover:shadow-md"
           >
             <ReliableImage
-              src={getServiceImage(item, index + 1)}
+              src={getServiceImage(item)}
               alt={item.name}
               className="h-32 w-full object-cover"
             />

@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import {
+  formatServicePrice,
+  formatServicePriceNote,
   getCategoryName,
   getServiceImage,
-  getServicePrice,
-  money,
+  getServicePriceLabel,
 } from "../utils/serviceDisplay";
 import type { Category, Service } from "@/types/booking";
 
@@ -16,8 +17,11 @@ interface ServiceCardProps {
 
 /** Thẻ dịch vụ trong lưới danh sách dịch vụ khách hàng. */
 export function ServiceCard({ service, index, categories }: ServiceCardProps) {
-  const price = getServicePrice(service);
-  const isQuoteOnly = price <= 0;
+  const priceLabel = getServicePriceLabel(service);
+  const priceNote = formatServicePriceNote(priceLabel);
+  // Chỉ giá thật mới in đậm cỡ lớn. "Báo giá sau khảo sát" là một câu, không
+  // phải một con số, nên không dùng cỡ chữ dành cho tiền.
+  const isAmount = priceLabel.kind === "from" || priceLabel.kind === "exact";
 
   return (
     <Link
@@ -26,7 +30,7 @@ export function ServiceCard({ service, index, categories }: ServiceCardProps) {
     >
       <div className="relative h-48 overflow-hidden">
         <ReliableImage
-          src={getServiceImage(service, index)}
+          src={getServiceImage(service)}
           alt={service.name}
           loading={index < 3 ? "eager" : "lazy"}
           decoding="async"
@@ -45,17 +49,17 @@ export function ServiceCard({ service, index, categories }: ServiceCardProps) {
           {service.name}
         </h3>
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
-          <div>
-            {!isQuoteOnly && (
-              <span className="block text-xs text-on-surface-variant">Từ</span>
-            )}
-            <span className="text-lg font-bold tabular-nums text-primary">
-              {isQuoteOnly
-                ? service.serviceType === "fixed_price"
-                  ? "Theo tùy chọn"
-                  : "Báo giá"
-                : money.format(price)}
+          <div className="min-w-0">
+            <span
+              className={`block text-primary ${isAmount ? "text-lg font-bold tabular-nums" : "text-sm font-semibold"}`}
+            >
+              {formatServicePrice(priceLabel)}
             </span>
+            {priceNote && (
+              <span className="mt-0.5 block text-xs text-on-surface-variant">
+                {priceNote}
+              </span>
+            )}
           </div>
           <span className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary transition group-hover:bg-primary group-hover:text-on-primary">
             Xem chi tiết

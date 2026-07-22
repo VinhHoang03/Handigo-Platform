@@ -7,7 +7,7 @@ import { ServiceCard } from "../components/ServiceCard";
 import { ServiceListSkeleton } from "../components/ServiceListSkeleton";
 import { AsyncState } from "@/components/common/AsyncState";
 import { customerServiceApi } from "../api/customerService.api";
-import { getCategoryId, getServicePrice } from "../utils/serviceDisplay";
+import { getCategoryId, getServiceSortValue } from "../utils/serviceDisplay";
 import type { Category, Service, ServiceOption } from "@/types/booking";
 
 const getErrorMessage = (error: unknown) => {
@@ -133,12 +133,22 @@ export default function CustomerServiceListPage() {
 
     return [...filtered].sort((left, right) => {
       if (sortBy === "price_asc") {
-        return getServicePrice(left) - getServicePrice(right);
+        return getServiceSortValue(left) - getServiceSortValue(right);
       }
       if (sortBy === "name") return left.name.localeCompare(right.name, "vi");
       return 0;
     });
   }, [categories, optionMap, search, selectedCategoryId, services, sortBy]);
+
+  // Đếm dịch vụ theo danh mục để sidebar ẩn được danh mục rỗng và in số thật.
+  const serviceCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const service of services) {
+      const id = getCategoryId(service);
+      if (id) counts[id] = (counts[id] || 0) + 1;
+    }
+    return counts;
+  }, [services]);
 
   const selectedCategory = categories.find(
     (category) => category._id === selectedCategoryId,
@@ -151,6 +161,8 @@ export default function CustomerServiceListPage() {
           categories={categories}
           selectedCategoryId={selectedCategoryId}
           onSelect={handleCategoryChange}
+          serviceCounts={serviceCounts}
+          totalCount={services.length}
         />
 
         <section className="md:col-span-3">

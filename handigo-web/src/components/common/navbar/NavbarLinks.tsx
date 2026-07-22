@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ReliableImage } from "@/components/common/ReliableImage";
 import { getServiceImage } from "@/features/customer-service/utils/serviceDisplay";
 import type { Service } from "@/types/booking";
 import type { NavbarItem } from "./navbar.types";
@@ -47,16 +48,16 @@ export function NavbarLinks({ navItems, isActive, services }: NavbarLinksProps) 
                   </Link>
                   {services.length > 0 ? (
                     <div className="grid grid-cols-3 gap-3">
-                      {services.map((service, index) => (
+                      {services.map((service) => (
                         <Link
                           key={service._id}
                           to={`/customer/services/${service._id}`}
                           className="group/card overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-lowest transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
                         >
-                          <img
-                            src={getServiceImage(service, index)}
+                          <ReliableImage
+                            src={getServiceImage(service)}
                             alt={service.name}
-                            className="h-20 w-full object-cover transition duration-300 group-hover/card:scale-105"
+                            className="h-20 w-full bg-surface-container object-cover transition duration-300 group-hover/card:scale-105"
                           />
                           <div className="px-3 py-2">
                             <p className="line-clamp-2 min-h-10 text-xs font-semibold leading-5 text-on-surface group-hover/card:text-primary">
