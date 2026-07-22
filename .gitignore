@@ -20,6 +20,8 @@ codex/
 !codex/**
 credentials/
 *.json
+# Cấu hình MCP dùng chung cho cả đội — phải nằm sau quy tắc *.json ở trên
+!.mcp.json
 docs/
 # Node modules cho cả 2 ứng dụng
 node_modules/
