@@ -1,59 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CategoryIcon } from '../common/CategoryIcon';
 import { MaterialIcon } from '../common/MaterialIcon';
 import { InitialsAvatar } from '../common/InitialsAvatar';
 import { normalizeImageUrl } from '@/utils/imageUrl';
 
-const colorClasses: Record<string, string> = {
-  primary: 'bg-primary/8 text-primary',
-  secondary: 'bg-secondary/8 text-secondary',
-  tertiary: 'bg-tertiary/8 text-tertiary',
-};
-
-interface CategoryCardProps {
-  icon: string;
-  imageUrl?: string;
-  title: string;
-  desc: string;
-  color: string;
-  to?: string;
-}
-
-export const CategoryCard = ({ icon, imageUrl, title, desc, color, to = '/customer/services' }: CategoryCardProps) => {
-  const [imageFailed, setImageFailed] = useState(false);
-  const safeImageUrl = normalizeImageUrl(imageUrl);
-
-  return (
-    <Link
-      to={to}
-      className="group block overflow-hidden rounded-3xl border border-outline-variant/30 bg-surface-container-low transition-[background-color,box-shadow] duration-300 hover:bg-surface-container-lowest hover:shadow-[0_16px_40px_-16px_rgba(19,27,46,0.22)]"
-    >
-      {safeImageUrl && !imageFailed && (
-        <img
-          src={safeImageUrl}
-          alt=""
-          loading="lazy"
-          className="aspect-[16/9] w-full bg-surface-container object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-          onError={() => setImageFailed(true)}
-        />
-      )}
-      <div className="p-6">
-        {(!safeImageUrl || imageFailed) && (
-          <div className={`mb-4 grid h-12 w-12 place-items-center rounded-2xl ${colorClasses[color]}`}>
-            <CategoryIcon icon={icon} name={title} className="h-6 w-6" />
-          </div>
-        )}
-        <h3 className="mb-1 font-headline-md text-base font-semibold text-on-surface">{title}</h3>
-        <p className="line-clamp-2 text-label-sm text-on-surface-variant">{desc}</p>
-      </div>
-    </Link>
-  );
-};
-
 interface ProviderCardProps {
   name: string;
   rating: number;
+  totalFeedbacks: number;
   services: string[];
   area: string;
   img?: string | null;
@@ -87,14 +41,34 @@ const ProviderCardMedia = ({ name, img }: { name: string; img?: string | null })
   );
 };
 
-export const ProviderCard = ({ name, rating, services, area, img }: ProviderCardProps) => (
+/**
+ * Huy hiệu điểm đánh giá. Thợ chưa có nhận xét nào thì hiện nhãn chữ, không hiện
+ * "0.0 ★": một thợ mới chưa ai chấm điểm khác hẳn một thợ bị chấm 0 điểm, mà
+ * người đọc lướt qua chỉ thấy con số.
+ */
+const ProviderRatingBadge = ({ rating, totalFeedbacks }: { rating: number; totalFeedbacks: number }) => {
+  if (!totalFeedbacks) {
+    return (
+      <span className="absolute right-2 top-2 rounded-lg bg-surface-container-lowest/95 px-2 py-1 text-[10px] font-semibold text-on-surface-variant shadow-sm">
+        Chưa có đánh giá
+      </span>
+    );
+  }
+
+  return (
+    <span className="absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-surface-container-lowest/95 px-2 py-1 shadow-sm">
+      <MaterialIcon className="text-xs text-tertiary" filled>star</MaterialIcon>
+      <span className="text-xs font-semibold tabular-nums text-on-surface">{rating.toFixed(1)}</span>
+      <span className="text-[10px] text-on-surface-variant">({totalFeedbacks})</span>
+    </span>
+  );
+};
+
+export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img }: ProviderCardProps) => (
   <article className="group flex h-full flex-col rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 transition-shadow duration-200 hover:shadow-[0_16px_36px_-16px_rgba(19,27,46,0.24)]">
     <div className="relative mb-3">
       <ProviderCardMedia name={name} img={img} />
-      <span className="absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-surface-container-lowest/95 px-2 py-1 shadow-sm">
-        <MaterialIcon className="text-xs text-tertiary" filled>star</MaterialIcon>
-        <span className="text-xs font-semibold tabular-nums text-on-surface">{rating.toFixed(1)}</span>
-      </span>
+      <ProviderRatingBadge rating={rating} totalFeedbacks={totalFeedbacks} />
     </div>
 
     <h3 className="truncate font-headline-md text-base font-semibold text-on-surface">{name}</h3>
@@ -115,45 +89,13 @@ export const ProviderCard = ({ name, rating, services, area, img }: ProviderCard
     {/* mt-auto ghim nút xuống đáy để các thẻ cạnh nhau thẳng hàng dù nội dung dài ngắn khác nhau */}
     <Link
       to="/customer/services"
-      className="mt-auto block w-full rounded-lg bg-primary/6 pt-2.5 pb-2.5 text-center text-sm font-semibold text-primary transition-colors group-hover:bg-primary group-hover:text-on-primary"
+      className="mt-auto flex min-h-11 w-full items-center justify-center rounded-lg bg-primary/6 text-sm font-semibold text-primary transition-colors group-hover:bg-primary group-hover:text-on-primary"
     >
       Xem dịch vụ
     </Link>
   </article>
 );
 
-interface FeatureCardProps {
-  icon: string;
-  title: string;
-  desc: string;
-  color: string;
-  fill?: boolean;
-}
-
-/** Hàng nội dung phân cách bằng đường kẻ — không viền, không đổ bóng, không căn giữa. */
-export const FeatureCard = ({ icon, title, desc, color, fill }: FeatureCardProps) => (
-  <div className="flex gap-5 border-b border-outline-variant/50 py-8">
-    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${colorClasses[color]}`}>
-      <MaterialIcon className="text-2xl" filled={fill}>{icon}</MaterialIcon>
-    </span>
-    <div className="min-w-0">
-      <h3 className="font-headline-md text-base font-semibold text-on-surface">{title}</h3>
-      <p className="mt-1.5 max-w-[46ch] text-pretty font-body-md text-body-md text-on-surface-variant">{desc}</p>
-    </div>
-  </div>
-);
-
-export const StatItem = ({ val, label }: { val: string; label: string }) => (
-  <div>
-    <div className="font-headline-xl text-5xl font-bold leading-none tracking-[-0.03em] tabular-nums">{val}</div>
-    <p className="mt-3 text-body-md text-on-primary/75">{label}</p>
-  </div>
-);
-
 export const SocialLink = ({ icon }: { icon: string }) => (
-  <Link className="grid h-10 w-10 place-items-center rounded-full bg-surface-container-high text-primary transition-colors hover:bg-primary hover:text-on-primary" to="#"><MaterialIcon className="text-lg">{icon}</MaterialIcon></Link>
-);
-
-export const AppBadge = ({ icon, store, label }: { icon: string; store: string; label: string }) => (
-  <button className="flex w-full items-center gap-2 rounded-xl bg-on-surface px-4 py-2 text-surface"><MaterialIcon>{icon}</MaterialIcon><span className="text-left"><span className="block text-[8px] opacity-60">{label}</span> {store}</span></button>
+  <Link className="grid h-11 w-11 place-items-center rounded-full bg-surface-container-high text-primary transition-colors hover:bg-primary hover:text-on-primary" to="#"><MaterialIcon className="text-lg">{icon}</MaterialIcon></Link>
 );

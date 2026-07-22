@@ -110,7 +110,7 @@ export const HeroSearch = () => {
             search
           </MaterialIcon>
           <input
-            className="w-full border-none bg-transparent text-body-md text-on-surface outline-none placeholder:text-on-surface-variant/80 focus:ring-0"
+            className="min-h-11 w-full border-none bg-transparent text-body-md text-on-surface outline-none placeholder:text-on-surface-variant/80 focus:ring-0"
             placeholder="Bạn cần sửa gì?"
             aria-label="Tìm dịch vụ"
             role="combobox"

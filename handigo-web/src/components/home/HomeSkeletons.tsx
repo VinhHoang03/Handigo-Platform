@@ -45,7 +45,7 @@ export const TestimonialCardSkeleton = () => (
   </div>
 );
 
-/** Thông báo khi danh sách rỗng — thay cho một dòng chữ trơ trọi. */
+/** Thông báo khi danh sách rỗng, thay cho một dòng chữ trơ trọi. */
 export const HomeEmptyState = ({ message }: { message: string }) => (
   <p className="rounded-2xl border border-dashed border-outline-variant bg-surface-container-low px-6 py-10 text-center text-body-md text-on-surface-variant">
     {message}
