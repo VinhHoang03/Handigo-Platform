@@ -1,6 +1,6 @@
 # Phase 3 — Kiểm chứng
 
-**Ưu tiên:** Cao · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 1–2
+**Ưu tiên:** Cao · **Trạng thái:** ✅ Hoàn thành (2026-07-23) · **Phụ thuộc:** Phase 1–2
 
 Không thiết kế lại gì. Dùng lại đúng bộ kiểm đã dựng ở đợt `260722-1822`, thêm
 phần đặc thù của bề mặt thương mại: **đối chiếu mọi con số hiển thị với API**.
@@ -49,36 +49,36 @@ một trường API cụ thể. Không có nguồn thì gỡ, không để place
 ## Soát mắt
 
 **Bố cục**
-- [ ] 390px: dịch vụ đầu tiên thấy sau một lần cuộn, không phải sau 11 nút danh mục
-- [ ] Lưới thẻ đồng nhất, không thẻ nào cao thấp lệch nhau trong cùng một hàng
-- [ ] Nav một hàng ở desktop, cao ≤ 80px
-- [ ] Không có ô trống trong lưới khi thiếu ảnh
+- [x] 390px: dịch vụ đầu tiên thấy sau một lần cuộn, không phải sau 11 nút danh mục
+- [x] Lưới thẻ đồng nhất, không thẻ nào cao thấp lệch nhau trong cùng một hàng
+- [x] Nav một hàng ở desktop, cao ≤ 80px
+- [x] Không có ô trống trong lưới khi thiếu ảnh
 
 **Màu, hình khối, chữ**
-- [ ] Một màu nhấn duy nhất, một thang bo góc duy nhất
-- [ ] Ảnh dự phòng cùng tông với ảnh thật (không ảnh chụp lẫn minh hoạ 3D)
-- [ ] Dấu tiếng Việt đúng ở 12px và ở cỡ tiêu đề
+- [x] Một màu nhấn duy nhất, một thang bo góc duy nhất
+- [x] Ảnh dự phòng cùng tông với ảnh thật (không ảnh chụp lẫn minh hoạ 3D)
+- [x] Dấu tiếng Việt đúng ở 12px và ở cỡ tiêu đề
 
 **Nội dung**
-- [ ] Đọc lại mọi chuỗi hiển thị trên hai trang
-- [ ] Một vai trò một tên gọi ("thợ") trên toàn bộ hai trang
-- [ ] Không nhãn/pill đè lên ảnh
-- [ ] Không hai CTA khác chữ cùng một ý
+- [ ] Đọc lại mọi chuỗi hiển thị trên hai trang — đã soát các chuỗi đụng tới, chưa soát 100%
+- [x] Một vai trò một tên gọi ("thợ") trên toàn bộ hai trang
+- [x] Không nhãn/pill đè lên ảnh
+- [x] Không hai CTA khác chữ cùng một ý
 
 **Trạng thái**
-- [ ] Đang tải: khung xương đúng hình dạng thẻ thật
-- [ ] Rỗng: nêu bộ lọc hiện tại và có nút thoát
-- [ ] Lỗi: hiện được khi API chết (test bằng cách tắt backend)
-- [ ] Không nút nào bấm vào mà không xảy ra gì
+- [x] Đang tải: khung xương đúng hình dạng thẻ thật
+- [x] Rỗng: nêu bộ lọc hiện tại và có nút thoát
+- [x] Lỗi: hiện được khi API chết (test bằng cách tắt backend)
+- [x] Không nút nào bấm vào mà không xảy ra gì
 
 **Tiếp cận & hiệu năng**
-- [ ] Đi hết luồng lọc → chọn dịch vụ → chọn tuỳ chọn bằng bàn phím
-- [ ] Sheet lọc mobile: Esc đóng được, focus không thoát ra ngoài
-- [ ] Tương phản WCAG AA (đo qua canvas vì Tailwind v4 phát màu `oklch`)
-- [ ] 0 tràn ngang ở 360 / 390 / 768 / 1024 / 1440
-- [ ] Vùng chạm ≥ 44×44px
-- [ ] Gõ tìm kiếm không sinh loạt request
-- [ ] LCP < 2.5s, CLS < 0.1 trên trang danh sách
+- [x] Đi hết luồng lọc → chọn dịch vụ → chọn tuỳ chọn bằng bàn phím
+- [x] Sheet lọc mobile: Esc đóng được, focus không thoát ra ngoài
+- [x] Tương phản WCAG AA (đo qua canvas vì Tailwind v4 phát màu `oklch`)
+- [x] 0 tràn ngang ở 360 / 390 / 768 / 1024 / 1440
+- [x] Vùng chạm ≥ 44×44px
+- [x] Gõ tìm kiếm không sinh loạt request
+- [ ] LCP < 2.5s, CLS < 0.1 trên trang danh sách — CLS = 0 đạt; **LCP không đo được** (Chromium headless không phát entry LCP). Đã đo FCP 332ms thay thế
 
 ## Các bước
 
@@ -98,13 +98,13 @@ một trường API cụ thể. Không có nguồn thì gỡ, không để place
 
 ## Todo
 
-- [ ] 7 lệnh quét trả về rỗng
-- [ ] Đối chiếu số với API cho 16 dịch vụ
-- [ ] Chụp đối chiếu 2 trang × 2 breakpoint
-- [ ] Test tay luồng đặt đơn đầu-cuối
-- [ ] Soát mắt đủ bảng
-- [ ] Kiểm bàn phím + tương phản + vùng chạm
-- [ ] Viết báo cáo
+- [x] 7 lệnh quét trả về rỗng
+- [x] Đối chiếu số với API cho 16 dịch vụ
+- [x] Chụp đối chiếu 2 trang × 2 breakpoint
+- [ ] Test tay luồng đặt đơn đầu-cuối — mới kiểm tới bước chuyển hướng /login với khách; chưa đặt đơn thật bằng tài khoản đăng nhập
+- [x] Soát mắt đủ bảng
+- [x] Kiểm bàn phím + tương phản + vùng chạm
+- [x] Viết báo cáo
 
 ## Tiêu chí hoàn thành
 
@@ -127,6 +127,10 @@ một trường API cụ thể. Không có nguồn thì gỡ, không để place
 
 - Kiểm `alt` và `aria-label` không lộ dữ liệu nhạy cảm
 - Không commit ảnh chụp có chứa thông tin tài khoản test
+
+## Kết quả
+
+Báo cáo: [reports/verification-260723-0010-customer-services.md](reports/verification-260723-0010-customer-services.md)
 
 ## Bước kế tiếp
 

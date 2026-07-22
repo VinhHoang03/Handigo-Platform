@@ -36,7 +36,7 @@ export const normalizeServiceImageUrl = (value?: string | null) => {
  * Trước đây hàm này nhận thêm `index` và rơi về một trong bốn ảnh Unsplash
  * hotlink khi thiếu ảnh. Hai vấn đề: ảnh chụp thật lệch hẳn tông với bộ minh hoạ
  * 3D của sản phẩm, và tham số `index` khiến người đọc tưởng gọi với index khác
- * sẽ ra ảnh khác — thực ra dịch vụ có ảnh thì index bị bỏ qua hoàn toàn, nên
+ * sẽ ra ảnh khác. Thực ra dịch vụ có ảnh thì index bị bỏ qua hoàn toàn, nên
  * thư viện ảnh ở trang chi tiết hiện đúng một tấm ba lần.
  *
  * Trả `null` để `ReliableImage` dựng ô giữ chỗ theo token màu của hệ thống.

@@ -7,7 +7,7 @@ import { getOptionPrice } from "../utils/serviceDisplay";
  *
  * Với `variable_price`, hàm trả **0** chứ không trả tiền cọc. Trước đây nó trả
  * `depositAmount`, nên thanh đặt lịch in "Giá tạm tính 20.000 đ" ngay phía trên
- * dòng "Báo giá sau khảo sát" — hai câu mâu thuẫn nhau, và con số đó là tiền
+ * dòng "Báo giá sau khảo sát": hai câu mâu thuẫn nhau, và con số đó là tiền
  * cọc chứ không phải giá. Trả 0 để `BookingSidebar` đi vào đúng nhánh sẵn có
  * của nó là hiện "Báo giá sau khảo sát".
  *

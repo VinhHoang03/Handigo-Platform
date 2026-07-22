@@ -56,7 +56,7 @@ export function ServiceOptionsSection({
                           {/* Chỉ dựng khung ảnh khi tuỳ chọn thật sự có ảnh.
                               Toàn bộ tuỳ chọn hiện tại đều `image: null`, nên
                               trước đây mỗi thẻ hiện một ô xám kèm icon "ảnh
-                              hỏng" — đọc như trang đang lỗi tải. */}
+                              hỏng": đọc như trang đang lỗi tải. */}
                           {option.image && (
                             <ReliableImage
                               src={option.image}
@@ -79,7 +79,7 @@ export function ServiceOptionsSection({
                             </div>
                             {/* Không có mô tả thì không render dòng nào. Trước
                                 đây rơi về "Tùy chọn bổ sung cho dịch vụ này."
-                                lặp ở mọi thẻ — chữ chiếm chỗ mà không nói gì. */}
+                                lặp ở mọi thẻ, chữ chiếm chỗ mà không nói gì. */}
                             {option.description && (
                               <p className="mt-2 text-sm text-on-surface-variant">
                                 {option.description}

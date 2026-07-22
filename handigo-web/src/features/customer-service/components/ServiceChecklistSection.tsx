@@ -4,7 +4,7 @@ import { MaterialIcon } from "@/components/common/MaterialIcon";
  * Cam kết đi kèm mọi đơn, dùng chung ngôn ngữ với dải cam kết ở trang chủ.
  *
  * Tiêu đề cũ là "Danh mục công việc", nhưng nội dung bên dưới không phải danh
- * mục công việc của dịch vụ này — đó là cam kết chung của nền tảng, giống hệt
+ * mục công việc của dịch vụ này: đó là cam kết chung của nền tảng, giống hệt
  * nhau trên cả 16 dịch vụ. Nhãn sai làm người đọc tưởng sắp thấy phạm vi công
  * việc rồi hụt.
  *

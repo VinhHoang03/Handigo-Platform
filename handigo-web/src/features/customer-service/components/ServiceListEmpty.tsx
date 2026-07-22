@@ -10,7 +10,7 @@ interface ServiceListEmptyProps {
 /**
  * Trạng thái rỗng của danh sách dịch vụ.
  *
- * Trước đây chỗ này chỉ có một dòng "Chưa có dịch vụ phù hợp." — đúng nhưng vô
+ * Trước đây chỗ này chỉ có một dòng "Chưa có dịch vụ phù hợp.", đúng nhưng vô
  * dụng: người dùng không biết mình đang lọc theo gì và cũng không có đường lùi.
  * Nêu rõ điều kiện đang áp và cho nút gỡ từng điều kiện một.
  */

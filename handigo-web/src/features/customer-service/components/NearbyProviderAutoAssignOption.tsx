@@ -3,7 +3,7 @@ interface NearbyProviderAutoAssignOptionProps {
   onSelect: () => void;
 }
 
-/** Lựa chọn "để Handigo tự tìm thợ" — luôn đứng đầu danh sách. */
+/** Lựa chọn "để Handigo tự tìm thợ", luôn đứng đầu danh sách. */
 export function NearbyProviderAutoAssignOption({
   isSelected,
   onSelect,

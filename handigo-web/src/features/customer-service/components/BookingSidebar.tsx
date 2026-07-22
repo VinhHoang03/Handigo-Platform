@@ -33,7 +33,7 @@ export function BookingSidebar({
   return (
     <div className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-lg">
       {/* Trước đây khối này in "Giá tạm tính: Báo giá" rồi ngay dưới lại có ô
-          "LOẠI GIÁ: Báo giá sau khảo sát" — hai lần nói cùng một điều, và với
+          "LOẠI GIÁ: Báo giá sau khảo sát": hai lần nói cùng một điều, và với
           dịch vụ báo giá thì dòng trên còn từng in ra tiền cọc. Gộp làm một. */}
       <div className="mb-5">
         <p className="text-on-surface-variant">Giá tạm tính</p>
