@@ -1,6 +1,6 @@
 # Phase 2 — Trang khách hàng
 
-**Ưu tiên:** Cao · **Trạng thái:** ◐ Đang dở (quét cơ học xong ở `e648a50`, phần tách file chưa làm) · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Cao · **Trạng thái:** ✅ Xong (`d0cad37`; `BookingDetailPage` + route split ở `c547c3e`) · **Phụ thuộc:** Phase 0
 
 Luồng tạo ra doanh thu: tìm dịch vụ → đặt → thanh toán → theo dõi → đánh giá.
 Đây là phase **rủi ro cao nhất** của toàn plan.

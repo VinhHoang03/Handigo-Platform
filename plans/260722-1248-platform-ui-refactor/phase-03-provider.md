@@ -1,6 +1,6 @@
 # Phase 3 — Trang thợ
 
-**Ưu tiên:** Trung bình-cao · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Trung bình-cao · **Trạng thái:** ✅ Xong (`d30254e`) · **Phụ thuộc:** Phase 0
 
 Nhóm có **mật độ vi phạm cao nhất** toàn dự án: 50 chỗ hardcode màu và 20 chỗ
 `glass-card` — nhiều hơn bất kỳ nhóm nào khác.

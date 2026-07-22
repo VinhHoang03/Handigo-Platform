@@ -47,10 +47,28 @@ tách các file quá lớn. Landing page đã hoàn thành ở commit `87cd616`.
 |---|---|---|---|
 | 0 | [Nền tảng dùng chung](phase-00-shared-foundation.md) | ✅ Xong (`b2df0e5`) | — |
 | 1 | [Công khai + Auth](phase-01-public-and-auth.md) | ✅ Xong (`9b36193`, `33458de`) | Phase 0 |
-| 2 | [Khách hàng](phase-02-customer.md) (+ `chat`, `chatbot`, `case-management`) | ◐ **Đang dở** — mới quét cơ học (`e648a50`) | Phase 0 |
-| 3 | [Thợ](phase-03-provider.md) (+ trang gợi ý dịch vụ của thợ) | ☐ Chưa bắt đầu | Phase 0 |
-| 4 | [Quản trị](phase-04-admin.md) (+ trang duyệt gợi ý dịch vụ) | ☐ Chưa bắt đầu | Phase 0 |
-| 5 | [A11y + Responsive](phase-05-accessibility-responsive.md) | ☐ Chưa bắt đầu | Phase 1–4 |
+| 2 | [Khách hàng](phase-02-customer.md) (+ `chat`, `chatbot`, `case-management`) | ✅ Xong (`d0cad37`, BookingDetail trong `c547c3e`) | Phase 0 |
+| 3 | [Thợ](phase-03-provider.md) (+ trang gợi ý dịch vụ của thợ) | ✅ Xong (`d30254e`) | Phase 0 |
+| 4 | [Quản trị](phase-04-admin.md) (+ trang duyệt gợi ý dịch vụ) | ✅ Xong (`c288b5b`) | Phase 0 |
+| 5 | [A11y + Responsive](phase-05-accessibility-responsive.md) | ◐ Đang dở — xem ghi chú bên dưới | Phase 1–4 |
+
+### Kết quả thực hiện Phase 2–4 + phần đầu Phase 5 (2026-07-22 chiều tối)
+
+Số liệu cuối sau 4 commit (`d0cad37` → `c547c3e`):
+**0 file .tsx > 200 dòng** (từ 66) · `glass-card` 0 (đã xoá cả định nghĩa CSS) ·
+`ui-avatars` 0 · palette mặc định chỉ còn 2 (màu sao vàng RatingStars — giữ có
+chủ đích vì token `warning` là nâu olive) · `bg/text-white` còn 12 — toàn bộ là
+overlay trên scrim đen (`bg-black/60 text-white`) hợp lệ theo quy ước.
+Build xanh + ESLint 0 lỗi. `App.tsx` tách thành `src/routes/` theo vai trò.
+
+Phase 5 đã làm: quét class chết (sửa `accent-cyan`, xoá `.glass-card`),
+quét handler giả (0 — submit đều qua service thật), `prefers-reduced-motion`
+cho `animate-bounce`/`animate-in`, kiểm tràn ngang 360px trên các trang public (0 lỗi).
+
+**Phase 5 còn lại — cần tài khoản test:** kiểm tra bàn phím/tràn ngang/console
+trên các trang sau đăng nhập (customer/provider/admin), test tay 4 luồng nghiệp
+vụ (đặt đơn → thanh toán, thợ nhận việc, admin duyệt), chạy axe. DB là Atlas
+dùng chung của team + đăng ký cần OTP email thật nên không tự tạo tài khoản được.
 
 ### Phase 2 đã làm tới đâu (tạm dừng 2026-07-22)
 

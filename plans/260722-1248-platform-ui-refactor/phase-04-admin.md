@@ -1,6 +1,6 @@
 # Phase 4 — Trang quản trị
 
-**Ưu tiên:** Trung bình · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Trung bình · **Trạng thái:** ✅ Xong (`c288b5b`) · **Phụ thuộc:** Phase 0
 
 15 trang admin — nhóm đông trang nhất nhưng ít người dùng nhất. Ưu tiên **hiệu quả
 thao tác** hơn thẩm mỹ: bảng dữ liệu, lọc, phân trang, hành động hàng loạt.

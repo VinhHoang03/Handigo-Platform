@@ -1,6 +1,6 @@
 # Phase 5 — Kiểm tra a11y + responsive toàn bộ
 
-**Ưu tiên:** Trung bình · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 1–4
+**Ưu tiên:** Trung bình · **Trạng thái:** ◐ Đang dở — quét cơ học xong (class chết, handler giả, reduced-motion, tràn ngang public 360px); phần trang sau đăng nhập chờ tài khoản test · **Phụ thuộc:** Phase 1–4
 
 Rà soát cuối cùng sau khi 50 trang đã refactor xong. Đây là phase **kiểm chứng**,
 không phải phase thiết kế lại.
