@@ -1,6 +1,6 @@
 # Phase 3 — Tin tức + Duyệt dịch vụ + Auth
 
-**Ưu tiên:** Trung bình · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Trung bình · **Trạng thái:** ✅ Hoàn thành (2026-07-22) · **Phụ thuộc:** Phase 0
 
 Ba nhóm trang **đã ở trạng thái tốt nhất** trong nhóm công khai. Phase này là
 chỉnh sửa có chọn lọc, không dựng lại. Nguyên tắc: đụng ít nhất có thể.
@@ -71,13 +71,13 @@ Dùng làm chuẩn tham chiếu cho các trang khác.
 
 ## Todo
 
-- [ ] Gỡ CTA trùng ý trên thẻ nổi bật trang Tin tức
-- [ ] Chốt phương án ngày tháng bài viết (sửa seed hoặc ẩn ngày)
-- [ ] Xử lý bài khuyến mãi đã hết hạn
-- [ ] Chuyển nhãn danh mục ra khỏi ảnh ở `ServiceCard`
-- [ ] Dọn 3 khối comment lịch sử trong `AuthLayout.tsx`
-- [ ] (Tuỳ chọn) Ảnh thương hiệu cho panel trái trang auth
-- [ ] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
+- [x] Gỡ CTA trùng ý trên thẻ nổi bật trang Tin tức
+- [x] Chốt phương án ngày tháng bài viết (sửa seed hoặc ẩn ngày)
+- [x] Xử lý bài khuyến mãi đã hết hạn
+- [x] Chuyển nhãn danh mục ra khỏi ảnh ở `ServiceCard`
+- [x] Dọn 3 khối comment lịch sử trong `AuthLayout.tsx`
+- [ ] (Tuỳ chọn) Ảnh thương hiệu cho panel trái trang auth — **bỏ qua có chủ ý**: plan cho phép giữ nguyên nếu không đủ hợp
+- [x] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
 
 ## Tiêu chí hoàn thành
 

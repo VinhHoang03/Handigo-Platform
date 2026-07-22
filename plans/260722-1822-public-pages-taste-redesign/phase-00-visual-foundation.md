@@ -1,6 +1,6 @@
 # Phase 0 — Nền tảng thị giác
 
-**Ưu tiên:** Cao nhất · **Trạng thái:** ☐ Chưa bắt đầu · **Chặn:** Phase 1–3
+**Ưu tiên:** Cao nhất · **Trạng thái:** ✅ Hoàn thành (2026-07-22) · **Chặn:** Phase 1–3
 
 Chuẩn bị 4 thứ mà mọi trang sau đều cần: chữ, icon, chuyển động, ảnh. Không làm
 trước thì mỗi trang tự chọn một kiểu và phải sửa lại lần hai.
@@ -105,14 +105,14 @@ lại lý do — không đổi font chỉ để thoát danh sách cấm.
 
 ## Todo
 
-- [ ] Cài + import font self-host, gỡ `<link>` Google Fonts
-- [ ] Kiểm dấu tiếng Việt ở 4 trọng lượng, chốt giữ/đổi body font
-- [ ] Cập nhật `--font-*` trong `@theme`
-- [ ] Thay lucide → Material Symbols trong nhóm trang công khai
-- [ ] Tạo `.reveal` utility + `use-reveal-on-scroll.ts`
-- [ ] Bổ sung reduced-motion cho `.reveal`
-- [ ] Tạo và khai báo `og:image` 1200×630
-- [ ] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
+- [x] Cài + import font self-host, gỡ `<link>` Google Fonts
+- [x] Kiểm dấu tiếng Việt ở 4 trọng lượng, chốt giữ/đổi body font
+- [x] Cập nhật `--font-*` trong `@theme`
+- [x] Thay lucide → Material Symbols trong nhóm trang công khai
+- [x] Tạo `.reveal` utility + `use-reveal-on-scroll.ts`
+- [x] Bổ sung reduced-motion cho `.reveal`
+- [x] Tạo và khai báo `og:image` 1200×630
+- [x] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
 
 ## Tiêu chí hoàn thành
 

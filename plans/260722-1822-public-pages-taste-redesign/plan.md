@@ -1,6 +1,6 @@
 ---
 title: Làm mới UI nhóm trang công khai Handigo (taste-driven)
-status: planned
+status: completed
 created: 2026-07-22
 branch: feat/ui-refactor-landing
 blockedBy: []
@@ -46,13 +46,16 @@ tiên thẩm mỹ và là lý do các dial dưới đây không đẩy lên mứ
 
 | # | Phase | Trạng thái | Phụ thuộc |
 |---|---|---|---|
-| 0 | [Nền tảng thị giác](phase-00-visual-foundation.md) | ☐ | — |
-| 1 | [Dựng lại landing](phase-01-landing-rebuild.md) | ☐ | Phase 0 |
-| 2 | [Giới thiệu + Hỗ trợ](phase-02-about-support.md) | ☐ | Phase 0 |
-| 3 | [Tin tức + Dịch vụ + Auth](phase-03-news-services-auth.md) | ☐ | Phase 0 |
-| 4 | [Pre-flight + kiểm chứng](phase-04-preflight-verification.md) | ☐ | Phase 1–3 |
+| 0 | [Nền tảng thị giác](phase-00-visual-foundation.md) | ✅ | — |
+| 1 | [Dựng lại landing](phase-01-landing-rebuild.md) | ✅ | Phase 0 |
+| 2 | [Giới thiệu + Hỗ trợ](phase-02-about-support.md) | ✅ | Phase 0 |
+| 3 | [Tin tức + Dịch vụ + Auth](phase-03-news-services-auth.md) | ✅ | Phase 0 |
+| 4 | [Pre-flight + kiểm chứng](phase-04-preflight-verification.md) | ✅ | Phase 1–3 |
 
 Phase 0 chặn tất cả. Phase 1–3 độc lập, chạy song song được (khác thư mục).
+
+**Hoàn thành 2026-07-22.** Báo cáo kiểm chứng:
+[reports/verification-260722-2130-public-pages-redesign.md](reports/verification-260722-2130-public-pages-redesign.md)
 
 ## Ba tầng vấn đề tìm được khi audit
 

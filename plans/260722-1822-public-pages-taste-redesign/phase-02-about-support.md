@@ -1,6 +1,6 @@
 # Phase 2 — Giới thiệu + Hỗ trợ
 
-**Ưu tiên:** Cao · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Cao · **Trạng thái:** ✅ Hoàn thành (2026-07-22) · **Phụ thuộc:** Phase 0
 
 Hai trang xây niềm tin. Trang Giới thiệu đang chứa **lỗi tin cậy nặng nhất toàn
 dự án**; trang Hỗ trợ có một ô tìm kiếm không tìm được gì.
@@ -87,14 +87,14 @@ features/content/data/
 
 ## Todo
 
-- [ ] Gỡ section đội ngũ lãnh đạo giả khỏi `AboutPage`
-- [ ] Gỡ dải số liệu chưa xác thực, thay bằng cam kết định tính
-- [ ] Bổ sung 2–3 ảnh thật vào trang Giới thiệu
-- [ ] Phá thế căn giữa toàn trang, đổi khuôn 4 thẻ giá trị
-- [ ] Sửa `—` ở `AboutPage.tsx:44` và `PublicSupportCta.tsx:25`
-- [ ] Viết `support-faq.ts` + dựng `SupportFaq.tsx` (hoặc gỡ ô tìm kiếm)
-- [ ] Gỡ khối liên hệ lặp trên trang Hỗ trợ
-- [ ] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
+- [x] Gỡ section đội ngũ lãnh đạo giả khỏi `AboutPage`
+- [x] Gỡ dải số liệu chưa xác thực, thay bằng cam kết định tính
+- [x] Bổ sung 2–3 ảnh thật vào trang Giới thiệu
+- [x] Phá thế căn giữa toàn trang, đổi khuôn 4 thẻ giá trị
+- [x] Sửa `—` ở `AboutPage.tsx:44` và `PublicSupportCta.tsx:25`
+- [x] Viết `support-faq.ts` + dựng `SupportFaq.tsx` (hoặc gỡ ô tìm kiếm)
+- [x] Gỡ khối liên hệ lặp trên trang Hỗ trợ
+- [x] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
 
 ## Tiêu chí hoàn thành
 

@@ -1,6 +1,6 @@
 # Phase 1 — Dựng lại trang chủ
 
-**Ưu tiên:** Cao nhất · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Cao nhất · **Trạng thái:** ✅ Hoàn thành (2026-07-22) · **Phụ thuộc:** Phase 0
 
 Trang gây ấn tượng đầu. Hiện tại là 4 section liên tiếp cùng một khuôn "lưới thẻ
 trắng", **không có một tấm ảnh nào**, và thứ chiếm nửa màn hình đầu là một **giao
@@ -103,19 +103,19 @@ Dùng lại ảnh dịch vụ qua API công khai (đã xác minh gọi được 
 
 ## Todo
 
-- [ ] Xoá `HeroPreviewCard.tsx`, thay bằng ảnh dịch vụ thật
-- [ ] Sửa hero: 2 dòng headline, subtext ≤20 từ, gỡ `—`, gỡ social proof
-- [ ] Tạo `TrustStrip.tsx`
-- [ ] Chuyển danh mục sang `CategoryBento.tsx`, gỡ copy độn 8 chỗ
-- [ ] Tạo `HowItWorksSection.tsx` (nhãn động từ, không "Bước 1/2/3")
-- [ ] Lọc thợ (0 sao, tên placeholder) + sửa mép carousel
-- [ ] Lọc đánh giá theo độ dài, bố cục 1 lớn + 2 nhỏ
-- [ ] `FeaturesSection` sang editorial
-- [ ] Tạo `ClosingCta.tsx`, thống nhất nhãn CTA toàn trang
-- [ ] Xoá `StatsSection.tsx`, thay `stats` bằng cam kết định tính
-- [ ] Gỡ huy hiệu Google Play / App Store khỏi footer
-- [ ] Gắn `.reveal` cho section 3–8
-- [ ] Build xanh + ESLint 0 lỗi + ảnh đối chiếu desktop/mobile
+- [x] Xoá `HeroPreviewCard.tsx`, thay bằng ảnh dịch vụ thật
+- [x] Sửa hero: 2 dòng headline, subtext ≤20 từ, gỡ `—`, gỡ social proof
+- [x] Tạo `TrustStrip.tsx`
+- [x] Chuyển danh mục sang `CategoryBento.tsx`, gỡ copy độn 8 chỗ
+- [x] Tạo `HowItWorksSection.tsx` (nhãn động từ, không "Bước 1/2/3")
+- [x] Lọc thợ (0 sao, tên placeholder) + sửa mép carousel
+- [x] Lọc đánh giá theo độ dài, bố cục 1 lớn + 2 nhỏ
+- [x] `FeaturesSection` sang editorial
+- [x] Tạo `ClosingCta.tsx`, thống nhất nhãn CTA toàn trang
+- [x] Xoá `StatsSection.tsx`, thay `stats` bằng cam kết định tính
+- [x] Gỡ huy hiệu Google Play / App Store khỏi footer
+- [x] Gắn `.reveal` cho section 3–8
+- [x] Build xanh + ESLint 0 lỗi + ảnh đối chiếu desktop/mobile
 
 ## Tiêu chí hoàn thành
 
