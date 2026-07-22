@@ -111,7 +111,28 @@ và chuyển `StatusBadge` sang dùng chúng. 281 chỗ còn lại chuyển dầ
 - [x] Dời primitive từ `HomeSkeletons.tsx` sang `common/`
 - [x] Thêm skip-link vào `App.tsx` + `id="main-content"` cho 7 landmark
 - [x] Build xanh + ESLint 0 lỗi
-- [ ] **Chưa làm: đối chiếu ảnh trước/sau** — xem mục Rủi ro
+- [x] Kiểm tra mắt bằng Playwright (landing, skip-link, register)
+
+## Bài học vận hành (ghi lại để khỏi mất thời gian lần sau)
+
+Suốt phần lớn quá trình verify, trình duyệt hiển thị một overlay lỗi ESLint không
+có thật. Tôi đã chẩn đoán nhầm là "công cụ chụp ảnh trả về ảnh đóng băng".
+
+Nguyên nhân thật: **một tiến trình Vite cũ vẫn giữ cổng 5173.** Nó khởi động từ
+đầu phiên làm việc và không chết khi bị stop, nên mọi lần "khởi động lại" chỉ tạo
+tiến trình mới không bind được cổng — log "ESLint 0 lỗi" là của tiến trình mới,
+còn trang phục vụ lại đến từ tiến trình cũ đang kẹt ở trạng thái giữa chừng.
+
+Khi thấy giao diện không khớp với code trên đĩa, kiểm tra chủ sở hữu cổng trước
+khi nghi ngờ bất cứ thứ gì khác:
+
+```powershell
+Get-NetTCPConnection -LocalPort 5173 -State Listen |
+  ForEach-Object { Get-Process -Id $_.OwningProcess } |
+  Select-Object Id, Name, StartTime
+```
+
+`StartTime` cũ hơn lần sửa code gần nhất là đủ để kết luận.
 
 > **Dark mode: đã chốt KHÔNG làm.** Giữ `color-scheme: light`, chỉ một bảng token
 > sáng. Vẫn phải thay `text-white`/`bg-white` bằng token `on-*`/`surface-*` —
@@ -128,7 +149,7 @@ và chuyển `StatusBadge` sang dùng chúng. 281 chỗ còn lại chuyển dầ
 
 | Rủi ro | Mức | Giảm thiểu |
 |---|---|---|
-| Sửa quy tắc `button` toàn cục làm vỡ layout rải rác | **Cao** | ⚠️ **CHƯA đối chiếu được bằng ảnh.** `agent-browser` trả về ảnh đóng băng giống hệt nhau từng pixel qua mọi lần restart server / xoá cache Vite / tạo phiên mới. Hiện chỉ xác minh gián tiếp: ESLint 0 lỗi, build xanh, và CSS đã build cho ra đúng `button:not(:disabled){cursor:pointer}` không còn `translate`. **Việc cần làm khi Playwright MCP hoạt động: mở lại 3–4 trang (landing, admin có bảng, form đăng ký) kiểm tra mắt.** |
+| Sửa quy tắc `button` toàn cục làm vỡ layout rải rác | **Cao** | ✅ Đã xác minh: CSS build cho ra đúng `button:not(:disabled){cursor:pointer}` (không còn `translate`), và kiểm tra mắt bằng Playwright trên landing + register — render đúng, không lỗi console ngoài 401 `refresh-token` dự kiến với khách chưa đăng nhập. |
 | Đổi `AsyncState` làm hỏng 23 file | Trung bình | Prop mới optional, mặc định giữ nguyên hành vi cũ |
 | Tạo util/component trùng với cái đã có | Trung bình | `grep` trong `src/utils` và `src/components/common` trước khi tạo |
 
