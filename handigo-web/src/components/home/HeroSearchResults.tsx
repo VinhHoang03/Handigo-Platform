@@ -1,5 +1,6 @@
 import type { CatalogSearchResult } from "@/features/home/api/home.api";
 import { MaterialIcon } from "../common/MaterialIcon";
+import { Skeleton } from "../common/Skeleton";
 
 const resultTypeLabel: Record<CatalogSearchResult["type"], string> = {
   category: "Danh mục",
@@ -18,10 +19,10 @@ const ResultsSkeleton = () => (
   <div className="space-y-1" aria-hidden="true">
     {[0, 1, 2].map((row) => (
       <div key={row} className="flex items-center gap-3 px-3 py-2.5">
-        <div className="h-5 w-5 shrink-0 animate-pulse rounded bg-surface-container-high" />
+        <Skeleton className="h-5 w-5 shrink-0" />
         <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="h-3 w-1/2 animate-pulse rounded bg-surface-container-high" />
-          <div className="h-2.5 w-1/3 animate-pulse rounded bg-surface-container" />
+          <Skeleton className="h-3 w-1/2" />
+          <Skeleton className="h-2.5 w-1/3" />
         </div>
       </div>
     ))}
@@ -60,7 +61,7 @@ export const HeroSearchResults = ({
         aria-selected={selectedResult?.id === result.id}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => onSelect(result)}
-        className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:translate-y-0 hover:bg-surface-container-low"
+        className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-container-low"
       >
         <MaterialIcon className="mt-0.5 shrink-0 text-[20px] text-on-surface-variant">
           {resultTypeIcon[result.type]}

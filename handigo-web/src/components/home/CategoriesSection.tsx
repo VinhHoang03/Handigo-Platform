@@ -31,7 +31,7 @@ export const CategoriesSection = () => {
         action={
           <Link
             to="/customer/services"
-            className="flex w-fit items-center gap-1.5 text-label-md font-semibold text-primary transition-colors hover:translate-y-0 hover:text-primary-hover"
+            className="flex w-fit items-center gap-1.5 text-label-md font-semibold text-primary transition-colors hover:text-primary-hover"
           >
             Xem tất cả
             <MaterialIcon className="text-[18px]">arrow_forward</MaterialIcon>

@@ -51,7 +51,7 @@ export function ProfessionalSummarySection({
             <div
               id="service-addition-tooltip"
               role="tooltip"
-              className="pointer-events-none absolute right-0 top-full z-20 mt-3 w-72 translate-y-1 rounded-xl bg-on-surface px-4 py-3 text-sm leading-6 text-surface opacity-0 shadow-lg transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
+              className="pointer-events-none absolute right-0 top-full z-20 mt-3 w-72 translate-y-1 rounded-xl bg-on-surface px-4 py-3 text-sm leading-6 text-surface opacity-0 shadow-lg transition-all duration-200 group-group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100"
             >
               Muốn nhận thêm loại dịch vụ mới, bạn cần gửi chứng chỉ để admin
               xét duyệt.

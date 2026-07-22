@@ -6,7 +6,7 @@ export function PublicContentLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-on-surface">
       <Navbar />
-      <main className="pt-24">{children}</main>
+      <main id="main-content" className="pt-24">{children}</main>
       <HomeFooter />
     </div>
   );

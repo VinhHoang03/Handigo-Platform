@@ -158,7 +158,7 @@ export const HeroSearch = () => {
       <button
         type="button"
         onClick={locate}
-        className="flex flex-1 items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:translate-y-0 hover:bg-surface-container-low"
+        className="flex flex-1 items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-surface-container-low"
       >
         <MaterialIcon
           className={`shrink-0 text-[20px] text-on-surface-variant ${isLocating ? "animate-spin" : ""}`}
@@ -172,7 +172,7 @@ export const HeroSearch = () => {
 
       <button
         type="submit"
-        className="flex items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-label-md font-semibold text-on-primary shadow-[0_6px_16px_-4px_rgba(42,28,166,0.45)] transition-colors duration-200 hover:translate-y-0 hover:bg-primary-hover active:scale-[0.98]"
+        className="flex items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-label-md font-semibold text-on-primary shadow-[0_6px_16px_-4px_rgba(42,28,166,0.45)] transition-colors duration-200 hover:bg-primary-hover active:scale-[0.98]"
       >
         Tìm thợ
       </button>

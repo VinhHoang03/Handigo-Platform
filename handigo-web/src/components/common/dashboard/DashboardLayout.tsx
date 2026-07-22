@@ -276,6 +276,7 @@ export function DashboardLayout({
       )}
 
       <main
+        id="main-content"
         className={`relative min-h-screen pb-12 pt-32 ${hasSidebar ? "lg:pl-80 xl:pl-[21rem]" : ""}`}
       >
         <div

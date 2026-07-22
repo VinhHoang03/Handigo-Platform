@@ -115,7 +115,7 @@ export const ProviderCard = ({ name, rating, services, area, img }: ProviderCard
     {/* mt-auto ghim nút xuống đáy để các thẻ cạnh nhau thẳng hàng dù nội dung dài ngắn khác nhau */}
     <Link
       to="/customer/services"
-      className="mt-auto block w-full rounded-lg bg-primary/6 pt-2.5 pb-2.5 text-center text-sm font-semibold text-primary transition-colors hover:translate-y-0 group-hover:bg-primary group-hover:text-on-primary"
+      className="mt-auto block w-full rounded-lg bg-primary/6 pt-2.5 pb-2.5 text-center text-sm font-semibold text-primary transition-colors group-hover:bg-primary group-hover:text-on-primary"
     >
       Xem dịch vụ
     </Link>
@@ -191,7 +191,7 @@ export const TestimonialCard = ({ quote, name, loc, img, rating = 5, service, pe
 );
 
 export const SocialLink = ({ icon }: { icon: string }) => (
-  <Link className="grid h-10 w-10 place-items-center rounded-full bg-surface-container-high text-primary transition-colors hover:translate-y-0 hover:bg-primary hover:text-on-primary" to="#"><MaterialIcon className="text-lg">{icon}</MaterialIcon></Link>
+  <Link className="grid h-10 w-10 place-items-center rounded-full bg-surface-container-high text-primary transition-colors hover:bg-primary hover:text-on-primary" to="#"><MaterialIcon className="text-lg">{icon}</MaterialIcon></Link>
 );
 
 export const AppBadge = ({ icon, store, label }: { icon: string; store: string; label: string }) => (

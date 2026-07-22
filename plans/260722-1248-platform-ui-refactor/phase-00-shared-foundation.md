@@ -84,15 +84,34 @@ src/utils/imageUrl.ts      normalizeImageUrl (đã lọc 'null'/'undefined')
 5. **Bổ sung `sr-only` skip-link** vào `App.tsx` cho điều hướng bàn phím.
 6. Build + lint + chụp ảnh đối chiếu.
 
+## Phát hiện bổ sung khi thực hiện (2026-07-22)
+
+**Hệ màu ngầm thứ hai: 281 lần dùng bảng màu mặc định Tailwind trên 38 file**
+(`emerald` 111 · `amber` 71 · `red` 58 · còn lại ~41). Nhiều hơn cả `bg-white` (162).
+
+Nguyên nhân gốc: **M3 chỉ định nghĩa `error`, không có `success`/`warning`**, nên
+mọi trạng thái tích cực/chờ xử lý đều phải mượn palette Tailwind. `StatusBadge` —
+component nhãn trạng thái dùng chung — là ví dụ điển hình: toàn bộ bảng màu của nó
+nằm ngoài hệ token.
+
+→ Đã bổ sung 8 token (`success`/`warning` × 4 biến) theo đúng khuôn của `error`,
+và chuyển `StatusBadge` sang dùng chúng. 281 chỗ còn lại chuyển dần ở Phase 1–4.
+
 ## Todo
 
-- [ ] Rà 29 mã hex, quyết định token hoá hay giữ
-- [ ] Thu hẹp quy tắc `button` toàn cục trong `@layer base`
-- [ ] Tạo `common/Skeleton.tsx`
-- [ ] Thêm prop `skeleton` cho `AsyncState` (giữ tương thích ngược)
-- [ ] Dời primitive từ `HomeSkeletons.tsx` sang `common/`
-- [ ] Thêm skip-link vào `App.tsx`
-- [ ] Build xanh + ESLint 0 lỗi
+- [x] Rà 29 mã hex, quyết định token hoá hay giữ
+      → màu thương hiệu Google/Facebook (5) **giữ nguyên**, không được token hoá;
+        SVG mascot chatbot (10) giữ; `OrderTrackingMap` (12) xử lý ở Phase 2
+- [x] Bổ sung token `success` + `warning` (phát hiện mới, xem trên)
+- [x] Chuyển `StatusBadge` sang token ngữ nghĩa
+- [x] Thu hẹp quy tắc `button` toàn cục trong `@layer base`
+- [x] Gỡ 9 override `hover:translate-y-0` đã thành thừa sau khi bỏ quy tắc trên
+- [x] Tạo `common/Skeleton.tsx`
+- [x] Thêm prop `skeleton` cho `AsyncState` (giữ tương thích ngược)
+- [x] Dời primitive từ `HomeSkeletons.tsx` sang `common/`
+- [x] Thêm skip-link vào `App.tsx` + `id="main-content"` cho 7 landmark
+- [x] Build xanh + ESLint 0 lỗi
+- [ ] **Chưa làm: đối chiếu ảnh trước/sau** — xem mục Rủi ro
 
 > **Dark mode: đã chốt KHÔNG làm.** Giữ `color-scheme: light`, chỉ một bảng token
 > sáng. Vẫn phải thay `text-white`/`bg-white` bằng token `on-*`/`surface-*` —
@@ -109,7 +128,7 @@ src/utils/imageUrl.ts      normalizeImageUrl (đã lọc 'null'/'undefined')
 
 | Rủi ro | Mức | Giảm thiểu |
 |---|---|---|
-| Sửa quy tắc `button` toàn cục làm vỡ layout rải rác | **Cao** | Chụp ảnh đối chiếu nhiều trang trước khi commit |
+| Sửa quy tắc `button` toàn cục làm vỡ layout rải rác | **Cao** | ⚠️ **CHƯA đối chiếu được bằng ảnh.** `agent-browser` trả về ảnh đóng băng giống hệt nhau từng pixel qua mọi lần restart server / xoá cache Vite / tạo phiên mới. Hiện chỉ xác minh gián tiếp: ESLint 0 lỗi, build xanh, và CSS đã build cho ra đúng `button:not(:disabled){cursor:pointer}` không còn `translate`. **Việc cần làm khi Playwright MCP hoạt động: mở lại 3–4 trang (landing, admin có bảng, form đăng ký) kiểm tra mắt.** |
 | Đổi `AsyncState` làm hỏng 23 file | Trung bình | Prop mới optional, mặc định giữ nguyên hành vi cũ |
 | Tạo util/component trùng với cái đã có | Trung bình | `grep` trong `src/utils` và `src/components/common` trước khi tạo |
 

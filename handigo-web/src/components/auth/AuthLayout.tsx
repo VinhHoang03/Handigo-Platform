@@ -32,7 +32,7 @@ export function AuthLayout({
   maxWidth = "md",
 }: AuthLayoutProps) {
   return (
-    <main className="h-dvh min-h-dvh overflow-hidden bg-background lg:grid lg:grid-cols-2">
+    <main id="main-content" className="h-dvh min-h-dvh overflow-hidden bg-background lg:grid lg:grid-cols-2">
       <section className="relative hidden h-full min-h-0 min-w-0 overflow-hidden bg-primary px-8 py-8 lg:flex lg:items-center lg:justify-center xl:px-12">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-secondary-container/20 blur-3xl" />

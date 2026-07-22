@@ -44,6 +44,22 @@
   --color-surface: #faf8ff;
   --color-error: #ba1a1a;
   --color-on-error-container: #93000a;
+
+  /* Token trạng thái ngữ nghĩa.
+     M3 chỉ định nghĩa sẵn `error`, nên trước đây mọi trạng thái tích cực/cảnh báo
+     đều rơi vào bảng màu mặc định của Tailwind (emerald/amber/...) — 281 chỗ trên
+     38 file, tức là một hệ màu thứ hai chạy song song ngoài tầm kiểm soát.
+     Bốn biến mỗi nhóm theo đúng khuôn của `error`: nền đậm + chữ trắng cho nhấn
+     mạnh, nền nhạt + chữ đậm cho nhãn/chip. */
+  --color-success: #106b3f;
+  --color-on-success: #ffffff;
+  --color-success-container: #a8f2c8;
+  --color-on-success-container: #00522c;
+
+  --color-warning: #7d5800;
+  --color-on-warning: #ffffff;
+  --color-warning-container: #ffdf9a;
+  --color-on-warning-container: #5c4000;
   --color-tertiary-container: #a44100;
   --color-on-secondary-fixed-variant: #004e5c;
   --color-surface-container-low: #f2f3ff;
@@ -154,8 +170,15 @@
     @apply transition-all duration-200;
   }
 
+  /* Chỉ giữ con trỏ tay ở mức toàn cục.
+     Trước đây khối này còn có `hover:-translate-y-0.5`, khiến MỌI <button> nhấc
+     lên khi rê chuột — kể cả nút trong bảng, tab, dropdown, mục chọn — làm giao
+     diện nhấp nhổm.
+     Không đưa hiệu ứng nhấc về lại chỗ nào: `.btn-primary` đã báo hiệu hover
+     bằng màu đậm dần + shadow lớn dần, `.btn-secondary`/`.btn-ghost` bằng nền
+     nhạt, và cả ba đều có `active:scale-[0.98]` khi nhấn. Đủ rõ mà không giật. */
   button:not(:disabled) {
-    @apply cursor-pointer hover:-translate-y-0.5 active:translate-y-0;
+    @apply cursor-pointer;
   }
 }
 

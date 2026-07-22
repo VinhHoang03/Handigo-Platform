@@ -23,7 +23,7 @@ const LandingPage = () => {
   return (
     <div className="bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container min-h-screen">
       <Navbar isScrolled={isScrolled} />
-      <main className="pt-32 pb-xl">
+      <main id="main-content" className="pt-32 pb-xl">
         <HeroSection />
         <CategoriesSection />
         <ProvidersSection />

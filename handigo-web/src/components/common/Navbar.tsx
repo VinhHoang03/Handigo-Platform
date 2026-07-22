@@ -221,7 +221,7 @@ export function Navbar({
                     </span>
                   </Link>
 
-                  <div className="invisible absolute left-1/2 top-full z-50 w-[520px] -translate-x-1/2 translate-y-2 pt-3 opacity-0 transition-all duration-300 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                  <div className="invisible absolute left-1/2 top-full z-50 w-[520px] -translate-x-1/2 translate-y-2 pt-3 opacity-0 transition-all duration-300 ease-out group-hover:visible group-group-hover:opacity-100">
                     <div className="rounded-2xl border border-outline-variant/30 bg-white p-3 shadow-[0_18px_46px_rgba(19,27,46,0.16)]">
                       <Link
                         to="/customer/services"

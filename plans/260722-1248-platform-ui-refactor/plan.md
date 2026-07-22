@@ -28,6 +28,7 @@ tách các file quá lớn. Landing page đã hoàn thành ở commit `87cd616`.
 | File `.tsx` | 155 |
 | File > 200 dòng (vi phạm rule) | **66** |
 | `bg-white` / `text-white` hardcode | 162 / 42 lần |
+| **Bảng màu mặc định Tailwind** (emerald/amber/red…) | **281 lần / 38 file** |
 | Mã hex viết thẳng | 29 lần / 4 file |
 | `ui-avatars.com` (CDN ngoài) | 19 lần / **18 file** |
 | `glass-card` | 35 lần / 16 file |

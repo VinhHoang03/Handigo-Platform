@@ -197,6 +197,14 @@ function App() {
       <SystemAlertProvider>
         <Router>
           <AuthBootstrap>
+          {/* Cho người dùng bàn phím nhảy thẳng tới nội dung, bỏ qua thanh điều
+              hướng. Ẩn cho tới khi được focus. */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-on-primary"
+          >
+            Bỏ qua, tới nội dung chính
+          </a>
           <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<HomeRoute />} />
