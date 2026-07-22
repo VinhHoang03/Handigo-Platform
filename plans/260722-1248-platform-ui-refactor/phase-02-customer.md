@@ -1,0 +1,114 @@
+# Phase 2 — Trang khách hàng
+
+**Ưu tiên:** Cao · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+
+Luồng tạo ra doanh thu: tìm dịch vụ → đặt → thanh toán → theo dõi → đánh giá.
+Đây là phase **rủi ro cao nhất** của toàn plan.
+
+## Liên kết
+
+- [plan.md](plan.md) · [Phase 0](phase-00-shared-foundation.md)
+
+## Kết quả khảo sát
+
+| Nhóm | File | >200 dòng | bg/text-white | glass-card | "Đang tải" |
+|---|---|---|---|---|---|
+| `booking` | 7 | **7/7** | 20 | 7 | 3 |
+| `customer-service` | 5 | 4 | 26 | 0 | 4 |
+| `customer` | 2 | 2 | 9 | 0 | 1 |
+| `wallet` | 2 | 1 | 0 | 0 | 1 |
+| `notification` | 1 | 1 | 0 | 0 | 1 |
+| `profile` | 4 | 4 | 4 | 0 | 3 |
+| `tracking` | 1 | 1 | 2 | 1 | 0 |
+
+**`booking` không có file nào dưới 200 dòng.**
+
+## File liên quan (sắp theo rủi ro giảm dần)
+
+| File | Dòng | Ghi chú |
+|---|---|---|
+| `booking/pages/BookingDetailPage.tsx` | **1911** | ⚠️ Rủi ro cao nhất toàn dự án |
+| `customer-service/pages/CustomerServiceDetailPage.tsx` | 931 | Trang chọn dịch vụ + tuỳ chọn giá |
+| `notification/pages/NotificationsPage.tsx` | 685 | |
+| `customer/pages/CustomerProfilePage.tsx` | 681 | |
+| `booking/pages/CreateBookingStep2Page.tsx` | 628 | |
+| `booking/pages/ConfirmPaymentPage.tsx` | 594 | ⚠️ Đụng PayOS |
+| `wallet/pages/WalletPage.tsx` | 559 | ⚠️ Đụng số dư tiền |
+| `tracking/components/OrderTrackingMap.tsx` | 849 | Leaflet, nhiều side-effect |
+| `profile/components/AddressBookModal.tsx` | 724 | |
+| `profile/components/UserProfileSection.tsx` | 630 | |
+| `customer-service/pages/PublicProviderProfilePage.tsx` | 486 | |
+| `customer-service/pages/CustomerServiceListPage.tsx` | 327 | |
+| `booking/pages/CreateBookingStep1Page.tsx` | 275 | |
+| `booking/pages/BookingSuccessPage.tsx` | 248 | |
+| `booking/pages/BookingHistoryPage.tsx` | 200 | |
+
+## Thứ tự thực hiện (quan trọng)
+
+Làm từ **thấp rủi ro → cao rủi ro** để tích luỹ hiểu biết về codebase trước khi
+chạm vào file 1911 dòng:
+
+1. `BookingHistoryPage` (200) → `BookingSuccessPage` (248) → `CreateBookingStep1Page` (275)
+2. `CustomerServiceListPage` (327) → `PublicProviderProfilePage` (486)
+3. `NotificationsPage` (685) → `CustomerProfilePage` (681) → `AddressBookModal` (724)
+4. `WalletPage` (559) → `ConfirmPaymentPage` (594) ⚠️ test thanh toán kỹ
+5. `CreateBookingStep2Page` (628) → `CustomerServiceDetailPage` (931)
+6. `OrderTrackingMap` (849) — tách riêng, nhiều side-effect Leaflet
+7. **`BookingDetailPage` (1911) — làm cuối cùng**
+
+## Ghi chú riêng cho `BookingDetailPage.tsx`
+
+Trang này gộp: chi tiết đơn, trạng thái, thanh toán, hoàn tiền, khiếu nại, chat,
+đánh giá. Đề xuất tách theo **khối nghiệp vụ**, không theo khối giao diện:
+
+```
+booking/pages/BookingDetailPage.tsx        ← chỉ còn bố cục + điều phối
+booking/components/detail/
+  ├── BookingStatusTimeline.tsx
+  ├── BookingServiceSummary.tsx
+  ├── BookingPaymentPanel.tsx      ⚠️ đụng tiền
+  ├── BookingRefundPanel.tsx       ⚠️ đụng tiền
+  ├── BookingComplaintPanel.tsx
+  └── BookingFeedbackPanel.tsx
+```
+
+**Bắt buộc:** tách từng khối một, build + test tay sau mỗi khối. Không tách cả
+7 khối rồi mới chạy thử.
+
+## Todo
+
+- [ ] Tách 15 file theo đúng thứ tự rủi ro ở trên
+- [ ] `bg-white`/`text-white` → token (57 chỗ trong nhóm này)
+- [ ] Gỡ 7 `glass-card` trong `booking`
+- [ ] Thay 12 chỗ `"Đang tải"` bằng skeleton
+- [ ] Thay `ui-avatars.com` (4 file) bằng `InitialsAvatar`
+- [ ] Định dạng tiền tệ nhất quán (`tabular-nums` + `Intl.NumberFormat('vi-VN')`)
+- [ ] Test tay: đặt đơn → thanh toán → theo dõi → đánh giá
+- [ ] Build xanh + ESLint 0 lỗi
+
+## Tiêu chí hoàn thành
+
+- Không còn file > 200 dòng trong `booking`, `customer-service`, `customer`, `wallet`, `profile`, `notification`
+- Luồng đặt đơn hoàn chỉnh chạy được từ đầu tới cuối, không lỗi console
+- Số tiền hiển thị đúng định dạng Việt Nam ở mọi trang
+- Không còn `ui-avatars.com` trong nhóm này
+
+## Rủi ro
+
+| Rủi ro | Mức | Giảm thiểu |
+|---|---|---|
+| Tách `BookingDetailPage` làm sai luồng thanh toán/hoàn tiền | **Rất cao** | Làm cuối cùng, tách từng khối, test tay sau mỗi khối, commit nhỏ |
+| `ConfirmPaymentPage` + PayOS: đổi UI làm hỏng callback return/cancel | **Cao** | Không đụng logic URL redirect; test bằng đơn thật ở sandbox |
+| `WalletPage` hiển thị sai số dư sau refactor | **Cao** | Đối chiếu số hiển thị với response API trước/sau |
+| `OrderTrackingMap` — Leaflet cleanup sai gây rò bộ nhớ | Trung bình | Giữ nguyên `useEffect` cleanup, chỉ đụng phần trình bày |
+
+## Bảo mật
+
+- **Không** đưa số tài khoản, mã giao dịch PayOS đầy đủ ra UI hoặc `console.log`
+- Giữ nguyên kiểm tra quyền sở hữu đơn hàng — refactor UI không được bỏ điều kiện
+  render dựa trên vai trò
+- Không cache dữ liệu ví/thanh toán vào `localStorage` khi refactor state
+
+## Bước kế tiếp
+
+Độc lập với Phase 1, 3, 4.
