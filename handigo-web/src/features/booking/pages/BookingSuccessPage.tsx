@@ -95,7 +95,7 @@ const BookingSuccessPage = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-md w-full max-w-4xl">
-          <section className="md:col-span-2 glass-card rounded-3xl p-md shadow-sm">
+          <section className="md:col-span-2 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl p-md shadow-sm">
             <div className="flex justify-between items-start mb-md">
               <div>
                 <span className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">
@@ -151,7 +151,7 @@ const BookingSuccessPage = () => {
           </section>
 
           <section className="md:col-span-1 flex flex-col gap-md">
-            <div className="glass-card rounded-3xl p-md shadow-sm flex flex-col h-full">
+            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-3xl p-md shadow-sm flex flex-col h-full">
               <h3 className="font-headline-md text-headline-md mb-md">Tóm tắt</h3>
               <div className="space-y-sm flex-grow">
                 <div className="flex justify-between text-label-md">
@@ -214,7 +214,7 @@ const BookingSuccessPage = () => {
           <div className="absolute inset-0 bg-slate-200 flex items-center justify-center overflow-hidden">
             <img className="w-full h-full object-cover opacity-60 grayscale" src={mapImage} alt="Bản đồ vị trí" />
             <div className="absolute inset-0 bg-gradient-to-t from-surface-container/80 to-transparent" />
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-md py-xs rounded-full shadow-md flex items-center gap-sm">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-surface-container-lowest/90 backdrop-blur-sm px-md py-xs rounded-full shadow-md flex items-center gap-sm">
               <div className="w-3 h-3 bg-primary rounded-full animate-pulse" />
               <span className="text-label-sm font-label-sm text-on-surface">Đang tìm chuyên gia gần nhất...</span>
             </div>

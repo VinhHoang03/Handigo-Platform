@@ -8,6 +8,7 @@ import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalo
 import type { Service, ServiceOption } from '../../../types/booking';
 import { ReliableImage } from '@/components/common/ReliableImage';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
+import { toneOutlineClasses } from '@/utils/statusTone';
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
@@ -15,19 +16,20 @@ interface BookingShellProps {
   children: ReactNode;
 }
 
+// Bảng màu quy về token ngữ nghĩa dùng chung, xem `utils/statusTone.ts`.
 const statusToneClass: Record<BookingStatusTone, string> = {
-  completed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  pending: 'border-amber-200 bg-amber-50 text-amber-700',
-  cancelled: 'border-red-200 bg-red-50 text-red-700',
-  active: 'border-blue-200 bg-blue-50 text-blue-700',
+  completed: toneOutlineClasses.success,
+  pending: toneOutlineClasses.warning,
+  cancelled: toneOutlineClasses.error,
+  active: toneOutlineClasses.info,
 };
 
 const orderStatusClass: Record<string, string> = {
-  created: 'border-amber-200 bg-amber-50 text-amber-700',
-  accepted: 'border-violet-200 bg-violet-50 text-violet-700',
-  in_progress: 'border-blue-200 bg-blue-50 text-blue-700',
-  completed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  cancelled: 'border-red-200 bg-red-50 text-red-700',
+  created: toneOutlineClasses.warning,
+  accepted: toneOutlineClasses.brand,
+  in_progress: toneOutlineClasses.info,
+  completed: toneOutlineClasses.success,
+  cancelled: toneOutlineClasses.error,
 };
 
 export const BookingShell: React.FC<BookingShellProps> = ({ children }) => (
@@ -173,7 +175,7 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
         {booking?.statusLabel || 'Đang xử lý'}
       </span>
       {booking?.rating ? (
-        <div className="flex items-center gap-1 px-2 text-amber-500">
+        <div className="flex items-center gap-1 px-2 text-tertiary">
           <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
             star
           </span>
@@ -284,7 +286,7 @@ export const OrderSummaryCard: React.FC<{
 
   return (
     <aside className="space-y-md lg:sticky lg:top-24">
-      <div className="bg-white rounded-3xl p-md shadow-lg border border-outline-variant/30">
+      <div className="bg-surface-container-lowest rounded-3xl p-md shadow-lg border border-outline-variant/30">
         <h3 className="font-headline-md text-headline-md text-primary mb-md">Tóm tắt đơn hàng</h3>
 
         <div className="space-y-md">
@@ -362,7 +364,7 @@ export const OrderSummaryCard: React.FC<{
             <div>
               <span className="font-bold">Tổng cộng</span>
               {discountAmount > 0 && (
-                <p className="mt-1 text-sm font-semibold text-emerald-600">
+                <p className="mt-1 text-sm font-semibold text-success">
                   Đã giảm {discountAmount.toLocaleString("vi-VN")}đ
                 </p>
               )}
@@ -395,7 +397,7 @@ export const OrderSummaryCard: React.FC<{
           <button
             onClick={handleAction}
             disabled={isLoading || (step === 1 && !serviceId)}
-            className="w-full bg-primary text-white py-md rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:-translate-y-1 active:translate-y-0 transition-[transform,box-shadow] flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
+            className="w-full bg-primary text-on-primary py-md rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:-translate-y-1 active:translate-y-0 transition-[transform,box-shadow] flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
           >
             {isLoading ? (
               <span className="animate-spin material-symbols-outlined">progress_activity</span>

@@ -734,8 +734,8 @@ export default function CustomerServiceDetailPage() {
                     : "Báo giá sau khảo sát"}
                 </p>
               </div>
-              <div className="flex items-center gap-3 rounded-lg bg-success-green/10 p-3">
-                <span className="material-symbols-outlined text-success-green">
+              <div className="flex items-center gap-3 rounded-lg bg-success/10 p-3">
+                <span className="material-symbols-outlined text-success">
                   verified_user
                 </span>
                 <span className="text-sm font-bold">Provider đã được xác minh</span>

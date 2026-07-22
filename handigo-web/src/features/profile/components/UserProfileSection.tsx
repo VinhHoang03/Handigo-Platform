@@ -22,8 +22,7 @@ import {
   normalizeVietnamesePhone,
 } from "@/utils/phoneValidation";
 
-const DEFAULT_AVATAR =
-  "https://ui-avatars.com/api/?name=Handigo&background=4f46e5&color=fff";
+const DEFAULT_AVATAR = undefined;
 
 interface UserProfileSectionProps {
   user: UserProfileData;

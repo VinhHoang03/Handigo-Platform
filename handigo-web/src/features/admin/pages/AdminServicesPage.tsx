@@ -618,7 +618,7 @@ export default function AdminServicesPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="truncate text-label-md font-bold text-on-surface">{svc.name}</p>
-                        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${svc.isActive ? 'bg-success-green' : 'bg-outline'}`}
+                        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${svc.isActive ? 'bg-success' : 'bg-outline'}`}
                           title={svc.isActive ? 'Hoạt động' : 'Tạm ngưng'} aria-label={svc.isActive ? 'Hoạt động' : 'Tạm ngưng'}>
                         </span>
                       </div>
@@ -663,7 +663,7 @@ export default function AdminServicesPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <h2 id="service-detail-title" className="text-wrap-balance font-headline-md text-headline-md font-bold text-on-surface">{selectedService.name}</h2>
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedService.isActive ? 'bg-success-green/10 text-success-green' : 'bg-on-surface-variant/10 text-on-surface-variant'}`}>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedService.isActive ? 'bg-success/10 text-success' : 'bg-on-surface-variant/10 text-on-surface-variant'}`}>
                               {selectedService.isActive ? 'Hoạt động' : 'Tạm ngưng'}
                             </span>
                           </div>
@@ -771,7 +771,7 @@ export default function AdminServicesPage() {
                               </td>
                               <td className="border-y border-outline-variant/30 px-4 py-4">
                                 {opt.isActive
-                                  ? <span className="rounded-full bg-success-green/10 px-2.5 py-1 text-[12px] font-bold text-success-green">Hoạt động</span>
+                                  ? <span className="rounded-full bg-success/10 px-2.5 py-1 text-[12px] font-bold text-success">Hoạt động</span>
                                   : <span className="rounded-full bg-on-surface-variant/10 px-2.5 py-1 text-[12px] font-bold text-on-surface-variant">Tạm ngưng</span>}
                               </td>
                               <td className="rounded-r-lg border-y border-r border-outline-variant/30 px-4 py-4 text-right">

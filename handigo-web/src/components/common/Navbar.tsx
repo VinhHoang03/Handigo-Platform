@@ -1,3 +1,4 @@
+import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { authService } from "@/features/auth/services/auth.service";
@@ -22,7 +23,7 @@ interface NavbarItem {
 interface NavbarProps {
   role?: AppRole;
   isScrolled?: boolean;
-  userAvatar?: string;
+  userAvatar?: string | null;
   showStatusToggle?: boolean;
   isOnline?: boolean;
   onStatusToggle?: () => void;
@@ -118,10 +119,8 @@ export function Navbar({
   const currentRole = isAuthenticated ? authenticatedRole : role;
   const scrolled = isScrolled ?? internalScrolled;
   const navItems = useMemo(() => createNavbarItems(currentRole), [currentRole]);
-  const avatar =
-    userAvatar ||
-    user?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || "Handigo")}&background=4f46e5&color=fff`;
+  // Thiếu ảnh thì `InitialsAvatar` lùi về chữ cái đầu, không gọi CDN ngoài.
+  const avatar = userAvatar || user?.avatar;
 
   useEffect(() => {
     const handleScroll = () => setInternalScrolled(window.scrollY > 20);
@@ -361,10 +360,11 @@ export function Navbar({
                   onClick={() => setIsAccountOpen((open) => !open)}
                   className="h-10 w-10 overflow-hidden rounded-full border border-outline-variant bg-surface-container-highest transition-all hover:border-primary focus:ring-4 focus:ring-primary/15"
                 >
-                  <img
-                    alt="Ảnh đại diện"
+                  <InitialsAvatar
+                    name={user?.fullName || "Handigo"}
                     src={avatar}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full"
+                    textClassName="text-xs"
                   />
                 </button>
 

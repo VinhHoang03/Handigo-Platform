@@ -257,7 +257,7 @@ const CreateBookingStep2Page = () => {
 
       <div className="grid grid-cols-1 gap-lg lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-md">
-          <section className="rounded-2xl border border-outline-variant/30 bg-white p-md shadow-sm">
+          <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm">
             <div className="mb-sm flex items-center justify-between gap-md">
               <h2 className="font-headline-sm text-headline-sm text-primary">Thông tin thực hiện</h2>
             </div>
@@ -336,7 +336,7 @@ const CreateBookingStep2Page = () => {
                       type="button"
                       aria-label="Xóa ảnh hiện trạng"
                       onClick={() => handleRemoveAttachment(url)}
-                      className="absolute top-1 right-1 bg-black/55 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-black/55 text-on-primary rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <span className="material-symbols-outlined text-xs">close</span>
                     </button>
@@ -350,7 +350,7 @@ const CreateBookingStep2Page = () => {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-outline-variant/30 bg-white p-md shadow-sm">
+          <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm">
             <h2 className="font-headline-sm text-headline-sm text-primary mb-sm">Thời gian thực hiện</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-sm">
               {[

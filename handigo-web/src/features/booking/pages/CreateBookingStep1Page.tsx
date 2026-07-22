@@ -91,7 +91,7 @@ const CreateBookingStep1Page = () => {
         <div className="col-span-12 lg:col-span-8 space-y-xl">
           <section>
             <h2 className="font-headline-md text-headline-md mb-md flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">1</span>
+              <span className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center text-sm">1</span>
               Chọn loại dịch vụ
             </h2>
             <div className="grid grid-cols-6 gap-sm">
@@ -99,7 +99,7 @@ const CreateBookingStep1Page = () => {
                 <button
                   key={cat._id}
                   onClick={() => handleSelectCategory(cat._id)}
-                  className={`group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 bg-white px-2 py-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
+                  className={`group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 bg-surface-container-lowest px-2 py-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
                   }`}
                 >
                   <div className="mb-2 flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-primary-container/10 transition-colors group-hover:bg-primary-container/20">
@@ -129,7 +129,7 @@ const CreateBookingStep1Page = () => {
 
           <section>
             <h2 className="font-headline-md text-headline-md mb-md flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">2</span>
+              <span className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center text-sm">2</span>
               Chọn dịch vụ cụ thể
             </h2>
             <div className="space-y-md">
@@ -138,7 +138,7 @@ const CreateBookingStep1Page = () => {
                   <button
                     key={service._id}
                     onClick={() => setServiceId(service._id)}
-                    className={`relative text-left overflow-hidden rounded-xl glass-card border-2 cursor-pointer group transition-all hover:border-outline-variant ${serviceId === service._id ? 'border-primary bg-primary-container/5' : 'border-transparent'
+                    className={`relative text-left overflow-hidden rounded-xl bg-surface-container-lowest border border-outline-variant/30 border-2 cursor-pointer group transition-all hover:border-outline-variant ${serviceId === service._id ? 'border-primary bg-primary-container/5' : 'border-transparent'
                       }`}
                   >
                     {serviceId === service._id ? (
@@ -185,7 +185,7 @@ const CreateBookingStep1Page = () => {
                           {group.options.map((option) => (
                             <label
                               key={option._id}
-                              className={`flex items-center gap-2 px-4 py-2 bg-white rounded-full border cursor-pointer hover:border-primary transition-colors ${selectedOptionIds.includes(option._id) ? 'border-primary bg-primary/5' : 'border-outline-variant'}`}
+                              className={`flex items-center gap-2 px-4 py-2 bg-surface-container-lowest rounded-full border cursor-pointer hover:border-primary transition-colors ${selectedOptionIds.includes(option._id) ? 'border-primary bg-primary/5' : 'border-outline-variant'}`}
                             >
                               <input
                                 className="rounded text-primary focus:ring-primary"
@@ -251,7 +251,7 @@ const CreateBookingStep1Page = () => {
               key={cat._id}
               type="button"
               onClick={() => handleSelectCategory(cat._id)}
-              className={`group flex min-h-[112px] flex-col items-center justify-center rounded-xl border-2 bg-white px-3 py-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
+              className={`group flex min-h-[112px] flex-col items-center justify-center rounded-xl border-2 bg-surface-container-lowest px-3 py-4 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-md ${categoryId === cat._id ? 'border-primary bg-surface-container-low shadow-primary/10' : 'border-outline-variant/30'
                 }`}
             >
               <div className="mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary-container/10 transition-colors group-hover:bg-primary-container/20">

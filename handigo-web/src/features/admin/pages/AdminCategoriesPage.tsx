@@ -292,8 +292,8 @@ export default function AdminCategoriesPage() {
                     </td>
                     <td className="px-6 py-5">
                       {cat.isActive ? (
-                        <div className="flex items-center gap-2 text-label-md font-bold text-success-green">
-                          <span className="h-2 w-2 rounded-full bg-success-green" /> Hoạt động
+                        <div className="flex items-center gap-2 text-label-md font-bold text-success">
+                          <span className="h-2 w-2 rounded-full bg-success" /> Hoạt động
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-label-md font-bold text-error">
@@ -397,7 +397,7 @@ function StatCard({ icon, label, value, trend, trendUp }: { icon: string; label:
         <p className="font-label-md uppercase tracking-wide text-on-surface-variant">{label}</p>
         <p className="mt-2 font-headline-md text-headline-md font-bold">{value}</p>
         {trend && (
-          <div className={`mt-4 flex items-center gap-2 text-label-sm ${trendUp ? 'text-success-green' : 'text-on-surface-variant'}`}>
+          <div className={`mt-4 flex items-center gap-2 text-label-sm ${trendUp ? 'text-success' : 'text-on-surface-variant'}`}>
             {trendUp && <span className="material-symbols-outlined text-[18px]">trending_up</span>}
             <span>{trend}</span>
           </div>

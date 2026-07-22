@@ -1,3 +1,4 @@
+import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
@@ -14,7 +15,7 @@ const ACCEPTED_AVATAR_TYPES = new Set([
 ]);
 
 interface AvatarEditorProps {
-  src: string;
+  src?: string;
   fullName: string;
   onSave: (url: string) => Promise<void> | void;
   size?: "md" | "lg";
@@ -213,10 +214,10 @@ export function AvatarEditor({
         className={`group relative shrink-0 overflow-hidden rounded-full ring-4 ring-primary-container/20 focus:outline-none focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 ${sizeClass}`}
         aria-label="Đổi ảnh đại diện"
       >
-        <img
+        <InitialsAvatar
+          name={fullName}
           src={src}
-          alt={`Ảnh đại diện của ${fullName}`}
-          className="h-full w-full object-cover transition duration-200 group-hover:opacity-40 group-focus-visible:opacity-40"
+          className="h-full w-full transition duration-200 group-hover:opacity-40 group-focus-visible:opacity-40"
         />
         <span className="absolute inset-0 grid place-items-center bg-on-surface/0 text-white opacity-0 transition duration-200 group-hover:bg-on-surface/35 group-hover:opacity-100 group-focus-visible:bg-on-surface/35 group-focus-visible:opacity-100">
           <Camera size={size === "lg" ? 28 : 22} aria-hidden="true" />
@@ -239,10 +240,11 @@ export function AvatarEditor({
                 onPointerCancel={handlePointerUp}
               />
             ) : (
-              <img
+              <InitialsAvatar
+                name={fullName}
                 src={src}
-                alt="Ảnh đại diện hiện tại"
-                className="h-40 w-40 rounded-full border-4 border-primary/10 object-cover shadow-md"
+                className="h-40 w-40 border-4 border-primary/10 shadow-md"
+                textClassName="text-4xl"
               />
             )}
           </div>

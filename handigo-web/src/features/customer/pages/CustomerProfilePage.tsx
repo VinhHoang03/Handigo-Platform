@@ -21,8 +21,7 @@ import type {
   UserProfileFormValue,
 } from "@/features/profile/types/profile.types";
 
-const DEFAULT_AVATAR =
-  "https://ui-avatars.com/api/?name=Customer&background=4f46e5&color=fff";
+const DEFAULT_AVATAR = undefined;
 
 const WAITING_PROVIDER_STATUSES: ProviderApplication["status"][] = [
   "pending",

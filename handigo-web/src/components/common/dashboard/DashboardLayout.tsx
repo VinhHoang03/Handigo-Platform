@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { Navbar } from "@/components/common/Navbar";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { NotificationBell } from "@/components/common/NotificationBell";
@@ -19,7 +20,7 @@ const normalizeRole = (role?: string | null): DashboardRole | undefined => {
 };
 
 interface ProviderTopbarProps {
-  userAvatar?: string;
+  userAvatar?: string | null;
   isOnline?: boolean;
   onStatusToggle?: () => void;
   switchLabel?: string;
@@ -39,10 +40,7 @@ function ProviderTopbar({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const avatar =
-    userAvatar ||
-    user?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || "Handigo")}&background=4f46e5&color=fff`;
+  const avatar = userAvatar || user?.avatar;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -137,10 +135,11 @@ function ProviderTopbar({
               onClick={() => setIsAccountOpen((open) => !open)}
               className="h-10 w-10 overflow-hidden rounded-full border border-outline-variant bg-surface-container-highest transition-all hover:border-primary focus:ring-4 focus:ring-primary/15"
             >
-              <img
-                alt="Ảnh đại diện"
+              <InitialsAvatar
+                name={user?.fullName || "Handigo"}
                 src={avatar}
-                className="h-full w-full object-cover"
+                className="h-full w-full"
+                textClassName="text-xs"
               />
             </button>
 
@@ -213,7 +212,7 @@ interface DashboardLayoutProps {
   switchLabel?: string;
   onSwitch?: () => void;
   switchVariant?: "outline" | "gradient";
-  userAvatar?: string;
+  userAvatar?: string | null;
   showStatusToggle?: boolean;
   isOnline?: boolean;
   onStatusToggle?: () => void;

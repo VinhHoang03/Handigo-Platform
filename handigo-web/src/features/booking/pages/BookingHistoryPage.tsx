@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BookingHistoryCard, BookingPageHeader, BookingShell } from '../components/BookingComponents';
+import { BookingHistoryListSkeleton } from '../components/BookingSkeletons';
+import { AsyncState } from '@/components/common/AsyncState';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import type { Order } from '../../../types/booking';
@@ -102,7 +104,7 @@ const BookingHistoryPage = () => {
             <div className="relative w-full md:w-[400px]">
               <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">search</span>
               <input
-                className="w-full pl-12 pr-10 py-3 bg-primary/5 rounded-full border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none text-body-md transition-all placeholder:text-on-surface-variant/60"
+                className="w-full pl-12 pr-10 py-3 bg-primary/5 rounded-full border border-primary/10 focus:border-primary focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/10 outline-none text-body-md transition-all placeholder:text-on-surface-variant/60"
                 placeholder="Tìm kiếm đơn đặt chỗ..."
                 type="text"
                 value={searchTerm}
@@ -144,37 +146,26 @@ const BookingHistoryPage = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-md">
-        {error && !loading ? (
-          <div className="rounded-2xl border border-error/20 bg-error/10 p-md text-center text-error">
-            <p>{error}</p>
-            <button
-              type="button"
-              onClick={() => void fetchOrders(activeFilter, debouncedSearch, 1)}
-              className="mt-3 rounded-xl bg-error px-4 py-2 font-semibold text-on-error"
-            >
-              Thử lại
-            </button>
-          </div>
-        ) : loading ? (
-          <div className="text-center py-xl flex flex-col items-center gap-2">
-            <span className="animate-spin material-symbols-outlined text-primary text-4xl">progress_activity</span>
-            <p className="text-on-surface-variant animate-pulse">Đang tải danh sách...</p>
-          </div>
-        ) : (
+        <AsyncState
+          loading={loading}
+          error={error}
+          onRetry={() => void fetchOrders(activeFilter, debouncedSearch, 1)}
+          skeleton={<BookingHistoryListSkeleton />}
+        >
           <>
             {formattedBookings.map((booking, index) => (
               <BookingHistoryCard key={booking.id !== 'unknown' ? booking.id : `booking-${index}`} booking={booking} />
             ))}
             {formattedBookings.length === 0 && (
               <div className="py-xl text-center">
-                <span className="material-symbols-outlined text-6xl text-on-surface-variant/30 mb-2">assignment_late</span>
-                <p className="text-on-surface-variant font-medium">
+                <span aria-hidden="true" className="material-symbols-outlined mb-2 text-6xl text-on-surface-variant/30">assignment_late</span>
+                <p className="font-medium text-on-surface-variant">
                   {debouncedSearch ? `Không tìm thấy kết quả cho "${debouncedSearch}"` : 'Bạn chưa có đơn đặt lịch nào.'}
                 </p>
                 {activeFilter !== 'all' && (
                   <button
                     onClick={() => setActiveFilter('all')}
-                    className="mt-4 text-primary font-label-md hover:underline"
+                    className="mt-4 font-label-md text-primary hover:underline"
                   >
                     Xem tất cả đơn hàng
                   </button>
@@ -182,7 +173,7 @@ const BookingHistoryPage = () => {
               </div>
             )}
           </>
-        )}
+        </AsyncState>
       </div>
 
       {!loading && total > 5 && formattedBookings.length < total && (

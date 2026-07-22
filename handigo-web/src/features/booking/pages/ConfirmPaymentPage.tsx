@@ -476,7 +476,7 @@ const ConfirmPaymentPage = () => {
                     />
                     <div className="flex-1 flex items-center gap-4 peer-focus-visible:rounded-lg peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15">
                       <div
-                        className={`w-12 h-12 rounded-lg flex items-center justify-center ${effectivePaymentMethod === value ? "bg-primary text-white" : "bg-on-surface/5 text-on-surface"}`}
+                        className={`w-12 h-12 rounded-lg flex items-center justify-center ${effectivePaymentMethod === value ? "bg-primary text-on-primary" : "bg-on-surface/5 text-on-surface"}`}
                       >
                         <span className="material-symbols-outlined">
                           {icon}
@@ -493,7 +493,7 @@ const ConfirmPaymentPage = () => {
                       </div>
                     </div>
                     <div className="w-6 h-6 border-2 border-outline-variant rounded-full peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">
-                      <div className="w-2.5 h-2.5 bg-white rounded-full" />
+                      <div className="w-2.5 h-2.5 bg-surface-container-lowest rounded-full" />
                     </div>
                   </label>
                 ))}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ReliableImage } from "@/components/common/ReliableImage";
+import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import {
   customerServiceApi,
   type NearbyProvider,
@@ -34,9 +34,6 @@ const formatDistance = (distanceMeters: number) => {
   return `${(distanceMeters / 1000).toFixed(1)} km`;
 };
 
-const getProviderAvatar = (provider: NearbyProvider) =>
-  provider.user.avatar ||
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(provider.user.fullName || "Handigo")}&background=E2DFFF&color=0F006D`;
 
 export function NearbyProviderSelector({
   serviceId,
@@ -230,12 +227,12 @@ export function NearbyProviderSelector({
               >
                 <div className="flex items-center gap-3">
                   <div className="relative shrink-0">
-                    <ReliableImage
-                      src={getProviderAvatar(provider)}
-                      alt={provider.user.fullName}
-                      className="h-14 w-14 rounded-full object-cover"
+                    <InitialsAvatar
+                      name={provider.user.fullName || "Thợ"}
+                      src={provider.user.avatar}
+                      className="h-14 w-14"
                     />
-                    <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white bg-success-green" />
+                    <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white bg-success" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-on-surface">

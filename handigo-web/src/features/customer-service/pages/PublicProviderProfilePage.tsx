@@ -1,3 +1,4 @@
+import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CategoryIcon } from "@/components/common/CategoryIcon";
@@ -7,14 +8,6 @@ import {
   customerServiceApi,
   type PublicProviderProfile,
 } from "../api/customerService.api";
-
-const getAvatar = (profile: PublicProviderProfile) =>
-  profile.user.avatar ||
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.user.fullName)}&background=E2DFFF&color=0F006D`;
-
-const getCustomerAvatar = (name: string, avatar?: string | null) =>
-  avatar ||
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=F2F3FF&color=131B2E`;
 
 const formatDate = (value?: string) => {
   if (!value) return "";
@@ -139,13 +132,12 @@ export default function PublicProviderProfilePage() {
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
         <div className="space-y-10 lg:col-span-8">
           <section className="flex flex-col items-center gap-4 rounded-2xl border border-outline-variant/20 bg-white p-4 text-center shadow-sm sm:flex-row sm:text-left md:p-5">
-            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border border-outline-variant/30 shadow-sm md:h-28 md:w-28">
-              <img
-                src={getAvatar(profile)}
-                alt={profile.user.fullName}
-                className="h-full w-full object-cover"
-              />
-            </div>
+            <InitialsAvatar
+              name={profile.user.fullName}
+              src={profile.user.avatar}
+              className="h-24 w-24 shrink-0 border border-outline-variant/30 md:h-28 md:w-28"
+              textClassName="text-2xl"
+            />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 <h1 className="break-words text-2xl font-bold text-on-background md:text-3xl">
@@ -256,13 +248,11 @@ export default function PublicProviderProfilePage() {
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={getCustomerAvatar(
-                          feedback.customer.fullName,
-                          feedback.customer.avatar,
-                        )}
-                        alt={feedback.customer.fullName}
-                        className="h-10 w-10 rounded-full object-cover"
+                      <InitialsAvatar
+                        name={feedback.customer.fullName}
+                        src={feedback.customer.avatar}
+                        className="h-10 w-10"
+                        textClassName="text-xs"
                       />
                       <div>
                         <p className="font-bold">
