@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
+import { ServiceCategoryFilter } from "../components/ServiceCategoryFilter";
+import { ServiceListToolbar } from "../components/ServiceListToolbar";
+import { ServiceCard } from "../components/ServiceCard";
+import { ServiceListSkeleton } from "../components/ServiceListSkeleton";
+import { AsyncState } from "@/components/common/AsyncState";
 import { customerServiceApi } from "../api/customerService.api";
-import {
-  getCategoryId,
-  getCategoryName,
-  getServiceImage,
-  getServicePrice,
-  money,
-} from "../utils/serviceDisplay";
-import { ReliableImage } from "@/components/common/ReliableImage";
-import { CategoryIcon } from "@/components/common/CategoryIcon";
+import { getCategoryId, getServicePrice } from "../utils/serviceDisplay";
 import type { Category, Service, ServiceOption } from "@/types/booking";
 
 const getErrorMessage = (error: unknown) => {
@@ -150,110 +147,21 @@ export default function CustomerServiceListPage() {
   return (
     <CustomerServiceLayout>
       <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-4">
-        <aside className="md:sticky md:top-32 md:col-span-1 md:self-start">
-          <div className="rounded-xl border border-outline-variant/30 bg-white p-5 shadow-sm md:max-h-[calc(100vh-9rem)] md:overflow-y-auto">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-on-surface">Bộ lọc</h2>
-              <span className="material-symbols-outlined text-on-surface-variant">
-                tune
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <p className="mb-3 text-xs font-bold uppercase text-outline">
-                Danh mục
-              </p>
-              <button
-                type="button"
-                onClick={() => handleCategoryChange("")}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
-                  !selectedCategoryId
-                    ? "bg-primary text-on-primary"
-                    : "text-on-surface hover:bg-surface-container-low"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[20px]">
-                  apps
-                </span>
-                Tất cả dịch vụ
-              </button>
-              {categories.map((category) => {
-                const categoryImage = category.image;
-
-                return (
-                  <button
-                    key={category._id}
-                    type="button"
-                    onClick={() => handleCategoryChange(category._id)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
-                      selectedCategoryId === category._id
-                        ? "bg-primary text-on-primary"
-                        : "text-on-surface hover:bg-surface-container-low"
-                    }`}
-                  >
-                    {categoryImage ? (
-                      <ReliableImage
-                        src={categoryImage.replace(
-                          /^http:\/\/res\.cloudinary\.com/i,
-                          "https://res.cloudinary.com",
-                        )}
-                        alt={category.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-5 w-5 shrink-0 rounded object-cover"
-                      />
-                    ) : (
-                      <CategoryIcon
-                        icon={category.icon}
-                        name={category.name}
-                        className="h-5 w-5 shrink-0"
-                      />
-                    )}
-                    {category.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
+        <ServiceCategoryFilter
+          categories={categories}
+          selectedCategoryId={selectedCategoryId}
+          onSelect={handleCategoryChange}
+        />
 
         <section className="md:col-span-3">
-          <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-            <div>
-              <p className="text-sm font-bold uppercase text-primary">
-                Dịch vụ Handigo
-              </p>
-              <h1 className="mt-2 text-3xl font-bold text-on-surface">
-                {selectedCategory?.name || "Danh sách dịch vụ"}
-              </h1>
-              <p className="mt-1 text-on-surface-variant">
-                Hiển thị {visibleServices.length} dịch vụ phù hợp
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative min-w-64">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                  search
-                </span>
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tìm kiếm dịch vụ..."
-                  className="min-h-11 w-full rounded-full border border-outline-variant/40 bg-white pl-10 pr-4 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                />
-              </div>
-              <select
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value)}
-                className="min-h-11 rounded-full border border-outline-variant/40 bg-white px-4 text-sm font-semibold text-primary"
-              >
-                <option value="popular">Phổ biến nhất</option>
-                <option value="price_asc">Giá thấp đến cao</option>
-                <option value="name">Tên A-Z</option>
-              </select>
-            </div>
-          </div>
+          <ServiceListToolbar
+            title={selectedCategory?.name || "Danh sách dịch vụ"}
+            resultCount={visibleServices.length}
+            search={search}
+            onSearchChange={setSearch}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+          />
 
           {error && (
             <div className="mb-4 rounded-lg bg-error/10 px-4 py-3 text-error">
@@ -261,65 +169,23 @@ export default function CustomerServiceListPage() {
             </div>
           )}
 
-          {isLoading ? (
-            <div className="rounded-xl bg-white p-8 text-center text-on-surface-variant">
-              Đang tải danh sách dịch vụ...
-            </div>
-          ) : visibleServices.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-outline-variant bg-white p-8 text-center text-on-surface-variant">
-              Chưa có dịch vụ phù hợp.
-            </div>
-          ) : (
+          <AsyncState
+            loading={isLoading}
+            empty={visibleServices.length === 0}
+            emptyMessage="Chưa có dịch vụ phù hợp."
+            skeleton={<ServiceListSkeleton />}
+          >
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-              {visibleServices.map((service, index) => {
-                const price = getServicePrice(service);
-                const isQuoteOnly = price <= 0;
-                return (
-                  <Link
-                    key={service._id}
-                    to={`/customer/services/${service._id}`}
-                    className="group overflow-hidden rounded-2xl border border-outline-variant/20 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
-                  >
-                    <div className="relative h-48 overflow-hidden">
-                      <ReliableImage
-                        src={getServiceImage(service, index)}
-                        alt={service.name}
-                        loading={index < 3 ? "eager" : "lazy"}
-                        decoding="async"
-                        fetchPriority={index < 3 ? "high" : "auto"}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <span className="absolute left-4 top-4 rounded-full bg-primary-container/90 px-3 py-1 text-xs font-bold uppercase text-white">
-                        {getCategoryName(service, categories)}
-                      </span>
-                    </div>
-                    <div className="p-5">
-                      <h3 className="line-clamp-2 text-xl font-bold leading-tight text-on-surface transition-colors group-hover:text-primary">
-                        {service.name}
-                      </h3>
-                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
-                        <div>
-                          {!isQuoteOnly && (
-                            <span className="block text-xs text-outline">Từ</span>
-                          )}
-                          <span className="text-lg font-bold text-primary">
-                            {isQuoteOnly
-                              ? service.serviceType === "fixed_price"
-                                ? "Theo tùy chọn"
-                                : "Báo giá"
-                              : money.format(price)}
-                          </span>
-                        </div>
-                        <span className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary transition group-hover:bg-primary group-hover:text-on-primary">
-                          Xem chi tiết
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+              {visibleServices.map((service, index) => (
+                <ServiceCard
+                  key={service._id}
+                  service={service}
+                  index={index}
+                  categories={categories}
+                />
+              ))}
             </div>
-          )}
+          </AsyncState>
         </section>
       </div>
     </CustomerServiceLayout>

@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/common/Skeleton";
 import type { ChatbotAudience, ChatbotMessage } from "../types/chatbot.types";
 import { ChatbotComposer } from "./ChatbotComposer";
 import { ChatbotMessageList } from "./ChatbotMessageList";
@@ -66,13 +67,15 @@ export function ChatbotPanel({
       </header>
 
       {isLoading ? (
-        <div className="grid flex-1 place-items-center text-sm text-on-surface-variant">
-          <div className="text-center">
-            <span className="material-symbols-outlined animate-spin text-3xl text-primary">
-              progress_activity
-            </span>
-            <p className="mt-2">Đang tải cuộc trò chuyện...</p>
-          </div>
+        <div
+          className="flex-1 space-y-3 overflow-y-auto p-4"
+          role="status"
+          aria-busy="true"
+          aria-label="Đang tải cuộc trò chuyện"
+        >
+          <Skeleton className="h-16 w-3/5" rounded="rounded-2xl" />
+          <Skeleton className="ml-auto h-10 w-2/5" rounded="rounded-2xl" />
+          <Skeleton className="h-14 w-1/2" rounded="rounded-2xl" />
         </div>
       ) : (
         <ChatbotMessageList

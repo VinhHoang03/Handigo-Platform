@@ -4,16 +4,8 @@ import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import { chatApi } from "../api/chat.api";
 import type { Conversation } from "../types/chat.types";
 import { ChatPopup } from "./ChatPopup";
-
-const formatMessageTime = (value?: string) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const today = new Date();
-  return date.toDateString() === today.toDateString()
-    ? date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-};
+import { ConversationListItem } from "./ConversationListItem";
+import { ConversationListSkeleton } from "./ConversationListSkeleton";
 
 export function MessageCenter() {
   const user = useAuthStore((state) => state.user);
@@ -132,7 +124,7 @@ export function MessageCenter() {
         </button>
 
         {open && (
-          <div className="fixed inset-x-4 top-20 z-50 overflow-hidden rounded-2xl border border-outline-variant/30 bg-white shadow-[0_18px_46px_rgba(19,27,46,0.18)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-3 sm:w-[380px]">
+          <div className="fixed inset-x-4 top-20 z-50 overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-[0_18px_46px_rgba(19,27,46,0.18)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-3 sm:w-[380px]">
             <div className="flex items-center justify-between border-b border-outline-variant/20 px-4 py-3">
               <div>
                 <h2 className="font-bold text-on-surface">Tin nhắn</h2>
@@ -145,7 +137,7 @@ export function MessageCenter() {
 
             <div className="max-h-[min(520px,70vh)] overflow-y-auto p-2">
               {loading ? (
-                <p className="p-6 text-center text-sm text-on-surface-variant">Đang tải tin nhắn...</p>
+                <ConversationListSkeleton />
               ) : error ? (
                 <div className="p-5 text-center text-sm text-error"><p>{error}</p><button type="button" onClick={() => void load(true)} className="mt-2 font-bold text-primary">Thử lại</button></div>
               ) : items.length === 0 ? (
@@ -158,24 +150,16 @@ export function MessageCenter() {
                 const providerUser = typeof conversation.providerId === "object" && typeof conversation.providerId.userId === "object" ? conversation.providerId.userId : undefined;
                 const partner = role === "PROVIDER" ? customer : providerUser;
                 const partnerName = partner?.fullName || "Người dùng Handigo";
-                const avatar = partner?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(partnerName)}&background=4f46e5&color=fff`;
                 const unread = isUnread(conversation);
                 return (
-                  <button key={conversation._id} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-surface-container-low ${unread ? "bg-primary/5" : ""}`}>
-                    <img src={avatar} alt={`Ảnh đại diện của ${partnerName}`} className="h-11 w-11 shrink-0 rounded-full object-cover" />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className={`truncate text-sm ${unread ? "font-bold text-on-surface" : "font-semibold text-on-surface"}`}>{partnerName}</span>
-                        <span className="shrink-0 text-[11px] text-on-surface-variant">{formatMessageTime(conversation.lastMessage?.sentAt)}</span>
-                      </span>
-                      <span className="mt-1 flex items-center gap-2">
-                        <span className={`truncate text-xs ${unread ? "font-semibold text-on-surface" : "text-on-surface-variant"}`}>
-                          {conversation.lastMessage?.messageType === "image" ? "Đã gửi một hình ảnh" : conversation.lastMessage?.content || "Chưa có tin nhắn"}
-                        </span>
-                        {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                      </span>
-                    </span>
-                  </button>
+                  <ConversationListItem
+                    key={conversation._id}
+                    conversation={conversation}
+                    partnerName={partnerName}
+                    partnerAvatar={partner?.avatar}
+                    unread={unread}
+                    onOpen={openConversation}
+                  />
                 );
               })}
             </div>
