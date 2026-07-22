@@ -161,7 +161,7 @@ export default function RegisterPage() {
       <p className="mt-5 text-center text-sm text-on-surface-variant">
         Đã có tài khoản?{" "}
         <Link
-          className="font-semibold text-primary hover:text-primary-hover"
+          className="inline-flex min-h-11 items-center font-semibold text-primary hover:text-primary-hover"
           to="/login"
         >
           Đăng nhập

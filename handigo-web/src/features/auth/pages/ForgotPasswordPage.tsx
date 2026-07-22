@@ -158,7 +158,7 @@ export default function ForgotPasswordPage() {
 
       <p className="mt-7 text-center text-sm text-on-surface-variant">
         Đã nhớ mật khẩu?{' '}
-        <Link className="font-semibold text-primary hover:text-primary-hover" to="/login">
+        <Link className="inline-flex min-h-11 items-center font-semibold text-primary hover:text-primary-hover" to="/login">
           Đăng nhập
         </Link>
       </p>

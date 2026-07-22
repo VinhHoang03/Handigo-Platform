@@ -25,13 +25,13 @@ export function ServiceCategoryFilter({
         </div>
 
         <div className="space-y-2">
-          <p className="mb-3 text-xs font-bold uppercase text-outline">
+          <p className="mb-3 text-xs font-bold uppercase text-on-surface-variant">
             Danh mục
           </p>
           <button
             type="button"
             onClick={() => onSelect("")}
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
+            className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
               !selectedCategoryId
                 ? "bg-primary text-on-primary"
                 : "text-on-surface hover:bg-surface-container-low"
@@ -50,7 +50,7 @@ export function ServiceCategoryFilter({
                 key={category._id}
                 type="button"
                 onClick={() => onSelect(category._id)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
+                className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold ${
                   selectedCategoryId === category._id
                     ? "bg-primary text-on-primary"
                     : "text-on-surface hover:bg-surface-container-low"

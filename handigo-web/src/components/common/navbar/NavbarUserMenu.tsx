@@ -58,7 +58,7 @@ export function NavbarUserMenu({
         <button
           type="button"
           onClick={onBookService}
-          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
         >
           <span className="material-symbols-outlined text-lg">
             cleaning_services
@@ -99,7 +99,7 @@ export function NavbarUserMenu({
               aria-label="Mở menu tài khoản"
               aria-expanded={isAccountOpen}
               onClick={() => setIsAccountOpen((open) => !open)}
-              className="h-10 w-10 overflow-hidden rounded-full border border-outline-variant bg-surface-container-highest transition-all hover:border-primary focus:ring-4 focus:ring-primary/15"
+              className="h-11 w-11 overflow-hidden rounded-full border border-outline-variant bg-surface-container-highest transition-all hover:border-primary focus:ring-4 focus:ring-primary/15"
             >
               <InitialsAvatar
                 name={user?.fullName || "Handigo"}
@@ -123,13 +123,13 @@ export function NavbarUserMenu({
         <>
           <Link
             to="/login"
-            className="hidden rounded-lg px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low sm:inline-flex"
+            className="hidden min-h-11 items-center rounded-lg px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low sm:inline-flex"
           >
             Đăng nhập
           </Link>
           <Link
             to="/register"
-            className="btn-primary min-h-10 px-4 py-2 text-sm sm:px-5"
+            className="btn-primary min-h-11 px-4 py-2 text-sm sm:px-5"
           >
             Đăng ký
           </Link>

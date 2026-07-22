@@ -27,11 +27,11 @@ export function LoginForm({ rememberMe, onRememberMeChange }: LoginFormProps) {
       <FloatingInput id="login-email" label="Email" type="email" autoComplete="email" inputMode="email" required value={email} onValueChange={setEmail} />
       <FloatingInput id="login-password" label="Mật khẩu" type="password" autoComplete="current-password" required value={password} onValueChange={setPassword} />
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-on-surface-variant">
-          <input type="checkbox" checked={rememberMe} onChange={(event) => onRememberMeChange(event.target.checked)} className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary" />
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-on-surface-variant">
+          <input type="checkbox" checked={rememberMe} onChange={(event) => onRememberMeChange(event.target.checked)} className="h-5 w-5 rounded border-outline-variant text-primary focus:ring-primary" />
           <span>Ghi nhớ đăng nhập</span>
         </label>
-        <Link className="font-medium text-primary hover:text-primary-hover" to="/forgot-password">Quên mật khẩu?</Link>
+        <Link className="inline-flex min-h-11 items-center font-medium text-primary hover:text-primary-hover" to="/forgot-password">Quên mật khẩu?</Link>
       </div>
       <button type="submit" disabled={isLoading} className="btn-primary w-full">{isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
     </form>

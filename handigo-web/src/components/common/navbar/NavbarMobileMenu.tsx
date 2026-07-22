@@ -23,7 +23,7 @@ export function NavbarMobileMenu({
         aria-label="Mở menu điều hướng"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((open) => !open)}
-        className="ml-auto grid h-10 w-10 place-items-center rounded-xl text-primary hover:bg-surface-container-low xl:hidden"
+        className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-primary hover:bg-surface-container-low xl:hidden"
       >
         <span className="material-symbols-outlined">
           {isOpen ? "close" : "menu"}

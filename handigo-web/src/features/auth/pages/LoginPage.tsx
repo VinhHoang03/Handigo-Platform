@@ -48,7 +48,7 @@ export default function LoginPage() {
 
       <p className="mt-5 text-center text-sm text-on-surface-variant">
         Chưa có tài khoản?{' '}
-        <Link className="font-semibold text-primary hover:text-primary-hover" to="/register">
+        <Link className="inline-flex min-h-11 items-center font-semibold text-primary hover:text-primary-hover" to="/register">
           Đăng ký ngay
         </Link>
       </p>
