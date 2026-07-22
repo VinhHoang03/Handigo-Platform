@@ -1,6 +1,6 @@
 # Phase 1 — Trang công khai + Auth
 
-**Ưu tiên:** Cao · **Trạng thái:** ◐ Landing đã xong · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Cao · **Trạng thái:** ✅ Xong (`9b36193`, `33458de`; landing `87cd616`) · **Phụ thuộc:** Phase 0
 
 Nhóm trang người chưa đăng nhập nhìn thấy. Ảnh hưởng trực tiếp tới ấn tượng đầu
 và tỉ lệ đăng ký.

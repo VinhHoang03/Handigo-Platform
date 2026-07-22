@@ -32,8 +32,14 @@ tách các file quá lớn. Landing page đã hoàn thành ở commit `87cd616`.
 | Mã hex viết thẳng | 29 lần / 4 file |
 | `ui-avatars.com` (CDN ngoài) | 19 lần / **18 file** |
 | `glass-card` | 35 lần / 16 file |
-| `"Đang tải"` text thô | 49 lần |
+| `"Đang tải"` text thô | 49 lần ⚠️ xem định nghĩa lại bên dưới |
 | Ảnh Stitch `aida-public` còn sót | 12 lần / `AboutPage.tsx` |
+
+> ⚠️ **Định nghĩa lại metric `"Đang tải"` (verify 22-07):** grep thô đếm cả các
+> chuỗi *hợp lệ* — `aria-label` trong `Skeleton.tsx`, message mặc định của
+> `AsyncState`, fallback lazy-load trong `App.tsx`. Những chỗ đó **nên** có chữ
+> "Đang tải" cho screen reader. Tiêu chí đúng: **không còn trang nào render text
+> tải thô thay vì skeleton ở tầng trang** — không dùng con số 49 làm đích.
 
 ## Các phase
 
@@ -41,9 +47,9 @@ tách các file quá lớn. Landing page đã hoàn thành ở commit `87cd616`.
 |---|---|---|---|
 | 0 | [Nền tảng dùng chung](phase-00-shared-foundation.md) | ✅ Xong (`b2df0e5`) | — |
 | 1 | [Công khai + Auth](phase-01-public-and-auth.md) | ✅ Xong (`9b36193`, `33458de`) | Phase 0 |
-| 2 | [Khách hàng](phase-02-customer.md) | ◐ **Đang dở** — mới quét cơ học (`e648a50`) | Phase 0 |
-| 3 | [Thợ](phase-03-provider.md) | ☐ Chưa bắt đầu | Phase 0 |
-| 4 | [Quản trị](phase-04-admin.md) | ☐ Chưa bắt đầu | Phase 0 |
+| 2 | [Khách hàng](phase-02-customer.md) (+ `chat`, `chatbot`, `case-management`) | ◐ **Đang dở** — mới quét cơ học (`e648a50`) | Phase 0 |
+| 3 | [Thợ](phase-03-provider.md) (+ trang gợi ý dịch vụ của thợ) | ☐ Chưa bắt đầu | Phase 0 |
+| 4 | [Quản trị](phase-04-admin.md) (+ trang duyệt gợi ý dịch vụ) | ☐ Chưa bắt đầu | Phase 0 |
 | 5 | [A11y + Responsive](phase-05-accessibility-responsive.md) | ☐ Chưa bắt đầu | Phase 1–4 |
 
 ### Phase 2 đã làm tới đâu (tạm dừng 2026-07-22)
@@ -105,9 +111,30 @@ ban đầu còn sót, nên khi rà lại plan hãy chủ động tìm thêm cùn
 4. **Hệ màu ngầm thứ hai.** 281 lần dùng palette mặc định Tailwind trên 38 file,
    nhiều hơn cả `bg-white` (162) — nguyên nhân là M3 thiếu `success`/`warning`.
 
+## Kết quả verify plan (2026-07-22 chiều)
+
+Đã đối chiếu toàn bộ số liệu plan với code thực tế. Build xanh, ESLint 0 lỗi,
+các claim "đã xong" của Phase 0–1 đều kiểm chứng đúng (`aida-public` = 0, không
+còn file > 200 dòng trong `auth`/`content`, `AsyncState` có prop `skeleton`).
+
+Số liệu cập nhật: file > 200 dòng **66 → 55** · palette Tailwind **281 → 233**
+(33 file) · `bg/text-white` **204 → 171** · `ui-avatars` **18 → 9 file thật**
+(1 hit còn lại là comment trong `InitialsAvatar`) · `glass-card` **35 → 32**.
+
+**Sửa đổi plan từ đợt verify:**
+
+1. **Bổ sung 4 feature bị sót khỏi khảo sát ban đầu** (~2.600 dòng, 7 file > 200):
+   `chat` + `chatbot` + `case-management` → Phase 2;
+   `service-suggestion` tách đôi: trang provider → Phase 3, trang admin → Phase 4.
+   Bài học: khảo sát theo nhóm vai trò đã bỏ qua các feature cắt ngang vai trò.
+2. **Định nghĩa lại metric `"Đang tải"`** (xem ghi chú ở bảng khảo sát).
+3. **Sync header trạng thái** các phase file với bảng phase ở trên.
+4. **Thêm 2 phép quét vào Phase 5**: class không tồn tại + handler giả không gọi
+   mạng (hai loại lỗi đã gặp ở Phase 0–1, cần rà nốt toàn dự án).
+
 ## Câu hỏi chưa chốt
 
 - Bộ số liệu `10.000+ / 2.000+ / 50.000+` và `50.000+ việc đã hoàn thành` ở
   landing có phản ánh số thật không? Đang giữ nguyên giá trị cũ.
-- Nguồn ảnh thay thế cho 12 ảnh Stitch ở `AboutPage.tsx` (xem Phase 1) —
-  sinh ảnh AI đang bị chặn vì key Gemini ở free tier.
+- ~~Nguồn ảnh thay thế cho 12 ảnh Stitch ở `AboutPage.tsx`~~ — đã giải quyết ở
+  Phase 1: `aida-public` = 0 toàn dự án, bố cục không còn phụ thuộc ảnh ngoài.

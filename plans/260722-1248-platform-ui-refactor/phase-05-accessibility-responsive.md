@@ -58,6 +58,11 @@ thực sự mô tả đúng nội dung không, hay chỉ là chuỗi cho có.
    - `primary/6`, `primary/8` làm nền — kiểm tra chữ trên nền này
 5. **Rà `prefers-reduced-motion`** — bổ sung cho mọi `animate-*` còn lại.
 6. **Kiểm tra tràn ngang** ở 360px cho toàn bộ 50 trang.
+7. **Quét class không tồn tại** (bài học `shadow-soft`/`success-green` ở Phase 0):
+   mọi class trong `.tsx` không khớp token nào trong `index.css` cũng không phải
+   utility Tailwind hợp lệ → phần tử render không màu mà không ai báo lỗi.
+8. **Quét chức năng giả** (bài học form hỗ trợ ở Phase 1): mọi `onSubmit` /
+   handler nút hành động không có lời gọi mạng nào nhưng vẫn báo thành công.
 
 ## Todo
 
@@ -70,6 +75,8 @@ thực sự mô tả đúng nội dung không, hay chỉ là chuỗi cho có.
 - [ ] Bổ sung `prefers-reduced-motion` cho animation còn lại
 - [ ] Kiểm tra tràn ngang ở 360px
 - [ ] Vùng chạm ≥ 44px trên di động
+- [ ] Quét class không tồn tại (toàn `src/`)
+- [ ] Quét `onSubmit`/handler không gọi mạng nhưng báo thành công
 - [ ] Viết báo cáo tổng kết
 
 ## Tiêu chí hoàn thành

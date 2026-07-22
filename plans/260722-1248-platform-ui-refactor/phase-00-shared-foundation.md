@@ -1,6 +1,6 @@
 # Phase 0 — Nền tảng dùng chung
 
-**Ưu tiên:** Cao nhất · **Trạng thái:** ☐ Chưa bắt đầu · **Chặn:** Phase 1–4
+**Ưu tiên:** Cao nhất · **Trạng thái:** ✅ Xong (`b2df0e5`) · **Chặn:** Phase 1–4
 
 Chuẩn hoá lớp dung chứa trước khi chạm vào từng trang. Không làm phase này trước
 thì mỗi trang sẽ tự phát minh quy ước riêng và phải sửa lại lần hai.

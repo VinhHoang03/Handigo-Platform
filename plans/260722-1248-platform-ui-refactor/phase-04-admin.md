@@ -38,6 +38,7 @@ kích thước file và trạng thái tải.
 | `admin/pages/AdminWithdrawalsPage.tsx` | 335 | ⚠️ Duyệt rút tiền |
 | `admin/pages/AdminRevenuePage.tsx` | 311 |
 | `admin/pages/AdminCasesPage.tsx` | 264 |
+| `service-suggestion/pages/AdminServiceSuggestionsPage.tsx` | 393 | ⁺ Bổ sung khi verify plan (22-07) — trang admin nhưng nằm trong `features/service-suggestion` nên khảo sát ban đầu sót |
 | `admin/pages/AdminUsersPage.tsx` | 78 | ✓ |
 | `admin/pages/AdminDashboardPage.tsx` | 72 | ✓ |
 | `admin/pages/AdminPaymentsPage.tsx` | 66 | ✓ |
@@ -83,7 +84,7 @@ từng trang.
 - [ ] Khảo sát `common/dashboard/` trước khi tạo mới
 - [ ] Trích `DataTable`, `TableToolbar`, `TableSkeleton`
 - [ ] Kiểm chứng trên `AdminCasesPage` trước
-- [ ] Áp dụng cho 11 trang còn lại (mỗi trang 1 commit)
+- [ ] Áp dụng cho 11 trang còn lại (mỗi trang 1 commit) + `AdminServiceSuggestionsPage` (393) ⁺
 - [ ] 13 chỗ `"Đang tải"` → `TableSkeleton`
 - [ ] 2 file `ui-avatars` → `InitialsAvatar`
 - [ ] 18 chỗ `bg-white` → token
@@ -92,7 +93,7 @@ từng trang.
 
 ## Tiêu chí hoàn thành
 
-- Không còn file > 200 dòng trong `features/admin`
+- Không còn file > 200 dòng trong `features/admin` + `AdminServiceSuggestionsPage`
 - 11 trang bảng dùng chung `DataTable`, không copy-paste khuôn bảng
 - Mọi bảng có skeleton + trạng thái rỗng
 - Cột số thẳng hàng nhờ `tabular-nums`
