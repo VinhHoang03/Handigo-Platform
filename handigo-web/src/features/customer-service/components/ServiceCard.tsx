@@ -33,18 +33,21 @@ export function ServiceCard({ service, index, categories }: ServiceCardProps) {
           fetchPriority={index < 3 ? "high" : "auto"}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        <span className="absolute left-4 top-4 rounded-full bg-primary-container/90 px-3 py-1 text-xs font-bold uppercase text-on-primary-container">
-          {getCategoryName(service, categories)}
-        </span>
       </div>
       <div className="p-5">
-        <h3 className="line-clamp-2 text-xl font-bold leading-tight text-on-surface transition-colors group-hover:text-primary">
+        {/* Nhãn danh mục nay nằm ngoài khung ảnh. Dán chữ đè lên ảnh làm hỏng cả
+            hai: ảnh mất một góc, còn chữ thì phải tự chống chọi với nền không
+            đoán trước được độ sáng. */}
+        <p className="text-xs font-bold uppercase tracking-wide text-secondary">
+          {getCategoryName(service, categories)}
+        </p>
+        <h3 className="mt-2 line-clamp-2 text-xl font-bold leading-tight text-on-surface transition-colors group-hover:text-primary">
           {service.name}
         </h3>
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/30 pt-4">
           <div>
             {!isQuoteOnly && (
-              <span className="block text-xs text-outline">Từ</span>
+              <span className="block text-xs text-on-surface-variant">Từ</span>
             )}
             <span className="text-lg font-bold tabular-nums text-primary">
               {isQuoteOnly

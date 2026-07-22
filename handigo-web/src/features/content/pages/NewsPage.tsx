@@ -68,19 +68,16 @@ export default function NewsPage() {
               <p className="mt-5 leading-7 text-on-primary/80">
                 {featuredArticle.excerpt}
               </p>
-              <div className="mt-7 flex flex-wrap gap-3">
+              {/* Một nút duy nhất. Trước đây có thêm "Xem bài viết" trỏ xuống
+                  danh sách ngay bên dưới: hai nút, hai nhãn, cùng một ý "đọc
+                  bài", buộc người dùng phải đoán xem chúng khác nhau chỗ nào. */}
+              <div className="mt-7">
                 <Link
                   to={`/tin-tuc/${featuredArticle.slug}`}
-                  className="rounded-xl bg-on-primary px-5 py-3 font-semibold text-primary"
+                  className="inline-flex min-h-14 items-center rounded-xl bg-on-primary px-6 py-3 font-semibold text-primary"
                 >
-                  Đọc chi tiết
+                  Đọc bài viết
                 </Link>
-                <a
-                  href="#danh-sach"
-                  className="rounded-xl border border-on-primary/40 px-5 py-3 font-semibold text-on-primary hover:bg-surface-container-lowest/10"
-                >
-                  Xem bài viết
-                </a>
               </div>
             </div>
             <img
@@ -117,7 +114,7 @@ export default function NewsPage() {
                 role="tab"
                 aria-selected={category === item}
                 onClick={() => setCategory(item)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${
                   category === item
                     ? "bg-primary text-on-primary"
                     : "bg-surface-container-low text-on-surface-variant hover:text-primary"
