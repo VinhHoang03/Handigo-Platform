@@ -1,8 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/auth/AuthLayout';
-import { FloatingInput } from '@/components/common/FloatingField';
 import { authService } from '../services/auth.service';
+import { AuthFeedback } from '../components/AuthFeedback';
+import {
+  ForgotEmailStep,
+  ForgotOtpStep,
+  ForgotPasswordProgress,
+  ForgotPasswordStep,
+} from '../components/ForgotPasswordSteps';
 
 type ForgotStep = 'email' | 'otp' | 'password';
 const steps: ForgotStep[] = ['email', 'otp', 'password'];
@@ -114,112 +120,45 @@ export default function ForgotPasswordPage() {
       brandDescription="Quy trình xác thực ngắn gọn giúp bạn quay lại quản lý dịch vụ mà vẫn bảo vệ tài khoản."
       maxWidth="sm"
     >
-      <div className="mb-7 grid grid-cols-3 gap-2" aria-label={`Bước ${stepIndex + 1} trên 3`}>
-        {steps.map((item, index) => (
-          <div
-            key={item}
-            className={`h-1.5 rounded-full transition-colors ${
-              index <= stepIndex ? 'bg-primary' : 'bg-outline-variant/60'
-            }`}
-          />
-        ))}
-      </div>
+      <ForgotPasswordProgress stepIndex={stepIndex} total={steps.length} />
 
-      {(error || notice) && (
-        <div
-          role="status"
-          className={`mb-5 rounded-xl border p-3 text-sm ${
-            error
-              ? 'border-error/20 bg-error/10 text-error'
-              : 'border-secondary/20 bg-secondary/10 text-secondary'
-          }`}
-        >
-          {error || notice}
-        </div>
-      )}
+      <AuthFeedback error={error} notice={notice} />
 
       {step === 'email' && (
-        <form className="space-y-5" onSubmit={handleSendOtp}>
-          <FloatingInput
-            id="forgot-email"
-            label="Email"
-            type="email"
-            value={email}
-            autoComplete="email"
-            required
-            onValueChange={setEmail}
-          />
-          <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
-            {isSubmitting ? 'Đang gửi OTP...' : 'Gửi mã OTP'}
-          </button>
-        </form>
+        <ForgotEmailStep
+          email={email}
+          isSubmitting={isSubmitting}
+          onEmailChange={setEmail}
+          onSubmit={handleSendOtp}
+        />
       )}
 
       {step === 'otp' && (
-        <form className="space-y-5" onSubmit={handleConfirmOtp}>
-          <FloatingInput
-            id="forgot-otp"
-            label="Mã OTP"
-            value={otp}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            required
-            onValueChange={(value) => setOtp(value.replace(/\D/g, '').slice(0, 6))}
-          />
-          <button type="submit" disabled={otp.length !== 6} className="btn-primary w-full">
-            Tiếp tục
-          </button>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button type="button" className="btn-ghost px-0" onClick={() => setStep('email')}>
-              Sửa email
-            </button>
-            <button
-              type="button"
-              className="btn-ghost px-0"
-              disabled={isResending}
-              onClick={handleResendOtp}
-            >
-              {isResending ? 'Đang gửi lại...' : 'Gửi lại OTP'}
-            </button>
-          </div>
-        </form>
+        <ForgotOtpStep
+          otp={otp}
+          isResending={isResending}
+          onOtpChange={setOtp}
+          onSubmit={handleConfirmOtp}
+          onBack={() => setStep('email')}
+          onResend={handleResendOtp}
+        />
       )}
 
       {step === 'password' && (
-        <form className="space-y-4" onSubmit={handleResetPassword}>
-          <FloatingInput
-            id="forgot-new-password"
-            label="Mật khẩu mới"
-            type="password"
-            value={newPassword}
-            autoComplete="new-password"
-            minLength={8}
-            required
-            onValueChange={setNewPassword}
-          />
-          <FloatingInput
-            id="forgot-confirm-password"
-            label="Xác nhận mật khẩu mới"
-            type="password"
-            value={confirmPassword}
-            autoComplete="new-password"
-            minLength={8}
-            required
-            onValueChange={setConfirmPassword}
-          />
-          <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
-            {isSubmitting ? 'Đang cập nhật...' : 'Đặt lại mật khẩu'}
-          </button>
-          <button type="button" className="btn-ghost w-full" onClick={() => setStep('otp')}>
-            Quay lại mã OTP
-          </button>
-        </form>
+        <ForgotPasswordStep
+          newPassword={newPassword}
+          confirmPassword={confirmPassword}
+          isSubmitting={isSubmitting}
+          onNewPasswordChange={setNewPassword}
+          onConfirmPasswordChange={setConfirmPassword}
+          onSubmit={handleResetPassword}
+          onBack={() => setStep('otp')}
+        />
       )}
 
       <p className="mt-7 text-center text-sm text-on-surface-variant">
         Đã nhớ mật khẩu?{' '}
-        <Link className="font-semibold text-primary hover:text-primary-container" to="/login">
+        <Link className="font-semibold text-primary hover:text-primary-hover" to="/login">
           Đăng nhập
         </Link>
       </p>

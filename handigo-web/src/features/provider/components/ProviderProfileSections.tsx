@@ -361,7 +361,7 @@ export function ProviderCertificatesSection({
             <button
               type="button"
               aria-label="Thêm chứng chỉ"
-              className="grid h-11 w-11 place-items-center rounded-full bg-primary text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition hover:bg-primary-container hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)]"
+              className="grid h-11 w-11 place-items-center rounded-full bg-primary text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition hover:bg-primary-hover hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)]"
               onClick={onOpenCreate}
             >
               <span className="material-symbols-outlined">add</span>

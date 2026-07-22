@@ -54,7 +54,7 @@ export function ChatbotComposer({
           type="submit"
           disabled={disabled || !content.trim()}
           aria-label="Gửi tin nhắn"
-          className="mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-on-primary shadow-[0_6px_16px_rgba(53,37,205,0.2)] hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+          className="mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-on-primary shadow-[0_6px_16px_rgba(53,37,205,0.2)] hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           <span className="material-symbols-outlined text-xl">send</span>
         </button>

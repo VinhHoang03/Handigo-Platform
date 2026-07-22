@@ -60,13 +60,18 @@ export function AuthLayout({
           <p className="mt-3 max-w-[500px] text-base leading-7 text-on-primary-container">
             {brandDescription}
           </p>
-          <div className="group relative mt-5 aspect-[16/10] w-full max-w-[460px] overflow-hidden rounded-3xl flex items-center justify-center">
+          {/* Ảnh minh hoạ có nền trắng đặc, nên đóng khung trên nền sáng để
+              trông có chủ đích thay vì như một ô trắng dán nhầm lên nền indigo.
+              (Class cũ `mix-blend-mode-screen` không tồn tại trong Tailwind —
+              đúng phải là `mix-blend-screen` — nên hiệu ứng hoà trộn chưa từng
+              được áp dụng; mà blend cũng không cứu được ảnh nền trắng trên nền
+              tối, đã thử tách nền nhưng bóng đổ để lại vệt trắng.) */}
+          <div className="mt-6 w-full max-w-[460px] overflow-hidden rounded-3xl bg-surface-container-lowest p-4 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.35)]">
             <img
               src={loginImg}
-              alt="Dịch vụ chăm sóc và sửa chữa nhà cửa"
-              className="h-full w-full object-contain mix-blend-mode-screen transition-transform duration-700 group-hover:scale-[1.03]"
+              alt="Minh hoạ dịch vụ chăm sóc và sửa chữa nhà cửa"
+              className="aspect-[4/3] w-full rounded-2xl object-contain"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/45 via-transparent to-transparent pointer-events-none" />
           </div>
         </div>
       </section>
@@ -89,7 +94,10 @@ export function AuthLayout({
             </span>
           </Link>
 
-          <div className="glass-panel w-full rounded-[28px] p-5 shadow-[0_12px_40px_rgba(19,27,46,0.09)] sm:p-7 lg:p-8">
+          {/* Trước đây dùng `.glass-panel` (nền mờ + backdrop-blur). Đây là chỗ
+              duy nhất trong app dùng class đó, và hiệu ứng kính mờ không mang
+              lại gì trên nền đặc — thay bằng bề mặt đặc theo token. */}
+          <div className="w-full rounded-[28px] border border-outline-variant/50 bg-surface-container-lowest p-5 shadow-[0_12px_40px_-12px_rgba(19,27,46,0.16)] sm:p-7 lg:p-8">
             <header className="mb-4 sm:mb-5">
               {eyebrow && (
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">

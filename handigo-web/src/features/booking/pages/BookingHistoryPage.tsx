@@ -119,7 +119,7 @@ const BookingHistoryPage = () => {
             </div>
             <Link
               to="/customer/bookings/new"
-              className="w-full md:w-auto flex items-center justify-center gap-2 bg-primary text-on-primary px-lg py-3 rounded-xl font-label-md text-label-md shadow-md hover:bg-primary-container transition-all active:scale-95"
+              className="w-full md:w-auto flex items-center justify-center gap-2 bg-primary text-on-primary px-lg py-3 rounded-xl font-label-md text-label-md shadow-md hover:bg-primary-hover transition-all active:scale-95"
             >
               <span className="material-symbols-outlined">add</span>
               Tạo đơn dịch vụ mới

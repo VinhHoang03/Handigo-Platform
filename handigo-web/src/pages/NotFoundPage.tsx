@@ -16,14 +16,14 @@ export default function NotFoundPage() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 rounded-lg border border-outline-variant px-4 py-2.5"
+            className="btn-secondary"
           >
             <ArrowLeft size={18} /> Quay lại
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-on-primary"
+            className="btn-primary"
           >
             <Home size={18} /> Trang chủ
           </button>

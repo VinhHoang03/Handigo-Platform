@@ -31,7 +31,7 @@ export function LoginForm({ rememberMe, onRememberMeChange }: LoginFormProps) {
           <input type="checkbox" checked={rememberMe} onChange={(event) => onRememberMeChange(event.target.checked)} className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary" />
           <span>Ghi nhớ đăng nhập</span>
         </label>
-        <Link className="font-medium text-primary hover:text-primary-container" to="/forgot-password">Quên mật khẩu?</Link>
+        <Link className="font-medium text-primary hover:text-primary-hover" to="/forgot-password">Quên mật khẩu?</Link>
       </div>
       <button type="submit" disabled={isLoading} className="btn-primary w-full">{isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}</button>
     </form>
