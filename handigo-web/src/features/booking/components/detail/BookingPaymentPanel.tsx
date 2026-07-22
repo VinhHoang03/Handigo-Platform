@@ -38,7 +38,7 @@ export const BookingPaymentPanel = ({
 }: BookingPaymentPanelProps) => (
   <>
     {canMakeInitialPayment && (
-      <div className="mb-lg rounded-2xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-950">
+      <div className="mb-lg rounded-2xl border border-warning/30 bg-warning-container p-md text-sm text-on-warning-container">
         <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-bold">

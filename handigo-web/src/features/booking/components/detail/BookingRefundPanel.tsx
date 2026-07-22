@@ -48,11 +48,11 @@ export const BookingRefundPanel = ({
         <div className="space-y-2">
           <button
             disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-red-100 py-3 font-bold text-red-600 transition-all hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-error/20 py-3 font-bold text-error transition-all hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onCancelOrder}
           >
             {busy ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-red-600" />
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-error/20 border-t-error" />
             ) : (
               <span className="material-symbols-outlined text-sm">close</span>
             )}
@@ -61,7 +61,7 @@ export const BookingRefundPanel = ({
           {order.orderType === "recurring" && (
             <button
               disabled={busy}
-              className="w-full rounded-2xl bg-red-600 py-3 font-bold text-on-primary transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-2xl bg-error py-3 font-bold text-on-error transition hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onCancelSeries}
             >
               Hủy buổi này và các buổi sau
@@ -115,7 +115,7 @@ export const BookingRefundPanel = ({
             )}
 
             {pendingAction.error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <div className="rounded-2xl border border-error/30 bg-error/8 px-4 py-3 text-sm font-medium text-error">
                 {pendingAction.error}
               </div>
             )}
@@ -139,7 +139,7 @@ export const BookingRefundPanel = ({
                 onClick={onExecute}
                 className={`rounded-2xl px-5 py-3 font-bold text-on-primary transition disabled:opacity-50 ${
                   actionDialogConfig.tone === "danger"
-                    ? "bg-red-600 hover:bg-red-700"
+                    ? "bg-error hover:bg-error/90"
                     : "bg-primary hover:bg-primary/90"
                 }`}
               >

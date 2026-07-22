@@ -24,7 +24,7 @@ export const BookingCancellationReasonForm = ({
       {customerCancellationReasons.map((cancellationReason) => (
         <label
           key={cancellationReason}
-          className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition ${reason === cancellationReason ? "border-red-300 bg-red-50" : "border-outline-variant/50 hover:bg-surface-container-low"}`}
+          className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition ${reason === cancellationReason ? "border-error/30 bg-error/8" : "border-outline-variant/50 hover:bg-surface-container-low"}`}
         >
           <input
             type="radio"
@@ -33,7 +33,7 @@ export const BookingCancellationReasonForm = ({
             checked={reason === cancellationReason}
             onChange={() => onUpdateReason(cancellationReason)}
             disabled={busy}
-            className="mt-0.5 text-red-600 focus:ring-red-500"
+            className="mt-0.5 text-error focus:ring-error"
           />
           <span className="text-sm font-medium text-on-surface">
             {cancellationReason}

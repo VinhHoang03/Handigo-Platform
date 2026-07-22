@@ -59,7 +59,7 @@ export function ProviderHomeStats({
         icon="monetization_on"
         label="Thu nhập gần đây"
         value={formatMoney(todayIncome)}
-        tone="bg-accent-cyan/10 text-accent-cyan"
+        tone="bg-secondary/10 text-secondary"
       />
       <StatCard
         icon="star"

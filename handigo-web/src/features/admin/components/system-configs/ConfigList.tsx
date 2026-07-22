@@ -28,7 +28,7 @@ export function ConfigList({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-semibold text-on-surface">{item.label}</h2>
               <span
-                className={`rounded-md px-2 py-0.5 text-xs font-semibold ${item.isEffective ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+                className={`rounded-md px-2 py-0.5 text-xs font-semibold ${item.isEffective ? "bg-success-container text-on-success-container" : "bg-warning-container text-on-warning-container"}`}
               >
                 {item.isEffective ? "Đã nối logic" : "Chưa nối logic"}
               </span>

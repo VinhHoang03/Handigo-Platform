@@ -58,14 +58,14 @@ export const BookingServiceSummary = ({
         <div
           className={`px-4 py-2 rounded-full font-bold flex items-center gap-2 shadow-sm ${
             order.status === "completed"
-              ? "bg-emerald-100 text-emerald-700"
+              ? "bg-success-container text-on-success-container"
               : order.status === "cancelled"
-                ? "bg-red-100 text-red-700"
+                ? "bg-error-container text-on-error-container"
                 : "bg-primary/10 text-primary"
           }`}
         >
           <span
-            className={`w-2 h-2 rounded-full ${order.status === "completed" ? "bg-emerald-600" : order.status === "cancelled" ? "bg-red-600" : "bg-primary animate-pulse"}`}
+            className={`w-2 h-2 rounded-full ${order.status === "completed" ? "bg-success" : order.status === "cancelled" ? "bg-error" : "bg-primary animate-pulse"}`}
           />
           {statusLabel}
         </div>

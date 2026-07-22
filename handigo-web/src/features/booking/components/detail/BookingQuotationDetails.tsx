@@ -94,7 +94,7 @@ export const BookingQuotationDetails = ({
           </p>
         )}
         {!!quotation.quotation.discountAmount && (
-          <p className="text-sm text-emerald-700 tabular-nums">
+          <p className="text-sm text-success tabular-nums">
             Giảm giá: -{formatCurrency(quotation.quotation.discountAmount)}
           </p>
         )}
@@ -110,7 +110,7 @@ export const BookingQuotationDetails = ({
           <button
             disabled={busy}
             onClick={onReject}
-            className="px-6 py-3 border-2 border-red-200 text-red-600 rounded-2xl font-bold hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+            className="px-6 py-3 border-2 border-error/30 text-error rounded-2xl font-bold hover:bg-error/10 active:scale-95 transition-all disabled:opacity-50"
           >
             Từ chối
           </button>
@@ -129,14 +129,14 @@ export const BookingQuotationDetails = ({
     </div>
 
     {quotation.quotation.status === "approved" && (
-      <div className="mt-md rounded-3xl border border-emerald-200 bg-emerald-50 p-md text-emerald-900">
+      <div className="mt-md rounded-3xl border border-success/30 bg-success-container p-md text-on-success-container">
         <p className="font-bold">Bạn đã đồng ý báo giá</p>
-        <p className="mt-1 text-sm text-emerald-800">
+        <p className="mt-1 text-sm text-on-success-container">
           Chuyên gia có thể bắt đầu thực hiện công việc ngay, không cần chờ thanh toán.
         </p>
-        <div className="mt-3 grid gap-2 border-t border-emerald-200 pt-3 sm:grid-cols-2">
+        <div className="mt-3 grid gap-2 border-t border-success/30 pt-3 sm:grid-cols-2">
           <div>
-            <p className="text-xs font-bold uppercase text-emerald-700">
+            <p className="text-xs font-bold uppercase text-on-success-container">
               Tiền cọc qua Handigo
             </p>
             <p className="mt-1 font-bold tabular-nums">
@@ -144,7 +144,7 @@ export const BookingQuotationDetails = ({
             </p>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-emerald-700">
+            <p className="text-xs font-bold uppercase text-on-success-container">
               Chi phí theo báo giá
             </p>
             <p className="mt-1 text-sm font-medium">
@@ -167,7 +167,7 @@ export const BookingQuotationDetails = ({
     )}
     {quotation.quotation.status === "rejected" &&
       quotation.quotation.rejectionReason && (
-        <div className="mt-md p-md bg-red-50 rounded-2xl border border-red-100 text-red-700 text-sm">
+        <div className="mt-md p-md bg-error/8 rounded-2xl border border-error/30 text-error text-sm">
           <strong>Lý do từ chối:</strong> {quotation.quotation.rejectionReason}
         </div>
       )}

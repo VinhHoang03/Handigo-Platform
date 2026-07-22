@@ -183,13 +183,6 @@
 }
 
 @layer components {
-  .glass-card {
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(199, 196, 216, 0.45);
-    box-shadow: 0 4px 20px rgba(19, 27, 46, 0.06);
-  }
-
   @keyframes provider-status-marquee {
     from {
       transform: translateX(100%);
@@ -208,6 +201,13 @@
       animation: none;
       width: auto;
       white-space: normal !important;
+    }
+
+    /* Tắt chuyển động trang trí khi người dùng yêu cầu giảm chuyển động.
+       Giữ animate-spin (chỉ báo tiến trình) và animate-pulse (skeleton, biên độ thấp). */
+    .animate-bounce,
+    .animate-in {
+      animation: none;
     }
   }
 

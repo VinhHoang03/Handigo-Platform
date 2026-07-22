@@ -31,7 +31,7 @@ export function MonthlyChart({ rows }: { rows: MonthlyRevenue[] }) {
               title={"Thu nhập provider: " + money.format(row.provider)}
             />
             <div
-              className="h-2.5 rounded-full bg-emerald-500"
+              className="h-2.5 rounded-full bg-success"
               style={{ width: Math.max((row.platform / maxAmount) * 100, 1) + "%" }}
               title={"Phí nền tảng: " + money.format(row.platform)}
             />
@@ -41,7 +41,7 @@ export function MonthlyChart({ rows }: { rows: MonthlyRevenue[] }) {
       <div className="flex flex-wrap gap-4 text-xs text-on-surface-variant">
         <span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-primary" />GMV hoàn tất</span>
         <span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-secondary" />Thu nhập provider</span>
-        <span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />Phí nền tảng</span>
+        <span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-success" />Phí nền tảng</span>
       </div>
     </div>
   );

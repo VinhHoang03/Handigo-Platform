@@ -3,8 +3,8 @@ import { money } from "./revenue-format";
 const toneClasses = {
   primary: "bg-primary/10 text-primary",
   secondary: "bg-secondary/10 text-secondary",
-  success: "bg-emerald-100 text-emerald-700",
-  warning: "bg-amber-100 text-amber-700",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
 } as const;
 
 export function MetricCard({

@@ -27,7 +27,7 @@ export function ReconciliationPanel({
           </div>
         ))}
       </dl>
-      <div className={"mt-5 rounded-xl p-4 text-sm " + (Math.abs(difference) < 1 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800")}>
+      <div className={"mt-5 rounded-xl p-4 text-sm " + (Math.abs(difference) < 1 ? "bg-success-container text-on-success-container" : "bg-warning-container text-on-warning-container")}>
         <p className="tabular-nums font-bold">Chênh lệch đối soát: {money.format(difference)}</p>
         <p className="mt-1">GMV = phí nền tảng + thu nhập provider. Số liệu chuẩn khi chênh lệch bằng 0.</p>
       </div>

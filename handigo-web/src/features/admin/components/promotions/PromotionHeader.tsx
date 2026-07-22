@@ -33,7 +33,7 @@ export function PromotionHeader({
       </div>
 
       {(notice || error) && (
-        <div className={`rounded-xl px-4 py-3 ${error ? "bg-error/10 text-error" : "bg-emerald-100 text-emerald-700"}`}>
+        <div className={`rounded-xl px-4 py-3 ${error ? "bg-error/10 text-error" : "bg-success-container text-on-success-container"}`}>
           {error || notice}
         </div>
       )}

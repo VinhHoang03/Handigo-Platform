@@ -72,7 +72,7 @@ export const BookingStatusBanners = ({
           </div>
         </div>
         {matchingSecondsRemaining === 0 && (
-          <p className="mt-sm font-medium text-amber-700">
+          <p className="mt-sm font-medium text-warning">
             Đã hết thời gian tìm chuyên gia, hệ thống đang cập nhật kết quả đơn hàng.
           </p>
         )}
@@ -80,7 +80,7 @@ export const BookingStatusBanners = ({
     )}
 
     {order.reassignment?.status === "awaiting_customer" && (
-      <div className="mb-lg rounded-2xl border border-amber-300 bg-amber-50 p-md text-sm text-amber-950">
+      <div className="mb-lg rounded-2xl border border-warning/30 bg-warning-container p-md text-sm text-on-warning-container">
         <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-bold">
@@ -108,9 +108,9 @@ export const BookingStatusBanners = ({
     {paymentBannerSlot}
 
     {order.bookingStatus === "reserved" && (
-      <div className="mb-lg rounded-2xl border border-emerald-200 bg-emerald-50 p-md text-sm text-emerald-950">
+      <div className="mb-lg rounded-2xl border border-success/30 bg-success-container p-md text-sm text-on-success-container">
         <p className="font-bold">Chuyên gia đã giữ lịch cho buổi này</p>
-        <p className="mt-1 text-emerald-800">
+        <p className="mt-1 text-on-success-container">
           Thanh toán sẽ được mở trước giờ thực hiện 24 giờ. Handigo sẽ gửi thông báo khi đến hạn.
         </p>
       </div>

@@ -38,7 +38,7 @@ export const BookingReassignmentModal = ({
       closeOnOverlayClick={!busy}
     >
       <div className="space-y-md">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+        <div className="rounded-2xl border border-warning/30 bg-warning-container p-4 text-sm text-on-warning-container">
           <p className="font-bold">
             {order.bookingStatus === "rejected"
               ? "Provider bạn chọn đã từ chối nhận đơn hàng."
@@ -49,13 +49,13 @@ export const BookingReassignmentModal = ({
             để tự điều phối thợ phù hợp gần bạn. Nếu từ chối, đơn sẽ được hủy
             và khoản đã thanh toán sẽ được hoàn về ví Handigo.
           </p>
-          <p className="mt-2 text-xs text-amber-800">
+          <p className="mt-2 text-xs text-on-warning-container">
             Phản hồi trước {new Date(order.reassignment.expiresAt).toLocaleString("vi-VN")}.
           </p>
         </div>
 
         {reassignmentError && (
-          <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p className="rounded-2xl border border-error/30 bg-error/8 px-4 py-3 text-sm font-medium text-error">
             {reassignmentError}
           </p>
         )}
@@ -65,7 +65,7 @@ export const BookingReassignmentModal = ({
             type="button"
             disabled={busy}
             onClick={() => onRespond("decline")}
-            className="rounded-2xl border border-red-200 px-5 py-3 font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+            className="rounded-2xl border border-error/30 px-5 py-3 font-bold text-error transition hover:bg-error/10 disabled:opacity-50"
           >
             Hủy đơn và hoàn tiền
           </button>
