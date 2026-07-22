@@ -10,6 +10,7 @@ import { NavbarLinks } from "./navbar/NavbarLinks";
 import { NavbarMobileMenu } from "./navbar/NavbarMobileMenu";
 import { NavbarUserMenu } from "./navbar/NavbarUserMenu";
 import { createNavbarItems, normalizeRole } from "./navbar/navbar.types";
+import { usePageScrolled } from "@/hooks/use-page-scrolled";
 import type { AppRole, NavbarItem } from "./navbar/navbar.types";
 
 export type { AppRole };
@@ -31,7 +32,6 @@ export function Navbar({
   isOnline = false,
   onStatusToggle,
 }: NavbarProps) {
-  const [internalScrolled, setInternalScrolled] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -42,6 +42,7 @@ export function Navbar({
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authenticatedRole = normalizeRole(user?.role);
   const currentRole = isAuthenticated ? authenticatedRole : role;
+  const internalScrolled = usePageScrolled();
   const scrolled = isScrolled ?? internalScrolled;
   const navItems = useMemo(
     () => createNavbarItems(currentRole),
@@ -49,13 +50,6 @@ export function Navbar({
   );
   // Thiếu ảnh thì `InitialsAvatar` lùi về chữ cái đầu, không gọi CDN ngoài.
   const avatar = userAvatar || user?.avatar;
-
-  useEffect(() => {
-    const handleScroll = () => setInternalScrolled(window.scrollY > 20);
-    handleScroll();
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   useEffect(() => {
     const loadServices = async () => {

@@ -1,4 +1,3 @@
-import { ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function NotFoundPage() {
@@ -18,14 +17,14 @@ export default function NotFoundPage() {
             onClick={() => navigate(-1)}
             className="btn-secondary"
           >
-            <ArrowLeft size={18} /> Quay lại
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">arrow_back</span> Quay lại
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
             className="btn-primary"
           >
-            <Home size={18} /> Trang chủ
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">home</span> Trang chủ
           </button>
         </div>
       </section>

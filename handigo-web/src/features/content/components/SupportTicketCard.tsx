@@ -1,4 +1,3 @@
-import { Headphones } from "lucide-react";
 import { Skeleton, SkeletonText } from "@/components/common/Skeleton";
 import type { SupportTicket } from "@/features/case-management/types/caseManagement.types";
 import {
@@ -77,7 +76,7 @@ export function SupportTicketCard({
           )}
 
           <p className="mt-3 flex items-center gap-2 text-xs text-on-surface-variant">
-            <Headphones size={14} />
+            <span aria-hidden="true" className="material-symbols-outlined text-[14px] leading-none">headset_mic</span>
             <span className="tabular-nums">
               {ticket.responses.length} phản hồi
             </span>

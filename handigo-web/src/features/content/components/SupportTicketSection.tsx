@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { Pagination } from "@/components/common/Pagination";
 import { CreateCaseModal } from "@/features/case-management/components/CreateCaseModal";
@@ -41,10 +40,12 @@ export function SupportTicketSection({ role }: { role: SupportRole }) {
               disabled={support.loading}
               className="btn-secondary min-h-11"
             >
-              <RefreshCw
-                size={18}
-                className={support.loading ? "animate-spin" : ""}
-              />
+              <span
+                aria-hidden="true"
+                className={`material-symbols-outlined text-[18px] leading-none ${support.loading ? "animate-spin" : ""}`}
+              >
+                refresh
+              </span>
               Làm mới
             </button>
             <button
@@ -52,7 +53,7 @@ export function SupportTicketSection({ role }: { role: SupportRole }) {
               onClick={() => setCreateOpen(true)}
               className="btn-primary"
             >
-              <Plus size={18} />
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">add</span>
               Tạo yêu cầu hỗ trợ
             </button>
           </div>

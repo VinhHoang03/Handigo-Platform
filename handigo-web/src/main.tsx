@@ -1,6 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+// Font self-host: không nạp qua <link> Google Fonts nữa (chặn render, rò rỉ IP
+// người dùng sang bên thứ ba). Chỉ nạp đúng các trọng lượng đang dùng.
+import "@fontsource/be-vietnam-pro/400.css";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/700.css";
+import "@fontsource-variable/hanken-grotesk";
 import "./index.css";
 import App from "./App.tsx";
 import api, { refreshAccessToken } from "@/api/client";
