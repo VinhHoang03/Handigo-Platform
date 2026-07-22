@@ -68,12 +68,33 @@ lẫn "chuyên gia" lẫn "thợ" trong cùng một màn hình.
 
 Phase 0 chặn tất cả. Phase 1 và 2 độc lập, chạy song song được.
 
+## Phạm vi kỹ thuật (chốt 2026-07-22)
+
+Đợt này **không thuần trình bày**. Ghi rõ để không ai hiểu nhầm khi review.
+
+**Không đụng:**
+- Backend: route, controller, service, model — 0 file
+- Schema, migration, seed data — 0
+- Hợp đồng API, tên field, query param, URL — giữ nguyên
+- `useAddressSelection`, `useBookNowHandler`, `serviceOptionSelection`
+
+**Có đụng, đã được chấp thuận:**
+
+| # | Chỗ | Loại | Quyết định |
+|---|---|---|---|
+| 1 | `useServicePricing` | **Business logic** | Sửa. Lỗi tiền cọc nằm cả trong hook này, không chỉ ở tầng hiển thị (chi tiết ở Phase 0) |
+| 2 | Tìm kiếm ở trang danh sách | **Hành vi chức năng** | Bỏ tìm theo tên tuỳ chọn để loại 16 request mỗi lần gõ |
+| 3 | Mục sắp xếp "Phổ biến nhất" | Gỡ tính năng | Gỡ. Chưa từng hoạt động (`return 0`) |
+| 4 | Danh mục rỗng ở sidebar | Lọc tầng hiển thị | Ẩn 4 danh mục không có dịch vụ |
+| 5 | Test đặt đơn ở Phase 3 | **Ghi DB dev** | Một đơn thật, huỷ ngay sau khi kiểm |
+
 ## Nguyên tắc xuyên suốt
 
 1. **Không đổi URL, IA, tên nav, tên field form.**
 2. **Không bịa số.** Thiếu dữ liệu thì đổi cách nói, không đổi con số.
-3. **Không hiển thị tiền cọc như thể là giá.** Đây là luật cứng của đợt này.
-4. Không đụng logic đặt đơn, chọn địa chỉ, tính giá.
+3. **Không hiển thị tiền cọc như thể là giá.** Luật cứng của đợt này, áp dụng ở
+   cả tầng hiển thị lẫn hook tính giá.
+4. Không đổi luồng đặt đơn, thứ tự bước, hay cách chọn địa chỉ.
 5. Mỗi phase build xanh + ESLint 0 lỗi + ảnh đối chiếu trước/sau.
 6. File dưới 200 dòng.
 

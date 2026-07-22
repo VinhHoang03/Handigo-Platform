@@ -28,7 +28,9 @@
 ## Yêu cầu
 
 **Chức năng**
-- Không đụng `useServicePricing`, `useAddressSelection`, `useBookNowHandler`
+- Không đụng `useAddressSelection`, `useBookNowHandler`
+- `useServicePricing` **đã được sửa ở Phase 0** (bỏ tiền cọc khỏi giá tạm tính).
+  Phase này không đụng thêm vào hook đó
 - Không đổi luồng đặt đơn, không đổi thứ tự bước
 - Không đổi URL, không đổi `serviceId` param
 

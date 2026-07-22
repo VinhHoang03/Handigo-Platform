@@ -27,6 +27,18 @@ Làm trước vì Phase 1 và 2 đều dựng lại các thành phần chứa nh
 11/16 dịch vụ đang sai kiểu này. Chữ "Từ" khiến người đọc hiểu đó là mức giá
 thấp nhất của dịch vụ.
 
+**Lỗi này không chỉ ở tầng hiển thị.** `useServicePricing` cũng gọi
+`getServicePrice()` để lấy `basePrice`, và với `variable_price` thì
+`estimatePrice = basePrice = depositAmount`. Kết quả trên trang chi tiết:
+
+```
+Giá tạm tính        20.000 đ      ← tiền cọc
+Báo giá sau khảo sát              ← nhãn ngay bên dưới, tự mâu thuẫn
+```
+
+Sửa nửa vời (chỉ đổi nhãn ở thẻ danh sách) thì trang chi tiết vẫn sai. Đã chốt
+**sửa cả hook** (xem bước 1b).
+
 ### 0.2 Số liệu viết cứng trong `ServiceGallery.tsx`
 
 ```
@@ -61,7 +73,9 @@ bộ ảnh dịch vụ là minh hoạ 3D. Rơi vào dự phòng là lộ ngay.
 
 **Chức năng**
 - Không đổi API, không đổi schema, không ghi vào DB
-- Không đổi logic tính giá khi đặt đơn (`useServicePricing`)
+- **Có** đổi `useServicePricing` (bước 2): ngừng dùng tiền cọc làm giá tạm tính.
+  Đây là thay đổi logic duy nhất của đợt này, đã được chấp thuận
+- Không đổi luồng đặt đơn, thứ tự bước, hay cách chọn địa chỉ
 
 **Phi chức năng**
 - Build xanh, ESLint 0 lỗi, file < 200 dòng
@@ -89,20 +103,33 @@ features/customer-service/pages/
      sát`**, và nếu muốn nêu cọc thì phải ghi đúng chữ: `Đặt cọc 20.000 đ`.
      **Cấm** ghép tiền cọc với chữ "Từ".
    - Không có dữ liệu → `{ kind: "unknown" }` → hiện `Liên hệ báo giá`
+2. **Sửa `useServicePricing` (business logic).** Với `variable_price`,
+   `estimatePrice` trả **0** thay vì `depositAmount`; `BookingSidebar` đã có sẵn
+   nhánh hiện `Báo giá sau khảo sát` khi `estimatePrice <= 0`, nên chỉ cần ngừng
+   truyền tiền cọc vào chỗ dành cho giá.
+   ✅ **Cổng chặn đã kiểm (2026-07-22):** `CreateOrderPayload` trong
+   `booking.api.ts` **không có trường tiền nào** (chỉ `serviceId`,
+   `selectedOptionIds`, `addressId`, `paymentMethod`...). Backend tự dựng
+   `buildServicePricingSnapshot(service, ...)` từ bản ghi dịch vụ trong DB
+   (`order.service.ts:331`). Nghĩa là `estimatePrice` phía client **thuần là số
+   để hiển thị**, đổi nó không thể làm sai số tiền khách bị tính.
+   Vẫn test tay luồng đặt đơn đầu-cuối sau khi sửa (Phase 3 bước 5) để chắc
+   `BookingSidebar` và `OrderSummaryCard` không rơi vào nhánh hiển thị lạ.
    ⚠️ Giữ `getServicePrice()` cho khâu **sắp xếp** (Phase 1) nhưng đổi tên thành
-   `getServiceSortValue()` để không ai dùng nhầm nó cho hiển thị.
-2. **Gỡ `4.8 / 128 đánh giá / 300+ đơn hàng`** khỏi `ServiceGallery`. Nếu muốn giữ
+   `getServiceSortValue()` để không ai dùng nhầm nó cho hiển thị. TypeScript sẽ
+   bắt hết chỗ gọi; `useServicePricing` là một trong số đó.
+3. **Gỡ `4.8 / 128 đánh giá / 300+ đơn hàng`** khỏi `ServiceGallery`. Nếu muốn giữ
    chỗ cho số thật thì chỉ hiện khi API trả về; hiện tại API dịch vụ **không có**
    trường đánh giá, nên gỡ hẳn, không để placeholder.
-3. **Sửa thư viện ảnh:** dịch vụ chỉ có một ảnh thì hiện **một** ảnh tràn khung,
+4. **Sửa thư viện ảnh:** dịch vụ chỉ có một ảnh thì hiện **một** ảnh tràn khung,
    không dựng lưới 3 ô lặp lại. Chỉ dựng lưới khi thực sự có nhiều ảnh khác nhau.
-4. **Xử lý 2 nút chết:** gỡ nút `favorite` (chưa có tính năng lưu). Giữ nút chia
+5. **Xử lý 2 nút chết:** gỡ nút `favorite` (chưa có tính năng lưu). Giữ nút chia
    sẻ **chỉ khi** nối vào `navigator.share` với `navigator.clipboard` làm dự
    phòng, và có `aria-label`. Không đủ thời gian thì gỡ cả hai.
-5. **Lọc danh mục rỗng** ở sidebar: đếm dịch vụ theo danh mục ở trang danh sách,
+6. **Lọc danh mục rỗng** ở sidebar: đếm dịch vụ theo danh mục ở trang danh sách,
    truyền xuống, chỉ hiện danh mục có `count > 0` và **in kèm số**
    (`Thiết Bị Gia Dụng · 4`). Giống cách đã làm ở bento trang chủ.
-6. **Ảnh dự phòng cùng tông:** thay 4 link Unsplash bằng một ô giữ chỗ theo token
+7. **Ảnh dự phòng cùng tông:** thay 4 link Unsplash bằng một ô giữ chỗ theo token
    (nền `surface-container` + icon danh mục), hoặc dùng lại ảnh của một dịch vụ
    khác **cùng danh mục** nếu có. Không hotlink ảnh chụp thật vào một site dùng
    minh hoạ 3D.
@@ -110,6 +137,8 @@ features/customer-service/pages/
 ## Todo
 
 - [ ] `getServicePriceLabel()` phân biệt giá / cọc / báo giá
+- [x] Kiểm backend tự đọc `depositAmount` khi tạo đơn — **đã xác nhận**, client không gửi số tiền nào
+- [ ] `useServicePricing`: `variable_price` trả `estimatePrice = 0`, không trả tiền cọc
 - [ ] Đổi tên `getServicePrice` → `getServiceSortValue`, chỉ dùng cho sắp xếp
 - [ ] Gỡ `4.8`, `128 đánh giá`, `300+ đơn hàng` khỏi `ServiceGallery`
 - [ ] Sửa lưới ảnh: một ảnh thì hiện một ảnh
@@ -123,6 +152,8 @@ features/customer-service/pages/
 - `grep -rn "4.8\|128 đánh giá\|300+" src/features/customer-service` → 0
 - Không thẻ nào ghép chữ `Từ` với `depositAmount`. Kiểm bằng cách mở
   `/customer/services`, đối chiếu 11 dịch vụ `variable_price` với dữ liệu API
+- Trang chi tiết của dịch vụ `variable_price` **không in con số nào** ở dòng
+  "Giá tạm tính"; chỉ hiện "Báo giá sau khảo sát"
 - Trang chi tiết của một dịch vụ có 1 ảnh → hiện đúng 1 ảnh, không lặp
 - Sidebar chỉ còn danh mục có dịch vụ; mỗi mục có số đếm khớp kết quả khi bấm
 - Không nút nào bấm vào mà không xảy ra gì
@@ -132,7 +163,8 @@ features/customer-service/pages/
 | Rủi ro | Mức | Giảm thiểu |
 |---|---|---|
 | Đổi cách hiển thị giá làm khách tưởng dịch vụ đắt lên | Trung bình | Không đổi con số nào, chỉ đổi **nhãn**. "Báo giá sau khảo sát" đúng với bản chất `variable_price` |
-| `getServicePrice` còn được dùng chỗ khác | Trung bình | Grep toàn repo trước khi đổi tên; TypeScript bắt được chỗ sót |
+| `getServicePrice` còn được dùng chỗ khác | Trung bình | Đã grep: dùng ở `ServiceCard`, `CustomerServiceListPage` (sắp xếp) và `useServicePricing` (tính giá). TypeScript bắt chỗ sót |
+| Sửa hook tính giá làm sai số tiền khách phải trả | ~~Cao~~ → **Thấp** | Đã kiểm: client không gửi trường tiền nào khi tạo đơn, backend tự dựng snapshot giá từ DB. `estimatePrice` chỉ để hiển thị. Vẫn test tay đặt đơn ở Phase 3 |
 | Lọc danh mục rỗng làm mất lối vào danh mục mới tạo | Thấp | Danh mục tự hiện lại ngay khi có dịch vụ đầu tiên |
 
 ## Bảo mật

@@ -73,11 +73,14 @@ features/customer-service/
    - Hoặc nếu backend có `totalCompletedOrders` cho dịch vụ thì nối vào — **cần
      kiểm tra trước**, không đoán.
    Không giữ một mục sắp xếp trả về nguyên thứ tự cũ.
-4. **Bỏ N+1 request khi tìm kiếm.** Hiện tại mỗi lần gõ nạp option của **tất cả**
-   dịch vụ để tìm trong tên tuỳ chọn. Thay bằng: tìm trên tên + mô tả dịch vụ +
-   tên danh mục (đã có sẵn trong bộ nhớ), bỏ phần tìm trong tuỳ chọn. Nếu thực sự
-   cần tìm theo tuỳ chọn thì phải là **một** lời gọi tìm kiếm phía server, không
-   phải 16 lời gọi phía client.
+4. **Bỏ N+1 request khi tìm kiếm.** (Chốt 2026-07-22.) Hiện tại mỗi lần gõ nạp
+   option của **tất cả** dịch vụ để tìm trong tên tuỳ chọn. Thay bằng: tìm trên
+   tên + mô tả dịch vụ + tên danh mục (đã có sẵn trong bộ nhớ), **bỏ phần tìm
+   trong tuỳ chọn**.
+   ⚠️ Đây là **thu hẹp phạm vi chức năng**, không phải tối ưu thuần tuý: gõ
+   "50 mét vuông" sẽ không còn ra kết quả. Chấp nhận đánh đổi vì tuỳ chọn hiện
+   tại đều là thông số dạng "Dưới 50 mét vuông", ít ai dùng làm từ khoá tìm dịch
+   vụ. Muốn khôi phục thì phải làm tìm kiếm phía server, nằm ngoài đợt này.
 5. **Thẻ dịch vụ:** siết mật độ theo `VISUAL_DENSITY 5`. Nhãn giá dùng
    `getServicePriceLabel` từ Phase 0. Gỡ nhãn danh mục uppercase khỏi **thẻ** khi
    đang lọc theo đúng danh mục đó (thừa thông tin), giữ khi xem "Tất cả".
