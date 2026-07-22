@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { MaterialIcon } from "@/components/common/MaterialIcon";
 
 /**
  * Lối vào tạo yêu cầu hỗ trợ cho khách chưa đăng nhập.
@@ -22,7 +21,7 @@ export function PublicSupportCta() {
         Gửi yêu cầu hỗ trợ
       </h2>
       <p className="mt-3 max-w-[60ch] text-pretty leading-7 text-on-surface-variant">
-        Đăng nhập để tạo yêu cầu có mã theo dõi — bạn xem được tiến độ xử lý và
+        Đăng nhập để tạo yêu cầu có mã theo dõi. Bạn xem được tiến độ xử lý và
         trao đổi trực tiếp với bộ phận hỗ trợ ngay trong ứng dụng.
       </p>
 
@@ -35,27 +34,9 @@ export function PublicSupportCta() {
         </Link>
       </div>
 
-      <div className="mt-8 border-t border-outline-variant/40 pt-6">
-        <p className="text-label-md font-semibold text-on-surface">
-          Cần hỗ trợ ngay, chưa muốn đăng nhập?
-        </p>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:gap-6">
-          <a
-            href="tel:19001234"
-            className="inline-flex items-center gap-2 text-on-surface-variant hover:text-primary"
-          >
-            <MaterialIcon className="text-[20px] text-primary">call</MaterialIcon>
-            <span className="font-semibold tabular-nums">1900 1234</span>
-          </a>
-          <a
-            href="mailto:support@handigo.vn"
-            className="inline-flex items-center gap-2 text-on-surface-variant hover:text-primary"
-          >
-            <MaterialIcon className="text-[20px] text-primary">mail</MaterialIcon>
-            <span className="font-semibold">support@handigo.vn</span>
-          </a>
-        </div>
-      </div>
+      {/* Khối "Cần hỗ trợ ngay?" kèm số tổng đài và email đã gỡ: cột "Kênh hỗ
+          trợ" ngay bên cạnh đã liệt kê đúng hai kênh đó. In hai lần trên cùng
+          một màn hình chỉ làm người đọc phân vân xem có khác nhau chỗ nào. */}
     </section>
   );
 }

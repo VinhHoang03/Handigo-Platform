@@ -1,16 +1,15 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { PublicContentLayout } from "../components/PublicContentLayout";
 import { PublicSupportCta } from "../components/PublicSupportCta";
-import {
-  IconTile,
-  SupportChannels,
-} from "../components/SupportChannels";
+import { IconTile, SupportChannels } from "../components/SupportChannels";
+import { SupportFaq } from "../components/SupportFaq";
 import {
   SupportTicketSection,
   type SupportRole,
 } from "../components/SupportTicketSection";
-import { faqs, supportCategories } from "../data/supportData";
+import { supportCategories } from "../data/supportData";
+import type { SupportFaqGroup } from "../data/support-faq";
 
 interface SupportPageProps {
   role?: SupportRole;
@@ -18,16 +17,16 @@ interface SupportPageProps {
 
 export default function SupportPage({ role }: SupportPageProps) {
   const [faqQuery, setFaqQuery] = useState("");
-  const normalizedQuery = faqQuery.trim().toLocaleLowerCase("vi-VN");
-  const filteredFaqs = useMemo(
-    () =>
-      faqs.filter((faq) =>
-        `${faq.question} ${faq.answer}`
-          .toLocaleLowerCase("vi-VN")
-          .includes(normalizedQuery),
-      ),
-    [normalizedQuery],
-  );
+  const [faqGroup, setFaqGroup] = useState<SupportFaqGroup | null>(null);
+
+  // Bốn thẻ danh mục nay là bộ lọc thật cho danh sách câu hỏi bên dưới, thay vì
+  // bốn tấm thẻ chỉ để nhìn.
+  const selectCategory = (title: string) => {
+    setFaqGroup(title as SupportFaqGroup);
+    document
+      .getElementById("cau-hoi-thuong-gap")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const content = (
     <>
@@ -58,40 +57,25 @@ export default function SupportPage({ role }: SupportPageProps) {
             aria-label="Tìm kiếm câu hỏi thường gặp"
           />
         </div>
-
-        {faqQuery && (
-          <div className="mx-auto mt-3 max-w-2xl overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest text-left">
-            {filteredFaqs.length ? (
-              filteredFaqs.map((faq) => (
-                <div
-                  key={faq.question}
-                  className="border-b border-outline-variant/20 p-4 last:border-0"
-                >
-                  <p className="font-semibold text-on-surface">{faq.question}</p>
-                  <p className="mt-1 text-sm leading-6 text-on-surface-variant">
-                    {faq.answer}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="p-5 text-center text-on-surface-variant">
-                Không tìm thấy câu trả lời phù hợp. Thử từ khoá ngắn hơn, hoặc
-                gọi 1900 1234.
-              </p>
-            )}
-          </div>
-        )}
       </section>
 
-      <section className={`mx-auto max-w-7xl ${role ? "py-4" : "px-6 pb-5 pt-10"}`}>
-        <h2 className="mb-7 font-headline-lg text-3xl font-bold tracking-[-0.02em] text-on-surface">
+      <section
+        aria-labelledby="support-categories-heading"
+        className={`mx-auto max-w-7xl ${role ? "py-4" : "px-6 pb-2 pt-12"}`}
+      >
+        <h2
+          id="support-categories-heading"
+          className="mb-7 font-headline-lg text-3xl font-bold tracking-[-0.02em] text-on-surface"
+        >
           Danh mục hỗ trợ
         </h2>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {supportCategories.map((category) => (
-            <article
+            <button
               key={category.title}
-              className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 transition-colors hover:border-primary/30"
+              type="button"
+              onClick={() => selectCategory(category.title)}
+              className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-left transition-colors hover:border-primary/30 hover:bg-surface-container-low"
             >
               <IconTile icon={category.icon} />
               <h3 className="mt-5 text-lg font-semibold text-on-surface">
@@ -100,10 +84,16 @@ export default function SupportPage({ role }: SupportPageProps) {
               <p className="mt-2 text-pretty text-sm leading-6 text-on-surface-variant">
                 {category.text}
               </p>
-            </article>
+            </button>
           ))}
         </div>
       </section>
+
+      <SupportFaq
+        query={faqQuery}
+        group={faqGroup}
+        onGroupChange={setFaqGroup}
+      />
 
       {role ? (
         <>

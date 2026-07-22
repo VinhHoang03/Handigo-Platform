@@ -40,27 +40,32 @@ export const milestones = [
 ];
 
 /**
- * TODO: thay bằng thông tin ban lãnh đạo THẬT trước khi phát hành.
+ * Cam kết thay cho dải số liệu cũ ("50.000+ khách hàng / 5.000+ đối tác / 100+
+ * loại dịch vụ").
  *
- * "Nguyễn Văn A/B/C" là tên giữ chỗ (tương đương "Nguyễn Văn A" trong tiếng
- * Việt là cách gọi người vô danh). Trước đây mỗi người còn kèm một chân dung do
- * AI sinh, host trên CDN của Google — tức là dựng người không có thật kèm khuôn
- * mặt không có thật trên trang giới thiệu công ty. Ảnh đã gỡ; phần tên vẫn cần
- * dữ liệu thật hoặc gỡ hẳn mục này.
+ * Ba con số đó vừa mâu thuẫn với trang chủ (2.000+ thợ ở đó, 5.000+ đối tác ở
+ * đây), vừa mâu thuẫn với chính dòng thời gian ngay bên dưới: một công ty khởi
+ * tạo tháng 5/2026 không thể đã có 50.000 khách hàng. Dùng chung ngôn ngữ với
+ * dải cam kết ở trang chủ để hai trang nói cùng một điều.
+ *
+ * Đội ngũ lãnh đạo "Nguyễn Văn A / Trần Thị B / Lê Văn C" cũng đã gỡ khỏi file
+ * này. Một công ty hai tháng tuổi không cần trang ban lãnh đạo; không có tốt
+ * hơn có mà giả.
  */
-export const leaders = [
-  { name: 'Nguyễn Văn A', role: 'Giám đốc điều hành (CEO)' },
-  { name: 'Trần Thị B', role: 'Giám đốc công nghệ (CTO)' },
-  { name: 'Lê Văn C', role: 'Giám đốc vận hành (COO)' },
-];
-
-/**
- * TODO: đối chiếu với số liệu thật.
- * Hiện không khớp với trang chủ: trang chủ ghi "2.000+ thợ chuyên nghiệp",
- * trang này ghi "5.000+ đối tác". Một trong hai (hoặc cả hai) đang sai.
- */
-export const aboutStats = [
-  { value: '50.000+', label: 'Khách hàng tin dùng' },
-  { value: '5.000+', label: 'Đối tác chuyên nghiệp' },
-  { value: '100+', label: 'Loại dịch vụ đa dạng' },
+export const aboutCommitments = [
+  {
+    icon: 'badge',
+    title: 'Kiểm duyệt trước khi nhận việc',
+    text: 'Mỗi hồ sơ nhà cung cấp được xét duyệt thủ công: giấy tờ tuỳ thân, chuyên môn và phạm vi dịch vụ nhận làm.',
+  },
+  {
+    icon: 'request_quote',
+    title: 'Giá thoả thuận trước khi làm',
+    text: 'Báo giá nằm trong đơn và cần bạn đồng ý mới bắt đầu. Muốn đổi thì phải sửa đơn, hai bên cùng thấy.',
+  },
+  {
+    icon: 'history',
+    title: 'Mọi việc để lại dấu vết',
+    text: 'Tin nhắn, thay đổi trạng thái và thanh toán đều lưu trong đơn, tra lại được khi cần đối chiếu.',
+  },
 ];

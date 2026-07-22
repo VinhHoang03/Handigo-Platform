@@ -21,23 +21,9 @@ export const supportCategories = [
   },
 ];
 
-export const faqs = [
-  {
-    question: 'Làm thế nào để thay đổi lịch hẹn?',
-    answer:
-      'Mở chi tiết đơn dịch vụ và chọn thay đổi lịch nếu đơn chưa được nhà cung cấp bắt đầu.',
-  },
-  {
-    question: 'Khi nào tôi nhận được tiền hoàn?',
-    answer:
-      'Tiền hoàn được xử lý theo phương thức ban đầu, dự kiến từ 3 đến 7 ngày làm việc.',
-  },
-  {
-    question: 'Tôi có thể liên hệ nhà cung cấp ở đâu?',
-    answer:
-      'Mở cuộc trò chuyện từ biểu tượng tin nhắn sau khi đơn hàng được xác nhận.',
-  },
-];
+/* `faqs` (3 câu) đã chuyển sang `support-faq.ts` và mở rộng thành 16 câu theo
+   đúng 4 nhóm của `supportCategories`, để ô tìm kiếm trên trang Hỗ trợ có nội
+   dung thật để lọc. */
 
 export const supportChannels = [
   {
