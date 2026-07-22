@@ -1,0 +1,175 @@
+import type { Order, OrderQuotation } from "@/types/booking";
+import {
+  formatCurrency,
+  getQuotationStatusClass,
+  getQuotationStatusLabel,
+} from "./bookingDetailFormatters";
+
+type BookingQuotationDetailsProps = {
+  order: Order;
+  quotation: OrderQuotation;
+  busy: boolean;
+  paidDepositAmount: number;
+  onConfirm: () => void;
+  onReject: () => void;
+};
+
+/** Nội dung báo giá sửa chữa khi chuyên gia đã gửi báo giá. */
+export const BookingQuotationDetails = ({
+  order,
+  quotation,
+  busy,
+  paidDepositAmount,
+  onConfirm,
+  onReject,
+}: BookingQuotationDetailsProps) => (
+  <>
+    <div className="flex flex-col gap-3 mb-lg sm:flex-row sm:items-center sm:justify-between">
+      <h3 className="font-headline-md text-headline-md text-primary flex min-w-0 items-center gap-2">
+        <span className="material-symbols-outlined">request_quote</span>
+        Báo giá sửa chữa
+      </h3>
+      <span
+        className={`inline-flex max-w-full whitespace-normal break-words px-3 py-1 rounded-full text-xs font-bold uppercase leading-snug ${getQuotationStatusClass(quotation.quotation.status)}`}
+      >
+        {getQuotationStatusLabel(quotation.quotation.status)}
+      </span>
+    </div>
+
+    <div className="grid gap-sm mb-lg sm:grid-cols-2">
+      {quotation.quotation.quotationCode && (
+        <div className="rounded-2xl bg-surface-container-low p-sm">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+            Mã báo giá
+          </p>
+          <p className="mt-1 font-semibold text-on-surface">
+            {quotation.quotation.quotationCode}
+          </p>
+        </div>
+      )}
+      {quotation.quotation.createdAt && (
+        <div className="rounded-2xl bg-surface-container-low p-sm">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+            Thời gian gửi
+          </p>
+          <p className="mt-1 font-semibold text-on-surface">
+            {new Date(quotation.quotation.createdAt).toLocaleString("vi-VN")}
+          </p>
+        </div>
+      )}
+    </div>
+
+    <div className="space-y-sm mb-lg">
+      {quotation.items.map((item, idx) => (
+        <div
+          key={idx}
+          className="flex justify-between items-center bg-surface-container-low p-md rounded-2xl"
+        >
+          <div className="flex-1 min-w-0 mr-md">
+            <p className="font-bold text-on-surface truncate">{item.title}</p>
+            <p className="text-sm text-on-surface-variant tabular-nums">
+              {item.quantity} x {formatCurrency(item.unitPrice)}
+            </p>
+            {item.description && (
+              <p className="mt-1 text-xs text-on-surface-variant line-clamp-2">
+                {item.description}
+              </p>
+            )}
+          </div>
+          <p className="font-headline-sm text-primary shrink-0 tabular-nums">
+            {formatCurrency(item.totalPrice)}
+          </p>
+        </div>
+      ))}
+    </div>
+
+    <div className="flex flex-col gap-md p-lg bg-primary/5 rounded-3xl border border-primary/10 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-1">
+        {typeof quotation.quotation.subtotalAmount === "number" && (
+          <p className="text-sm text-on-surface-variant tabular-nums">
+            Tạm tính:{" "}
+            <span className="font-semibold text-on-surface">
+              {formatCurrency(quotation.quotation.subtotalAmount)}
+            </span>
+          </p>
+        )}
+        {!!quotation.quotation.discountAmount && (
+          <p className="text-sm text-emerald-700 tabular-nums">
+            Giảm giá: -{formatCurrency(quotation.quotation.discountAmount)}
+          </p>
+        )}
+        <p className="text-label-sm text-on-surface-variant font-bold uppercase">
+          Tổng chi phí dự kiến
+        </p>
+        <p className="text-headline-lg font-black text-primary leading-none mt-1 tabular-nums">
+          {formatCurrency(quotation.quotation.finalAmount)}
+        </p>
+      </div>
+      {quotation.quotation.status === "pending" && (
+        <div className="flex flex-col gap-sm sm:flex-row">
+          <button
+            disabled={busy}
+            onClick={onReject}
+            className="px-6 py-3 border-2 border-red-200 text-red-600 rounded-2xl font-bold hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50"
+          >
+            Từ chối
+          </button>
+          <button
+            disabled={busy}
+            onClick={onConfirm}
+            className="px-8 py-3 bg-primary text-on-primary rounded-2xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {busy && (
+              <div className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+            )}
+            Đồng ý báo giá
+          </button>
+        </div>
+      )}
+    </div>
+
+    {quotation.quotation.status === "approved" && (
+      <div className="mt-md rounded-3xl border border-emerald-200 bg-emerald-50 p-md text-emerald-900">
+        <p className="font-bold">Bạn đã đồng ý báo giá</p>
+        <p className="mt-1 text-sm text-emerald-800">
+          Chuyên gia có thể bắt đầu thực hiện công việc ngay, không cần chờ thanh toán.
+        </p>
+        <div className="mt-3 grid gap-2 border-t border-emerald-200 pt-3 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-bold uppercase text-emerald-700">
+              Tiền cọc qua Handigo
+            </p>
+            <p className="mt-1 font-bold tabular-nums">
+              {formatCurrency(paidDepositAmount || order.depositAmount)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase text-emerald-700">
+              Chi phí theo báo giá
+            </p>
+            <p className="mt-1 text-sm font-medium">
+              Tự thanh toán trực tiếp với chuyên gia, không thanh toán qua Handigo.
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {quotation.quotation.inspectionNote && (
+      <div className="mt-md p-md bg-surface-container rounded-2xl border border-outline-variant/30 italic text-on-surface-variant text-sm">
+        <strong>Ghi chú khảo sát:</strong> {quotation.quotation.inspectionNote}
+      </div>
+    )}
+    {quotation.quotation.recommendation && (
+      <div className="mt-md p-md bg-surface-container rounded-2xl border border-outline-variant/30 text-on-surface-variant text-sm">
+        <strong>Đề xuất xử lý:</strong> {quotation.quotation.recommendation}
+      </div>
+    )}
+    {quotation.quotation.status === "rejected" &&
+      quotation.quotation.rejectionReason && (
+        <div className="mt-md p-md bg-red-50 rounded-2xl border border-red-100 text-red-700 text-sm">
+          <strong>Lý do từ chối:</strong> {quotation.quotation.rejectionReason}
+        </div>
+      )}
+  </>
+);

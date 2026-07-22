@@ -40,8 +40,10 @@ export function useAvatarEditor({ onSave }: UseAvatarEditorParams) {
   } = useAvatarCropCanvas({ previewUrl, file, isUploading });
 
   useEffect(() => {
+    // Giữ tham chiếu ref để thu hồi object URL cuối cùng khi unmount
+    const urlRef = previewUrlRef;
     return () => {
-      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
     };
   }, [previewUrlRef]);
 

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { providerOrderApi } from '../api/providerOrder.api';
-import { PendingAssignmentCard } from '../components/PendingAssignmentCard';
 import { ProviderOrderCard } from '../components/ProviderOrderCard';
+import { PendingAssignmentsSection } from '../components/orders/PendingAssignmentsSection';
+import { ProviderOrdersListSkeleton } from '../components/orders/ProviderOrdersListSkeleton';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import type { Order } from '@/types/booking';
 
@@ -122,40 +123,14 @@ export default function ProviderOrdersPage() {
           </div>
         )}
 
-        <section className="hidden">
-          <div className="flex items-center justify-between gap-md">
-            <h2 className="font-headline-md text-on-surface">Đơn chờ phản hồi</h2>
-            <button
-              type="button"
-              onClick={loadAssignments}
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Làm mới
-            </button>
-          </div>
-
-          {loadingAssignments ? (
-            <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
-              Đang tải đơn chờ phản hồi...
-            </div>
-          ) : assignments.length === 0 ? (
-            <div className="rounded-3xl border-2 border-dashed border-outline-variant bg-surface-container-low p-lg text-center text-on-surface-variant">
-              Hiện chưa có đơn mới cần phản hồi.
-            </div>
-          ) : (
-            <div className="grid gap-md">
-              {assignments.map((assignment) => (
-                <PendingAssignmentCard
-                  key={assignment._id}
-                  assignment={assignment}
-                  onAccept={handleAccept}
-                  onReject={handleReject}
-                  busy={actionBusy}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+        <PendingAssignmentsSection
+          assignments={assignments}
+          loading={loadingAssignments}
+          busy={actionBusy}
+          onRefresh={loadAssignments}
+          onAccept={handleAccept}
+          onReject={handleReject}
+        />
 
         <section className="space-y-md">
           <div className="flex flex-col gap-md md:flex-row md:items-center md:justify-between">
@@ -168,7 +143,7 @@ export default function ProviderOrdersPage() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Tìm mã đơn, dịch vụ..."
-                className="w-full rounded-full border border-outline-variant/40 bg-white py-3 pl-12 pr-4 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                className="w-full rounded-full border border-outline-variant/40 bg-surface-container-lowest py-3 pl-12 pr-4 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
               />
             </div>
           </div>
@@ -191,9 +166,7 @@ export default function ProviderOrdersPage() {
           </div>
 
           {loadingOrders ? (
-            <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
-              Đang tải danh sách đơn...
-            </div>
+            <ProviderOrdersListSkeleton />
           ) : orders.length === 0 ? (
             <div className="rounded-3xl border-2 border-dashed border-outline-variant bg-surface-container-low p-lg text-center text-on-surface-variant">
               {debouncedSearch

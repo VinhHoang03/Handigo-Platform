@@ -46,22 +46,22 @@ export default function ProviderFeedbackPage() {
 
       {result?.summary && (
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="glass-card rounded-2xl p-5">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
             <p className="text-sm text-on-surface-variant">Điểm trung bình</p>
             <p className="text-4xl font-bold text-primary">{result.summary.averageRating.toFixed(1)}</p>
             <RatingStars value={Math.round(result.summary.averageRating)} size="sm" />
           </div>
-          <div className="glass-card rounded-2xl p-5">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
             <p className="text-sm text-on-surface-variant">Tổng đánh giá</p>
             <p className="text-4xl font-bold">{result.summary.totalFeedbacks}</p>
           </div>
-          <div className="glass-card space-y-2 rounded-2xl p-5">
+          <div className="space-y-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
             {[5, 4, 3, 2, 1].map((rating) => (
               <div key={rating} className="flex items-center gap-2 text-sm">
                 <span>{rating}★</span>
                 <div className="h-2 flex-1 rounded bg-surface-container-high">
                   <div
-                    className="h-2 rounded bg-amber-400"
+                    className="h-2 rounded bg-tertiary"
                     style={{
                       width: `${result.summary!.totalFeedbacks
                         ? ((result.summary!.ratingDistribution[rating as 1 | 2 | 3 | 4 | 5] || 0) / result.summary!.totalFeedbacks) * 100
@@ -76,7 +76,7 @@ export default function ProviderFeedbackPage() {
         </div>
       )}
 
-      <div className="glass-card grid gap-3 rounded-2xl p-4 md:grid-cols-[minmax(14rem,1fr)_12rem_13rem]">
+      <div className="grid gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 md:grid-cols-[minmax(14rem,1fr)_12rem_13rem]">
         <FloatingInput
           id="provider-feedback-keyword"
           label="Tìm trong nhận xét"

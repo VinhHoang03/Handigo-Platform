@@ -7,7 +7,7 @@ export function OrderFeedbackSection({ orderId }: { orderId: string }) {
     useOrderFeedback(orderId);
 
   return (
-    <section className="glass-card overflow-hidden rounded-3xl border border-outline-variant/30 p-md shadow-sm sm:p-lg">
+    <section className="overflow-hidden rounded-3xl border border-outline-variant bg-surface-container-lowest p-md shadow-sm sm:p-lg">
       <div className="mb-lg flex items-start gap-3">
         <span className="material-symbols-outlined flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-tertiary/10 text-tertiary">
           reviews

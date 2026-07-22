@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../common/SectionHeader";
-import { TestimonialCard } from "./HomeCards";
+import { TestimonialCard } from "../common/TestimonialCard";
 import { HomeEmptyState, TestimonialCardSkeleton } from "./HomeSkeletons";
 import { homeApi, type LatestFeedback } from "@/features/home/api/home.api";
 
