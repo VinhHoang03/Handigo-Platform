@@ -19,6 +19,12 @@
   --color-tertiary-fixed-dim: #ffb695;
   --color-secondary-fixed-dim: #4cd7f6;
   --color-primary: #3525cd;
+  /* Trạng thái hover/pressed của nút chính. M3 không định nghĩa sẵn hai token
+     này; trước đây hover dùng `primary-container` (#4f46e5) nên nút SÁNG lên
+     khi rê chuột, làm tương phản với chữ trắng giảm đi và trông như bị disable.
+     Hai token dưới đây tối dần theo đúng kỳ vọng của người dùng. */
+  --color-primary-hover: #2a1ca6;
+  --color-primary-pressed: #221584;
   --color-on-secondary-container: #006172;
   --color-surface-dim: #d2d9f4;
   --color-secondary-fixed: #acedff;
@@ -350,7 +356,7 @@
   }
 
   .btn-primary {
-    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition duration-200 hover:bg-primary-container hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition duration-200 hover:bg-primary-hover hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)] active:bg-primary-pressed active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
   }
 
   .btn-secondary {

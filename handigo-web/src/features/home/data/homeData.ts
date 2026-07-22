@@ -26,8 +26,9 @@ export const features = [
   },
 ];
 
+// Dấu phân cách hàng nghìn theo chuẩn tiếng Việt là dấu chấm, không phải dấu phẩy.
 export const stats = [
-  { val: '10,000+', label: 'Khách hàng tin dùng' },
-  { val: '2,000+', label: 'Thợ chuyên nghiệp' },
-  { val: '50,000+', label: 'Công việc đã hoàn thành' },
+  { val: '10.000+', label: 'Khách hàng tin dùng' },
+  { val: '2.000+', label: 'Thợ chuyên nghiệp' },
+  { val: '50.000+', label: 'Công việc đã hoàn thành' },
 ];
