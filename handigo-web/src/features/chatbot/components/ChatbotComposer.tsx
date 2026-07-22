@@ -33,7 +33,7 @@ export function ChatbotComposer({
   return (
     <form
       onSubmit={submit}
-      className="border-t border-outline-variant/30 bg-white/90 p-3 backdrop-blur-xl"
+      className="border-t border-outline-variant/30 bg-surface-container-lowest/90 p-3 backdrop-blur-xl"
     >
       <div className="relative flex items-end gap-1.5 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-1.5 shadow-sm transition-colors duration-200 focus-within:border-primary/80 focus-within:shadow-[0_0_0_3px_rgba(53,37,205,0.10)]">
         <textarea

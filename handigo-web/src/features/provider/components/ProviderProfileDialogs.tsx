@@ -44,7 +44,7 @@ export function ProfessionalProfileDialog({
               rows={7}
               maxLength={2000}
               onChange={(event) => onBioChange(event.target.value)}
-              className="w-full resize-y rounded-xl border border-outline-variant/40 bg-white px-4 py-3 text-sm leading-relaxed outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="w-full resize-y rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
               placeholder="Mô tả kinh nghiệm, thế mạnh và cách bạn phục vụ khách hàng..."
             />
             <span className="mt-1 block text-right text-xs text-on-surface-variant">

@@ -28,7 +28,7 @@ export function DashboardSidebar({
 
   return (
     <aside
-      className={`fixed bottom-6 left-4 z-40 hidden w-72 flex-col gap-5 rounded-2xl border border-outline-variant/30 bg-white/92 p-5 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl lg:flex xl:left-6 ${sidebarTopClass}`}
+      className={`fixed bottom-6 left-4 z-40 hidden w-72 flex-col gap-5 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/92 p-5 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl lg:flex xl:left-6 ${sidebarTopClass}`}
     >
       <Link
         to={homePath}

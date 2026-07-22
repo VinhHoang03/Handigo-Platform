@@ -50,11 +50,11 @@ export function AuthLayout({
               alt=""
               className="h-9 w-9 object-contain rounded-lg"
             />
-            <span className="font-headline-md text-xl font-bold text-white">
+            <span className="font-headline-md text-xl font-bold text-on-primary">
               Handigo
             </span>
           </Link>
-          <h1 className="max-w-[520px] font-headline-lg text-3xl font-semibold leading-tight text-white xl:text-4xl">
+          <h1 className="max-w-[520px] font-headline-lg text-3xl font-semibold leading-tight text-on-primary xl:text-4xl">
             {brandTitle}
           </h1>
           <p className="mt-3 max-w-[500px] text-base leading-7 text-on-primary-container">

@@ -60,7 +60,7 @@ export function ChatbotMessageList({
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                 isUser
                   ? "rounded-br-md bg-primary text-on-primary"
-                  : "rounded-bl-md border border-outline-variant/30 bg-white text-on-surface"
+                  : "rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest text-on-surface"
               }`}
             >
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -77,7 +77,7 @@ export function ChatbotMessageList({
       })}
       {isReplying && (
         <div className="flex justify-start" aria-live="polite">
-          <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-outline-variant/30 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 shadow-sm">
             {[0, 1, 2].map((index) => (
               <span
                 key={index}
