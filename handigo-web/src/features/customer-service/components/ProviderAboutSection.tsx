@@ -12,7 +12,7 @@ interface ProviderAboutSectionProps {
   certificates: PublicProviderProfile["provider"]["certificates"];
 }
 
-/** Giới thiệu chuyên gia và danh sách chứng chỉ công khai. */
+/** Giới thiệu thợ và danh sách chứng chỉ công khai. */
 export function ProviderAboutSection({
   bio,
   description,

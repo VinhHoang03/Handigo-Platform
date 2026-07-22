@@ -2,7 +2,7 @@ interface ProviderServiceAreasProps {
   areas: string[];
 }
 
-/** Khu vực hoạt động của chuyên gia. */
+/** Khu vực hoạt động của thợ. */
 export function ProviderServiceAreas({ areas }: ProviderServiceAreasProps) {
   return (
     <section>

@@ -3,7 +3,7 @@ interface NearbyProviderAutoAssignOptionProps {
   onSelect: () => void;
 }
 
-/** Lựa chọn "để Handigo tự điều phối chuyên gia" — luôn đứng đầu danh sách. */
+/** Lựa chọn "để Handigo tự tìm thợ" — luôn đứng đầu danh sách. */
 export function NearbyProviderAutoAssignOption({
   isSelected,
   onSelect,
@@ -23,7 +23,7 @@ export function NearbyProviderAutoAssignOption({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-bold text-on-surface">
-          Handigo tự điều phối chuyên gia
+          Handigo tự tìm thợ
         </span>
         <span className="block text-xs text-on-surface-variant">
           Hệ thống sẽ điều phối người phù hợp nhất khi bạn đặt lịch.

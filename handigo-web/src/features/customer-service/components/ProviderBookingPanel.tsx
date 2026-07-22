@@ -10,7 +10,7 @@ interface ProviderBookingPanelProps {
   onBook: () => void;
 }
 
-/** Thẻ đặt dịch vụ với chuyên gia: chọn dịch vụ và xác nhận đặt lịch. */
+/** Thẻ đặt dịch vụ với thợ: chọn dịch vụ và xác nhận đặt lịch. */
 export function ProviderBookingPanel({
   providerFullName,
   averageRating,
@@ -22,10 +22,10 @@ export function ProviderBookingPanel({
   return (
     <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-lg">
       <h3 className="text-xl font-bold text-on-background">
-        Đặt dịch vụ với chuyên gia này
+        Đặt dịch vụ với thợ này
       </h3>
       <p className="mt-2 text-sm text-on-surface-variant">
-        Chọn dịch vụ bạn cần. Handigo sẽ giữ đúng chuyên gia này khi họ phù
+        Chọn dịch vụ bạn cần. Handigo sẽ giữ đúng thợ này khi họ phù
         hợp với khu vực và lịch đã chọn.
       </p>
       {services.length > 0 ? (

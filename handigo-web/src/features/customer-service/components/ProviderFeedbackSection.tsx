@@ -12,7 +12,7 @@ interface ProviderFeedbackSectionProps {
   totalFeedbacks: number;
 }
 
-/** Danh sách đánh giá công khai từ khách hàng đã đặt dịch vụ với chuyên gia. */
+/** Danh sách đánh giá công khai từ khách hàng đã đặt dịch vụ với thợ. */
 export function ProviderFeedbackSection({
   feedbacks,
   totalFeedbacks,
@@ -29,7 +29,7 @@ export function ProviderFeedbackSection({
       </div>
       {feedbacks.length === 0 ? (
         <p className="rounded-2xl bg-surface-container-lowest p-5 text-on-surface-variant">
-          Chưa có đánh giá công khai cho chuyên gia này.
+          Chưa có đánh giá công khai cho thợ này.
         </p>
       ) : (
         feedbacks.map((feedback) => (

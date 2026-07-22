@@ -16,7 +16,7 @@ interface NearbyProviderCardProps {
   onSelect: (provider: NearbyProvider) => void;
 }
 
-/** Thẻ hiển thị một chuyên gia phù hợp, kèm nút chọn/ưu tiên chuyên gia. */
+/** Thẻ hiển thị một thợ phù hợp, kèm nút chọn/ưu tiên thợ. */
 export function NearbyProviderCard({
   provider,
   isSelected,
@@ -67,7 +67,7 @@ export function NearbyProviderCard({
         <Link
           to={`/customer/providers/${provider.id}`}
           className="grid h-10 w-10 place-items-center rounded-full bg-primary-container/10 text-primary hover:bg-primary-container/20"
-          aria-label={`Xem chuyên gia ${provider.user.fullName}`}
+          aria-label={`Xem hồ sơ thợ ${provider.user.fullName}`}
         >
           <span className="material-symbols-outlined">person_search</span>
         </Link>
@@ -94,18 +94,18 @@ export function NearbyProviderCard({
           >
             {isSelected
               ? requireSelection
-                ? "Đã chọn chuyên gia"
-                : "Đã ưu tiên chuyên gia"
+                ? "Đã chọn thợ"
+                : "Đã ưu tiên thợ"
               : requireSelection
-                ? "Chọn chuyên gia này"
-                : "Ưu tiên chuyên gia này"}
+                ? "Chọn thợ này"
+                : "Ưu tiên thợ này"}
             <span className="material-symbols-outlined text-[18px]">
               {isSelected ? "check_circle" : "add_circle"}
             </span>
           </button>
           {isSelected && !requireSelection && (
             <p className="mt-2 text-xs leading-5 text-on-surface-variant">
-              Nếu chuyên gia không thể nhận, Handigo sẽ tự tìm người phù hợp khác.
+              Nếu thợ không thể nhận, Handigo sẽ tự tìm người phù hợp khác.
             </p>
           )}
         </>

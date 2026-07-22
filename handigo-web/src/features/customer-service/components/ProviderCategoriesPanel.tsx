@@ -5,7 +5,7 @@ interface ProviderCategoriesPanelProps {
   categories: PublicProviderProfile["provider"]["serviceCategories"];
 }
 
-/** Danh mục dịch vụ mà chuyên gia đăng ký, mở rộng để xem dịch vụ con. */
+/** Danh mục dịch vụ mà thợ đăng ký, mở rộng để xem dịch vụ con. */
 export function ProviderCategoriesPanel({
   categories,
 }: ProviderCategoriesPanelProps) {

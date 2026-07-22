@@ -1,6 +1,6 @@
 # Phase 2 — Trang chi tiết dịch vụ
 
-**Ưu tiên:** Cao · **Trạng thái:** ☐ Chưa bắt đầu · **Phụ thuộc:** Phase 0
+**Ưu tiên:** Cao · **Trạng thái:** ✅ Hoàn thành (2026-07-22) · **Phụ thuộc:** Phase 0
 
 Đây là màn hình cuối trước khi khách bấm "Đặt lịch ngay". Mọi chi tiết sai ở đây
 đều làm khách chần chừ đúng lúc không nên chần chừ.
@@ -83,15 +83,15 @@ features/customer-service/pages/
 
 ## Todo
 
-- [ ] Tuỳ chọn không có ảnh → không dựng khung ảnh
-- [ ] Gỡ copy độn "Tùy chọn bổ sung cho dịch vụ này."
-- [ ] Sửa xuống dòng tên tuỳ chọn / va chạm với cột giá
-- [ ] Đổi tiêu đề "Danh mục công việc", chuyển sang dải mảnh
-- [ ] Thống nhất "thợ" trong mọi chuỗi hiển thị
-- [ ] Phá chuỗi 5 thẻ trắng giống nhau
-- [ ] Nhãn uppercase màn hình đầu ≤ 2
-- [ ] Trạng thái rỗng của khối thợ nói được bước tiếp theo
-- [ ] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
+- [x] Tuỳ chọn không có ảnh → không dựng khung ảnh
+- [x] Gỡ copy độn "Tùy chọn bổ sung cho dịch vụ này."
+- [x] Sửa xuống dòng tên tuỳ chọn / va chạm với cột giá
+- [x] Đổi tiêu đề "Danh mục công việc", chuyển sang dải mảnh
+- [x] Thống nhất "thợ" trong mọi chuỗi hiển thị
+- [x] Phá chuỗi 5 thẻ trắng giống nhau
+- [x] Nhãn uppercase màn hình đầu ≤ 2
+- [x] Trạng thái rỗng của khối thợ nói được bước tiếp theo
+- [x] Build xanh + ESLint 0 lỗi + ảnh đối chiếu
 
 ## Tiêu chí hoàn thành
 

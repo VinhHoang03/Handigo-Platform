@@ -26,7 +26,7 @@ interface UseNearbyProvidersArgs {
   onAvailabilityChange?: (status: ProviderAvailabilityStatus) => void;
 }
 
-/** Tải danh sách chuyên gia gần địa chỉ đã chọn và đồng bộ lựa chọn hiện tại. */
+/** Tải danh sách thợ gần địa chỉ đã chọn và đồng bộ lựa chọn hiện tại. */
 export function useNearbyProviders({
   serviceId,
   addressId,
@@ -77,7 +77,7 @@ export function useNearbyProviders({
       } catch {
         if (!isMounted) return;
         setProviders([]);
-        setError("Không tải được chuyên gia phù hợp với địa chỉ này.");
+        setError("Không tải được danh sách thợ ở địa chỉ này.");
         onAvailabilityChange?.("error");
       } finally {
         if (isMounted) {

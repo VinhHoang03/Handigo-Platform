@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** Các khối trình bày nhỏ dùng lại trong trang hồ sơ công khai của chuyên gia. */
+/** Các khối trình bày nhỏ dùng lại trong trang hồ sơ công khai của thợ. */
 
 export function Metric({
   label,

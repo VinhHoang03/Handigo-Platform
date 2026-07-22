@@ -53,25 +53,38 @@ export function ServiceOptionsSection({
                         className={`w-full rounded-xl border-2 bg-surface-container-lowest p-5 text-left transition ${checked ? "border-primary bg-surface-container-low shadow-sm" : "border-outline-variant hover:border-primary/50"}`}
                       >
                         <div className="flex gap-4">
-                          <ReliableImage
-                            src={option.image}
-                            alt={`Ảnh tùy chọn ${option.name}`}
-                            className="h-24 w-24 shrink-0 rounded-lg object-cover"
-                          />
+                          {/* Chỉ dựng khung ảnh khi tuỳ chọn thật sự có ảnh.
+                              Toàn bộ tuỳ chọn hiện tại đều `image: null`, nên
+                              trước đây mỗi thẻ hiện một ô xám kèm icon "ảnh
+                              hỏng" — đọc như trang đang lỗi tải. */}
+                          {option.image && (
+                            <ReliableImage
+                              src={option.image}
+                              alt={`Ảnh tùy chọn ${option.name}`}
+                              className="h-24 w-24 shrink-0 rounded-lg object-cover"
+                            />
+                          )}
                           <div className="min-w-0 flex-1">
-                            <div className="mb-2 flex items-start justify-between gap-3">
-                              <h3 className="font-bold text-primary">{option.name}</h3>
+                            <div className="flex items-start justify-between gap-4">
+                              <h3 className="min-w-0 text-balance font-bold text-primary">
+                                {option.name}
+                              </h3>
                               {service.serviceType === "fixed_price" ? (
-                                <span className="font-bold tabular-nums text-on-surface">
+                                <span className="shrink-0 whitespace-nowrap font-bold tabular-nums text-on-surface">
                                   {getOptionPrice(option) > 0
                                     ? `+${money.format(getOptionPrice(option))}`
                                     : "Miễn phí"}
                                 </span>
                               ) : null}
                             </div>
-                            <p className="text-sm text-on-surface-variant">
-                              {option.description || "Tùy chọn bổ sung cho dịch vụ này."}
-                            </p>
+                            {/* Không có mô tả thì không render dòng nào. Trước
+                                đây rơi về "Tùy chọn bổ sung cho dịch vụ này."
+                                lặp ở mọi thẻ — chữ chiếm chỗ mà không nói gì. */}
+                            {option.description && (
+                              <p className="mt-2 text-sm text-on-surface-variant">
+                                {option.description}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </button>

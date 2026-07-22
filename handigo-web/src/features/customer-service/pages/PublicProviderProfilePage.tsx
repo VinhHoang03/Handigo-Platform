@@ -57,7 +57,7 @@ export default function PublicProviderProfilePage() {
         if (isMounted) setProfile(data);
       } catch {
         if (isMounted) {
-          setError("Không tải được hồ sơ chuyên gia. Vui lòng thử lại.");
+          setError("Không tải được hồ sơ thợ. Vui lòng thử lại.");
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -100,7 +100,7 @@ export default function PublicProviderProfilePage() {
         <AsyncState loading={isLoading} skeleton={<ProviderProfileSkeleton />}>
           {error || !profile ? (
             <div className="rounded-2xl border border-error/20 bg-error/10 p-8 text-center text-error">
-              {error || "Không tìm thấy hồ sơ chuyên gia."}
+              {error || "Không tìm thấy hồ sơ thợ."}
             </div>
           ) : (
             <>

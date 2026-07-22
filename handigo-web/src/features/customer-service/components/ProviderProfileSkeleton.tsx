@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/common/Skeleton";
 
-/** Khung xương trang hồ sơ chuyên gia, bám theo bố cục hero + nội dung + panel đặt lịch. */
+/** Khung xương trang hồ sơ thợ, bám theo bố cục hero + nội dung + panel đặt lịch. */
 export function ProviderProfileSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">

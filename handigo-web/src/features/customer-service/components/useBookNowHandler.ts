@@ -23,7 +23,7 @@ interface UseBookNowHandlerParams {
   ) => void;
 }
 
-/** Xác thực điều kiện đặt lịch (đăng nhập, địa chỉ, chuyên gia, tùy chọn) rồi điều hướng sang bước chọn lịch. */
+/** Xác thực điều kiện đặt lịch (đăng nhập, địa chỉ, thợ, tùy chọn) rồi điều hướng sang bước chọn lịch. */
 export function useBookNowHandler({
   service,
   isAuthenticated,
@@ -50,8 +50,8 @@ export function useBookNowHandler({
     if (providerAvailability !== "available") {
       setAddressSelectionError(
         providerAvailability === "loading" || providerAvailability === "idle"
-          ? "Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp."
-          : "Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.",
+          ? "Vui lòng chờ hệ thống tìm thợ phù hợp."
+          : "Chưa có thợ phù hợp với dịch vụ và địa chỉ đã chọn.",
       );
       return;
     }

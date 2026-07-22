@@ -110,11 +110,11 @@ export default function CustomerServiceDetailPage() {
         ) : (
           <>
             <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
-              <Link to="/customer" className="hover:text-primary">
+              <Link to="/customer" className="inline-flex min-h-11 items-center hover:text-primary">
                 Trang chủ
               </Link>
               <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-              <Link to="/customer/services" className="hover:text-primary">
+              <Link to="/customer/services" className="inline-flex min-h-11 items-center hover:text-primary">
                 Dịch vụ
               </Link>
               <span className="material-symbols-outlined text-[16px]">chevron_right</span>

@@ -6,7 +6,7 @@ interface ProviderProfileHeaderProps {
   profile: PublicProviderProfile;
 }
 
-/** Khối đầu trang hồ sơ chuyên gia: avatar, tên, huy hiệu xác minh và số liệu tổng quan. */
+/** Khối đầu trang hồ sơ thợ: avatar, tên, huy hiệu xác minh và số liệu tổng quan. */
 export function ProviderProfileHeader({ profile }: ProviderProfileHeaderProps) {
   return (
     <>

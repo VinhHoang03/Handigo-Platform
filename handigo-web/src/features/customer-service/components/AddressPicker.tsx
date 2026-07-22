@@ -24,7 +24,7 @@ export function AddressPicker({
 }: AddressPickerProps) {
   return (
     <div className="mb-5">
-      <p className="mb-2 text-xs font-bold uppercase text-on-surface-variant">
+      <p className="mb-2 text-label-md font-semibold text-on-surface">
         Địa chỉ thực hiện
       </p>
       <div
