@@ -39,12 +39,25 @@ tách các file quá lớn. Landing page đã hoàn thành ở commit `87cd616`.
 
 | # | Phase | Trạng thái | Phụ thuộc |
 |---|---|---|---|
-| 0 | [Nền tảng dùng chung](phase-00-shared-foundation.md) | ☐ Chưa bắt đầu | — |
-| 1 | [Công khai + Auth](phase-01-public-and-auth.md) | ◐ Landing xong | Phase 0 |
-| 2 | [Khách hàng](phase-02-customer.md) | ☐ Chưa bắt đầu | Phase 0 |
+| 0 | [Nền tảng dùng chung](phase-00-shared-foundation.md) | ✅ Xong (`b2df0e5`) | — |
+| 1 | [Công khai + Auth](phase-01-public-and-auth.md) | ✅ Xong (`9b36193`, `33458de`) | Phase 0 |
+| 2 | [Khách hàng](phase-02-customer.md) | ◐ **Đang dở** — mới quét cơ học (`e648a50`) | Phase 0 |
 | 3 | [Thợ](phase-03-provider.md) | ☐ Chưa bắt đầu | Phase 0 |
 | 4 | [Quản trị](phase-04-admin.md) | ☐ Chưa bắt đầu | Phase 0 |
 | 5 | [A11y + Responsive](phase-05-accessibility-responsive.md) | ☐ Chưa bắt đầu | Phase 1–4 |
+
+### Phase 2 đã làm tới đâu (tạm dừng 2026-07-22)
+
+**Xong:** token tông trạng thái dùng chung (`utils/statusTone.ts`), gỡ `ui-avatars.com`
+khỏi khung dùng chung (Navbar/DashboardLayout/DashboardShell) và 4 file nhóm khách
+hàng, sửa class chết `success-green`, gỡ `glass-card` + màu hardcode ở nhóm booking,
+`BookingHistoryPage` dùng `AsyncState` + skeleton.
+
+**Chưa làm — toàn bộ phần tách file**, đây mới là phần nặng:
+`BookingDetailPage` 1911 · `CustomerServiceDetailPage` 931 · `OrderTrackingMap` 849 ·
+`NotificationsPage` 685 · `CustomerProfilePage` 681 · `CreateBookingStep2Page` 628 ·
+`ConfirmPaymentPage` 594 · `WalletPage` 559 · `AddressBookModal` 724 ·
+`UserProfileSection` 630 · `PublicProviderProfilePage` 486 · và 4 file khác.
 
 **Phase 0 chặn tất cả.** Làm trước để phase 1–4 chỉ còn là áp dụng, không phải
 vừa làm vừa nghĩ ra quy ước. Phase 1–4 độc lập nhau, chạy song song được nếu
@@ -74,6 +87,23 @@ xem chi tiết ở Phase 2.
 - **`docs/` tiếp tục nằm ngoài git** (`.gitignore`). Không đưa vào repo.
   Hệ quả: tài liệu phát sinh từ plan này chỉ lưu cục bộ; mọi thứ cần chia sẻ với
   đội phải nằm trong `plans/` hoặc chính comment trong code.
+
+## Phát hiện trong lúc thực hiện — nên soi lại khi verify plan
+
+Bốn thứ tìm được khi làm mà lúc lập plan không thấy. Chúng gợi ý rằng khảo sát
+ban đầu còn sót, nên khi rà lại plan hãy chủ động tìm thêm cùng loại:
+
+1. **Class CSS không tồn tại vẫn được dùng.** `shadow-soft` và `success-green`
+   được viết ở 9+ chỗ nhưng chưa bao giờ khai báo → phần tử render không màu.
+   `mix-blend-mode-screen` cũng sai tên (đúng là `mix-blend-screen`).
+   → Nên quét: mọi class không khớp token nào trong `index.css` cũng không phải
+   utility Tailwind hợp lệ.
+2. **Chức năng giả.** Form gửi yêu cầu hỗ trợ công khai không gọi API nào mà vẫn
+   báo "đã được ghi nhận". → Nên quét: `onSubmit` không có lời gọi mạng.
+3. **Nội dung rác lọt vào bản chính thức.** Câu "Tôi thích phản hồi này hơn" từ
+   giao diện chat AI nằm giữa đoạn văn trang Giới thiệu.
+4. **Hệ màu ngầm thứ hai.** 281 lần dùng palette mặc định Tailwind trên 38 file,
+   nhiều hơn cả `bg-white` (162) — nguyên nhân là M3 thiếu `success`/`warning`.
 
 ## Câu hỏi chưa chốt
 
