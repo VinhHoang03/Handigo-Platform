@@ -1,15 +1,13 @@
 import type { AdminRevenue, RevenueQuery, RevenueSeriesPoint } from "../../types/adminRevenue.types";
+import { chartCompactMoney, chartMoney, monthLabel as chartMonthLabel } from "@/components/common/chart";
 
-export const money = new Intl.NumberFormat("vi-VN", {
-  style: "currency",
-  currency: "VND",
-  maximumFractionDigits: 0,
-});
-
-export const compactMoney = new Intl.NumberFormat("vi-VN", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+/*
+ * Ba định dạng dưới đây đã chuyển sang `components/common/chart/chart-format.ts`
+ * để trục biểu đồ, tooltip và bảng dữ liệu ẩn dùng chung một cách hiển thị số.
+ * Giữ re-export ở đây để các import cũ không phải sửa.
+ */
+export const money = chartMoney;
+export const compactMoney = chartCompactMoney;
 
 export const toInputDate = (date: Date) => {
   const year = date.getFullYear();
@@ -25,10 +23,7 @@ export const createRange = (days: number): RevenueQuery => {
   return { fromDate: toInputDate(fromDate), toDate: toInputDate(toDate) };
 };
 
-export const monthLabel = (value: string) => {
-  const [year, month] = value.split("-");
-  return "Tháng " + Number(month) + "/" + year;
-};
+export const monthLabel = chartMonthLabel;
 
 export interface MonthlyRevenue {
   month: string;

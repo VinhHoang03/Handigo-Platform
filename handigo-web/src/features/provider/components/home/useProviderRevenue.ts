@@ -67,7 +67,6 @@ export function useProviderRevenue() {
         : String(date.getDate()),
     amount: earningsByDay.get(dateKey(date)) ?? 0,
   }));
-  const maxRevenue = Math.max(...revenueChart.map((item) => item.amount), 0);
   const revenueTotal = revenueChart.reduce(
     (total, item) => total + item.amount,
     0,
@@ -80,7 +79,6 @@ export function useProviderRevenue() {
     earningsError,
     revenueRange,
     revenueChart,
-    maxRevenue,
     revenueTotal,
   };
 }
