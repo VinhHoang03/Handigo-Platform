@@ -163,6 +163,10 @@ const CaseManagementPage = lazy(
   () => import("./features/case-management/pages/CaseManagementPage"),
 );
 
+const WalletDepositResultPage = lazy(
+  () => import('./features/wallet/pages/WalletDepositResultPage'),
+);
+
 function PageLoading() {
   return (
     <div className="grid min-h-screen place-items-center text-on-surface-variant">
@@ -541,6 +545,22 @@ function App() {
                 }
               />
               <Route path="*" element={<NotFoundPage />} />
+              <Route
+                path={'/wallet/deposit/success'}
+                element={
+                  <RouteGuard roles={['CUSTOMER', 'PROVIDER']}>
+                    <WalletDepositResultPage callback={'success'} />
+                  </RouteGuard>
+                }
+              />
+              <Route
+                path={'/wallet/deposit/cancel'}
+                element={
+                  <RouteGuard roles={['CUSTOMER', 'PROVIDER']}>
+                    <WalletDepositResultPage callback={'cancel'} />
+                  </RouteGuard>
+                }
+              />
             </Routes>
           </Suspense>
           <ProviderAssignmentModalGate />

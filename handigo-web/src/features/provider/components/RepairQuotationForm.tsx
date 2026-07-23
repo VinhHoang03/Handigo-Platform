@@ -3,7 +3,9 @@ import type {
   CreateQuotationPayload,
   QuotationItem,
 } from "../types/providerOrder.types";
+import { providerOrderApi } from "../api/providerOrder.api";
 import { formatMoney } from "../utils/providerOrder.utils";
+import { getErrorMessage } from "@/utils/apiError";
 
 type QuotationFormItem = CreateQuotationPayload["items"][number] & {
   description: string;
@@ -27,9 +29,18 @@ const emptyItem: QuotationFormItem = {
 };
 
 const MAX_QUOTATION_ITEMS = 100;
+const MAX_ITEMS_PER_ADD = 20;
+const MAX_SCAN_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_GENERAL_TEXT_LENGTH = 2000;
 const MAX_ITEM_TITLE_LENGTH = 200;
 const MAX_ITEM_NOTE_LENGTH = 1000;
+
+const isEmptyItem = (item: QuotationFormItem) =>
+  !item.title &&
+  !item.description &&
+  !item.note &&
+  item.quantity === 1 &&
+  item.unitPrice === 0;
 
 interface RepairQuotationFormProps {
   onSubmit: (payload: CreateQuotationPayload) => Promise<void>;
@@ -45,6 +56,8 @@ export function RepairQuotationForm({
   const [inspectionNote, setInspectionNote] = useState("");
   const [recommendation, setRecommendation] = useState("");
   const [items, setItems] = useState([{ ...emptyItem }]);
+  const [itemCountToAdd, setItemCountToAdd] = useState("1");
+  const [isScanningImage, setIsScanningImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const subtotal = items.reduce(
@@ -58,6 +71,74 @@ export function RepairQuotationForm({
         itemIndex === index ? { ...item, ...patch } : item,
       ),
     );
+  };
+
+  const handleAddItems = () => {
+    const count = Number(itemCountToAdd);
+    if (!Number.isInteger(count) || count < 1 || count > MAX_ITEMS_PER_ADD) {
+      setError("Số hạng mục thêm mỗi lần phải là số nguyên từ 1 đến 20.");
+      return;
+    }
+    if (items.length + count > MAX_QUOTATION_ITEMS) {
+      setError(`Bạn chỉ có thể thêm tối đa ${MAX_QUOTATION_ITEMS - items.length} hạng mục nữa.`);
+      return;
+    }
+
+    setItems((current) => [
+      ...current,
+      ...Array.from({ length: count }, () => ({ ...emptyItem })),
+    ]);
+    setError(null);
+  };
+
+  const handleScanQuotationImage = async (file: File | undefined) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Chỉ chấp nhận ảnh JPG, JPEG, PNG hoặc WebP.");
+      return;
+    }
+    if (file.size > MAX_SCAN_IMAGE_SIZE) {
+      setError("Ảnh hạng mục không được vượt quá 10 MB.");
+      return;
+    }
+
+    try {
+      setIsScanningImage(true);
+      setError(null);
+      const scannedItems = await providerOrderApi.scanQuotationItems(file);
+      const shouldReplaceEmptyItem = items.length === 1 && isEmptyItem(items[0]);
+      const currentItems = shouldReplaceEmptyItem ? [] : items;
+      const availableSlots = MAX_QUOTATION_ITEMS - currentItems.length;
+      const acceptedItems = scannedItems.slice(0, availableSlots);
+
+      if (!acceptedItems.length) {
+        setError("Form báo giá đã đạt giới hạn 100 hạng mục.");
+        return;
+      }
+
+      setItems([
+        ...currentItems,
+        ...acceptedItems.map((item) => ({
+          ...item,
+          description: item.description || "",
+          note: item.note || "",
+        })),
+      ]);
+      if (acceptedItems.length < scannedItems.length) {
+        setError(
+          `Đã thêm ${acceptedItems.length} hạng mục. Các hạng mục còn lại vượt quá giới hạn 100 dòng.`,
+        );
+      }
+    } catch (scanError) {
+      setError(
+        getErrorMessage(
+          scanError,
+          "Không thể quét ảnh hạng mục. Vui lòng thử lại.",
+        ),
+      );
+    } finally {
+      setIsScanningImage(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -157,24 +238,65 @@ export function RepairQuotationForm({
       </div>
 
       <div className="space-y-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-sm">
           <div>
             <h4 className="font-label-md text-on-surface">Hạng mục báo giá</h4>
             <p className="mt-1 text-xs text-on-surface-variant">
               Thành tiền từng hạng mục = Số lượng × Đơn giá.
             </p>
           </div>
-          <button
-            type="button"
-            disabled={items.length >= MAX_QUOTATION_ITEMS}
-            onClick={() =>
-              setItems((current) => [...current, { ...emptyItem }])
-            }
-            className="text-sm font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            + Thêm hạng mục
-          </button>
+          <div className="flex flex-wrap items-end justify-end gap-2">
+            <label className="space-y-1">
+              <span className="block text-xs text-on-surface-variant">
+                Số hạng mục muốn thêm
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={MAX_ITEMS_PER_ADD}
+                step={1}
+                value={itemCountToAdd}
+                onChange={(event) => setItemCountToAdd(event.target.value)}
+                className="h-10 w-24 rounded-xl border border-outline-variant bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={items.length >= MAX_QUOTATION_ITEMS || isScanningImage}
+              onClick={handleAddItems}
+              className="h-10 rounded-xl border border-primary/30 px-3 text-sm font-medium text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + Thêm hạng mục
+            </button>
+            <label
+              className={`flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-primary px-3 text-sm font-semibold text-white transition hover:bg-primary/90 ${
+                isScanningImage || items.length >= MAX_QUOTATION_ITEMS
+                  ? "pointer-events-none opacity-50"
+                  : ""
+              }`}
+            >
+              <span className={`material-symbols-outlined text-lg ${isScanningImage ? "animate-spin" : ""}`}>
+                {isScanningImage ? "progress_activity" : "document_scanner"}
+              </span>
+              {isScanningImage ? "AI đang quét..." : "Quét ảnh hạng mục"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={isScanningImage || items.length >= MAX_QUOTATION_ITEMS}
+                onChange={(event) => {
+                  void handleScanQuotationImage(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
+
+        <p className="rounded-xl bg-primary/5 px-3 py-2 text-xs text-on-surface-variant">
+          Có thể chụp giấy viết tay, bảng Excel hoặc bảng báo giá rõ nét. AI sẽ đọc tên hạng mục,
+          loại, số lượng và đơn giá; bạn nên kiểm tra lại trước khi gửi khách hàng.
+        </p>
 
         <div className="hidden grid-cols-12 gap-sm px-sm text-xs font-medium text-on-surface-variant md:grid">
           <span className="md:col-span-4">Tên hạng mục</span>

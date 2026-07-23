@@ -242,11 +242,8 @@ export function WalletPage({ role }: { role: WalletRole }) {
         setDepositError('Số tiền phải lớn hơn hoặc bằng 1.');
         return;
       }
-      const walletPath = isProvider ? '/provider/wallet' : '/customer/wallet';
       const result = await walletApi.createDeposit({
         amount,
-        returnUrl: `${window.location.origin}${walletPath}`,
-        cancelUrl: `${window.location.origin}${walletPath}`,
       });
       const orderCode = result.transaction.gatewayOrderCode || result.transaction.transactionCode;
       if (orderCode) {

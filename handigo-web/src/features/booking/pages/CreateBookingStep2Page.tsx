@@ -163,21 +163,41 @@ const CreateBookingStep2Page = () => {
       return;
     }
 
-    const validationMessages = (await Promise.all(selectedFiles.map(validateImageFile))).filter(Boolean);
-    if (validationMessages.length > 0) {
-      setUploadError(`${validationMessages.join(' ')} Vui lòng tải ảnh rõ nét về hiện trạng thiết bị, máy móc hoặc khu vực cần sửa.`);
+    const validationResults = await Promise.all(selectedFiles.map(validateImageFile));
+    const validFiles = selectedFiles.filter((_, index) => !validationResults[index]);
+    const rejectedMessages = validationResults.filter(
+      (message): message is string => Boolean(message),
+    );
+
+    if (validFiles.length === 0) {
+      setUploadError(`${rejectedMessages.join(' ')} Vui lòng tải ảnh rõ nét về hiện trạng thiết bị, máy móc hoặc khu vực cần sửa.`);
       return;
     }
 
     try {
       setIsUploadingImages(true);
       setUploadError(null);
-      const uploadedUrls = await Promise.all(
-        selectedFiles.map((file) => bookingApi.uploadOrderAttachment(file, 'order_problem')),
+      const uploadResults = await Promise.allSettled(
+        validFiles.map((file) => bookingApi.uploadOrderAttachment(file, 'order_problem')),
       );
-      setCustomerAttachments([...customerAttachments, ...uploadedUrls]);
-    } catch (error) {
-      setUploadError(getUploadErrorMessage(error));
+
+      const uploadedUrls = uploadResults.flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value] : [],
+      );
+      uploadResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          rejectedMessages.push(
+            `"${validFiles[index].name}": ${getUploadErrorMessage(result.reason)}`,
+          );
+        }
+      });
+
+      if (uploadedUrls.length > 0) {
+        setCustomerAttachments([...customerAttachments, ...uploadedUrls]);
+      }
+      if (rejectedMessages.length > 0) {
+        setUploadError(rejectedMessages.join(' '));
+      }
     } finally {
       setIsUploadingImages(false);
     }

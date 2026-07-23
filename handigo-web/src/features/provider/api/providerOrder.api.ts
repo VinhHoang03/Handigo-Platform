@@ -5,6 +5,7 @@ import type {
   OrderAssignment,
   ProviderOrdersResult,
   QuotationDetail,
+  ScannedQuotationItem,
 } from '../types/providerOrder.types';
 
 export const providerOrderApi = {
@@ -85,5 +86,17 @@ export const providerOrderApi = {
       payload,
     );
     return response.data.data;
+  },
+
+  scanQuotationItems: async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await api.post<{
+      success: boolean;
+      data: { items: ScannedQuotationItem[] };
+    }>('/orders/quotation-items/scan-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data.items;
   },
 };

@@ -60,6 +60,11 @@ export interface CreateQuotationPayload {
   }>;
 }
 
+export type ScannedQuotationItem = CreateQuotationPayload['items'][number] & {
+  description: string;
+  note: string;
+};
+
 export interface ProviderOrdersResult {
   items: Order[];
   pagination: Pagination;
