@@ -28,7 +28,7 @@ export function buildCategoryTableColumns({ serviceCounts, onEdit, onDelete }: C
       key: 'description',
       header: 'Mô tả',
       className: 'max-w-xs truncate text-on-surface-variant',
-      render: (category) => category.description || '—',
+      render: (category) => category.description || 'Chưa có mô tả',
     },
     {
       key: 'serviceCount',

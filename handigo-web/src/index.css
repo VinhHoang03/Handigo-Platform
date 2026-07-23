@@ -130,6 +130,30 @@
   --text-headline-lg--line-height: 40px;
   --text-headline-lg--letter-spacing: -0.01em;
   --text-headline-lg--font-weight: 600;
+
+  /* Ba cấp bổ sung theo thang Material 3.
+     Trước đây 20 chỗ trong mã nguồn đã dùng `text-title-lg`, `text-title-md`,
+     `text-headline-sm` và `font-headline-sm` — nhưng không token nào tồn tại.
+     Tailwind v4 chỉ sinh utility từ `@theme`, nên các class đó KHÔNG sinh CSS và
+     heading rơi về cỡ chữ kế thừa (16px). Lỗi im lặng: build xanh, ESLint sạch,
+     chỉ nhìn kỹ mới thấy tiêu đề bằng cỡ chữ thường. M3 vốn có cấp `title-*`;
+     thiếu chúng chính là lý do mọi người tự chế class. */
+  --text-headline-sm: 20px;
+  --text-headline-sm--line-height: 28px;
+  --text-headline-sm--font-weight: 600;
+
+  --text-title-lg: 22px;
+  --text-title-lg--line-height: 28px;
+  --text-title-lg--font-weight: 600;
+
+  --text-title-md: 16px;
+  --text-title-md--line-height: 24px;
+  --text-title-md--letter-spacing: 0.01em;
+  --text-title-md--font-weight: 600;
+
+  --font-headline-sm: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
+  --font-title-lg: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
+  --font-title-md: "Be Vietnam Pro", sans-serif;
 }
 
 @layer base {

@@ -20,7 +20,7 @@ function SummaryCard({
         </span>
         <div>
           <p className="text-sm text-on-surface-variant">{label}</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
+          <p className="mt-1 text-headline-md font-bold tabular-nums">{value}</p>
           <p className="mt-1 text-xs text-on-surface-variant">{description}</p>
         </div>
       </div>

@@ -26,7 +26,7 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 function PageLoading() {
   return (
-    <div className="grid min-h-screen place-items-center text-on-surface-variant">
+    <div className="grid min-h-dvh place-items-center text-on-surface-variant">
       Đang tải trang...
     </div>
   );

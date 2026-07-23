@@ -14,7 +14,7 @@ function Stat({ icon, label, value }: { icon: string; label: string; value: numb
       </span>
       <div>
         <p className="text-sm text-on-surface-variant">{label}</p>
-        <p className="text-2xl font-bold tabular-nums text-on-surface">{value}</p>
+        <p className="text-headline-md font-bold tabular-nums text-on-surface">{value}</p>
       </div>
     </div>
   );

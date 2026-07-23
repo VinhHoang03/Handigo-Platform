@@ -33,7 +33,7 @@ export function ServiceDetailPanel({
     return (
       <div className="flex min-h-80 flex-col items-center justify-center p-8 text-center">
         <span className="material-symbols-outlined text-5xl text-outline" aria-hidden="true">inventory_2</span>
-        <h2 className="mt-3 text-lg font-bold text-on-surface">Chưa có dịch vụ được chọn</h2>
+        <h2 className="mt-3 text-title-lg font-bold text-on-surface">Chưa có dịch vụ được chọn</h2>
         <p className="mt-1 max-w-sm text-sm text-on-surface-variant">Chọn một dịch vụ trong danh sách hoặc thêm dịch vụ mới để quản lý thông tin và tùy chọn.</p>
       </div>
     );

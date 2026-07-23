@@ -24,7 +24,7 @@ export function MetricCard({
         <span className="material-symbols-outlined">payments</span>
       </div>
       <p className="text-sm font-semibold text-on-surface-variant">{label}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-on-surface">{money.format(value)}</p>
+      <p className="mt-1 text-headline-md font-bold tabular-nums text-on-surface">{money.format(value)}</p>
       <p className="mt-2 text-xs leading-5 text-on-surface-variant">{description}</p>
     </article>
   );

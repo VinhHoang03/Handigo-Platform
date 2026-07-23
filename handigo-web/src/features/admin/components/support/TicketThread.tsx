@@ -31,7 +31,7 @@ export function TicketThread({ ticket, busy, onRespond }: TicketThreadProps) {
           <SupportPriorityBadge priority={ticket.priority} />
           <span className="text-xs text-on-surface-variant">#{ticket._id.slice(-8).toUpperCase()}</span>
         </div>
-        <h3 className="mt-3 text-xl font-bold">{ticket.subject}</h3>
+        <h3 className="mt-3 text-headline-sm font-bold">{ticket.subject}</h3>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-on-surface-variant">
           <span>{ticket.requesterId.fullName} · {ticket.requesterId.email}</span>
           <span>Tạo lúc {dateTime.format(new Date(ticket.createdAt))}</span>

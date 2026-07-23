@@ -58,7 +58,7 @@ export function ApplicationDetailModal({ application, busy, onApprove, onReject,
             <div className="grid gap-4 rounded-2xl border border-outline-variant/40 bg-surface-container-low p-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Kinh nghiệm</p>
-                <p className="mt-2 text-2xl font-bold text-primary">{application.experienceYears}+</p>
+                <p className="mt-2 text-headline-md font-bold text-primary">{application.experienceYears}+</p>
                 <p className="text-xs text-on-surface-variant">năm hoạt động</p>
               </div>
               <div>

@@ -4,7 +4,7 @@ export default function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <main id="main-content" className="grid min-h-screen place-items-center bg-surface px-6">
+    <main id="main-content" className="grid min-h-dvh place-items-center bg-surface px-6">
       <section className="max-w-lg text-center">
         <p className="text-sm font-bold uppercase text-primary">404</p>
         <h1 className="mt-3 text-headline-lg font-bold">Không tìm thấy trang</h1>

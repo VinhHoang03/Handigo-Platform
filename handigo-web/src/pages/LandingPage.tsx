@@ -28,7 +28,7 @@ const LandingPage = () => {
   const heroImage = items.find((item) => item.image);
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+    <div className="min-h-dvh bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container">
       <Navbar />
       <main id="main-content" className="pb-xl pt-32">
         <HeroSection

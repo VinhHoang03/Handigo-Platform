@@ -45,7 +45,7 @@ export function OrderProgressCard({ order }: { order: Order }) {
                   <p className="text-sm font-bold text-on-surface">{step.label}</p>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${reached ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'}`}>{reached ? 'Đã cập nhật' : 'Chưa thực hiện'}</span>
                 </div>
-                <p className="mt-1 text-xs text-on-surface-variant">{isCurrent ? formatDateTime(order.updatedAt) : reached ? 'Chưa có dữ liệu thời gian' : '—'}</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{isCurrent ? formatDateTime(order.updatedAt) : reached ? 'Chưa có dữ liệu thời gian' : 'Chưa tới bước này'}</p>
                 <p className="mt-1 text-xs leading-5 text-on-surface-variant">{reached ? step.note : 'Đang chờ giai đoạn trước hoàn tất.'}</p>
                 {reached && <p className="mt-1 text-[11px] font-medium text-primary">Cập nhật bởi Provider</p>}
                 {step.key === 'completed' && reached && order.completionEvidenceImages?.length ? <p className="mt-1 text-xs text-on-surface-variant">Đã tải lên {order.completionEvidenceImages.length} ảnh hoàn thành.</p> : null}
