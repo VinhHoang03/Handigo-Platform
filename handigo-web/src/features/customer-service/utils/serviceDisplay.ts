@@ -22,12 +22,33 @@ export const getCategoryName = (service: Service, categories: Category[]) => {
   return categories.find((item) => item._id === getCategoryId(service))?.name || "Dịch vụ";
 };
 
+/**
+ * Cloudinary chọn định dạng và mức nén theo trình duyệt khi có `f_auto,q_auto`
+ * trong đường dẫn. Không có hai tham số này, mọi ảnh dịch vụ được trả về nguyên
+ * bản JPEG: Lighthouse đo được 683 KB ảnh cho một lần mở trang danh sách, và
+ * nêu đích danh "serve images in next-gen formats" là cơ hội lớn nhất còn lại.
+ *
+ * Chỉ đổi định dạng và chất lượng, **không** đổi kích thước: ảnh gốc vốn đã
+ * khoảng 600px, thêm `w_` chỉ khiến Cloudinary phóng to hoặc làm mềm ảnh trên
+ * màn hình mật độ cao.
+ */
+const CLOUDINARY_DELIVERY = "f_auto,q_auto";
+
+const withCloudinaryDelivery = (url: string) => {
+  if (!/res\.cloudinary\.com/i.test(url)) return url;
+  // Đã có sẵn khối biến đổi thì để nguyên, tránh chồng tham số mâu thuẫn.
+  if (/\/upload\/[^/]*(f_auto|q_auto|c_|w_\d)/i.test(url)) return url;
+  return url.replace("/upload/", `/upload/${CLOUDINARY_DELIVERY}/`);
+};
+
 export const normalizeServiceImageUrl = (value?: string | null) => {
   const url = value?.trim();
   if (!url) return null;
-  if (/^\/\/res\.cloudinary\.com/i.test(url)) return `https:${url}`;
-  if (/^res\.cloudinary\.com/i.test(url)) return `https://${url}`;
-  return url.replace(/^http:\/\/res\.cloudinary\.com/i, "https://res.cloudinary.com");
+  if (/^\/\/res\.cloudinary\.com/i.test(url)) return withCloudinaryDelivery(`https:${url}`);
+  if (/^res\.cloudinary\.com/i.test(url)) return withCloudinaryDelivery(`https://${url}`);
+  return withCloudinaryDelivery(
+    url.replace(/^http:\/\/res\.cloudinary\.com/i, "https://res.cloudinary.com"),
+  );
 };
 
 /**
