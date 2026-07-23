@@ -17,7 +17,7 @@ interface Step2ProviderFieldsetProps {
   onAvailabilityChange: (status: ProviderAvailabilityStatus) => void;
 }
 
-/** "Chọn chuyên gia": bọc NearbyProviderSelector, có/không đánh số bước tùy luồng đặt lịch. */
+/** "Phân phối chuyên gia": bọc NearbyProviderSelector, có/không đánh số bước tùy luồng đặt lịch. */
 export const Step2ProviderFieldset = ({
   stepNumber, serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount,
   requireSelection, preferredProviderId, requestedProviderId, error,
@@ -53,7 +53,7 @@ export const Step2ProviderFieldset = ({
     <fieldset>
       <legend className="mb-sm flex items-center gap-sm text-sm font-bold text-on-surface">
         <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs text-on-primary">{stepNumber}</span>
-        Chọn chuyên gia
+        Phân phối chuyên gia
       </legend>
       {selector}
     </fieldset>

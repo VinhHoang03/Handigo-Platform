@@ -26,7 +26,7 @@ export function NearbyProviderAutoAssignOption({
           Handigo tự tìm thợ
         </span>
         <span className="block text-xs text-on-surface-variant">
-          Hệ thống sẽ điều phối người phù hợp nhất khi bạn đặt lịch.
+          Hệ thống sẽ lần lượt gửi yêu cầu đến các chuyên gia phù hợp.
         </span>
       </span>
       {isSelected && (

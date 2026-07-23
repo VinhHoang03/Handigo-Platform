@@ -67,7 +67,9 @@ export function useProviderAssignmentGate() {
         new Date(nextAssignment.responseDeadline).getTime() > Date.now()
       ) {
         setError(null);
-        setAssignment(nextAssignment);
+        // Giữ đơn đang hiển thị: khi nhiều đề nghị tới cùng lúc, ghi đè sẽ làm
+        // thợ đang xem một đơn bỗng thấy đơn khác ngay trước khi bấm nhận.
+        setAssignment((current) => current ?? nextAssignment);
         return;
       }
 

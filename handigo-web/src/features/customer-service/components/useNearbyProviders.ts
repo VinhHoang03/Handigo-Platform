@@ -19,6 +19,7 @@ interface UseNearbyProvidersArgs {
   requireSelection: boolean;
   recurrenceUnit?: "weekly" | "monthly";
   recurrenceCount?: number;
+  orderId?: string;
   allowSelection: boolean;
   selectedProviderId?: string;
   requestedProviderId?: string;
@@ -35,6 +36,7 @@ export function useNearbyProviders({
   requireSelection,
   recurrenceUnit,
   recurrenceCount,
+  orderId,
   allowSelection,
   selectedProviderId,
   requestedProviderId,
@@ -69,6 +71,7 @@ export function useNearbyProviders({
           scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
           recurrenceUnit,
           recurrenceCount,
+          orderId,
         );
         if (isMounted) {
           setProviders(data);
@@ -92,7 +95,7 @@ export function useNearbyProviders({
     return () => {
       isMounted = false;
     };
-  }, [addressId, enabled, onAvailabilityChange, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
+  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
 
   useEffect(() => {
     if (!allowSelection || !hasLoaded || !onSelectProvider || !selectedProviderId) return;

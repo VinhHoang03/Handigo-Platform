@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
+import { Order } from "../models/order.model";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { getEligibleProviderUserIds } from "./providerWalletEligibility.service";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
@@ -34,7 +35,33 @@ export interface FindNearestProvidersOptions {
   onlyProviderId?: Types.ObjectId;
   /** Lịch hẹn có thể chọn provider đang ngoại tuyến, miễn là không trùng lịch. */
   requireOnline?: boolean;
+  /** Các thời điểm phải còn trống khi tự điều phối lịch hẹn hoặc lịch định kỳ. */
+  scheduledDates?: Date[];
 }
+
+const filterProvidersWithoutScheduleConflicts = async <T extends IProvider>(
+  providers: T[],
+  scheduledDates: Date[],
+): Promise<T[]> => {
+  if (providers.length === 0 || scheduledDates.length === 0) return providers;
+
+  const conflictingProviderIds = await Order.distinct("providerId", {
+    providerId: { $in: providers.map((provider) => provider._id) },
+    status: { $in: ["accepted", "in_progress"] },
+    $or: scheduledDates.map((date) => ({
+      scheduledAt: {
+        $gt: new Date(date.getTime() - 60 * 60 * 1000),
+        $lt: new Date(date.getTime() + 60 * 60 * 1000),
+      },
+    })),
+    isDeleted: false,
+  });
+  const conflictingIdSet = new Set(conflictingProviderIds.map(String));
+
+  return providers.filter(
+    (provider) => !conflictingIdSet.has(provider._id.toString()),
+  );
+};
 
 // ─── Service ─────────────────────────────────────────────────────────────────
 
@@ -70,7 +97,11 @@ export const MatchingService = {
       excludeProviderIds = [],
       onlyProviderId,
       requireOnline = true,
+      scheduledDates = [],
     } = options;
+    const candidateLimit = scheduledDates.length > 0
+      ? Math.max(limit * 5, 100)
+      : limit * 5;
 
     const serviceObjectId = new Types.ObjectId(serviceId);
     const excludeIds = excludeProviderIds.map((id) => id.toString());
@@ -103,7 +134,7 @@ export const MatchingService = {
           },
         },
       })
-        .limit(limit * 5) // over-fetch to allow filtering by category/status
+        .limit(candidateLimit) // over-fetch để còn ứng viên sau khi lọc điều kiện
         .lean();
 
       if (nearbyLocations.length === 0) {
@@ -131,18 +162,16 @@ export const MatchingService = {
             _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
           }),
         })
-          .limit(limit * 5)
+          .limit(candidateLimit)
           .lean();
 
-        const providersInArea = providers
-          .filter((provider) =>
+        const providersInArea = providers.filter((provider) =>
             isAddressInProviderWorkingAreas(
               provider.workingAreas,
               { province, ward },
               provider.serviceArea,
             ),
-          )
-          .slice(0, limit);
+          );
 
         if (providersInArea.length > 0) {
           // 3. Sort by geo distance order (index in nearbyLocations)
@@ -151,9 +180,13 @@ export const MatchingService = {
             const bi = userIdToIndex.get(b.userId.toString()) ?? Infinity;
             return ai - bi;
           });
+          const availableProviders = await filterProvidersWithoutScheduleConflicts(
+            sorted,
+            scheduledDates,
+          );
 
           // 4. Compute approximate distance using Haversine
-          return sorted.map((p) => {
+          return availableProviders.slice(0, limit).map((p) => {
             const loc = nearbyLocations.find(
               (l) => l.userId.toString() === p.userId.toString(),
             );
@@ -195,7 +228,7 @@ export const MatchingService = {
       }),
     })
       .sort({ averageRating: -1, totalCompletedOrders: -1 })
-      .limit(limit * 5)
+      .limit(candidateLimit)
       .lean();
 
     const providersInArea = providers.filter((provider) =>
@@ -205,6 +238,10 @@ export const MatchingService = {
           provider.serviceArea,
         ),
       );
+    const availableProviders = await filterProvidersWithoutScheduleConflicts(
+      providersInArea,
+      scheduledDates,
+    );
 
     if (providers.length === 0) {
       matchingLogger.warn("Không có provider hợp lệ cho dịch vụ.", {
@@ -227,7 +264,7 @@ export const MatchingService = {
       });
     }
 
-    return providersInArea
+    return availableProviders
       .slice(0, limit)
       .map((p) => ({
       providerId: p._id as Types.ObjectId,

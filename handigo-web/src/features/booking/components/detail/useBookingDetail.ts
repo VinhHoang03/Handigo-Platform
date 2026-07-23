@@ -66,6 +66,14 @@ export const useBookingDetail = () => {
         payment.paymentType === "inspection_deposit",
     )
     .reduce((total, payment) => total + payment.amount, 0);
+  // Đơn đã ghi nhận `depositPaidAt` thì lấy mức cọc lớn hơn giữa khoản đã thu và
+  // mức cọc của đơn — tránh hụt khi bản ghi payment chưa khớp đủ.
+  const appliedDepositAmount = order?.depositPaidAt
+    ? Math.max(paidDepositAmount, order.depositAmount || 0)
+    : paidDepositAmount;
+  const remainingQuotationAmount = quotation
+    ? Math.max(quotation.quotation.finalAmount - appliedDepositAmount, 0)
+    : 0;
   const canMakeInitialPayment = Boolean(
     order &&
       !hasPaidInitialPayment &&
@@ -90,6 +98,8 @@ export const useBookingDetail = () => {
     hasSuccessfulPayment,
     paymentStatusDisplay,
     paidDepositAmount,
+    appliedDepositAmount,
+    remainingQuotationAmount,
     canMakeInitialPayment,
     timeline,
   };

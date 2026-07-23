@@ -39,7 +39,8 @@ const BookingDetailPage = () => {
     providerInfo,
     hasSuccessfulPayment,
     paymentStatusDisplay,
-    paidDepositAmount,
+    appliedDepositAmount,
+    remainingQuotationAmount,
     canMakeInitialPayment,
     timeline,
   } = useBookingDetail();
@@ -138,7 +139,8 @@ const BookingDetailPage = () => {
               order={order}
               quotation={quotation}
               busy={busy}
-              paidDepositAmount={paidDepositAmount}
+              appliedDepositAmount={appliedDepositAmount}
+              remainingQuotationAmount={remainingQuotationAmount}
               onConfirm={cancellationFlow.handleConfirmQuotation}
               onReject={cancellationFlow.handleRejectQuotation}
             />

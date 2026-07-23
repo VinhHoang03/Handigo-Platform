@@ -89,6 +89,14 @@ export function ProviderAssignmentModal() {
           </div>
         )}
 
+        <div className="flex items-start gap-2 rounded-2xl bg-surface-container-low p-sm text-sm text-on-surface-variant">
+          {/* `shield` chứ không phải `shield_lock`: danh sách icon nạp từ Google
+              trong index.html được cắt gọn theo tên, `shield_lock` không có
+              trong đó nên sẽ render ra đúng chữ "shield_lock". */}
+          <span aria-hidden="true" className="material-symbols-outlined text-base text-primary">shield</span>
+          <span>Thông tin liên hệ và địa chỉ chi tiết sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
+        </div>
+
         {error && (
           <div className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">
             {error}

@@ -1,4 +1,4 @@
-import type { Order, OrderQuotation } from "@/types/booking";
+import type { OrderQuotation } from "@/types/booking";
 import {
   formatCurrency,
   getQuotationStatusClass,
@@ -6,20 +6,20 @@ import {
 } from "./bookingDetailFormatters";
 
 type BookingQuotationDetailsProps = {
-  order: Order;
   quotation: OrderQuotation;
   busy: boolean;
-  paidDepositAmount: number;
+  appliedDepositAmount: number;
+  remainingQuotationAmount: number;
   onConfirm: () => void;
   onReject: () => void;
 };
 
 /** Nội dung báo giá sửa chữa khi chuyên gia đã gửi báo giá. */
 export const BookingQuotationDetails = ({
-  order,
   quotation,
   busy,
-  paidDepositAmount,
+  appliedDepositAmount,
+  remainingQuotationAmount,
   onConfirm,
   onReject,
 }: BookingQuotationDetailsProps) => (
@@ -98,12 +98,35 @@ export const BookingQuotationDetails = ({
             Giảm giá: -{formatCurrency(quotation.quotation.discountAmount)}
           </p>
         )}
-        <p className="text-label-sm text-on-surface-variant font-bold uppercase">
-          Tổng chi phí dự kiến
-        </p>
-        <p className="text-headline-lg font-black text-primary leading-none mt-1 tabular-nums">
-          {formatCurrency(quotation.quotation.finalAmount)}
-        </p>
+        <div className="mt-3 space-y-2 border-t border-primary/10 pt-3">
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <span className="font-medium text-on-surface-variant">
+              Tổng chi phí theo báo giá
+            </span>
+            <span className="font-bold tabular-nums text-on-surface">
+              {formatCurrency(quotation.quotation.finalAmount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-4 text-sm text-success">
+            <span>Tiền cọc đã thanh toán</span>
+            <span className="font-bold tabular-nums">
+              -{formatCurrency(appliedDepositAmount)}
+            </span>
+          </div>
+          <div className="flex items-end justify-between gap-4 border-t border-primary/10 pt-3">
+            <div>
+              <p className="text-label-sm font-bold uppercase text-on-surface-variant">
+                Còn cần thanh toán
+              </p>
+              <p className="mt-1 text-xs text-on-surface-variant">
+                Thanh toán trực tiếp theo thỏa thuận với chuyên gia
+              </p>
+            </div>
+            <p className="shrink-0 text-headline-lg font-black leading-none text-primary tabular-nums">
+              {formatCurrency(remainingQuotationAmount)}
+            </p>
+          </div>
+        </div>
       </div>
       {quotation.quotation.status === "pending" && (
         <div className="flex flex-col gap-sm sm:flex-row">
@@ -134,24 +157,35 @@ export const BookingQuotationDetails = ({
         <p className="mt-1 text-sm text-on-success-container">
           Chuyên gia có thể bắt đầu thực hiện công việc ngay, không cần chờ thanh toán.
         </p>
-        <div className="mt-3 grid gap-2 border-t border-success/30 pt-3 sm:grid-cols-2">
+        <div className="mt-3 grid gap-2 border-t border-success/30 pt-3 sm:grid-cols-3">
+          <div>
+            <p className="text-xs font-bold uppercase text-on-success-container">
+              Tổng chi phí
+            </p>
+            <p className="mt-1 font-bold tabular-nums">
+              {formatCurrency(quotation.quotation.finalAmount)}
+            </p>
+          </div>
           <div>
             <p className="text-xs font-bold uppercase text-on-success-container">
               Tiền cọc qua Handigo
             </p>
             <p className="mt-1 font-bold tabular-nums">
-              {formatCurrency(paidDepositAmount || order.depositAmount)}
+              {formatCurrency(appliedDepositAmount)}
             </p>
           </div>
           <div>
             <p className="text-xs font-bold uppercase text-on-success-container">
-              Chi phí theo báo giá
+              Còn cần thanh toán
             </p>
-            <p className="mt-1 text-sm font-medium">
-              Tự thanh toán trực tiếp với chuyên gia, không thanh toán qua Handigo.
+            <p className="mt-1 font-bold tabular-nums">
+              {formatCurrency(remainingQuotationAmount)}
             </p>
           </div>
         </div>
+        <p className="mt-3 text-sm text-on-success-container">
+          Bạn tự trao đổi phương thức và thanh toán số tiền còn lại trực tiếp với chuyên gia.
+        </p>
       </div>
     )}
 

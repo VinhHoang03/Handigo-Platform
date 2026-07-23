@@ -59,6 +59,9 @@ export const getNearbyProviders = async (
     const recurrenceCount = req.query.recurrenceCount
       ? Number(req.query.recurrenceCount)
       : undefined;
+    const orderId = req.query.orderId
+      ? String(req.query.orderId)
+      : undefined;
 
     if (!serviceId || !addressId) {
       throw new AppError("Vui lòng chọn dịch vụ và địa chỉ.", 400);
@@ -71,6 +74,7 @@ export const getNearbyProviders = async (
       scheduledAt,
       recurrenceUnit,
       recurrenceCount,
+      orderId,
     );
 
     return res.json({ success: true, data });

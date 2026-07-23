@@ -6,7 +6,8 @@ type BookingQuotationPanelProps = {
   order: Order;
   quotation: OrderQuotation | null;
   busy: boolean;
-  paidDepositAmount: number;
+  appliedDepositAmount: number;
+  remainingQuotationAmount: number;
   onConfirm: () => void;
   onReject: () => void;
 };
@@ -19,7 +20,8 @@ export const BookingQuotationPanel = ({
   order,
   quotation,
   busy,
-  paidDepositAmount,
+  appliedDepositAmount,
+  remainingQuotationAmount,
   onConfirm,
   onReject,
 }: BookingQuotationPanelProps) => {
@@ -34,10 +36,10 @@ export const BookingQuotationPanel = ({
     <div className="mt-lg pt-lg border-t-4 border-primary/20 w-full overflow-hidden">
       {quotation ? (
         <BookingQuotationDetails
-          order={order}
           quotation={quotation}
           busy={busy}
-          paidDepositAmount={paidDepositAmount}
+          appliedDepositAmount={appliedDepositAmount}
+          remainingQuotationAmount={remainingQuotationAmount}
           onConfirm={onConfirm}
           onReject={onReject}
         />

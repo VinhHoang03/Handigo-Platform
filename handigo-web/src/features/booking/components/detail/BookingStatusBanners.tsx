@@ -40,7 +40,9 @@ export const BookingStatusBanners = ({
   paymentBannerSlot,
 }: BookingStatusBannersProps) => (
   <>
-    {order.bookingStatus === "awaiting_provider" && (
+    {/* Khi đang chạy vòng tìm thợ thì khối đếm ngược bên dưới đã nói rồi, không
+        hiện thêm banner chờ xác nhận nữa. */}
+    {order.bookingStatus === "awaiting_provider" && !isWaitingForProvider && (
       <div className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm text-on-surface">
         <p className="font-bold">Đang chờ chuyên gia xác nhận lịch hẹn</p>
         <p className="mt-1 text-on-surface-variant">
@@ -116,7 +118,10 @@ export const BookingStatusBanners = ({
       </div>
     )}
 
-    {order.bookingStatus === "rejected" &&
+    {/* Chỉ mời chọn lại chuyên gia khi đơn còn ở trạng thái mới tạo; đơn đã đi
+        tiếp thì việc chọn lại không còn ý nghĩa. */}
+    {order.status === "created" &&
+      order.bookingStatus === "rejected" &&
       order.orderType !== "normal" &&
       order.reassignment?.status !== "awaiting_customer" && (
       <div className="mb-lg rounded-2xl border border-error/20 bg-error/5 p-md">
@@ -131,6 +136,7 @@ export const BookingStatusBanners = ({
             scheduledAt={order.scheduledAt || undefined}
             recurrenceUnit={order.recurrenceUnit || undefined}
             recurrenceCount={order.totalOccurrences || undefined}
+            orderId={order._id}
             requireSelection
             selectedProviderId={replacementProviderId}
             onSelectProvider={(providerId) => {

@@ -116,10 +116,11 @@ export const customerServiceApi = {
     scheduledAt?: string,
     recurrenceUnit?: "weekly" | "monthly",
     recurrenceCount?: number,
+    orderId?: string,
   ) =>
     unwrap<NearbyProvider[]>(
       await api.get("/providers/nearby", {
-        params: { serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount },
+        params: { serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount, orderId },
       }),
     ),
 

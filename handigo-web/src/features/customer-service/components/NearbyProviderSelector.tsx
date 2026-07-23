@@ -14,6 +14,7 @@ interface NearbyProviderSelectorProps {
   requireSelection?: boolean;
   recurrenceUnit?: "weekly" | "monthly";
   recurrenceCount?: number;
+  orderId?: string;
   allowSelection?: boolean;
   selectedProviderId?: string;
   requestedProviderId?: string;
@@ -29,6 +30,7 @@ export function NearbyProviderSelector({
   requireSelection = false,
   recurrenceUnit,
   recurrenceCount,
+  orderId,
   allowSelection = true,
   selectedProviderId,
   requestedProviderId,
@@ -43,6 +45,7 @@ export function NearbyProviderSelector({
     requireSelection,
     recurrenceUnit,
     recurrenceCount,
+    orderId,
     allowSelection,
     selectedProviderId,
     requestedProviderId,
@@ -105,7 +108,8 @@ export function NearbyProviderSelector({
                 Thợ đã chọn chưa phù hợp với khu vực hoặc lịch này. Đổi lịch hoặc chọn thợ khác.
               </p>
             )}
-          {allowSelection && !requireSelection && (
+          {/* Kể cả luồng bắt buộc chọn cũng được phép để Handigo tự điều phối. */}
+          {allowSelection && (
             <NearbyProviderAutoAssignOption
               isSelected={!selectedProviderId}
               onSelect={() => onSelectProvider?.(undefined)}
