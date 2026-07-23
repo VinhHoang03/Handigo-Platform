@@ -1,102 +1,26 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { AsyncState } from '@/components/common/AsyncState';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
-import { Modal } from '@/components/common/Modal';
-import { Pagination } from '@/components/common/Pagination';
 import { walletApi } from '../api/wallet.api';
-import type {
-  WalletOverview,
-  WalletSummary,
-  WalletTransaction,
-  WalletTransactionQuery,
-  WalletTransactionType,
-  WithdrawalQuery,
-  WithdrawalRequest,
-  WithdrawalStatus,
-} from '../types/wallet.types';
+import type { WalletOverview, WalletSummary } from '../types/wallet.types';
+import { WalletAmountModal } from '../components/WalletAmountModal';
+import { WalletHeaderActions } from '../components/WalletHeaderActions';
+import { WalletStatsCards } from '../components/WalletStatsCards';
+import { WalletTransactionsSection, type WalletSectionHandle } from '../components/WalletTransactionsSection';
+import { WalletWithdrawalsSection } from '../components/WalletWithdrawalsSection';
+import { getErrorMessage } from '../components/wallet-formatters';
+import { useWalletAmountForms } from '../components/useWalletAmountForms';
+import { useWalletDepositReturn } from '../components/useWalletDepositReturn';
 
 type WalletRole = 'CUSTOMER' | 'PROVIDER';
-type DepositForm = { amount: string };
-type WithdrawForm = { amount: string };
-
-const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
-const dateTime = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
-const PENDING_DEPOSIT_ORDER_CODE_KEY = 'handigo:pending-wallet-deposit-order-code';
-
-const transactionLabels: Record<WalletTransactionType, string> = {
-  deposit: 'Nạp ví',
-  payment: 'Thanh toán',
-  refund: 'Hoàn tiền',
-  provider_earning: 'Thu nhập dịch vụ',
-  platform_fee: 'Phí nền tảng',
-  withdraw: 'Rút tiền',
-  withdraw_rejected: 'Hoàn rút tiền',
-  adjustment: 'Điều chỉnh',
-};
-
-const withdrawalLabels: Record<WithdrawalStatus, string> = {
-  pending: 'Chờ duyệt',
-  approved: 'Đã duyệt',
-  rejected: 'Từ chối',
-};
-
-const getErrorMessage = (error: unknown) => {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: { message?: string } } }).response;
-    if (response?.data?.message) return response.data.message;
-  }
-  return error instanceof Error ? error.message : 'Có lỗi xảy ra, vui lòng thử lại.';
-};
-
-const toneByStatus = (status: string) => {
-  if (status === 'success' || status === 'approved') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'failed' || status === 'rejected' || status === 'cancelled') return 'bg-red-100 text-red-700';
-  return 'bg-amber-100 text-amber-700';
-};
-
-const transactionStatusLabel = (status: WalletTransaction['status']) => {
-  if (status === 'success') return 'Thành công';
-  if (status === 'failed') return 'Thất bại';
-  if (status === 'cancelled') return 'Đã hủy';
-  return 'Đang xử lý';
-};
-
-const bankText = (withdrawal: WithdrawalRequest) => {
-  const bank = withdrawal.bankAccountId;
-  if (!bank || typeof bank === 'string') return 'Tài khoản nhận mặc định';
-  return `${bank.bankName} - ${bank.accountNumber}`;
-};
-
-const normalizeAmountInput = (value: string) => value.replace(/\D/g, '');
-
-const parseAmount = (value: string) => {
-  const normalized = normalizeAmountInput(value);
-  return normalized ? Number(normalized) : 0;
-};
 
 export function WalletPage({ role }: { role: WalletRole }) {
   const [wallet, setWallet] = useState<WalletOverview | null>(null);
   const [summary, setSummary] = useState<WalletSummary | null>(null);
-  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
-  const [transactionQuery, setTransactionQuery] = useState<WalletTransactionQuery>({ page: 1, limit: 8, type: '' });
-  const [withdrawalQuery, setWithdrawalQuery] = useState<WithdrawalQuery>({ page: 1, limit: 5, status: '' });
-  const [transactionPages, setTransactionPages] = useState(1);
-  const [withdrawalPages, setWithdrawalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [transactionLoading, setTransactionLoading] = useState(true);
-  const [withdrawalLoading, setWithdrawalLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [depositForm, setDepositForm] = useState<DepositForm>({ amount: '' });
-  const [withdrawForm, setWithdrawForm] = useState<WithdrawForm>({ amount: '' });
-  const [depositError, setDepositError] = useState('');
-  const [withdrawError, setWithdrawError] = useState('');
-  const handledDepositReturnRef = useRef(false);
+  const transactionsRef = useRef<WalletSectionHandle>(null);
+  const withdrawalsRef = useRef<WalletSectionHandle>(null);
 
   const isProvider = role === 'PROVIDER';
 
@@ -115,56 +39,12 @@ export function WalletPage({ role }: { role: WalletRole }) {
     }
   }, []);
 
-  const loadTransactions = useCallback(async () => {
-    try {
-      const result = await walletApi.listTransactions({
-        ...transactionQuery,
-        type: transactionQuery.type || undefined,
-      });
-      setTransactions(result.items);
-      setTransactionPages(result.pagination.totalPages || 1);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setTransactionLoading(false);
-    }
-  }, [transactionQuery]);
-
-  const loadWithdrawals = useCallback(async () => {
-    try {
-      const result = await walletApi.listWithdrawals({
-        ...withdrawalQuery,
-        status: withdrawalQuery.status || undefined,
-      });
-      setWithdrawals(result.items);
-      setWithdrawalPages(result.pagination.totalPages || 1);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setWithdrawalLoading(false);
-    }
-  }, [withdrawalQuery]);
-
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void loadOverview();
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [loadOverview]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void loadTransactions();
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [loadTransactions]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void loadWithdrawals();
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [loadWithdrawals]);
 
   const stats = useMemo(() => {
     const currentBalance = wallet?.balance ?? summary?.currentBalance ?? 0;
@@ -187,110 +67,12 @@ export function WalletPage({ role }: { role: WalletRole }) {
   }, [isProvider, summary, wallet]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadOverview(), loadTransactions(), loadWithdrawals()]);
-  }, [loadOverview, loadTransactions, loadWithdrawals]);
+    await Promise.all([loadOverview(), transactionsRef.current?.refresh(), withdrawalsRef.current?.refresh()]);
+  }, [loadOverview]);
 
-  useEffect(() => {
-    if (handledDepositReturnRef.current) return;
+  useWalletDepositReturn({ refreshAll, setError, setNotice });
 
-    const params = new URLSearchParams(window.location.search);
-    const walletDepositStatus = params.get('walletDeposit');
-    const storedOrderCode = sessionStorage.getItem(PENDING_DEPOSIT_ORDER_CODE_KEY);
-    const orderCode = params.get('orderCode') || storedOrderCode;
-
-    if (!orderCode || (!walletDepositStatus && !storedOrderCode)) return;
-
-    handledDepositReturnRef.current = true;
-    if (walletDepositStatus) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-
-    const syncDepositStatus = async () => {
-      setError('');
-      setNotice('');
-      try {
-        if (walletDepositStatus === 'cancelled') {
-          await walletApi.cancelDeposit(orderCode);
-          setNotice('Đã hủy giao dịch nạp ví.');
-        } else {
-          const transaction = await walletApi.syncDeposit(orderCode);
-          if (transaction.status === 'success') {
-            setNotice('Nạp ví thành công. Số dư đã được cập nhật.');
-          } else {
-            setNotice('Giao dịch nạp ví chưa được PayOS xác nhận, vui lòng kiểm tra lại sau.');
-          }
-        }
-        sessionStorage.removeItem(PENDING_DEPOSIT_ORDER_CODE_KEY);
-        await refreshAll();
-      } catch (err) {
-        setError(getErrorMessage(err));
-      }
-    };
-
-    void syncDepositStatus();
-  }, [refreshAll]);
-
-  const submitDeposit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError('');
-    setDepositError('');
-    setNotice('');
-    try {
-      const amount = parseAmount(depositForm.amount);
-      if (amount < 1) {
-        setDepositError('Số tiền phải lớn hơn hoặc bằng 1.');
-        return;
-      }
-      const walletPath = isProvider ? '/provider/wallet' : '/customer/wallet';
-      const result = await walletApi.createDeposit({
-        amount,
-        returnUrl: `${window.location.origin}${walletPath}`,
-        cancelUrl: `${window.location.origin}${walletPath}`,
-      });
-      const orderCode = result.transaction.gatewayOrderCode || result.transaction.transactionCode;
-      if (orderCode) {
-        sessionStorage.setItem(PENDING_DEPOSIT_ORDER_CODE_KEY, orderCode);
-      }
-      setDepositOpen(false);
-      setDepositForm({ amount: '' });
-      setNotice('Đã tạo liên kết nạp ví. Bạn sẽ được chuyển sang cổng thanh toán.');
-      await refreshAll();
-      if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
-    } catch (err) {
-      setDepositError(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const submitWithdrawal = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError('');
-    setWithdrawError('');
-    setNotice('');
-    try {
-      const amount = parseAmount(withdrawForm.amount);
-      if (amount < 1) {
-        setWithdrawError('Số tiền rút phải lớn hơn hoặc bằng 1.');
-        return;
-      }
-      if (wallet?.balance !== undefined && amount > wallet.balance) {
-        setWithdrawError('Số tiền rút không được vượt quá số dư khả dụng.');
-        return;
-      }
-      await walletApi.createWithdrawal({ amount });
-      setWithdrawOpen(false);
-      setWithdrawForm({ amount: '' });
-      setNotice('Đã gửi yêu cầu rút tiền. Số tiền được chuyển sang trạng thái chờ duyệt.');
-      await refreshAll();
-    } catch (err) {
-      setWithdrawError(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const forms = useWalletAmountForms({ isProvider, walletBalance: wallet?.balance, refreshAll, setError, setNotice });
 
   return (
     <DashboardShell role={role}>
@@ -300,260 +82,46 @@ export function WalletPage({ role }: { role: WalletRole }) {
             <h1 className="text-headline-lg font-bold text-on-background">Ví Handigo</h1>
             <p className="text-on-surface-variant">Theo dõi số dư, nạp ví, gửi yêu cầu rút tiền và lịch sử giao dịch của bạn.</p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={() => {
-              setDepositError('');
-              setDepositOpen(true);
-            }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low">
-              <span className="material-symbols-outlined text-[20px]">add_card</span>
-              Nạp ví
-            </button>
-            <Link to={isProvider ? '/provider/bank-accounts' : '/customer/bank-accounts'} className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low">
-              <span className="material-symbols-outlined text-[20px]">account_balance</span>
-              Tài khoản ngân hàng
-            </Link>
-            <button type="button" onClick={() => {
-              setWithdrawError('');
-              setWithdrawOpen(true);
-            }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm">
-              <span className="material-symbols-outlined text-[20px]">payments</span>
-              Rút tiền
-            </button>
-          </div>
+          <WalletHeaderActions isProvider={isProvider} onOpenDeposit={forms.openDeposit} onOpenWithdraw={forms.openWithdraw} />
         </div>
 
-        {(notice || error) && <div className={`rounded-xl px-4 py-3 ${error ? 'bg-error/10 text-error' : 'bg-emerald-100 text-emerald-700'}`}>{error || notice}</div>}
+        {(notice || error) && (
+          <div className={`rounded-xl px-4 py-3 ${error ? 'bg-error/10 text-error' : 'bg-success/10 text-success'}`}>{error || notice}</div>
+        )}
 
-        <AsyncState loading={loading} error={error && !wallet ? error : ''} empty={false} onRetry={refreshAll}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {stats.map((item) => (
-              <div key={item.label} className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <span className="material-symbols-outlined block text-2xl leading-none">{item.icon}</span>
-                </div>
-                <p className="mt-4 text-sm text-on-surface-variant">{item.label}</p>
-                <p className={`${item.strong ? 'text-headline-md' : 'text-title-lg'} mt-1 font-bold text-on-surface`}>{money.format(item.value)}</p>
-              </div>
-            ))}
-          </div>
-        </AsyncState>
+        <WalletStatsCards stats={stats} loading={loading} error={error && !wallet ? error : ''} onRetry={refreshAll} />
 
-        <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
-          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-title-lg font-bold text-on-surface">Lịch sử giao dịch</h2>
-              <p className="text-sm text-on-surface-variant">Các biến động số dư ví theo thời gian gần nhất.</p>
-            </div>
-            <select
-              value={transactionQuery.type || ''}
-              onChange={(event) => setTransactionQuery({ ...transactionQuery, type: event.target.value as WalletTransactionQuery['type'], page: 1 })}
-              className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none focus:ring-2 focus:ring-primary/30"
-            >
-              <option value="">Tất cả loại giao dịch</option>
-              {Object.entries(transactionLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
+        <WalletTransactionsSection ref={transactionsRef} onError={setError} />
 
-          <AsyncState loading={transactionLoading} error="" empty={!transactions.length} emptyMessage="Chưa có giao dịch ví.">
-            <TransactionTable items={transactions} />
-          </AsyncState>
-          <Pagination page={transactionQuery.page || 1} totalPages={transactionPages} onChange={(page) => setTransactionQuery({ ...transactionQuery, page })} />
-        </section>
-
-        <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
-            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-title-lg font-bold text-on-surface">Yêu cầu rút tiền</h2>
-              <p className="text-sm text-on-surface-variant">Theo dõi trạng thái duyệt và tài khoản nhận tiền.</p>
-            </div>
-            <select
-              value={withdrawalQuery.status || ''}
-              onChange={(event) => setWithdrawalQuery({ ...withdrawalQuery, status: event.target.value as WithdrawalQuery['status'], page: 1 })}
-              className="rounded-xl border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none focus:ring-2 focus:ring-primary/30"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="pending">Chờ duyệt</option>
-              <option value="approved">Đã duyệt</option>
-              <option value="rejected">Từ chối</option>
-              </select>
-            </div>
-
-            <AsyncState loading={withdrawalLoading} error="" empty={!withdrawals.length} emptyMessage="Chưa có yêu cầu rút tiền.">
-              <WithdrawalTable items={withdrawals} />
-            </AsyncState>
-            <Pagination page={withdrawalQuery.page || 1} totalPages={withdrawalPages} onChange={(page) => setWithdrawalQuery({ ...withdrawalQuery, page })} />
-        </section>
+        <WalletWithdrawalsSection ref={withdrawalsRef} onError={setError} />
       </div>
 
-      <AmountModal
-        open={depositOpen}
+      <WalletAmountModal
+        open={forms.depositOpen}
         title="Nạp ví"
-        amount={depositForm.amount}
-        busy={busy}
+        amount={forms.depositAmount}
+        busy={forms.busy}
         submitLabel="Tạo liên kết thanh toán"
         helper="Bạn sẽ được chuyển sang cổng PayOS để hoàn tất giao dịch."
-        error={depositError}
-        onAmountChange={(amount) => {
-          setDepositForm({ amount });
-          setDepositError('');
-        }}
-        onClose={() => {
-          setDepositError('');
-          setDepositOpen(false);
-        }}
-        onSubmit={submitDeposit}
+        error={forms.depositError}
+        onAmountChange={forms.changeDepositAmount}
+        onClose={forms.closeDeposit}
+        onSubmit={forms.submitDeposit}
       />
 
-      <AmountModal
-        open={withdrawOpen}
+      <WalletAmountModal
+        open={forms.withdrawOpen}
         title="Rút tiền"
-        amount={withdrawForm.amount}
-        busy={busy}
+        amount={forms.withdrawAmount}
+        busy={forms.busy}
         submitLabel="Gửi yêu cầu"
         helper="Hệ thống sẽ dùng tài khoản ngân hàng mặc định hoặc tài khoản mới nhất trong hồ sơ của bạn."
         maxAmount={wallet?.balance}
-        error={withdrawError}
-        onAmountChange={(amount) => {
-          setWithdrawForm({ amount });
-          setWithdrawError('');
-        }}
-        onClose={() => {
-          setWithdrawError('');
-          setWithdrawOpen(false);
-        }}
-        onSubmit={submitWithdrawal}
+        error={forms.withdrawError}
+        onAmountChange={forms.changeWithdrawAmount}
+        onClose={forms.closeWithdraw}
+        onSubmit={forms.submitWithdrawal}
       />
     </DashboardShell>
-  );
-}
-
-function TransactionTable({ items }: { items: WalletTransaction[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-left">
-        <thead className="border-b border-outline-variant/20 text-sm uppercase tracking-wide text-on-surface-variant">
-          <tr>
-            <th className="pb-4 font-semibold">Giao dịch</th>
-            <th className="pb-4 font-semibold">Số tiền</th>
-            <th className="pb-4 font-semibold">Số dư sau</th>
-            <th className="pb-4 font-semibold">Trạng thái</th>
-            <th className="pb-4 font-semibold">Thời gian</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-outline-variant/10">
-          {items.map((item) => (
-            <tr key={item._id} className="hover:bg-surface-container-low">
-              <td className="py-4">
-                <p className="font-semibold text-on-surface">{transactionLabels[item.type]}</p>
-                <p className="mt-1 text-sm text-on-surface-variant">{item.description || item.transactionCode || 'Giao dịch ví'}</p>
-              </td>
-              <td className={`py-4 font-bold ${item.direction === 'in' ? 'text-emerald-700' : 'text-error'}`}>
-                {item.direction === 'in' ? '+' : '-'}{money.format(item.amount)}
-              </td>
-              <td className="py-4">{money.format(item.balanceAfter)}</td>
-              <td className="py-4">
-                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${toneByStatus(item.status)}`}>{transactionStatusLabel(item.status)}</span>
-              </td>
-              <td className="py-4 text-sm text-on-surface-variant">{dateTime.format(new Date(item.createdAt))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function WithdrawalTable({ items }: { items: WithdrawalRequest[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-left">
-        <thead className="border-b border-outline-variant/20 text-sm uppercase tracking-wide text-on-surface-variant">
-          <tr>
-            <th className="pb-4 font-semibold">Yêu cầu</th>
-            <th className="pb-4 font-semibold">Số tiền</th>
-            <th className="pb-4 font-semibold">Tài khoản nhận</th>
-            <th className="pb-4 font-semibold">Trạng thái</th>
-            <th className="pb-4 font-semibold">Thời gian</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-outline-variant/10">
-          {items.map((item) => (
-            <tr key={item._id} className="hover:bg-surface-container-low">
-              <td className="py-4">
-                <p className="font-semibold text-on-surface">Rút tiền về ngân hàng</p>
-                {item.adminNote && <p className="mt-1 text-sm text-on-surface-variant">{item.adminNote}</p>}
-              </td>
-              <td className="py-4 font-bold text-on-surface">{money.format(item.amount)}</td>
-              <td className="py-4 text-sm text-on-surface-variant">{bankText(item)}</td>
-              <td className="py-4">
-                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${toneByStatus(item.status)}`}>{withdrawalLabels[item.status]}</span>
-              </td>
-              <td className="py-4 text-sm text-on-surface-variant">{dateTime.format(new Date(item.createdAt))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function AmountModal({
-  open,
-  title,
-  amount,
-  busy,
-  submitLabel,
-  helper,
-  maxAmount,
-  error,
-  onAmountChange,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  title: string;
-  amount: string;
-  busy: boolean;
-  submitLabel: string;
-  helper: string;
-  maxAmount?: number;
-  error?: string;
-  onAmountChange: (amount: string) => void;
-  onClose: () => void;
-  onSubmit: (event: FormEvent) => void;
-}) {
-  return (
-    <Modal open={open} title={title} onClose={onClose} size="sm">
-      <form onSubmit={onSubmit} className="space-y-4">
-        <label className="block">
-          <span className="mb-1 block text-sm font-semibold">Số tiền</span>
-          <input
-            type="text"
-            required
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={amount}
-            onChange={(event) => onAmountChange(normalizeAmountInput(event.target.value))}
-            aria-invalid={Boolean(error)}
-            aria-describedby={error ? 'wallet-amount-error' : undefined}
-            className={`w-full rounded-xl border bg-surface p-3 outline-none focus:ring-2 ${error ? 'border-error focus:ring-error/30' : 'border-outline-variant focus:ring-primary/30'}`}
-            placeholder="Nhập số tiền"
-          />
-        </label>
-        {error && <p id="wallet-amount-error" role="alert" className="text-sm font-medium text-error">{error}</p>}
-        {maxAmount !== undefined && (
-          <p className="text-sm text-on-surface-variant">Số dư khả dụng: <span className="font-semibold text-on-surface">{money.format(maxAmount)}</span></p>
-        )}
-        <p className="rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">{helper}</p>
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} disabled={busy} className="rounded-xl bg-surface-container-high px-5 py-2.5">Hủy</button>
-          <button type="submit" disabled={busy} className="rounded-xl bg-primary px-5 py-2.5 font-semibold text-on-primary disabled:opacity-50">
-            {busy ? 'Đang xử lý...' : submitLabel}
-          </button>
-        </div>
-      </form>
-    </Modal>
   );
 }

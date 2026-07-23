@@ -1,11 +1,10 @@
-import { ArrowLeft, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
 
   return (
-    <main className="grid min-h-screen place-items-center bg-surface px-6">
+    <main id="main-content" className="grid min-h-dvh place-items-center bg-surface px-6">
       <section className="max-w-lg text-center">
         <p className="text-sm font-bold uppercase text-primary">404</p>
         <h1 className="mt-3 text-headline-lg font-bold">Không tìm thấy trang</h1>
@@ -16,16 +15,16 @@ export default function NotFoundPage() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 rounded-lg border border-outline-variant px-4 py-2.5"
+            className="btn-secondary"
           >
-            <ArrowLeft size={18} /> Quay lại
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">arrow_back</span> Quay lại
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-on-primary"
+            className="btn-primary"
           >
-            <Home size={18} /> Trang chủ
+            <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">home</span> Trang chủ
           </button>
         </div>
       </section>

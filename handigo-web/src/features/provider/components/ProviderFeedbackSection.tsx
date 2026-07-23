@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { TestimonialCard } from "@/components/home/HomeCards";
+import { TestimonialCard } from "@/components/common/TestimonialCard";
+import { TestimonialCardSkeleton } from "@/components/home/HomeSkeletons";
 import { feedbackApi } from "@/features/feedback/api/feedback.api";
 import type { Feedback, PersonRef } from "@/features/feedback/types/feedback.types";
-
-const DEFAULT_AVATAR = "https://ui-avatars.com/api/?name=Khach+hang&background=E8DEF8&color=21005D";
 
 const customerOf = (feedback: Feedback) =>
   typeof feedback.customerId === "string" ? undefined : feedback.customerId;
@@ -36,13 +35,16 @@ export function ProviderFeedbackSection({ enabled = true }: { enabled?: boolean 
   }, [enabled]);
 
   return (
-    <section className="rounded-xl border border-outline-variant/20 bg-white p-6 shadow-sm">
+    <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm">
       <div className="mb-6">
         <h3 className="font-headline-md text-headline-md text-on-surface">Đánh giá khách hàng</h3>
         <p className="mt-1 text-sm text-on-surface-variant">Phản hồi từ khách hàng đã sử dụng dịch vụ của bạn.</p>
       </div>
       {loading ? (
-        <p className="rounded-xl bg-surface-container-low p-5 text-center text-sm text-on-surface-variant">Đang tải đánh giá...</p>
+        <div className="grid gap-5 lg:grid-cols-1 2xl:grid-cols-2">
+          <TestimonialCardSkeleton />
+          <TestimonialCardSkeleton />
+        </div>
       ) : error ? (
         <p className="rounded-xl bg-error/10 p-4 text-sm text-error">{error}</p>
       ) : feedbacks.length === 0 ? (
@@ -57,7 +59,7 @@ export function ProviderFeedbackSection({ enabled = true }: { enabled?: boolean 
               quote={feedback.comment || "Khách hàng đã đánh giá dịch vụ."}
               name={customer?.fullName || "Khách hàng"}
               loc={`${feedback.rating}/5 điểm`}
-              img={customer?.avatar || DEFAULT_AVATAR}
+              img={customer?.avatar}
               rating={feedback.rating}
               service={serviceOf(feedback)}
               performedAt={new Date(performedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}

@@ -1,16 +1,16 @@
 import { Link } from "react-router-dom";
 import { BrandLogo } from "../common/BrandLogo";
-import { AppBadge, SocialLink } from "./HomeCards";
+import { SocialLink } from "./HomeCards";
 
 const FooterColumn = ({ title, links }: { title: string; links: string[] }) => (
   <div>
     <h4 className="font-label-md text-label-md font-bold text-on-surface mb-4">
       {title}
     </h4>
-    <ul className="space-y-2 font-body-md text-body-md text-on-surface-variant">
+    <ul className="font-body-md text-body-md text-on-surface-variant">
       {links.map((link) => (
         <li key={link}>
-          <Link className="hover:text-primary transition-all" to="#">
+          <Link className="inline-flex min-h-11 items-center transition-all hover:text-primary" to="#">
             {link}
           </Link>
         </li>
@@ -21,7 +21,7 @@ const FooterColumn = ({ title, links }: { title: string; links: string[] }) => (
 
 export const HomeFooter = () => (
   <footer className="mt-xl border-t border-outline-variant/50 bg-surface-container-lowest">
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 px-4 md:px-8 py-16 max-w-7xl mx-auto">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 px-4 md:px-8 py-16 max-w-7xl mx-auto">
       <div className="col-span-2 space-y-4">
         <BrandLogo compact />
         <p className="font-body-md text-body-md text-on-surface-variant">
@@ -30,9 +30,9 @@ export const HomeFooter = () => (
           Giải pháp công nghệ kết nối thợ chuyên nghiệp hàng đầu Việt Nam.
         </p>
         <div className="flex gap-4">
-          <SocialLink icon="social_leaderboard" />
-          <SocialLink icon="smart_display" />
-          <SocialLink icon="language" />
+          <SocialLink icon="social_leaderboard" label="Handigo trên mạng xã hội" />
+          <SocialLink icon="smart_display" label="Kênh video của Handigo" />
+          <SocialLink icon="language" label="Website Handigo" />
         </div>
       </div>
       <FooterColumn
@@ -52,15 +52,9 @@ export const HomeFooter = () => (
           "An toàn",
         ]}
       />
-      <div className="space-y-4">
-        <h4 className="font-label-md text-label-md font-bold text-on-surface mb-4">
-          Tải Ứng Dụng
-        </h4>
-        <div className="space-y-2">
-          <AppBadge icon="play_arrow" store="Google Play" label="TẢI TRÊN" />
-          <AppBadge icon="ios" store="App Store" label="Tải về trên" />
-        </div>
-      </div>
+      {/* Cột "Tải Ứng Dụng" với huy hiệu Google Play / App Store đã gỡ: Handigo
+          hiện chỉ có bản web, hai huy hiệu đó không có link và hứa một thứ không
+          tồn tại. Thêm lại khi nào thực sự phát hành ứng dụng di động. */}
     </div>
   </footer>
 );

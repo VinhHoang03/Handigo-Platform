@@ -32,7 +32,7 @@ export function ToggleOption({
           onChange={() => {}}
         />
         <span className="h-6 w-11 rounded-full bg-outline-variant transition peer-checked:bg-primary peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15" />
-        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full border border-gray-300 bg-white transition peer-checked:translate-x-full peer-checked:border-white" />
+        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full border border-outline-variant bg-surface transition peer-checked:translate-x-full peer-checked:border-on-primary" />
       </label>
     </div>
   );

@@ -100,7 +100,7 @@ export function CategorySelectionStep({
           })}
         </div>
       ) : (
-        <div className="flex gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-800">
+        <div className="flex gap-3 rounded-2xl border border-warning/30 bg-warning-container p-4 text-on-warning-container">
           <AlertCircle className="shrink-0" size={20} />
           <p>
             Chưa có dịch vụ đang hoạt động. Quản trị viên cần tạo hoặc kích hoạt

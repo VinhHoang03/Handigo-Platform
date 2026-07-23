@@ -1,69 +1,34 @@
-import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { newsApi } from "../api/news.api";
+import { Skeleton, SkeletonText } from "@/components/common/Skeleton";
 import { PublicContentLayout } from "../components/PublicContentLayout";
-import { newsArticles } from "../data/content.data";
-import {
-  mergeNewsArticles,
-  toNewsViewArticle,
-  toStaticNewsViewArticle,
-  type NewsViewArticle,
-} from "../utils/newsView";
+import { useNewsArticle } from "../hooks/useNewsArticle";
+
+/** Skeleton bám theo bố cục bài viết thật: nhãn, tiêu đề, ảnh bìa, thân bài. */
+const ArticleSkeleton = () => (
+  <div
+    role="status"
+    aria-busy="true"
+    aria-label="Đang tải bài viết"
+    className="mx-auto max-w-4xl px-6 py-10 lg:py-16"
+  >
+    <Skeleton className="h-4 w-32" />
+    <Skeleton className="mt-6 h-10 w-full" />
+    <Skeleton className="mt-3 h-10 w-3/4" />
+    <Skeleton className="mt-6 h-4 w-48" />
+    <Skeleton className="mt-8 aspect-[16/9] w-full" rounded="rounded-3xl" />
+    <SkeletonText lines={5} className="mt-8" />
+    <SkeletonText lines={4} className="mt-6" />
+  </div>
+);
 
 export default function NewsDetailPage() {
   const { articleId } = useParams();
-  const [article, setArticle] = useState<NewsViewArticle | null>(null);
-  const [related, setRelated] = useState<NewsViewArticle[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      if (!articleId) return;
-      try {
-        const [record, records] = await Promise.all([
-          newsApi.getPublished(articleId),
-          newsApi.listPublished(),
-        ]);
-        if (!active) return;
-        const current = toNewsViewArticle(record);
-        setArticle(current);
-        setRelated(
-          mergeNewsArticles(records, newsArticles)
-            .filter((item) => item.slug !== current.slug)
-            .slice(0, 3),
-        );
-      } catch {
-        if (!active) return;
-        const staticArticle = newsArticles.find((item) => item.id === articleId);
-        if (!staticArticle) {
-          setError("Không tìm thấy bài viết.");
-        } else {
-          setArticle(toStaticNewsViewArticle(staticArticle));
-          setRelated(
-            newsArticles
-              .filter((item) => item.id !== staticArticle.id)
-              .slice(0, 3)
-              .map(toStaticNewsViewArticle),
-          );
-        }
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [articleId]);
+  const { article, related, isLoading, error } = useNewsArticle(articleId);
 
   if (isLoading) {
     return (
       <PublicContentLayout>
-        <div className="mx-auto max-w-4xl px-6 py-20 text-center text-on-surface-variant">
-          Đang tải bài viết…
-        </div>
+        <ArticleSkeleton />
       </PublicContentLayout>
     );
   }
@@ -104,7 +69,7 @@ export default function NewsDetailPage() {
             {article.title}
           </h1>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm text-on-surface-variant">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-primary text-sm font-bold text-white">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-primary text-sm font-bold text-on-primary">
               HD
             </span>
             <span className="font-semibold text-on-surface">
@@ -180,7 +145,7 @@ export default function NewsDetailPage() {
                 <Link
                   key={item.slug}
                   to={`/tin-tuc/${item.slug}`}
-                  className="group overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-lg"
+                  className="group overflow-hidden rounded-2xl bg-surface-container-lowest shadow-sm hover:shadow-lg"
                 >
                   <img
                     src={item.image}

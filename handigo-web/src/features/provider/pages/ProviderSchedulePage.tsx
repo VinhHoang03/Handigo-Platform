@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../api/providerOrder.api';
-import { formatProviderOrderAmount, getCustomer, providerStatusLabels, providerStatusStyles } from '../utils/providerOrder.utils';
+import { getOrderStatusMeta } from '@/utils/orderStatus';
+import { toneChipClasses } from '@/utils/statusTone';
+import { formatProviderOrderAmount, getCustomer } from '../utils/providerOrder.utils';
 
 const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 const orderDate = (order: Order) => new Date(order.scheduledAt || order.createdAt);
@@ -86,7 +88,7 @@ export default function ProviderSchedulePage() {
           </div>
         ) : (
           <div className="grid items-start gap-gutter xl:grid-cols-12">
-            <section className="min-w-0 rounded-3xl border border-outline-variant/30 bg-white p-4 shadow-sm sm:p-md xl:col-span-9">
+            <section className="min-w-0 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm sm:p-md xl:col-span-9">
               <div className="mb-md flex items-center justify-between gap-3">
                 <h2 className="font-headline-md text-headline-md capitalize text-on-surface">
                   {visibleMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
@@ -112,12 +114,12 @@ export default function ProviderSchedulePage() {
                           key={date.toISOString()}
                           type="button"
                           onClick={() => { setSelectedDate(date); setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1)); }}
-                          className={`min-h-28 bg-white p-2 text-left align-top transition hover:bg-primary/5 ${outside ? 'text-outline/50' : ''} ${selected ? 'ring-2 ring-inset ring-primary' : ''}`}
+                          className={`min-h-28 bg-surface-container-lowest p-2 text-left align-top transition hover:bg-primary/5 ${outside ? 'text-outline/50' : ''} ${selected ? 'ring-2 ring-inset ring-primary' : ''}`}
                         >
-                          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${current ? 'bg-primary text-white' : ''}`}>{date.getDate()}</span>
+                          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${current ? 'bg-primary text-on-primary' : ''}`}>{date.getDate()}</span>
                           <span className="mt-1 block space-y-1">
                             {dayOrders.slice(0, 2).map((order) => (
-                              <span key={order._id} className={`block truncate rounded-md px-1.5 py-1 text-[10px] font-bold ${providerStatusStyles[order.status]}`}>{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · {order.serviceId?.name || 'Dịch vụ'}</span>
+                              <span key={order._id} className={`block truncate rounded-md px-1.5 py-1 text-[10px] font-bold ${toneChipClasses[getOrderStatusMeta(order.status).tone]}`}>{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · {order.serviceId?.name || 'Dịch vụ'}</span>
                             ))}
                             {dayOrders.length > 2 && <span className="block px-1 text-[10px] font-bold text-primary">+{dayOrders.length - 2} công việc</span>}
                           </span>
@@ -129,7 +131,7 @@ export default function ProviderSchedulePage() {
               </div>
             </section>
 
-            <aside className="rounded-3xl border border-outline-variant/30 bg-white p-4 shadow-sm sm:p-md xl:sticky xl:top-24 xl:col-span-3">
+            <aside className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm sm:p-md xl:sticky xl:top-24 xl:col-span-3">
               <div className="mb-md flex items-end justify-between gap-3 border-b border-outline-variant/30 pb-md">
                 <div>
                   <h2 className="font-headline-md text-headline-md">{dateKey(selectedDate) === dateKey(today) ? 'Hôm nay' : `Ngày ${selectedDate.getDate()}`}</h2>
@@ -145,14 +147,14 @@ export default function ProviderSchedulePage() {
                     return (
                       <article key={order._id} className="rounded-2xl border border-outline-variant/30 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${providerStatusStyles[order.status]}`}>{providerStatusLabels[order.status]}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${toneChipClasses[getOrderStatusMeta(order.status).tone]}`}>{getOrderStatusMeta(order.status).label}</span>
                           <span className="text-xs text-on-surface-variant">{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <h3 className="mt-3 font-bold text-on-surface">{order.serviceId?.name || 'Dịch vụ'}</h3>
                         {customer?.fullName && <p className="mt-2 text-sm text-on-surface-variant">{customer.fullName}</p>}
                         {formatAddress(order) && <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">{formatAddress(order)}</p>}
                         <div className="mt-3 flex items-center justify-between border-t border-outline-variant/20 pt-3">
-                          <span className="font-bold text-primary">{formatProviderOrderAmount(order)}</span>
+                          <span className="font-bold text-primary tabular-nums">{formatProviderOrderAmount(order)}</span>
                           <Link to={`/provider/orders/${order._id}`} className="text-xs font-bold text-primary hover:underline">Chi tiết</Link>
                         </div>
                       </article>

@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
 import {
-  SearchableSelect,
-  type SearchableSelectOption,
-} from "@/components/common/SearchableSelect";
-import {
-  getProvinces,
-  getWardsByProvince,
-  type AdministrativeUnit,
-} from "@/features/customer/api/vietnamAddress.api";
+  getProvinceName,
+  normalizeName,
+  toSelectOptions,
+} from "./workingAreasStepHelpers";
+import { useProvinces, useWardsByProvince } from "./useProvinceWardData";
 
 interface Props {
   areas: string[];
@@ -16,39 +14,17 @@ interface Props {
   onRemove: (value: string) => void;
 }
 
-const toSelectOptions = (
-  items: AdministrativeUnit[],
-): SearchableSelectOption[] =>
-  items.map((item) => ({
-    value: item.code,
-    label: item.name,
-    searchText: `${item.codeName} ${item.divisionType}`,
-  }));
-
-const getProvinceName = (area: string) => {
-  const separatorIndex = area.lastIndexOf(",");
-  return separatorIndex >= 0 ? area.slice(separatorIndex + 1).trim() : "";
-};
-
-const normalizeName = (value: string) =>
-  value.normalize("NFC").trim().toLocaleLowerCase("vi");
-
 export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
-  const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
-  const [wards, setWards] = useState<AdministrativeUnit[]>([]);
   const [provinceCode, setProvinceCode] = useState<number | undefined>();
   const [wardCode, setWardCode] = useState<number | undefined>();
   const [provinceName, setProvinceName] = useState("");
   const [wardName, setWardName] = useState("");
-  const [loadingProvinces, setLoadingProvinces] = useState(false);
-  const [loadingWards, setLoadingWards] = useState(false);
-  const [error, setError] = useState("");
 
-  const provinceOptions = useMemo(
-    () => toSelectOptions(provinces),
-    [provinces],
-  );
-  const wardOptions = useMemo(() => toSelectOptions(wards), [wards]);
+  const {
+    provinces,
+    loading: loadingProvinces,
+    error: provincesError,
+  } = useProvinces();
   const lockedProvinceName = useMemo(
     () => getProvinceName(areas[0] || ""),
     [areas],
@@ -63,6 +39,19 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
   );
   const effectiveProvinceCode = lockedProvince?.code ?? provinceCode;
   const effectiveProvinceName = lockedProvince?.name ?? provinceName;
+  const {
+    wards,
+    setWards,
+    loading: loadingWards,
+    error: wardsError,
+  } = useWardsByProvince(effectiveProvinceCode);
+  const error = provincesError || wardsError;
+
+  const provinceOptions = useMemo(
+    () => toSelectOptions(provinces),
+    [provinces],
+  );
+  const wardOptions = useMemo(() => toSelectOptions(wards), [wards]);
   const selectedArea = [wardName, effectiveProvinceName]
     .filter(Boolean)
     .join(", ");
@@ -72,54 +61,6 @@ export function WorkingAreasStep({ areas, onAdd, onRemove }: Props) {
   const canAdd = Boolean(
     effectiveProvinceCode && wardCode && selectedArea && isSelectedProvinceValid,
   );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        setLoadingProvinces(true);
-        setError("");
-        const data = await getProvinces();
-        if (!cancelled) setProvinces(data);
-      } catch {
-        if (!cancelled) setError("Khong tai duoc danh sach tinh/thanh.");
-      } finally {
-        if (!cancelled) setLoadingProvinces(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!effectiveProvinceCode) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        setLoadingWards(true);
-        setError("");
-        const data = await getWardsByProvince(effectiveProvinceCode);
-        if (!cancelled) setWards(data);
-      } catch {
-        if (!cancelled) setError("Khong tai duoc danh sach phuong/xa.");
-      } finally {
-        if (!cancelled) setLoadingWards(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveProvinceCode]);
 
   const handleAdd = () => {
     if (!canAdd) return;

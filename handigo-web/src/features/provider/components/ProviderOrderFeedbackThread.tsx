@@ -1,41 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { InitialsAvatar } from '@/components/common/InitialsAvatar';
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { feedbackApi } from '@/features/feedback/api/feedback.api';
 import type { Feedback, PersonRef } from '@/features/feedback/types/feedback.types';
+import { FeedbackImageGallery } from './orders/FeedbackImageGallery';
+import { FeedbackReplyForm } from './orders/FeedbackReplyForm';
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_REPLY_LENGTH = 1000;
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
 
 const customerOf = (feedback: Feedback) =>
   typeof feedback.customerId === 'string' ? undefined : feedback.customerId;
-
-function ImageGallery({ images, onPreview }: { images: string[]; onPreview: (url: string) => void }) {
-  if (!images.length) return null;
-
-  return (
-    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-      {images.map((image, index) => (
-        <button
-          key={`${image}-${index}`}
-          type="button"
-          onClick={() => onPreview(image)}
-          className="group aspect-square overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-low focus:outline-none focus:ring-4 focus:ring-primary/20"
-          aria-label={`Xem ảnh ${index + 1}`}
-        >
-          <ReliableImage
-            src={image}
-            alt={`Ảnh đánh giá ${index + 1}`}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -117,7 +97,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
   const customer = feedback ? customerOf(feedback) as PersonRef | undefined : undefined;
 
   return (
-    <section className="glass-card overflow-hidden rounded-3xl border border-outline-variant/30 p-md sm:p-lg">
+    <section className="overflow-hidden rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg">
       <div className="mb-md">
         <p className="text-xs font-bold uppercase tracking-wider text-primary">Trao đổi sau dịch vụ</p>
         <h2 className="mt-1 font-headline-md text-headline-md text-on-surface">Đánh giá của khách hàng</h2>
@@ -145,10 +125,10 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
           <article className="rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
-                <ReliableImage
-                  src={customer?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(customer?.fullName || 'KH')}&background=E8DEF8&color=21005D`}
-                  alt={customer?.fullName || 'Khách hàng'}
-                  className="h-11 w-11 shrink-0 rounded-full object-cover"
+                <InitialsAvatar
+                  name={customer?.fullName || 'Khách hàng'}
+                  src={customer?.avatar}
+                  className="h-11 w-11 shrink-0"
                 />
                 <div className="min-w-0">
                   <p className="truncate font-bold text-on-surface">{customer?.fullName || 'Khách hàng'}</p>
@@ -164,7 +144,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
             <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-on-surface">
               {feedback.comment || 'Khách hàng đã đánh giá dịch vụ nhưng không để lại nhận xét.'}
             </p>
-            <ImageGallery images={feedback.images || []} onPreview={setPreviewImage} />
+            <FeedbackImageGallery images={feedback.images || []} onPreview={setPreviewImage} />
           </article>
 
           <div className="relative pl-0 sm:pl-10">
@@ -179,52 +159,21 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
                   <time className="text-xs text-on-surface-variant">{formatDate(feedback.providerReply.repliedAt)}</time>
                 </div>
                 <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-on-surface">{feedback.providerReply.content}</p>
-                <ImageGallery images={feedback.providerReply.images || []} onPreview={setPreviewImage} />
+                <FeedbackImageGallery images={feedback.providerReply.images || []} onPreview={setPreviewImage} />
               </article>
             ) : (
-              <div className="rounded-2xl border border-primary/20 bg-white p-4 sm:p-5">
-                <div className="mb-3">
-                  <h3 className="font-bold text-on-surface">Phản hồi đánh giá</h3>
-                  <p className="text-xs text-on-surface-variant">Bạn chỉ có thể gửi một phản hồi chính thức.</p>
-                </div>
-                <textarea
-                  value={content}
-                  onChange={(event) => setContent(event.target.value)}
-                  maxLength={1000}
-                  rows={4}
-                  disabled={submitting}
-                  placeholder="Nhập lời cảm ơn hoặc phản hồi dành cho khách hàng..."
-                  className="w-full resize-none rounded-2xl border border-outline-variant/50 bg-surface-container-lowest px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-60"
-                />
-                <div className="mt-1 text-right text-xs text-on-surface-variant">{content.length}/1000</div>
-
-                {previewUrls.length > 0 && (
-                  <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
-                    {previewUrls.map(({ file, url }, index) => (
-                      <div key={`${file.name}-${file.lastModified}`} className="relative aspect-square overflow-hidden rounded-xl border border-outline-variant/30">
-                        <img src={url} alt={`Ảnh phản hồi ${index + 1}`} className="h-full w-full object-cover" />
-                        <button type="button" onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-on-surface/70 text-white" aria-label={`Xóa ảnh ${index + 1}`}>
-                          <span className="material-symbols-outlined text-base">close</span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {submitError && <p className="mt-3 rounded-xl bg-error/10 px-3 py-2 text-sm text-error">{submitError}</p>}
-
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container-low">
-                    <span className="material-symbols-outlined text-xl">add_photo_alternate</span>
-                    Thêm ảnh ({files.length}/{MAX_IMAGES})
-                    <input type="file" accept="image/*" multiple disabled={submitting || files.length >= MAX_IMAGES} onChange={(event) => { handleFiles(event.target.files); event.target.value = ''; }} className="sr-only" />
-                  </label>
-                  <button type="button" onClick={() => void submitReply()} disabled={submitting || !content.trim()} className="btn-primary inline-flex min-h-11 items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
-                    <span className="material-symbols-outlined text-xl">send</span>
-                    {submitting ? 'Đang gửi...' : 'Gửi phản hồi'}
-                  </button>
-                </div>
-              </div>
+              <FeedbackReplyForm
+                content={content}
+                onContentChange={setContent}
+                maxContentLength={MAX_REPLY_LENGTH}
+                previewUrls={previewUrls}
+                onRemoveFile={(index) => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+                onFilesSelected={handleFiles}
+                maxImages={MAX_IMAGES}
+                submitting={submitting}
+                submitError={submitError}
+                onSubmit={() => void submitReply()}
+              />
             )}
           </div>
         </div>
@@ -232,7 +181,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
 
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-label="Xem ảnh đánh giá" onClick={() => setPreviewImage('')}>
-          <button type="button" onClick={() => setPreviewImage('')} className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-on-surface" aria-label="Đóng ảnh">
+          <button type="button" onClick={() => setPreviewImage('')} className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-lowest/90 text-on-surface" aria-label="Đóng ảnh">
             <span className="material-symbols-outlined">close</span>
           </button>
           <ReliableImage src={previewImage} alt="Ảnh đánh giá phóng lớn" className="max-h-[90vh] max-w-[92vw] rounded-2xl object-contain shadow-2xl" onClick={(event) => event.stopPropagation()} />

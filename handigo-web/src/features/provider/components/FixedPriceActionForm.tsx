@@ -85,7 +85,7 @@ export function FixedPriceActionForm({
   };
 
   return (
-    <div className="glass-card flex h-full flex-col space-y-md rounded-3xl border border-outline-variant/30 p-md sm:p-lg">
+    <div className="flex h-full flex-col space-y-md rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg">
       <div>
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary">task_alt</span>
@@ -149,7 +149,7 @@ export function FixedPriceActionForm({
               maxLength={MAX_COMPLETION_NOTE_LENGTH}
               rows={4}
               disabled={busy}
-              className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+              className="w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
               placeholder="Mô tả công việc đã thực hiện..."
             />
           </label>
