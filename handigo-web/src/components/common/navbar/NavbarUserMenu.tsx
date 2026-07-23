@@ -6,6 +6,7 @@ import type { User } from "@/features/auth/types/auth.types";
 import { NotificationBell } from "../NotificationBell";
 import { NavbarAccountDropdown } from "./NavbarAccountDropdown";
 import type { AppRole } from "./navbar.types";
+import { SprayCan } from "lucide-react";
 
 interface NavbarUserMenuProps {
   isAuthenticated: boolean;
@@ -60,9 +61,7 @@ export function NavbarUserMenu({
           onClick={onBookService}
           className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)] transition hover:bg-primary/90"
         >
-          <span className="material-symbols-outlined text-lg">
-            cleaning_services
-          </span>
+          <SprayCan aria-hidden="true" size={18} />
           Đặt dịch vụ
         </button>
       )}

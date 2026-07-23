@@ -6,6 +6,7 @@ import { Step2TimeSlotFieldset } from './Step2TimeSlotFieldset';
 import { Step2RecurringPreview } from './Step2RecurringPreview';
 import { Step2ProviderFieldset } from './Step2ProviderFieldset';
 import type { RecurrenceCount } from './step2Helpers';
+import { CalendarCheck } from "lucide-react";
 
 type OrderType = 'normal' | 'urgent' | 'scheduled' | 'recurring';
 type RecurrenceUnit = 'weekly' | 'monthly';
@@ -56,7 +57,7 @@ export const Step2ScheduleSection = ({
       {shouldShowSchedulePicker && (
         <div className="mt-md border-t border-outline-variant/30 pt-md">
           <div className="mb-md flex items-start gap-sm rounded-xl bg-primary-container/10 p-sm">
-            <span aria-hidden="true" className="material-symbols-outlined text-primary">event_available</span>
+            <CalendarCheck aria-hidden="true" size={24} className="text-primary" />
             <div>
               <p className="text-sm font-bold text-on-surface">Đặt trước chuyên gia theo lịch của bạn</p>
               <p className="mt-1 text-xs leading-5 text-on-surface-variant">

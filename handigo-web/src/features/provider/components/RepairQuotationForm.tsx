@@ -4,6 +4,7 @@ import { formatMoney } from '../utils/providerOrder.utils';
 import { QuotationItemRow } from './orders/QuotationItemRow';
 import { QuotationNotesFields } from './orders/QuotationNotesFields';
 import type { QuotationFormItem } from './orders/quotationForm.types';
+import { TriangleAlert } from "lucide-react";
 
 const emptyItem: QuotationFormItem = {
   title: '',
@@ -152,7 +153,7 @@ export function RepairQuotationForm({ onSubmit, onCancel, busy }: RepairQuotatio
           onClick={onCancel}
           className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm font-bold text-error transition hover:border-error/50 hover:bg-error/10 active:scale-[0.98] disabled:opacity-50"
         >
-          <span className="material-symbols-outlined text-xl">warning</span>
+          <TriangleAlert aria-hidden="true" size={20} />
           Hủy đơn hàng
         </button>
         <button type="submit" disabled={busy} className="btn-primary w-full sm:w-auto">

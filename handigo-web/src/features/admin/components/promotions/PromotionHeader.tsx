@@ -1,4 +1,5 @@
 import { StatCard } from "../shared/StatCard";
+import { Plus } from "lucide-react";
 
 export function PromotionHeader({
   stats,
@@ -21,7 +22,7 @@ export function PromotionHeader({
           onClick={onCreate}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm"
         >
-          <span className="material-symbols-outlined text-[20px]">add</span>
+          <Plus aria-hidden="true" size={20} />
           Tạo voucher
         </button>
       </div>

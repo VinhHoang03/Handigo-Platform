@@ -3,6 +3,7 @@ import type { Order } from "@/types/booking";
 import { Skeleton } from "@/components/common/Skeleton";
 import { getOrderStatusMeta } from "@/utils/orderStatus";
 import { getOrderDate, shortAddress } from "./providerHome.utils";
+import { ArrowRight, CalendarCheck } from "lucide-react";
 
 interface ProviderTodayScheduleProps {
   todaySchedule: Order[];
@@ -24,9 +25,7 @@ export function ProviderTodaySchedule({
           aria-label="Xem lịch làm việc"
           className="rounded-full p-xs transition-colors hover:bg-surface-container"
         >
-          <span className="material-symbols-outlined text-outline">
-            arrow_forward
-          </span>
+          <ArrowRight aria-hidden="true" size={24} className="text-outline" />
         </Link>
       </div>
       {isLoadingSchedule ? (
@@ -37,9 +36,7 @@ export function ProviderTodaySchedule({
         </div>
       ) : todaySchedule.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-outline-variant/40 px-4 py-10 text-center text-on-surface-variant">
-          <span className="material-symbols-outlined text-4xl">
-            event_available
-          </span>
+          <CalendarCheck aria-hidden="true" size={36} />
           <p className="mt-2 text-sm font-semibold">
             Hôm nay chưa có lịch làm việc.
           </p>

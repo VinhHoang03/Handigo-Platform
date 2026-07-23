@@ -2,6 +2,7 @@ import { AddressBookManager } from '@/features/profile/components/AddressBookMan
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import type { UserAddress } from '@/features/profile/types/profile.types';
 import { MIN_DESCRIPTION_LENGTH } from './step2Helpers';
+import { X } from "lucide-react";
 
 interface Step2ExecutionInfoSectionProps {
   addressId?: string;
@@ -105,7 +106,7 @@ export const Step2ExecutionInfoSection = ({
                 onClick={() => onRemoveAttachment(url)}
                 className="absolute top-1 right-1 bg-black/55 text-on-primary rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <span className="material-symbols-outlined text-xs">close</span>
+                <X aria-hidden="true" size={12} />
               </button>
             </div>
           ))}

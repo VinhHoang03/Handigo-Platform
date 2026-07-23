@@ -4,6 +4,7 @@ import { ReliableImage } from '@/components/common/ReliableImage';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import { toneOutlineClasses } from '@/utils/statusTone';
 import { getOrderStatusMeta } from '@/utils/orderStatus';
+import { Calendar, Star } from "lucide-react";
 
 // Bảng màu quy về token ngữ nghĩa dùng chung, xem `utils/statusTone.ts`.
 const statusToneClass: Record<BookingStatusTone, string> = {
@@ -45,7 +46,7 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
       <h3 className="min-w-0 break-words font-headline-md text-headline-md text-on-surface">{booking?.serviceName || 'Dịch vụ'}</h3>
       <div className="flex flex-wrap gap-x-md gap-y-1 text-on-surface-variant text-label-md mb-2">
         <span className="flex items-center gap-1">
-          <span className="material-symbols-outlined text-[18px]">calendar_today</span>
+          <Calendar aria-hidden="true" size={18} />
           {booking?.schedule || 'Sớm nhất'}
         </span>
         <span className="flex items-center gap-1">
@@ -64,9 +65,7 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
       </span>
       {booking?.rating ? (
         <div className="flex items-center gap-1 px-2 text-tertiary">
-          <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-            star
-          </span>
+          <Star aria-hidden="true" size={20} fill="currentColor" />
           <span className="font-label-md text-label-md">{booking.rating}</span>
         </div>
       ) : null}

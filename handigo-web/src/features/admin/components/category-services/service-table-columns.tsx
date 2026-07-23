@@ -2,6 +2,7 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import type { DataTableColumn } from '@/components/common/dashboard/DataTable';
 import type { Service } from '../../types/categoryService.types';
 import { categoryServiceMoney } from './category-service.helpers';
+import { Pencil, Trash2, Wrench } from "lucide-react";
 
 interface ServiceTableContext {
   onEdit: (service: Service) => void;
@@ -20,7 +21,7 @@ export function buildServiceTableColumns({ onEdit, onDelete }: ServiceTableConte
             {service.image ? (
               <img alt={service.name} src={service.image} className="h-full w-full object-cover" />
             ) : (
-              <span className="material-symbols-outlined flex h-full w-full items-center justify-center text-on-surface-variant">home_repair_service</span>
+              <Wrench aria-hidden="true" size={24} className="flex h-full w-full items-center justify-center text-on-surface-variant" />
             )}
           </div>
           <div>
@@ -59,10 +60,10 @@ export function buildServiceTableColumns({ onEdit, onDelete }: ServiceTableConte
       render: (service) => (
         <div className="flex justify-end gap-1">
           <button type="button" onClick={() => onEdit(service)} className="rounded-lg p-2 text-primary hover:bg-primary/10" aria-label="Sửa dịch vụ">
-            <span className="material-symbols-outlined text-[20px]">edit</span>
+            <Pencil aria-hidden="true" size={20} />
           </button>
           <button type="button" onClick={() => onDelete(service)} className="rounded-lg p-2 text-error hover:bg-error/10" aria-label="Xóa dịch vụ">
-            <span className="material-symbols-outlined text-[20px]">delete</span>
+            <Trash2 aria-hidden="true" size={20} />
           </button>
         </div>
       ),

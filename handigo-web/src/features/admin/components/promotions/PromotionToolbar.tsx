@@ -1,5 +1,6 @@
 import { TableToolbar } from "@/components/common/dashboard/TableToolbar";
 import type { VoucherQuery } from "../../types/voucher.types";
+import { RefreshCw } from "lucide-react";
 
 export function PromotionToolbar({
   query,
@@ -35,7 +36,7 @@ export function PromotionToolbar({
           className="rounded-xl border border-outline-variant px-4 py-3 text-on-surface-variant hover:bg-surface-container-low"
           aria-label="Tải lại"
         >
-          <span className="material-symbols-outlined">refresh</span>
+          <RefreshCw aria-hidden="true" size={24} />
         </button>
       }
     />

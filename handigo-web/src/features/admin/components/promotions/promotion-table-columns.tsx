@@ -2,6 +2,7 @@ import type { DataTableColumn } from "@/components/common/dashboard/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { Voucher } from "../../types/voucher.types";
 import { dateTime, discountText, money, statusValue } from "./promotion-format";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface VoucherColumnHandlers {
   onEdit: (voucher: Voucher) => void;
@@ -75,7 +76,7 @@ export const buildVoucherColumns = ({
           className="rounded-lg p-2 text-primary hover:bg-primary/10"
           aria-label="Sửa voucher"
         >
-          <span className="material-symbols-outlined text-[20px]">edit</span>
+          <Pencil aria-hidden="true" size={20} />
         </button>
         <button
           onClick={() => onToggle(voucher)}
@@ -91,7 +92,7 @@ export const buildVoucherColumns = ({
           className="rounded-lg p-2 text-error hover:bg-error/10"
           aria-label="Xóa voucher"
         >
-          <span className="material-symbols-outlined text-[20px]">delete</span>
+          <Trash2 aria-hidden="true" size={20} />
         </button>
       </div>
     ),

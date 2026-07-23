@@ -1,6 +1,7 @@
 import type { Address, Service } from "@/types/booking";
 import { money } from "../utils/serviceDisplay";
 import { AddressPicker } from "./AddressPicker";
+import { ArrowRight, Shield, ShieldCheck } from "lucide-react";
 
 interface BookingSidebarProps {
   service: Service;
@@ -53,11 +54,11 @@ export function BookingSidebar({
 
       <div className="mb-5 space-y-3">
         <div className="flex items-center gap-3 rounded-lg bg-success/10 p-3">
-          <span className="material-symbols-outlined text-success">verified_user</span>
+          <ShieldCheck aria-hidden="true" size={24} className="text-success" />
           <span className="text-sm font-bold">Thợ đã qua kiểm duyệt</span>
         </div>
         <div className="flex items-center gap-3 rounded-lg bg-primary-container/5 p-3">
-          <span className="material-symbols-outlined text-primary">security</span>
+          <Shield aria-hidden="true" size={24} className="text-primary" />
           <span className="text-sm">Thanh toán an toàn</span>
         </div>
       </div>
@@ -79,7 +80,7 @@ export function BookingSidebar({
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 text-lg font-bold text-on-primary shadow-md transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
       >
         Đặt lịch ngay
-        <span className="material-symbols-outlined">arrow_forward</span>
+        <ArrowRight aria-hidden="true" size={24} />
       </button>
     </div>
   );

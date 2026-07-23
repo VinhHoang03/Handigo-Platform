@@ -1,6 +1,7 @@
 import type { QuotationItem } from '../../types/providerOrder.types';
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { quotationItemTypes, type QuotationFormItem } from './quotationForm.types';
+import { Trash2 } from "lucide-react";
 
 interface QuotationItemRowProps {
   item: QuotationFormItem;
@@ -62,7 +63,7 @@ export function QuotationItemRow({ item, removable, maxTitleLength, onUpdate, on
         </div>
         {removable && (
           <button type="button" onClick={onRemove} className="text-error">
-            <span className="material-symbols-outlined text-base">delete</span>
+            <Trash2 aria-hidden="true" size={16} />
           </button>
         )}
       </div>

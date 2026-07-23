@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { Send } from "lucide-react";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -56,7 +57,7 @@ export function ChatbotComposer({
           aria-label="Gửi tin nhắn"
           className="mb-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-on-primary shadow-[0_6px_16px_rgba(53,37,205,0.2)] hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
-          <span className="material-symbols-outlined text-xl">send</span>
+          <Send aria-hidden="true" size={20} />
         </button>
       </div>
     </form>

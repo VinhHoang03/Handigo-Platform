@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 interface AccountActionRowProps {
   icon: string;
   title: string;
@@ -30,9 +31,7 @@ export function AccountActionRow({
           </span>
         </span>
       </span>
-      <span className="material-symbols-outlined text-outline-variant">
-        chevron_right
-      </span>
+      <ChevronRight aria-hidden="true" size={24} className="text-outline-variant" />
     </button>
   );
 }

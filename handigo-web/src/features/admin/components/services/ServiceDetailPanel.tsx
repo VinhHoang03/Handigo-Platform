@@ -4,6 +4,7 @@ import { TableSkeleton } from '@/components/common/dashboard/TableSkeleton';
 import type { Service, ServiceOption } from '../../types/categoryService.types';
 import { buildServiceOptionTableColumns } from './service-option-table-columns';
 import { getPriceLabel, isImageUrl, serviceMoney } from './service.helpers';
+import { ListPlus, Package, Pencil, PlusCircle, Trash2, Wrench } from "lucide-react";
 
 interface ServiceDetailPanelProps {
   service: Service | null;
@@ -32,7 +33,7 @@ export function ServiceDetailPanel({
   if (!service) {
     return (
       <div className="flex min-h-80 flex-col items-center justify-center p-8 text-center">
-        <span className="material-symbols-outlined text-5xl text-outline" aria-hidden="true">inventory_2</span>
+        <Package aria-hidden="true" size={48} className="text-outline" />
         <h2 className="mt-3 text-title-lg font-bold text-on-surface">Chưa có dịch vụ được chọn</h2>
         <p className="mt-1 max-w-sm text-sm text-on-surface-variant">Chọn một dịch vụ trong danh sách hoặc thêm dịch vụ mới để quản lý thông tin và tùy chọn.</p>
       </div>
@@ -50,7 +51,7 @@ export function ServiceDetailPanel({
               {service.image && isImageUrl(service.image) ? (
                 <img src={service.image} alt={service.name} width={112} height={112} className="h-full w-full object-cover" />
               ) : (
-                <span className="material-symbols-outlined flex h-full w-full items-center justify-center text-5xl text-on-surface-variant" aria-hidden="true">home_repair_service</span>
+                <Wrench aria-hidden="true" size={48} className="flex h-full w-full items-center justify-center text-on-surface-variant" />
               )}
             </div>
           </div>
@@ -71,7 +72,7 @@ export function ServiceDetailPanel({
                   onClick={onEditService}
                   className="flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-label-md font-bold text-on-primary transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
-                  <span className="material-symbols-outlined text-base" aria-hidden="true">edit</span>Sửa dịch vụ
+                  <Pencil aria-hidden="true" size={16} />Sửa dịch vụ
                 </button>
                 <button
                   type="button"
@@ -79,7 +80,7 @@ export function ServiceDetailPanel({
                   className="flex min-h-10 items-center gap-2 rounded-lg border border-error/30 px-3 py-2 text-label-md font-bold text-error transition-colors hover:bg-error-container/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
                   aria-label={`Xóa dịch vụ ${service.name}`}
                 >
-                  <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>Xóa
+                  <Trash2 aria-hidden="true" size={16} />Xóa
                 </button>
               </div>
             </div>
@@ -115,7 +116,7 @@ export function ServiceDetailPanel({
             onClick={onCreateOption}
             className="flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-primary/20 px-4 py-2 font-bold text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
-            <span className="material-symbols-outlined" aria-hidden="true">add_circle</span>
+            <PlusCircle aria-hidden="true" size={24} />
             Thêm tùy chọn
           </button>
         </div>
@@ -126,7 +127,7 @@ export function ServiceDetailPanel({
             rowKey={(option) => option._id}
             emptyState={
               <div className="p-10 text-center">
-                <span className="material-symbols-outlined text-3xl text-outline" aria-hidden="true">playlist_add</span>
+                <ListPlus aria-hidden="true" size={30} className="text-outline" />
                 <p className="mt-2 font-semibold text-on-surface">Chưa có tùy chọn nào</p>
                 <p className="mt-1 text-sm text-on-surface-variant">Tạo tùy chọn đầu tiên để cấu hình gói và mức giá cho dịch vụ.</p>
                 <button

@@ -4,6 +4,7 @@ import { DataTable } from '@/components/common/dashboard/DataTable';
 import { TableToolbar } from '@/components/common/dashboard/TableToolbar';
 import type { CategoryDetail, Service } from '../../types/categoryService.types';
 import { buildServiceTableColumns } from './service-table-columns';
+import { Pencil, Plus, Trash2 } from "lucide-react";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -67,13 +68,13 @@ export function CategoryDetailPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => onEditCategory(selected)} className="inline-flex items-center gap-2 rounded-lg border border-outline-variant px-4 py-2 font-semibold text-on-surface-variant hover:bg-surface-container-low">
-            <span className="material-symbols-outlined text-[20px]">edit</span>Sửa
+            <Pencil aria-hidden="true" size={20} />Sửa
           </button>
           <button onClick={onCreateService} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary">
-            <span className="material-symbols-outlined text-[20px]">add</span>Thêm dịch vụ
+            <Plus aria-hidden="true" size={20} />Thêm dịch vụ
           </button>
           <button onClick={() => onDeleteCategory(selected)} className="rounded-lg p-2 text-error hover:bg-error/10" aria-label="Xóa danh mục">
-            <span className="material-symbols-outlined">delete</span>
+            <Trash2 aria-hidden="true" size={24} />
           </button>
         </div>
       </div>

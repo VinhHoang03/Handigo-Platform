@@ -1,4 +1,5 @@
 import type { Service } from '../../../types/booking';
+import { CheckCircle2, Wrench } from "lucide-react";
 
 interface ServiceGridProps {
   services: Service[];
@@ -16,9 +17,7 @@ export const ServiceGrid = ({ services, serviceId, onSelect }: ServiceGridProps)
           }`}
       >
         {serviceId === service._id ? (
-          <span className="absolute top-3 right-3 z-10 text-primary material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-            check_circle
-          </span>
+          <CheckCircle2 aria-hidden="true" size={24} className="absolute top-3 right-3 z-10 text-primary" fill="currentColor" />
         ) : null}
         <div className="aspect-[5/3] w-full overflow-hidden bg-surface-container-low">
           {service.image ? (
@@ -29,7 +28,7 @@ export const ServiceGrid = ({ services, serviceId, onSelect }: ServiceGridProps)
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-primary">
-              <span className="material-symbols-outlined text-4xl">home_repair_service</span>
+              <Wrench aria-hidden="true" size={36} />
             </div>
           )}
         </div>

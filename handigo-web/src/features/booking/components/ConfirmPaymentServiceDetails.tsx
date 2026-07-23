@@ -1,5 +1,6 @@
 import type { Address, Service, ServiceOption } from '../../../types/booking';
 import { getOptionPrice } from './useConfirmPaymentFlow';
+import { CalendarCheck, ReceiptText } from "lucide-react";
 
 const formatAddress = (address: Address | null) => {
   if (!address) return '';
@@ -56,7 +57,7 @@ export const ConfirmPaymentServiceDetails = ({
     <>
       {isAppointment && (
         <section className="flex items-start gap-sm rounded-xl border border-primary/20 bg-primary-container/10 p-md">
-          <span aria-hidden="true" className="material-symbols-outlined text-primary">event_available</span>
+          <CalendarCheck aria-hidden="true" size={24} className="text-primary" />
           <div>
             <h2 className="font-bold text-on-surface">Xác nhận yêu cầu lịch hẹn</h2>
             <p className="mt-1 text-sm leading-6 text-on-surface-variant">
@@ -68,9 +69,7 @@ export const ConfirmPaymentServiceDetails = ({
       )}
       <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
         <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">
-            receipt_long
-          </span>
+          <ReceiptText aria-hidden="true" size={24} className="text-primary" />
           Chi tiết dịch vụ
         </h2>
         <div className="grid md:grid-cols-2 gap-6">

@@ -1,4 +1,5 @@
 import { money } from "./revenue-format";
+import { Banknote } from "lucide-react";
 
 const toneClasses = {
   primary: "bg-primary/10 text-primary",
@@ -21,7 +22,7 @@ export function MetricCard({
   return (
     <article className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5 shadow-sm">
       <div className={"mb-4 grid h-10 w-10 place-items-center rounded-xl " + toneClasses[tone]}>
-        <span className="material-symbols-outlined">payments</span>
+        <Banknote aria-hidden="true" size={24} />
       </div>
       <p className="text-sm font-semibold text-on-surface-variant">{label}</p>
       <p className="mt-1 text-headline-md font-bold tabular-nums text-on-surface">{money.format(value)}</p>

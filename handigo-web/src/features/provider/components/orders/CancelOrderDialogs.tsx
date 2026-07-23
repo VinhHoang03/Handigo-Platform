@@ -1,4 +1,5 @@
 import { Modal } from '@/components/common/Modal';
+import { Trash, TriangleAlert } from "lucide-react";
 
 const cancellationReasons = [
   'Không thể sửa chữa hoặc thực hiện dịch vụ',
@@ -48,7 +49,7 @@ export function CancellationDialog({
       {error && <p className="mt-2 text-sm text-error">{error}</p>}
       <div className="mt-md flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
         <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
-        <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50"><span className="material-symbols-outlined">warning</span>Tiếp tục hủy đơn</button>
+        <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50"><TriangleAlert aria-hidden="true" size={24} />Tiếp tục hủy đơn</button>
       </div>
     </Modal>
   );
@@ -65,7 +66,7 @@ export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: Ca
   return (
     <Modal open title="Xác nhận hủy đơn?" onClose={onBack} size="md" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error">
-        <span className="material-symbols-outlined text-3xl">warning</span>
+        <TriangleAlert aria-hidden="true" size={30} />
       </div>
       <p className="mt-2 text-sm leading-6 text-on-surface-variant">Hành động này sẽ hủy đơn dịch vụ và thông báo cho khách hàng. Vui lòng kiểm tra lại trước khi xác nhận.</p>
       <div className="mt-4 rounded-2xl bg-error/5 p-4">
@@ -75,7 +76,7 @@ export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: Ca
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button type="button" onClick={onBack} disabled={busy} className="btn-secondary min-h-12">Kiểm tra lại</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
-          <span className="material-symbols-outlined">delete_forever</span>
+          <Trash aria-hidden="true" size={24} />
           {busy ? 'Đang hủy đơn...' : 'Hủy đơn ngay'}
         </button>
       </div>

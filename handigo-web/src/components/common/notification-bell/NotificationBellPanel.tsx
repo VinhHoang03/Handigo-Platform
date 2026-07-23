@@ -3,6 +3,7 @@ import type {
   NotificationQuery,
 } from "@/features/notification/types/notification.types";
 import { NotificationItem } from "./NotificationItem";
+import { ChevronDown } from "lucide-react";
 
 interface NotificationBellPanelProps {
   unreadCount: number;
@@ -105,9 +106,7 @@ export function NotificationBellPanel({
             disabled={loadingMore}
             className="inline-flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:text-on-surface-variant"
           >
-            <span className="material-symbols-outlined text-[18px]">
-              expand_more
-            </span>
+            <ChevronDown aria-hidden="true" size={18} />
             {loadingMore ? "Đang tải..." : "Xem thông báo trước đó"}
           </button>
         ) : (

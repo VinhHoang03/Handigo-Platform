@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check } from "lucide-react";
 
 export const BookingStepper: React.FC<{ currentStep: 1 | 2 | 3 }> = ({ currentStep }) => {
   const steps = [
@@ -41,7 +42,7 @@ export const BookingStepper: React.FC<{ currentStep: 1 | 2 | 3 }> = ({ currentSt
                   }`}
                 >
                   {isDone ? (
-                    <span className="material-symbols-outlined text-[16px] leading-none">check</span>
+                    <Check aria-hidden="true" size={16} className="leading-none" />
                   ) : (
                     step.id
                   )}

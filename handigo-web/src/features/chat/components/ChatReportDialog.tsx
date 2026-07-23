@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { X } from "lucide-react";
 
 interface ChatReportDialogProps {
   onClose: () => void;
@@ -38,7 +39,7 @@ export function ChatReportDialog({ onClose, onSubmit }: ChatReportDialogProps) {
             <p className="mt-1 text-sm text-on-surface-variant">Mô tả rõ nội dung cần được kiểm tra.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Đóng báo cáo" className="rounded-full p-1 hover:bg-surface-container-low">
-            <span className="material-symbols-outlined block">close</span>
+            <X aria-hidden="true" size={24} className="block" />
           </button>
         </div>
         <textarea

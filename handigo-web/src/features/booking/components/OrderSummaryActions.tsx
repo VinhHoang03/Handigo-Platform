@@ -1,3 +1,4 @@
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 interface OrderSummaryActionsProps {
   step: 1 | 2 | 3;
   orderType: string;
@@ -25,7 +26,7 @@ export const OrderSummaryActions: React.FC<OrderSummaryActionsProps> = ({
           onClick={onBack}
           className="w-full py-3 border border-primary text-primary rounded-2xl font-bold hover:bg-primary/5 transition-[background-color,transform] active:scale-95 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
         >
-          <span className="material-symbols-outlined text-sm">arrow_back</span>
+          <ArrowLeft aria-hidden="true" size={14} />
           Quay lại
         </button>
       )}
@@ -35,7 +36,7 @@ export const OrderSummaryActions: React.FC<OrderSummaryActionsProps> = ({
         className="w-full bg-primary text-on-primary py-md rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:-translate-y-1 active:translate-y-0 transition-[transform,box-shadow] flex items-center justify-center gap-sm disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
       >
         {isLoading ? (
-          <span className="animate-spin material-symbols-outlined">progress_activity</span>
+          <Loader2 aria-hidden="true" size={24} className="animate-spin" />
         ) : (
           <>
             {step === 3 ? (
@@ -44,7 +45,7 @@ export const OrderSummaryActions: React.FC<OrderSummaryActionsProps> = ({
               </span>
             ) : null}
             {actionLabel}
-            <span className="material-symbols-outlined">arrow_forward</span>
+            <ArrowRight aria-hidden="true" size={24} />
           </>
         )}
       </button>

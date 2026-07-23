@@ -7,6 +7,7 @@ import { ServiceFilterBar } from '../components/services/ServiceFilterBar';
 import { ServiceFormModal } from '../components/services/ServiceFormModal';
 import { ServiceListPanel } from '../components/services/ServiceListPanel';
 import { useAdminServicesController } from '../components/services/use-admin-services-controller';
+import { Plus } from "lucide-react";
 
 export default function AdminServicesPage() {
   const c = useAdminServicesController();
@@ -28,7 +29,7 @@ export default function AdminServicesPage() {
             onClick={c.openCreateService}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-bold text-on-primary shadow-sm transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:translate-y-0"
           >
-            <span className="material-symbols-outlined" aria-hidden="true">add</span>
+            <Plus aria-hidden="true" size={24} />
             Thêm dịch vụ mới
           </button>
         </header>

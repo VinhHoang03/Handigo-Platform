@@ -1,5 +1,6 @@
 import { CategoryIcon } from '@/components/common/CategoryIcon';
 import type { Category } from '../../../types/booking';
+import { ArrowRight } from "lucide-react";
 
 interface CategoryQuickSelectProps {
   categories: Category[];
@@ -34,9 +35,7 @@ export const CategoryQuickSelect = ({ categories, categoryId, onSelect, onOpenMo
       disabled={categories.length === 0}
       className="group flex min-h-[104px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/60 bg-surface-container-low px-2 py-3 text-center text-on-surface-variant transition-all hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:text-primary disabled:cursor-default disabled:opacity-50 disabled:disabled:hover:border-outline-variant/60 disabled:hover:bg-surface-container-low disabled:hover:text-on-surface-variant"
     >
-      <span className="material-symbols-outlined mb-2 text-3xl transition-transform group-hover:translate-x-0.5">
-        arrow_forward
-      </span>
+      <ArrowRight aria-hidden="true" size={30} className="mb-2 transition-transform group-hover:translate-x-0.5" />
       <span className="text-label-sm font-bold">Thêm</span>
     </button>
   </div>

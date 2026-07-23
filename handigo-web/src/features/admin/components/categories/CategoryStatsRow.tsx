@@ -1,4 +1,5 @@
 import { categoryMoney } from './category.helpers';
+import { TrendingUp } from "lucide-react";
 
 interface StatCardProps {
   icon: string;
@@ -16,7 +17,7 @@ function StatCard({ icon, label, value, trend, trendUp }: StatCardProps) {
         <p className="mt-2 font-headline-md text-headline-md font-bold">{value}</p>
         {trend && (
           <div className={`mt-4 flex items-center gap-2 text-label-sm ${trendUp ? 'text-success' : 'text-on-surface-variant'}`}>
-            {trendUp && <span className="material-symbols-outlined text-[18px]">trending_up</span>}
+            {trendUp && <TrendingUp aria-hidden="true" size={18} />}
             <span>{trend}</span>
           </div>
         )}

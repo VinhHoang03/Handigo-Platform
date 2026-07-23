@@ -1,6 +1,7 @@
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import type { ProviderInfo } from "./bookingDetailProvider";
+import { Star } from "lucide-react";
 
 type ProviderDetailProps = {
   icon: string;
@@ -56,12 +57,7 @@ export const BookingProviderCard = ({
               {providerInfo.name}
             </h4>
             <div className="mt-1 flex flex-wrap items-center gap-x-1 text-tertiary">
-              <span
-                className="material-symbols-outlined text-[16px]"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                star
-              </span>
+              <Star aria-hidden="true" size={16} fill="currentColor" />
               <span className="font-bold text-label-md">
                 {providerInfo.rating.toFixed(1)}
               </span>

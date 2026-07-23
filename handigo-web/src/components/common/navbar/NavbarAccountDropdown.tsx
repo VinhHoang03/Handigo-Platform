@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { User } from "@/features/auth/types/auth.types";
 import { getProfilePath, getRoleLabel, getWalletPath, type AppRole } from "./navbar.types";
+import { LifeBuoy, LogOut, ReceiptText, Wallet } from "lucide-react";
 
 interface NavbarAccountDropdownProps {
   user: User;
@@ -47,9 +48,7 @@ export function NavbarAccountDropdown({
               onClick={onNavigate}
               className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
             >
-              <span className="material-symbols-outlined text-xl">
-                receipt_long
-              </span>
+              <ReceiptText aria-hidden="true" size={20} />
               Đơn dịch vụ của tôi
             </Link>
             <Link
@@ -57,9 +56,7 @@ export function NavbarAccountDropdown({
               onClick={onNavigate}
               className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
             >
-              <span className="material-symbols-outlined text-xl">
-                support_agent
-              </span>
+              <LifeBuoy aria-hidden="true" size={20} />
               Khiếu nại, hỗ trợ & báo cáo
             </Link>
           </>
@@ -70,9 +67,7 @@ export function NavbarAccountDropdown({
             onClick={onNavigate}
             className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
           >
-            <span className="material-symbols-outlined text-xl">
-              account_balance_wallet
-            </span>
+            <Wallet aria-hidden="true" size={20} />
             Ví
           </Link>
         )}
@@ -81,7 +76,7 @@ export function NavbarAccountDropdown({
           onClick={onLogout}
           className="mt-1 flex w-full items-center gap-3 px-4 py-2 text-sm text-error hover:bg-error/10"
         >
-          <span className="material-symbols-outlined text-xl">logout</span>
+          <LogOut aria-hidden="true" size={20} />
           Đăng xuất
         </button>
       </div>

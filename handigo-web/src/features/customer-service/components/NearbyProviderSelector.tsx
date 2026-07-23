@@ -2,6 +2,7 @@ import type { NearbyProvider } from "../api/customerService.api";
 import { NearbyProviderAutoAssignOption } from "./NearbyProviderAutoAssignOption";
 import { NearbyProviderCard } from "./NearbyProviderCard";
 import { useNearbyProviders, type ProviderAvailabilityStatus } from "./useNearbyProviders";
+import { Loader2 } from "lucide-react";
 
 // Re-export để giữ nguyên đường dẫn import cũ (`.../NearbyProviderSelector`).
 export type { ProviderAvailabilityStatus };
@@ -85,9 +86,7 @@ export function NearbyProviderSelector({
         </p>
       ) : isLoading ? (
         <div className="flex items-center gap-2 rounded-lg bg-surface-container-low p-3 text-sm font-semibold text-on-surface-variant">
-          <span className="material-symbols-outlined animate-spin text-primary">
-            progress_activity
-          </span>
+          <Loader2 aria-hidden="true" size={24} className="animate-spin text-primary" />
           Đang tìm thợ gần bạn...
         </div>
       ) : error ? (

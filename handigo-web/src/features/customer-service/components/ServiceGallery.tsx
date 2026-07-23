@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import type { Service } from "@/types/booking";
 import { getServiceImage } from "../utils/serviceDisplay";
+import { Share2 } from "lucide-react";
 
 interface ServiceGalleryProps {
   service: Service;
@@ -76,9 +77,7 @@ export function ServiceGallery({ service, categoryName }: ServiceGalleryProps) {
             aria-label={`Chia sẻ dịch vụ ${service.name}`}
             className="grid h-11 w-11 place-items-center rounded-full border border-outline-variant hover:bg-surface-container-low"
           >
-            <span aria-hidden="true" className="material-symbols-outlined">
-              share
-            </span>
+            <Share2 aria-hidden="true" size={24} />
           </button>
         </div>
       </div>

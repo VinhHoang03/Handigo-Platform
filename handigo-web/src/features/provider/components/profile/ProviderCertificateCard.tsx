@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import type { ProviderCertificate } from "../../types/provider.types";
 import { isImageUrl } from "../../utils/providerProfilePage";
+import { FileText, ImageOff, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 export function CertificateCard({
   certificate,
@@ -43,9 +44,7 @@ export function CertificateCard({
             onToggleMenu();
           }}
         >
-          <span className="material-symbols-outlined text-[18px]">
-            more_horiz
-          </span>
+          <MoreHorizontal aria-hidden="true" size={18} />
         </button>
 
         {isMenuOpen && (
@@ -71,9 +70,7 @@ export function CertificateCard({
                 onEditCertificate(certificate);
               }}
             >
-              <span className="material-symbols-outlined text-[18px]">
-                edit
-              </span>
+              <Pencil aria-hidden="true" size={18} />
               Sửa
             </button>
             <button
@@ -84,9 +81,7 @@ export function CertificateCard({
                 onDeleteCertificate(certificate.id);
               }}
             >
-              <span className="material-symbols-outlined text-[18px]">
-                delete
-              </span>
+              <Trash2 aria-hidden="true" size={18} />
               Xóa
             </button>
           </div>
@@ -113,16 +108,12 @@ export function CertificateCard({
               </div>
             ) : (
               <div className="flex h-48 w-full items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-primary">
-                <span className="material-symbols-outlined text-5xl">
-                  description
-                </span>
+                <FileText aria-hidden="true" size={48} />
               </div>
             )
           ) : (
             <div className="flex h-48 w-full items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant">
-              <span className="material-symbols-outlined text-5xl">
-                image_not_supported
-              </span>
+              <ImageOff aria-hidden="true" size={48} />
             </div>
           )}
         </div>

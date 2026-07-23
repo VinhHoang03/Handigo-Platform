@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Banknote, Zap } from "lucide-react";
 
 interface ProviderHomeHeaderProps {
   firstName: string;
@@ -24,14 +25,14 @@ export function ProviderHomeHeader({
           to="/provider/orders"
           className="flex items-center gap-base rounded-xl bg-primary px-md py-sm font-label-md text-on-primary shadow-md transition-all hover:scale-105"
         >
-          <span className="material-symbols-outlined">bolt</span>
+          <Zap aria-hidden="true" size={24} />
           Xem đơn mới
         </Link>
         <Link
           to="/provider/wallet"
           className="flex items-center gap-base rounded-xl bg-surface-container-high px-md py-sm font-label-md text-primary transition-all hover:bg-primary-fixed"
         >
-          <span className="material-symbols-outlined">payments</span>
+          <Banknote aria-hidden="true" size={24} />
           Rút tiền
         </Link>
       </div>

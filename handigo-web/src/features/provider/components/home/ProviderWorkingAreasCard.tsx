@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/common/Skeleton";
+import { Navigation2 } from "lucide-react";
 
 interface ProviderWorkingAreasCardProps {
   workingAreas: string[];
@@ -50,7 +51,7 @@ export function ProviderWorkingAreasCard({
             aria-label="Cập nhật khu vực hoạt động"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-transform hover:scale-110"
           >
-            <span className="material-symbols-outlined">near_me</span>
+            <Navigation2 aria-hidden="true" size={24} />
           </Link>
         </div>
       </div>

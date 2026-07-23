@@ -1,4 +1,5 @@
 import { TableToolbar } from '@/components/common/dashboard/TableToolbar';
+import { RefreshCw } from "lucide-react";
 
 interface CategoryFilterBarProps {
   search: string;
@@ -31,7 +32,7 @@ export function CategoryFilterBar({ search, onSearchChange, statusFilter, onStat
           className="flex h-11 w-11 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container-high"
           aria-label="Tải lại"
         >
-          <span className="material-symbols-outlined">refresh</span>
+          <RefreshCw aria-hidden="true" size={24} />
         </button>
       }
     />

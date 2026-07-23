@@ -6,6 +6,7 @@ import { BankAccountStatCard } from '../components/BankAccountStatCard';
 import { BankAccountTable } from '../components/BankAccountTable';
 import { maskAccountNumber } from '../components/bankAccountConstants';
 import { useBankAccountManager } from '../components/useBankAccountManager';
+import { CreditCard, RefreshCw } from "lucide-react";
 
 export default function ProviderBankAccountsPage({ role = 'PROVIDER' }: { role?: 'CUSTOMER' | 'PROVIDER' }) {
   const {
@@ -45,7 +46,7 @@ export default function ProviderBankAccountsPage({ role = 'PROVIDER' }: { role?:
               onClick={() => void load()}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low"
             >
-              <span className="material-symbols-outlined text-[20px]">refresh</span>
+              <RefreshCw aria-hidden="true" size={20} />
               Tải lại
             </button>
             <button
@@ -53,7 +54,7 @@ export default function ProviderBankAccountsPage({ role = 'PROVIDER' }: { role?:
               onClick={openCreate}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm"
             >
-              <span className="material-symbols-outlined text-[20px]">add_card</span>
+              <CreditCard aria-hidden="true" size={20} />
               Thêm tài khoản
             </button>
           </div>

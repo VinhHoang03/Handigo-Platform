@@ -9,6 +9,7 @@ import {
 } from "../hooks/useSupportTickets";
 import { SupportTicketCard, TicketListSkeleton } from "./SupportTicketCard";
 import { SupportTicketFilters } from "./SupportTicketFilters";
+import { Plus } from "lucide-react";
 
 export type { SupportRole };
 
@@ -53,7 +54,7 @@ export function SupportTicketSection({ role }: { role: SupportRole }) {
               onClick={() => setCreateOpen(true)}
               className="btn-primary"
             >
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px] leading-none">add</span>
+              <Plus aria-hidden="true" size={18} className="leading-none" />
               Tạo yêu cầu hỗ trợ
             </button>
           </div>

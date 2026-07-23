@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ReliableImage } from "@/components/common/ReliableImage";
 import type { Order } from "@/types/booking";
 import type { PaymentStatusDisplay } from "./bookingDetailFormatters";
+import { Banknote, Clock, Grid2X2, MapPin } from "lucide-react";
 
 type BookingServiceSummaryProps = {
   order: Order;
@@ -36,17 +37,13 @@ export const BookingServiceSummary = ({
           </h2>
           <div className="flex flex-wrap gap-xs mt-1">
             <span className="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">
-                category
-              </span>
+              <Grid2X2 aria-hidden="true" size={14} />
               {order.serviceId?.serviceType === "fixed_price"
                 ? "Giá cố định"
                 : "Báo giá sau"}
             </span>
             <span className="bg-surface-container text-on-surface-variant px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">
-                schedule
-              </span>
+              <Clock aria-hidden="true" size={14} />
               {order.scheduledAt
                 ? new Date(order.scheduledAt).toLocaleString("vi-VN")
                 : "Sớm nhất"}
@@ -78,9 +75,7 @@ export const BookingServiceSummary = ({
     <div className="grid md:grid-cols-2 gap-lg pt-lg border-t border-outline-variant/30">
       <div className="space-y-sm">
         <div className="flex items-start gap-sm">
-          <span className="material-symbols-outlined text-primary bg-primary/10 p-2 rounded-lg">
-            location_on
-          </span>
+          <MapPin aria-hidden="true" size={24} className="text-primary bg-primary/10 p-2 rounded-lg" />
           <div>
             <h4 className="text-label-sm font-label-sm text-on-surface-variant uppercase">
               Địa điểm thực hiện
@@ -93,9 +88,7 @@ export const BookingServiceSummary = ({
       </div>
       <div className="space-y-sm">
         <div className="flex items-start gap-sm">
-          <span className="material-symbols-outlined text-primary bg-primary/10 p-2 rounded-lg">
-            payments
-          </span>
+          <Banknote aria-hidden="true" size={24} className="text-primary bg-primary/10 p-2 rounded-lg" />
           <div>
             <h4 className="text-label-sm font-label-sm text-on-surface-variant uppercase">
               Thanh toán

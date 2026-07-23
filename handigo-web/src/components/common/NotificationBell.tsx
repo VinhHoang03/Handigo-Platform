@@ -5,6 +5,7 @@ import { NotificationBellPanel } from "./notification-bell/NotificationBellPanel
 import { ReassignmentPromptModal } from "./notification-bell/ReassignmentPromptModal";
 import { useNotificationFeed } from "./notification-bell/useNotificationFeed";
 import { useReassignmentPrompt } from "./notification-bell/useReassignmentPrompt";
+import { Bell } from "lucide-react";
 
 export function NotificationBell({ role }: { role?: AppRole }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -49,9 +50,7 @@ export function NotificationBell({ role }: { role?: AppRole }) {
         onClick={feed.toggleOpen}
         className="relative grid h-10 w-10 place-items-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary"
       >
-        <span className="material-symbols-outlined text-[22px]">
-          notifications
-        </span>
+        <Bell aria-hidden="true" size={22} />
         {feed.unreadCount > 0 && (
           <span className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-error px-1.5 text-center text-[11px] font-bold leading-5 text-on-error">
             {feed.unreadCount > 99 ? "99+" : feed.unreadCount}

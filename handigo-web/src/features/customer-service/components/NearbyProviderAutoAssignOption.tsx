@@ -1,3 +1,4 @@
+import { CheckCircle2 } from "lucide-react";
 interface NearbyProviderAutoAssignOptionProps {
   isSelected: boolean;
   onSelect: () => void;
@@ -30,7 +31,7 @@ export function NearbyProviderAutoAssignOption({
         </span>
       </span>
       {isSelected && (
-        <span className="material-symbols-outlined text-primary">check_circle</span>
+        <CheckCircle2 aria-hidden="true" size={24} className="text-primary" />
       )}
     </button>
   );

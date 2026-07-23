@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 /** Nút "xem thêm" phân trang kiểu vô hạn cho danh sách thông báo của khách hàng/nhà cung cấp. */
 export function NotificationLoadMore({
   page,
@@ -21,9 +22,7 @@ export function NotificationLoadMore({
           disabled={loadingMore}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <span className="material-symbols-outlined text-[20px]">
-            expand_more
-          </span>
+          <ChevronDown aria-hidden="true" size={20} />
           {loadingMore ? "Đang tải..." : "Xem thông báo trước đó"}
         </button>
       ) : hasItems ? (

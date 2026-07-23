@@ -7,6 +7,7 @@ import { CategoryFormModal } from '../components/category-services/CategoryFormM
 import { CategoryListPanel } from '../components/category-services/CategoryListPanel';
 import { ServiceFormModal } from '../components/category-services/ServiceFormModal';
 import { useAdminCategoryServicesController } from '../components/category-services/use-admin-category-services-controller';
+import { Plus } from "lucide-react";
 
 export default function AdminCategoryServicesPage() {
   const c = useAdminCategoryServicesController();
@@ -28,7 +29,7 @@ export default function AdminCategoryServicesPage() {
               onClick={c.openCreateCategory}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm"
             >
-              <span className="material-symbols-outlined text-[20px]">add</span>
+              <Plus aria-hidden="true" size={20} />
               Thêm danh mục
             </button>
           }

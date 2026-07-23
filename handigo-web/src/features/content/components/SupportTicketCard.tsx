@@ -8,6 +8,7 @@ import {
   TICKET_STATUS_LABELS,
   ticketDate,
 } from "../data/supportData";
+import { Headset } from "lucide-react";
 
 /** Skeleton bám theo đúng hình dạng thẻ yêu cầu hỗ trợ thật. */
 export const TicketListSkeleton = () => (
@@ -76,7 +77,7 @@ export function SupportTicketCard({
           )}
 
           <p className="mt-3 flex items-center gap-2 text-xs text-on-surface-variant">
-            <span aria-hidden="true" className="material-symbols-outlined text-[14px] leading-none">headset_mic</span>
+            <Headset aria-hidden="true" size={14} className="leading-none" />
             <span className="tabular-nums">
               {ticket.responses.length} phản hồi
             </span>

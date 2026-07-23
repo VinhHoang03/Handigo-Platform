@@ -1,6 +1,7 @@
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import type { PublicProviderProfile } from "../api/customerService.api";
 import { Metric } from "./ProviderProfilePrimitives";
+import { BadgeCheck } from "lucide-react";
 
 interface ProviderProfileHeaderProps {
   profile: PublicProviderProfile;
@@ -24,9 +25,7 @@ export function ProviderProfileHeader({ profile }: ProviderProfileHeaderProps) {
             </h1>
             {profile.provider.verified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
-                <span className="material-symbols-outlined text-[14px]">
-                  verified
-                </span>
+                <BadgeCheck aria-hidden="true" size={14} />
                 Đã xác minh
               </span>
             )}

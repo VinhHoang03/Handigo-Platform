@@ -6,6 +6,7 @@ import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalo
 import type { Service, ServiceOption } from '../../../types/booking';
 import { OrderSummaryPriceDetails } from './OrderSummaryPriceDetails';
 import { OrderSummaryActions } from './OrderSummaryActions';
+import { Calendar, User } from "lucide-react";
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
@@ -120,7 +121,7 @@ export const OrderSummaryCard: React.FC<{
           {step >= 2 && orderType !== 'normal' && (
             <div className="space-y-sm border-t border-dashed border-outline-variant pt-md text-sm">
               <div className="flex items-start gap-sm">
-                <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-primary">calendar_today</span>
+                <Calendar aria-hidden="true" size={19} className="text-primary" />
                 <div>
                   <p className="text-xs text-on-surface-variant">Lịch thực hiện</p>
                   <p className="font-bold text-on-surface">
@@ -131,7 +132,7 @@ export const OrderSummaryCard: React.FC<{
                 </div>
               </div>
               <div className="flex items-start gap-sm">
-                <span aria-hidden="true" className="material-symbols-outlined text-[19px] text-primary">person</span>
+                <User aria-hidden="true" size={19} className="text-primary" />
                 <div>
                   <p className="text-xs text-on-surface-variant">Chuyên gia</p>
                   <p className="font-bold text-on-surface">

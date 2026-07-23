@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import type { NearbyProvider } from "../api/customerService.api";
+import { Star, UserSearch } from "lucide-react";
 
 const formatDistance = (distanceMeters: number) => {
   if (distanceMeters < 0) return "Chưa xác định khoảng cách";
@@ -47,12 +48,7 @@ export function NearbyProviderCard({
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
             <span className="inline-flex items-center gap-1">
-              <span
-                className="material-symbols-outlined text-[16px] text-star-gold"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                star
-              </span>
+              <Star aria-hidden="true" size={16} className="text-star-gold" fill="currentColor" />
               <b className="text-on-surface">
                 {provider.averageRating.toFixed(1)}
               </b>
@@ -69,7 +65,7 @@ export function NearbyProviderCard({
           className="grid h-10 w-10 place-items-center rounded-full bg-primary-container/10 text-primary hover:bg-primary-container/20"
           aria-label={`Xem hồ sơ thợ ${provider.user.fullName}`}
         >
-          <span className="material-symbols-outlined">person_search</span>
+          <UserSearch aria-hidden="true" size={24} />
         </Link>
       </div>
 

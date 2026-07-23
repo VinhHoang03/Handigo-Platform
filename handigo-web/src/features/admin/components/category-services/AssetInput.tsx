@@ -3,6 +3,7 @@ import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { getErrorMessage } from '@/utils/apiError';
 import { categoryServiceApi } from '../../api/categoryService.api';
 import { isImageUrl } from './category-service.helpers';
+import { Image, Upload } from "lucide-react";
 
 interface AssetInputProps {
   label: string;
@@ -38,7 +39,7 @@ export function AssetInput({ label, value, name, onChange, placeholder, mode }: 
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className="text-sm font-semibold">{label}</span>
         <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
-          <span className="material-symbols-outlined text-[18px]">upload</span>
+          <Upload aria-hidden="true" size={18} />
           {uploading ? 'Đang tải...' : 'Chọn ảnh'}
           <input type="file" accept="image/*" className="sr-only" onChange={(event) => void upload(event.target.files?.[0])} />
         </label>
@@ -50,7 +51,7 @@ export function AssetInput({ label, value, name, onChange, placeholder, mode }: 
           ) : value && isImageUrl(value) ? (
             <img src={value} alt="Service" className="h-full w-full object-cover" />
           ) : (
-            <span className="material-symbols-outlined text-3xl">image</span>
+            <Image aria-hidden="true" size={30} />
           )}
         </div>
         <div className="min-w-0 flex-1">

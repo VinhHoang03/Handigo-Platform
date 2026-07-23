@@ -3,6 +3,7 @@ import {
   notificationTypeIcons,
   notificationTypeLabels,
 } from "./notification-type-meta";
+import { Check } from "lucide-react";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",
@@ -96,9 +97,7 @@ function NotificationListItem({
               disabled={busy || item.isRead}
               className="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-[18px]">
-                done
-              </span>
+              <Check aria-hidden="true" size={18} />
               Đã đọc
             </button>
           )}

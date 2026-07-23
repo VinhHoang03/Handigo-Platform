@@ -12,6 +12,7 @@ import { CategoryStatsRow } from '../components/categories/CategoryStatsRow';
 import { buildCategoryTableColumns } from '../components/categories/category-table-columns';
 import { countActiveCategories } from '../components/categories/category.helpers';
 import { useAdminCategoriesController } from '../components/categories/use-admin-categories-controller';
+import { Plus } from "lucide-react";
 
 export default function AdminCategoriesPage() {
   const c = useAdminCategoriesController();
@@ -37,7 +38,7 @@ export default function AdminCategoriesPage() {
             onClick={c.openCreate}
             className="inline-flex items-center gap-2 rounded-xl bg-primary-container px-6 py-3 font-bold text-on-primary-container shadow-md transition-all hover:opacity-90 active:scale-95"
           >
-            <span className="material-symbols-outlined">add</span>
+            <Plus aria-hidden="true" size={24} />
             Thêm danh mục
           </button>
         </header>

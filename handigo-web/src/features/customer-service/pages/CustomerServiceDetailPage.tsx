@@ -24,6 +24,7 @@ import {
   groupServiceOptions,
   toggleServiceOption,
 } from "@/features/booking/utils/serviceOptionSelection";
+import { ChevronRight } from "lucide-react";
 
 export default function CustomerServiceDetailPage() {
   const { serviceId } = useParams();
@@ -113,11 +114,11 @@ export default function CustomerServiceDetailPage() {
               <Link to="/customer" className="inline-flex min-h-11 items-center hover:text-primary">
                 Trang chủ
               </Link>
-              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+              <ChevronRight aria-hidden="true" size={16} />
               <Link to="/customer/services" className="inline-flex min-h-11 items-center hover:text-primary">
                 Dịch vụ
               </Link>
-              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+              <ChevronRight aria-hidden="true" size={16} />
               <span className="font-semibold text-on-surface">{service.name}</span>
             </nav>
 

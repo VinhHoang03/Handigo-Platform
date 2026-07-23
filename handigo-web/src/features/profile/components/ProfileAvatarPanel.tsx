@@ -1,4 +1,5 @@
 import { AvatarEditor } from "@/features/profile/components/AvatarEditor";
+import { BadgeCheck } from "lucide-react";
 
 interface ProfileAvatarPanelProps {
   avatarSrc?: string;
@@ -27,7 +28,7 @@ export function ProfileAvatarPanel({
         <p className="truncate font-bold text-on-surface">{fullName}</p>
         {isEmailVerified && (
           <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-secondary-container/30 px-2 py-1 text-xs font-bold text-on-secondary-container">
-            <span className="material-symbols-outlined text-sm">verified</span>
+            <BadgeCheck aria-hidden="true" size={14} />
             Email đã xác minh
           </span>
         )}

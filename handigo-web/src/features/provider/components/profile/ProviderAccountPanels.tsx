@@ -1,5 +1,6 @@
 import React from "react";
 import type { BankAccount } from "../../types/provider.types";
+import { ChevronRight } from "lucide-react";
 
 export const BankAccountPanel: React.FC<{ account: BankAccount }> = ({
   account,
@@ -74,9 +75,7 @@ export const AccountFunctionsPanel: React.FC<{
                 </span>
               </span>
             </span>
-            <span aria-hidden="true" className="material-symbols-outlined text-outline-variant">
-              chevron_right
-            </span>
+            <ChevronRight aria-hidden="true" size={24} className="text-outline-variant" />
           </button>
         ))}
       </div>

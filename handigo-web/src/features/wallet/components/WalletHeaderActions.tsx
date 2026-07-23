@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Banknote, CreditCard, Landmark } from "lucide-react";
 
 interface WalletHeaderActionsProps {
   isProvider: boolean;
@@ -14,14 +15,14 @@ export function WalletHeaderActions({ isProvider, onOpenDeposit, onOpenWithdraw 
         onClick={onOpenDeposit}
         className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low"
       >
-        <span className="material-symbols-outlined text-[20px]">add_card</span>
+        <CreditCard aria-hidden="true" size={20} />
         Nạp ví
       </button>
       <Link
         to={isProvider ? '/provider/bank-accounts' : '/customer/bank-accounts'}
         className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low"
       >
-        <span className="material-symbols-outlined text-[20px]">account_balance</span>
+        <Landmark aria-hidden="true" size={20} />
         Tài khoản ngân hàng
       </Link>
       <button
@@ -29,7 +30,7 @@ export function WalletHeaderActions({ isProvider, onOpenDeposit, onOpenWithdraw 
         onClick={onOpenWithdraw}
         className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm"
       >
-        <span className="material-symbols-outlined text-[20px]">payments</span>
+        <Banknote aria-hidden="true" size={20} />
         Rút tiền
       </button>
     </div>

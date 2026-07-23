@@ -1,6 +1,7 @@
 import { AsyncState } from "@/components/common/AsyncState";
 import { useOrderFeedback } from "../hooks/useFeedback";
 import { FeedbackForm } from "./FeedbackForm";
+import { Star } from "lucide-react";
 
 export function OrderFeedbackSection({ orderId }: { orderId: string }) {
   const { context, feedback, loading, saving, error, load, save } =
@@ -9,9 +10,7 @@ export function OrderFeedbackSection({ orderId }: { orderId: string }) {
   return (
     <section className="overflow-hidden rounded-3xl border border-outline-variant bg-surface-container-lowest p-md shadow-sm sm:p-lg">
       <div className="mb-lg flex items-start gap-3">
-        <span className="material-symbols-outlined flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-tertiary/10 text-tertiary">
-          reviews
-        </span>
+        <Star aria-hidden="true" size={24} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-tertiary/10 text-tertiary" />
         <div>
           <h2 className="font-headline-sm text-headline-sm text-on-surface">
             {feedback ? "Đánh giá của bạn" : "Đánh giá dịch vụ"}

@@ -6,6 +6,7 @@ import { feedbackApi } from '@/features/feedback/api/feedback.api';
 import type { Feedback, PersonRef } from '@/features/feedback/types/feedback.types';
 import { FeedbackImageGallery } from './orders/FeedbackImageGallery';
 import { FeedbackReplyForm } from './orders/FeedbackReplyForm';
+import { CircleAlert, Hammer, Star, X } from "lucide-react";
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -111,12 +112,12 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
         </div>
       ) : loadError ? (
         <div className="flex items-center gap-3 rounded-2xl bg-error/10 p-4 text-sm text-error">
-          <span className="material-symbols-outlined">error</span>
+          <CircleAlert aria-hidden="true" size={24} />
           {loadError}
         </div>
       ) : !feedback ? (
         <div className="rounded-2xl border-2 border-dashed border-outline-variant/40 bg-surface-container-low/40 px-5 py-10 text-center">
-          <span className="material-symbols-outlined text-4xl text-outline">reviews</span>
+          <Star aria-hidden="true" size={36} className="text-outline" />
           <p className="mt-2 font-bold text-on-surface">Chưa có đánh giá</p>
           <p className="mt-1 text-sm text-on-surface-variant">Đánh giá của khách hàng sẽ xuất hiện tại đây sau khi được gửi.</p>
         </div>
@@ -153,7 +154,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
               <article className="rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-primary">
-                    <span className="material-symbols-outlined">handyman</span>
+                    <Hammer aria-hidden="true" size={24} />
                     <p className="font-bold">Phản hồi của bạn</p>
                   </div>
                   <time className="text-xs text-on-surface-variant">{formatDate(feedback.providerReply.repliedAt)}</time>
@@ -182,7 +183,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-label="Xem ảnh đánh giá" onClick={() => setPreviewImage('')}>
           <button type="button" onClick={() => setPreviewImage('')} className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-lowest/90 text-on-surface" aria-label="Đóng ảnh">
-            <span className="material-symbols-outlined">close</span>
+            <X aria-hidden="true" size={24} />
           </button>
           <ReliableImage src={previewImage} alt="Ảnh đánh giá phóng lớn" className="max-h-[90vh] max-w-[92vw] rounded-2xl object-contain shadow-2xl" onClick={(event) => event.stopPropagation()} />
         </div>

@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { Skeleton, SkeletonText } from "@/components/common/Skeleton";
 import { PublicContentLayout } from "../components/PublicContentLayout";
 import { useNewsArticle } from "../hooks/useNewsArticle";
+import { ArrowLeft } from "lucide-react";
 
 /** Skeleton bám theo bố cục bài viết thật: nhãn, tiêu đề, ảnh bìa, thân bài. */
 const ArticleSkeleton = () => (
@@ -54,9 +55,7 @@ export default function NewsDetailPage() {
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
         >
           <span className="grid h-8 w-8 place-items-center rounded-full border border-primary/20">
-            <span aria-hidden="true" className="material-symbols-outlined block text-[18px] leading-none">
-              arrow_back
-            </span>
+            <ArrowLeft aria-hidden="true" size={18} className="block leading-none" />
           </span>
           Quay lại Tin tức
         </Link>

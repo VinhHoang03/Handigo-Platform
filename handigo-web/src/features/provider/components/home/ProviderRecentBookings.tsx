@@ -10,6 +10,7 @@ import {
   getCustomer,
   shortAddress,
 } from "./providerHome.utils";
+import { Clock } from "lucide-react";
 
 function BookingItem({ order }: { order: Order }) {
   const customer = getCustomer(order);
@@ -35,9 +36,7 @@ function BookingItem({ order }: { order: Order }) {
             {shortAddress(order) ? ` - ${shortAddress(order)}` : ""}
           </p>
           <div className="mt-1 flex items-center gap-xs">
-            <span className="material-symbols-outlined text-[14px] text-on-surface-variant">
-              schedule
-            </span>
+            <Clock aria-hidden="true" size={14} className="text-on-surface-variant" />
             <span className="text-xs text-on-surface-variant">
               {formatDateTime(order.scheduledAt || order.createdAt)}
             </span>

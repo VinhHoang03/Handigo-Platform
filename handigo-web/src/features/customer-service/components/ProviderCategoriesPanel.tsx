@@ -1,5 +1,6 @@
 import { CategoryIcon } from "@/components/common/CategoryIcon";
 import type { PublicProviderProfile } from "../api/customerService.api";
+import { CheckCircle2, ChevronDown } from "lucide-react";
 
 interface ProviderCategoriesPanelProps {
   categories: PublicProviderProfile["provider"]["serviceCategories"];
@@ -32,9 +33,7 @@ export function ProviderCategoriesPanel({
               <span className="min-w-0 flex-1 font-bold text-on-surface">
                 {category.name}
               </span>
-              <span className="material-symbols-outlined text-on-surface-variant transition-transform group-hover:rotate-180 group-focus:rotate-180">
-                expand_more
-              </span>
+              <ChevronDown aria-hidden="true" size={24} className="text-on-surface-variant transition-transform group-hover:rotate-180 group-focus:rotate-180" />
             </div>
             <div className="grid grid-rows-[0fr] transition-all duration-200 group-hover:grid-rows-[1fr] group-focus:grid-rows-[1fr]">
               <div className="overflow-hidden">
@@ -44,9 +43,7 @@ export function ProviderCategoriesPanel({
                       key={service.id}
                       className="flex items-start gap-2 text-sm text-on-surface-variant"
                     >
-                      <span className="material-symbols-outlined mt-0.5 text-[16px] text-primary">
-                        check_circle
-                      </span>
+                      <CheckCircle2 aria-hidden="true" size={16} className="mt-0.5 text-primary" />
                       {service.name}
                     </li>
                   ))}

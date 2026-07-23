@@ -5,6 +5,7 @@ import type { ProviderCertificate } from "../../types/provider.types";
 import type { CertificateForm } from "../../utils/providerProfilePage";
 import { CertificateCard } from "./ProviderCertificateCard";
 import { CertificateDetailModal } from "./ProviderCertificateDetailModal";
+import { Plus } from "lucide-react";
 
 export function ProviderCertificatesSection({
   certificates,
@@ -96,7 +97,7 @@ export function ProviderCertificatesSection({
               className="grid h-11 w-11 place-items-center rounded-full bg-primary text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition hover:bg-primary-hover hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)]"
               onClick={onOpenCreate}
             >
-              <span className="material-symbols-outlined">add</span>
+              <Plus aria-hidden="true" size={24} />
             </button>
           )
         }

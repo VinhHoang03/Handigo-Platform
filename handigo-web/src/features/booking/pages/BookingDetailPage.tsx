@@ -21,6 +21,7 @@ import {
   getStatusLabel,
 } from "../components/detail/bookingDetailFormatters";
 import { formatOrderAddress } from "../components/detail/bookingDetailProvider";
+import { ChevronRight } from "lucide-react";
 
 const BookingDetailPage = () => {
   const {
@@ -80,9 +81,7 @@ const BookingDetailPage = () => {
             <Link to="/customer/bookings" className="hover:text-primary">
               Lịch sử
             </Link>
-            <span className="material-symbols-outlined text-sm">
-              chevron_right
-            </span>
+            <ChevronRight aria-hidden="true" size={14} />
             <span className="text-primary font-bold">#{order.orderCode}</span>
           </nav>
         </div>

@@ -14,6 +14,7 @@ import { CancellationDialog, CancelConfirmationDialog } from '../components/orde
 import { ProviderOrderDetailSkeleton } from '../components/orders/ProviderOrderDetailSkeleton';
 import { useProviderOrderDetail } from '../hooks/useProviderOrderDetail';
 import { getPaymentStatusLabel, orderTypeLabels } from '../utils/providerOrderDetailLabels';
+import { ArrowLeft, CircleAlert } from "lucide-react";
 
 export default function ProviderOrderDetailPage() {
   const navigate = useNavigate();
@@ -56,7 +57,7 @@ export default function ProviderOrderDetailPage() {
     return (
       <DashboardShell role="PROVIDER">
         <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
-          <span className="material-symbols-outlined mb-2 text-6xl text-error/60">error_outline</span>
+          <CircleAlert aria-hidden="true" size={60} className="mb-2 text-error/60" />
           <h2 className="font-headline-md">{error || 'Không tìm thấy đơn dịch vụ'}</h2>
           <Link to="/provider/orders" className="btn-primary mt-md">
             Quay lại danh sách
@@ -94,7 +95,7 @@ export default function ProviderOrderDetailPage() {
     <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <Link to="/provider/orders" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
-          <span className="material-symbols-outlined text-base">arrow_back</span>
+          <ArrowLeft aria-hidden="true" size={16} />
           Quay lại danh sách
         </Link>
 

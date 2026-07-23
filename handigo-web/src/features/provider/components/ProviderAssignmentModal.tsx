@@ -1,6 +1,7 @@
 import { Modal } from '@/components/common/Modal';
 import { formatDateTime, formatMoney, shortAddress } from '../utils/providerOrder.utils';
 import { useProviderAssignmentGate } from './useProviderAssignmentGate';
+import { BellRing, Shield } from "lucide-react";
 
 export function ProviderAssignmentModal() {
   const {
@@ -50,9 +51,7 @@ export function ProviderAssignmentModal() {
                 {customer?.phone ? ` · ${customer.phone}` : ''}
               </p>
             </div>
-            <span className="material-symbols-outlined rounded-full bg-primary p-2 text-on-primary">
-              notifications_active
-            </span>
+            <BellRing aria-hidden="true" size={24} className="rounded-full bg-primary p-2 text-on-primary" />
           </div>
         </div>
 
@@ -93,7 +92,7 @@ export function ProviderAssignmentModal() {
           {/* `shield` chứ không phải `shield_lock`: danh sách icon nạp từ Google
               trong index.html được cắt gọn theo tên, `shield_lock` không có
               trong đó nên sẽ render ra đúng chữ "shield_lock". */}
-          <span aria-hidden="true" className="material-symbols-outlined text-base text-primary">shield</span>
+          <Shield aria-hidden="true" size={16} className="text-primary" />
           <span>Thông tin liên hệ và địa chỉ chi tiết sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
         </div>
 

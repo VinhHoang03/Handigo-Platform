@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { Address } from "@/types/booking";
 import { CURRENT_LOCATION_VALUE, formatAddressLabel } from "./addressLocationUtils";
+import { ArrowRight, CheckCircle2, LocateFixed, MapPin } from "lucide-react";
 
 interface AddressPickerProps {
   addresses: Address[];
@@ -40,9 +41,7 @@ export function AddressPicker({
           onClick={() => onAddressChange(CURRENT_LOCATION_VALUE)}
           className="relative flex min-h-20 w-full items-start gap-3 rounded-xl border border-outline-variant/50 bg-surface-container-low p-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="material-symbols-outlined mt-0.5 shrink-0 text-xl leading-none text-primary">
-            my_location
-          </span>
+          <LocateFixed aria-hidden="true" size={20} className="mt-0.5 shrink-0 leading-none text-primary" />
           <span className="min-w-0 text-sm font-semibold leading-5 text-on-surface">
             {isLocating ? "Đang lấy vị trí hiện tại..." : "Vị trí hiện tại"}
           </span>
@@ -65,16 +64,12 @@ export function AddressPicker({
                   : "border-outline-variant/50 bg-surface-container-low hover:border-primary/50 hover:bg-primary/5"
               } ${address.isDefault ? "pb-8" : ""}`}
             >
-              <span className="material-symbols-outlined mt-0.5 shrink-0 text-xl leading-none text-primary">
-                location_on
-              </span>
+              <MapPin aria-hidden="true" size={20} className="mt-0.5 shrink-0 leading-none text-primary" />
               <span className="min-w-0 flex-1 text-sm font-semibold leading-5 text-on-surface">
                 {formatAddressLabel(address)}
               </span>
               {isSelected && (
-                <span className="material-symbols-outlined shrink-0 text-xl leading-none text-primary">
-                  check_circle
-                </span>
+                <CheckCircle2 aria-hidden="true" size={20} className="shrink-0 leading-none text-primary" />
               )}
               {address.isDefault && (
                 <span className="absolute bottom-2 right-3 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
@@ -100,7 +95,7 @@ export function AddressPicker({
               className="mt-2 inline-flex items-center gap-1 underline underline-offset-2"
             >
               Cập nhật số điện thoại
-              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              <ArrowRight aria-hidden="true" size={14} />
             </Link>
           )}
         </div>

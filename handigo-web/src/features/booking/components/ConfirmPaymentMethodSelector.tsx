@@ -1,5 +1,6 @@
 import type { Service } from '../../../types/booking';
 import { WalletBalanceText } from '@/features/wallet/components/WalletBalanceText';
+import { Wallet } from "lucide-react";
 
 const paymentMethods = [
   [
@@ -33,9 +34,7 @@ export const ConfirmPaymentMethodSelector = ({
 }: ConfirmPaymentMethodSelectorProps) => (
   <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
     <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
-      <span className="material-symbols-outlined text-primary">
-        account_balance_wallet
-      </span>
+      <Wallet aria-hidden="true" size={24} className="text-primary" />
       {isAppointment ? 'Phương thức sẽ thanh toán' : 'Phương thức thanh toán'}
     </h2>
     {isAppointment && (

@@ -1,5 +1,6 @@
 import React from "react";
 import type { VerificationItem } from "../../types/provider.types";
+import { ChevronRight } from "lucide-react";
 
 type VerificationPanelItem = VerificationItem & {
   onClick?: () => void;
@@ -38,9 +39,7 @@ function VerificationRow({ item }: { item: VerificationPanelItem }) {
         </span>
       </span>
       {item.onClick && (
-        <span aria-hidden="true" className="material-symbols-outlined text-outline-variant">
-          chevron_right
-        </span>
+        <ChevronRight aria-hidden="true" size={24} className="text-outline-variant" />
       )}
     </>
   );

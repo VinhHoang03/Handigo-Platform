@@ -1,5 +1,6 @@
 import React from "react";
 import type { PortfolioItem } from "../../types/provider.types";
+import { Eye } from "lucide-react";
 
 export const ProfileSection: React.FC<{
   title: string;
@@ -72,9 +73,7 @@ export const PortfolioGrid: React.FC<{ items: PortfolioItem[] }> = ({
           src={item.imageUrl}
         />
         <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
-          <span className="material-symbols-outlined text-on-primary">
-            visibility
-          </span>
+          <Eye aria-hidden="true" size={24} className="text-on-primary" />
         </div>
       </div>
     ))}

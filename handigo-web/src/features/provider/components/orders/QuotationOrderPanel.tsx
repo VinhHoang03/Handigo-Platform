@@ -3,6 +3,7 @@ import type { CreateQuotationPayload, QuotationDetail } from '../../types/provid
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { FixedPriceActionForm } from '../FixedPriceActionForm';
 import { RepairQuotationForm } from '../RepairQuotationForm';
+import { CalendarX, Hourglass } from "lucide-react";
 
 interface QuotationOrderPanelProps {
   order: Order;
@@ -32,7 +33,7 @@ export function QuotationOrderPanel({
     <>
       {isUnconfirmedAppointment ? (
         <div className="flex h-full flex-col items-center justify-center border border-outline-variant/30 bg-surface-container-lowest p-md text-center text-on-surface-variant lg:col-span-2">
-          <span className="material-symbols-outlined mb-2 text-4xl">event_busy</span>
+          <CalendarX aria-hidden="true" size={36} className="mb-2" />
           <p className="font-bold text-on-surface">Đang chờ khách hàng thanh toán giữ lịch</p>
           <p className="mt-1 text-sm">Form báo giá sẽ hiển thị sau khi lịch hẹn được thanh toán và xác nhận.</p>
         </div>
@@ -101,7 +102,7 @@ export function QuotationOrderPanel({
 
       {!isUnconfirmedAppointment && !quotation && !showQuotationForm && (
         <div className="flex h-full flex-col items-center justify-center border border-outline-variant/30 bg-surface-container-lowest p-md text-center text-on-surface-variant">
-          <span className="material-symbols-outlined text-4xl mb-2">hourglass_empty</span>
+          <Hourglass aria-hidden="true" size={36} className="mb-2" />
           <p>Chờ khách hàng hoặc bước tiếp theo</p>
         </div>
       )}
