@@ -71,7 +71,7 @@ Trang chi tiết `variable_price`: dòng "Giá tạm tính" hiện `Báo giá sa
 | Mục | Lý do |
 |---|---|
 | ~~**LCP < 2.5s**~~ | **Đã đo bằng Lighthouse thật (2026-07-23), xem mục 7.** Kết quả: **hỏng ngưỡng**. Đã sửa hai nguyên nhân lớn nhất, LCP giảm 33% nhưng vẫn 10.5s. Nguyên nhân còn lại là kiến trúc SPA, không phải dung lượng. |
-| **Đặt một đơn thật rồi huỷ** | Chưa làm. Đã kiểm tới bước chuyển hướng `/login` với khách. Rủi ro của thay đổi giá đã được khép lại bằng đường khác: `CreateOrderPayload` không có trường tiền nào, backend tự dựng pricing snapshot từ DB (`order.service.ts:331`), nên `estimatePrice` phía client không thể ảnh hưởng số tiền khách bị tính. |
+| **Đặt một đơn thật rồi huỷ** | **Bỏ qua theo quyết định (2026-07-23)** để không ghi dữ liệu rác vào DB dev dùng chung. Đã kiểm tới bước chuyển hướng `/login` với khách và giá tạm tính đổi đúng khi chọn gói. Rủi ro của thay đổi giá khép bằng đường khác: `CreateOrderPayload` không có trường tiền nào, backend tự dựng pricing snapshot từ DB (`order.service.ts:331`), nên `estimatePrice` phía client không thể ảnh hưởng số tiền khách bị tính. |
 | **agent-browser** | Không dùng được trên máy này: từ chối cert tự ký của dev server (`ERR_CERT_AUTHORITY_INVALID`), và treo vô hạn khi mở qua http (thử 4 lần, mỗi lần > 150s). Thay bằng runner Playwright độc lập dùng Chromium sẵn có. |
 | **`prefers-reduced-motion`** | Không áp dụng: trang này ở `MOTION_INTENSITY 3`, không có scroll-reveal hay animation trang trí nào để tắt (`grep reveal` → 0). |
 
@@ -161,9 +161,15 @@ Thêm icon Material Symbols mới vào mã thì **phải thêm tên vào `icon_n
 `index.html`**, nếu không nó hiện ra dưới dạng chữ thay vì hình. Cách sinh lại
 danh sách được ghi trong chính chú thích ở `index.html`.
 
+## Quyết định đã chốt (2026-07-23)
+
+- **Không đặt đơn thật để kiểm.** Chấp nhận mục kiểm đầu-cuối để trống, đổi lại
+  không ghi bản ghi rác vào DB dev dùng chung. Xem mục 4 để biết phần nào đã
+  kiểm được và vì sao rủi ro vẫn khép.
+- **Giữ "Đặt cọc 20.000 ₫" trên thẻ danh sách.** Nó trả lời câu "tôi phải trả gì
+  ngay bây giờ", và là lý do dòng chính ghi được "Báo giá sau khảo sát" mà không
+  bỏ sót thông tin tiền. Không đổi mã, đây đã là trạng thái hiện tại.
+
 ## Câu hỏi chưa giải quyết
 
-- Có muốn tôi đặt một đơn thật bằng tài khoản test rồi huỷ, để đóng nốt mục kiểm
-  cuối cùng không? Việc này ghi một bản ghi vào DB dev dùng chung.
-- "Đặt cọc 20.000 ₫" hiện trên thẻ danh sách: giữ hay ẩn đi, chỉ hiện ở bước đặt
-  đơn? Hiện tại giữ vì nó trả lời câu "tôi phải trả gì ngay bây giờ".
+Không còn.

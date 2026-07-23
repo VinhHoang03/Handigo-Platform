@@ -91,8 +91,10 @@ một trường API cụ thể. Không có nguồn thì gỡ, không để place
      Select-Object Id, Name, StartTime
    ```
 4. Chụp đối chiếu: danh sách + chi tiết, ở 1440 và 390, so với `audit-before/`.
-5. Test tay luồng đặt đơn với tài khoản thật: lọc → chọn dịch vụ → chọn tuỳ chọn
-   → giá tạm tính đổi đúng → đặt được đơn.
+5. ~~Test tay luồng đặt đơn với tài khoản thật~~ — **bỏ qua theo quyết định
+   (2026-07-23)**, không đặt đơn thật vào DB dev dùng chung. Phần kiểm được:
+   lọc → chọn dịch vụ → chọn tuỳ chọn → giá tạm tính đổi đúng → CTA điều hướng
+   đúng. Phần không kiểm: tạo đơn thật đầu-cuối.
 6. Soát mắt theo bảng trên, mỗi mục kèm ảnh hoặc số đo.
 7. Viết báo cáo vào `reports/`.
 
@@ -101,7 +103,11 @@ một trường API cụ thể. Không có nguồn thì gỡ, không để place
 - [x] 7 lệnh quét trả về rỗng
 - [x] Đối chiếu số với API cho 16 dịch vụ
 - [x] Chụp đối chiếu 2 trang × 2 breakpoint
-- [ ] Test tay luồng đặt đơn đầu-cuối — mới kiểm tới bước chuyển hướng /login với khách; chưa đặt đơn thật bằng tài khoản đăng nhập
+- [~] Test tay luồng đặt đơn đầu-cuối — **bỏ qua theo quyết định (2026-07-23)**.
+      Đã kiểm tới bước chuyển hướng `/login` với khách, và giá tạm tính đổi đúng
+      khi chọn gói. Không đặt đơn thật để tránh ghi dữ liệu rác vào DB dev dùng
+      chung; rủi ro của thay đổi giá đã khép bằng đường khác (client không gửi
+      trường tiền nào khi tạo đơn)
 - [x] Soát mắt đủ bảng
 - [x] Kiểm bàn phím + tương phản + vùng chạm
 - [x] Viết báo cáo
