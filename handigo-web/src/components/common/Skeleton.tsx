@@ -5,19 +5,27 @@
  * nếu không thì lúc dữ liệu về layout sẽ nhảy. Vì vậy chỉ cung cấp khối cơ bản,
  * còn hình dạng cụ thể do từng nơi tự ghép.
  */
+import type { CSSProperties } from 'react';
 
 type SkeletonProps = {
   className?: string;
   /** Dùng `rounded-full` cho avatar, `rounded-xl` cho ảnh/thẻ. */
   rounded?: string;
+  /**
+   * Chiều cao động khi không biết trước lúc viết class — ví dụ vùng vẽ biểu đồ
+   * nhận `height` qua prop. Ưu tiên class Tailwind khi giá trị là cố định.
+   */
+  style?: CSSProperties;
 };
 
 export const Skeleton = ({
   className = 'h-4 w-full',
   rounded = 'rounded',
+  style,
 }: SkeletonProps) => (
   <div
     aria-hidden="true"
+    style={style}
     className={`animate-pulse bg-surface-container-high ${rounded} ${className}`}
   />
 );
