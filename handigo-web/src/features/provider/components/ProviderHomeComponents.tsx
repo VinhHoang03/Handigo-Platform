@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Job } from '../types/provider.types';
-import { Navigation, TrendingUp, Wallet } from "lucide-react";
-
+import { Navigation, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
 // JobCard
 interface JobCardProps {
   job: Job;
@@ -99,15 +98,15 @@ export const EarningsChart: React.FC = () => (
 
 // QuickAccessCard
 interface QuickAccessCardProps {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   desc: string;
 }
 
-export const QuickAccessCard: React.FC<QuickAccessCardProps> = ({ icon, title, desc }) => (
+export const QuickAccessCard: React.FC<QuickAccessCardProps> = ({ icon: Icon, title, desc }) => (
   <div className="border border-outline-variant bg-surface-container-lowest p-md rounded-xl hover:scale-105 transition-all cursor-pointer group">
     <div className="w-12 h-12 bg-surface-container-high rounded-full flex items-center justify-center mb-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
-      <span className="material-symbols-outlined">{icon}</span>
+      <Icon aria-hidden="true" size={24} />
     </div>
     <h4 className="font-body-lg font-semibold">{title}</h4>
     <p className="text-xs text-on-surface-variant mt-1">{desc}</p>

@@ -1,21 +1,22 @@
+import { FileSpreadsheet, Heart, History, IdCard, Lightbulb, Scale, ShieldCheck } from "lucide-react";
 export const coreValues = [
   {
-    icon: 'favorite',
+    icon: Heart,
     title: 'Tận tâm',
     text: 'Phục vụ khách hàng bằng cả trái tim, luôn đặt lợi ích của khách hàng lên trên hết.',
   },
   {
-    icon: 'lightbulb',
+    icon: Lightbulb,
     title: 'Sáng tạo',
     text: 'Không ngừng đổi mới công nghệ và quy trình để mang lại trải nghiệm tối ưu.',
   },
   {
-    icon: 'balance',
+    icon: Scale,
     title: 'Công bằng',
     text: 'Xây dựng hệ sinh thái minh bạch, đôi bên cùng có lợi cho đối tác và khách hàng.',
   },
   {
-    icon: 'verified_user',
+    icon: ShieldCheck,
     title: 'Tin cậy',
     text: 'Duy trì chất lượng dịch vụ đồng nhất và bảo vệ thông tin người dùng.',
   },
@@ -54,17 +55,17 @@ export const milestones = [
  */
 export const aboutCommitments = [
   {
-    icon: 'badge',
+    icon: IdCard,
     title: 'Kiểm duyệt trước khi nhận việc',
     text: 'Mỗi hồ sơ nhà cung cấp được xét duyệt thủ công: giấy tờ tuỳ thân, chuyên môn và phạm vi dịch vụ nhận làm.',
   },
   {
-    icon: 'request_quote',
+    icon: FileSpreadsheet,
     title: 'Giá thoả thuận trước khi làm',
     text: 'Báo giá nằm trong đơn và cần bạn đồng ý mới bắt đầu. Muốn đổi thì phải sửa đơn, hai bên cùng thấy.',
   },
   {
-    icon: 'history',
+    icon: History,
     title: 'Mọi việc để lại dấu vết',
     text: 'Tin nhắn, thay đổi trạng thái và thanh toán đều lưu trong đơn, tra lại được khi cần đối chiếu.',
   },

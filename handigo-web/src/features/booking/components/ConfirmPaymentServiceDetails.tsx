@@ -1,6 +1,6 @@
 import type { Address, Service, ServiceOption } from '../../../types/booking';
 import { getOptionPrice } from './useConfirmPaymentFlow';
-import { CalendarCheck, ReceiptText } from "lucide-react";
+import { Calendar, CalendarCheck, MapPin, ReceiptText, SprayCan, UserSearch, type LucideIcon } from "lucide-react";
 
 const formatAddress = (address: Address | null) => {
   if (!address) return '';
@@ -32,18 +32,18 @@ export const ConfirmPaymentServiceDetails = ({
   preferredProviderId, preferredProviderName, selectedOptions, selectedOptionQuantities,
 }: ConfirmPaymentServiceDetailsProps) => {
   const addressText = formatAddress(address);
-  const detailItems: string[][] = [
-    ['cleaning_services', 'Dịch vụ', service?.name || '…'],
+  const detailItems: Array<[LucideIcon, string, string]> = [
+    [SprayCan, 'Dịch vụ', service?.name || '…'],
     [
-      'calendar_today',
+      Calendar,
       'Thời gian',
       scheduledAt
         ? new Date(scheduledAt).toLocaleString('vi-VN')
         : 'Sớm nhất có thể',
     ],
-    ...(addressText ? [['location_on', 'Địa chỉ', addressText]] : []),
+    ...(addressText ? [[MapPin, 'Địa chỉ', addressText] as [LucideIcon, string, string]] : []),
     [
-      'person_search',
+      UserSearch,
       isAppointment && preferredProviderId ? 'Chuyên gia đặt trước' : 'Điều phối chuyên gia',
       preferredProviderId
         ? isAppointment
@@ -73,13 +73,13 @@ export const ConfirmPaymentServiceDetails = ({
           Chi tiết dịch vụ
         </h2>
         <div className="grid md:grid-cols-2 gap-6">
-          {detailItems.map(([icon, label, value], index) => (
+          {detailItems.map(([Icon, label, value], index) => (
             <div
               key={label}
               className={`flex items-start gap-4 ${index === 2 ? 'md:col-span-2' : ''}`}
             >
               <div className="bg-primary-fixed-dim/30 p-3 rounded-lg text-primary">
-                <span className="material-symbols-outlined">{icon}</span>
+                <Icon aria-hidden="true" size={24} />
               </div>
               <div>
                 <p className="font-label-md text-label-md text-on-surface-variant">

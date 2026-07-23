@@ -47,9 +47,7 @@ export const BookingStatusTimeline = ({
                         : "border-outline-variant bg-surface-container-lowest text-on-surface-variant"
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px] leading-none">
-                  {step.icon}
-                </span>
+                <step.icon aria-hidden="true" size={16} className="leading-none" />
               </span>
               {!isLast && (
                 <span

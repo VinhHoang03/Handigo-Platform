@@ -1,4 +1,5 @@
 import { AccountActionRow } from "./AccountActionRow";
+import { Lock, MoreHorizontal, Shield } from "lucide-react";
 
 interface SecurityTabSectionProps {
   onPasswordClick: () => void;
@@ -12,18 +13,18 @@ export function SecurityTabSection({ onPasswordClick }: SecurityTabSectionProps)
       </h3>
       <div className="space-y-3">
         <AccountActionRow
-          icon="lock"
+          icon={Lock}
           title="Mật khẩu và bảo mật"
           description="Cập nhật mật khẩu để bảo vệ tài khoản."
           onClick={onPasswordClick}
         />
         <AccountActionRow
-          icon="shield"
+          icon={Shield}
           title="Quyền riêng tư"
           description="Các tùy chọn quyền riêng tư sẽ được bổ sung."
         />
         <AccountActionRow
-          icon="more_horiz"
+          icon={MoreHorizontal}
           title="Các tùy chọn khác"
           description="Khu vực cho các thiết lập tài khoản khác."
         />

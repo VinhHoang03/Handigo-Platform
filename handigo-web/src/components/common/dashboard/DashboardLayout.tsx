@@ -113,9 +113,7 @@ export function DashboardLayout({
                     className={`${className} cursor-not-allowed opacity-50`}
                     aria-disabled="true"
                   >
-                    <span className="material-symbols-outlined text-xl">
-                      {item.icon}
-                    </span>
+                    <item.icon aria-hidden="true" size={20} />
                     <span className="max-w-full truncate text-[10px] font-medium">
                       {item.label}
                     </span>
@@ -125,9 +123,7 @@ export function DashboardLayout({
 
               return (
                 <Link key={item.label} to={item.path} className={className}>
-                  <span className="material-symbols-outlined text-xl">
-                    {item.icon}
-                  </span>
+                  <item.icon aria-hidden="true" size={20} />
                   <span className="max-w-full truncate text-[10px] font-medium">
                     {item.label}
                   </span>

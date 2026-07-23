@@ -58,9 +58,7 @@ export function DashboardSidebar({
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
               }`}
             >
-              <span className="material-symbols-outlined shrink-0">
-                {item.icon}
-              </span>
+              <item.icon aria-hidden="true" size={24} className="shrink-0" />
               <span className="text-sm font-medium">{item.label}</span>
             </Link>
           );

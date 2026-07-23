@@ -1,13 +1,13 @@
 import type { SupportSummary } from "../../types/adminSupport.types";
 import { formatDuration } from "./support.constants";
-
+import { AlertCircle, CircleCheckBig, Clock, Inbox, UserX, type LucideIcon } from "lucide-react";
 function SummaryCard({
-  icon,
+  icon: Icon,
   label,
   value,
   description,
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: string | number;
   description: string;
@@ -16,7 +16,7 @@ function SummaryCard({
     <article className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-4">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <span className="material-symbols-outlined block text-[22px] leading-none">{icon}</span>
+          <Icon aria-hidden="true" size={22} className="block leading-none" />
         </span>
         <div>
           <p className="text-sm text-on-surface-variant">{label}</p>
@@ -30,11 +30,11 @@ function SummaryCard({
 
 export function SupportSummaryCards({ summary }: { summary: SupportSummary }) {
   const cards = [
-    { icon: "inbox", label: "Đang tồn", value: summary.active, description: "Ticket cần tiếp tục xử lý" },
-    { icon: "priority_high", label: "Khẩn cấp", value: summary.urgentActive, description: "Ưu tiên xử lý ngay" },
-    { icon: "person_off", label: "Chưa phân công", value: summary.unassignedActive, description: "Chưa có người phụ trách" },
-    { icon: "task_alt", label: "Hoàn tất hôm nay", value: summary.resolvedToday, description: "Đã xử lý hoặc đóng" },
-    { icon: "schedule", label: "Thời gian xử lý TB", value: formatDuration(summary.averageResolutionMs), description: "Từ lúc tạo đến khi xử lý" },
+    { icon: Inbox, label: "Đang tồn", value: summary.active, description: "Ticket cần tiếp tục xử lý" },
+    { icon: AlertCircle, label: "Khẩn cấp", value: summary.urgentActive, description: "Ưu tiên xử lý ngay" },
+    { icon: UserX, label: "Chưa phân công", value: summary.unassignedActive, description: "Chưa có người phụ trách" },
+    { icon: CircleCheckBig, label: "Hoàn tất hôm nay", value: summary.resolvedToday, description: "Đã xử lý hoặc đóng" },
+    { icon: Clock, label: "Thời gian xử lý TB", value: formatDuration(summary.averageResolutionMs), description: "Từ lúc tạo đến khi xử lý" },
   ];
 
   return (

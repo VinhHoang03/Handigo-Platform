@@ -10,6 +10,7 @@ import { WalletWithdrawalsSection } from '../components/WalletWithdrawalsSection
 import { getErrorMessage } from '../components/wallet-formatters';
 import { useWalletAmountForms } from '../components/useWalletAmountForms';
 import { useWalletDepositReturn } from '../components/useWalletDepositReturn';
+import { Banknote, CreditCard, Hourglass, ReceiptText, TrendingUp, Wallet } from "lucide-react";
 
 type WalletRole = 'CUSTOMER' | 'PROVIDER';
 
@@ -51,18 +52,18 @@ export function WalletPage({ role }: { role: WalletRole }) {
 
     if (!isProvider) {
       return [
-        { icon: 'account_balance_wallet', label: 'Số dư khả dụng', value: currentBalance, strong: true },
-        { icon: 'hourglass_top', label: 'Đang chờ xử lý', value: wallet?.pendingBalance ?? 0 },
-        { icon: 'add_card', label: 'Tổng đã nạp', value: wallet?.totalDeposited ?? summary?.totalDeposited ?? 0 },
-        { icon: 'receipt_long', label: 'Đã thanh toán', value: wallet?.totalPaid ?? summary?.totalPaid ?? 0 },
+        { icon: Wallet, label: 'Số dư khả dụng', value: currentBalance, strong: true },
+        { icon: Hourglass, label: 'Đang chờ xử lý', value: wallet?.pendingBalance ?? 0 },
+        { icon: CreditCard, label: 'Tổng đã nạp', value: wallet?.totalDeposited ?? summary?.totalDeposited ?? 0 },
+        { icon: ReceiptText, label: 'Đã thanh toán', value: wallet?.totalPaid ?? summary?.totalPaid ?? 0 },
       ];
     }
 
     return [
-      { icon: 'account_balance_wallet', label: 'Số dư khả dụng', value: currentBalance, strong: true },
-      { icon: 'hourglass_top', label: 'Đang chờ xử lý', value: wallet?.pendingBalance ?? 0 },
-      { icon: 'trending_up', label: 'Tổng thu nhập', value: wallet?.totalEarnings ?? summary?.totalEarnings ?? 0 },
-      { icon: 'payments', label: 'Đã rút', value: wallet?.totalWithdrawn ?? summary?.totalWithdrawals ?? 0 },
+      { icon: Wallet, label: 'Số dư khả dụng', value: currentBalance, strong: true },
+      { icon: Hourglass, label: 'Đang chờ xử lý', value: wallet?.pendingBalance ?? 0 },
+      { icon: TrendingUp, label: 'Tổng thu nhập', value: wallet?.totalEarnings ?? summary?.totalEarnings ?? 0 },
+      { icon: Banknote, label: 'Đã rút', value: wallet?.totalWithdrawn ?? summary?.totalWithdrawals ?? 0 },
     ];
   }, [isProvider, summary, wallet]);
 

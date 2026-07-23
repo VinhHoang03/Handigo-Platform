@@ -1,9 +1,10 @@
 import { AsyncState } from '@/components/common/AsyncState';
 import { Skeleton } from '@/components/common/Skeleton';
 import { money } from './wallet-formatters';
+import type { LucideIcon } from "lucide-react";
 
 export interface WalletStat {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: number;
   strong?: boolean;
@@ -35,7 +36,7 @@ export function WalletStatsCards({ stats, loading, error, onRetry }: WalletStats
         {stats.map((item) => (
           <div key={item.label} className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-              <span className="material-symbols-outlined block text-2xl leading-none">{item.icon}</span>
+              <item.icon aria-hidden="true" size={24} className="block leading-none" />
             </div>
             <p className="mt-4 text-sm text-on-surface-variant">{item.label}</p>
             <p className={`${item.strong ? 'text-headline-md' : 'text-title-lg'} mt-1 font-bold tabular-nums text-on-surface`}>

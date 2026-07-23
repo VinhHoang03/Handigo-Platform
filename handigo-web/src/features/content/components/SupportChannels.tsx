@@ -1,10 +1,11 @@
 import { supportChannels } from "../data/supportData";
+import type { LucideIcon } from "lucide-react";
 
 export function IconTile({
-  icon,
+  icon: Icon,
   size = "md",
 }: {
-  icon: string;
+  icon: LucideIcon;
   size?: "sm" | "md";
 }) {
   return (
@@ -13,14 +14,7 @@ export function IconTile({
         size === "sm" ? "h-10 w-10" : "h-12 w-12"
       }`}
     >
-      <span
-        aria-hidden="true"
-        className={`material-symbols-outlined leading-none ${
-          size === "sm" ? "text-xl" : "text-2xl"
-        }`}
-      >
-        {icon}
-      </span>
+      <Icon aria-hidden="true" size={size === "sm" ? 20 : 24} />
     </span>
   );
 }

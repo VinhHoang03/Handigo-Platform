@@ -1,5 +1,6 @@
 import type { PublicProviderProfile } from "../api/customerService.api";
 import { InfoSection, VerificationRow } from "./ProviderProfilePrimitives";
+import { Award } from "lucide-react";
 
 const formatDate = (value?: string) => {
   if (!value) return "";
@@ -29,7 +30,7 @@ export function ProviderAboutSection({
           {certificates.map((certificate) => (
             <VerificationRow
               key={certificate.id}
-              icon="workspace_premium"
+              icon={Award}
               title={certificate.title}
               description={[
                 certificate.issuer,

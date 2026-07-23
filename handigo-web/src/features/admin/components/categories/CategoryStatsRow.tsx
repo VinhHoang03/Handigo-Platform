@@ -1,15 +1,14 @@
 import { categoryMoney } from './category.helpers';
-import { TrendingUp } from "lucide-react";
-
+import { BellRing, Grid2X2, HardHat, type LucideIcon, TrendingUp } from "lucide-react";
 interface StatCardProps {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: string;
   trend?: string;
   trendUp?: boolean;
 }
 
-function StatCard({ icon, label, value, trend, trendUp }: StatCardProps) {
+function StatCard({ icon: Icon, label, value, trend, trendUp }: StatCardProps) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-primary/10 bg-primary-container/5 p-6">
       <div className="relative z-10">
@@ -23,9 +22,7 @@ function StatCard({ icon, label, value, trend, trendUp }: StatCardProps) {
         )}
       </div>
       <div className="absolute -bottom-4 -right-4 opacity-5">
-        <span className="material-symbols-outlined text-[120px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-          {icon}
-        </span>
+        <Icon aria-hidden="true" size={120} />
       </div>
     </div>
   );
@@ -41,9 +38,9 @@ interface CategoryStatsRowProps {
 export function CategoryStatsRow({ totalServices, activeCount, total }: CategoryStatsRowProps) {
   return (
     <div className="grid gap-gutter sm:grid-cols-3">
-      <StatCard icon="construction" label="Tổng dịch vụ hoạt động" value={categoryMoney.format(totalServices)} trend="+12% so với tháng trước" trendUp />
-      <StatCard icon="notifications_active" label="Danh mục đang hoạt động" value={String(activeCount)} />
-      <StatCard icon="category" label="Tổng danh mục" value={String(total)} />
+      <StatCard icon={HardHat} label="Tổng dịch vụ hoạt động" value={categoryMoney.format(totalServices)} trend="+12% so với tháng trước" trendUp />
+      <StatCard icon={BellRing} label="Danh mục đang hoạt động" value={String(activeCount)} />
+      <StatCard icon={Grid2X2} label="Tổng danh mục" value={String(total)} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import type { PublicProviderProfile } from "../api/customerService.api";
 import { Metric } from "./ProviderProfilePrimitives";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Star } from "lucide-react";
 
 interface ProviderProfileHeaderProps {
   profile: PublicProviderProfile;
@@ -37,7 +37,7 @@ export function ProviderProfileHeader({ profile }: ProviderProfileHeaderProps) {
         <Metric
           label="Đánh giá"
           value={profile.provider.averageRating.toFixed(1)}
-          icon="star"
+          icon={Star}
         />
         <Metric
           label="Công việc"

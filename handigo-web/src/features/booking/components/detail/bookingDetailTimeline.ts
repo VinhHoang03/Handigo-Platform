@@ -1,7 +1,7 @@
 import type { Order } from "@/types/booking";
-
+import { BadgeCheck, Check, HardHat, UserCheck, X, type LucideIcon } from "lucide-react";
 export type TimelineStep = {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   description: string;
   time: string;
@@ -15,7 +15,7 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
   if (order.status === "cancelled") {
     return [
       {
-        icon: "close",
+        icon: X,
         title: "Đơn hàng đã hủy",
         description: order.cancellation?.reason
           ? `Lý do: ${order.cancellation.reason}`
@@ -43,14 +43,14 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
 
   return [
     {
-      icon: "check",
+      icon: Check,
       title: "Đã tạo đơn hàng",
       description: `Yêu cầu ${serviceName} đã được ghi nhận với mã ${order.orderCode}.`,
       time: formatTimelineTime(order.createdAt),
       state: currentStatusIndex > 0 ? "done" : "active",
     },
     {
-      icon: "person_check",
+      icon: UserCheck,
       title: providerName ? `${providerName} đã nhận đơn` : "Chờ chuyên gia nhận đơn",
       description: providerName
         ? `${providerName} đã xác nhận tiếp nhận yêu cầu ${serviceName}.`
@@ -69,7 +69,7 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
             : "pending",
     },
     {
-      icon: "construction",
+      icon: HardHat,
       title: "Đang thực hiện",
       description:
         currentStatusIndex >= 2
@@ -89,7 +89,7 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
             : "pending",
     },
     {
-      icon: "verified",
+      icon: BadgeCheck,
       title: "Hoàn thành",
       description:
         order.status === "completed"

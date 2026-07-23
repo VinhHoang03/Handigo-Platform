@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import type { Order } from "@/types/booking";
 
 export type Coordinate = {
@@ -32,5 +33,5 @@ export type TrackingPoint = {
   coordinate: Coordinate;
   displayText: string;
   updatedAtLabel: string;
-  icon: string;
+  icon: LucideIcon;
 };

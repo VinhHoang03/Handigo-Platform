@@ -45,9 +45,10 @@ export function ConfigList({
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                <span className="material-symbols-outlined text-[16px]">
-                  {typeOptions[item.type].icon}
-                </span>
+                {(() => {
+                  const TypeIcon = typeOptions[item.type].icon;
+                  return <TypeIcon aria-hidden="true" size={16} />;
+                })()}
                 {typeOptions[item.type].label}
               </span>
               <span

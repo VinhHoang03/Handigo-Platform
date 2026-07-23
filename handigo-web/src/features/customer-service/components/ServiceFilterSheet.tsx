@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { CategoryIcon } from "@/components/common/CategoryIcon";
-import { MaterialIcon } from "@/components/common/MaterialIcon";
 import type { Category } from "@/types/booking";
+import { LayoutGrid, X } from "lucide-react";
 
 interface ServiceFilterSheetProps {
   open: boolean;
@@ -68,7 +68,7 @@ export function ServiceFilterSheet({
           aria-label="Đóng bộ lọc"
           className="grid h-11 w-11 place-items-center rounded-full hover:bg-surface-container-low"
         >
-          <MaterialIcon>close</MaterialIcon>
+          <X aria-hidden="true" size={24} />
         </button>
       </div>
 
@@ -78,9 +78,7 @@ export function ServiceFilterSheet({
           count={totalCount}
           onClick={() => pick("")}
         >
-          <MaterialIcon className="text-[20px]">
-            apps
-          </MaterialIcon>
+          <LayoutGrid aria-hidden="true" size={20} />
           Tất cả dịch vụ
         </FilterRow>
 

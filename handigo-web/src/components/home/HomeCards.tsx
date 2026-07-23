@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MaterialIcon } from '../common/MaterialIcon';
 import { InitialsAvatar } from '../common/InitialsAvatar';
 import { normalizeImageUrl } from '@/utils/imageUrl';
-
+import { MapPin, Star, type LucideIcon } from "lucide-react";
 interface ProviderCardProps {
   name: string;
   rating: number;
@@ -57,7 +56,7 @@ const ProviderRatingBadge = ({ rating, totalFeedbacks }: { rating: number; total
 
   return (
     <span className="absolute right-2 top-2 flex items-center gap-1 rounded-lg bg-surface-container-lowest/95 px-2 py-1 shadow-sm">
-      <MaterialIcon className="text-xs text-tertiary" filled>star</MaterialIcon>
+      <Star aria-hidden="true" size={12} className="text-tertiary" fill="currentColor" />
       <span className="text-xs font-semibold tabular-nums text-on-surface">{rating.toFixed(1)}</span>
       <span className="text-[10px] text-on-surface-variant">({totalFeedbacks})</span>
     </span>
@@ -74,7 +73,7 @@ export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img
     <h3 className="truncate font-headline-md text-base font-semibold text-on-surface">{name}</h3>
 
     <p className="mt-2 flex min-h-8 items-start gap-1 text-on-surface-variant">
-      <MaterialIcon className="text-sm">location_on</MaterialIcon>
+      <MapPin aria-hidden="true" size={14} />
       <span className="line-clamp-2 text-xs">{area || 'Chưa cập nhật khu vực hoạt động'}</span>
     </p>
 
@@ -96,12 +95,12 @@ export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img
   </article>
 );
 
-export const SocialLink = ({ icon, label }: { icon: string; label: string }) => (
+export const SocialLink = ({ icon: Icon, label }: { icon: LucideIcon; label: string }) => (
   <Link
     to="#"
     aria-label={label}
     className="grid h-11 w-11 place-items-center rounded-full bg-surface-container-high text-primary transition-colors hover:bg-primary hover:text-on-primary"
   >
-    <MaterialIcon className="text-lg">{icon}</MaterialIcon>
+    <Icon aria-hidden="true" size={18} />
   </Link>
 );

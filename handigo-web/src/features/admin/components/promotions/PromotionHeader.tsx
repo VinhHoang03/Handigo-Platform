@@ -1,6 +1,5 @@
 import { StatCard } from "../shared/StatCard";
-import { Plus } from "lucide-react";
-
+import { PauseCircle, Plus, Tag, Ticket } from "lucide-react";
 export function PromotionHeader({
   stats,
   notice,
@@ -28,9 +27,9 @@ export function PromotionHeader({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard icon="local_offer" label="Đang hoạt động" value={stats.active} />
-        <StatCard icon="pause_circle" label="Tạm dừng" value={stats.inactive} />
-        <StatCard icon="confirmation_number" label="Lượt đã dùng" value={stats.used} />
+        <StatCard icon={Tag} label="Đang hoạt động" value={stats.active} />
+        <StatCard icon={PauseCircle} label="Tạm dừng" value={stats.inactive} />
+        <StatCard icon={Ticket} label="Lượt đã dùng" value={stats.used} />
       </div>
 
       {(notice || error) && (

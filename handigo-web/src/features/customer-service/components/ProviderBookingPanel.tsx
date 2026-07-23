@@ -1,7 +1,6 @@
 import type { PublicProviderProfile } from "../api/customerService.api";
 import { TrustItem } from "./ProviderProfilePrimitives";
-import { ArrowRight } from "lucide-react";
-
+import { ArrowRight, ShieldCheck, Star } from "lucide-react";
 interface ProviderBookingPanelProps {
   providerFullName: string;
   averageRating: number;
@@ -52,9 +51,9 @@ export function ProviderBookingPanel({
         </p>
       )}
       <div className="mt-5 space-y-3">
-        <TrustItem icon="verified_user" text="Hồ sơ đã xác minh" />
+        <TrustItem icon={ShieldCheck} text="Hồ sơ đã xác minh" />
         <TrustItem
-          icon="star"
+          icon={Star}
           text={`${averageRating.toFixed(1)} điểm đánh giá`}
         />
       </div>

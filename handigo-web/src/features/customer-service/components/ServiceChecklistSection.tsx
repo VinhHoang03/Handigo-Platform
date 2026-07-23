@@ -1,4 +1,4 @@
-import { MaterialIcon } from "@/components/common/MaterialIcon";
+import { Banknote, FileSpreadsheet, GitCommitHorizontal, History, IdCard, LifeBuoy } from "lucide-react";
 
 /**
  * Cam kết đi kèm mọi đơn, dùng chung ngôn ngữ với dải cam kết ở trang chủ.
@@ -12,12 +12,12 @@ import { MaterialIcon } from "@/components/common/MaterialIcon";
  * `rounded-xl bg-surface-container-lowest shadow-sm` xếp liên tiếp trên trang.
  */
 const commitments = [
-  { icon: "badge", text: "Thợ đã qua kiểm duyệt hồ sơ" },
-  { icon: "request_quote", text: "Báo giá trước khi bắt đầu" },
-  { icon: "timeline", text: "Theo dõi trạng thái đơn" },
-  { icon: "payments", text: "Xong việc mới thanh toán" },
-  { icon: "support_agent", text: "Gửi yêu cầu hỗ trợ ngay trong đơn" },
-  { icon: "history", text: "Mọi trao đổi lưu lại để tra sau" },
+  { icon: IdCard, text: "Thợ đã qua kiểm duyệt hồ sơ" },
+  { icon: FileSpreadsheet, text: "Báo giá trước khi bắt đầu" },
+  { icon: GitCommitHorizontal, text: "Theo dõi trạng thái đơn" },
+  { icon: Banknote, text: "Xong việc mới thanh toán" },
+  { icon: LifeBuoy, text: "Gửi yêu cầu hỗ trợ ngay trong đơn" },
+  { icon: History, text: "Mọi trao đổi lưu lại để tra sau" },
 ];
 
 export function ServiceChecklistSection() {
@@ -35,9 +35,7 @@ export function ServiceChecklistSection() {
       <ul className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
         {commitments.map((item) => (
           <li key={item.text} className="flex items-start gap-3">
-            <MaterialIcon className="mt-0.5 shrink-0 text-[20px] text-primary">
-              {item.icon}
-            </MaterialIcon>
+            <item.icon aria-hidden="true" size={20} className="mt-0.5 shrink-0 text-primary" />
             <span className="text-pretty text-on-surface-variant">
               {item.text}
             </span>

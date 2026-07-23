@@ -20,6 +20,7 @@ import {
   stringifyValue,
 } from "../components/system-configs/system-config-format";
 import type { SystemConfigPayload, SystemConfigQuery, UpdateSystemConfigPayload } from "../types/systemConfig.types";
+import { Globe, Settings, Zap } from "lucide-react";
 
 export default function AdminSystemConfigsPage() {
   const [items, setItems] = useState<ConfigItem[]>([]);
@@ -140,9 +141,9 @@ export default function AdminSystemConfigsPage() {
         </header>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard icon="settings" label="Đã thiết lập" value={stats.configuredCount} />
-          <StatCard icon="bolt" label="Đã nối logic" value={stats.effectiveCount} />
-          <StatCard icon="public" label="Công khai" value={stats.publicCount} />
+          <StatCard icon={Settings} label="Đã thiết lập" value={stats.configuredCount} />
+          <StatCard icon={Zap} label="Đã nối logic" value={stats.effectiveCount} />
+          <StatCard icon={Globe} label="Công khai" value={stats.publicCount} />
         </div>
 
         {(notice || error) && (

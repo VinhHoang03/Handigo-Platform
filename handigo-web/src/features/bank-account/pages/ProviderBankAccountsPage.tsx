@@ -6,8 +6,7 @@ import { BankAccountStatCard } from '../components/BankAccountStatCard';
 import { BankAccountTable } from '../components/BankAccountTable';
 import { maskAccountNumber } from '../components/bankAccountConstants';
 import { useBankAccountManager } from '../components/useBankAccountManager';
-import { CreditCard, RefreshCw } from "lucide-react";
-
+import { CircleCheckBig, CreditCard, Landmark, RefreshCw, Star } from "lucide-react";
 export default function ProviderBankAccountsPage({ role = 'PROVIDER' }: { role?: 'CUSTOMER' | 'PROVIDER' }) {
   const {
     items,
@@ -61,9 +60,9 @@ export default function ProviderBankAccountsPage({ role = 'PROVIDER' }: { role?:
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <BankAccountStatCard icon="account_balance" label="Tổng tài khoản" value={String(stats.total)} />
-          <BankAccountStatCard icon="task_alt" label="Đang hoạt động" value={String(stats.active)} />
-          <BankAccountStatCard icon="star" label="Mặc định" value={stats.defaultAccount?.bankCode || '-'} />
+          <BankAccountStatCard icon={Landmark} label="Tổng tài khoản" value={String(stats.total)} />
+          <BankAccountStatCard icon={CircleCheckBig} label="Đang hoạt động" value={String(stats.active)} />
+          <BankAccountStatCard icon={Star} label="Mặc định" value={stats.defaultAccount?.bankCode || '-'} />
         </div>
 
         {(notice || error) && (

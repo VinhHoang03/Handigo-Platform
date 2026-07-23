@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { BrandLogo } from "../common/BrandLogo";
 import { SocialLink } from "./HomeCards";
+import { Languages, MonitorPlay, Trophy } from "lucide-react";
 
 const FooterColumn = ({ title, links }: { title: string; links: string[] }) => (
   <div>
@@ -30,9 +31,9 @@ export const HomeFooter = () => (
           Giải pháp công nghệ kết nối thợ chuyên nghiệp hàng đầu Việt Nam.
         </p>
         <div className="flex gap-4">
-          <SocialLink icon="social_leaderboard" label="Handigo trên mạng xã hội" />
-          <SocialLink icon="smart_display" label="Kênh video của Handigo" />
-          <SocialLink icon="language" label="Website Handigo" />
+          <SocialLink icon={Trophy} label="Handigo trên mạng xã hội" />
+          <SocialLink icon={MonitorPlay} label="Kênh video của Handigo" />
+          <SocialLink icon={Languages} label="Website Handigo" />
         </div>
       </div>
       <FooterColumn

@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { ReliableImage } from "@/components/common/ReliableImage";
-import { MaterialIcon } from "@/components/common/MaterialIcon";
 import {
   formatServicePrice,
   formatServicePriceNote,
@@ -9,6 +8,7 @@ import {
   getServicePriceLabel,
 } from "../utils/serviceDisplay";
 import type { Category, Service } from "@/types/booking";
+import { ArrowRight } from "lucide-react";
 
 interface ServiceCardProps {
   service: Service;
@@ -67,7 +67,7 @@ export function ServiceCard({ service, index, categories }: ServiceCardProps) {
               nhãn giá lẫn chính nó xuống hai dòng. Mũi tên giữ lại tín hiệu
               "bấm được" mà không cần một từ nào. */}
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-on-primary">
-            <MaterialIcon className="text-[20px]">arrow_forward</MaterialIcon>
+            <ArrowRight aria-hidden="true" size={20} />
           </span>
         </div>
       </div>

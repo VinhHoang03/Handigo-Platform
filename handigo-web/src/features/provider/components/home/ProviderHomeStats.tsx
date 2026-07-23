@@ -1,12 +1,13 @@
 import { formatMoney } from "./providerHome.utils";
-
+import type { LucideIcon } from "lucide-react";
+import { CircleDollarSign, ClipboardClock, Package, Star } from "lucide-react";
 function StatCard({
-  icon,
+  icon: Icon,
   label,
   value,
   tone,
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: string;
   tone: string;
@@ -16,7 +17,7 @@ function StatCard({
       <div
         className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone}`}
       >
-        <span className="material-symbols-outlined">{icon}</span>
+        <Icon aria-hidden="true" size={24} />
       </div>
       <div>
         <p className="text-label-sm uppercase tracking-wider text-on-surface-variant">
@@ -58,25 +59,25 @@ export function ProviderHomeStats({
   return (
     <section className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
-        icon="inventory"
+        icon={Package}
         label="Tổng số đơn"
         value={String(totalOrders)}
         tone="bg-primary-container/20 text-primary"
       />
       <StatCard
-        icon="pending_actions"
+        icon={ClipboardClock}
         label="Đang thực hiện"
         value={String(activeOrders)}
         tone="bg-secondary-container/30 text-secondary"
       />
       <StatCard
-        icon="monetization_on"
+        icon={CircleDollarSign}
         label="Thu nhập gần đây"
         value={formatMoney(todayIncome)}
         tone="bg-secondary/10 text-secondary"
       />
       <StatCard
-        icon="star"
+        icon={Star}
         label="Đánh giá"
         value={ratingValue(rating)}
         tone="bg-tertiary-fixed/30 text-tertiary"

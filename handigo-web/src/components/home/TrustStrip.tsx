@@ -1,4 +1,3 @@
-import { MaterialIcon } from "../common/MaterialIcon";
 import { commitments } from "@/features/home/data/homeData";
 
 /**
@@ -19,9 +18,7 @@ export const TrustStrip = () => (
           key={item.title}
           className="flex items-start gap-4 py-7 lg:px-8 lg:first:pl-0 lg:last:pr-0"
         >
-          <MaterialIcon className="mt-0.5 shrink-0 text-[22px] text-primary">
-            {item.icon}
-          </MaterialIcon>
+          <item.icon aria-hidden="true" size={22} className="mt-0.5 shrink-0 text-primary" />
           <div className="min-w-0">
             <h3 className="font-headline-md text-base font-semibold text-on-surface">
               {item.title}

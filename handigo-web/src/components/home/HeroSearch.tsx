@@ -6,6 +6,7 @@ import {
 } from "@/features/home/api/home.api";
 import { MaterialIcon } from "../common/MaterialIcon";
 import { HeroSearchResults } from "./HeroSearchResults";
+import { Loader2, Search } from "lucide-react";
 
 /**
  * Ô tìm kiếm chính của trang chủ: gợi ý dịch vụ theo từ khoá (debounce 250ms)
@@ -106,9 +107,7 @@ export const HeroSearch = () => {
     >
       <div className="relative flex-[1.6]">
         <div className="flex items-center gap-3 rounded-xl px-4 py-3 transition-colors focus-within:bg-surface-container-low">
-          <MaterialIcon className="shrink-0 text-[20px] text-on-surface-variant">
-            search
-          </MaterialIcon>
+          <Search aria-hidden="true" size={20} className="shrink-0 text-on-surface-variant" />
           <input
             className="min-h-11 w-full border-none bg-transparent text-body-md text-on-surface outline-none placeholder:text-on-surface-variant/80 focus:ring-0"
             placeholder="Bạn cần sửa gì?"
@@ -132,9 +131,7 @@ export const HeroSearch = () => {
             }}
           />
           {isSearching && (
-            <MaterialIcon className="shrink-0 animate-spin text-[18px] text-on-surface-variant">
-              progress_activity
-            </MaterialIcon>
+            <Loader2 aria-hidden="true" size={18} className="shrink-0 animate-spin text-on-surface-variant" />
           )}
         </div>
 
