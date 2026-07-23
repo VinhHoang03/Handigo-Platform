@@ -70,7 +70,7 @@ Trang chi tiết `variable_price`: dòng "Giá tạm tính" hiện `Báo giá sa
 
 | Mục | Lý do |
 |---|---|
-| **LCP < 2.5s** | Chromium headless trên máy này **không phát entry `largest-contentful-paint`** dù đã thử 4 cách (observer trước navigate, đọc buffer sau load, cả trên dev server lẫn bản build production qua http). Đã đo thay bằng FCP (332ms/316ms) và CLS (0). Cần chạy Lighthouse trên môi trường thật để chốt. |
+| ~~**LCP < 2.5s**~~ | **Đã đo bằng Lighthouse thật (2026-07-23), xem mục 7.** Kết quả: **hỏng ngưỡng**. Đã sửa hai nguyên nhân lớn nhất, LCP giảm 33% nhưng vẫn 10.5s. Nguyên nhân còn lại là kiến trúc SPA, không phải dung lượng. |
 | **Đặt một đơn thật rồi huỷ** | Chưa làm. Đã kiểm tới bước chuyển hướng `/login` với khách. Rủi ro của thay đổi giá đã được khép lại bằng đường khác: `CreateOrderPayload` không có trường tiền nào, backend tự dựng pricing snapshot từ DB (`order.service.ts:331`), nên `estimatePrice` phía client không thể ảnh hưởng số tiền khách bị tính. |
 | **agent-browser** | Không dùng được trên máy này: từ chối cert tự ký của dev server (`ERR_CERT_AUTHORITY_INVALID`), và treo vô hạn khi mở qua http (thử 4 lần, mỗi lần > 150s). Thay bằng runner Playwright độc lập dùng Chromium sẵn có. |
 | **`prefers-reduced-motion`** | Không áp dụng: trang này ở `MOTION_INTENSITY 3`, không có scroll-reveal hay animation trang trí nào để tắt (`grep reveal` → 0). |
@@ -93,17 +93,73 @@ Trang chi tiết `variable_price`: dòng "Giá tạm tính" hiện `Báo giá sa
 
 ---
 
+## 7. Lighthouse trên bản build production (bổ sung 2026-07-23)
+
+Chạy `lighthouse@12`, hồ sơ mobile mặc định (4G chậm 1638 Kbps, RTT 150ms,
+CPU x4), trên bản build production phục vụ qua http tại `localhost:5173`.
+
+| Chỉ số | Trước | Sau | |
+|---|---|---|---|
+| Điểm hiệu năng | 45 | **60** | |
+| LCP | 15.7s | **10.5s** | ❌ vẫn hỏng ngưỡng 2.5s |
+| FCP | 6.4s | **4.9s** | |
+| TBT | 590ms | **130ms** | ✅ |
+| CLS | 0.003 | **0.003** | ✅ |
+| Tổng trọng lượng | ~2.7 MB | **1.34 MB** | |
+
+### Ba nguyên nhân, đã sửa hai
+
+1. **Material Symbols tải toàn bộ bộ icon: 1.126 MB** trên mọi trang, hơn một
+   nửa trọng lượng trang. Thêm `icon_names` giới hạn 180 icon → **53 KB (-95%)**.
+   Danh sách sinh bằng quét mọi chuỗi snake_case trong `src/` rồi giao với danh
+   mục 4222 icon chính thức của Google. Đã xác minh **không tên icon nào đến từ
+   API**. Kiểm chứng trên 8 trang công khai: 0 icon rơi về chữ; bộ đo có chứng
+   ngược (tên ngoài subset đo 240–456px, tên trong subset đúng 24px).
+2. **`logo.png` 400×400 nặng 166 KB** nhưng render ở 32–44px, trên mọi trang →
+   thu về 96px, **6.9 KB (-96%)**. Không vẽ lại, giữ nguyên pixel gốc.
+3. **Ảnh Cloudinary trả JPEG nguyên bản** → thêm `f_auto,q_auto`, **683 KB →
+   379 KB (-44%)**. Không đổi kích thước vì ảnh gốc vốn đã ~600px.
+
+### Vì sao LCP vẫn hỏng
+
+Phân rã LCP: TTFB 450ms (4%) · **Load Delay 9127ms (87%)** · Load Time 870ms
+(8%) · Render Delay 70ms (1%).
+
+87% thời gian là *chờ trước khi yêu cầu ảnh*. URL ảnh chỉ lộ ra sau khi tải JS →
+hydrate → gọi `/categories/active` + `/services` → render thẻ. Tối ưu tài sản
+không chạm được vào đoạn này. Sửa triệt để cần **SSR hoặc prerender màn hình
+đầu**, nằm ngoài phạm vi refactor UI.
+
+### Hai cảnh báo về phép đo
+
+- Lighthouse báo "Enable text compression, 447 KiB". Máy chủ tĩnh tạm tôi dựng để
+  đo **không nén**, nên con số LCP/FCP ở trên **bi quan hơn thực tế**.
+- Nhưng `handigo-web/nginx.conf` **cũng không bật gzip**, và ảnh nền
+  `nginx:1.27-alpine` để `gzip` ở dạng comment. Nghĩa là bản Docker thật cũng
+  không nén. Vercel thì tự nén. **Đây là hạ tầng, tôi không tự sửa** — xem nợ.
+
 ## Nợ ghi nhận
 
 1. Không phân trang; `limit: 100` viết cứng. 16 dịch vụ thì chưa sao, thêm nữa
    thì trang mobile dài vô tận (hiện 6408px cho 16 thẻ).
 2. Tìm kiếm theo tên tuỳ chọn cần endpoint phía server nếu muốn khôi phục.
 3. Sắp xếp theo độ phổ biến cần backend trả `totalCompletedOrders` cho dịch vụ.
-4. Lighthouse thật trên bản production chưa chạy.
-5. `CategoryIcon` vẫn import `lucide-react` (nhánh dead code với dữ liệu thật vì
+4. ~~Lighthouse thật chưa chạy~~ → đã chạy, xem mục 7. Nợ còn lại: **LCP 10.5s**
+   do chuỗi khởi động SPA; cần SSR/prerender màn hình đầu.
+5. **`nginx.conf` không bật gzip.** 447 KB text không nén mỗi lần tải trang trên
+   bản Docker. Ba dòng cấu hình, nhưng là thay đổi deploy nên chưa tự sửa.
+6. `f_auto,q_auto` mới áp cho ảnh dịch vụ (`serviceDisplay.ts`). `utils/imageUrl.ts`
+   dùng cho avatar và ảnh thợ vẫn trả URL nguyên bản.
+7. `CategoryIcon` vẫn import `lucide-react` (nhánh dead code với dữ liệu thật vì
    `category.icon` là URL SVG) — nằm trong đợt gỡ lucide toàn app.
-6. Trang hồ sơ thợ `/customer/providers/:id` chưa được audit thẩm mỹ, mới chỉ
+8. Trang hồ sơ thợ `/customer/providers/:id` chưa được audit thẩm mỹ, mới chỉ
    đồng bộ thuật ngữ.
+
+## Lưu ý cho người bảo trì
+
+Thêm icon Material Symbols mới vào mã thì **phải thêm tên vào `icon_names` trong
+`index.html`**, nếu không nó hiện ra dưới dạng chữ thay vì hình. Cách sinh lại
+danh sách được ghi trong chính chú thích ở `index.html`.
 
 ## Câu hỏi chưa giải quyết
 
