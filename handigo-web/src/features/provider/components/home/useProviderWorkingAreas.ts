@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { providerProfileApi } from "../../api/providerProfile.api";
 
-/** Khu vực hoạt động hiện tại của thợ, dùng cho thẻ bản đồ trên trang chủ. */
+/**
+ * Khu vực hoạt động và điểm đánh giá của thợ, lấy chung từ một lần gọi
+ * `getProfile()` — cùng response nên không tách thành hook riêng để khỏi gọi
+ * API hai lần.
+ */
 export function useProviderWorkingAreas() {
   const [workingAreas, setWorkingAreas] = useState<string[]>([]);
+  const [rating, setRating] = useState<{ average: number; total: number } | null>(null);
   const [isLoadingAreas, setIsLoadingAreas] = useState(true);
   const [areasError, setAreasError] = useState<string | null>(null);
 
@@ -33,6 +38,10 @@ export function useProviderWorkingAreas() {
               ? [legacyArea]
               : [],
         );
+        setRating({
+          average: profile.provider.averageRating,
+          total: profile.provider.totalFeedbacks,
+        });
         setAreasError(null);
       })
       .catch(() => {
@@ -51,5 +60,5 @@ export function useProviderWorkingAreas() {
     };
   }, []);
 
-  return { workingAreas, isLoadingAreas, areasError };
+  return { workingAreas, rating, isLoadingAreas, areasError };
 }

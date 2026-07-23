@@ -24,6 +24,7 @@ const ProviderHomePage = () => {
           totalOrders={data.totalOrders}
           activeOrders={data.activeOrders}
           todayIncome={data.todayIncome}
+          rating={data.rating}
         />
 
         <section className="grid grid-cols-1 gap-gutter lg:grid-cols-12">
@@ -34,7 +35,6 @@ const ProviderHomePage = () => {
               isLoadingEarnings={data.isLoadingEarnings}
               earningsError={data.earningsError}
               revenueChart={data.revenueChart}
-              maxRevenue={data.maxRevenue}
               revenueTotal={data.revenueTotal}
               revenueLabel={data.revenueRange.label}
             />

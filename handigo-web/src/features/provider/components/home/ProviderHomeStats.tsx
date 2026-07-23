@@ -34,12 +34,26 @@ interface ProviderHomeStatsProps {
   totalOrders: number;
   activeOrders: number;
   todayIncome: number;
+  /** `null` khi chưa tải xong hồ sơ. */
+  rating: { average: number; total: number } | null;
 }
+
+/**
+ * Thẻ "Đánh giá" trước đây viết cứng `4.9/5`, nên thợ vừa đăng ký và chưa có
+ * đơn nào cũng thấy 4.9/5. Nay lấy từ `averageRating`/`totalFeedbacks` thật và
+ * nói rõ khi chưa có đánh giá nào.
+ */
+const ratingValue = (rating: { average: number; total: number } | null) => {
+  if (!rating) return "...";
+  if (!rating.total) return "Chưa có";
+  return `${rating.average.toFixed(1)}/5`;
+};
 
 export function ProviderHomeStats({
   totalOrders,
   activeOrders,
   todayIncome,
+  rating,
 }: ProviderHomeStatsProps) {
   return (
     <section className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
@@ -64,7 +78,7 @@ export function ProviderHomeStats({
       <StatCard
         icon="star"
         label="Đánh giá"
-        value="4.9/5"
+        value={ratingValue(rating)}
         tone="bg-tertiary-fixed/30 text-tertiary"
       />
     </section>
