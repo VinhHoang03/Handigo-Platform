@@ -1,8 +1,11 @@
 import type { Order } from '@/types/booking';
 import { OrderChatButton } from '@/features/chat/components/OrderChatButton';
-import { providerStatusLabels, providerStatusStyles } from '../../utils/providerOrder.utils';
+import { getOrderStatusMeta } from '@/utils/orderStatus';
+import { toneOutlineClasses } from '@/utils/statusTone';
 
 export function OrderDetailHeader({ order }: { order: Order }) {
+  const status = getOrderStatusMeta(order.status);
+
   return (
     <header className="flex flex-col gap-md rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:flex-row sm:items-center sm:justify-between sm:p-lg">
       <div className="min-w-0">
@@ -13,8 +16,8 @@ export function OrderDetailHeader({ order }: { order: Order }) {
         <p className="mt-1 text-sm text-on-surface-variant">Theo dõi thông tin, tài chính và tiến độ trên cùng một màn hình.</p>
       </div>
       <div className="flex flex-wrap items-center gap-sm">
-        <span className={`inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-bold ${providerStatusStyles[order.status]}`}>
-          {providerStatusLabels[order.status]}
+        <span className={`inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-bold ${toneOutlineClasses[status.tone]}`}>
+          {status.label}
         </span>
         {['accepted', 'in_progress'].includes(order.status) && <OrderChatButton orderId={order._id} />}
       </div>

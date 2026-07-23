@@ -2,22 +2,23 @@ import { Link } from "react-router-dom";
 import type { Order } from "@/types/booking";
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { Skeleton } from "@/components/common/Skeleton";
+import { getOrderStatusMeta } from "@/utils/orderStatus";
+import { toneBorderClasses, toneTextClasses } from "@/utils/statusTone";
 import { formatProviderOrderAmount } from "../../utils/providerOrder.utils";
 import {
   formatDateTime,
   getCustomer,
   shortAddress,
-  statusLabels,
-  statusStyles,
 } from "./providerHome.utils";
 
 function BookingItem({ order }: { order: Order }) {
   const customer = getCustomer(order);
+  const status = getOrderStatusMeta(order.status);
 
   return (
     <Link
       to={`/provider/orders/${order._id}`}
-      className={`group flex flex-col gap-md rounded-2xl border-l-4 bg-surface-container-low p-md transition-all hover:bg-surface-container-lowest sm:flex-row sm:items-center sm:justify-between ${statusStyles[order.status]}`}
+      className={`group flex flex-col gap-md rounded-2xl border-l-4 bg-surface-container-low p-md transition-all hover:bg-surface-container-lowest sm:flex-row sm:items-center sm:justify-between ${toneBorderClasses[status.tone]}`}
     >
       <div className="flex min-w-0 items-center gap-md">
         <InitialsAvatar
@@ -48,8 +49,8 @@ function BookingItem({ order }: { order: Order }) {
         <p className="font-bold text-primary tabular-nums">
           {formatProviderOrderAmount(order)}
         </p>
-        <span className="text-[10px] font-bold uppercase tracking-tight">
-          {statusLabels[order.status]}
+        <span className={`text-[10px] font-bold uppercase tracking-tight ${toneTextClasses[status.tone]}`}>
+          {status.label}
         </span>
       </div>
     </Link>

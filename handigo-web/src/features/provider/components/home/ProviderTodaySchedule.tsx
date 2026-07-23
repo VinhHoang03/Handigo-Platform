@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import type { Order } from "@/types/booking";
 import { Skeleton } from "@/components/common/Skeleton";
-import { getOrderDate, shortAddress, statusLabels } from "./providerHome.utils";
+import { getOrderStatusMeta } from "@/utils/orderStatus";
+import { getOrderDate, shortAddress } from "./providerHome.utils";
 
 interface ProviderTodayScheduleProps {
   todaySchedule: Order[];
@@ -65,7 +66,7 @@ export function ProviderTodaySchedule({
                       </span>
                     )}
                     <span className="text-[10px] font-bold uppercase text-on-surface-variant">
-                      {statusLabels[order.status]}
+                      {getOrderStatusMeta(order.status).label}
                     </span>
                   </div>
                   <p className="text-xs font-bold uppercase text-primary">

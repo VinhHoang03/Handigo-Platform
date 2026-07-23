@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BookingHistoryCard, BookingPageHeader, BookingShell } from '../components/BookingComponents';
 import { BookingHistoryListSkeleton } from '../components/BookingSkeletons';
 import { AsyncState } from '@/components/common/AsyncState';
+import { getOrderStatusMeta } from '@/utils/orderStatus';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import type { Order } from '../../../types/booking';
@@ -70,21 +71,10 @@ const BookingHistoryPage = () => {
     }
   };
 
-  const mapStatusToLabel = (status: string): string => {
-    switch (status) {
-      case 'completed': return 'Đã hoàn thành';
-      case 'cancelled': return 'Đã hủy';
-      case 'created': return 'Đang xử lý';
-      case 'accepted': return 'Đã chấp nhận';
-      case 'in_progress': return 'Đang thực hiện';
-      default: return status;
-    }
-  };
-
   const formattedBookings: BookingListItem[] = (orders || []).map(order => ({
     id: order?._id || 'unknown',
     serviceName: order?.serviceId?.name || 'Dịch vụ',
-    statusLabel: mapStatusToLabel(order?.status || 'created'),
+    statusLabel: getOrderStatusMeta(order?.status || 'created').label,
     statusTone: mapStatusToTone(order?.status || 'created'),
     status: order?.status || 'created',
     schedule: order?.scheduledAt ? new Date(order.scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất',

@@ -39,16 +39,21 @@ export const toneTextClasses: Record<StatusTone, string> = {
   brand: 'text-primary',
 };
 
-/** Trạng thái đơn hàng của Handigo quy về tông tương ứng. */
-export const ORDER_STATUS_TONES: Record<string, StatusTone> = {
-  created: 'warning',
-  pending: 'warning',
-  accepted: 'brand',
-  in_progress: 'info',
-  active: 'info',
-  completed: 'success',
-  cancelled: 'error',
+/**
+ * Chỉ màu viền — dùng cho dải màu bên trái thẻ (`border-l-4`), nơi nền và chữ
+ * đã có màu riêng nên không được đè thêm.
+ */
+export const toneBorderClasses: Record<StatusTone, string> = {
+  success: 'border-success',
+  warning: 'border-warning',
+  error: 'border-error',
+  info: 'border-secondary',
+  neutral: 'border-outline-variant',
+  brand: 'border-primary',
 };
 
-export const getOrderStatusTone = (status?: string): StatusTone =>
-  (status && ORDER_STATUS_TONES[status]) || 'neutral';
+/*
+ * `ORDER_STATUS_TONES` / `getOrderStatusTone` từng nằm ở đây nhưng không nơi nào
+ * import — trong khi các trang vẫn tự dựng bảng màu riêng. Nhãn và tông của
+ * trạng thái đơn nay gom về `utils/orderStatus.ts` để chỉ có một nơi phải sửa.
+ */

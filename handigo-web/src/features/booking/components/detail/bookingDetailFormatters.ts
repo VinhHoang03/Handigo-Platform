@@ -1,21 +1,8 @@
 import type { Order, OrderQuotation } from "@/types/booking";
+import { getOrderStatusMeta } from "@/utils/orderStatus";
+import { toneChipClasses, toneTextClasses } from "@/utils/statusTone";
 
-export const getStatusLabel = (status: string) => {
-  switch (status) {
-    case "created":
-      return "Chờ xử lý";
-    case "accepted":
-      return "Đã xác nhận";
-    case "in_progress":
-      return "Đang thực hiện";
-    case "completed":
-      return "Đã hoàn thành";
-    case "cancelled":
-      return "Đã hủy";
-    default:
-      return status;
-  }
-};
+export const getStatusLabel = (status: string) => getOrderStatusMeta(status).label;
 
 export const getPaymentMethodLabel = (method: string) => {
   switch (method) {
@@ -50,7 +37,7 @@ export const getPaymentStatusDisplay = (
           refundPolicy && refundPolicy.paidAmount > refundPolicy.refundAmount
             ? `Đã hoàn ${formatCurrency(refundPolicy.refundAmount)} (${refundPolicy.refundRate}%)`
             : "Đã hoàn tiền",
-        className: "text-emerald-600",
+        className: toneTextClasses.success,
       };
     }
 
@@ -60,66 +47,66 @@ export const getPaymentStatusDisplay = (
     ) {
       return {
         label: "Đang xử lý hoàn tiền",
-        className: "text-amber-600",
+        className: toneTextClasses.warning,
       };
     }
 
     return {
       label: "Đã hủy, chưa phát sinh thanh toán",
-      className: "text-on-surface-variant",
+      className: toneTextClasses.neutral,
     };
   }
 
   if (currentOrder.paymentStatus === "refunded") {
     return {
       label: "Đã hoàn tiền",
-      className: "text-emerald-600",
+      className: toneTextClasses.success,
     };
   }
 
   if (currentOrder.inspectionRequired && hasPaidInitialPayment) {
     return {
       label: "Đã thanh toán tiền cọc",
-      className: "text-emerald-600",
+      className: toneTextClasses.success,
     };
   }
 
   if (currentOrder.paymentStatus === "paid") {
     return {
       label: "Đã thanh toán",
-      className: "text-emerald-600",
+      className: toneTextClasses.success,
     };
   }
 
   if (currentOrder.paymentStatus === "partially_paid") {
     return {
       label: "Đã thanh toán một phần",
-      className: "text-amber-600",
+      className: toneTextClasses.warning,
     };
   }
 
   if (hasPaidInitialPayment) {
     return {
       label: "Đã thanh toán",
-      className: "text-emerald-600",
+      className: toneTextClasses.success,
     };
   }
 
   if (isFlexiblePrice) {
     return {
       label: "Chờ báo giá",
-      className: "text-amber-600",
+      className: toneTextClasses.warning,
     };
   }
 
   if (currentOrder.paymentMethod === "cash") {
     return {
       label: "Thanh toán sau khi hoàn thành",
-      className: "text-on-surface-variant",
+      className: toneTextClasses.neutral,
     };
   }
 
-  return { label: "Chờ thanh toán", className: "text-primary" };
+  return { label: "Chờ thanh toán", className: toneTextClasses.brand };
 };
 
 export const getQuotationStatusLabel = (
@@ -146,13 +133,13 @@ export const getQuotationStatusClass = (
 ) => {
   switch (status) {
     case "approved":
-      return "bg-emerald-100 text-emerald-700";
+      return toneChipClasses.success;
     case "rejected":
     case "cancelled":
-      return "bg-red-100 text-red-700";
+      return toneChipClasses.error;
     case "expired":
-      return "bg-slate-100 text-slate-700";
+      return toneChipClasses.neutral;
     default:
-      return "bg-amber-100 text-amber-700 animate-pulse";
+      return toneChipClasses.warning + " animate-pulse";
   }
 };

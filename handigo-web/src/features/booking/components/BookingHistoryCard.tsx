@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ReliableImage } from '@/components/common/ReliableImage';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import { toneOutlineClasses } from '@/utils/statusTone';
+import { getOrderStatusMeta } from '@/utils/orderStatus';
 
 // Bảng màu quy về token ngữ nghĩa dùng chung, xem `utils/statusTone.ts`.
 const statusToneClass: Record<BookingStatusTone, string> = {
@@ -10,14 +11,6 @@ const statusToneClass: Record<BookingStatusTone, string> = {
   pending: toneOutlineClasses.warning,
   cancelled: toneOutlineClasses.error,
   active: toneOutlineClasses.info,
-};
-
-const orderStatusClass: Record<string, string> = {
-  created: toneOutlineClasses.warning,
-  accepted: toneOutlineClasses.brand,
-  in_progress: toneOutlineClasses.info,
-  completed: toneOutlineClasses.success,
-  cancelled: toneOutlineClasses.error,
 };
 
 export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ booking }) => {
@@ -66,7 +59,7 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
     </div>
 
     <div className="flex w-full shrink-0 flex-col gap-sm sm:w-auto sm:min-w-52 sm:items-end sm:self-stretch sm:justify-between">
-      <span className={`inline-flex h-8 w-fit min-w-28 items-center justify-center self-end rounded-full border px-3 text-center text-xs font-bold leading-none ${orderStatusClass[booking.status || ''] || (booking?.statusTone ? statusToneClass[booking.statusTone] : statusToneClass.pending)}`}>
+      <span className={`inline-flex h-8 w-fit min-w-28 items-center justify-center self-end rounded-full border px-3 text-center text-xs font-bold leading-none ${booking.status ? toneOutlineClasses[getOrderStatusMeta(booking.status).tone] : statusToneClass[booking?.statusTone || 'pending']}`}>
         {booking?.statusLabel || 'Đang xử lý'}
       </span>
       {booking?.rating ? (

@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../api/providerOrder.api';
-import { formatProviderOrderAmount, getCustomer, providerStatusLabels, providerStatusStyles } from '../utils/providerOrder.utils';
+import { getOrderStatusMeta } from '@/utils/orderStatus';
+import { toneChipClasses } from '@/utils/statusTone';
+import { formatProviderOrderAmount, getCustomer } from '../utils/providerOrder.utils';
 
 const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 const orderDate = (order: Order) => new Date(order.scheduledAt || order.createdAt);
@@ -117,7 +119,7 @@ export default function ProviderSchedulePage() {
                           <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${current ? 'bg-primary text-on-primary' : ''}`}>{date.getDate()}</span>
                           <span className="mt-1 block space-y-1">
                             {dayOrders.slice(0, 2).map((order) => (
-                              <span key={order._id} className={`block truncate rounded-md px-1.5 py-1 text-[10px] font-bold ${providerStatusStyles[order.status]}`}>{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · {order.serviceId?.name || 'Dịch vụ'}</span>
+                              <span key={order._id} className={`block truncate rounded-md px-1.5 py-1 text-[10px] font-bold ${toneChipClasses[getOrderStatusMeta(order.status).tone]}`}>{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · {order.serviceId?.name || 'Dịch vụ'}</span>
                             ))}
                             {dayOrders.length > 2 && <span className="block px-1 text-[10px] font-bold text-primary">+{dayOrders.length - 2} công việc</span>}
                           </span>
@@ -145,7 +147,7 @@ export default function ProviderSchedulePage() {
                     return (
                       <article key={order._id} className="rounded-2xl border border-outline-variant/30 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${providerStatusStyles[order.status]}`}>{providerStatusLabels[order.status]}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${toneChipClasses[getOrderStatusMeta(order.status).tone]}`}>{getOrderStatusMeta(order.status).label}</span>
                           <span className="text-xs text-on-surface-variant">{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <h3 className="mt-3 font-bold text-on-surface">{order.serviceId?.name || 'Dịch vụ'}</h3>

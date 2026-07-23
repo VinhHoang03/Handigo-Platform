@@ -6,22 +6,6 @@ export const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
-export const statusLabels: Record<Order["status"], string> = {
-  created: "Đang chờ",
-  accepted: "Đã nhận",
-  in_progress: "Đang làm",
-  completed: "Hoàn tất",
-  cancelled: "Đã hủy",
-};
-
-export const statusStyles: Record<Order["status"], string> = {
-  created: "border-primary text-primary",
-  accepted: "border-accent-cyan text-accent-cyan",
-  in_progress: "border-secondary text-secondary",
-  completed: "border-success text-success",
-  cancelled: "border-error text-error",
-};
-
 export type RevenuePeriod = "week" | "month";
 
 export const dateKey = (date: Date) => {
