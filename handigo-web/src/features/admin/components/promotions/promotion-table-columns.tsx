@@ -2,7 +2,7 @@ import type { DataTableColumn } from "@/components/common/dashboard/DataTable";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { Voucher } from "../../types/voucher.types";
 import { dateTime, discountText, money, statusValue } from "./promotion-format";
-import { Pencil, Trash2 } from "lucide-react";
+import { PauseCircle, Pencil, PlayCircle, Trash2 } from "lucide-react";
 
 interface VoucherColumnHandlers {
   onEdit: (voucher: Voucher) => void;
@@ -83,9 +83,7 @@ export const buildVoucherColumns = ({
           className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high"
           aria-label="Đổi trạng thái voucher"
         >
-          <span className="material-symbols-outlined text-[20px]">
-            {voucher.isActive && voucher.status === "ACTIVE" ? "pause_circle" : "play_circle"}
-          </span>
+          {voucher.isActive && voucher.status === "ACTIVE" ? <PauseCircle aria-hidden="true" size={20} /> : <PlayCircle aria-hidden="true" size={20} />}
         </button>
         <button
           onClick={() => onDelete(voucher)}

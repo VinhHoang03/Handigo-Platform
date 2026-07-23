@@ -54,9 +54,10 @@ function NotificationListItem({
       <span
         className={`mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${item.isRead ? "bg-surface-container-low text-on-surface-variant" : "bg-primary/10 text-primary"}`}
       >
-        <span className="material-symbols-outlined block text-[24px] leading-none">
-          {notificationTypeIcons[item.type]}
-        </span>
+        {(() => {
+          const TypeIcon = notificationTypeIcons[item.type];
+          return <TypeIcon aria-hidden="true" size={24} className="block" />;
+        })()}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

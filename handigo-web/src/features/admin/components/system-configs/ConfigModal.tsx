@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
 import type { ConfigFormState, ConfigItem } from "./config-definitions";
 import { formatValue } from "./system-config-format";
+import { ToggleLeft, ToggleRight } from "lucide-react";
 
 export function ConfigModal({
   item,
@@ -111,9 +112,7 @@ function ValueField({
             </span>
             <span className="text-sm">Bấm để chuyển trạng thái bật/tắt.</span>
           </span>
-          <span className="material-symbols-outlined text-[28px]">
-            {form.value === "true" ? "toggle_on" : "toggle_off"}
-          </span>
+          {form.value === "true" ? <ToggleRight aria-hidden="true" size={28} /> : <ToggleLeft aria-hidden="true" size={28} />}
         </button>
       </div>
     );

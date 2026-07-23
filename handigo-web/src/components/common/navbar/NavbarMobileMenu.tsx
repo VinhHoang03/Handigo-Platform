@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { Link } from "react-router-dom";
 import type { NavbarItem } from "./navbar.types";
+import { Menu, X } from "lucide-react";
 
 interface NavbarMobileMenuProps {
   navItems: NavbarItem[];
@@ -25,9 +26,7 @@ export function NavbarMobileMenu({
         onClick={() => setIsOpen((open) => !open)}
         className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-primary hover:bg-surface-container-low xl:hidden"
       >
-        <span className="material-symbols-outlined">
-          {isOpen ? "close" : "menu"}
-        </span>
+        {isOpen ? <X aria-hidden="true" size={24} /> : <Menu aria-hidden="true" size={24} />}
       </button>
 
       {isOpen && (

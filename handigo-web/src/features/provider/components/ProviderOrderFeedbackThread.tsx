@@ -138,7 +138,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
               </div>
               <div className="flex items-center gap-0.5" aria-label={`${feedback.rating} trên 5 sao`}>
                 {Array.from({ length: 5 }, (_, index) => (
-                  <span key={index} className={`material-symbols-outlined text-xl ${index < feedback.rating ? 'text-amber-500' : 'text-outline-variant'}`} style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  <Star key={index} aria-hidden="true" size={20} className={index < feedback.rating ? 'text-tertiary' : 'text-outline-variant'} fill={index < feedback.rating ? 'currentColor' : 'none'} />
                 ))}
               </div>
             </div>

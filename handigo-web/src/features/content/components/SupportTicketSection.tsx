@@ -9,7 +9,7 @@ import {
 } from "../hooks/useSupportTickets";
 import { SupportTicketCard, TicketListSkeleton } from "./SupportTicketCard";
 import { SupportTicketFilters } from "./SupportTicketFilters";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 
 export type { SupportRole };
 
@@ -43,9 +43,9 @@ export function SupportTicketSection({ role }: { role: SupportRole }) {
             >
               <span
                 aria-hidden="true"
-                className={`material-symbols-outlined text-[18px] leading-none ${support.loading ? "animate-spin" : ""}`}
+                className={support.loading ? "animate-spin" : ""}
               >
-                refresh
+                <RefreshCw aria-hidden="true" size={18} />
               </span>
               Làm mới
             </button>

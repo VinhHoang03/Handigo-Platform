@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarCheck, Loader2, Lock } from "lucide-react";
 interface OrderSummaryActionsProps {
   step: 1 | 2 | 3;
   orderType: string;
@@ -40,9 +40,7 @@ export const OrderSummaryActions: React.FC<OrderSummaryActionsProps> = ({
         ) : (
           <>
             {step === 3 ? (
-              <span className="material-symbols-outlined">
-                {orderType === 'normal' ? 'lock' : 'event_available'}
-              </span>
+              orderType === 'normal' ? <Lock aria-hidden="true" size={24} /> : <CalendarCheck aria-hidden="true" size={24} />
             ) : null}
             {actionLabel}
             <ArrowRight aria-hidden="true" size={24} />

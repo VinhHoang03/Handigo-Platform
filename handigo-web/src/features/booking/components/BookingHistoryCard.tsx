@@ -4,7 +4,7 @@ import { ReliableImage } from '@/components/common/ReliableImage';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import { toneOutlineClasses } from '@/utils/statusTone';
 import { getOrderStatusMeta } from '@/utils/orderStatus';
-import { Calendar, Star } from "lucide-react";
+import { Calendar, Info, Star, User } from "lucide-react";
 
 // Bảng màu quy về token ngữ nghĩa dùng chung, xem `utils/statusTone.ts`.
 const statusToneClass: Record<BookingStatusTone, string> = {
@@ -50,7 +50,7 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
           {booking?.schedule || 'Sớm nhất'}
         </span>
         <span className="flex items-center gap-1">
-          <span className="material-symbols-outlined text-[18px]">{booking?.statusTone === 'pending' ? 'info' : 'person'}</span>
+          {booking?.statusTone === 'pending' ? <Info aria-hidden="true" size={18} /> : <User aria-hidden="true" size={18} />}
           {booking?.meta || 'Đang cập nhật'}
         </span>
       </div>

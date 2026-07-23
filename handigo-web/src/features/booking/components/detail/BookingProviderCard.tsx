@@ -1,7 +1,7 @@
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import type { ProviderInfo } from "./bookingDetailProvider";
-import { Hammer, type LucideIcon, MapPin, Phone, Star } from "lucide-react";
+import { Banknote, Hammer, type LucideIcon, MapPin, Phone, Star, UserSearch } from "lucide-react";
 type ProviderDetailProps = {
   icon: LucideIcon;
   label: string;
@@ -89,9 +89,9 @@ export const BookingProviderCard = ({
       <div className="rounded-2xl bg-surface-container-low p-md text-center">
         <div className="mx-auto mb-sm grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-primary">
           <span
-            className={`material-symbols-outlined ${hasSuccessfulPayment ? "animate-pulse" : ""}`}
+            className={hasSuccessfulPayment ? "animate-pulse" : ""}
           >
-            {hasSuccessfulPayment ? "person_search" : "payments"}
+            {hasSuccessfulPayment ? <UserSearch aria-hidden="true" size={24} /> : <Banknote aria-hidden="true" size={24} />}
           </span>
         </div>
         <p className="text-sm font-semibold leading-5 text-on-surface">

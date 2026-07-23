@@ -4,9 +4,8 @@ import {
   homeApi,
   type CatalogSearchResult,
 } from "@/features/home/api/home.api";
-import { MaterialIcon } from "../common/MaterialIcon";
 import { HeroSearchResults } from "./HeroSearchResults";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, MapPin, Search } from "lucide-react";
 
 /**
  * Ô tìm kiếm chính của trang chủ: gợi ý dịch vụ theo từ khoá (debounce 250ms)
@@ -157,11 +156,11 @@ export const HeroSearch = () => {
         onClick={locate}
         className="flex flex-1 items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-surface-container-low"
       >
-        <MaterialIcon
-          className={`shrink-0 text-[20px] text-on-surface-variant ${isLocating ? "animate-spin" : ""}`}
-        >
-          {isLocating ? "progress_activity" : "location_on"}
-        </MaterialIcon>
+        {isLocating ? (
+          <Loader2 aria-hidden="true" size={20} className="shrink-0 animate-spin text-on-surface-variant" />
+        ) : (
+          <MapPin aria-hidden="true" size={20} className="shrink-0 text-on-surface-variant" />
+        )}
         <span className="truncate text-body-md text-on-surface-variant">
           {locationLabel}
         </span>

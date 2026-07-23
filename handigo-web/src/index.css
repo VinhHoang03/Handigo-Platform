@@ -281,11 +281,11 @@
   }
 
   .places-address-field__icon {
-    @apply pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-[21px] text-primary;
+    @apply pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-primary;
   }
 
   .places-address-field__loading {
-    @apply pointer-events-none absolute right-4 top-1/2 z-10 -translate-y-1/2 animate-spin text-[20px] text-primary;
+    @apply pointer-events-none absolute right-4 top-1/2 z-10 -translate-y-1/2 animate-spin text-primary;
   }
 
   .places-address-dropdown {
@@ -301,7 +301,7 @@
   }
 
   .places-address-option__icon {
-    @apply mt-0.5 text-[20px] text-primary;
+    @apply mt-0.5 text-primary;
   }
 
   .places-address-option__content {

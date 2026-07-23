@@ -1,6 +1,6 @@
 ---
 title: Hợp nhất icon về lucide-react
-status: in-progress
+status: completed
 created: 2026-07-23
 branch: feat/unify-icon-library
 blockedBy: []
@@ -64,14 +64,14 @@ component `LucideIcon` được, không cần bảng tra tên.
 
 ## Todo
 
-- [ ] Bảng ánh xạ 87 icon
-- [ ] Codemod chỗ viết cứng
-- [ ] 19 chỗ động
-- [ ] Ca riêng: sao đặc, spinner, aria-hidden
-- [ ] Xoá `MaterialIcon.tsx` và link Google Fonts
-- [ ] `tsc` + `eslint` + build sạch
-- [ ] Soát trình duyệt: trang chủ, đặt đơn, thợ, admin
-- [ ] Đo lại bundle và số request ngoài
+- [x] Bảng ánh xạ 137 icon (87 viết cứng + 50 trong dữ liệu)
+- [x] Codemod chỗ viết cứng
+- [x] 19 chỗ động
+- [x] Ca riêng: sao đặc, spinner, aria-hidden
+- [x] Xoá `MaterialIcon.tsx` và link Google Fonts
+- [x] `tsc` + `eslint` + build sạch
+- [x] Soát trình duyệt: trang chủ, đặt đơn, thợ, admin
+- [x] Đo lại bundle và số request ngoài
 
 ## Tiêu chí hoàn thành
 

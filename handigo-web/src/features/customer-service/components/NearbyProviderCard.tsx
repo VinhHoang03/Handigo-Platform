@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import type { NearbyProvider } from "../api/customerService.api";
-import { Star, UserSearch } from "lucide-react";
+import { CheckCircle2, PlusCircle, Star, UserSearch } from "lucide-react";
 
 const formatDistance = (distanceMeters: number) => {
   if (distanceMeters < 0) return "Chưa xác định khoảng cách";
@@ -95,9 +95,7 @@ export function NearbyProviderCard({
               : requireSelection
                 ? "Chọn thợ này"
                 : "Ưu tiên thợ này"}
-            <span className="material-symbols-outlined text-[18px]">
-              {isSelected ? "check_circle" : "add_circle"}
-            </span>
+            {isSelected ? <CheckCircle2 aria-hidden="true" size={18} /> : <PlusCircle aria-hidden="true" size={18} />}
           </button>
           {isSelected && !requireSelection && (
             <p className="mt-2 text-xs leading-5 text-on-surface-variant">

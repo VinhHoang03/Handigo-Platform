@@ -3,7 +3,7 @@ import { SectionHeader } from "../common/SectionHeader";
 import { TestimonialCardSkeleton } from "./HomeSkeletons";
 import { homeApi, type LatestFeedback } from "@/features/home/api/home.api";
 import { InitialsAvatar } from "../common/InitialsAvatar";
-import { MaterialIcon } from "../common/MaterialIcon";
+import { Star } from "lucide-react";
 
 /**
  * Nhận xét ngắn hơn ngưỡng này không nói được gì ("sạch, đẹp") mà lại chiếm trọn
@@ -38,13 +38,13 @@ const Quote = ({ feedback, large }: QuoteProps) => {
         aria-label={`${feedback.rating} trên 5 sao`}
       >
         {[0, 1, 2, 3, 4].map((star) => (
-          <MaterialIcon
+          <Star
             key={star}
-            filled={star < feedback.rating}
-            className={`text-base ${star < feedback.rating ? "text-tertiary" : "text-outline-variant"}`}
-          >
-            star
-          </MaterialIcon>
+            aria-hidden="true"
+            size={16}
+            className={star < feedback.rating ? "text-tertiary" : "text-outline-variant"}
+            fill={star < feedback.rating ? "currentColor" : "none"}
+          />
         ))}
       </div>
 

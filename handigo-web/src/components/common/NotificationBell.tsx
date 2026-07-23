@@ -34,9 +34,9 @@ export function NotificationBell({ role }: { role?: AppRole }) {
       <Link
         to={feed.notificationPath}
         aria-label="Thông báo"
-        className="material-symbols-outlined hidden rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary sm:inline-flex"
+        className="hidden rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary sm:inline-flex"
       >
-        notifications
+        <Bell aria-hidden="true" size={24} />
       </Link>
     );
   }

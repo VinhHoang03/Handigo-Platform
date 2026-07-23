@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { MaterialIcon } from "@/components/common/MaterialIcon";
 import {
   supportFaqs,
   type SupportFaqGroup,
 } from "../data/support-faq";
+import { ChevronDown } from "lucide-react";
 
 const GROUPS: SupportFaqGroup[] = [
   "Tài khoản",
@@ -102,11 +102,11 @@ export function SupportFaq({ query, group, onGroupChange }: SupportFaqProps) {
                       {faq.question}
                     </span>
                   </span>
-                  <MaterialIcon
-                    className={`mt-1 shrink-0 text-[22px] text-on-surface-variant transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                  >
-                    expand_more
-                  </MaterialIcon>
+                  <ChevronDown
+                    aria-hidden="true"
+                    size={22}
+                    className={`mt-1 shrink-0 text-on-surface-variant transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                  />
                 </button>
                 {isOpen && (
                   <p className="max-w-[80ch] pb-6 text-pretty leading-7 text-on-surface-variant">
