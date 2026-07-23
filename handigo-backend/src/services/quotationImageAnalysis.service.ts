@@ -50,7 +50,9 @@ const normalizePrice = (value: unknown) => {
   return Math.round(parsed);
 };
 
-const normalizeItems = (value: unknown): ScannedQuotationItem[] => {
+export const normalizeScannedQuotationItems = (
+  value: unknown,
+): ScannedQuotationItem[] => {
   const rawItems = Array.isArray((value as { items?: unknown })?.items)
     ? (value as { items: unknown[] }).items
     : [];
@@ -118,7 +120,7 @@ export const analyzeQuotationImage = async (
       },
     ]);
     const parsed = JSON.parse(extractJsonObject(result.response.text()));
-    items = normalizeItems(parsed);
+    items = normalizeScannedQuotationItems(parsed);
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError(

@@ -7,14 +7,23 @@ const allowedMimeTypes = new Set([
   "image/jpg",
   "image/png",
   "image/webp",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
+const SPREADSHEET_MIME_TYPE =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+const isSpreadsheetFile = (file: Express.Multer.File) =>
+  file.originalname.toLowerCase().endsWith(".xlsx") &&
+  [SPREADSHEET_MIME_TYPE, "application/octet-stream", "application/zip"].includes(
+    file.mimetype,
+  );
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
-    if (!allowedMimeTypes.has(file.mimetype)) {
-      callback(new Error("Chỉ chấp nhận ảnh JPG, JPEG, PNG hoặc WebP"));
+    if (!allowedMimeTypes.has(file.mimetype) && !isSpreadsheetFile(file)) {
+      callback(new Error("Chỉ chấp nhận ảnh JPG, JPEG, PNG, WebP hoặc tệp Excel .xlsx"));
       return;
     }
     callback(null, true);
@@ -30,22 +39,25 @@ export const uploadQuotationImage = (
     if (error) {
       const message =
         error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
-          ? "Ảnh hạng mục không được vượt quá 10 MB"
-          : error.message || "Không thể tải ảnh hạng mục lên";
+          ? "Tệp hạng mục không được vượt quá 10 MB"
+          : error.message || "Không thể tải tệp hạng mục lên";
       return res.status(400).json({ success: false, message });
     }
 
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Vui lòng chọn ảnh hạng mục cần quét",
+        message: "Vui lòng chọn ảnh hoặc tệp Excel chứa hạng mục",
       });
     }
 
-    if (!hasValidFileSignature(req.file.buffer, req.file.mimetype)) {
+    const signatureMimeType = isSpreadsheetFile(req.file)
+      ? SPREADSHEET_MIME_TYPE
+      : req.file.mimetype;
+    if (!hasValidFileSignature(req.file.buffer, signatureMimeType)) {
       return res.status(400).json({
         success: false,
-        message: "Nội dung tệp không khớp với định dạng ảnh đã khai báo",
+        message: "Nội dung tệp không khớp với định dạng đã khai báo",
       });
     }
 

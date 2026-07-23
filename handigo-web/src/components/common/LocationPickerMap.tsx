@@ -57,7 +57,8 @@ export function LocationPickerMap({
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> | Search by <a href="https://locationiq.com/">LocationIQ.com</a>',
     }).addTo(map);
     lastCenterRef.current = map.getCenter();
 

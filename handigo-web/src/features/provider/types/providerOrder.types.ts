@@ -58,12 +58,38 @@ export interface CreateQuotationPayload {
     unitPrice: number;
     note?: string;
   }>;
+  relevanceConfirmed?: boolean;
 }
 
 export type ScannedQuotationItem = CreateQuotationPayload['items'][number] & {
   description: string;
   note: string;
 };
+
+export type QuotationRelevanceLevel =
+  | 'relevant'
+  | 'uncertain'
+  | 'irrelevant';
+
+export interface QuotationRelevanceEvaluation {
+  index: number;
+  title: string;
+  level: QuotationRelevanceLevel;
+  confidence: number;
+  reason: string;
+}
+
+export interface QuotationRelevanceResult {
+  status: 'passed' | 'warning' | 'blocked';
+  serviceName: string;
+  evaluations: QuotationRelevanceEvaluation[];
+  systemWarning?: string;
+}
+
+export interface ScannedQuotationResult {
+  items: ScannedQuotationItem[];
+  relevance: QuotationRelevanceResult;
+}
 
 export interface ProviderOrdersResult {
   items: Order[];

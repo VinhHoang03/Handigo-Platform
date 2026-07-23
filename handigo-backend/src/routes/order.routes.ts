@@ -21,6 +21,7 @@ import {
   orderIdParamSchema,
   orderListQuerySchema,
   quotationIdParamSchema,
+  quotationItemsRelevanceSchema,
   recentOrderQuerySchema,
   reassignmentResponseSchema,
   rejectAssignmentSchema,
@@ -55,7 +56,10 @@ import {
   respondToReassignment,
 } from "../controllers/order.controller";
 import { getOrderTrackingRoute } from "../controllers/orderTracking.controller";
-import { scanQuotationItems } from "../controllers/quotationImageAnalysis.controller";
+import {
+  scanQuotationItems,
+  validateQuotationItemsRelevance,
+} from "../controllers/quotationImageAnalysis.controller";
 
 const router = Router();
 
@@ -115,6 +119,16 @@ router.post(
   ocrRateLimit,
   uploadQuotationImage,
   scanQuotationItems,
+);
+
+router.post(
+  "/:orderId/quotation-items/validate",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  ocrRateLimit,
+  validate(orderIdParamSchema, "params"),
+  validate(quotationItemsRelevanceSchema),
+  validateQuotationItemsRelevance,
 );
 
 router.get(
@@ -255,6 +269,7 @@ router.post(
   "/:orderId/quotations",
   roleMiddleware("PROVIDER"),
   approvedProviderMiddleware,
+  ocrRateLimit,
   validate(orderIdParamSchema, "params"),
   validate(createRepairQuotationSchema),
   createRepairQuotation,

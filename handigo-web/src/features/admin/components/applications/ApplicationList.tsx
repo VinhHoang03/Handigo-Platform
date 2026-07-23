@@ -1,3 +1,4 @@
+import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { AdminApplication } from "../../types/admin.types";
 
@@ -23,15 +24,10 @@ export function ApplicationList({
             {/* Header: Avatar & Status */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-1 items-center gap-3 min-w-0">
-                <img
-                  src={
-                    item.userId?.avatar ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      userName,
-                    )}`
-                  }
-                  alt=""
-                  className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-primary/10"
+                <InitialsAvatar
+                  name={userName}
+                  src={item.userId?.avatar}
+                  className="h-12 w-12 shrink-0 ring-2 ring-primary/10"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold text-on-surface">

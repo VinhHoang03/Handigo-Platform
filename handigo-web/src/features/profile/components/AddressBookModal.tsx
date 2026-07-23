@@ -1,31 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { LocateFixed, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
-import { LocationPickerMap } from "@/components/common/LocationPickerMap";
-import {
-  SearchableSelect,
-  type SearchableSelectOption,
-} from "@/components/common/SearchableSelect";
-import { FloatingTextarea } from "@/components/common/FloatingField";
-import { bookingApi } from "@/features/booking/api/booking.api";
-import {
-  getProvinces,
-  getWardsByProvince,
-  type AdministrativeUnit,
-} from "@/features/customer/api/vietnamAddress.api";
 import type {
   UserAddress,
   UserAddressPayload,
 } from "@/features/profile/types/profile.types";
-import { getErrorMessage } from "@/utils/apiError";
-import {
-  isValidVietnamesePhone,
-  normalizeVietnamesePhone,
-} from "@/utils/phoneValidation";
-
-type AddressFormState = UserAddressPayload & {
-  addressLine: string;
-};
+import { useAddressBookForm } from "@/features/profile/hooks/useAddressBookForm";
+import { AddressBookFormFields } from "./AddressBookFormFields";
 
 interface AddressBookModalProps {
   open: boolean;
@@ -43,166 +22,6 @@ interface AddressBookModalProps {
   ) => Promise<void> | void;
 }
 
-const EMPTY_ADDRESS_FORM: AddressFormState = {
-  recipientName: "",
-  recipientPhone: "",
-  addressLine: "",
-  fullAddress: "",
-  province: "",
-  provinceCode: undefined,
-  ward: "",
-  wardCode: undefined,
-  note: "",
-  isDefault: false,
-};
-
-const toSelectOptions = (
-  items: AdministrativeUnit[],
-): SearchableSelectOption[] =>
-  items.map((item) => ({
-    value: item.code,
-    label: item.name,
-    searchText: `${item.codeName} ${item.divisionType}`,
-  }));
-
-const normalizeAddressPart = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-const composeFullAddress = (
-  addressLine: string,
-  ward: string,
-  province: string,
-) => {
-  const parts = [addressLine.trim()];
-  const normalizedAddressLine = normalizeAddressPart(addressLine);
-
-  [ward, province]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .forEach((part) => {
-      if (!normalizedAddressLine.includes(normalizeAddressPart(part))) {
-        parts.push(part);
-      }
-    });
-
-  return parts.filter(Boolean).join(", ");
-};
-
-const extractAddressLine = (
-  fullAddress: string,
-  ward?: string,
-  province?: string,
-) => {
-  const administrativeParts = [ward, province]
-    .map((part) => part?.trim().toLowerCase())
-    .filter(Boolean);
-
-  return fullAddress
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => !administrativeParts.includes(part.toLowerCase()))
-    .join(", ")
-    .trim();
-};
-
-const extractStreetAddressLine = (
-  fullAddress: string,
-  ward?: string,
-  province?: string,
-) => {
-  const segments = fullAddress
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (!segments.length) return "";
-
-  const normalizedWard = normalizeAddressPart(ward || "");
-  const normalizedProvince = normalizeAddressPart(province || "");
-  const streetParts: string[] = [];
-
-  for (const segment of segments) {
-    const normalizedSegment = normalizeAddressPart(segment);
-    const isAdministrativeSegment =
-      normalizedSegment === normalizedWard ||
-      normalizedSegment === normalizedProvince ||
-      normalizedSegment.includes("viet nam") ||
-      normalizedSegment.includes("vietnam") ||
-      /\b\d{5,6}\b/.test(segment);
-
-    if (isAdministrativeSegment) break;
-    streetParts.push(segment);
-  }
-
-  return extractAddressLine(streetParts.join(" "), ward, province);
-};
-
-const findAdministrativeUnitByName = (
-  items: AdministrativeUnit[],
-  target: string,
-) => {
-  const normalizedTarget = normalizeAddressPart(target);
-  if (!normalizedTarget) return undefined;
-
-  return items.find((item) => {
-    const normalizedName = normalizeAddressPart(item.name);
-    const normalizedCodeName = normalizeAddressPart(item.codeName);
-    return (
-      normalizedName === normalizedTarget ||
-      normalizedCodeName === normalizedTarget ||
-      normalizedName.includes(normalizedTarget) ||
-      normalizedTarget.includes(normalizedName)
-    );
-  });
-};
-
-const clearGeocodedFields = (form: AddressFormState): AddressFormState => {
-  const next = { ...form };
-  delete next.latitude;
-  delete next.longitude;
-  delete next.placeId;
-  return next;
-};
-
-const toAddressForm = (
-  address: UserAddress | null | undefined,
-  addressCount: number,
-  defaultRecipient: AddressBookModalProps["defaultRecipient"],
-): AddressFormState => {
-  if (!address) {
-    return {
-      ...EMPTY_ADDRESS_FORM,
-      recipientName: defaultRecipient.name,
-      recipientPhone: defaultRecipient.phone,
-      isDefault: addressCount === 0,
-    };
-  }
-
-  return {
-    recipientName: address.recipientName || defaultRecipient.name,
-    recipientPhone: address.recipientPhone || defaultRecipient.phone,
-    addressLine: extractAddressLine(
-      address.fullAddress,
-      address.ward,
-      address.province,
-    ),
-    fullAddress: address.fullAddress,
-    province: address.province,
-    provinceCode: address.provinceCode,
-    ward: address.ward,
-    wardCode: address.wardCode,
-    latitude: address.latitude,
-    longitude: address.longitude,
-    placeId: address.placeId,
-    note: address.note || "",
-    isDefault: Boolean(address.isDefault),
-  };
-};
-
 export function AddressBookModal({
   open,
   address = null,
@@ -212,341 +31,32 @@ export function AddressBookModal({
   onClose,
   onSubmit,
 }: AddressBookModalProps) {
-  const [addressForm, setAddressForm] = useState<AddressFormState>(() =>
-    toAddressForm(address, addressCount, defaultRecipient),
-  );
-  const [addressFormError, setAddressFormError] = useState("");
-  const [administrativeError, setAdministrativeError] = useState("");
-  const [locationError, setLocationError] = useState("");
-  const [locationHint, setLocationHint] = useState("");
-  const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
-  const [wards, setWards] = useState<AdministrativeUnit[]>([]);
-  const [isProvinceLoading, setIsProvinceLoading] = useState(false);
-  const [isWardLoading, setIsWardLoading] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
-  const [isResolvingMapAddress, setIsResolvingMapAddress] = useState(false);
-  const mapRequestSequenceRef = useRef(0);
-
-  const provinceOptions = useMemo(
-    () => toSelectOptions(provinces),
-    [provinces],
-  );
-  const wardOptions = useMemo(() => toSelectOptions(wards), [wards]);
-
-  useEffect(() => {
-    if (!open || provinces.length > 0) return undefined;
-
-    let cancelled = false;
-
-    const loadProvinces = async () => {
-      try {
-        setIsProvinceLoading(true);
-        setAdministrativeError("");
-        const data = await getProvinces();
-        if (!cancelled) {
-          setProvinces(data);
-
-          if (addressForm.province && !addressForm.provinceCode) {
-            const matchedProvince = findAdministrativeUnitByName(
-              data,
-              addressForm.province,
-            );
-            if (matchedProvince) {
-              setAddressForm((current) => ({
-                ...current,
-                province: matchedProvince.name,
-                provinceCode: matchedProvince.code,
-              }));
-            }
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setAdministrativeError("Không tải được danh sách tỉnh/thành.");
-        }
-      } finally {
-        if (!cancelled) setIsProvinceLoading(false);
-      }
-    };
-
-    void loadProvinces();
-    return () => {
-      cancelled = true;
-    };
-  }, [addressForm.province, addressForm.provinceCode, open, provinces.length]);
-
-  useEffect(() => {
-    if (!open || !addressForm.provinceCode) return undefined;
-
-    let cancelled = false;
-
-    const loadWards = async () => {
-      try {
-        setIsWardLoading(true);
-        setAdministrativeError("");
-        const data = await getWardsByProvince(
-          addressForm.provinceCode as number,
-        );
-        if (!cancelled) {
-          setWards(data);
-
-          if (addressForm.ward && !addressForm.wardCode) {
-            const matchedWard = findAdministrativeUnitByName(
-              data,
-              addressForm.ward,
-            );
-            if (matchedWard) {
-              setAddressForm((current) => ({
-                ...current,
-                ward: matchedWard.name,
-                wardCode: matchedWard.code,
-              }));
-            }
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setAdministrativeError("Không tải được danh sách phường/xã.");
-        }
-      } finally {
-        if (!cancelled) setIsWardLoading(false);
-      }
-    };
-
-    void loadWards();
-    return () => {
-      cancelled = true;
-    };
-  }, [addressForm.provinceCode, addressForm.ward, addressForm.wardCode, open]);
-
-  const handleAddressInputChange = (
-    field: keyof AddressFormState,
-    value: string | boolean,
-  ) => {
-    setAddressForm((current) => {
-      const next = { ...current, [field]: value };
-      if (field === "addressLine") {
-        return clearGeocodedFields(next);
-      }
-      return next;
-    });
-  };
-
-  const handleProvinceChange = (option: SearchableSelectOption | null) => {
-    setAddressForm((current) =>
-      clearGeocodedFields({
-        ...current,
-        province: option?.label || "",
-        provinceCode: option?.value,
-        ward: "",
-        wardCode: undefined,
-      }),
-    );
-    setWards([]);
-    setLocationHint("");
-  };
-
-  const handleWardChange = (option: SearchableSelectOption | null) => {
-    setAddressForm((current) =>
-      clearGeocodedFields({
-        ...current,
-        ward: option?.label || "",
-        wardCode: option?.value,
-      }),
-    );
-    setLocationHint("");
-  };
-
-  const applyResolvedAddress = async (
-    currentAddress: Awaited<ReturnType<typeof bookingApi.reverseGeocode>>,
-  ) => {
-    const provinceSource =
-      provinces.length > 0 ? provinces : await getProvinces();
-    if (provinces.length === 0) {
-      setProvinces(provinceSource);
-    }
-
-    const matchedProvince = findAdministrativeUnitByName(
-      provinceSource,
-      currentAddress.province,
-    );
-    const wardSource = matchedProvince
-      ? await getWardsByProvince(matchedProvince.code)
-      : [];
-    const matchedWard = findAdministrativeUnitByName(
-      wardSource,
-      currentAddress.ward,
-    );
-
-    setAddressForm((current) => ({
-      ...current,
-      addressLine: extractStreetAddressLine(
-        currentAddress.fullAddress,
-        currentAddress.ward,
-        currentAddress.province,
-      ),
-      fullAddress: currentAddress.fullAddress,
-      province: matchedProvince?.name || currentAddress.province,
-      provinceCode: matchedProvince?.code,
-      ward: matchedWard?.name || currentAddress.ward,
-      wardCode: matchedWard?.code,
-      latitude: currentAddress.latitude,
-      longitude: currentAddress.longitude,
-      placeId: currentAddress.placeId,
-    }));
-    setWards(wardSource);
-  };
-
-  const updateAddressFromCoordinate = async (
-    latitude: number,
-    longitude: number,
-    successMessage: string,
-  ) => {
-    const requestSequence = ++mapRequestSequenceRef.current;
-    setLocationError("");
-    setIsResolvingMapAddress(true);
-
-    try {
-      const currentAddress = await bookingApi.reverseGeocode(
-        latitude,
-        longitude,
-      );
-      if (requestSequence !== mapRequestSequenceRef.current) return;
-
-      await applyResolvedAddress(currentAddress);
-      if (requestSequence !== mapRequestSequenceRef.current) return;
-      setLocationHint(successMessage);
-    } catch (error) {
-      if (requestSequence !== mapRequestSequenceRef.current) return;
-      setAddressForm((current) => ({
-        ...current,
-        latitude,
-        longitude,
-        placeId: undefined,
-      }));
-      setLocationError(
-        getErrorMessage(
-          error,
-          "Đã ghim tọa độ nhưng không thể xác định địa chỉ tại vị trí này. Vui lòng kiểm tra lại địa chỉ trước khi lưu.",
-        ),
-      );
-    } finally {
-      if (requestSequence === mapRequestSequenceRef.current) {
-        setIsResolvingMapAddress(false);
-      }
-    }
-  };
-
-  const handleUseCurrentLocation = () => {
-    setAddressFormError("");
-    setLocationError("");
-    setLocationHint("");
-
-    if (!navigator.geolocation) {
-      setLocationError("Trình duyệt không hỗ trợ định vị hiện tại.");
-      return;
-    }
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          await updateAddressFromCoordinate(
-            coords.latitude,
-            coords.longitude,
-            "Đã điền địa chỉ từ vị trí hiện tại. Kéo bản đồ nếu bạn muốn chỉnh ghim chính xác hơn.",
-          );
-        } catch (error) {
-          setLocationError(
-            getErrorMessage(
-              error,
-              "Không thể lấy địa chỉ từ vị trí hiện tại. Vui lòng thử lại.",
-            ),
-          );
-        } finally {
-          setIsLocating(false);
-        }
-      },
-      () => {
-        setLocationError(
-          "Không thể lấy vị trí hiện tại. Vui lòng kiểm tra quyền định vị.",
-        );
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
-    );
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setAddressFormError("");
-
-    const currentAddressLine = addressForm.addressLine.trim();
-
-    if (
-      !addressForm.recipientName.trim() ||
-      !addressForm.recipientPhone.trim() ||
-      !currentAddressLine ||
-      !addressForm.province.trim() ||
-      !addressForm.ward.trim()
-    ) {
-      setAddressFormError(
-        "Vui lòng nhập đầy đủ người nhận, số điện thoại và thông tin địa chỉ.",
-      );
-      return;
-    }
-
-    const normalizedRecipientPhone = normalizeVietnamesePhone(
-      addressForm.recipientPhone,
-    );
-
-    if (
-      !/^[\p{L}\p{M}]+(?: [\p{L}\p{M}]+)*$/u.test(
-        addressForm.recipientName.trim().replace(/\s+/g, " "),
-      )
-    ) {
-      setAddressFormError(
-        "Tên người nhận chỉ được chứa chữ cái và khoảng trắng.",
-      );
-      return;
-    }
-
-    if (!isValidVietnamesePhone(normalizedRecipientPhone)) {
-      setAddressFormError("Số điện thoại người nhận không hợp lệ.");
-      return;
-    }
-
-    const payload: UserAddressPayload = {
-      recipientName: addressForm.recipientName.trim().replace(/\s+/g, " "),
-      recipientPhone: normalizedRecipientPhone,
-      fullAddress: composeFullAddress(
-        currentAddressLine,
-        addressForm.ward,
-        addressForm.province,
-      ),
-      province: addressForm.province,
-      provinceCode: addressForm.provinceCode,
-      ward: addressForm.ward,
-      wardCode: addressForm.wardCode,
-      latitude: addressForm.latitude,
-      longitude: addressForm.longitude,
-      placeId: addressForm.placeId,
-      note: addressForm.note,
-      isDefault: addressForm.isDefault,
-    };
-
-    try {
-      await onSubmit(payload, address);
-      onClose();
-    } catch (submitError) {
-      setAddressFormError(
-        getErrorMessage(
-          submitError,
-          "Không thể lưu địa chỉ. Vui lòng thử lại.",
-        ),
-      );
-    }
-  };
+  const {
+    addressForm,
+    addressFormError,
+    administrativeError,
+    locationError,
+    locationHint,
+    provinceOptions,
+    wardOptions,
+    isProvinceLoading,
+    isWardLoading,
+    isLocating,
+    isResolvingMapAddress,
+    handleAddressInputChange,
+    handleProvinceChange,
+    handleWardChange,
+    handleUseCurrentLocation,
+    updateAddressFromCoordinate,
+    handleSubmit,
+  } = useAddressBookForm({
+    open,
+    address,
+    addressCount,
+    defaultRecipient,
+    onSubmit,
+    onClose,
+  });
 
   return (
     <Modal
@@ -568,124 +78,27 @@ export function AddressBookModal({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <label className="order-1 block space-y-2">
-            <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
-              Tên người nhận
-            </span>
-            <input
-              type="text"
-              value={addressForm.recipientName}
-              required
-              maxLength={120}
-              className="form-field__input pb-2 pt-2"
-              onChange={(event) =>
-                handleAddressInputChange("recipientName", event.target.value)
-              }
-            />
-          </label>
-
-          <label className="order-2 block space-y-2">
-            <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
-              Số điện thoại người nhận
-            </span>
-            <input
-              type="tel"
-              value={addressForm.recipientPhone}
-              required
-              className="form-field__input pb-2 pt-2"
-              onChange={(event) =>
-                handleAddressInputChange("recipientPhone", event.target.value)
-              }
-            />
-          </label>
-
-          <SearchableSelect
-            id="address-province"
-            label="Tỉnh / Thành phố"
-            value={addressForm.provinceCode}
-            options={provinceOptions}
-            loading={isProvinceLoading}
-            placeholder="Nhập để tìm kiếm tỉnh/thành"
-            emptyText="Không tìm thấy tỉnh/thành."
-            containerClassName="order-4"
-            onChange={handleProvinceChange}
-          />
-
-          <SearchableSelect
-            id="address-ward"
-            label="Phường / Xã"
-            value={addressForm.wardCode}
-            options={wardOptions}
-            loading={isWardLoading}
-            disabled={!addressForm.provinceCode}
-            placeholder="Nhập để tìm kiếm phường/xã"
-            emptyText="Không tìm thấy phường/xã."
-            containerClassName="order-5"
-            onChange={handleWardChange}
-          />
-
-          <label className="order-6 block space-y-2 md:col-span-2">
-            <span className="ml-1 block text-label-sm font-medium text-on-surface-variant">
-              Địa chỉ cụ thể
-            </span>
-            <input
-              type="text"
-              value={addressForm.addressLine}
-              minLength={2}
-              required
-              placeholder="Nhập số nhà, tên đường, tòa nhà..."
-              className="form-field__input pb-2 pt-2"
-              onChange={(event) =>
-                handleAddressInputChange("addressLine", event.target.value)
-              }
-            />
-          </label>
-
-          <div className="order-7 space-y-3 md:col-span-2">
-            <button
-              type="button"
-              disabled={isLocating || isResolvingMapAddress || isSaving}
-              onClick={handleUseCurrentLocation}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-outline-variant/50 bg-surface px-3.5 py-2 text-sm font-semibold text-on-surface transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLocating || isResolvingMapAddress ? (
-                <RefreshCw size={16} className="animate-spin" />
-              ) : (
-                <LocateFixed size={16} />
-              )}
-              {isLocating
-                ? "Đang lấy vị trí hiện tại..."
-                : isResolvingMapAddress
-                  ? "Đang xác định địa chỉ..."
-                  : "Định vị địa chỉ trên bản đồ"}
-            </button>
-
-            <LocationPickerMap
-              latitude={addressForm.latitude}
-              longitude={addressForm.longitude}
-              disabled={Boolean(isSaving || isResolvingMapAddress)}
-              isResolvingAddress={isResolvingMapAddress}
-              onPositionChange={(latitude, longitude) =>
-                void updateAddressFromCoordinate(
-                  latitude,
-                  longitude,
-                  "Đã cập nhật địa chỉ theo vị trí ghim trên bản đồ.",
-                )
-              }
-            />
-          </div>
-
-          <FloatingTextarea
-            id="address-note"
-            label="Ghi chú"
-            value={addressForm.note || ""}
-            rows={3}
-            maxLength={200}
-            containerClassName="order-8 md:col-span-2"
-            onValueChange={(value) => handleAddressInputChange("note", value)}
-          />
-        </div>
+        <AddressBookFormFields
+          addressForm={addressForm}
+          provinceOptions={provinceOptions}
+          wardOptions={wardOptions}
+          isProvinceLoading={isProvinceLoading}
+          isWardLoading={isWardLoading}
+          isLocating={isLocating}
+          isResolvingMapAddress={isResolvingMapAddress}
+          isSaving={isSaving}
+          onInputChange={handleAddressInputChange}
+          onProvinceChange={handleProvinceChange}
+          onWardChange={handleWardChange}
+          onUseCurrentLocation={handleUseCurrentLocation}
+          onPositionChange={(latitude, longitude) =>
+            void updateAddressFromCoordinate(
+              latitude,
+              longitude,
+              "Đã cập nhật địa chỉ theo vị trí ghim trên bản đồ.",
+            )
+          }
+        />
 
         <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-surface-container-low p-4">
           <input

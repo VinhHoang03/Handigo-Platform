@@ -5,7 +5,8 @@ import type {
   OrderAssignment,
   ProviderOrdersResult,
   QuotationDetail,
-  ScannedQuotationItem,
+  QuotationRelevanceResult,
+  ScannedQuotationResult,
 } from '../types/providerOrder.types';
 
 export const providerOrderApi = {
@@ -88,15 +89,27 @@ export const providerOrderApi = {
     return response.data.data;
   },
 
-  scanQuotationItems: async (file: File) => {
+  scanQuotationItems: async (orderId: string, file: File) => {
     const formData = new FormData();
     formData.append('image', file);
+    formData.append('orderId', orderId);
     const response = await api.post<{
       success: boolean;
-      data: { items: ScannedQuotationItem[] };
+      data: ScannedQuotationResult;
     }>('/orders/quotation-items/scan-image', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return response.data.data.items;
+    return response.data.data;
+  },
+
+  validateQuotationItems: async (
+    orderId: string,
+    items: CreateQuotationPayload['items'],
+  ) => {
+    const response = await api.post<{
+      success: boolean;
+      data: { relevance: QuotationRelevanceResult };
+    }>(`/orders/${orderId}/quotation-items/validate`, { items });
+    return response.data.data.relevance;
   },
 };
