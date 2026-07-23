@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
+import { Pagination } from '@/components/common/Pagination';
 import { providerOrderApi } from '../api/providerOrder.api';
 import { ProviderOrderCard } from '../components/ProviderOrderCard';
 import { PendingAssignmentsSection } from '../components/orders/PendingAssignmentsSection';
 import { ProviderOrdersListSkeleton } from '../components/orders/ProviderOrdersListSkeleton';
 import type { OrderAssignment } from '../types/providerOrder.types';
-import type { Order } from '@/types/booking';
+import type { Order, Pagination as PaginationData } from '@/types/booking';
 import { Search } from "lucide-react";
 
 const filters = [
@@ -15,10 +16,18 @@ const filters = [
   { label: 'Hoàn tất', value: 'completed' },
   { label: 'Đã hủy', value: 'cancelled' },
 ];
+const ORDERS_PER_PAGE = 5;
 
 export default function ProviderOrdersPage() {
   const [assignments, setAssignments] = useState<OrderAssignment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationData>({
+    page: 1,
+    limit: ORDERS_PER_PAGE,
+    total: 0,
+    totalPages: 0,
+  });
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -28,7 +37,10 @@ export default function ProviderOrdersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 500);
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 500);
     return () => window.clearTimeout(timer);
   }, [searchTerm]);
 
@@ -48,16 +60,23 @@ export default function ProviderOrdersPage() {
     setLoadingOrders(true);
     try {
       const statusParam = activeFilter === 'all' ? undefined : activeFilter;
-      const data = await providerOrderApi.getProviderOrders(1, 20, statusParam, debouncedSearch);
+      const data = await providerOrderApi.getProviderOrders(
+        page,
+        ORDERS_PER_PAGE,
+        statusParam,
+        debouncedSearch,
+      );
       setOrders(data.items);
+      setPagination(data.pagination);
       setError(null);
     } catch {
       setError('Không thể tải danh sách đơn dịch vụ.');
       setOrders([]);
+      setPagination((current) => ({ ...current, total: 0, totalPages: 0 }));
     } finally {
       setLoadingOrders(false);
     }
-  }, [activeFilter, debouncedSearch]);
+  }, [activeFilter, debouncedSearch, page]);
 
   useEffect(() => {
     void Promise.resolve().then(loadAssignments);
@@ -134,15 +153,15 @@ export default function ProviderOrdersPage() {
         />
 
         <section className="space-y-md">
-          <div className="flex flex-col gap-md md:flex-row md:items-center md:justify-between">
-            <h2 className="font-headline-md text-on-surface">Đơn đã nhận</h2>
-            <div className="relative w-full md:max-w-md">
+          <div className="flex justify-start">
+            <div className="relative w-full min-w-0 lg:max-w-3xl">
               <Search aria-hidden="true" size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Tìm mã đơn, dịch vụ..."
-                className="w-full rounded-full border border-outline-variant/40 bg-surface-container-lowest py-3 pl-12 pr-4 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                aria-label="Tìm kiếm đơn dịch vụ"
+                className="min-h-12 w-full min-w-0 rounded-full border border-outline-variant/40 bg-surface-container-lowest py-3 pl-12 pr-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
               />
             </div>
           </div>
@@ -152,7 +171,10 @@ export default function ProviderOrdersPage() {
               <button
                 key={filter.value}
                 type="button"
-                onClick={() => setActiveFilter(filter.value)}
+                onClick={() => {
+                  setActiveFilter(filter.value);
+                  setPage(1);
+                }}
                 className={`whitespace-nowrap rounded-full px-md py-2 text-sm font-medium transition-all ${
                   activeFilter === filter.value
                     ? 'bg-primary text-on-primary shadow-md'
@@ -177,6 +199,11 @@ export default function ProviderOrdersPage() {
               {orders.map((order) => (
                 <ProviderOrderCard key={order._id} order={order} />
               ))}
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                onChange={setPage}
+              />
             </div>
           )}
         </section>

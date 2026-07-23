@@ -10,10 +10,10 @@ const CreateBookingStep2Page = () => {
     recurrenceUnit, setRecurrenceUnit, recurrenceCount, setRecurrenceCount,
     customerAttachments, setPreferredProviderId,
     isUploadingImages, uploadError, formErrors, currentTimestamp,
-    todayInputValue, upcomingDates, recurringPreview, recurrenceCountOptions, isFromServiceDetail,
-    shouldShowSchedulePicker,
-    handleUploadImages, handleRemoveAttachment, handleOrderTypeChange, clearFormError,
-    handleSelectAddress, handleContinue, setProviderAvailability,
+    todayInputValue, upcomingDates, recurringPreview, recurrenceCountOptions,
+    isFromServiceDetail, shouldShowSchedulePicker,
+    handleUploadImages, handleRemoveAttachment, handleOrderTypeChange,
+    clearFormError, handleSelectAddress, handleContinue, setProviderAvailability,
   } = useCreateBookingStep2Form();
 
   return (
@@ -95,7 +95,6 @@ const CreateBookingStep2Page = () => {
           onAction={handleContinue}
         />
       </div>
-
     </OrderCreationShell>
   );
 };

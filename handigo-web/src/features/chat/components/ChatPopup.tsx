@@ -11,7 +11,8 @@ import { ChatReportDialog } from './ChatReportDialog';
 import { MessageComposer } from './MessageComposer';
 import { MessageThread } from './MessageThread';
 import { normalizeImageUrl } from '@/utils/imageUrl';
-import { MessageCircle, Minus, Wrench, X } from "lucide-react";
+import { useChatUiStore } from '../store/chatUi.store';
+import { MessageCircle, Minus, Wrench, X } from 'lucide-react';
 
 const sortMessages = (items: ChatMessage[]) => [...items].sort((a, b) => {
   const timeDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -29,6 +30,8 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
   const [reportOpen, setReportOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [partner, setPartner] = useState<{ fullName: string; avatar?: string | null } | null>(null);
+  const registerOpenPopup = useChatUiStore((state) => state.registerOpenPopup);
+  const unregisterOpenPopup = useChatUiStore((state) => state.unregisterOpenPopup);
   const menuRef = useRef<HTMLDivElement>(null);
   const addMessage = useCallback((message: ChatMessage) => {
     setMessages((items) => items.some((item) => item._id === message._id) ? items : sortMessages([...items, message]));
@@ -41,6 +44,12 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
   }, []);
 
   useChatSocket(open ? conversationId : null, addMessage, updateMessage, removeMessage);
+
+  useEffect(() => {
+    if (!open) return;
+    registerOpenPopup();
+    return unregisterOpenPopup;
+  }, [open, registerOpenPopup, unregisterOpenPopup]);
 
   useEffect(() => {
     if (!open) return;

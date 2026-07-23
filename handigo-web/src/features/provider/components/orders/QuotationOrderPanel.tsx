@@ -96,7 +96,13 @@ export function QuotationOrderPanel({
 
       {showQuotationForm && (
         <div className="h-full lg:col-span-2">
-          <RepairQuotationForm onSubmit={onCreateQuotation} onCancel={onCancel} busy={busy} />
+          <RepairQuotationForm
+            orderId={order._id}
+            serviceName={order.serviceId.name}
+            onSubmit={onCreateQuotation}
+            onCancel={onCancel}
+            busy={busy}
+          />
         </div>
       )}
 

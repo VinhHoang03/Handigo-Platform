@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthBootstrap } from "./components/auth/AuthBootstrap";
+import { RouteGuard } from "./components/common/RouteGuard";
 import { ToastProvider, ToastContainer } from "./components/common/Toast";
 import { SystemAlertProvider } from "./components/common/SystemAlert";
 import { useAuthStore } from "./features/auth/store/auth.store";
@@ -23,6 +24,10 @@ const ChatbotGate = lazy(() =>
   ),
 );
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+
+const WalletDepositResultPage = lazy(
+  () => import('./features/wallet/pages/WalletDepositResultPage'),
+);
 
 function PageLoading() {
   return (
@@ -73,6 +78,22 @@ function App() {
               {ProviderRoutes()}
               {AdminRoutes()}
               <Route path="*" element={<NotFoundPage />} />
+              <Route
+                path={'/wallet/deposit/success'}
+                element={
+                  <RouteGuard roles={['CUSTOMER', 'PROVIDER']}>
+                    <WalletDepositResultPage callback={'success'} />
+                  </RouteGuard>
+                }
+              />
+              <Route
+                path={'/wallet/deposit/cancel'}
+                element={
+                  <RouteGuard roles={['CUSTOMER', 'PROVIDER']}>
+                    <WalletDepositResultPage callback={'cancel'} />
+                  </RouteGuard>
+                }
+              />
             </Routes>
           </Suspense>
           <ProviderAssignmentModalGate />

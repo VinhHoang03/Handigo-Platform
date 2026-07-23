@@ -47,16 +47,26 @@ export const toSelectOptions = (
     searchText: `${item.codeName} ${item.divisionType}`,
   }));
 
+const normalizeAdministrativeUnitName = (value: string) =>
+  normalizeAddressPart(value)
+    .replace(/[.,_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(
+      /^(tinh|thanh pho|tp|phuong|xa|thi tran|đac khu|dac khu)\s+/,
+      "",
+    )
+    .trim();
+
 export const findAdministrativeUnitByName = (
   items: AdministrativeUnit[],
   target: string,
 ) => {
-  const normalizedTarget = normalizeAddressPart(target);
+  const normalizedTarget = normalizeAdministrativeUnitName(target);
   if (!normalizedTarget) return undefined;
 
   return items.find((item) => {
-    const normalizedName = normalizeAddressPart(item.name);
-    const normalizedCodeName = normalizeAddressPart(item.codeName);
+    const normalizedName = normalizeAdministrativeUnitName(item.name);
+    const normalizedCodeName = normalizeAdministrativeUnitName(item.codeName);
     return (
       normalizedName === normalizedTarget ||
       normalizedCodeName === normalizedTarget ||
