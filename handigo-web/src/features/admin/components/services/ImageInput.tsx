@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getErrorMessage } from '@/utils/apiError';
 import { categoryServiceApi } from '../../api/categoryService.api';
 import { isImageUrl } from './service.helpers';
+import { Image, Upload } from "lucide-react";
 
 interface ImageInputProps {
   value: string;
@@ -37,7 +38,7 @@ export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', input
         <label
           className={`inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary/90 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 ${uploading ? 'pointer-events-none opacity-60' : ''}`}
         >
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">upload</span>
+          <Upload aria-hidden="true" size={18} />
           {uploading ? 'Đang tải…' : 'Chọn ảnh'}
           <input type="file" name={`${inputName}-file`} accept="image/*" className="sr-only" onChange={(event) => void upload(event.target.files?.[0])} />
         </label>
@@ -47,7 +48,7 @@ export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', input
           {value && isImageUrl(value) ? (
             <img src={value} alt={`Xem trước ${label.toLowerCase()}`} width={64} height={64} className="h-full w-full object-cover" />
           ) : (
-            <span className="material-symbols-outlined text-3xl text-on-surface-variant" aria-hidden="true">image</span>
+            <Image aria-hidden="true" size={30} className="text-on-surface-variant" />
           )}
         </div>
         <div className="min-w-0 flex-1">

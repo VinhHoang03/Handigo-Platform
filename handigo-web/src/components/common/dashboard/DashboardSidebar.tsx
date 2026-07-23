@@ -5,6 +5,7 @@ import {
   isNavItemActive,
 } from "./dashboardNavigation";
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
+import { HardHat } from "lucide-react";
 
 interface DashboardSidebarProps {
   role: DashboardRole;
@@ -57,9 +58,7 @@ export function DashboardSidebar({
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
               }`}
             >
-              <span className="material-symbols-outlined shrink-0">
-                {item.icon}
-              </span>
+              <item.icon aria-hidden="true" size={24} className="shrink-0" />
               <span className="text-sm font-medium">{item.label}</span>
             </Link>
           );
@@ -77,9 +76,7 @@ export function DashboardSidebar({
           }
         >
           {switchVariant === "gradient" && (
-            <span className="material-symbols-outlined text-base">
-              engineering
-            </span>
+            <HardHat aria-hidden="true" size={16} />
           )}
           {switchLabel}
         </button>

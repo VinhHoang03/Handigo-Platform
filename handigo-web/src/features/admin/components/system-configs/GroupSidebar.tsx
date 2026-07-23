@@ -28,9 +28,7 @@ export function GroupSidebar({
             }`}
           >
             <span className="inline-flex min-w-0 items-center gap-2">
-              <span className="material-symbols-outlined text-[20px]">
-                {group.icon}
-              </span>
+              <group.icon aria-hidden="true" size={20} />
               <span className="truncate">{group.label}</span>
             </span>
             <span className="tabular-nums">{count}</span>

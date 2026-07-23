@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import { mapText } from "./constants";
 import type { Coordinate } from "./types";
+import { Loader2, MapPinOff } from "lucide-react";
 
 interface TrackingMapCanvasProps {
   compact: boolean;
@@ -38,24 +39,14 @@ export function TrackingMapCanvas({
           <div className="flex max-w-2xl items-center gap-4 rounded-2xl bg-surface-container-lowest/95 px-6 py-6 text-left shadow-lg ring-1 ring-outline-variant/30">
             {isGeocoding ? (
               <>
-                <span
-                  className="material-symbols-outlined shrink-0 animate-spin text-primary"
-                  style={{ fontSize: 40 }}
-                >
-                  progress_activity
-                </span>
+                <Loader2 aria-hidden="true" size={24} className="shrink-0 animate-spin text-primary" />
                 <p className="text-sm font-semibold text-on-surface">
                   Đang xác định toạ độ địa chỉ...
                 </p>
               </>
             ) : (
               <>
-                <span
-                  className="material-symbols-outlined shrink-0 text-warning"
-                  style={{ fontSize: 40 }}
-                >
-                  location_off
-                </span>
+                <MapPinOff aria-hidden="true" size={24} className="shrink-0 text-warning" />
                 <p className="text-sm font-semibold leading-relaxed text-on-surface">
                   {mapText.missingCoordinate}
                 </p>

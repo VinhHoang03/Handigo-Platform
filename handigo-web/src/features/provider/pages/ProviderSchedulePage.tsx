@@ -6,6 +6,7 @@ import { providerOrderApi } from '../api/providerOrder.api';
 import { getOrderStatusMeta } from '@/utils/orderStatus';
 import { toneChipClasses } from '@/utils/statusTone';
 import { formatProviderOrderAmount, getCustomer } from '../utils/providerOrder.utils';
+import { CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
 
 const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 const orderDate = (order: Order) => new Date(order.scheduledAt || order.createdAt);
@@ -94,8 +95,8 @@ export default function ProviderSchedulePage() {
                   {visibleMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
                 </h2>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => changeMonth(-1)} aria-label="Tháng trước" className="grid h-10 w-10 place-items-center rounded-xl border border-outline-variant/40 hover:bg-surface-container-low"><span className="material-symbols-outlined">chevron_left</span></button>
-                  <button type="button" onClick={() => changeMonth(1)} aria-label="Tháng sau" className="grid h-10 w-10 place-items-center rounded-xl border border-outline-variant/40 hover:bg-surface-container-low"><span className="material-symbols-outlined">chevron_right</span></button>
+                  <button type="button" onClick={() => changeMonth(-1)} aria-label="Tháng trước" className="grid h-10 w-10 place-items-center rounded-xl border border-outline-variant/40 hover:bg-surface-container-low"><ChevronLeft aria-hidden="true" size={24} /></button>
+                  <button type="button" onClick={() => changeMonth(1)} aria-label="Tháng sau" className="grid h-10 w-10 place-items-center rounded-xl border border-outline-variant/40 hover:bg-surface-container-low"><ChevronRight aria-hidden="true" size={24} /></button>
                 </div>
               </div>
 
@@ -163,7 +164,7 @@ export default function ProviderSchedulePage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border-2 border-dashed border-outline-variant/40 px-4 py-10 text-center">
-                  <span className="material-symbols-outlined text-4xl text-outline">event_available</span>
+                  <CalendarCheck aria-hidden="true" size={36} className="text-outline" />
                   <p className="mt-2 font-bold">Chưa có công việc</p>
                   <p className="mt-1 text-sm text-on-surface-variant">Ngày này chưa có lịch hẹn.</p>
                 </div>

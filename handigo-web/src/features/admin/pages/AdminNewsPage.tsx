@@ -8,6 +8,7 @@ import { NewsFormModal } from "../components/news/NewsFormModal";
 import { NewsStatsBar } from "../components/news/NewsStatsBar";
 import { newsTableColumns } from "../components/news/news-table-columns";
 import { useAdminNewsController } from "../components/news/useAdminNewsController";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 
 export default function AdminNewsPage() {
   const news = useAdminNewsController();
@@ -25,7 +26,7 @@ export default function AdminNewsPage() {
             onClick={news.openCreate}
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 font-bold text-on-primary shadow-md hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20"
           >
-            <span aria-hidden="true" className="material-symbols-outlined block text-[20px] leading-none">add</span>
+            <Plus aria-hidden="true" size={20} className="block leading-none" />
             Đăng bài mới
           </button>
         </header>
@@ -68,10 +69,10 @@ export default function AdminNewsPage() {
                 render: (article) => (
                   <div className="flex justify-end gap-1">
                     <button type="button" onClick={() => news.openEdit(article)} aria-label={`Sửa ${article.title}`} className="grid h-10 w-10 place-items-center rounded-lg text-primary hover:bg-primary/10">
-                      <span className="material-symbols-outlined block text-[20px] leading-none">edit</span>
+                      <Pencil aria-hidden="true" size={20} className="block leading-none" />
                     </button>
                     <button type="button" onClick={() => news.setDeleteTarget(article)} aria-label={`Xóa ${article.title}`} className="grid h-10 w-10 place-items-center rounded-lg text-error hover:bg-error/10">
-                      <span className="material-symbols-outlined block text-[20px] leading-none">delete</span>
+                      <Trash2 aria-hidden="true" size={20} className="block leading-none" />
                     </button>
                   </div>
                 ),

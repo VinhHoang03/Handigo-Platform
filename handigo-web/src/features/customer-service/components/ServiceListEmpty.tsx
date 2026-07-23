@@ -1,4 +1,4 @@
-import { MaterialIcon } from "@/components/common/MaterialIcon";
+import { SearchX } from "lucide-react";
 
 interface ServiceListEmptyProps {
   search: string;
@@ -25,9 +25,7 @@ export function ServiceListEmpty({
   return (
     <div className="rounded-3xl border border-outline-variant/30 bg-surface-container-low p-10 text-center">
       <span className="grid h-14 w-14 place-items-center justify-self-center rounded-2xl bg-surface-container text-on-surface-variant">
-        <MaterialIcon className="text-2xl">
-          search_off
-        </MaterialIcon>
+        <SearchX aria-hidden="true" size={24} />
       </span>
 
       <p className="mt-5 text-lg font-semibold text-on-surface">

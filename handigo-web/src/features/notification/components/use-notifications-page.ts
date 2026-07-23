@@ -7,6 +7,7 @@ import type {
 import { getNotificationErrorMessage } from "./notification-error";
 import type { SendFormState } from "./SendNotificationModal";
 import { useNotificationsFetch } from "./use-notifications-fetch";
+import { Bell, Inbox, MailOpen } from "lucide-react";
 
 export type NotificationRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
@@ -56,9 +57,9 @@ export function useNotificationsPageController(role: NotificationRole) {
   const stats = useMemo(() => {
     const readOnPage = items.filter((item) => item.isRead).length;
     return [
-      { icon: "notifications", label: "Chưa đọc", value: unreadCount },
-      { icon: "drafts", label: "Đã đọc trên trang", value: readOnPage },
-      { icon: "inbox", label: "Tổng trên trang", value: items.length },
+      { icon: Bell, label: "Chưa đọc", value: unreadCount },
+      { icon: MailOpen, label: "Đã đọc trên trang", value: readOnPage },
+      { icon: Inbox, label: "Tổng trên trang", value: items.length },
     ];
   }, [items, unreadCount]);
 

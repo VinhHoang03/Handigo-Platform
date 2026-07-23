@@ -10,6 +10,7 @@ import {
 } from "../components/SupportTicketSection";
 import { supportCategories } from "../data/supportData";
 import type { SupportFaqGroup } from "../data/support-faq";
+import { Search } from "lucide-react";
 
 interface SupportPageProps {
   role?: SupportRole;
@@ -43,12 +44,7 @@ export default function SupportPage({ role }: SupportPageProps) {
         </h1>
 
         <div className="relative mx-auto mt-8 max-w-2xl">
-          <span
-            aria-hidden="true"
-            className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-xl leading-none text-on-surface-variant"
-          >
-            search
-          </span>
+          <Search aria-hidden="true" size={20} className="absolute left-5 top-1/2 -translate-y-1/2 leading-none text-on-surface-variant" />
           <input
             value={faqQuery}
             onChange={(event) => setFaqQuery(event.target.value)}

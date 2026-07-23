@@ -2,6 +2,7 @@ import { AddressBookManager } from '@/features/profile/components/AddressBookMan
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import type { UserAddress } from '@/features/profile/types/profile.types';
 import { MIN_DESCRIPTION_LENGTH } from './step2Helpers';
+import { ImagePlus, Loader2, X } from "lucide-react";
 
 interface Step2ExecutionInfoSectionProps {
   addressId?: string;
@@ -77,9 +78,11 @@ export const Step2ExecutionInfoSection = ({
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-sm">
           <label className={`aspect-[4/3] rounded-2xl border-2 border-dashed border-outline-variant hover:border-primary flex flex-col items-center justify-center cursor-pointer transition-colors group bg-surface-container-lowest ${isUploadingImages ? 'pointer-events-none opacity-60' : ''}`}>
-            <span className={`material-symbols-outlined text-primary transition-transform ${isUploadingImages ? 'animate-spin' : 'group-hover:scale-110'}`}>
-              {isUploadingImages ? 'progress_activity' : 'add_a_photo'}
-            </span>
+            {isUploadingImages ? (
+              <Loader2 aria-hidden="true" size={24} className="animate-spin text-primary" />
+            ) : (
+              <ImagePlus aria-hidden="true" size={24} className="text-primary transition-transform group-hover:scale-110" />
+            )}
             <span className="mt-1 text-xs font-bold text-primary">
               {isUploadingImages ? 'Đang tải…' : 'Tải ảnh'}
             </span>
@@ -105,7 +108,7 @@ export const Step2ExecutionInfoSection = ({
                 onClick={() => onRemoveAttachment(url)}
                 className="absolute top-1 right-1 bg-black/55 text-on-primary rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <span className="material-symbols-outlined text-xs">close</span>
+                <X aria-hidden="true" size={12} />
               </button>
             </div>
           ))}

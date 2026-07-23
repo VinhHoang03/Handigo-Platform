@@ -1,21 +1,22 @@
+import { Banknote, Bug, LifeBuoy, Mail, MessageSquare, UserCog, Wrench } from "lucide-react";
 export const supportCategories = [
   {
-    icon: 'manage_accounts',
+    icon: UserCog,
     title: 'Tài khoản',
     text: 'Bảo mật, thông tin cá nhân và cài đặt ứng dụng.',
   },
   {
-    icon: 'payments',
+    icon: Banknote,
     title: 'Thanh toán',
     text: 'Hóa đơn, hoàn tiền và phương thức thanh toán.',
   },
   {
-    icon: 'home_repair_service',
+    icon: Wrench,
     title: 'Dịch vụ',
     text: 'Chất lượng dịch vụ, lịch hẹn và phản hồi thợ.',
   },
   {
-    icon: 'bug_report',
+    icon: Bug,
     title: 'Lỗi kỹ thuật',
     text: 'Sự cố ứng dụng hoặc lỗi trong quá trình đặt lịch.',
   },
@@ -27,21 +28,21 @@ export const supportCategories = [
 
 export const supportChannels = [
   {
-    icon: 'support_agent',
+    icon: LifeBuoy,
     title: 'Tổng đài hỗ trợ',
     value: '1900 1234',
     text: 'Phục vụ hằng ngày từ 7:00 đến 22:00.',
     href: 'tel:19001234',
   },
   {
-    icon: 'mail',
+    icon: Mail,
     title: 'Email chăm sóc khách hàng',
     value: 'support@handigo.vn',
     text: 'Phù hợp cho yêu cầu cần mô tả chi tiết hoặc gửi kèm hình ảnh.',
     href: 'mailto:support@handigo.vn',
   },
   {
-    icon: 'chat',
+    icon: MessageSquare,
     title: 'Hỗ trợ trong ứng dụng',
     value: 'Trò chuyện với Handigo',
     text: 'Theo dõi và phản hồi trực tiếp theo từng yêu cầu đã gửi.',

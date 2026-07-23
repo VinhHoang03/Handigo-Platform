@@ -1,5 +1,5 @@
-import { MaterialIcon } from "@/components/common/MaterialIcon";
 import type { ServiceSortKey } from "../hooks/useServiceCatalog";
+import { ArrowUpDown, Search, SlidersHorizontal, X } from "lucide-react";
 
 interface ServiceListToolbarProps {
   title: string;
@@ -50,11 +50,7 @@ export function ServiceListToolbar({
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <MaterialIcon
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
-          >
-            search
-          </MaterialIcon>
+          <Search aria-hidden="true" size={24} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
@@ -69,7 +65,7 @@ export function ServiceListToolbar({
               aria-label="Xoá từ khoá"
               className="absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant hover:bg-surface-container"
             >
-              <MaterialIcon className="text-[20px]">close</MaterialIcon>
+              <X aria-hidden="true" size={20} />
             </button>
           )}
         </div>
@@ -80,9 +76,7 @@ export function ServiceListToolbar({
             onClick={onOpenFilters}
             className="flex min-h-14 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 text-sm font-semibold text-on-surface md:hidden"
           >
-            <MaterialIcon className="text-[20px]">
-              tune
-            </MaterialIcon>
+            <SlidersHorizontal aria-hidden="true" size={20} />
             Danh mục
             {activeFilterCount > 0 && (
               <span className="grid h-6 min-w-6 place-items-center rounded-full bg-primary px-1.5 text-xs font-bold text-on-primary">
@@ -93,11 +87,7 @@ export function ServiceListToolbar({
 
           <label className="flex min-h-14 flex-1 items-center gap-2 whitespace-nowrap rounded-full border border-outline-variant/50 bg-surface-container-lowest px-4 sm:flex-none">
             <span className="sr-only">Sắp xếp theo</span>
-            <MaterialIcon
-              className="text-[20px] text-on-surface-variant"
-            >
-              swap_vert
-            </MaterialIcon>
+            <ArrowUpDown aria-hidden="true" size={20} className="text-on-surface-variant" />
             <select
               value={sortBy}
               onChange={(event) =>

@@ -1,4 +1,5 @@
 import type { Category } from '../../types/categoryService.types';
+import { RefreshCw, Search } from "lucide-react";
 
 interface ServiceFilterBarProps {
   search: string;
@@ -35,7 +36,7 @@ export function ServiceFilterBar({
     <div className="flex flex-col gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm lg:flex-row lg:items-center">
       <label className="relative min-w-0 flex-1">
         <span className="sr-only">Tìm kiếm dịch vụ</span>
-        <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60" aria-hidden="true">search</span>
+        <Search aria-hidden="true" size={24} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60" />
         <input
           type="search"
           name="service-search"
@@ -89,7 +90,7 @@ export function ServiceFilterBar({
         className="flex h-11 min-w-11 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant transition-colors hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         aria-label="Tải lại danh sách"
       >
-        <span className="material-symbols-outlined" aria-hidden="true">refresh</span>
+        <RefreshCw aria-hidden="true" size={24} />
       </button>
     </div>
   );

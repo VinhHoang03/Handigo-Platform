@@ -1,5 +1,6 @@
 import { ReliableImage } from '@/components/common/ReliableImage';
 import type { Order } from '../../../types/booking';
+import { Clock, MapPin } from "lucide-react";
 
 interface BookingSuccessOrderCardProps {
   order: Order;
@@ -38,7 +39,7 @@ export const BookingSuccessOrderCard = ({ order, addressText }: BookingSuccessOr
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-md border-t border-outline-variant/30 pt-md">
         <div className="flex items-start gap-sm">
           <div className="p-2 bg-surface-container rounded-lg text-primary">
-            <span className="material-symbols-outlined">schedule</span>
+            <Clock aria-hidden="true" size={24} />
           </div>
           <div>
             <p className="font-label-sm text-on-surface-variant">Thời gian</p>
@@ -50,7 +51,7 @@ export const BookingSuccessOrderCard = ({ order, addressText }: BookingSuccessOr
         {addressText && (
           <div className="flex items-start gap-sm">
             <div className="p-2 bg-surface-container rounded-lg text-primary">
-              <span className="material-symbols-outlined">location_on</span>
+              <MapPin aria-hidden="true" size={24} />
             </div>
             <div>
               <p className="font-label-sm text-on-surface-variant">Địa chỉ</p>

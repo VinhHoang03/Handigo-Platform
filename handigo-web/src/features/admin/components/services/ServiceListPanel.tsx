@@ -1,5 +1,6 @@
 import type { Category, Service } from '../../types/categoryService.types';
 import { getCategoryId, getPriceLabel, isImageUrl } from './service.helpers';
+import { SearchX, Wrench } from "lucide-react";
 
 interface ServiceListPanelProps {
   services: Service[];
@@ -25,7 +26,7 @@ export function ServiceListPanel({ services, categories, loading, selectedServic
         {loading && <div className="rounded-lg bg-surface-container-low p-6 text-center text-on-surface-variant">Đang tải…</div>}
         {!loading && services.length === 0 && (
           <div className="rounded-lg border border-dashed border-outline-variant p-6 text-center">
-            <span className="material-symbols-outlined text-3xl text-on-surface-variant" aria-hidden="true">search_off</span>
+            <SearchX aria-hidden="true" size={30} className="text-on-surface-variant" />
             <p className="mt-2 font-semibold text-on-surface">Không tìm thấy dịch vụ</p>
             <p className="mt-1 text-sm text-on-surface-variant">Thử thay đổi từ khóa hoặc xóa bộ lọc hiện tại.</p>
             {hasFilters && (
@@ -51,7 +52,7 @@ export function ServiceListPanel({ services, categories, loading, selectedServic
                     {service.image && isImageUrl(service.image) ? (
                       <img src={service.image} alt="" aria-hidden="true" width={64} height={64} loading="lazy" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="material-symbols-outlined flex h-full w-full items-center justify-center text-on-surface-variant" aria-hidden="true">home_repair_service</span>
+                      <Wrench aria-hidden="true" size={24} className="flex h-full w-full items-center justify-center text-on-surface-variant" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">

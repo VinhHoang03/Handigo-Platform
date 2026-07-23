@@ -6,6 +6,7 @@ import { NotificationBell } from "@/components/common/NotificationBell";
 import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { MessageCenter } from "@/features/chat/components/MessageCenter";
+import { ChevronRight, House, LogOut, User, Wallet } from "lucide-react";
 
 interface ProviderTopbarProps {
   userAvatar?: string | null;
@@ -69,14 +70,12 @@ export function ProviderTopbar({
             to="/"
             className="flex items-center gap-1.5 text-on-surface-variant transition-colors hover:text-primary"
           >
-            <span className="material-symbols-outlined !text-[20px]">home</span>
+            <House aria-hidden="true" size={24} className="!text-[20px]" />
             <span className="text-[13px] font-medium text-on-surface">
               Trang chủ
             </span>
           </Link>
-          <span className="material-symbols-outlined pointer-events-none select-none !text-sm text-outline-variant">
-            chevron_right
-          </span>
+          <ChevronRight aria-hidden="true" size={24} className="pointer-events-none select-none !text-sm text-outline-variant" />
           <p className="text-[10px] font-bold uppercase tracking-[0.05em] text-primary/80">
             Kênh của tôi
           </p>
@@ -149,9 +148,7 @@ export function ProviderTopbar({
                     onClick={() => setIsAccountOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
                   >
-                    <span className="material-symbols-outlined !text-[20px]">
-                      person
-                    </span>
+                    <User aria-hidden="true" size={24} className="!text-[20px]" />
                     Hồ sơ cá nhân
                   </Link>
                   <Link
@@ -159,9 +156,7 @@ export function ProviderTopbar({
                     onClick={() => setIsAccountOpen(false)}
                     className="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
                   >
-                    <span className="material-symbols-outlined !text-[20px]">
-                      account_balance_wallet
-                    </span>
+                    <Wallet aria-hidden="true" size={24} className="!text-[20px]" />
                     Ví
                   </Link>
                   <button
@@ -169,9 +164,7 @@ export function ProviderTopbar({
                     onClick={requestLogout}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-error transition hover:bg-error/10"
                   >
-                    <span className="material-symbols-outlined !text-[20px]">
-                      logout
-                    </span>
+                    <LogOut aria-hidden="true" size={24} className="!text-[20px]" />
                     Đăng xuất
                   </button>
                 </div>

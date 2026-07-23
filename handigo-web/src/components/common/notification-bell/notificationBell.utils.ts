@@ -2,14 +2,15 @@ import type {
   NotificationType,
 } from "@/features/notification/types/notification.types";
 import type { AppRole } from "../Navbar";
+import { Banknote, FileSpreadsheet, type LucideIcon, Megaphone, ReceiptText, Tag, Wallet } from "lucide-react";
 
-export const typeIcons: Record<NotificationType, string> = {
-  ORDER: "receipt_long",
-  PAYMENT: "payments",
-  QUOTATION: "request_quote",
-  WITHDRAWAL: "account_balance_wallet",
-  PROMOTION: "local_offer",
-  SYSTEM: "campaign",
+export const typeIcons: Record<NotificationType, LucideIcon> = {
+  ORDER: ReceiptText,
+  PAYMENT: Banknote,
+  QUOTATION: FileSpreadsheet,
+  WITHDRAWAL: Wallet,
+  PROMOTION: Tag,
+  SYSTEM: Megaphone,
 };
 
 export const dateTime = new Intl.DateTimeFormat("vi-VN", {

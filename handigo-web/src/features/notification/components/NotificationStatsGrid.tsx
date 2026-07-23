@@ -1,5 +1,6 @@
+import type { LucideIcon } from "lucide-react";
 export type NotificationStat = {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: number;
 };
@@ -17,9 +18,7 @@ export function NotificationStatsGrid({
           className="flex items-center gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm"
         >
           <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <span className="material-symbols-outlined block text-[24px] leading-none">
-              {item.icon}
-            </span>
+            <item.icon aria-hidden="true" size={24} className="block leading-none" />
           </span>
           <div>
             <p className="text-sm text-on-surface-variant">{item.label}</p>

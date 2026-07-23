@@ -1,4 +1,3 @@
-import { MaterialIcon } from "@/components/common/MaterialIcon";
 import { aboutCommitments, coreValues } from "../data/aboutData";
 
 /**
@@ -25,9 +24,7 @@ export function AboutValues() {
           <ul className="mt-8 space-y-7">
             {aboutCommitments.map((item) => (
               <li key={item.title} className="flex items-start gap-4">
-                <MaterialIcon className="mt-0.5 shrink-0 text-[22px] text-primary">
-                  {item.icon}
-                </MaterialIcon>
+                <item.icon aria-hidden="true" size={22} className="mt-0.5 shrink-0 text-primary" />
                 <div className="min-w-0">
                   <h3 className="font-headline-md text-base font-semibold text-on-surface">
                     {item.title}

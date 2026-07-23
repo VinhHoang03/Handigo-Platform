@@ -1,6 +1,6 @@
 import React from "react";
 import type { BankAccount } from "../../types/provider.types";
-
+import { ChevronRight, Lock, MoreHorizontal, Shield } from "lucide-react";
 export const BankAccountPanel: React.FC<{ account: BankAccount }> = ({
   account,
 }) => (
@@ -33,18 +33,18 @@ export const AccountFunctionsPanel: React.FC<{
 }> = ({ onPasswordClick }) => {
   const items = [
     {
-      icon: "lock",
+      icon: Lock,
       label: "Mật khẩu và bảo mật",
       description: "Cập nhật mật khẩu đăng nhập.",
       onClick: onPasswordClick,
     },
     {
-      icon: "shield",
+      icon: Shield,
       label: "Quyền riêng tư",
       description: "Tùy chọn quyền riêng tư sẽ được bổ sung.",
     },
     {
-      icon: "more_horiz",
+      icon: MoreHorizontal,
       label: "Các tùy chọn khác",
       description: "Khu vực cho thiết lập tài khoản.",
     },
@@ -64,9 +64,7 @@ export const AccountFunctionsPanel: React.FC<{
             onClick={item.onClick}
           >
             <span className="flex min-w-0 items-center gap-3">
-              <span aria-hidden="true" className="material-symbols-outlined text-on-surface-variant transition-colors group-hover:text-primary">
-                {item.icon}
-              </span>
+              <item.icon aria-hidden="true" size={24} className="text-on-surface-variant transition-colors group-hover:text-primary" />
               <span className="min-w-0">
                 <span className="block text-sm font-medium">{item.label}</span>
                 <span className="mt-0.5 block text-xs text-on-surface-variant">
@@ -74,9 +72,7 @@ export const AccountFunctionsPanel: React.FC<{
                 </span>
               </span>
             </span>
-            <span aria-hidden="true" className="material-symbols-outlined text-outline-variant">
-              chevron_right
-            </span>
+            <ChevronRight aria-hidden="true" size={24} className="text-outline-variant" />
           </button>
         ))}
       </div>

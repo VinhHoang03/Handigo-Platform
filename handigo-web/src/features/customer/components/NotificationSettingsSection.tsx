@@ -1,5 +1,5 @@
 import { ToggleOption } from "@/features/customer/components/ToggleOption";
-
+import { CalendarCheck, Megaphone, MessageSquareText } from "lucide-react";
 export function NotificationSettingsSection() {
   return (
     <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm md:p-8">
@@ -10,18 +10,18 @@ export function NotificationSettingsSection() {
         <ToggleOption
           label="Cập nhật đặt lịch"
           desc="Nhận thông báo khi lịch đặt được xác nhận hoặc thay đổi."
-          icon="event_available"
+          icon={CalendarCheck}
           checked
         />
         <ToggleOption
           label="Tiếp thị và khuyến mãi"
           desc="Nhận các ưu đãi và cập nhật từ Handigo."
-          icon="campaign"
+          icon={Megaphone}
         />
         <ToggleOption
           label="Tin nhắn SMS trực tiếp"
           desc="Nhận thông báo qua SMS."
-          icon="sms"
+          icon={MessageSquareText}
           checked
         />
       </div>

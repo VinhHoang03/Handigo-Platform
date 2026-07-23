@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MaterialIcon } from "../common/MaterialIcon";
+import { ArrowRight } from "lucide-react";
 
 /**
  * Dải đóng trang. Trước đây trang kết thúc ở khối đánh giá rồi rơi thẳng vào
@@ -31,7 +31,7 @@ export const ClosingCta = () => (
         className="inline-flex min-h-14 shrink-0 items-center justify-center gap-2 rounded-lg bg-surface px-8 py-3 text-label-md font-semibold text-primary transition-colors duration-200 hover:bg-surface-container active:scale-[0.98]"
       >
         Tìm thợ
-        <MaterialIcon className="text-[18px]">arrow_forward</MaterialIcon>
+        <ArrowRight aria-hidden="true" size={18} />
       </Link>
     </div>
   </section>

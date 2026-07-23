@@ -3,6 +3,7 @@ import { ReliableImage } from "@/components/common/ReliableImage";
 import { getServiceImage } from "@/features/customer-service/utils/serviceDisplay";
 import type { Service } from "@/types/booking";
 import type { NavbarItem } from "./navbar.types";
+import { ChevronDown, LayoutGrid } from "lucide-react";
 
 interface NavbarLinksProps {
   navItems: NavbarItem[];
@@ -30,9 +31,7 @@ export function NavbarLinks({ navItems, isActive, services }: NavbarLinksProps) 
                 }`}
               >
                 {item.label}
-                <span className="material-symbols-outlined text-[18px] transition-transform group-hover:rotate-180">
-                  expand_more
-                </span>
+                <ChevronDown aria-hidden="true" size={18} className="transition-transform group-hover:rotate-180" />
               </Link>
 
               <div className="invisible absolute left-1/2 top-full z-50 w-[520px] -translate-x-1/2 translate-y-2 pt-3 opacity-0 transition-all duration-300 ease-out group-hover:visible group-group-hover:opacity-100">
@@ -41,9 +40,7 @@ export function NavbarLinks({ navItems, isActive, services }: NavbarLinksProps) 
                     to="/customer/services"
                     className="mb-2 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
                   >
-                    <span className="material-symbols-outlined text-xl">
-                      apps
-                    </span>
+                    <LayoutGrid aria-hidden="true" size={20} />
                     Tất cả dịch vụ
                   </Link>
                   {services.length > 0 ? (

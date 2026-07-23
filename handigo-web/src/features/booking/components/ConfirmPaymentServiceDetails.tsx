@@ -1,5 +1,6 @@
 import type { Address, Service, ServiceOption } from '../../../types/booking';
 import { getOptionPrice } from './useConfirmPaymentFlow';
+import { Calendar, CalendarCheck, MapPin, ReceiptText, SprayCan, UserSearch, type LucideIcon } from "lucide-react";
 
 const formatAddress = (address: Address | null) => {
   if (!address) return '';
@@ -31,18 +32,18 @@ export const ConfirmPaymentServiceDetails = ({
   preferredProviderId, preferredProviderName, selectedOptions, selectedOptionQuantities,
 }: ConfirmPaymentServiceDetailsProps) => {
   const addressText = formatAddress(address);
-  const detailItems: string[][] = [
-    ['cleaning_services', 'Dịch vụ', service?.name || '…'],
+  const detailItems: Array<[LucideIcon, string, string]> = [
+    [SprayCan, 'Dịch vụ', service?.name || '…'],
     [
-      'calendar_today',
+      Calendar,
       'Thời gian',
       scheduledAt
         ? new Date(scheduledAt).toLocaleString('vi-VN')
         : 'Sớm nhất có thể',
     ],
-    ...(addressText ? [['location_on', 'Địa chỉ', addressText]] : []),
+    ...(addressText ? [[MapPin, 'Địa chỉ', addressText] as [LucideIcon, string, string]] : []),
     [
-      'person_search',
+      UserSearch,
       isAppointment && preferredProviderId ? 'Chuyên gia đặt trước' : 'Điều phối chuyên gia',
       preferredProviderId
         ? isAppointment
@@ -56,7 +57,7 @@ export const ConfirmPaymentServiceDetails = ({
     <>
       {isAppointment && (
         <section className="flex items-start gap-sm rounded-xl border border-primary/20 bg-primary-container/10 p-md">
-          <span aria-hidden="true" className="material-symbols-outlined text-primary">event_available</span>
+          <CalendarCheck aria-hidden="true" size={24} className="text-primary" />
           <div>
             <h2 className="font-bold text-on-surface">Xác nhận yêu cầu lịch hẹn</h2>
             <p className="mt-1 text-sm leading-6 text-on-surface-variant">
@@ -68,19 +69,17 @@ export const ConfirmPaymentServiceDetails = ({
       )}
       <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
         <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">
-            receipt_long
-          </span>
+          <ReceiptText aria-hidden="true" size={24} className="text-primary" />
           Chi tiết dịch vụ
         </h2>
         <div className="grid md:grid-cols-2 gap-6">
-          {detailItems.map(([icon, label, value], index) => (
+          {detailItems.map(([Icon, label, value], index) => (
             <div
               key={label}
               className={`flex items-start gap-4 ${index === 2 ? 'md:col-span-2' : ''}`}
             >
               <div className="bg-primary-fixed-dim/30 p-3 rounded-lg text-primary">
-                <span className="material-symbols-outlined">{icon}</span>
+                <Icon aria-hidden="true" size={24} />
               </div>
               <div>
                 <p className="font-label-md text-label-md text-on-surface-variant">

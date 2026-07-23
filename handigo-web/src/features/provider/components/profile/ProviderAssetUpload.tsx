@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { isImageUrl } from "../../utils/providerProfilePage";
+import { Upload } from "lucide-react";
 
 export function UploadedAssetPreview({
   url,
@@ -72,7 +73,7 @@ export function FileUploadSlot({
           onClick={() => inputRef.current?.click()}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          <span className="material-symbols-outlined text-[18px]">upload</span>
+          <Upload aria-hidden="true" size={18} />
           {uploading ? "Đang tải..." : value ? "Thay đổi" : "Tải lên"}
         </button>
         <input

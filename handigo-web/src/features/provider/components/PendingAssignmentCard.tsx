@@ -8,6 +8,7 @@ import {
   getOrderFromAssignment,
   shortAddress,
 } from '../utils/providerOrder.utils';
+import { BellRing, ShieldCheck } from "lucide-react";
 
 interface PendingAssignmentCardProps {
   assignment: OrderAssignment;
@@ -44,7 +45,7 @@ export function PendingAssignmentCard({
       <div className="border-b border-outline-variant/20 bg-primary/5 px-md py-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">notifications_active</span>
+            <BellRing aria-hidden="true" size={24} className="text-primary" />
             <span className="font-label-md text-primary">
               {isAppointment
                 ? 'Yêu cầu lịch hẹn'
@@ -123,7 +124,7 @@ export function PendingAssignmentCard({
         )}
 
         <div className="flex items-start gap-2 rounded-2xl bg-surface-container-low p-sm text-sm text-on-surface-variant">
-          <span className="material-symbols-outlined text-base text-primary">shield_lock</span>
+          <ShieldCheck aria-hidden="true" size={16} className="text-primary" />
           <span>Thông tin liên hệ và địa chỉ chi tiết sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
         </div>
 

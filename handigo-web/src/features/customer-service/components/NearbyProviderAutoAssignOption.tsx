@@ -1,3 +1,4 @@
+import { CheckCircle2, Sparkles } from "lucide-react";
 interface NearbyProviderAutoAssignOptionProps {
   isSelected: boolean;
   onSelect: () => void;
@@ -18,9 +19,7 @@ export function NearbyProviderAutoAssignOption({
           : "border-outline-variant/40 bg-surface-container-lowest hover:border-primary/50"
       }`}
     >
-      <span className={`material-symbols-outlined ${isSelected ? "text-primary" : "text-on-surface-variant"}`}>
-        auto_awesome
-      </span>
+      <Sparkles aria-hidden="true" size={24} className={isSelected ? "text-primary" : "text-on-surface-variant"} />
       <span className="min-w-0 flex-1">
         <span className="block font-bold text-on-surface">
           Handigo tự tìm thợ
@@ -30,7 +29,7 @@ export function NearbyProviderAutoAssignOption({
         </span>
       </span>
       {isSelected && (
-        <span className="material-symbols-outlined text-primary">check_circle</span>
+        <CheckCircle2 aria-hidden="true" size={24} className="text-primary" />
       )}
     </button>
   );

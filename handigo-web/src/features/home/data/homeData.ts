@@ -1,3 +1,4 @@
+import { CircleCheckBig, FileSpreadsheet, Hammer, IdCard, LifeBuoy, PenLine } from "lucide-react";
 /**
  * Nội dung tĩnh của trang chủ.
  *
@@ -10,17 +11,17 @@
 /** Dải cam kết ngay dưới hero. Mô tả cơ chế có thật trong sản phẩm. */
 export const commitments = [
   {
-    icon: 'badge',
+    icon: IdCard,
     title: 'Hồ sơ thợ được kiểm duyệt',
     desc: 'Giấy tờ và tay nghề duyệt xong mới được nhận việc.',
   },
   {
-    icon: 'request_quote',
+    icon: FileSpreadsheet,
     title: 'Báo giá trước khi làm',
     desc: 'Bạn xem giá và đồng ý rồi thợ mới bắt đầu.',
   },
   {
-    icon: 'support_agent',
+    icon: LifeBuoy,
     title: 'Có người xử lý khi trục trặc',
     desc: 'Gửi yêu cầu hỗ trợ ngay trong đơn, không phải gọi vòng.',
   },
@@ -29,22 +30,22 @@ export const commitments = [
 /** 4 bước của luồng đặt dịch vụ. Nhãn là động từ, không đánh số "Bước 1/2/3". */
 export const howItWorksSteps = [
   {
-    icon: 'edit_note',
+    icon: PenLine,
     title: 'Mô tả việc',
     desc: 'Chọn dịch vụ, ghi rõ vấn đề và địa chỉ. Thêm ảnh nếu có.',
   },
   {
-    icon: 'request_quote',
+    icon: FileSpreadsheet,
     title: 'Nhận báo giá',
     desc: 'Thợ phù hợp xem yêu cầu và gửi giá trước khi tới.',
   },
   {
-    icon: 'handyman',
+    icon: Hammer,
     title: 'Thợ đến làm',
     desc: 'Theo dõi trạng thái đơn và nhắn tin trực tiếp với thợ.',
   },
   {
-    icon: 'task_alt',
+    icon: CircleCheckBig,
     title: 'Thanh toán & đánh giá',
     desc: 'Xong việc mới thanh toán, rồi để lại nhận xét cho người sau.',
   },

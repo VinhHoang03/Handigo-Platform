@@ -23,9 +23,10 @@ export function NotificationItem({ item, onMarkAsRead }: NotificationItemProps) 
             : "bg-primary/10 text-primary"
         }`}
       >
-        <span className="material-symbols-outlined block text-[20px] leading-none">
-          {typeIcons[item.type]}
-        </span>
+        {(() => {
+          const TypeIcon = typeIcons[item.type];
+          return <TypeIcon aria-hidden="true" size={20} className="block" />;
+        })()}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start justify-between gap-2">

@@ -4,6 +4,7 @@ import {
   getQuotationStatusClass,
   getQuotationStatusLabel,
 } from "./bookingDetailFormatters";
+import { FileSpreadsheet } from "lucide-react";
 
 type BookingQuotationDetailsProps = {
   quotation: OrderQuotation;
@@ -26,7 +27,7 @@ export const BookingQuotationDetails = ({
   <>
     <div className="flex flex-col gap-3 mb-lg sm:flex-row sm:items-center sm:justify-between">
       <h3 className="font-headline-md text-headline-md text-primary flex min-w-0 items-center gap-2">
-        <span className="material-symbols-outlined">request_quote</span>
+        <FileSpreadsheet aria-hidden="true" size={24} />
         Báo giá sửa chữa
       </h3>
       <span

@@ -21,6 +21,7 @@ import {
   getStatusLabel,
 } from "../components/detail/bookingDetailFormatters";
 import { formatOrderAddress } from "../components/detail/bookingDetailProvider";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 
 const BookingDetailPage = () => {
   const {
@@ -68,9 +69,9 @@ const BookingDetailPage = () => {
       <div className="flex items-center gap-sm mb-lg">
         <Link
           to="/customer/bookings"
-          className="material-symbols-outlined text-primary p-2 hover:bg-primary/10 rounded-full transition-all active:scale-90"
+          className="text-primary p-2 hover:bg-primary/10 rounded-full transition-all active:scale-90"
         >
-          arrow_back
+          <ArrowLeft aria-hidden="true" size={24} />
         </Link>
         <div>
           <h1 className="font-headline-lg text-headline-lg text-on-surface">
@@ -80,9 +81,7 @@ const BookingDetailPage = () => {
             <Link to="/customer/bookings" className="hover:text-primary">
               Lịch sử
             </Link>
-            <span className="material-symbols-outlined text-sm">
-              chevron_right
-            </span>
+            <ChevronRight aria-hidden="true" size={14} />
             <span className="text-primary font-bold">#{order.orderCode}</span>
           </nav>
         </div>

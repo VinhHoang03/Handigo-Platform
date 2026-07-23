@@ -1,3 +1,4 @@
+import { FileSpreadsheet } from "lucide-react";
 type BookingQuotationPendingProps = {
   orderStatus: string;
 };
@@ -9,7 +10,7 @@ export const BookingQuotationPending = ({
   <div className="w-full overflow-hidden rounded-3xl border border-dashed border-warning/30 bg-warning-container/70 p-4 sm:p-5">
     <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
       <div className="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-warning-container text-on-warning-container sm:mx-0">
-        <span className="material-symbols-outlined text-2xl">request_quote</span>
+        <FileSpreadsheet aria-hidden="true" size={24} />
       </div>
 
       <div className="min-w-0 flex-1 text-center sm:text-left">

@@ -4,7 +4,7 @@ import { normalizeImageUrl } from '@/utils/imageUrl';
 import type { Order } from '@/types/booking';
 import { formatDateTime, getCustomer } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
-
+import { CalendarDays, MapPin, Phone, Ticket, User, Wrench } from "lucide-react";
 interface CustomerInformationCardProps {
   order: Order;
   customer: ReturnType<typeof getCustomer>;
@@ -21,16 +21,16 @@ export function CustomerInformationCard({
   orderType,
 }: CustomerInformationCardProps) {
   const details = [
-    { icon: 'phone', label: 'Số điện thoại', value: customer?.phone || 'Chưa cập nhật' },
-    { icon: 'location_on', label: 'Địa chỉ thực hiện', value: addressLine || 'Chưa cập nhật' },
-    { icon: 'home_repair_service', label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
-    { icon: 'event', label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },
-    { icon: 'confirmation_number', label: 'Mã đơn hàng', value: order.orderCode },
+    { icon: Phone, label: 'Số điện thoại', value: customer?.phone || 'Chưa cập nhật' },
+    { icon: MapPin, label: 'Địa chỉ thực hiện', value: addressLine || 'Chưa cập nhật' },
+    { icon: Wrench, label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
+    { icon: CalendarDays, label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },
+    { icon: Ticket, label: 'Mã đơn hàng', value: order.orderCode },
   ];
 
   return (
     <section className="order-1 h-full overflow-hidden rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg">
-      <CardTitle icon="person" title="Thông tin khách hàng" />
+      <CardTitle icon={User} title="Thông tin khách hàng" />
       <div className="mt-md flex items-center gap-3 rounded-2xl bg-primary/5 p-3">
         <InitialsAvatar
           name={customer?.fullName || 'Khách hàng'}
@@ -47,7 +47,7 @@ export function CustomerInformationCard({
       <div className="mt-md divide-y divide-outline-variant/20">
         {details.map((item) => (
           <div key={item.label} className="flex gap-3 py-3 first:pt-0 last:pb-0">
-            <span className="material-symbols-outlined mt-0.5 text-xl text-primary">{item.icon}</span>
+            <item.icon aria-hidden="true" size={20} className="mt-0.5 text-primary" />
             <div className="min-w-0">
               <p className="text-xs text-on-surface-variant">{item.label}</p>
               <p className="mt-0.5 break-words text-sm font-semibold text-on-surface">{item.value}</p>

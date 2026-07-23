@@ -6,6 +6,7 @@ import type { Conversation } from "../types/chat.types";
 import { ChatPopup } from "./ChatPopup";
 import { ConversationListItem } from "./ConversationListItem";
 import { ConversationListSkeleton } from "./ConversationListSkeleton";
+import { MessageCircle, MessagesSquare, RefreshCw } from "lucide-react";
 
 export function MessageCenter() {
   const user = useAuthStore((state) => state.user);
@@ -115,7 +116,7 @@ export function MessageCenter() {
           onClick={() => setOpen((value) => !value)}
           className="relative inline-flex rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary"
         >
-          <span className="material-symbols-outlined">chat_bubble</span>
+          <MessageCircle aria-hidden="true" size={24} />
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-error px-1.5 py-0.5 text-center text-[10px] font-bold leading-4 text-on-error">
               {unreadCount > 99 ? "99+" : unreadCount}
@@ -131,7 +132,7 @@ export function MessageCenter() {
                 <p className="text-xs text-on-surface-variant">{unreadCount} cuộc trò chuyện chưa đọc</p>
               </div>
               <button type="button" onClick={() => void load(true)} className="rounded-full p-2 text-primary hover:bg-primary/10" aria-label="Tải lại tin nhắn">
-                <span className="material-symbols-outlined block text-xl">refresh</span>
+                <RefreshCw aria-hidden="true" size={20} className="block" />
               </button>
             </div>
 
@@ -142,7 +143,7 @@ export function MessageCenter() {
                 <div className="p-5 text-center text-sm text-error"><p>{error}</p><button type="button" onClick={() => void load(true)} className="mt-2 font-bold text-primary">Thử lại</button></div>
               ) : items.length === 0 ? (
                 <div className="p-8 text-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-4xl">forum</span>
+                  <MessagesSquare aria-hidden="true" size={36} />
                   <p className="mt-2 text-sm">Bạn chưa có cuộc trò chuyện nào.</p>
                 </div>
               ) : items.map((conversation) => {

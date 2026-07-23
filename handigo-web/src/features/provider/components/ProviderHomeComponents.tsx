@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Job } from '../types/provider.types';
-
+import { Navigation, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
 // JobCard
 interface JobCardProps {
   job: Job;
@@ -32,7 +32,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job }) => (
           <>
             <button className="bg-primary text-on-primary px-6 py-2 rounded-xl font-label-md hover:shadow-lg transition-all">Bắt đầu công việc</button>
             <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-lg">
-              <span className="material-symbols-outlined">directions</span>
+              <Navigation aria-hidden="true" size={24} />
             </button>
           </>
         ) : (
@@ -53,7 +53,7 @@ export const WalletWidget: React.FC<WalletWidgetProps> = ({ balance, weeklyEarni
   <div className="border border-outline-variant bg-surface-container-lowest p-md rounded-xl">
     <div className="flex items-center justify-between mb-md">
       <h3 className="font-headline-md text-headline-md">Ví</h3>
-      <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
+      <Wallet aria-hidden="true" size={24} className="text-primary" />
     </div>
     <div className="mb-lg">
       <p className="font-label-sm text-on-surface-variant uppercase tracking-widest mb-xs">Số dư khả dụng</p>
@@ -63,7 +63,7 @@ export const WalletWidget: React.FC<WalletWidgetProps> = ({ balance, weeklyEarni
       <div className="flex items-center justify-between p-3 bg-surface-container rounded-xl">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined">trending_up</span>
+            <TrendingUp aria-hidden="true" size={24} />
           </div>
           <div>
             <p className="font-label-md">Thu nhập hàng tuần</p>
@@ -98,15 +98,15 @@ export const EarningsChart: React.FC = () => (
 
 // QuickAccessCard
 interface QuickAccessCardProps {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   desc: string;
 }
 
-export const QuickAccessCard: React.FC<QuickAccessCardProps> = ({ icon, title, desc }) => (
+export const QuickAccessCard: React.FC<QuickAccessCardProps> = ({ icon: Icon, title, desc }) => (
   <div className="border border-outline-variant bg-surface-container-lowest p-md rounded-xl hover:scale-105 transition-all cursor-pointer group">
     <div className="w-12 h-12 bg-surface-container-high rounded-full flex items-center justify-center mb-md group-hover:bg-primary group-hover:text-on-primary transition-colors">
-      <span className="material-symbols-outlined">{icon}</span>
+      <Icon aria-hidden="true" size={24} />
     </div>
     <h4 className="font-body-lg font-semibold">{title}</h4>
     <p className="text-xs text-on-surface-variant mt-1">{desc}</p>

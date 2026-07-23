@@ -1,18 +1,16 @@
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import type { ProviderInfo } from "./bookingDetailProvider";
-
+import { Banknote, Hammer, type LucideIcon, MapPin, Phone, Star, UserSearch } from "lucide-react";
 type ProviderDetailProps = {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   value: string;
 };
 
-const ProviderDetail = ({ icon, label, value }: ProviderDetailProps) => (
+const ProviderDetail = ({ icon: Icon, label, value }: ProviderDetailProps) => (
   <div className="flex min-w-0 items-start gap-2">
-    <span className="material-symbols-outlined mt-0.5 text-base text-primary">
-      {icon}
-    </span>
+    <Icon aria-hidden="true" size={16} className="mt-0.5 text-primary" />
     <div className="min-w-0">
       <p className="text-xs text-on-surface-variant">{label}</p>
       <p className="break-words font-medium text-on-surface">{value}</p>
@@ -56,12 +54,7 @@ export const BookingProviderCard = ({
               {providerInfo.name}
             </h4>
             <div className="mt-1 flex flex-wrap items-center gap-x-1 text-tertiary">
-              <span
-                className="material-symbols-outlined text-[16px]"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                star
-              </span>
+              <Star aria-hidden="true" size={16} fill="currentColor" />
               <span className="font-bold text-label-md">
                 {providerInfo.rating.toFixed(1)}
               </span>
@@ -73,17 +66,17 @@ export const BookingProviderCard = ({
         </div>
         <div className="grid gap-2 rounded-2xl bg-surface-container-low p-sm text-sm">
           <ProviderDetail
-            icon="phone"
+            icon={Phone}
             label="Số điện thoại"
             value={providerInfo.phone || "Chưa cập nhật"}
           />
           <ProviderDetail
-            icon="location_on"
+            icon={MapPin}
             label="Khu vực"
             value={providerInfo.area || "Chưa cập nhật"}
           />
           <ProviderDetail
-            icon="handyman"
+            icon={Hammer}
             label="Kinh nghiệm"
             value={`${providerInfo.experienceYears} năm · ${providerInfo.completedOrders} đơn hoàn thành`}
           />
@@ -96,9 +89,9 @@ export const BookingProviderCard = ({
       <div className="rounded-2xl bg-surface-container-low p-md text-center">
         <div className="mx-auto mb-sm grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-primary">
           <span
-            className={`material-symbols-outlined ${hasSuccessfulPayment ? "animate-pulse" : ""}`}
+            className={hasSuccessfulPayment ? "animate-pulse" : ""}
           >
-            {hasSuccessfulPayment ? "person_search" : "payments"}
+            {hasSuccessfulPayment ? <UserSearch aria-hidden="true" size={24} /> : <Banknote aria-hidden="true" size={24} />}
           </span>
         </div>
         <p className="text-sm font-semibold leading-5 text-on-surface">

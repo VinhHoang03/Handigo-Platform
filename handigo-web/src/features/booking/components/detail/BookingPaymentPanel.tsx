@@ -101,9 +101,7 @@ export const BookingPaymentPanel = ({
                     disabled={busy}
                     className="h-5 w-5"
                   />
-                  <span className="material-symbols-outlined text-primary">
-                    {method.icon}
-                  </span>
+                  <method.icon aria-hidden="true" size={24} className="text-primary" />
                   <span>
                     <span className="block font-bold text-on-surface">{method.title}</span>
                     <span className="text-sm text-on-surface-variant">{method.description}</span>

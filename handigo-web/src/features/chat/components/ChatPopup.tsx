@@ -11,6 +11,7 @@ import { ChatReportDialog } from './ChatReportDialog';
 import { MessageComposer } from './MessageComposer';
 import { MessageThread } from './MessageThread';
 import { normalizeImageUrl } from '@/utils/imageUrl';
+import { MessageCircle, Minus, Wrench, X } from "lucide-react";
 
 const sortMessages = (items: ChatMessage[]) => [...items].sort((a, b) => {
   const timeDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -136,14 +137,14 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
     return createPortal(
       <aside className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-[120] flex w-[min(360px,calc(100vw-32px))] items-center gap-3 rounded-2xl border border-outline-variant/40 bg-surface p-3 shadow-2xl">
         <button type="button" onClick={() => setMinimized(false)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <span className="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">chat_bubble</span>
+          <MessageCircle aria-hidden="true" size={24} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary" />
           <span className="min-w-0">
             <span className="block truncate text-sm font-bold text-on-surface">{partnerName}</span>
             <span className="block truncate text-xs text-on-surface-variant">Nhấn để tiếp tục trò chuyện</span>
           </span>
         </button>
         <button type="button" onClick={closeChat} aria-label="Đóng trò chuyện" className="rounded-full p-2 hover:bg-surface-container-low">
-          <span className="material-symbols-outlined block text-xl">close</span>
+          <X aria-hidden="true" size={20} className="block" />
         </button>
       </aside>,
       document.body,
@@ -157,7 +158,7 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
           <InitialsAvatar name={partnerName} src={partner?.avatar} className="h-11 w-11 border-2 border-white/40" />
           <div className="min-w-0">
             <p className="truncate font-bold">{partnerName}</p>
-            <p className="flex items-center gap-1.5 truncate text-xs opacity-85"><span className="material-symbols-outlined text-sm">home_repair_service</span>Đơn dịch vụ</p>
+            <p className="flex items-center gap-1.5 truncate text-xs opacity-85"><Wrench aria-hidden="true" size={14} />Đơn dịch vụ</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -168,8 +169,8 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
             onMarkAsRead={() => void markAsRead()}
             onReport={() => { setReportOpen(true); setMenuOpen(false); }}
           />
-          <button type="button" onClick={() => setMinimized(true)} aria-label="Thu gọn trò chuyện" className="rounded-full p-2 hover:bg-white/15"><span className="material-symbols-outlined block text-xl">remove</span></button>
-          <button type="button" onClick={closeChat} aria-label="Đóng cửa sổ trò chuyện" className="rounded-full p-2 hover:bg-white/15"><span className="material-symbols-outlined block text-xl">close</span></button>
+          <button type="button" onClick={() => setMinimized(true)} aria-label="Thu gọn trò chuyện" className="rounded-full p-2 hover:bg-white/15"><Minus aria-hidden="true" size={20} className="block" /></button>
+          <button type="button" onClick={closeChat} aria-label="Đóng cửa sổ trò chuyện" className="rounded-full p-2 hover:bg-white/15"><X aria-hidden="true" size={20} className="block" /></button>
         </div>
       </header>
       {notice && <div className="bg-primary/10 px-4 py-2 text-xs text-primary">{notice}</div>}

@@ -1,5 +1,6 @@
 import type { NewsContentBlock } from "@/features/content/api/news.api";
 import { blockLabels } from "./news.constants";
+import { Trash2 } from "lucide-react";
 
 interface NewsContentBlocksEditorProps {
   content: NewsContentBlock[];
@@ -61,7 +62,7 @@ export function NewsContentBlocksEditor({ content, onChange }: NewsContentBlocks
               className="ml-auto grid h-10 w-10 place-items-center rounded-lg text-error hover:bg-error/10 disabled:opacity-30"
               aria-label={`Xóa khối ${index + 1}`}
             >
-              <span className="material-symbols-outlined block text-[20px] leading-none">delete</span>
+              <Trash2 aria-hidden="true" size={20} className="block leading-none" />
             </button>
           </div>
           {block.type === "list" ? (

@@ -1,3 +1,4 @@
+import { CheckCheck, Megaphone, RefreshCw } from "lucide-react";
 export function NotificationPageHeader({
   isAdmin,
   busy,
@@ -26,9 +27,7 @@ export function NotificationPageHeader({
           onClick={onRefresh}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low"
         >
-          <span className="material-symbols-outlined text-[20px]">
-            refresh
-          </span>
+          <RefreshCw aria-hidden="true" size={20} />
           Tải lại
         </button>
         {!isAdmin && (
@@ -38,9 +37,7 @@ export function NotificationPageHeader({
             disabled={busy || unreadCount === 0}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[20px]">
-              done_all
-            </span>
+            <CheckCheck aria-hidden="true" size={20} />
             Đánh dấu tất cả
           </button>
         )}
@@ -50,9 +47,7 @@ export function NotificationPageHeader({
             onClick={onOpenSend}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-on-primary shadow-sm"
           >
-            <span className="material-symbols-outlined text-[20px]">
-              campaign
-            </span>
+            <Megaphone aria-hidden="true" size={20} />
             Gửi thông báo
           </button>
         )}

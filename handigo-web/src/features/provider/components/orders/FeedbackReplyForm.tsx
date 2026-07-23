@@ -1,3 +1,4 @@
+import { ImagePlus, Send, X } from "lucide-react";
 interface FeedbackReplyFormProps {
   content: string;
   onContentChange: (value: string) => void;
@@ -51,7 +52,7 @@ export function FeedbackReplyForm({
                 className="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-on-surface/70 text-white"
                 aria-label={`Xóa ảnh ${index + 1}`}
               >
-                <span className="material-symbols-outlined text-base">close</span>
+                <X aria-hidden="true" size={16} />
               </button>
             </div>
           ))}
@@ -62,7 +63,7 @@ export function FeedbackReplyForm({
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container-low">
-          <span className="material-symbols-outlined text-xl">add_photo_alternate</span>
+          <ImagePlus aria-hidden="true" size={20} />
           Thêm ảnh ({previewUrls.length}/{maxImages})
           <input
             type="file"
@@ -79,7 +80,7 @@ export function FeedbackReplyForm({
           disabled={submitting || !content.trim()}
           className="btn-primary inline-flex min-h-11 items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <span className="material-symbols-outlined text-xl">send</span>
+          <Send aria-hidden="true" size={20} />
           {submitting ? 'Đang gửi...' : 'Gửi phản hồi'}
         </button>
       </div>

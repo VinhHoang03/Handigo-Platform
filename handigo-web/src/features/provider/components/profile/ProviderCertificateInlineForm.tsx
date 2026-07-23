@@ -6,6 +6,7 @@ import {
   ProfileTextInput,
 } from "./ProviderProfileFormFields";
 import { UploadedAssetPreview } from "./ProviderAssetUpload";
+import { Upload } from "lucide-react";
 
 export function CertificateInlineForm({
   form,
@@ -93,9 +94,7 @@ export function CertificateInlineForm({
             onClick={() => inputRef.current?.click()}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-on-primary transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <span className="material-symbols-outlined text-[18px]">
-              upload
-            </span>
+            <Upload aria-hidden="true" size={18} />
             {uploading ? "Đang tải..." : "Tải lên"}
           </button>
           <input

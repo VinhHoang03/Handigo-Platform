@@ -1,3 +1,4 @@
+import { MapPin } from "lucide-react";
 interface ProviderServiceAreasProps {
   areas: string[];
 }
@@ -10,9 +11,7 @@ export function ProviderServiceAreas({ areas }: ProviderServiceAreasProps) {
         Khu vực hoạt động
       </h2>
       <div className="mb-4 flex items-center gap-2 text-on-surface-variant">
-        <span className="material-symbols-outlined text-primary">
-          location_on
-        </span>
+        <MapPin aria-hidden="true" size={24} className="text-primary" />
         Hỗ trợ nhanh tại các khu vực:
       </div>
       <div className="flex flex-wrap gap-2">

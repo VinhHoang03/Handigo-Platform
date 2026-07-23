@@ -1,6 +1,7 @@
 import { CategoryIcon } from '@/components/common/CategoryIcon';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import type { Category } from '../../types/categoryService.types';
+import { ChevronRight, RefreshCw } from "lucide-react";
 
 interface CategoryListPanelProps {
   categories: Category[];
@@ -21,7 +22,7 @@ export function CategoryListPanel({ categories, serviceCounts, loading, selected
           <p className="text-sm text-on-surface-variant">{categories.length} danh mục</p>
         </div>
         <button onClick={onRefresh} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-low" aria-label="Tải lại">
-          <span className="material-symbols-outlined">refresh</span>
+          <RefreshCw aria-hidden="true" size={24} />
         </button>
       </div>
 
@@ -52,7 +53,7 @@ export function CategoryListPanel({ categories, serviceCounts, loading, selected
                     </span>
                   </span>
                 </span>
-                <span className="material-symbols-outlined text-[20px] text-primary opacity-0 transition-opacity group-hover:opacity-100">chevron_right</span>
+                <ChevronRight aria-hidden="true" size={20} className="text-primary opacity-0 transition-opacity group-hover:opacity-100" />
               </button>
             );
           })}

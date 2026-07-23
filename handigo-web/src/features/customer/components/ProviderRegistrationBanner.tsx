@@ -1,5 +1,6 @@
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import type { ProviderBannerMode } from "@/features/customer/utils/providerBanner.utils";
+import { ClipboardClock, HardHat, TriangleAlert, X } from "lucide-react";
 
 interface ProviderRegistrationBannerProps {
   mode: ProviderBannerMode;
@@ -18,7 +19,7 @@ function DismissButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full text-on-primary transition hover:bg-on-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-primary/50"
     >
-      <span className="material-symbols-outlined text-xl">close</span>
+      <X aria-hidden="true" size={20} />
     </button>
   );
 }
@@ -40,11 +41,11 @@ export function ProviderRegistrationBanner({
           onClick={onDismiss}
           className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full text-on-error-container transition hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/30"
         >
-          <span className="material-symbols-outlined text-xl">close</span>
+          <X aria-hidden="true" size={20} />
         </button>
         <div className="flex items-start gap-4">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-error/10 text-error">
-            <span className="material-symbols-outlined text-2xl">warning</span>
+            <TriangleAlert aria-hidden="true" size={24} />
           </div>
           <p className="text-sm font-semibold leading-6">
             Hồ sơ đăng ký Provider của bạn đã bị từ chối. Vui lòng xem chi tiết
@@ -66,9 +67,7 @@ export function ProviderRegistrationBanner({
     return (
       <section className="relative flex items-start gap-4 overflow-hidden rounded-3xl border border-primary/20 bg-primary p-5 pr-14 text-on-primary shadow-sm sm:items-center sm:p-6 sm:pr-16">
         <DismissButton onClick={onDismiss} />
-        <span className="material-symbols-outlined shrink-0 rounded-2xl bg-on-primary/15 p-3 text-2xl">
-          pending_actions
-        </span>
+        <ClipboardClock aria-hidden="true" size={24} className="shrink-0 rounded-2xl bg-on-primary/15 p-3" />
         <div className="min-w-0 flex-1" aria-live="polite">
           <p className="font-headline-sm text-lg font-bold">
             Hồ sơ đang được xem xét
@@ -92,7 +91,7 @@ export function ProviderRegistrationBanner({
       <DismissButton onClick={onDismiss} />
       <div className="flex items-center gap-4">
         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-on-primary/15">
-          <span className="material-symbols-outlined text-2xl">engineering</span>
+          <HardHat aria-hidden="true" size={24} />
         </div>
         <div>
           <p className="font-headline-sm font-bold">Trở thành thợ dịch vụ</p>

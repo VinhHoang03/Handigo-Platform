@@ -3,6 +3,7 @@ import type {
   ChatbotAudience,
   ChatbotMessage,
 } from "../types/chatbot.types";
+import { Bot } from "lucide-react";
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString("vi-VN", {
@@ -29,9 +30,7 @@ export function ChatbotMessageList({
     return (
       <div className="grid flex-1 place-items-center px-7 py-10 text-center">
         <div>
-          <span className="material-symbols-outlined grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-3xl text-primary">
-            smart_toy
-          </span>
+          <Bot aria-hidden="true" size={30} className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary" />
           <h3 className="mt-4 font-headline-md text-lg text-on-surface">
             Tôi có thể hỗ trợ gì?
           </h3>

@@ -1,5 +1,6 @@
 import React from "react";
 import type { VerificationItem } from "../../types/provider.types";
+import { CheckCircle2, ChevronRight, Clock, XCircle } from "lucide-react";
 
 type VerificationPanelItem = VerificationItem & {
   onClick?: () => void;
@@ -8,7 +9,7 @@ type VerificationPanelItem = VerificationItem & {
 function VerificationRow({ item }: { item: VerificationPanelItem }) {
   const isRejected = item.statusTone === "rejected";
   const isPending = item.statusTone === "pending";
-  const icon = isRejected ? "cancel" : isPending ? "pending" : "check_circle";
+  const Icon = isRejected ? XCircle : isPending ? Clock : CheckCircle2;
   const iconClass = isRejected
     ? "text-error"
     : isPending
@@ -16,13 +17,7 @@ function VerificationRow({ item }: { item: VerificationPanelItem }) {
       : "text-secondary";
   const content = (
     <>
-      <span
-        aria-hidden="true"
-        className={`material-symbols-outlined ${iconClass}`}
-        style={{ fontVariationSettings: "'FILL' 1" }}
-      >
-        {icon}
-      </span>
+      <Icon aria-hidden="true" size={24} className={iconClass} fill="currentColor" />
       <span className="flex-1">
         <span className="block text-sm font-bold">{item.label}</span>
         <span
@@ -38,9 +33,7 @@ function VerificationRow({ item }: { item: VerificationPanelItem }) {
         </span>
       </span>
       {item.onClick && (
-        <span aria-hidden="true" className="material-symbols-outlined text-outline-variant">
-          chevron_right
-        </span>
+        <ChevronRight aria-hidden="true" size={24} className="text-outline-variant" />
       )}
     </>
   );

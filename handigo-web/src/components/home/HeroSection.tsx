@@ -1,6 +1,6 @@
-import { MaterialIcon } from "../common/MaterialIcon";
 import { ReliableImage } from "../common/ReliableImage";
 import { HeroSearch } from "./HeroSearch";
+import { BadgeCheck } from "lucide-react";
 
 interface HeroSectionProps {
   /** Ảnh minh hoạ dịch vụ thật, lấy từ API danh mục. */
@@ -28,9 +28,7 @@ export const HeroSection = ({ image, imageAlt }: HeroSectionProps) => (
     <div className="lg:col-span-7">
       <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-outline-variant/60 bg-surface-container-low py-1.5 pl-2 pr-4 text-label-sm text-on-surface-variant">
         <span className="grid h-5 w-5 place-items-center rounded-full bg-secondary/15 text-secondary">
-          <MaterialIcon filled className="text-[13px]">
-            verified
-          </MaterialIcon>
+          <BadgeCheck aria-hidden="true" size={13} fill="currentColor" />
         </span>
         Thợ đã qua kiểm duyệt hồ sơ
       </p>

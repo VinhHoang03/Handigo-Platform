@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { CircleAlert } from "lucide-react";
 
 type BookingDetailErrorProps = {
   message: string | null;
@@ -7,9 +8,7 @@ type BookingDetailErrorProps = {
 /** Trạng thái lỗi tải trang / không tìm thấy đơn hàng (không phân biệt được lý do cụ thể). */
 export const BookingDetailError = ({ message }: BookingDetailErrorProps) => (
   <div className="flex flex-col items-center justify-center min-h-[400px] text-center px-md">
-    <span className="material-symbols-outlined text-6xl text-error mb-sm">
-      error_outline
-    </span>
+    <CircleAlert aria-hidden="true" size={60} className="text-error mb-sm" />
     <h2 className="font-headline-md text-headline-md">
       {message || "Không tìm thấy đơn hàng"}
     </h2>

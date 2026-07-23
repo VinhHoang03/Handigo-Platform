@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import type { ProviderCertificate } from "../../types/provider.types";
 import { isImageUrl } from "../../utils/providerProfilePage";
+import { Eye, EyeOff, FileText, Globe, ImageOff, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 export function CertificateCard({
   certificate,
@@ -43,9 +44,7 @@ export function CertificateCard({
             onToggleMenu();
           }}
         >
-          <span className="material-symbols-outlined text-[18px]">
-            more_horiz
-          </span>
+          <MoreHorizontal aria-hidden="true" size={18} />
         </button>
 
         {isMenuOpen && (
@@ -58,9 +57,7 @@ export function CertificateCard({
                 onToggleVisibility(certificate);
               }}
             >
-              <span className="material-symbols-outlined text-[18px]">
-                {certificate.isPublic ? "visibility_off" : "visibility"}
-              </span>
+              {certificate.isPublic ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}
               {certificate.isPublic ? "Chuyển riêng tư" : "Công khai"}
             </button>
             <button
@@ -71,9 +68,7 @@ export function CertificateCard({
                 onEditCertificate(certificate);
               }}
             >
-              <span className="material-symbols-outlined text-[18px]">
-                edit
-              </span>
+              <Pencil aria-hidden="true" size={18} />
               Sửa
             </button>
             <button
@@ -84,9 +79,7 @@ export function CertificateCard({
                 onDeleteCertificate(certificate.id);
               }}
             >
-              <span className="material-symbols-outlined text-[18px]">
-                delete
-              </span>
+              <Trash2 aria-hidden="true" size={18} />
               Xóa
             </button>
           </div>
@@ -113,16 +106,12 @@ export function CertificateCard({
               </div>
             ) : (
               <div className="flex h-48 w-full items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-primary">
-                <span className="material-symbols-outlined text-5xl">
-                  description
-                </span>
+                <FileText aria-hidden="true" size={48} />
               </div>
             )
           ) : (
             <div className="flex h-48 w-full items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant">
-              <span className="material-symbols-outlined text-5xl">
-                image_not_supported
-              </span>
+              <ImageOff aria-hidden="true" size={48} />
             </div>
           )}
         </div>
@@ -138,9 +127,7 @@ export function CertificateCard({
             <span
               className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${certificate.isPublic ? "bg-secondary-container/30 text-secondary" : "bg-surface-container text-on-surface-variant"}`}
             >
-              <span className="material-symbols-outlined text-[14px]">
-                {certificate.isPublic ? "public" : "lock"}
-              </span>
+              {certificate.isPublic ? <Globe aria-hidden="true" size={14} /> : <Lock aria-hidden="true" size={14} />}
               {certificate.isPublic ? "Công khai" : "Riêng tư"}
             </span>
           </div>

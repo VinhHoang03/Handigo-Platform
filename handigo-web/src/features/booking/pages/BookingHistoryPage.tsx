@@ -7,6 +7,7 @@ import { getOrderStatusMeta } from '@/utils/orderStatus';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import type { Order } from '../../../types/booking';
+import { ChevronDown, FileClock, Plus, Search, X } from "lucide-react";
 
 const filters = [
   { label: 'Tất cả', value: 'all' },
@@ -92,7 +93,7 @@ const BookingHistoryPage = () => {
         action={
           <div className="flex flex-col md:flex-row gap-md items-center justify-between w-full">
             <div className="relative w-full md:w-[400px]">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-xl">search</span>
+              <Search aria-hidden="true" size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
               <input
                 className="w-full pl-12 pr-10 py-3 bg-primary/5 rounded-full border border-primary/10 focus:border-primary focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/10 outline-none text-body-md transition-all placeholder:text-on-surface-variant/60"
                 placeholder="Tìm kiếm đơn đặt chỗ..."
@@ -105,7 +106,7 @@ const BookingHistoryPage = () => {
                   onClick={() => setSearchTerm('')}
                   className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full hover:bg-on-surface/10 p-1 transition-colors"
                 >
-                  <span className="material-symbols-outlined text-sm block">close</span>
+                  <X aria-hidden="true" size={14} className="block" />
                 </button>
               )}
             </div>
@@ -113,7 +114,7 @@ const BookingHistoryPage = () => {
               to="/customer/bookings/new"
               className="w-full md:w-auto flex items-center justify-center gap-2 bg-primary text-on-primary px-lg py-3 rounded-xl font-label-md text-label-md shadow-md hover:bg-primary-hover transition-all active:scale-95"
             >
-              <span className="material-symbols-outlined">add</span>
+              <Plus aria-hidden="true" size={24} />
               Tạo đơn dịch vụ mới
             </Link>
           </div>
@@ -148,7 +149,7 @@ const BookingHistoryPage = () => {
             ))}
             {formattedBookings.length === 0 && (
               <div className="py-xl text-center">
-                <span aria-hidden="true" className="material-symbols-outlined mb-2 text-6xl text-on-surface-variant/30">assignment_late</span>
+                <FileClock aria-hidden="true" size={60} className="mb-2 text-on-surface-variant/30" />
                 <p className="font-medium text-on-surface-variant">
                   {debouncedSearch ? `Không tìm thấy kết quả cho "${debouncedSearch}"` : 'Bạn chưa có đơn đặt lịch nào.'}
                 </p>
@@ -170,7 +171,7 @@ const BookingHistoryPage = () => {
         <div className="pt-lg flex justify-center">
           <button type="button" onClick={() => void fetchOrders(activeFilter, debouncedSearch, page + 1, true)} className="px-lg py-3 border-2 border-primary/20 text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-all flex items-center gap-2 group">
             Xem thêm lịch sử
-            <span className="material-symbols-outlined group-hover:translate-y-1 transition-transform">expand_more</span>
+            <ChevronDown aria-hidden="true" size={24} className="group-hover:translate-y-1 transition-transform" />
           </button>
         </div>
       )}

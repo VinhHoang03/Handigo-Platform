@@ -1,17 +1,17 @@
 import type { SystemConfigType } from "../../types/systemConfig.types";
 import type { ConfigDefinition, ConfigGroupKey } from "./config-types";
-
+import { Bell, Braces, ClipboardList, Globe, LayoutDashboard, ShieldUser, Tag, ToggleRight, Type, Wallet, type LucideIcon } from "lucide-react";
 export const groupOptions: Array<{
   key: ConfigGroupKey | "all";
   label: string;
-  icon: string;
+  icon: LucideIcon;
 }> = [
-  { key: "all", label: "Tất cả cấu hình", icon: "dashboard" },
-  { key: "operation", label: "Vận hành", icon: "admin_panel_settings" },
-  { key: "booking", label: "Đơn hàng", icon: "assignment" },
-  { key: "payment", label: "Thanh toán và ví", icon: "account_balance_wallet" },
-  { key: "display", label: "Hiển thị công khai", icon: "public" },
-  { key: "notification", label: "Thông báo", icon: "notifications" },
+  { key: "all", label: "Tất cả cấu hình", icon: LayoutDashboard },
+  { key: "operation", label: "Vận hành", icon: ShieldUser },
+  { key: "booking", label: "Đơn hàng", icon: ClipboardList },
+  { key: "payment", label: "Thanh toán và ví", icon: Wallet },
+  { key: "display", label: "Hiển thị công khai", icon: Globe },
+  { key: "notification", label: "Thông báo", icon: Bell },
 ];
 
 export const configDefinitions: ConfigDefinition[] = [
@@ -186,9 +186,9 @@ export const configDefinitions: ConfigDefinition[] = [
   },
 ];
 
-export const typeOptions: Record<SystemConfigType, { label: string; icon: string }> = {
-  STRING: { label: "Chuỗi", icon: "text_fields" },
-  NUMBER: { label: "Số", icon: "tag" },
-  BOOLEAN: { label: "Bật/Tắt", icon: "toggle_on" },
-  JSON: { label: "JSON", icon: "data_object" },
+export const typeOptions: Record<SystemConfigType, { label: string; icon: LucideIcon }> = {
+  STRING: { label: "Chuỗi", icon: Type },
+  NUMBER: { label: "Số", icon: Tag },
+  BOOLEAN: { label: "Bật/Tắt", icon: ToggleRight },
+  JSON: { label: "JSON", icon: Braces },
 };

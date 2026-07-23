@@ -3,6 +3,7 @@ import type { CancellationPreview, Order } from "@/types/booking";
 import { getActionDialogConfig, type PendingAction } from "./bookingDetailConstants";
 import { BookingCancellationPreviewCard } from "./BookingCancellationPreviewCard";
 import { BookingCancellationReasonForm } from "./BookingCancellationReasonForm";
+import { X } from "lucide-react";
 
 type BookingRefundPanelProps = {
   order: Order;
@@ -54,7 +55,7 @@ export const BookingRefundPanel = ({
             {busy ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-error/20 border-t-error" />
             ) : (
-              <span className="material-symbols-outlined text-sm">close</span>
+              <X aria-hidden="true" size={14} />
             )}
             {order.orderType === "recurring" ? "Hủy buổi này" : "Hủy yêu cầu"}
           </button>

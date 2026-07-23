@@ -3,6 +3,7 @@ import type {
   DashboardRole,
   DashboardSwitchConfig,
 } from "./dashboard.types";
+import { Banknote, Bell, CalendarCheck, Gavel, Grid2X2, HardHat, Landmark, LayoutDashboard, LayoutGrid, LifeBuoy, Lightbulb, Newspaper, ReceiptText, Settings, ShieldCheck, Star, Tag, Users, Wallet } from "lucide-react";
 
 export const dashboardHomePath: Record<DashboardRole, string> = {
   CUSTOMER: "/customer",
@@ -17,65 +18,65 @@ export const dashboardSubtitle: Record<DashboardRole, string> = {
 };
 
 export const providerNavItems: DashboardNavItem[] = [
-  { icon: "grid_view", label: "Tổng quan", path: "/provider" },
+  { icon: LayoutGrid, label: "Tổng quan", path: "/provider" },
   {
-    icon: "receipt_long",
+    icon: ReceiptText,
     label: "Đơn dịch vụ",
     path: "/provider/orders",
     matchPrefix: true,
   },
-  { icon: "event_available", label: "Lịch làm việc", path: "/provider/schedule" },
-  { icon: "payments", label: "Ví", path: "/provider/wallet" },
+  { icon: CalendarCheck, label: "Lịch làm việc", path: "/provider/schedule" },
+  { icon: Banknote, label: "Ví", path: "/provider/wallet" },
   {
-    icon: "account_balance",
+    icon: Landmark,
     label: "Tài khoản ngân hàng",
     path: "/provider/bank-accounts",
   },
-  { icon: "reviews", label: "Đánh giá", path: "/provider/feedbacks" },
+  { icon: Star, label: "Đánh giá", path: "/provider/feedbacks" },
   {
-    icon: "lightbulb",
+    icon: Lightbulb,
     label: "Đề xuất dịch vụ",
     path: "/provider/service-suggestions",
   },
   {
-    icon: "support_agent",
+    icon: LifeBuoy,
     label: "Khiếu nại, hỗ trợ & báo cáo",
     path: "/provider/support",
   },
-  { icon: "settings", label: "Hồ sơ dịch vụ", path: "/provider/profile" },
+  { icon: Settings, label: "Hồ sơ dịch vụ", path: "/provider/profile" },
 ];
 
 export const adminNavItems: DashboardNavItem[] = [
-  { icon: "dashboard", label: "Tổng quan", path: "/admin" },
-  { icon: "people", label: "Người dùng", path: "/admin/users" },
+  { icon: LayoutDashboard, label: "Tổng quan", path: "/admin" },
+  { icon: Users, label: "Người dùng", path: "/admin/users" },
   {
-    icon: "verified_user",
+    icon: ShieldCheck,
     label: "Hồ sơ xét duyệt",
     path: "/admin/provider-applications",
   },
-  { icon: "reviews", label: "Đánh giá", path: "/admin/feedbacks" },
-  { icon: "category", label: "Danh mục dịch vụ", path: "/admin/categories" },
-  { icon: "construction", label: "Dịch vụ", path: "/admin/services" },
+  { icon: Star, label: "Đánh giá", path: "/admin/feedbacks" },
+  { icon: Grid2X2, label: "Danh mục dịch vụ", path: "/admin/categories" },
+  { icon: HardHat, label: "Dịch vụ", path: "/admin/services" },
   {
-    icon: "lightbulb",
+    icon: Lightbulb,
     label: "Đề xuất dịch vụ",
     path: "/admin/service-suggestions",
   },
-  { icon: "local_offer", label: "Khuyến mãi", path: "/admin/promotions" },
+  { icon: Tag, label: "Khuyến mãi", path: "/admin/promotions" },
   {
-    icon: "account_balance_wallet",
+    icon: Wallet,
     label: "Rút tiền",
     path: "/admin/withdrawals",
   },
-  { icon: "support_agent", label: "Yêu cầu hỗ trợ", path: "/admin/support" },
-  { icon: "gavel", label: "Khiếu nại & vi phạm", path: "/admin/cases" },
-  { icon: "receipt_long", label: "Thanh toán", path: "/admin/payments" },
-  { icon: "account_balance_wallet", label: "Ví provider", path: "/admin/wallets" },
-  { icon: "notifications", label: "Thông báo", path: "/admin/notifications" },
-  { icon: "newspaper", label: "Tin tức", path: "/admin/news" },
-  { icon: "payments", label: "Doanh thu hệ thống", path: "/admin/revenue" },
+  { icon: LifeBuoy, label: "Yêu cầu hỗ trợ", path: "/admin/support" },
+  { icon: Gavel, label: "Khiếu nại & vi phạm", path: "/admin/cases" },
+  { icon: ReceiptText, label: "Thanh toán", path: "/admin/payments" },
+  { icon: Wallet, label: "Ví provider", path: "/admin/wallets" },
+  { icon: Bell, label: "Thông báo", path: "/admin/notifications" },
+  { icon: Newspaper, label: "Tin tức", path: "/admin/news" },
+  { icon: Banknote, label: "Doanh thu hệ thống", path: "/admin/revenue" },
   {
-    icon: "settings",
+    icon: Settings,
     label: "Cấu hình hệ thống",
     path: "/admin/system-configs",
   },

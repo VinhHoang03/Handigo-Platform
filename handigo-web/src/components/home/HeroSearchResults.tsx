@@ -1,6 +1,6 @@
 import type { CatalogSearchResult } from "@/features/home/api/home.api";
-import { MaterialIcon } from "../common/MaterialIcon";
 import { Skeleton } from "../common/Skeleton";
+import { Grid2X2, type LucideIcon, SlidersHorizontal, Wrench } from "lucide-react";
 
 const resultTypeLabel: Record<CatalogSearchResult["type"], string> = {
   category: "Danh mục",
@@ -8,10 +8,10 @@ const resultTypeLabel: Record<CatalogSearchResult["type"], string> = {
   option: "Tùy chọn",
 };
 
-const resultTypeIcon: Record<CatalogSearchResult["type"], string> = {
-  category: "category",
-  service: "home_repair_service",
-  option: "tune",
+const resultTypeIcon: Record<CatalogSearchResult["type"], LucideIcon> = {
+  category: Grid2X2,
+  service: Wrench,
+  option: SlidersHorizontal,
 };
 
 /** Skeleton bám theo đúng hình dạng một dòng kết quả, thay cho spinner chung chung. */
@@ -63,9 +63,10 @@ export const HeroSearchResults = ({
         onClick={() => onSelect(result)}
         className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-container-low"
       >
-        <MaterialIcon className="mt-0.5 shrink-0 text-[20px] text-on-surface-variant">
-          {resultTypeIcon[result.type]}
-        </MaterialIcon>
+        {(() => {
+          const ResultIcon = resultTypeIcon[result.type];
+          return <ResultIcon aria-hidden="true" size={20} className="mt-0.5 shrink-0 text-on-surface-variant" />;
+        })()}
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium text-on-surface">
             {result.name}

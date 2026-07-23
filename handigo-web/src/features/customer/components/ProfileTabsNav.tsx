@@ -1,9 +1,10 @@
+import { HardHat, type LucideIcon, Shield, User } from "lucide-react";
 export type CustomerProfileTab = "profile" | "security" | "applications";
 
-const TABS: Array<[CustomerProfileTab, string, string]> = [
-  ["profile", "Hồ sơ", "person"],
-  ["security", "Bảo mật", "shield"],
-  ["applications", "Đơn của tôi", "engineering"],
+const TABS: Array<[CustomerProfileTab, string, LucideIcon]> = [
+  ["profile", "Hồ sơ", User],
+  ["security", "Bảo mật", Shield],
+  ["applications", "Đơn của tôi", HardHat],
 ];
 
 interface ProfileTabsNavProps {
@@ -18,7 +19,7 @@ export function ProfileTabsNav({ activeTab, onChange }: ProfileTabsNavProps) {
       aria-label="Các mục hồ sơ khách hàng"
       className="flex gap-2 overflow-x-auto rounded-2xl border border-outline-variant/30 bg-surface-container-low p-2 shadow-sm sm:grid sm:grid-cols-3"
     >
-      {TABS.map(([value, label, icon]) => (
+      {TABS.map(([value, label, Icon]) => (
         <button
           key={value}
           type="button"
@@ -31,7 +32,7 @@ export function ProfileTabsNav({ activeTab, onChange }: ProfileTabsNavProps) {
           }`}
           onClick={() => onChange(value)}
         >
-          <span className="material-symbols-outlined text-[18px]">{icon}</span>
+          <Icon aria-hidden="true" size={18} />
           {label}
         </button>
       ))}

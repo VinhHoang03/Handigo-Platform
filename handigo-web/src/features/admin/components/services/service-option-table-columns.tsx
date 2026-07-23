@@ -1,6 +1,7 @@
 import type { DataTableColumn } from '@/components/common/dashboard/DataTable';
 import type { Service, ServiceOption } from '../../types/categoryService.types';
 import { OPTION_TYPE_LABELS, serviceMoney } from './service.helpers';
+import { Image, Pencil, Trash2 } from "lucide-react";
 
 interface ServiceOptionTableContext {
   service: Service;
@@ -21,7 +22,7 @@ export function buildServiceOptionTableColumns({ service, onEdit, onDelete }: Se
             {option.image ? (
               <img src={option.image} alt="" aria-hidden="true" width={48} height={48} loading="lazy" className="h-full w-full object-cover" />
             ) : (
-              <span className="material-symbols-outlined flex h-full w-full items-center justify-center text-on-surface-variant" aria-hidden="true">image</span>
+              <Image aria-hidden="true" size={24} className="flex h-full w-full items-center justify-center text-on-surface-variant" />
             )}
           </div>
           <div className="min-w-0">
@@ -71,10 +72,10 @@ export function buildServiceOptionTableColumns({ service, onEdit, onDelete }: Se
       render: (option) => (
         <div className="flex justify-end gap-1">
           <button type="button" onClick={() => onEdit(option)} className="grid h-9 w-9 place-items-center rounded-lg text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" aria-label={`Sửa tùy chọn ${option.name}`}>
-            <span className="material-symbols-outlined text-base" aria-hidden="true">edit</span>
+            <Pencil aria-hidden="true" size={16} />
           </button>
           <button type="button" onClick={() => onDelete(option)} className="grid h-9 w-9 place-items-center rounded-lg text-error transition-colors hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/30" aria-label={`Xóa tùy chọn ${option.name}`}>
-            <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
+            <Trash2 aria-hidden="true" size={16} />
           </button>
         </div>
       ),

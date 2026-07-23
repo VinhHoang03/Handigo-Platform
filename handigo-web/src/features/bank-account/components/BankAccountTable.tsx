@@ -1,5 +1,6 @@
 import type { BankAccount } from '../types/bankAccount.types';
 import { maskAccountNumber } from './bankAccountConstants';
+import { Pencil, Star, Trash2 } from "lucide-react";
 
 export function BankAccountTable({
   items,
@@ -55,7 +56,7 @@ export function BankAccountTable({
               <td className="py-4 text-right">
                 <div className="flex justify-end gap-1">
                   <button onClick={() => onEdit(account)} className="rounded-lg p-2 text-primary hover:bg-primary/10" aria-label="Sửa tài khoản">
-                    <span className="material-symbols-outlined text-[20px]">edit</span>
+                    <Pencil aria-hidden="true" size={20} />
                   </button>
                   <button
                     onClick={() => onSetDefault(account)}
@@ -63,10 +64,10 @@ export function BankAccountTable({
                     className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
                     aria-label="Đặt mặc định"
                   >
-                    <span className="material-symbols-outlined text-[20px]">star</span>
+                    <Star aria-hidden="true" size={20} />
                   </button>
                   <button onClick={() => onDelete(account)} className="rounded-lg p-2 text-error hover:bg-error/10" aria-label="Xóa tài khoản">
-                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                    <Trash2 aria-hidden="true" size={20} />
                   </button>
                 </div>
               </td>

@@ -1,4 +1,3 @@
-import { MaterialIcon } from "../common/MaterialIcon";
 import { howItWorksSteps } from "@/features/home/data/homeData";
 
 /**
@@ -33,7 +32,7 @@ export const HowItWorksSection = () => (
       {howItWorksSteps.map((step) => (
         <li key={step.title} className="relative">
           <span className="relative grid h-14 w-14 place-items-center rounded-2xl bg-primary text-on-primary shadow-[0_10px_24px_-10px_rgba(53,37,205,0.6)]">
-            <MaterialIcon className="text-2xl">{step.icon}</MaterialIcon>
+            <step.icon aria-hidden="true" size={24} />
           </span>
           <h3 className="mt-5 font-headline-md text-lg font-semibold text-on-surface">
             {step.title}

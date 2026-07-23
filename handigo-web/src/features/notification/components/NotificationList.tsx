@@ -3,6 +3,7 @@ import {
   notificationTypeIcons,
   notificationTypeLabels,
 } from "./notification-type-meta";
+import { Check } from "lucide-react";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",
@@ -53,9 +54,10 @@ function NotificationListItem({
       <span
         className={`mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${item.isRead ? "bg-surface-container-low text-on-surface-variant" : "bg-primary/10 text-primary"}`}
       >
-        <span className="material-symbols-outlined block text-[24px] leading-none">
-          {notificationTypeIcons[item.type]}
-        </span>
+        {(() => {
+          const TypeIcon = notificationTypeIcons[item.type];
+          return <TypeIcon aria-hidden="true" size={24} className="block" />;
+        })()}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -96,9 +98,7 @@ function NotificationListItem({
               disabled={busy || item.isRead}
               className="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-[18px]">
-                done
-              </span>
+              <Check aria-hidden="true" size={18} />
               Đã đọc
             </button>
           )}

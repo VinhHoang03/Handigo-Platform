@@ -27,22 +27,9 @@
     />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <!-- Font chữ đã self-host qua @fontsource (nạp trong main.tsx). Chỉ còn
-         Material Symbols nạp từ Google.
-
-         `icon_names` giới hạn font ở đúng 180 icon dự án dùng. Không có tham số
-         này, Google trả về TOÀN BỘ bộ icon: 1.126 MB, chiếm hơn một nửa trọng
-         lượng trang và là nguyên nhân chính khiến LCP hỏng trên mạng chậm. Bản
-         giới hạn nặng 53 KB.
-
-         ⚠️ Thêm icon mới vào mã thì phải thêm tên vào danh sách này, nếu không
-         nó sẽ hiện ra dưới dạng chữ thay vì hình. Danh sách sinh bằng cách quét
-         mọi chuỗi snake_case trong `src/` rồi giao với danh mục icon chính thức
-         của Google, nên là siêu tập an toàn của những gì đang dùng. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&icon_names=account_balance,account_balance_wallet,add,add_a_photo,add_card,add_circle,add_photo_alternate,admin_panel_settings,apps,arrow_back,arrow_forward,article,assignment,assignment_late,assignment_turned_in,assistant,auto_awesome,badge,balance,block,bolt,bug_report,calendar_today,campaign,cancel,category,chat,chat_bubble,check,check_circle,chevron_left,chevron_right,cleaning,cleaning_services,close,confirmation_number,construction,create,dashboard,data_object,delete,delete_forever,description,directions,discount,done,done_all,draft,drafts,edit,edit_note,email,engineering,error,error_outline,event,event_available,event_busy,expand_more,favorite,feedback,female,flag,forum,function,gavel,gradient,grid_view,group,handyman,headset_mic,history,home,home_repair_service,hourglass_empty,hourglass_top,image,image_not_supported,inbox,info,input,inventory,inventory_2,key,language,lightbulb,link,list,local_offer,location_off,location_on,lock,logout,mail,male,manage_accounts,map,menu,monetization_on,more_horiz,more_vert,my_location,near_me,newspaper,note,notifications,notifications_active,package,paid,passport,password,pause_circle,payment,payments,pending,pending_actions,people,person,person_check,person_off,person_pin_circle,person_search,phone,play_circle,playlist_add,priority,priority_high,progress_activity,public,radio,receipt_long,refresh,remove,report,request_quote,reviews,route,schedule,script,search,search_off,security,send,settings,share,shield,smart_display,smart_toy,sms,social_leaderboard,source,star,start,step,straighten,style,subject,support_agent,swap_vert,tab,tag,task_alt,text_fields,timeline,title,toggle_off,toggle_on,token,tooltip,trending_up,tune,update,upload,verified,verified_user,visibility,visibility_off,wallet,warning,workspace_premium&display=swap" rel="stylesheet">
-  </head>
+    <!-- Toàn bộ font chữ self-host qua @fontsource (nạp trong main.tsx) và
+         icon dùng lucide-react, nên trang không còn request nào ra host ngoài. -->
+</head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

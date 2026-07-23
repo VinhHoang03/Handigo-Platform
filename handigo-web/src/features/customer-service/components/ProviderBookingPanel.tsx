@@ -1,6 +1,6 @@
 import type { PublicProviderProfile } from "../api/customerService.api";
 import { TrustItem } from "./ProviderProfilePrimitives";
-
+import { ArrowRight, ShieldCheck, Star } from "lucide-react";
 interface ProviderBookingPanelProps {
   providerFullName: string;
   averageRating: number;
@@ -51,9 +51,9 @@ export function ProviderBookingPanel({
         </p>
       )}
       <div className="mt-5 space-y-3">
-        <TrustItem icon="verified_user" text="Hồ sơ đã xác minh" />
+        <TrustItem icon={ShieldCheck} text="Hồ sơ đã xác minh" />
         <TrustItem
-          icon="star"
+          icon={Star}
           text={`${averageRating.toFixed(1)} điểm đánh giá`}
         />
       </div>
@@ -64,7 +64,7 @@ export function ProviderBookingPanel({
         className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Đặt lịch với {providerFullName}
-        <span className="material-symbols-outlined">arrow_forward</span>
+        <ArrowRight aria-hidden="true" size={24} />
       </button>
     </div>
   );

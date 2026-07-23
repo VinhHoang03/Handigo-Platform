@@ -1,6 +1,7 @@
 import { ReliableImage } from "@/components/common/ReliableImage";
 import { normalizeImageUrl } from "@/utils/imageUrl";
 import type { ChatMessage } from "../types/chat.types";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 interface MessageRowProps {
   message: ChatMessage;
@@ -106,7 +107,7 @@ export function MessageRow({
               aria-label="Thao tác với tin nhắn"
               className="grid h-8 w-8 place-items-center rounded-full bg-surface-container-lowest text-on-surface-variant opacity-100 shadow-md transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
             >
-              <span className="material-symbols-outlined text-lg">more_horiz</span>
+              <MoreHorizontal aria-hidden="true" size={18} />
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-9 w-40 overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest py-1 text-on-surface shadow-xl">
@@ -116,7 +117,7 @@ export function MessageRow({
                     onClick={onStartEdit}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface-container-low"
                   >
-                    <span className="material-symbols-outlined text-lg">edit</span>
+                    <Pencil aria-hidden="true" size={18} />
                     Chỉnh sửa
                   </button>
                 )}
@@ -125,7 +126,7 @@ export function MessageRow({
                   onClick={onRequestDelete}
                   className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-error hover:bg-error/5"
                 >
-                  <span className="material-symbols-outlined text-lg">delete</span>
+                  <Trash2 aria-hidden="true" size={18} />
                   Xóa
                 </button>
               </div>

@@ -2,6 +2,7 @@ import type { FormEvent, ReactNode } from "react";
 import { Modal } from "@/components/common/Modal";
 import type { NewsArticlePayload, NewsArticleRecord } from "@/features/content/api/news.api";
 import { NewsContentBlocksEditor } from "./NewsContentBlocksEditor";
+import { Upload } from "lucide-react";
 
 interface NewsFormModalProps {
   open: boolean;
@@ -70,7 +71,7 @@ export function NewsFormModal({
               <p className="text-sm text-on-surface-variant">Ảnh ngang, rõ nét và phù hợp với nội dung bài.</p>
             </div>
             <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-primary px-4 text-sm font-bold text-primary">
-              <span className="material-symbols-outlined block text-[19px] leading-none">upload</span>
+              <Upload aria-hidden="true" size={19} className="block leading-none" />
               {isUploading ? "Đang tải…" : "Tải ảnh"}
               <input
                 type="file"

@@ -1,5 +1,5 @@
-import { MaterialIcon } from './MaterialIcon';
 import { InitialsAvatar } from './InitialsAvatar';
+import { Star } from "lucide-react";
 
 interface TestimonialCardProps {
   quote?: string;
@@ -22,7 +22,7 @@ export const TestimonialCard = ({ quote, name, loc, img, rating = 5, service, pe
   <figure className="rounded-3xl border border-outline-variant/40 bg-surface-container-lowest p-7">
     <div className="flex gap-0.5 text-tertiary" role="img" aria-label={`${rating} trên 5 sao`}>
       {[0, 1, 2, 3, 4].map((star) => (
-        <MaterialIcon key={star} className={`text-base ${star < rating ? 'text-tertiary' : 'text-outline-variant'}`} filled={star < rating}>star</MaterialIcon>
+        <Star key={star} aria-hidden="true" size={16} className={star < rating ? 'text-tertiary' : 'text-outline-variant'} fill={star < rating ? 'currentColor' : 'none'} />
       ))}
     </div>
 

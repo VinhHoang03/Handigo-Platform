@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { SectionHeader } from "../common/SectionHeader";
-import { MaterialIcon } from "../common/MaterialIcon";
 import { CategoryBento } from "./CategoryBento";
 import { CategoryCardSkeleton, HomeEmptyState } from "./HomeSkeletons";
 import type { CategoryShowcaseItem } from "@/features/home/hooks/useCategoryShowcase";
+import { ArrowRight } from "lucide-react";
 
 interface CategoriesSectionProps {
   items: CategoryShowcaseItem[];
@@ -33,7 +33,7 @@ export const CategoriesSection = ({
           className="flex min-h-11 w-fit items-center gap-1.5 text-label-md font-semibold text-primary transition-colors hover:text-primary-hover"
         >
           Xem tất cả
-          <MaterialIcon className="text-[18px]">arrow_forward</MaterialIcon>
+          <ArrowRight aria-hidden="true" size={18} />
         </Link>
       }
     />

@@ -1,6 +1,7 @@
 import type { ConfigItem } from "./config-definitions";
 import { typeOptions } from "./config-definitions";
 import { dateTime, formatValue } from "./system-config-format";
+import { Pencil } from "lucide-react";
 
 export function ConfigList({
   items,
@@ -44,9 +45,10 @@ export function ConfigList({
           <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                <span className="material-symbols-outlined text-[16px]">
-                  {typeOptions[item.type].icon}
-                </span>
+                {(() => {
+                  const TypeIcon = typeOptions[item.type].icon;
+                  return <TypeIcon aria-hidden="true" size={16} />;
+                })()}
                 {typeOptions[item.type].label}
               </span>
               <span
@@ -70,7 +72,7 @@ export function ConfigList({
             onClick={() => onEdit(item)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary"
           >
-            <span className="material-symbols-outlined text-[18px]">edit</span>
+            <Pencil aria-hidden="true" size={18} />
             Sửa
           </button>
         </article>

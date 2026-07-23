@@ -6,6 +6,7 @@ import { PendingAssignmentsSection } from '../components/orders/PendingAssignmen
 import { ProviderOrdersListSkeleton } from '../components/orders/ProviderOrdersListSkeleton';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import type { Order } from '@/types/booking';
+import { Search } from "lucide-react";
 
 const filters = [
   { label: 'Tất cả', value: 'all' },
@@ -136,9 +137,7 @@ export default function ProviderOrdersPage() {
           <div className="flex flex-col gap-md md:flex-row md:items-center md:justify-between">
             <h2 className="font-headline-md text-on-surface">Đơn đã nhận</h2>
             <div className="relative w-full md:max-w-md">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                search
-              </span>
+              <Search aria-hidden="true" size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}

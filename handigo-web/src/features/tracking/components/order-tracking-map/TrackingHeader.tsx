@@ -1,4 +1,5 @@
 import { mapText } from "./constants";
+import { LocateFixed, Ruler } from "lucide-react";
 
 interface TrackingHeaderProps {
   liveTrackingEnabled: boolean;
@@ -17,12 +18,7 @@ export function TrackingHeader({
     <div className="flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
       <div className="space-y-1">
         <div className="flex items-center gap-2.5">
-          <span
-            className="material-symbols-outlined text-primary"
-            style={{ fontSize: 22 }}
-          >
-            my_location
-          </span>
+          <LocateFixed aria-hidden="true" size={24} className="text-primary" />
           <h2 className="font-headline-md text-on-surface">
             {liveTrackingEnabled ? mapText.realtimeTitle : mapText.addressTitle}
           </h2>
@@ -43,9 +39,7 @@ export function TrackingHeader({
         )}
         {distanceLabel && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary ring-1 ring-primary/20">
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-              straighten
-            </span>
+            <Ruler aria-hidden="true" size={24} />
             {distanceLabel}
           </span>
         )}

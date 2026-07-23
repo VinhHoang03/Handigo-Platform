@@ -2,6 +2,7 @@ import type { Order } from '@/types/booking';
 import type { QuotationDetail } from '../../types/providerOrder.types';
 import { formatMoney, getPaymentMethodLabel } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
+import { Wallet } from "lucide-react";
 
 interface PaymentSummaryCardProps {
   order: Order;
@@ -27,7 +28,7 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
 
   return (
     <section className="order-3 h-full rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg md:col-span-2 lg:order-2 lg:col-span-1">
-      <CardTitle icon="account_balance_wallet" title="Thanh toán và thu nhập" />
+      <CardTitle icon={Wallet} title="Thanh toán và thu nhập" />
       <div className="mt-md flex items-center justify-between gap-3 rounded-2xl bg-surface-container-low p-3">
         <span className="text-sm text-on-surface-variant">Trạng thái thanh toán</span>
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{paymentStatus}</span>

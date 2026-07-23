@@ -17,6 +17,7 @@ import { useLeafletMapView } from "./use-leaflet-map-view";
 import { useRealtimeTracking } from "./use-realtime-tracking";
 import { useTrackingRoute } from "./use-tracking-route";
 import type { TrackingPoint } from "./types";
+import { HardHat, MapPinned } from "lucide-react";
 
 /** Toàn bộ state/refs/effects phục vụ vòng đời bản đồ theo dõi đơn hàng. */
 export function useOrderTrackingMap(order: Order, viewerRole: "CUSTOMER" | "PROVIDER") {
@@ -64,7 +65,7 @@ export function useOrderTrackingMap(order: Order, viewerRole: "CUSTOMER" | "PROV
             coordinate: customerCoordinate,
             displayText: addressLine || formatCoordinate(customerCoordinate),
             updatedAtLabel: formatUpdatedAt(customerCoordinate.updatedAt),
-            icon: "person_pin_circle",
+            icon: MapPinned,
           }
           : null,
         providerCoordinate
@@ -77,7 +78,7 @@ export function useOrderTrackingMap(order: Order, viewerRole: "CUSTOMER" | "PROV
             coordinate: providerCoordinate,
             displayText: formatCoordinate(providerCoordinate),
             updatedAtLabel: formatUpdatedAt(providerCoordinate.updatedAt),
-            icon: "engineering",
+            icon: HardHat,
           }
           : null,
       ].filter(Boolean) as TrackingPoint[],

@@ -1,6 +1,7 @@
 import { ReliableImage } from "@/components/common/ReliableImage";
 import { CategoryIcon } from "@/components/common/CategoryIcon";
 import type { Category } from "@/types/booking";
+import { LayoutGrid, SlidersHorizontal } from "lucide-react";
 
 interface ServiceCategoryFilterProps {
   categories: Category[];
@@ -34,9 +35,7 @@ export function ServiceCategoryFilter({
       <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 shadow-sm md:max-h-[calc(100vh-9rem)] md:overflow-y-auto">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-bold text-on-surface">Bộ lọc</h2>
-          <span className="material-symbols-outlined text-on-surface-variant">
-            tune
-          </span>
+          <SlidersHorizontal aria-hidden="true" size={24} className="text-on-surface-variant" />
         </div>
 
         <div className="space-y-2">
@@ -52,9 +51,7 @@ export function ServiceCategoryFilter({
                 : "text-on-surface hover:bg-surface-container-low"
             }`}
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[20px]">
-              apps
-            </span>
+            <LayoutGrid aria-hidden="true" size={20} />
             <span className="flex-1">Tất cả dịch vụ</span>
             <span className="text-xs tabular-nums opacity-70">{totalCount}</span>
           </button>

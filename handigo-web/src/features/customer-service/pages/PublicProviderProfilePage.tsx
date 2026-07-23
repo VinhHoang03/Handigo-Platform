@@ -14,6 +14,7 @@ import {
   customerServiceApi,
   type PublicProviderProfile,
 } from "../api/customerService.api";
+import { ArrowLeft } from "lucide-react";
 
 const getAreaText = (profile: PublicProviderProfile) => {
   const serviceArea = [
@@ -110,9 +111,7 @@ export default function PublicProviderProfilePage() {
                   onClick={() => navigate(-1)}
                   className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-lowest px-3 py-1.5 text-sm font-semibold text-on-surface shadow-sm hover:bg-surface-container-low"
                 >
-                  <span className="material-symbols-outlined text-[18px]">
-                    arrow_back
-                  </span>
+                  <ArrowLeft aria-hidden="true" size={18} />
                   Quay lại
                 </button>
               </div>

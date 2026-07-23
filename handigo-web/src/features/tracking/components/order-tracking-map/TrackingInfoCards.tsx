@@ -1,4 +1,5 @@
 import type { TrackingPoint } from "./types";
+import { HardHat, MapPinned } from "lucide-react";
 
 interface TrackingInfoCardsProps {
   hasMapCoordinate: boolean;
@@ -23,10 +24,9 @@ export function TrackingInfoCards({ hasMapCoordinate, points }: TrackingInfoCard
           <div className="flex items-start justify-between gap-2 pl-2">
             <div className="flex items-center gap-2">
               <span
-                className="material-symbols-outlined"
-                style={{ fontSize: 18, color: point.color }}
+                style={{ color: point.color }}
               >
-                {point.key === "customer" ? "person_pin_circle" : "engineering"}
+                {point.key === "customer" ? <MapPinned aria-hidden="true" size={18} /> : <HardHat aria-hidden="true" size={18} />}
               </span>
               <p className="text-sm font-bold text-on-surface">{point.label}</p>
             </div>

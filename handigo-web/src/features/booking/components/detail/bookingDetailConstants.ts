@@ -1,3 +1,4 @@
+import { Banknote, Landmark, Wallet, type LucideIcon } from "lucide-react";
 export type PendingAction = {
   type: "confirmQuotation" | "rejectQuotation" | "cancelOrder" | "cancelSeries";
   reason: string;
@@ -9,25 +10,25 @@ export type InitialPaymentMethod = "PAYOS" | "WALLET" | "CASH";
 
 export const initialPaymentMethods: Array<{
   value: InitialPaymentMethod;
-  icon: string;
+  icon: LucideIcon;
   title: string;
   description: string;
 }> = [
   {
     value: "PAYOS",
-    icon: "account_balance",
+    icon: Landmark,
     title: "Chuyển khoản ngân hàng",
     description: "Thanh toán qua cổng PayOS",
   },
   {
     value: "WALLET",
-    icon: "account_balance_wallet",
+    icon: Wallet,
     title: "Ví Handigo",
     description: "Thanh toán từ số dư ví",
   },
   {
     value: "CASH",
-    icon: "payments",
+    icon: Banknote,
     title: "Tiền mặt",
     description: "Thanh toán trực tiếp cho chuyên gia",
   },

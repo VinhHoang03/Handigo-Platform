@@ -2,6 +2,7 @@ import { CategoryIcon } from '@/components/common/CategoryIcon';
 import type { DataTableColumn } from '@/components/common/dashboard/DataTable';
 import type { Category } from '../../types/categoryService.types';
 import { formatCategoryDate } from './category.helpers';
+import { Pencil, Trash2 } from "lucide-react";
 
 interface CategoryTableContext {
   serviceCounts: Record<string, number>;
@@ -66,10 +67,10 @@ export function buildCategoryTableColumns({ serviceCounts, onEdit, onDelete }: C
       render: (category) => (
         <div className="flex items-center justify-end gap-2">
           <button type="button" onClick={() => onEdit(category)} className="rounded-lg p-2 transition-colors hover:bg-primary-container/10 hover:text-primary" aria-label="Sửa">
-            <span className="material-symbols-outlined">edit</span>
+            <Pencil aria-hidden="true" size={24} />
           </button>
           <button type="button" onClick={() => onDelete(category)} className="rounded-lg p-2 transition-colors hover:bg-error-container/20 hover:text-error" aria-label="Xóa">
-            <span className="material-symbols-outlined">delete</span>
+            <Trash2 aria-hidden="true" size={24} />
           </button>
         </div>
       ),

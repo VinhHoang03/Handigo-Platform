@@ -3,6 +3,7 @@ import type { ChatbotAudience, ChatbotMessage } from "../types/chatbot.types";
 import { ChatbotComposer } from "./ChatbotComposer";
 import { ChatbotMessageList } from "./ChatbotMessageList";
 import { ChatbotAvatar } from "./ChatbotAvatar";
+import { X } from "lucide-react";
 
 const getAudienceLabel = (audience: ChatbotAudience) => {
   if (audience === "CUSTOMER") return "Hỗ trợ dành cho khách hàng";
@@ -58,9 +59,7 @@ export function ChatbotPanel({
               aria-label="Đóng trợ lý"
               className="rounded-full p-2 hover:bg-white/15"
             >
-              <span className="material-symbols-outlined block text-xl">
-                close
-              </span>
+              <X aria-hidden="true" size={20} className="block" />
             </button>
           </div>
         </div>
