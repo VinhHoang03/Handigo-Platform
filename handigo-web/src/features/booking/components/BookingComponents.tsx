@@ -327,7 +327,7 @@ export const OrderSummaryCard: React.FC<{
                 <div>
                   <p className="text-xs text-on-surface-variant">Chuyên gia</p>
                   <p className="font-bold text-on-surface">
-                    {preferredProviderName || 'Chưa chọn chuyên gia'}
+                    {preferredProviderName || 'Handigo tự điều phối'}
                   </p>
                 </div>
               </div>

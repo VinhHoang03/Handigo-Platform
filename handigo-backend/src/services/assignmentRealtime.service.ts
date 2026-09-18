@@ -4,13 +4,26 @@ export const getAssignmentRealtimePayload = async (assignmentId: string) => {
   return OrderAssignment.findById(assignmentId)
     .populate({
       path: "orderId",
+      select: [
+        "orderCode",
+        "serviceId",
+        "addressId",
+        "orderType",
+        "scheduledAt",
+        "recurringGroupId",
+        "recurrenceUnit",
+        "occurrenceNumber",
+        "totalOccurrences",
+        "pricing",
+        "inspectionRequired",
+        "createdAt",
+      ].join(" "),
       populate: [
-        { path: "customerId", select: "fullName avatar phone" },
         {
           path: "serviceId",
           select: "name image serviceType depositAmount fixedPrice",
         },
-        { path: "addressId" },
+        { path: "addressId", select: "ward province" },
       ],
     })
     .lean();

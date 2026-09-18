@@ -16,6 +16,9 @@ import { reconcilePayosPaymentForExpiration } from "./payment.service";
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
 const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
 
+/** Số provider nhận cùng một lượt đề nghị để cạnh tranh nhận đơn. */
+const DEFAULT_MATCHING_BATCH_SIZE = 3;
+
 /** Thời gian phản hồi dành riêng cho yêu cầu customer chọn provider cụ thể. */
 export const DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -40,6 +43,7 @@ interface DispatchContext {
   serviceId: string;
   province: string;
   ward: string;
+  scheduledDates?: Date[];
 }
 
 async function getMatchingConfig() {
@@ -48,6 +52,7 @@ async function getMatchingConfig() {
     matchingProviderTimeoutSecondsValue,
     maxMatchingDurationSecondsValue,
     scheduledDispatchLeadMinutesValue,
+    matchingBatchSizeValue,
   ] = await Promise.all([
     getNumberConfigValue(
       "MAX_MATCHING_ATTEMPTS",
@@ -65,6 +70,7 @@ async function getMatchingConfig() {
       "SCHEDULED_DISPATCH_LEAD_MINUTES",
       DEFAULT_SCHEDULED_DISPATCH_LEAD_MINUTES,
     ),
+    getNumberConfigValue("MATCHING_BATCH_SIZE", DEFAULT_MATCHING_BATCH_SIZE),
   ]);
 
   return {
@@ -81,6 +87,7 @@ async function getMatchingConfig() {
       scheduledDispatchLeadMinutesValue,
       0,
     ),
+    matchingBatchSize: Math.max(Math.floor(matchingBatchSizeValue), 1),
   };
 }
 
@@ -90,7 +97,7 @@ export async function getMaxMatchingDurationSeconds(): Promise<number> {
 }
 
 async function cancelUnmatchedOrder(orderId: string, reason: string) {
-  const order = await Order.findById(orderId).select("status");
+  const order = await Order.findById(orderId).select("status recurringGroupId");
   if (!order || order.status !== "created") {
     return false;
   }
@@ -99,18 +106,29 @@ async function cancelUnmatchedOrder(orderId: string, reason: string) {
     { _id: orderId, "reassignment.status": "matching" },
     { $set: { "reassignment.status": "failed" } },
   );
-  await cancelSystemOrderWithSettlement(
-    orderId,
-    reason,
-    "provider_unavailable",
-  );
+  const orderIds = order.recurringGroupId
+    ? await Order.find({
+        recurringGroupId: order.recurringGroupId,
+        status: "created",
+        isDeleted: false,
+      }).distinct("_id")
+    : [order._id];
+  for (const currentOrderId of orderIds) {
+    await cancelSystemOrderWithSettlement(
+      currentOrderId.toString(),
+      reason,
+      "provider_unavailable",
+    );
+  }
   return true;
 }
 
 async function getDispatchContext(
   orderId: string,
 ): Promise<DispatchContext | null> {
-  const order = await Order.findById(orderId).select("serviceId addressId");
+  const order = await Order.findById(orderId).select(
+    "serviceId addressId orderType scheduledAt recurringGroupId",
+  );
   if (!order) return null;
 
   const address = await Address.findById(order.addressId).select(
@@ -118,12 +136,28 @@ async function getDispatchContext(
   );
   if (!address) return null;
 
+  const scheduledDates = order.recurringGroupId
+    ? (await Order.find({
+        recurringGroupId: order.recurringGroupId,
+        status: "created",
+        isDeleted: false,
+      })
+        .select("scheduledAt")
+        .sort({ occurrenceNumber: 1 })
+        .lean())
+        .map((item) => item.scheduledAt)
+        .filter((date): date is Date => date instanceof Date)
+    : order.scheduledAt
+      ? [order.scheduledAt]
+      : [];
+
   return {
     latitude: address.latitude,
     longitude: address.longitude,
     serviceId: order.serviceId.toString(),
     province: address.province,
     ward: address.ward,
+    scheduledDates,
   };
 }
 
@@ -155,56 +189,109 @@ async function getTriedProviderState(orderId: Types.ObjectId | string) {
   };
 }
 
-async function sendAssignment(
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === 11000
+  );
+}
+
+async function sendAssignmentBatch(
   orderId: string,
-  candidate: ProviderCandidate,
+  candidates: ProviderCandidate[],
   ctx: DispatchContext,
-  triedProviderIds: Types.ObjectId[],
-  attemptNumber: number,
+  batchNumber: number,
   deadline: Date,
 ) {
-  const assignment = await OrderAssignment.create({
-    orderId: new Types.ObjectId(orderId),
-    providerId: candidate.providerId,
-    status: "pending",
-    assignedAt: new Date(),
-    responseDeadline: deadline,
-  });
+  const isAppointment = Boolean(ctx.scheduledDates?.length);
+  const assignedAt = new Date();
+  const createAssignment = (candidate: ProviderCandidate) =>
+    OrderAssignment.create({
+      orderId: new Types.ObjectId(orderId),
+      providerId: candidate.providerId,
+      assignmentType: isAppointment ? "appointment" : "dispatch",
+      status: "pending",
+      assignedAt,
+      responseDeadline: deadline,
+    });
 
-  const realtimeAssignment = await getAssignmentRealtimePayload(
-    assignment._id.toString(),
+  const [firstCandidate, ...remainingCandidates] = candidates;
+  if (!firstCandidate) return;
+
+  const assignments = [];
+  try {
+    assignments.push(await createAssignment(firstCandidate));
+  } catch (error: unknown) {
+    if (isDuplicateKeyError(error)) {
+      dispatchLogger.info("Nhóm phân phối đã được tiến trình khác tạo.", {
+        orderId,
+        batchNumber,
+      });
+      return;
+    }
+    throw error;
+  }
+
+  for (const candidate of remainingCandidates) {
+    try {
+      assignments.push(await createAssignment(candidate));
+    } catch (error: unknown) {
+      if (!isDuplicateKeyError(error)) throw error;
+    }
+  }
+
+  const candidateByProviderId = new Map(
+    candidates.map((candidate) => [candidate.providerId.toString(), candidate]),
   );
-  emitToUser(candidate.userId.toString(), "assignment:new", {
-    assignmentId: assignment._id.toString(),
-    orderId,
-    responseDeadline: deadline,
-    assignment: realtimeAssignment,
-  });
 
-  dispatchLogger.info("Đã phân công đơn cho provider.", {
+  for (const assignment of assignments) {
+    const candidate = candidateByProviderId.get(assignment.providerId.toString());
+    if (!candidate) continue;
+
+    const realtimeAssignment = await getAssignmentRealtimePayload(
+      assignment._id.toString(),
+    );
+    emitToUser(candidate.userId.toString(), "assignment:new", {
+      assignmentId: assignment._id.toString(),
+      orderId,
+      responseDeadline: deadline,
+      assignment: realtimeAssignment,
+    });
+    if (isAppointment) {
+      await createNotificationRecord({
+        userId: candidate.userId,
+        type: "ORDER",
+        title: "Yêu cầu lịch hẹn mới",
+        content: `Handigo đề xuất một lịch hẹn vào ${ctx.scheduledDates?.[0]?.toLocaleString("vi-VN")}.`,
+        data: { orderId, assignmentId: assignment._id },
+      });
+    }
+
+    const assignmentTimer = setTimeout(() => {
+      DispatchService._onAssignmentTimeout(
+        orderId,
+        assignment._id.toString(),
+        candidate.providerId,
+        ctx,
+      ).catch((error: unknown) =>
+        dispatchLogger.error("Xử lý timeout assignment thất bại.", error, {
+          assignmentId: assignment._id.toString(),
+          orderId,
+        }),
+      );
+    }, Math.max(deadline.getTime() - Date.now(), 1));
+    assignmentTimer.unref();
+  }
+
+  dispatchLogger.info("Đã phát đơn cho nhóm provider.", {
     orderId,
-    providerId: candidate.providerId.toString(),
-    attemptNumber,
-    distanceMeters: candidate.distanceMeters,
+    batchNumber,
+    providerCount: assignments.length,
+    providerIds: candidates.map((candidate) => candidate.providerId.toString()),
     deadline: deadline.toISOString(),
   });
-
-  const assignmentTimer = setTimeout(() => {
-    DispatchService._onAssignmentTimeout(
-      orderId,
-      assignment._id.toString(),
-      candidate.providerId,
-      ctx,
-      triedProviderIds,
-      attemptNumber,
-    ).catch((error: unknown) =>
-      dispatchLogger.error("Xử lý timeout assignment thất bại.", error, {
-        assignmentId: assignment._id.toString(),
-        orderId,
-      }),
-    );
-  }, Math.max(deadline.getTime() - Date.now(), 1));
-  assignmentTimer.unref();
 }
 
 async function sendDirectProviderRequest(
@@ -245,8 +332,6 @@ async function sendDirectProviderRequest(
       assignment._id.toString(),
       candidate.providerId,
       ctx,
-      [],
-      1,
     ).catch((error: unknown) =>
       dispatchLogger.error("Xử lý timeout yêu cầu trực tiếp thất bại.", error, {
         assignmentId: assignment._id.toString(),
@@ -356,7 +441,6 @@ export const DispatchService = {
       orderId,
       ctx,
       triedState.triedProviderIds,
-      triedState.attemptNumber,
     );
   },
 
@@ -367,17 +451,23 @@ export const DispatchService = {
     orderId: string,
     ctx: DispatchContext,
     triedProviderIds: Types.ObjectId[] = [],
-    attemptNumber = 1,
   ): Promise<void> {
     const {
       maxMatchingAttempts,
       matchingProviderTimeoutSeconds,
       maxMatchingDurationSeconds,
+      matchingBatchSize,
     } = await getMatchingConfig();
     const order = await Order.findById(orderId).select(
       "status createdAt matchingStartedAt",
     );
     if (!order || order.status !== "created") return;
+    const hasPendingAssignment = await OrderAssignment.exists({
+      orderId: order._id,
+      status: "pending",
+      isDeleted: false,
+    });
+    if (hasPendingAssignment) return;
 
     const matchingDeadline = new Date(
       (order.matchingStartedAt || order.createdAt).getTime() +
@@ -391,7 +481,7 @@ export const DispatchService = {
       return;
     }
 
-    if (attemptNumber > maxMatchingAttempts) {
+    if (triedProviderIds.length >= maxMatchingAttempts) {
       await cancelUnmatchedOrder(
         orderId,
         `Không có provider nhận đơn sau ${maxMatchingAttempts} lượt matching.`,
@@ -403,6 +493,12 @@ export const DispatchService = {
       return;
     }
 
+    const candidateLimit = Math.min(
+      matchingBatchSize,
+      maxMatchingAttempts - triedProviderIds.length,
+    );
+    const batchNumber = Math.floor(triedProviderIds.length / matchingBatchSize) + 1;
+
     const candidates: ProviderCandidate[] =
       await MatchingService.findNearestProviders({
         latitude: ctx.latitude,
@@ -411,7 +507,9 @@ export const DispatchService = {
         province: ctx.province,
         ward: ctx.ward,
         excludeProviderIds: triedProviderIds,
-        limit: 1,
+        limit: candidateLimit,
+        requireOnline: !ctx.scheduledDates?.length,
+        scheduledDates: ctx.scheduledDates,
       });
 
     if (candidates.length === 0) {
@@ -428,7 +526,6 @@ export const DispatchService = {
           orderId,
           ctx,
           triedProviderIds,
-          attemptNumber,
         ).catch((error: unknown) =>
           dispatchLogger.error("Thử lại matching thất bại.", error, { orderId }),
         );
@@ -437,7 +534,6 @@ export const DispatchService = {
       return;
     }
 
-    const candidate = candidates[0];
     const deadline = new Date(
       Math.min(
         Date.now() + matchingProviderTimeoutSeconds * 1000,
@@ -445,12 +541,11 @@ export const DispatchService = {
       ),
     );
 
-    await sendAssignment(
+    await sendAssignmentBatch(
       orderId,
-      candidate,
+      candidates,
       ctx,
-      triedProviderIds,
-      attemptNumber,
+      batchNumber,
       deadline,
     );
   },
@@ -463,8 +558,6 @@ export const DispatchService = {
     assignmentId: string,
     timedOutProviderId: Types.ObjectId,
     ctx: DispatchContext,
-    triedProviderIds: Types.ObjectId[],
-    attemptNumber: number,
   ): Promise<void> {
     const assignment = await OrderAssignment.findOneAndUpdate(
       { _id: assignmentId, status: "pending" },
@@ -497,7 +590,8 @@ export const DispatchService = {
     if (!order || order.status !== "created") return;
 
     if (assignment.assignmentType === "appointment") {
-      if (order.recurringGroupId) {
+      const isPreferredProviderRequest = Boolean(order.preferredProviderId);
+      if (isPreferredProviderRequest && order.recurringGroupId) {
         await Order.updateMany(
           { recurringGroupId: order.recurringGroupId, status: "created" },
           {
@@ -508,19 +602,21 @@ export const DispatchService = {
           },
           { runValidators: true },
         );
-      } else {
+      } else if (isPreferredProviderRequest) {
         order.bookingStatus = "rejected";
         order.preferredProviderId = null;
         await order.save();
       }
-      await createNotificationRecord({
-        userId: order.customerId,
-        type: "ORDER",
-        title: "Yêu cầu lịch hẹn đã hết hạn",
-        content: `Chuyên gia chưa phản hồi đơn ${order.orderCode}. Vui lòng chọn chuyên gia khác.`,
-        data: { orderId: order._id },
-      });
-      return;
+      if (isPreferredProviderRequest) {
+        await createNotificationRecord({
+          userId: order.customerId,
+          type: "ORDER",
+          title: "Yêu cầu lịch hẹn đã hết hạn",
+          content: `Chuyên gia chưa phản hồi đơn ${order.orderCode}. Vui lòng chọn chuyên gia khác.`,
+          data: { orderId: order._id },
+        });
+        return;
+      }
     }
 
     if (assignment.assignmentType === "direct_request") {
@@ -546,13 +642,19 @@ export const DispatchService = {
       return;
     }
 
+    const hasPendingAssignment = await OrderAssignment.exists({
+      orderId: assignment.orderId,
+      status: "pending",
+      isDeleted: false,
+    });
+    if (hasPendingAssignment) return;
+
     const triedState = await getTriedProviderState(assignment.orderId);
 
     await DispatchService.dispatchOrder(
       orderId,
       ctx,
       triedState.triedProviderIds,
-      triedState.attemptNumber,
     );
   },
 
@@ -654,21 +756,11 @@ export const DispatchService = {
         const ctx = await getDispatchContext(assignment.orderId.toString());
         if (!ctx) continue;
 
-        const triedAssignments = await OrderAssignment.find({
-          orderId: assignment.orderId,
-          _id: { $ne: assignment._id },
-          status: { $in: ["rejected", "timeout"] },
-        })
-          .select("providerId")
-          .lean();
-
         await DispatchService._onAssignmentTimeout(
           assignment.orderId.toString(),
           assignment._id.toString(),
           assignment.providerId,
           ctx,
-          triedAssignments.map((item) => item.providerId),
-          triedAssignments.length + 1,
         );
       }
 
@@ -761,7 +853,6 @@ export const DispatchService = {
             order._id.toString(),
             ctx,
             triedState.triedProviderIds,
-            triedState.attemptNumber,
           );
         }
       }
@@ -798,20 +889,16 @@ export const DispatchService = {
       );
     }
 
-    const address = await Address.findById(order.addressId);
+    const ctx = await getDispatchContext(orderId);
+    if (!ctx) {
+      throw new AppError("Không thể tạo ngữ cảnh điều phối cho đơn hàng.", 404);
+    }
     const triedState = await getTriedProviderState(order._id);
 
     await DispatchService.dispatchOrder(
       order._id.toString(),
-      {
-        latitude: address?.latitude,
-        longitude: address?.longitude,
-        serviceId: order.serviceId.toString(),
-        province: address?.province || "",
-        ward: address?.ward || "",
-      },
+      ctx,
       triedState.triedProviderIds,
-      triedState.attemptNumber,
     );
   },
 };

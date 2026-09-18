@@ -201,9 +201,7 @@ export const OrderService = {
       );
     }
     const requiresProviderConfirmation = ["scheduled", "recurring"].includes(orderType);
-    if (requiresProviderConfirmation && !payload.preferredProviderId) {
-      throw new AppError("Vui lòng chọn chuyên gia cụ thể cho lịch hẹn.", 400);
-    }
+    const isAutoAppointment = requiresProviderConfirmation && !payload.preferredProviderId;
     const validRecurrenceCount =
       payload.recurrenceUnit === "weekly"
         ? [1, 2, 3, 4].includes(payload.recurrenceCount || 0)
@@ -285,6 +283,23 @@ export const OrderService = {
           409,
         );
       }
+    } else if (isAutoAppointment) {
+      const availableProviders = await MatchingService.findNearestProviders({
+        latitude: address.latitude,
+        longitude: address.longitude,
+        serviceId: service._id.toString(),
+        province: address.province,
+        ward: address.ward,
+        limit: 1,
+        requireOnline: false,
+        scheduledDates: occurrenceDates,
+      });
+      if (availableProviders.length === 0) {
+        throw new AppError(
+          "Chưa có chuyên gia phù hợp và còn trống trong thời gian đã chọn.",
+          409,
+        );
+      }
     }
 
     let preferredProvider: Awaited<
@@ -300,6 +315,7 @@ export const OrderService = {
         onlyProviderId: new Types.ObjectId(payload.preferredProviderId),
         limit: 1,
         requireOnline: false,
+        scheduledDates: requiresProviderConfirmation ? occurrenceDates : [],
       });
       preferredProvider = candidates[0] ?? null;
       if (!preferredProvider) {
@@ -356,6 +372,7 @@ export const OrderService = {
     // 6. Persist order
     const recurringGroupId = orderType === "recurring" ? new Types.ObjectId() : null;
     const orderDates = orderType === "normal" ? [null] : occurrenceDates;
+    const autoMatchingStartedAt = isAutoAppointment ? new Date() : null;
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
@@ -383,8 +400,10 @@ export const OrderService = {
       status: "created",
       paymentMethod: payload.paymentMethod,
       paymentStatus: "unpaid",
-      readyForMatching: false,
-      matchingStartedAt: null,
+      readyForMatching: isAutoAppointment && index === 0,
+      matchingStartedAt: isAutoAppointment && index === 0
+        ? autoMatchingStartedAt
+        : null,
       depositAmount: pricingSnapshot.depositAmount,
       inspectionRequired,
       hasAdditionalQuotation: false,
@@ -446,6 +465,8 @@ export const OrderService = {
         content: `Khách hàng muốn đặt lịch ${scheduledAt.toLocaleString("vi-VN")}.`,
         data: { orderId: order._id, assignmentId: assignment._id },
       });
+    } else if (isAutoAppointment) {
+      await DispatchService.redispatch(order._id.toString());
     }
 
     return order;
@@ -526,6 +547,26 @@ export const OrderService = {
     );
     if (!order || (isAppointment && !order.scheduledAt)) {
       throw new AppError("Đơn hàng không ở trạng thái có thể chọn lại provider.", 409);
+    }
+
+    const relatedOrderIds = order.recurringGroupId
+      ? await Order.find({
+          recurringGroupId: order.recurringGroupId,
+          customerId: new Types.ObjectId(customerId),
+          isDeleted: false,
+        }).distinct("_id")
+      : [order._id];
+    const hasDeclinedAssignment = await OrderAssignment.exists({
+      orderId: { $in: relatedOrderIds },
+      providerId: new Types.ObjectId(providerId),
+      status: { $in: ["rejected", "timeout"] },
+      isDeleted: false,
+    });
+    if (hasDeclinedAssignment) {
+      throw new AppError(
+        "Chuyên gia này đã từ chối hoặc không phản hồi yêu cầu trước đó. Vui lòng chọn người khác.",
+        409,
+      );
     }
 
     const address = await Address.findOne({
@@ -885,18 +926,7 @@ export const OrderService = {
     const isAssignedProvider =
       !!provider && providerIdOnOrder === provider._id.toString();
 
-    let hasPendingAssignment = false;
-    if (provider && !isCustomer && !isAssignedProvider) {
-      const pending = await OrderAssignment.findOne({
-        orderId: order._id,
-        providerId: provider._id,
-        status: "pending",
-        responseDeadline: { $gte: new Date() },
-      }).lean();
-      hasPendingAssignment = !!pending;
-    }
-
-    if (!isCustomer && !isAssignedProvider && !hasPendingAssignment) {
+    if (!isCustomer && !isAssignedProvider) {
       throw new AppError("Bạn không có quyền xem đơn hàng này.", 403);
     }
 

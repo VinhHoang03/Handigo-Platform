@@ -234,12 +234,12 @@ const CreateBookingStep2Page = () => {
     } else if (scheduleDate && scheduleDate < todayInputValue) {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
     }
-    if (shouldShowSchedulePicker && !preferredProviderId) {
-      nextErrors.preferredProviderId = 'Vui lòng chọn chuyên gia còn trống cho lịch hẹn.';
-    } else if (!shouldShowSchedulePicker && providerAvailability !== 'available') {
+    if (providerAvailability !== 'available') {
       nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
         ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
-        : 'Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.';
+        : shouldShowSchedulePicker
+          ? 'Chưa có chuyên gia phù hợp và còn trống trong thời gian đã chọn.'
+          : 'Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.';
     }
 
     setFormErrors(nextErrors);
@@ -570,7 +570,7 @@ const CreateBookingStep2Page = () => {
                   <fieldset>
                     <legend className="mb-sm flex items-center gap-sm text-sm font-bold text-on-surface">
                       <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs text-on-primary">{orderType === 'recurring' ? 4 : 3}</span>
-                      Chọn chuyên gia
+                      Phân phối chuyên gia
                     </legend>
                     <NearbyProviderSelector
                       serviceId={serviceId}

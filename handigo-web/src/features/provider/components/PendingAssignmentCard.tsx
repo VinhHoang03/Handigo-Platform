@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import {
   formatDateTime,
@@ -123,6 +122,11 @@ export function PendingAssignmentCard({
           </div>
         )}
 
+        <div className="flex items-start gap-2 rounded-2xl bg-surface-container-low p-sm text-sm text-on-surface-variant">
+          <span className="material-symbols-outlined text-base text-primary">shield_lock</span>
+          <span>Thông tin liên hệ và địa chỉ chi tiết sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
+        </div>
+
         <div className="flex flex-col gap-sm sm:flex-row">
           <button
             type="button"
@@ -146,9 +150,6 @@ export function PendingAssignmentCard({
           >
             Từ chối
           </button>
-          <Link to={`/provider/orders/${order._id}`} className="btn-secondary flex-1 text-center">
-            Xem chi tiết
-          </Link>
         </div>
       </div>
     </div>
