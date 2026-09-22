@@ -108,6 +108,12 @@ export interface IOrder extends Document, IBaseDocument {
   depositAmount: Money;
   depositPaidAt?: Date | null;
   readyForMatching: boolean;
+  matchingSearch?: {
+    initialRadiusKm: number;
+    expandedRadiusKm: number;
+    expandsAt: Date;
+    expiresAt: Date;
+  } | null;
   matchingStartedAt?: Date | null;
   platformFeeChargedAt?: Date | null;
   hasAdditionalQuotation: boolean;
@@ -241,6 +247,15 @@ const OrderSchema = new Schema<IOrder>(
     depositPaidAt: { type: Date, default: null },
     readyForMatching: { type: Boolean, default: false },
     matchingStartedAt: { type: Date, default: null },
+    matchingSearch: {
+      type: new Schema({
+        initialRadiusKm: { type: Number, required: true, min: 0.1 },
+        expandedRadiusKm: { type: Number, required: true, min: 0.1 },
+        expandsAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+      }, { _id: false }),
+      default: null,
+    },
     platformFeeChargedAt: { type: Date, default: null },
     hasAdditionalQuotation: { type: Boolean, default: false },
     currentQuotationId: {

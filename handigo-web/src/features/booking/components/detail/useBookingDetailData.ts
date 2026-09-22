@@ -86,6 +86,26 @@ export const useBookingDetailData = (id: string | undefined) => {
     void Promise.resolve().then(loadData);
   }, [loadData]);
 
+  // Đồng bộ tiến trình khi khách chờ, kể cả sau tải lại trang hoặc bỏ lỡ socket.
+  useEffect(() => {
+    if (!id || order?.status !== "created") return;
+    let disposed = false;
+    let pending = false;
+    const timer = window.setInterval(async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const updated = await bookingApi.getOrderById(id);
+        if (!disposed && updated) setOrder(updated);
+      } catch (error) {
+        console.error("Không thể cập nhật tiến trình tìm thợ:", error);
+      } finally {
+        pending = false;
+      }
+    }, 5000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [id, order?.status]);
+
   return {
     order,
     setOrder,

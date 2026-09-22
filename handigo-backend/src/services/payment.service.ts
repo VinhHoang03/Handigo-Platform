@@ -15,6 +15,22 @@ import { handleWalletDepositPayosWebhook } from "./wallet.service";
 import { buildTransactionCode } from "../utils/transaction";
 import { createLogger } from "../utils/logger";
 import { markOrderVoucherAsUsed } from "./voucher.service";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
+
+export interface ConfirmedPaymentExpectation {
+  amount: number;
+  paymentType: PaymentType;
+}
+
+// Kiểm tra lại bên trong transaction để số tiền trừ đúng với bản khách đã xác nhận.
+const assertConfirmedPayment = (order: InstanceType<typeof Order>, amount: number,
+  paymentType: PaymentType, expected?: ConfirmedPaymentExpectation) => {
+  if (!expected) return;
+  if (expected.amount !== amount || expected.paymentType !== paymentType
+    || !["created", "accepted"].includes(order.status) || order.paymentStatus !== "unpaid") {
+    throw new ActionPreconditionError();
+  }
+};
 
 const DEFAULT_RETURN_URL = process.env.PAYOS_RETURN_URL || "http://localhost:5173/payment/success";
 const DEFAULT_CANCEL_URL = process.env.PAYOS_CANCEL_URL || "http://localhost:5173/payment/cancel";
@@ -229,7 +245,7 @@ const canAccessOrder = async (order: any, user: RequestUser) => {
   return provider?.userId?.toString() === user.id;
 };
 
-const createWalletPayment = async (order: any, paymentType: PaymentType, amount: number) => {
+const createWalletPayment = async (order: any, paymentType: PaymentType, amount: number, expected?: ConfirmedPaymentExpectation) => {
   const session = await mongoose.startSession();
   let payment: InstanceType<typeof Payment> | null = null;
   let paymentOrder: any = null;
@@ -245,6 +261,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       assertAppointmentPaymentReady(transactionalOrder, paymentType);
 
       chargedAmount = await getPaymentAmount(transactionalOrder, paymentType);
+      assertConfirmedPayment(transactionalOrder, chargedAmount, paymentType, expected);
       if (chargedAmount <= 0) {
         throw new AppError("Số tiền thanh toán không hợp lệ", 400);
       }
@@ -334,6 +351,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       return createdPayment;
     })) ?? null;
   } catch (error: unknown) {
+    if (expected && error instanceof AppError && error.statusCode < 500) throw new ActionPreconditionError(error.message);
     rethrowDuplicatePaymentError(error);
   } finally {
     await session.endSession();
@@ -368,6 +386,7 @@ const reserveExternalPayment = async (
   input: CreatePaymentInput,
   method: "cash" | "payos",
   gatewayOrderCode?: string,
+  expected?: ConfirmedPaymentExpectation,
 ) => {
   const session = await mongoose.startSession();
   let result: {
@@ -397,6 +416,7 @@ const reserveExternalPayment = async (
       }
 
       const amount = await getPaymentAmount(order, paymentType);
+      assertConfirmedPayment(order, amount, paymentType, expected);
       if (amount <= 0) {
         throw new AppError("Số tiền thanh toán không hợp lệ", 400);
       }
@@ -463,6 +483,7 @@ const reserveExternalPayment = async (
       return { order, payment, paymentType, amount };
     });
   } catch (error: unknown) {
+    if (expected && error instanceof AppError && error.statusCode < 500) throw new ActionPreconditionError(error.message);
     rethrowDuplicatePaymentError(error);
   } finally {
     await session.endSession();
@@ -475,7 +496,42 @@ const reserveExternalPayment = async (
   return result;
 };
 
-export const createPayment = async (user: RequestUser, input: CreatePaymentInput) => {
+export const previewOrderPayment = async (user: RequestUser, orderId: string, method: CreatePaymentInput["method"]) => {
+  const order = await Order.findOne({ _id: orderId, customerId: user.id, isDeleted: false });
+  if (!order) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+  if (!["created", "accepted"].includes(order.status) || order.paymentStatus !== "unpaid") {
+    throw new AppError("Đơn không còn chờ thanh toán. Hãy kiểm tra trạng thái thanh toán của đơn.", 409);
+  }
+  const paymentType = getPaymentType(order);
+  assertAppointmentPaymentReady(order, paymentType);
+  if (order.inspectionRequired && method === "CASH") {
+    throw new AppError("Tiền đặt cọc khảo sát chỉ thanh toán bằng chuyển khoản hoặc ví Handigo.", 400);
+  }
+  const amount = await getPaymentAmount(order, paymentType);
+  if (amount <= 0) throw new AppError("Số tiền thanh toán không hợp lệ.", 400);
+  const existing = await Payment.findOne({ orderId, paymentType, isDeleted: false, status: { $in: ["pending", "paid"] } });
+  if (existing) {
+    throw new AppError(existing.status === "paid" ? "Khoản này đã được thanh toán. Hãy kiểm tra trạng thái đơn."
+      : existing.method === "payos" ? "Đang có giao dịch PayOS. Hãy kiểm tra thanh toán để tiếp tục liên kết cũ; hủy trên PayOS và kiểm tra lại trước khi đổi phương thức."
+      : "Đơn đã có giao dịch đang chờ. Hãy kiểm tra thanh toán, không tạo giao dịch mới.", 409);
+  }
+  if (method === "WALLET") {
+    const wallet = await Wallet.findOne({ userId: user.id, isDeleted: false }).select("balance");
+    if (!wallet || wallet.balance < amount) {
+      const missing = amount - (wallet?.balance ?? 0);
+      throw new AppError(`Ví còn thiếu ${missing.toLocaleString("vi-VN")} đ. Vui lòng nạp ví hoặc chọn chuyển khoản; đơn hàng vẫn được giữ nguyên.`, 400);
+    }
+  }
+  return { title: method === "WALLET" ? "Xác nhận trừ tiền ví" : method === "CASH" ? "Xác nhận thanh toán tiền mặt" : "Tạo liên kết chuyển khoản",
+    orderId: String(order._id), orderCode: order.orderCode, amount, paymentType,
+    paymentMethod: method === "PAYOS" ? "bank" : method === "WALLET" ? "wallet" : "cash",
+    paymentLabel: paymentType === "inspection_deposit" ? "Tiền đặt cọc khảo sát" : "Thanh toán toàn bộ dịch vụ",
+    note: method === "WALLET" ? "Xác nhận sẽ trừ số tiền trên từ ví Handigo."
+      : method === "CASH" ? "Thanh toán trực tiếp cho nhà cung cấp; chưa ghi nhận đã thanh toán."
+      : "Sau xác nhận, mở liên kết PayOS để thanh toán. Tạo liên kết chưa có nghĩa đã thanh toán." };
+};
+
+export const createPayment = async (user: RequestUser, input: CreatePaymentInput, expected?: ConfirmedPaymentExpectation) => {
   const order = await Order.findById(input.orderId);
 
   if (!order || order.isDeleted) {
@@ -494,6 +550,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   }
 
   const amount = await getPaymentAmount(order, paymentType);
+  assertConfirmedPayment(order, amount, paymentType, expected);
 
   if (amount <= 0) {
     throw new AppError("Số tiền thanh toán không hợp lệ", 400);
@@ -533,11 +590,11 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   }
 
   if (input.method === "WALLET") {
-    return createWalletPayment(order, paymentType, amount);
+    return createWalletPayment(order, paymentType, amount, expected);
   }
 
   if (input.method === "CASH") {
-    const reserved = await reserveExternalPayment(user, input, "cash");
+    const reserved = await reserveExternalPayment(user, input, "cash", undefined, expected);
     triggerDispatch(reserved.order._id.toString());
 
     return {
@@ -554,6 +611,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     input,
     "payos",
     orderCode.toString(),
+    expected,
   );
   const payment = reserved.payment;
   const reservedAmount = reserved.amount;

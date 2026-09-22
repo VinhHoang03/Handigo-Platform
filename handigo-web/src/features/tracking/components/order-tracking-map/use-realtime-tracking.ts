@@ -36,7 +36,7 @@ export function useRealtimeTracking({
       ? mapText.locationUnsupported
       : liveTrackingEnabled
         ? mapText.connecting
-        : mapText.ready,
+        : "",
   );
 
   // Socket connection

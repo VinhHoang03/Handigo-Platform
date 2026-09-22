@@ -87,6 +87,8 @@ export function useTrackingRoute({
   // Huỷ request đang chờ khi component unmount.
   useEffect(() => () => {
     routeRequestRef.current?.abort();
+    lastRouteRequestAtRef.current = 0;
+    lastRoutedProviderRef.current = null;
   }, []);
 
   return trackingRoute;

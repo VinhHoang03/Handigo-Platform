@@ -6,7 +6,9 @@ import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
 import { Address } from "../models/address.model";
+import { ensureAddressCoordinates } from "./address.service";
 import { AppError } from "../utils/appError";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import {
@@ -146,6 +148,7 @@ export async function dispatchOrderForMatching(orderId: string) {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CreateOrderPayload {
+  confirmedExpectation?: { amount: number; addressVersion: string };
   customerId: string;
   serviceId: string;
   servicePackageId?: string;
@@ -259,48 +262,18 @@ export const OrderService = {
     if (!Types.ObjectId.isValid(payload.addressId)) {
       throw new AppError("Địa chỉ không hợp lệ.", 400);
     }
-    const address = await Address.findOne({
+    const selectedAddress = await Address.findOne({
       _id: payload.addressId,
       userId: payload.customerId,
     });
-    if (!address) {
+    if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
-
-    if (!requiresProviderConfirmation) {
-      const availableProviders = await MatchingService.findNearestProviders({
-        latitude: address.latitude,
-        longitude: address.longitude,
-        serviceId: service._id.toString(),
-        province: address.province,
-        ward: address.ward,
-        limit: 1,
-        requireOnline: true,
-      });
-      if (availableProviders.length === 0) {
-        throw new AppError(
-          "Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.",
-          409,
-        );
-      }
-    } else if (isAutoAppointment) {
-      const availableProviders = await MatchingService.findNearestProviders({
-        latitude: address.latitude,
-        longitude: address.longitude,
-        serviceId: service._id.toString(),
-        province: address.province,
-        ward: address.ward,
-        limit: 1,
-        requireOnline: false,
-        scheduledDates: occurrenceDates,
-      });
-      if (availableProviders.length === 0) {
-        throw new AppError(
-          "Chưa có chuyên gia phù hợp và còn trống trong thời gian đã chọn.",
-          409,
-        );
-      }
+    if (payload.confirmedExpectation && selectedAddress.updatedAt.toISOString() !== payload.confirmedExpectation.addressVersion) {
+      throw new ActionPreconditionError();
     }
+
+    const address = await ensureAddressCoordinates(selectedAddress);
 
     let preferredProvider: Awaited<
       ReturnType<typeof MatchingService.findNearestProviders>
@@ -360,6 +333,9 @@ export const OrderService = {
       : Math.max(platformCommissionPercent, 0) / 100;
     // 4. Giá cố định là tổng thành tiền của các tùy chọn; giá linh hoạt chỉ thu tiền cọc.
     const totalAmount = pricingSnapshot.bookingAmount;
+    if (payload.confirmedExpectation && totalAmount !== payload.confirmedExpectation.amount) {
+      throw new ActionPreconditionError();
+    }
     const voucherResult = payload.voucherCode
       ? await resolveVoucherForAmount(payload.voucherCode, totalAmount)
       : null;
@@ -930,14 +906,15 @@ export const OrderService = {
       throw new AppError("Bạn không có quyền xem đơn hàng này.", 403);
     }
 
+    const matchingSearch = order.matchingStartedAt && !order.preferredProviderId
+      ? order.matchingSearch : null;
     const matchingExpiresAt = order.matchingStartedAt
-      ? new Date(
-          order.matchingStartedAt.getTime() +
-            (await getMaxMatchingDurationSeconds()) * 1000,
-        )
+      ? matchingSearch?.expiresAt ?? new Date(order.matchingStartedAt.getTime()
+          + (order.preferredProviderId ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
+            : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
-    return { ...order, matchingExpiresAt };
+    return { ...order, matchingSearch, matchingExpiresAt };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {
@@ -1222,6 +1199,7 @@ export const OrderService = {
     userId: string,
     role: "customer" | "provider" | "admin",
     reason: string,
+    confirmedExpectation?: { paidAmount: number; refundAmount: number; cancellationFee: number },
   ): Promise<IOrder> {
     if (role === "provider") {
       const order = await Order.findById(orderId).select("status orderType");
@@ -1238,6 +1216,7 @@ export const OrderService = {
       actorId: userId,
       role,
       reason,
+      confirmedExpectation,
     });
   },
 

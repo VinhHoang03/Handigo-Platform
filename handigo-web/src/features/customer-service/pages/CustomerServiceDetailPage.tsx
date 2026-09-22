@@ -6,7 +6,6 @@ import type { ServiceOption } from "@/types/booking";
 import { AsyncState } from "@/components/common/AsyncState";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import { NearbyProviderSelector } from "../components/NearbyProviderSelector";
-import type { ProviderAvailabilityStatus } from "../components/NearbyProviderSelector";
 import { ServiceDetailSkeleton } from "../components/ServiceDetailSkeleton";
 import { ServiceGallery } from "../components/ServiceGallery";
 import { ServiceDescriptionSection } from "../components/ServiceDescriptionSection";
@@ -41,8 +40,6 @@ export default function CustomerServiceDetailPage() {
     Record<string, number>
   >({});
   const [optionSelectionError, setOptionSelectionError] = useState("");
-  const [providerAvailability, setProviderAvailability] =
-    useState<ProviderAvailabilityStatus>("idle");
 
   const { estimatePrice } = useServicePricing(
     service,
@@ -73,7 +70,6 @@ export default function CustomerServiceDetailPage() {
     isAuthenticated,
     isAuthInitializing,
     navigate,
-    onAddressChanged: () => setProviderAvailability("idle"),
   });
 
   const optionGroups = groupServiceOptions(options);
@@ -93,7 +89,6 @@ export default function CustomerServiceDetailPage() {
     navigate,
     addressId,
     addresses,
-    providerAvailability,
     selectedOptionIds,
     selectedOptionQuantities,
     setAddressSelectionError,
@@ -159,11 +154,7 @@ export default function CustomerServiceDetailPage() {
                   addressSelectionError={addressSelectionError}
                   requiresPhoneUpdate={requiresPhoneUpdate}
                   onAddressChange={handleAddressChange}
-                  isBookDisabled={
-                    isAuthenticated &&
-                    addresses.some((address) => address._id === addressId) &&
-                    providerAvailability !== "available"
-                  }
+                  isBookDisabled={false}
                   onBookNow={handleBookNow}
                 />
 
@@ -175,7 +166,6 @@ export default function CustomerServiceDetailPage() {
                     addresses.some((address) => address._id === addressId)
                   }
                   allowSelection={false}
-                  onAvailabilityChange={setProviderAvailability}
                 />
               </aside>
             </div>

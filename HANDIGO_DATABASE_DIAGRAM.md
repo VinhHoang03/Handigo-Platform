@@ -1,4 +1,8 @@
 
+// Sơ đồ tinh gọn: chỉ giữ các tham chiếu bắt buộc cho luồng nghiệp vụ chính,
+// phân quyền/ownership, thanh toán - đối soát và truy xuất dữ liệu thường xuyên.
+// Các liên kết người duyệt, người xử lý và liên kết ngược có thể suy ra đã được lược bỏ.
+
 Table users {
   id varchar [pk, note: 'MongoDB ObjectId']
   email varchar [not null, unique]
@@ -64,7 +68,6 @@ Table providerapplications {
   identityDocument json
   certificates json
   status varchar [not null]
-  reviewedBy varchar [ref: > users.id]
   reviewHistory json
   submittedAt datetime
 }
@@ -122,9 +125,6 @@ Table servicesuggestions {
   suggestedCategoryName varchar
   categoryId varchar [ref: > categories.id]
   status varchar
-  reviewedBy varchar [ref: > users.id]
-  createdServiceId varchar [ref: > services.id]
-  createdCategoryId varchar [ref: > categories.id]
 }
 
 Table promotions {
@@ -153,7 +153,6 @@ Table news_articles {
   status varchar
   isFeatured boolean
   publishedAt datetime
-  createdBy varchar [not null, ref: > users.id]
 }
 
 Table orders {
@@ -200,7 +199,6 @@ Table orderstatuses {
   id varchar [pk]
   orderId varchar [not null, ref: > orders.id]
   status varchar [not null]
-  changedBy varchar [ref: > users.id]
   changedByRole varchar [not null]
   note text
   createdAt datetime
@@ -298,7 +296,6 @@ Table withdrawrequests {
   amount decimal [not null]
   status varchar
   adminNote text
-  reviewedBy varchar [ref: > users.id]
   reviewedAt datetime
 }
 
@@ -388,9 +385,6 @@ Table complaints {
   title varchar [not null]
   description text [not null]
   status varchar
-  resolvedBy varchar [ref: > users.id]
-  reviewedBy varchar [ref: > users.id]
-  createdViolationId varchar [ref: > violations.id]
 }
 
 Table complaintevidences {
@@ -416,8 +410,6 @@ Table reports {
   description text [not null]
   evidenceFiles json
   status varchar
-  handledBy varchar [ref: > users.id]
-  createdViolationId varchar [ref: > violations.id]
 }
 
 Table supporttickets {
@@ -429,11 +421,8 @@ Table supporttickets {
   subject varchar [not null]
   description text [not null]
   status varchar
-  assignedAdminId varchar [ref: > users.id]
   responses json
   attachments json
-  resolvedBy varchar [ref: > users.id]
-  createdViolationId varchar [ref: > violations.id]
 }
 
 Table violations {
@@ -441,10 +430,6 @@ Table violations {
   userId varchar [not null, ref: > users.id]
   sourceType varchar
   sourceId varchar
-  relatedReportId varchar [ref: > reports.id]
-  relatedComplaintId varchar [ref: > complaints.id]
-  relatedSupportTicketId varchar [ref: > supporttickets.id]
-  orderId varchar [ref: > orders.id]
   violationType varchar [not null]
   severity varchar [not null]
   penaltyType varchar [not null]
@@ -507,4 +492,3 @@ TableGroup trust_and_support {
   supporttickets
   violations
 }
-
