@@ -7,7 +7,6 @@ import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AppError } from "../utils/appError";
 import { Address } from "../models/address.model";
-import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { emitToUser } from "../sockets/socketServer";
 import { cancelOrderWithSettlement } from "./orderCancellation.service";
 import { assertProviderWalletEligible } from "./providerWalletEligibility.service";
@@ -148,18 +147,9 @@ export const AssignmentService = {
     const assignedAddress = assignedOrder
       ? await Address.findById(assignedOrder.addressId).select("ward province")
       : null;
-    if (
-      !assignedAddress ||
-      !isAddressInProviderWorkingAreas(
-        provider.workingAreas,
-        assignedAddress,
-        provider.serviceArea,
-      )
-    ) {
-      throw new AppError(
-        "Địa chỉ thực hiện không thuộc khu vực phục vụ đã đăng ký của bạn.",
-        400,
-      );
+    // Phạm vi địa lý đã được kiểm tra khi gửi đề nghị; không chặn lại theo phường/xã.
+    if (!assignedAddress) {
+      throw new AppError("Địa chỉ thực hiện dịch vụ không còn tồn tại.", 400);
     }
 
     await assertProviderWalletEligible(provider.userId);

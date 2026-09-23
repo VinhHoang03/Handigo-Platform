@@ -266,3 +266,67 @@ export const reverseGeocode = async (query: ReverseGeocodeQuery) => {
   pendingRequests.set(cacheKey, request);
   return request;
 };
+
+// Tra cứu địa chỉ đã lưu; không lấy tâm phường/tỉnh làm vị trí thực hiện dịch vụ.
+export const geocodeSavedAddress = async (
+  address: { fullAddress: string; ward: string; province: string },
+): Promise<ReverseGeocodedAddress> => {
+  const parts = [address.fullAddress.trim()];
+  for (const part of [address.ward, address.province, "Việt Nam"]) {
+    if (part && !parts.join(", ").toLocaleLowerCase("vi-VN").includes(part.toLocaleLowerCase("vi-VN"))) {
+      parts.push(part);
+    }
+  }
+  const query = parts.join(", ");
+  const cacheKey = `search:${query.toLocaleLowerCase("vi-VN")}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+  const pending = pendingRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const request = enqueueLocationIqRequest(async () => {
+    const key = getLocationIqApiKey();
+    try {
+      const response = await axios.get<Array<{
+        lat?: string;
+        lon?: string;
+        address?: { country_code?: string };
+        matchquality?: { matchcode?: string; matchlevel?: string };
+      }>>("https://us1.locationiq.com/v1/search", {
+        params: {
+          key, q: query, format: "json", countrycodes: "vn",
+          addressdetails: 1, matchquality: 1, limit: 2, "accept-language": "vi",
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      const candidates = Array.isArray(response.data) ? response.data.filter((item) =>
+        item.address?.country_code === "vn"
+        && item.matchquality?.matchcode === "exact"
+        && ["building", "venue"].includes(item.matchquality?.matchlevel || "")
+      ) : [];
+      const candidate = candidates.length === 1 ? candidates[0] : undefined;
+      const latitude = candidate?.lat?.trim() ? Number(candidate.lat) : NaN;
+      const longitude = candidate?.lon?.trim() ? Number(candidate.lon) : NaN;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+        || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+        throw new AppError(
+          "Chưa xác định được vị trí đủ chính xác từ địa chỉ đã lưu. Vui lòng bổ sung số nhà, tên đường hoặc ghim vị trí trên bản đồ.",
+          422,
+        );
+      }
+      return setCached(cacheKey, {
+        fullAddress: address.fullAddress, ward: address.ward, province: address.province,
+        latitude, longitude,
+        attribution: "© OpenStreetMap contributors | Search by LocationIQ.com",
+      });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new AppError("Không tìm thấy tọa độ cho địa chỉ đã lưu. Vui lòng kiểm tra địa chỉ hoặc ghim vị trí trên bản đồ.", 422);
+      }
+      throw new AppError("Không thể tra cứu tọa độ địa chỉ lúc này. Vui lòng thử lại sau hoặc chọn vị trí trên bản đồ.", 503);
+    }
+  }).finally(() => pendingRequests.delete(cacheKey));
+  pendingRequests.set(cacheKey, request);
+  return request;
+};

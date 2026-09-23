@@ -12,7 +12,7 @@ interface UseAddressSelectionParams {
   isAuthenticated: boolean;
   isAuthInitializing: boolean;
   navigate: NavigateFunction;
-  onAddressChanged: () => void;
+  onAddressChanged?: () => void;
 }
 
 /** Địa chỉ đã lưu + luồng "vị trí hiện tại" cho panel đặt lịch. */
@@ -92,7 +92,7 @@ export function useAddressSelection({
       return;
     }
     setAddressSelectionError("");
-    onAddressChanged();
+    onAddressChanged?.();
     setAddressId(value);
   };
 

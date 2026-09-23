@@ -141,6 +141,7 @@ function ValueField({
       <input
         type={item.type === "NUMBER" ? "number" : "text"}
         min={item.type === "NUMBER" ? 0 : undefined}
+        step={item.type === "NUMBER" ? "any" : undefined}
         required
         value={form.value}
         onChange={(event) => onChange({ ...form, value: event.target.value })}

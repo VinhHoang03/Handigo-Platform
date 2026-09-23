@@ -2,7 +2,6 @@ import { PublicContentLayout } from "../components/PublicContentLayout";
 import { AboutHero } from "../components/AboutHero";
 import { AboutValues } from "../components/AboutValues";
 import { AboutTimeline } from "../components/AboutTimeline";
-import { useCategoryShowcase } from "@/features/home/hooks/useCategoryShowcase";
 
 /**
  * Phần "Chúng tôi là ai?" trước đây là bốn đoạn văn dài bị nhồi vào một cột hẹp
@@ -50,31 +49,12 @@ const AboutIntro = () => (
 );
 
 export default function AboutPage() {
-  const { items } = useCategoryShowcase();
-  // Bỏ qua danh mục đầu: ảnh đó đã dùng ở hero trang chủ, dùng lại ở đây thì hai
-  // trang liền kề trong nav mở ra cùng một tấm hình.
-  const illustrated = items.filter((item) => item.image).slice(1);
-
   return (
     <PublicContentLayout>
-      <AboutHero
-        image={illustrated[0]?.image}
-        imageAlt={
-          illustrated[0]
-            ? `Thợ Handigo làm dịch vụ ${illustrated[0].name}`
-            : undefined
-        }
-      />
+      <AboutHero />
       <AboutIntro />
       <AboutValues />
-      <AboutTimeline
-        image={illustrated[1]?.image}
-        imageAlt={
-          illustrated[1]
-            ? `Thợ Handigo làm dịch vụ ${illustrated[1].name}`
-            : undefined
-        }
-      />
+      <AboutTimeline />
     </PublicContentLayout>
   );
 }

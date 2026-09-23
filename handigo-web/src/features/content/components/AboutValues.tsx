@@ -11,7 +11,7 @@ export function AboutValues() {
   return (
     <section
       aria-labelledby="about-values-heading"
-      className="bg-surface-container-low px-6 py-12 lg:py-16"
+      className="px-6 py-12 lg:py-16"
     >
       <div className="mx-auto grid max-w-7xl gap-x-14 gap-y-10 lg:grid-cols-12">
         <div className="lg:col-span-5">

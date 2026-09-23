@@ -10,7 +10,7 @@ import { commitments } from "@/features/home/data/homeData";
 export const TrustStrip = () => (
   <section
     aria-label="Cam kết của Handigo"
-    className="mt-lg border-y border-outline-variant/50 bg-surface-container-low/50"
+    className="border-y border-outline-variant/40"
   >
     <ul className="mx-auto grid max-w-7xl grid-cols-1 divide-y divide-outline-variant/50 px-4 md:px-8 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
       {commitments.map((item) => (
@@ -18,7 +18,9 @@ export const TrustStrip = () => (
           key={item.title}
           className="flex items-start gap-4 py-7 lg:px-8 lg:first:pl-0 lg:last:pr-0"
         >
-          <item.icon aria-hidden="true" size={22} className="mt-0.5 shrink-0 text-primary" />
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/5 text-primary">
+            <item.icon aria-hidden="true" size={22} />
+          </span>
           <div className="min-w-0">
             <h3 className="font-headline-md text-base font-semibold text-on-surface">
               {item.title}

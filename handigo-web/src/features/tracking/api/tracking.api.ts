@@ -14,7 +14,14 @@ type TrackingCoordinate = {
   longitude: number;
 };
 
+export type MatchingMapProvider = TrackingCoordinate & { providerId: string; distanceMeters: number };
 export const trackingApi = {
+  getMatchingProviders: async (orderId: string, signal: AbortSignal) => {
+    const response = await api.get<{ data: { radiusKm: number | null; providers: MatchingMapProvider[] } }>(
+      `/orders/${orderId}/matching-providers`, { signal },
+    );
+    return response.data.data;
+  },
   getOrderRoute: async (
     orderId: string,
     origin: TrackingCoordinate,

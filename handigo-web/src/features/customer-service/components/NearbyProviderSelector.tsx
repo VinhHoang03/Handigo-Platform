@@ -96,8 +96,8 @@ export function NearbyProviderSelector({
       ) : providers.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 py-3 text-sm text-on-surface-variant">
           {requireSelection
-            ? "Chưa có thợ nào trống trong khung giờ này. Thử chọn giờ khác."
-            : "Chưa có thợ nào nhận việc ở địa chỉ này."}
+            ? "Chưa có thợ trống trong khung giờ này. Bạn có thể tiếp tục để hệ thống tìm và mở rộng bán kính tự động."
+            : "Chưa có thợ phù hợp gần địa chỉ này. Bạn có thể tiếp tục để hệ thống tìm và mở rộng bán kính tự động."}
         </p>
       ) : (
         <div className="space-y-3">

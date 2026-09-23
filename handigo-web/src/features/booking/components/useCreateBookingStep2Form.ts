@@ -162,9 +162,8 @@ export const useCreateBookingStep2Form = () => {
     } else if (scheduleDate && scheduleDate < todayInputValue) {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
     }
-    // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
-    // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.
-    if (providerAvailability !== 'available') {
+    // Chỉ kiểm tra sẵn sàng khi khách chọn thợ cụ thể; tìm tự động chạy sau khi tạo đơn.
+    if (preferredProviderId && providerAvailability !== 'available') {
       nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
         ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
         : shouldShowSchedulePicker

@@ -21,16 +21,16 @@ export const CategoriesSection = ({
 }: CategoriesSectionProps) => (
   <section
     aria-labelledby="categories-heading"
-    className="mx-auto mt-lg max-w-7xl px-4 md:px-8"
+    className="mx-auto mt-14 max-w-7xl px-4 md:mt-20 md:px-8"
   >
     <SectionHeader
       id="categories-heading"
-      title="Danh mục dịch vụ"
-      description="Mọi vấn đề trong gia đình đều có chuyên gia phù hợp hỗ trợ bạn"
+      title="Bạn cần giúp việc gì?"
+      description="Chọn dịch vụ phù hợp để bắt đầu chăm sóc ngôi nhà của bạn."
       action={
         <Link
           to="/customer/services"
-          className="flex min-h-11 w-fit items-center gap-1.5 text-label-md font-semibold text-primary transition-colors hover:text-primary-hover"
+          className="flex min-h-11 w-fit items-center gap-2 rounded-full border border-outline-variant/60 px-5 text-label-md font-semibold text-primary transition-colors hover:border-primary hover:bg-primary/5"
         >
           Xem tất cả
           <ArrowRight aria-hidden="true" size={18} />

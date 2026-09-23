@@ -13,7 +13,7 @@ export type TrackingState = {
 };
 
 export type LocationEvent = Coordinate & {
-  ownerType: "customer" | "provider";
+  ownerType: "customer" | "provider" | `candidate:${string}`;
 };
 
 export interface OrderTrackingMapProps {
@@ -22,7 +22,7 @@ export interface OrderTrackingMapProps {
   compact?: boolean;
 }
 
-export type TrackingPointKey = "customer" | "provider";
+export type TrackingPointKey = "customer" | "provider" | `candidate:${string}`;
 
 export type TrackingPoint = {
   key: TrackingPointKey;

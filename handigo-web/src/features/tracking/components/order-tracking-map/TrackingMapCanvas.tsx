@@ -24,14 +24,14 @@ export function TrackingMapCanvas({
 }: TrackingMapCanvasProps) {
   return (
     <div
-      className={`relative w-full overflow-hidden bg-surface-container-low ${
+      className={`relative isolate z-0 w-full overflow-hidden bg-surface-container-low ${
         compact ? "h-[320px] sm:h-[360px]" : "h-[400px] sm:h-[460px]"
       }`}
     >
       {hasMapCoordinate ? (
         <div
           ref={mapContainerRef}
-          className="h-full w-full"
+          className="relative isolate z-0 h-full w-full"
           aria-label="Bản đồ theo dõi vị trí realtime"
         />
       ) : (
@@ -59,7 +59,7 @@ export function TrackingMapCanvas({
       {/* Status overlay */}
       {locationMessage && hasMapCoordinate && (
         <div
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-surface-container-lowest/90 px-4 py-2 text-xs font-semibold text-on-surface shadow-md ring-1 ring-outline-variant/30 backdrop-blur-sm"
+          className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-surface-container-lowest/90 px-4 py-2 text-xs font-semibold text-on-surface shadow-md ring-1 ring-outline-variant/30 backdrop-blur-sm"
           style={{ maxWidth: "calc(100% - 32px)", textOverflow: "ellipsis", overflow: "hidden" }}
         >
           {providerCoordinate || !trackingEnabled ? locationMessage : mapText.waitingProvider}

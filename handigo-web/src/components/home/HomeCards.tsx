@@ -64,7 +64,7 @@ const ProviderRatingBadge = ({ rating, totalFeedbacks }: { rating: number; total
 };
 
 export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img }: ProviderCardProps) => (
-  <article className="group flex h-full flex-col rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-4 transition-shadow duration-200 hover:shadow-[0_16px_36px_-16px_rgba(19,27,46,0.24)]">
+  <article className="group flex h-full flex-col border-t border-outline-variant/50 py-4">
     <div className="relative mb-3">
       <ProviderCardMedia name={name} img={img} />
       <ProviderRatingBadge rating={rating} totalFeedbacks={totalFeedbacks} />

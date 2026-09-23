@@ -40,7 +40,7 @@ export default function CustomerServiceListPage() {
       <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-4">
         {/* Sidebar chỉ tồn tại từ `md` trở lên. Ở màn hình hẹp, bộ lọc nằm trong
             tấm trượt mở từ toolbar để không chắn mất danh sách dịch vụ. */}
-        <div className="hidden md:col-span-1 md:block">
+        <div className="hidden md:sticky md:top-32 md:col-span-1 md:block">
           <ServiceCategoryFilter
             categories={categories}
             selectedCategoryId={selectedCategoryId}

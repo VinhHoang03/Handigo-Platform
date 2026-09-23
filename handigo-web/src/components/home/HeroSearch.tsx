@@ -104,12 +104,13 @@ export const HeroSearch = () => {
       role="search"
       className="flex flex-col items-stretch gap-1 rounded-2xl border border-outline-variant/70 bg-surface-container-lowest p-1.5 shadow-[0_2px_4px_rgba(19,27,46,0.04),0_12px_32px_-8px_rgba(19,27,46,0.10)] md:flex-row md:items-center"
     >
-      <div className="relative flex-[1.6]">
+      <div className="relative min-w-0 flex-[1.6]">
         <div className="flex items-center gap-3 rounded-xl px-4 py-3 transition-colors focus-within:bg-surface-container-low">
           <Search aria-hidden="true" size={20} className="shrink-0 text-on-surface-variant" />
           <input
-            className="min-h-11 w-full border-none bg-transparent text-body-md text-on-surface outline-none placeholder:text-on-surface-variant/80 focus:ring-0"
-            placeholder="Bạn cần sửa gì?"
+            className="min-h-11 min-w-0 w-full rounded-lg border-none bg-transparent text-body-md text-on-surface outline-none placeholder:text-on-surface-variant/80 focus-visible:ring-2 focus-visible:ring-primary"
+            name="search"
+            placeholder="Bạn cần sửa gì? Ví dụ: điều hoà…"
             aria-label="Tìm dịch vụ"
             role="combobox"
             aria-expanded={isOpen}
@@ -154,21 +155,21 @@ export const HeroSearch = () => {
       <button
         type="button"
         onClick={locate}
-        className="flex flex-1 items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-surface-container-low"
+        className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors hover:bg-surface-container-low"
       >
         {isLocating ? (
           <Loader2 aria-hidden="true" size={20} className="shrink-0 animate-spin text-on-surface-variant" />
         ) : (
           <MapPin aria-hidden="true" size={20} className="shrink-0 text-on-surface-variant" />
         )}
-        <span className="truncate text-body-md text-on-surface-variant">
+        <span aria-live="polite" className="truncate text-sm text-on-surface-variant">
           {locationLabel}
         </span>
       </button>
 
       <button
         type="submit"
-        className="flex items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-label-md font-semibold text-on-primary shadow-[0_6px_16px_-4px_rgba(42,28,166,0.45)] transition-colors duration-200 hover:bg-primary-hover active:scale-[0.98]"
+        className="flex min-h-14 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-label-md font-semibold text-on-primary shadow-[0_6px_16px_-4px_rgba(42,28,166,0.45)] transition-colors duration-200 hover:bg-primary-hover active:scale-[0.98]"
       >
         Tìm thợ
       </button>
