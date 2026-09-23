@@ -1,61 +1,86 @@
-import { ReliableImage } from "../common/ReliableImage";
+import { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
+import { ArrowRight, BadgeCheck } from "lucide-react";
 import { HeroSearch } from "./HeroSearch";
-import { BadgeCheck } from "lucide-react";
+import { HomeIllustration } from "./HomeIllustration";
+import "./home-motion.css";
+import type { CategoryShowcaseItem } from "@/features/home/hooks/useCategoryShowcase";
 
-interface HeroSectionProps {
-  /** Ảnh minh hoạ dịch vụ thật, lấy từ API danh mục. */
-  image?: string;
-  imageAlt?: string;
-}
+export const HeroSection = ({ items }: { items: CategoryShowcaseItem[] }) => {
+  const heroRef = useRef<HTMLElement>(null);
 
-/**
- * Chia đôi bất đối xứng: chữ chiếm 7 cột, ảnh 5 cột.
- *
- * Bên phải trước đây là một giao diện đơn hàng **giả** dựng bằng div (mã đơn,
- * tên thợ, số tiền, mốc giờ — bịa toàn bộ). Trên một sàn mà người dùng sắp cho
- * người lạ vào nhà, dựng bằng chứng giả là rủi ro thật chứ không phải trang trí.
- * Thay bằng ảnh dịch vụ thật của chính hệ thống.
- *
- * Hàng avatar kèm số việc đã hoàn thành cũng bị gỡ khỏi hero: con số đó không
- * truy được về dữ liệu nào, và hero chỉ nên làm một việc duy nhất là để người
- * dùng gõ được thứ họ cần sửa. Vai trò tạo niềm tin chuyển sang dải cam kết.
- */
-export const HeroSection = ({ image, imageAlt }: HeroSectionProps) => (
-  <section
-    aria-labelledby="hero-heading"
-    className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-x-16 gap-y-12 px-4 md:px-8 lg:grid-cols-12"
-  >
-    <div className="lg:col-span-7">
-      <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-outline-variant/60 bg-surface-container-low py-1.5 pl-2 pr-4 text-label-sm text-on-surface-variant">
-        <span className="grid h-5 w-5 place-items-center rounded-full bg-secondary/15 text-secondary">
-          <BadgeCheck aria-hidden="true" size={13} fill="currentColor" />
-        </span>
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine)");
+    let frame = 0;
+    let bounds: DOMRect | undefined;
+    const reset = () => {
+      cancelAnimationFrame(frame);
+      bounds = undefined;
+      hero.style.removeProperty("--home-x");
+      hero.style.removeProperty("--home-y");
+    };
+    const move = (event: PointerEvent) => {
+      if (!motion.matches || event.pointerType !== "mouse") return;
+      bounds ??= hero.getBoundingClientRect();
+      const x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1));
+      const y = Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1));
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        hero.style.setProperty("--home-x", `${x * 16}px`);
+        hero.style.setProperty("--home-y", `${y * 12}px`);
+      });
+    };
+    hero.addEventListener("pointermove", move, { passive: true });
+    hero.addEventListener("pointerleave", reset);
+    window.addEventListener("resize", reset);
+    window.addEventListener("scroll", reset, { passive: true });
+    motion.addEventListener("change", reset);
+    return () => {
+      reset();
+      hero.removeEventListener("pointermove", move);
+      hero.removeEventListener("pointerleave", reset);
+      window.removeEventListener("resize", reset);
+      window.removeEventListener("scroll", reset);
+      motion.removeEventListener("change", reset);
+    };
+  }, []);
+
+  return (
+  <section ref={heroRef} aria-labelledby="hero-heading" className="home-hero mx-auto max-w-7xl px-4 pb-8 pt-6 md:px-8 md:pb-10 md:pt-10">
+    <div className="home-hero-backdrop" aria-hidden="true"><div className="home-hero-lines" /></div>
+    <div className="grid items-center gap-6 lg:grid-cols-[1.2fr_1fr] lg:gap-8">
+    <div className="relative z-10 mx-auto max-w-2xl text-center lg:text-left">
+      <p className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-4 py-2 text-label-sm text-primary">
+        <BadgeCheck aria-hidden="true" size={16} />
         Thợ đã qua kiểm duyệt hồ sơ
       </p>
-
-      <h1
-        id="hero-heading"
-        className="text-balance font-headline-xl text-4xl font-bold leading-[1.08] tracking-[-0.03em] text-on-surface md:text-5xl lg:text-[3.5rem]"
-      >
-        Sửa gì cũng có thợ, <span className="text-primary">đến tận nhà bạn</span>
+      <h1 id="hero-heading" className="mt-5 text-balance font-headline-xl text-[2rem] font-bold leading-[1.12] tracking-[-0.035em] text-on-surface sm:text-5xl lg:text-[3.5rem]">
+        Chăm sóc ngôi nhà,<br />
+        <span className="text-primary">nhẹ việc của bạn.</span>
       </h1>
-
-      <p className="mt-6 max-w-[46ch] text-pretty text-body-lg text-on-surface-variant">
-        Điện, nước, điều hoà, đồ gỗ. Đặt thợ trong vài phút và theo dõi tiến độ
-        ngay trên đơn.
+      <p className="mx-auto mt-6 max-w-[34rem] text-pretty text-body-md text-on-surface-variant sm:text-body-lg lg:mx-0">
+        Tìm thợ điện, nước, điều hoà và nhiều dịch vụ tại nhà.
+        Xem báo giá trước, theo dõi công việc ngay trên đơn.
       </p>
-
-      <div className="mt-9">
-        <HeroSearch />
+    </div>
+    <div className="mx-auto hidden w-full max-w-[400px] sm:block lg:max-w-none"><HomeIllustration /></div>
+    </div>
+    <div className="relative z-10 mx-auto mt-8 max-w-5xl text-left md:mt-10">
+      <HeroSearch />
+      <div className="mt-4 flex min-h-11 flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm">
+        {items.length > 0 && <span className="mr-1 text-on-surface-variant">Khám phá nhanh:</span>}
+        {items.slice(0, 4).map((item) => (
+          <Link key={item.id} to={`/customer/services?categoryId=${item.id}`} className="inline-flex min-h-11 items-center rounded-full px-3 py-2 text-on-surface-variant transition-colors hover:bg-primary/5 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary">
+            {item.name}
+          </Link>
+        ))}
+        <Link to="/customer/services" className="inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 font-semibold text-primary transition-colors hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary">
+          Tất cả dịch vụ <ArrowRight aria-hidden="true" size={14} />
+        </Link>
       </div>
     </div>
-
-    <div className="lg:col-span-5">
-      <ReliableImage
-        src={image}
-        alt={imageAlt || ""}
-        className="aspect-[4/5] w-full rounded-3xl bg-surface-container object-cover shadow-[0_24px_60px_-24px_rgba(19,27,46,0.35)] sm:aspect-[16/10] lg:aspect-[4/5]"
-      />
-    </div>
   </section>
-);
+  );
+};

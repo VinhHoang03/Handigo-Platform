@@ -12,11 +12,10 @@ import {
 import { Navbar } from "../components/common/Navbar";
 import { Reveal } from "../components/common/Reveal";
 import { useCategoryShowcase } from "@/features/home/hooks/useCategoryShowcase";
+import { AnimatedBackground } from "../components/home/AnimatedBackground";
 
 /**
- * Tám section, tám khuôn bố cục khác nhau: chia đôi bất đối xứng → dải ngang →
- * lưới bento → chuỗi bước → carousel → editorial hai cột → trích dẫn 1 lớn 2 nhỏ
- * → dải CTA. Trước đây bốn section liên tiếp cùng dùng khuôn "lưới thẻ trắng".
+ * Tìm kiếm là trọng tâm đầu trang; ảnh dịch vụ nằm trong danh mục bên dưới.
  *
  * Hai section phụ thuộc dữ liệu (thợ, đánh giá) tự ẩn khi chưa đủ nội dung đạt
  * chuẩn — thà mất một section còn hơn hiện một danh sách nghèo nàn.
@@ -25,18 +24,13 @@ import { useCategoryShowcase } from "@/features/home/hooks/useCategoryShowcase";
  */
 const LandingPage = () => {
   const { items, loading } = useCategoryShowcase();
-  const heroImage = items.find((item) => item.image);
 
   return (
-    <div className="min-h-dvh bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+    <div className="relative isolate min-h-dvh text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+      <AnimatedBackground />
       <Navbar />
-      <main id="main-content" className="pb-xl pt-32">
-        <HeroSection
-          image={heroImage?.image}
-          imageAlt={
-            heroImage ? `Thợ Handigo làm dịch vụ ${heroImage.name}` : undefined
-          }
-        />
+      <main id="main-content" className="pb-12 pt-28 md:pt-32">
+        <HeroSection items={items} />
         <TrustStrip />
         <Reveal>
           <CategoriesSection items={items} loading={loading} />
@@ -57,7 +51,7 @@ const LandingPage = () => {
           <ClosingCta />
         </Reveal>
       </main>
-      <HomeFooter />
+      <HomeFooter transparent />
     </div>
   );
 };

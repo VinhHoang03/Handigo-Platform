@@ -51,7 +51,7 @@ export const ProvidersSection = () => {
   return (
     <section
       aria-labelledby="providers-heading"
-      className="mt-lg bg-surface-container-low/60 py-lg"
+      className="mt-lg py-lg"
     >
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         <SectionHeader

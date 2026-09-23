@@ -30,7 +30,7 @@ const Quote = ({ feedback, large }: QuoteProps) => {
 
   return (
     <figure
-      className={`flex h-full flex-col rounded-3xl border border-outline-variant/40 bg-surface-container-lowest ${large ? "p-8 lg:p-10" : "p-7"}`}
+      className={`flex h-full flex-col border-t border-outline-variant/50 ${large ? "py-8 lg:py-10 lg:pr-8" : "py-7"}`}
     >
       <div
         className="flex gap-0.5"
