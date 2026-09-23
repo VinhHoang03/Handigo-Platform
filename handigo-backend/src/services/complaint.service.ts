@@ -120,20 +120,15 @@ const withEvidence = async (complaint: any) => {
   return { ...value, evidence };
 };
 
-export const createComplaint = async (
+export const getComplaintCreationContext = async (
   userId: string,
   role: UserRole,
-  payload: {
-    orderId: string;
-    title: string;
-    description: string;
-    evidenceImages?: string[];
-  },
+  orderId: string,
 ) => {
   const { order, complainantRole, targetUserId } = await resolveOrderParticipant(
     userId,
     role,
-    payload.orderId,
+    orderId,
   );
   await assertComplaintWindow(order._id as Types.ObjectId, order.updatedAt);
 
@@ -145,6 +140,21 @@ export const createComplaint = async (
   if (existing) {
     throw new AppError("Bạn đã tạo khiếu nại cho đơn dịch vụ này", 400);
   }
+
+  return { order, complainantRole, targetUserId };
+};
+
+export const createComplaint = async (
+  userId: string,
+  role: UserRole,
+  payload: {
+    orderId: string;
+    title: string;
+    description: string;
+    evidenceImages?: string[];
+  },
+) => {
+  const { order, complainantRole, targetUserId } = await getComplaintCreationContext(userId, role, payload.orderId);
 
   const complaint = await Complaint.create({
     orderId: order._id,

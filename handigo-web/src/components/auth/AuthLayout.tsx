@@ -32,7 +32,7 @@ export function AuthLayout({
   maxWidth = "md",
 }: AuthLayoutProps) {
   return (
-    <main className="h-dvh min-h-dvh overflow-hidden bg-background lg:grid lg:grid-cols-2">
+    <main id="main-content" className="h-dvh min-h-dvh overflow-hidden bg-background lg:grid lg:grid-cols-2">
       <section className="relative hidden h-full min-h-0 min-w-0 overflow-hidden bg-primary px-8 py-8 lg:flex lg:items-center lg:justify-center xl:px-12">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-secondary-container/20 blur-3xl" />
@@ -50,23 +50,24 @@ export function AuthLayout({
               alt=""
               className="h-9 w-9 object-contain rounded-lg"
             />
-            <span className="font-headline-md text-xl font-bold text-white">
+            <span className="font-headline-md text-xl font-bold text-on-primary">
               Handigo
             </span>
           </Link>
-          <h1 className="max-w-[520px] font-headline-lg text-3xl font-semibold leading-tight text-white xl:text-4xl">
+          <h1 className="max-w-[520px] font-headline-lg text-3xl font-semibold leading-tight text-on-primary xl:text-4xl">
             {brandTitle}
           </h1>
           <p className="mt-3 max-w-[500px] text-base leading-7 text-on-primary-container">
             {brandDescription}
           </p>
-          <div className="group relative mt-5 aspect-[16/10] w-full max-w-[460px] overflow-hidden rounded-3xl flex items-center justify-center">
+          {/* Ảnh minh hoạ có nền trắng đặc nên phải đóng khung trên bề mặt
+              sáng; thả thẳng lên nền primary sẽ thành một ô trắng dán nhầm. */}
+          <div className="mt-6 w-full max-w-[460px] overflow-hidden rounded-3xl bg-surface-container-lowest p-4 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.35)]">
             <img
               src={loginImg}
-              alt="Dịch vụ chăm sóc và sửa chữa nhà cửa"
-              className="h-full w-full object-contain mix-blend-mode-screen transition-transform duration-700 group-hover:scale-[1.03]"
+              alt="Minh hoạ dịch vụ chăm sóc và sửa chữa nhà cửa"
+              className="aspect-[4/3] w-full rounded-2xl object-contain"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/45 via-transparent to-transparent pointer-events-none" />
           </div>
         </div>
       </section>
@@ -89,7 +90,7 @@ export function AuthLayout({
             </span>
           </Link>
 
-          <div className="glass-panel w-full rounded-[28px] p-5 shadow-[0_12px_40px_rgba(19,27,46,0.09)] sm:p-7 lg:p-8">
+          <div className="w-full rounded-[28px] border border-outline-variant/50 bg-surface-container-lowest p-5 shadow-[0_12px_40px_-12px_rgba(19,27,46,0.16)] sm:p-7 lg:p-8">
             <header className="mb-4 sm:mb-5">
               {eyebrow && (
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
@@ -107,13 +108,13 @@ export function AuthLayout({
           </div>
 
           <footer className="mt-4 flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2 text-center text-xs leading-5 text-on-surface-variant sm:mt-5 sm:gap-x-6 sm:text-[13px]">
-            <Link className="transition-colors hover:text-primary" to="#">
+            <Link className="inline-flex min-h-11 items-center transition-colors hover:text-primary" to="#">
               Trợ giúp
             </Link>
-            <Link className="transition-colors hover:text-primary" to="#">
+            <Link className="inline-flex min-h-11 items-center transition-colors hover:text-primary" to="#">
               Điều khoản
             </Link>
-            <Link className="transition-colors hover:text-primary" to="#">
+            <Link className="inline-flex min-h-11 items-center transition-colors hover:text-primary" to="#">
               Bảo mật
             </Link>
             <span>© 2026 Handigo</span>

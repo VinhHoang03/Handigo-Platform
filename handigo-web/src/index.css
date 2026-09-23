@@ -19,6 +19,12 @@
   --color-tertiary-fixed-dim: #ffb695;
   --color-secondary-fixed-dim: #4cd7f6;
   --color-primary: #3525cd;
+  /* Trạng thái hover/pressed của nút chính. M3 không định nghĩa sẵn hai token
+     này; trước đây hover dùng `primary-container` (#4f46e5) nên nút SÁNG lên
+     khi rê chuột, làm tương phản với chữ trắng giảm đi và trông như bị disable.
+     Hai token dưới đây tối dần theo đúng kỳ vọng của người dùng. */
+  --color-primary-hover: #2a1ca6;
+  --color-primary-pressed: #221584;
   --color-on-secondary-container: #006172;
   --color-surface-dim: #d2d9f4;
   --color-secondary-fixed: #acedff;
@@ -38,6 +44,22 @@
   --color-surface: #faf8ff;
   --color-error: #ba1a1a;
   --color-on-error-container: #93000a;
+
+  /* Token trạng thái ngữ nghĩa.
+     M3 chỉ định nghĩa sẵn `error`, nên trước đây mọi trạng thái tích cực/cảnh báo
+     đều rơi vào bảng màu mặc định của Tailwind (emerald/amber/...) — 281 chỗ trên
+     38 file, tức là một hệ màu thứ hai chạy song song ngoài tầm kiểm soát.
+     Bốn biến mỗi nhóm theo đúng khuôn của `error`: nền đậm + chữ trắng cho nhấn
+     mạnh, nền nhạt + chữ đậm cho nhãn/chip. */
+  --color-success: #106b3f;
+  --color-on-success: #ffffff;
+  --color-success-container: #a8f2c8;
+  --color-on-success-container: #00522c;
+
+  --color-warning: #7d5800;
+  --color-on-warning: #ffffff;
+  --color-warning-container: #ffdf9a;
+  --color-on-warning-container: #5c4000;
   --color-tertiary-container: #a44100;
   --color-on-secondary-fixed-variant: #004e5c;
   --color-surface-container-low: #f2f3ff;
@@ -65,14 +87,14 @@
   --spacing-container-max: 1280px;
   --spacing-gutter: 24px;
 
-  --font-body-lg: "Inter", sans-serif;
-  --font-label-sm: "Inter", sans-serif;
-  --font-headline-xl: "Hanken Grotesk", sans-serif;
-  --font-label-md: "Inter", sans-serif;
-  --font-headline-md: "Hanken Grotesk", sans-serif;
-  --font-body-md: "Inter", sans-serif;
-  --font-headline-lg-mobile: "Hanken Grotesk", sans-serif;
-  --font-headline-lg: "Hanken Grotesk", sans-serif;
+  --font-body-lg: "Be Vietnam Pro", sans-serif;
+  --font-label-sm: "Be Vietnam Pro", sans-serif;
+  --font-headline-xl: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
+  --font-label-md: "Be Vietnam Pro", sans-serif;
+  --font-headline-md: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
+  --font-body-md: "Be Vietnam Pro", sans-serif;
+  --font-headline-lg-mobile: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
+  --font-headline-lg: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
 
   --text-body-lg: 18px;
   --text-body-lg--line-height: 28px;
@@ -108,6 +130,30 @@
   --text-headline-lg--line-height: 40px;
   --text-headline-lg--letter-spacing: -0.01em;
   --text-headline-lg--font-weight: 600;
+
+  /* Ba cấp bổ sung theo thang Material 3.
+     Trước đây 20 chỗ trong mã nguồn đã dùng `text-title-lg`, `text-title-md`,
+     `text-headline-sm` và `font-headline-sm` — nhưng không token nào tồn tại.
+     Tailwind v4 chỉ sinh utility từ `@theme`, nên các class đó KHÔNG sinh CSS và
+     heading rơi về cỡ chữ kế thừa (16px). Lỗi im lặng: build xanh, ESLint sạch,
+     chỉ nhìn kỹ mới thấy tiêu đề bằng cỡ chữ thường. M3 vốn có cấp `title-*`;
+     thiếu chúng chính là lý do mọi người tự chế class. */
+  --text-headline-sm: 20px;
+  --text-headline-sm--line-height: 28px;
+  --text-headline-sm--font-weight: 600;
+
+  --text-title-lg: 22px;
+  --text-title-lg--line-height: 28px;
+  --text-title-lg--font-weight: 600;
+
+  --text-title-md: 16px;
+  --text-title-md--line-height: 24px;
+  --text-title-md--letter-spacing: 0.01em;
+  --text-title-md--font-weight: 600;
+
+  --font-headline-sm: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
+  --font-title-lg: "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif;
+  --font-title-md: "Be Vietnam Pro", sans-serif;
 }
 
 @layer base {
@@ -148,36 +194,19 @@
     @apply transition-all duration-200;
   }
 
+  /* Chỉ giữ con trỏ tay ở mức toàn cục.
+     Trước đây khối này còn có `hover:-translate-y-0.5`, khiến MỌI <button> nhấc
+     lên khi rê chuột — kể cả nút trong bảng, tab, dropdown, mục chọn — làm giao
+     diện nhấp nhổm.
+     Không đưa hiệu ứng nhấc về lại chỗ nào: `.btn-primary` đã báo hiệu hover
+     bằng màu đậm dần + shadow lớn dần, `.btn-secondary`/`.btn-ghost` bằng nền
+     nhạt, và cả ba đều có `active:scale-[0.98]` khi nhấn. Đủ rõ mà không giật. */
   button:not(:disabled) {
-    @apply cursor-pointer hover:-translate-y-0.5 active:translate-y-0;
+    @apply cursor-pointer;
   }
 }
 
 @layer components {
-  .glass-card {
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(199, 196, 216, 0.45);
-    box-shadow: 0 4px 20px rgba(19, 27, 46, 0.06);
-  }
-
-  .glass-panel {
-    background: rgba(255, 255, 255, 0.86);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(199, 196, 216, 0.48);
-  }
-
-  .floating-anim {
-    animation: floating 3s ease-in-out infinite;
-  }
-
-  @keyframes floating {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-    100% { transform: translateY(0px); }
-  }
-
   @keyframes provider-status-marquee {
     from {
       transform: translateX(100%);
@@ -196,6 +225,13 @@
       animation: none;
       width: auto;
       white-space: normal !important;
+    }
+
+    /* Tắt chuyển động trang trí khi người dùng yêu cầu giảm chuyển động.
+       Giữ animate-spin (chỉ báo tiến trình) và animate-pulse (skeleton, biên độ thấp). */
+    .animate-bounce,
+    .animate-in {
+      animation: none;
     }
   }
 
@@ -229,7 +265,7 @@
   }
 
   .form-field__action {
-    @apply absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-primary disabled:cursor-not-allowed disabled:opacity-40;
+    @apply absolute right-2 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-primary disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .google-place-autocomplete-shell {
@@ -245,11 +281,11 @@
   }
 
   .places-address-field__icon {
-    @apply pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-[21px] text-primary;
+    @apply pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-primary;
   }
 
   .places-address-field__loading {
-    @apply pointer-events-none absolute right-4 top-1/2 z-10 -translate-y-1/2 animate-spin text-[20px] text-primary;
+    @apply pointer-events-none absolute right-4 top-1/2 z-10 -translate-y-1/2 animate-spin text-primary;
   }
 
   .places-address-dropdown {
@@ -265,7 +301,7 @@
   }
 
   .places-address-option__icon {
-    @apply mt-0.5 text-[20px] text-primary;
+    @apply mt-0.5 text-primary;
   }
 
   .places-address-option__content {
@@ -350,7 +386,7 @@
   }
 
   .btn-primary {
-    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition duration-200 hover:bg-primary-container hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+    @apply inline-flex min-h-14 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-on-primary shadow-[0_8px_20px_rgba(53,37,205,0.18)] transition duration-200 hover:bg-primary-hover hover:shadow-[0_10px_26px_rgba(53,37,205,0.24)] active:bg-primary-pressed active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
   }
 
   .btn-secondary {
@@ -359,5 +395,31 @@
 
   .btn-ghost {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-medium text-primary transition duration-200 hover:bg-surface-container active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+}
+
+@layer utilities {
+  /* Scroll-reveal thuần CSS. Chỉ animate `transform` + `opacity` để trình duyệt
+     chạy trên GPU, không gây reflow. Hook `use-reveal-on-scroll` gắn `.reveal-in`
+     khi phần tử vào viewport (IntersectionObserver, once). */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .reveal-in {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
   }
 }

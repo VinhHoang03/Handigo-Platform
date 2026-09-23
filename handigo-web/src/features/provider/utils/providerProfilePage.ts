@@ -13,9 +13,6 @@ import type {
   VerificationStatus,
 } from "../types/provider.types";
 
-export const DEFAULT_PROVIDER_AVATAR =
-  "https://ui-avatars.com/api/?name=Provider&background=E8DEF8&color=21005D";
-
 export type ProfessionalForm = {
   bio: string;
   serviceIds: string[];
@@ -185,7 +182,7 @@ export const toUserProfileData = (
   email: profile.user.email,
   phone: profile.user.phone,
   avatar: profile.user.avatar,
-  avatarUrl: profile.user.avatar || DEFAULT_PROVIDER_AVATAR,
+  avatarUrl: profile.user.avatar || "",
   birthday: profile.user.birthday,
   gender: profile.user.gender,
   createdAt: profile.user.createdAt,
@@ -233,7 +230,7 @@ export const buildProviderProfileView = (
     joinDate: profile.user.createdAt
       ? String(new Date(profile.user.createdAt).getFullYear())
       : "N/A",
-    avatarUrl: profile.user.avatar || DEFAULT_PROVIDER_AVATAR,
+    avatarUrl: profile.user.avatar || "",
   };
 };
 

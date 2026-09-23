@@ -10,6 +10,8 @@ import type {
   SupportTicketPriority,
 } from "../types/caseManagement.types";
 import { EvidenceImagePicker } from "./EvidenceImagePicker";
+import { ReportExtraFields } from "./ReportExtraFields";
+import { TicketExtraFields } from "./TicketExtraFields";
 
 export type CreateCaseKind = "complaint" | "ticket" | "report";
 
@@ -28,27 +30,6 @@ const KIND_TITLES: Record<CreateCaseKind, string> = {
   ticket: "Tạo yêu cầu hỗ trợ",
   report: "Gửi báo cáo",
 };
-
-const REPORT_TYPES: Array<{ value: ReportType; label: string }> = [
-  { value: "harassment", label: "Quấy rối" },
-  { value: "insulting_language", label: "Ngôn từ xúc phạm" },
-  { value: "fraud", label: "Gian lận" },
-  { value: "impersonation", label: "Mạo danh" },
-  { value: "spam_booking", label: "Đặt đơn rác" },
-  { value: "payment_fraud", label: "Gian lận thanh toán" },
-  { value: "user_behavior", label: "Hành vi người dùng" },
-  { value: "other", label: "Khác" },
-];
-
-const CATEGORY_OPTIONS: Array<{ value: SupportTicketCategory; label: string }> = [
-  { value: "ACCOUNT", label: "Tài khoản" },
-  { value: "PAYMENT", label: "Thanh toán" },
-  { value: "ORDER", label: "Đơn dịch vụ" },
-  { value: "TECHNICAL", label: "Kỹ thuật" },
-  { value: "SECURITY", label: "Bảo mật" },
-  { value: "APPEAL", label: "Khiếu nại quyết định" },
-  { value: "OTHER", label: "Khác" },
-];
 
 const getCustomerId = (order: Order) =>
   typeof order.customerId === "string" ? order.customerId : order.customerId._id;
@@ -146,14 +127,7 @@ export function CreateCaseModal({
   };
 
   return (
-    <Modal
-      open={open}
-      title={KIND_TITLES[kind]}
-      onClose={onClose}
-      size="lg"
-      closeOnEsc={!busy}
-      closeOnOverlayClick={!busy}
-    >
+    <Modal open={open} title={KIND_TITLES[kind]} onClose={onClose} size="lg" closeOnEsc={!busy} closeOnOverlayClick={!busy}>
       <form onSubmit={submit} className="space-y-5">
         <label className="block text-sm font-semibold">
           Đơn dịch vụ {kind === "ticket" ? "(không bắt buộc)" : ""}
@@ -172,43 +146,24 @@ export function CreateCaseModal({
             ))}
           </select>
         </label>
-
         {kind === "ticket" && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold">
-              Danh mục
-              <select value={category} onChange={(event) => setCategory(event.target.value as SupportTicketCategory)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
-                {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
-            <label className="text-sm font-semibold">
-              Mức ưu tiên
-              <select value={priority} onChange={(event) => setPriority(event.target.value as SupportTicketPriority)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
-                <option value="LOW">Thấp</option>
-                <option value="MEDIUM">Trung bình</option>
-                <option value="HIGH">Cao</option>
-                <option value="URGENT">Khẩn cấp</option>
-              </select>
-            </label>
-          </div>
+          <TicketExtraFields
+            category={category}
+            priority={priority}
+            disabled={busy}
+            onCategoryChange={setCategory}
+            onPriorityChange={setPriority}
+          />
         )}
-
         {kind === "report" && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold">
-              Đối tượng báo cáo
-              <select value={reportTarget} onChange={(event) => setReportTarget(event.target.value as "participant" | "order")} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
-                <option value="participant">{role === "CUSTOMER" ? "Nhà cung cấp của đơn" : "Khách hàng của đơn"}</option>
-                <option value="order">Đơn dịch vụ</option>
-              </select>
-            </label>
-            <label className="text-sm font-semibold">
-              Loại báo cáo
-              <select value={reportType} onChange={(event) => setReportType(event.target.value as ReportType)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3">
-                {REPORT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </label>
-          </div>
+          <ReportExtraFields
+            role={role}
+            reportTarget={reportTarget}
+            reportType={reportType}
+            disabled={busy}
+            onReportTargetChange={setReportTarget}
+            onReportTypeChange={setReportType}
+          />
         )}
 
         <label className="block text-sm font-semibold">

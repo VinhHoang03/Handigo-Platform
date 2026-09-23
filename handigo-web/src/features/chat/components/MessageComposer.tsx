@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { ImagePlus, Loader2, X } from "lucide-react";
 
 export function MessageComposer({
   disabled,
@@ -71,7 +72,7 @@ export function MessageComposer({
         <div className="relative mb-3 w-fit rounded-2xl border border-outline-variant/40 bg-surface-container-low p-2">
           <img src={previewUrl} alt="Ảnh xem trước" className="h-24 w-24 rounded-xl object-cover" />
           <button type="button" onClick={clearImage} disabled={busy} aria-label="Bỏ ảnh đã chọn" className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-on-surface text-white shadow-md">
-            <span className="material-symbols-outlined text-base">close</span>
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
       )}
@@ -79,7 +80,7 @@ export function MessageComposer({
       <div className="flex items-end gap-2">
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={selectImage} className="hidden" />
       <button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || busy} aria-label="Chọn ảnh" className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary/10 disabled:opacity-40">
-        <span className="material-symbols-outlined">add_photo_alternate</span>
+        <ImagePlus aria-hidden="true" size={24} />
       </button>
       <input
         value={content}
@@ -89,7 +90,7 @@ export function MessageComposer({
         placeholder="Nhập tin nhắn..."
       />
       <button disabled={disabled || busy || (!content.trim() && !image)} className="btn-primary min-h-11 rounded-full px-4 py-2 sm:px-5">
-        {busy ? <span className="material-symbols-outlined animate-spin">progress_activity</span> : 'Gửi'}
+        {busy ? <Loader2 aria-hidden="true" size={24} className="animate-spin" /> : 'Gửi'}
       </button>
       </div>
     </form>

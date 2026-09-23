@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { ExternalLink } from "lucide-react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Modal } from "@/components/common/Modal";
+import { Skeleton, SkeletonText } from "@/components/common/Skeleton";
 import type {
   Complaint,
   EvidenceFile,
@@ -84,7 +85,10 @@ export function CaseDetailModal({
     <>
       <Modal open={Boolean(selected) || loading} title={title} onClose={onClose} size="xl" closeOnOverlayClick={!busy}>
         {loading && !selected ? (
-          <div className="p-10 text-center text-on-surface-variant">Đang tải chi tiết...</div>
+          <div className="space-y-4" role="status" aria-busy="true" aria-label="Đang tải chi tiết">
+            <Skeleton className="h-28 w-full" rounded="rounded-2xl" />
+            <SkeletonText lines={4} />
+          </div>
         ) : selected ? (
           <div className="space-y-6">
             <header className="rounded-2xl bg-surface-container-low p-5">
@@ -103,7 +107,7 @@ export function CaseDetailModal({
 
             {selected.kind === "complaint" && (
               <>
-                {selected.item.requestedEvidenceNote && <section className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><b>Yêu cầu bổ sung bằng chứng:</b><p className="mt-1">{selected.item.requestedEvidenceNote}</p></section>}
+                {selected.item.requestedEvidenceNote && <section className="rounded-xl bg-warning-container p-4 text-sm text-on-warning-container"><b>Yêu cầu bổ sung bằng chứng:</b><p className="mt-1">{selected.item.requestedEvidenceNote}</p></section>}
                 {selected.item.evidence?.map((evidence) => <section key={evidence._id} className="rounded-xl border border-outline-variant p-4"><p className="text-xs text-on-surface-variant">{evidence.uploadedBy.fullName} · {dateTime.format(new Date(evidence.createdAt))}</p>{evidence.note && <p className="mt-2 text-sm">{evidence.note}</p>}<FileLinks files={[evidence]} /></section>)}
                 {!['resolved', 'rejected', 'cancelled'].includes(selected.item.status) && (
                   <form onSubmit={submitEvidence} className="rounded-2xl border border-outline-variant p-4">
@@ -135,7 +139,7 @@ export function CaseDetailModal({
 
             {selected.kind === "report" && selected.item.targetUserId && <section className="rounded-xl border border-outline-variant p-4 text-sm"><b>Đối tượng báo cáo:</b> {selected.item.targetUserId.fullName}{selected.item.targetUserId.email ? ` · ${selected.item.targetUserId.email}` : ""}</section>}
 
-            {selected.item.resolutionNote && <section className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"><b>Kết quả xử lý</b><p className="mt-2 whitespace-pre-wrap">{selected.item.resolutionNote}</p></section>}
+            {selected.item.resolutionNote && <section className="rounded-xl bg-success-container p-4 text-sm text-on-success-container"><b>Kết quả xử lý</b><p className="mt-2 whitespace-pre-wrap">{selected.item.resolutionNote}</p></section>}
             {actionError && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{actionError}</p>}
             {selected.kind !== "report" && !['resolved', 'rejected', 'closed', 'cancelled'].includes(selected.item.status) && <button type="button" onClick={() => setConfirmCancel(true)} disabled={busy} className="rounded-xl border border-error px-4 py-2.5 font-semibold text-error">Hủy yêu cầu</button>}
           </div>

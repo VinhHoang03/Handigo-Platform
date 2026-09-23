@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
+import { Pagination } from '@/components/common/Pagination';
 import { providerOrderApi } from '../api/providerOrder.api';
-import { PendingAssignmentCard } from '../components/PendingAssignmentCard';
 import { ProviderOrderCard } from '../components/ProviderOrderCard';
+import { PendingAssignmentsSection } from '../components/orders/PendingAssignmentsSection';
+import { ProviderOrdersListSkeleton } from '../components/orders/ProviderOrdersListSkeleton';
 import type { OrderAssignment } from '../types/providerOrder.types';
-import type { Order } from '@/types/booking';
+import type { Order, Pagination as PaginationData } from '@/types/booking';
+import { Search } from "lucide-react";
 
 const filters = [
   { label: 'Tất cả', value: 'all' },
@@ -13,10 +16,18 @@ const filters = [
   { label: 'Hoàn tất', value: 'completed' },
   { label: 'Đã hủy', value: 'cancelled' },
 ];
+const ORDERS_PER_PAGE = 5;
 
 export default function ProviderOrdersPage() {
   const [assignments, setAssignments] = useState<OrderAssignment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationData>({
+    page: 1,
+    limit: ORDERS_PER_PAGE,
+    total: 0,
+    totalPages: 0,
+  });
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -26,7 +37,10 @@ export default function ProviderOrdersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 500);
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 500);
     return () => window.clearTimeout(timer);
   }, [searchTerm]);
 
@@ -46,16 +60,23 @@ export default function ProviderOrdersPage() {
     setLoadingOrders(true);
     try {
       const statusParam = activeFilter === 'all' ? undefined : activeFilter;
-      const data = await providerOrderApi.getProviderOrders(1, 20, statusParam, debouncedSearch);
+      const data = await providerOrderApi.getProviderOrders(
+        page,
+        ORDERS_PER_PAGE,
+        statusParam,
+        debouncedSearch,
+      );
       setOrders(data.items);
+      setPagination(data.pagination);
       setError(null);
     } catch {
       setError('Không thể tải danh sách đơn dịch vụ.');
       setOrders([]);
+      setPagination((current) => ({ ...current, total: 0, totalPages: 0 }));
     } finally {
       setLoadingOrders(false);
     }
-  }, [activeFilter, debouncedSearch]);
+  }, [activeFilter, debouncedSearch, page]);
 
   useEffect(() => {
     void Promise.resolve().then(loadAssignments);
@@ -122,53 +143,25 @@ export default function ProviderOrdersPage() {
           </div>
         )}
 
-        <section className="hidden">
-          <div className="flex items-center justify-between gap-md">
-            <h2 className="font-headline-md text-on-surface">Đơn chờ phản hồi</h2>
-            <button
-              type="button"
-              onClick={loadAssignments}
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Làm mới
-            </button>
-          </div>
-
-          {loadingAssignments ? (
-            <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
-              Đang tải đơn chờ phản hồi...
-            </div>
-          ) : assignments.length === 0 ? (
-            <div className="rounded-3xl border-2 border-dashed border-outline-variant bg-surface-container-low p-lg text-center text-on-surface-variant">
-              Hiện chưa có đơn mới cần phản hồi.
-            </div>
-          ) : (
-            <div className="grid gap-md">
-              {assignments.map((assignment) => (
-                <PendingAssignmentCard
-                  key={assignment._id}
-                  assignment={assignment}
-                  onAccept={handleAccept}
-                  onReject={handleReject}
-                  busy={actionBusy}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+        <PendingAssignmentsSection
+          assignments={assignments}
+          loading={loadingAssignments}
+          busy={actionBusy}
+          onRefresh={loadAssignments}
+          onAccept={handleAccept}
+          onReject={handleReject}
+        />
 
         <section className="space-y-md">
-          <div className="flex flex-col gap-md md:flex-row md:items-center md:justify-between">
-            <h2 className="font-headline-md text-on-surface">Đơn đã nhận</h2>
-            <div className="relative w-full md:max-w-md">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                search
-              </span>
+          <div className="flex justify-start">
+            <div className="relative w-full min-w-0 lg:max-w-3xl">
+              <Search aria-hidden="true" size={24} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Tìm mã đơn, dịch vụ..."
-                className="w-full rounded-full border border-outline-variant/40 bg-white py-3 pl-12 pr-4 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                aria-label="Tìm kiếm đơn dịch vụ"
+                className="min-h-12 w-full min-w-0 rounded-full border border-outline-variant/40 bg-surface-container-lowest py-3 pl-12 pr-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
               />
             </div>
           </div>
@@ -178,7 +171,10 @@ export default function ProviderOrdersPage() {
               <button
                 key={filter.value}
                 type="button"
-                onClick={() => setActiveFilter(filter.value)}
+                onClick={() => {
+                  setActiveFilter(filter.value);
+                  setPage(1);
+                }}
                 className={`whitespace-nowrap rounded-full px-md py-2 text-sm font-medium transition-all ${
                   activeFilter === filter.value
                     ? 'bg-primary text-on-primary shadow-md'
@@ -191,9 +187,7 @@ export default function ProviderOrdersPage() {
           </div>
 
           {loadingOrders ? (
-            <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant">
-              Đang tải danh sách đơn...
-            </div>
+            <ProviderOrdersListSkeleton />
           ) : orders.length === 0 ? (
             <div className="rounded-3xl border-2 border-dashed border-outline-variant bg-surface-container-low p-lg text-center text-on-surface-variant">
               {debouncedSearch
@@ -205,6 +199,11 @@ export default function ProviderOrdersPage() {
               {orders.map((order) => (
                 <ProviderOrderCard key={order._id} order={order} />
               ))}
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                onChange={setPage}
+              />
             </div>
           )}
         </section>

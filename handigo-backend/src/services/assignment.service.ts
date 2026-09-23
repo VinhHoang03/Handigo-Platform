@@ -7,13 +7,16 @@ import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AppError } from "../utils/appError";
 import { Address } from "../models/address.model";
-import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { emitToUser } from "../sockets/socketServer";
 import { cancelOrderWithSettlement } from "./orderCancellation.service";
 import { assertProviderWalletEligible } from "./providerWalletEligibility.service";
 import type { UserRole } from "../models/user.model";
 import { createNotificationRecord } from "./notification.service";
 import { requestDirectProviderReassignment } from "./orderReassignment.service";
+import {
+  evaluateQuotationItemsForOrder,
+  getBlockedRelevanceItems,
+} from "./quotationRelevance.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +41,7 @@ export interface CreateQuotationPayload {
   attachments?: string[];
   items: QuotationItemInput[];
   discountAmount?: number;
+  relevanceConfirmed?: boolean;
 }
 
 const closeCompetingAssignments = async (
@@ -143,18 +147,9 @@ export const AssignmentService = {
     const assignedAddress = assignedOrder
       ? await Address.findById(assignedOrder.addressId).select("ward province")
       : null;
-    if (
-      !assignedAddress ||
-      !isAddressInProviderWorkingAreas(
-        provider.workingAreas,
-        assignedAddress,
-        provider.serviceArea,
-      )
-    ) {
-      throw new AppError(
-        "Địa chỉ thực hiện không thuộc khu vực phục vụ đã đăng ký của bạn.",
-        400,
-      );
+    // Phạm vi địa lý đã được kiểm tra khi gửi đề nghị; không chặn lại theo phường/xã.
+    if (!assignedAddress) {
+      throw new AppError("Địa chỉ thực hiện dịch vụ không còn tồn tại.", 400);
     }
 
     await assertProviderWalletEligible(provider.userId);
@@ -571,6 +566,28 @@ export const AssignmentService = {
       throw new AppError(
         "Chỉ có thể tạo báo giá khi đơn hàng đang ở trạng thái accepted hoặc in_progress.",
         400,
+      );
+    }
+
+    const relevance = await evaluateQuotationItemsForOrder(
+      order,
+      payload.items,
+    );
+    const blockedItems = getBlockedRelevanceItems(relevance);
+    if (blockedItems.length) {
+      const titles = blockedItems
+        .slice(0, 3)
+        .map((item) => `"${item.title}"`)
+        .join(", ");
+      throw new AppError(
+        `Không thể gửi báo giá vì có hạng mục không phù hợp với dịch vụ ${relevance.serviceName}: ${titles}.`,
+        422,
+      );
+    }
+    if (relevance.status === "warning" && !payload.relevanceConfirmed) {
+      throw new AppError(
+        "Báo giá có hạng mục cần kiểm tra thêm. Vui lòng xem cảnh báo và xác nhận trước khi gửi.",
+        409,
       );
     }
 

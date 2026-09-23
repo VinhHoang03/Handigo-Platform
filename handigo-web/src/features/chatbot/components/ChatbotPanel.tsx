@@ -1,7 +1,12 @@
+import { Skeleton } from "@/components/common/Skeleton";
 import type { ChatbotAudience, ChatbotMessage } from "../types/chatbot.types";
 import { ChatbotComposer } from "./ChatbotComposer";
 import { ChatbotMessageList } from "./ChatbotMessageList";
 import { ChatbotAvatar } from "./ChatbotAvatar";
+import { X } from "lucide-react";
+import type { AgentConfirmation, AgentPayment } from "../types/agent.types";
+import { AgentPaymentCard } from "./AgentPaymentCard";
+import { AgentConfirmationCard } from "./AgentConfirmationCard";
 
 const getAudienceLabel = (audience: ChatbotAudience) => {
   if (audience === "CUSTOMER") return "Hỗ trợ dành cho khách hàng";
@@ -19,6 +24,13 @@ export function ChatbotPanel({
   onClose,
   onRetry,
   onSend,
+  pendingConfirmation,
+  onDecision,
+  onNewSession,
+  taskBlocked = false,
+  payment,
+  onCheckPayment,
+  onContinue,
 }: {
   audience: ChatbotAudience;
   messages: ChatbotMessage[];
@@ -29,13 +41,20 @@ export function ChatbotPanel({
   onClose: () => void;
   onRetry: () => void;
   onSend: (content: string) => Promise<void>;
+  pendingConfirmation?: AgentConfirmation | null;
+  onDecision?: (decision: "CONFIRM" | "REJECT") => void;
+  onNewSession?: () => void;
+  taskBlocked?: boolean;
+  payment?: AgentPayment | null;
+  onCheckPayment?: (orderId: string) => void;
+  onContinue?: () => void;
 }) {
   return (
     <aside
       aria-label="Trợ lý Handigo"
       className="fixed inset-x-3 bottom-3 z-[130] flex h-[min(620px,calc(100dvh-1.5rem))] flex-col overflow-hidden rounded-3xl border border-outline-variant/40 bg-surface shadow-[0_20px_60px_rgba(19,27,46,0.22)] sm:inset-x-auto sm:bottom-6 sm:right-6 sm:h-[min(590px,calc(100dvh-3rem))] sm:w-[390px]"
     >
-      <header className="relative overflow-hidden bg-primary px-4 py-4 text-on-primary">
+      <header className="relative shrink-0 overflow-hidden bg-primary px-4 py-4 text-on-primary">
         <span className="absolute -right-10 -top-12 h-28 w-28 rounded-full bg-white/10" />
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -57,31 +76,41 @@ export function ChatbotPanel({
               aria-label="Đóng trợ lý"
               className="rounded-full p-2 hover:bg-white/15"
             >
-              <span className="material-symbols-outlined block text-xl">
-                close
-              </span>
+              <X aria-hidden="true" size={20} className="block" />
             </button>
           </div>
         </div>
       </header>
 
       {isLoading ? (
-        <div className="grid flex-1 place-items-center text-sm text-on-surface-variant">
-          <div className="text-center">
-            <span className="material-symbols-outlined animate-spin text-3xl text-primary">
-              progress_activity
-            </span>
-            <p className="mt-2">Đang tải cuộc trò chuyện...</p>
-          </div>
+        <div
+          className="flex-1 space-y-3 overflow-y-auto p-4"
+          role="status"
+          aria-busy="true"
+          aria-label="Đang tải cuộc trò chuyện"
+        >
+          <Skeleton className="h-16 w-3/5" rounded="rounded-2xl" />
+          <Skeleton className="ml-auto h-10 w-2/5" rounded="rounded-2xl" />
+          <Skeleton className="h-14 w-1/2" rounded="rounded-2xl" />
         </div>
       ) : (
         <ChatbotMessageList
           messages={messages}
           isReplying={isReplying}
           audience={audience}
-        />
+        >
+          {pendingConfirmation && onDecision && (
+            <AgentConfirmationCard action={pendingConfirmation} disabled={isReplying || isLoading || taskBlocked} onDecision={onDecision} />
+          )}
+          {payment && onCheckPayment && (
+            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} />
+          )}
+        </ChatbotMessageList>
       )}
 
+      {onContinue && !pendingConfirmation && !taskBlocked && (
+        <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">Tiếp tục yêu cầu</button>
+      )}
       {availabilityMessage && (
         <div
           className="border-t border-primary/15 bg-primary-fixed px-4 py-3 text-sm leading-5 text-on-primary-fixed"
@@ -106,8 +135,11 @@ export function ChatbotPanel({
         </div>
       )}
       <ChatbotComposer
-        disabled={isLoading || isReplying || Boolean(availabilityMessage)}
+        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation) || taskBlocked}
         onSend={onSend}
+        onNewSession={onNewSession}
+        resetDisabled={isLoading || isReplying || Boolean(pendingConfirmation) || taskBlocked}
+        voiceEnabled={audience === "CUSTOMER"}
       />
     </aside>
   );

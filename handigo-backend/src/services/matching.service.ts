@@ -4,7 +4,6 @@ import { Location } from "../models/location.model";
 import { Order } from "../models/order.model";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { getEligibleProviderUserIds } from "./providerWalletEligibility.service";
-import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { createLogger } from "../utils/logger";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -15,6 +14,8 @@ export interface ProviderCandidate {
   providerId: Types.ObjectId;
   userId: Types.ObjectId;
   distanceMeters: number;
+  latitude?: number;
+  longitude?: number;
   averageRating: number;
   totalCompletedOrders: number;
 }
@@ -79,8 +80,7 @@ export const MatchingService = {
    *     - not in excludeProviderIds
    *  3. Return sorted candidates (nearest first).
    *
-   *  If no coordinates are provided, fall back to a simple filter without
-   *  geo-sorting (distance will be reported as -1).
+   * Thiếu tọa độ thì không có kết quả; không thay thế bằng bộ lọc khu vực.
    */
   async findNearestProviders(
     options: FindNearestProvidersOptions,
@@ -90,8 +90,6 @@ export const MatchingService = {
       latitude,
       longitude,
       serviceId,
-      province,
-      ward,
       maxDistanceMeters = Math.max(configuredRadiusKm, 0) * 1000,
       limit = 10,
       excludeProviderIds = [],
@@ -99,10 +97,6 @@ export const MatchingService = {
       requireOnline = true,
       scheduledDates = [],
     } = options;
-    const candidateLimit = scheduledDates.length > 0
-      ? Math.max(limit * 5, 100)
-      : limit * 5;
-
     const serviceObjectId = new Types.ObjectId(serviceId);
     const excludeIds = excludeProviderIds.map((id) => id.toString());
     const eligibleProviderUserIds = await getEligibleProviderUserIds();
@@ -116,7 +110,8 @@ export const MatchingService = {
     }
 
     // ── Path A: geo-sorted lookup ──────────────────────────────────────────
-    if (latitude != null && longitude != null) {
+    if (latitude != null && longitude != null && Number.isFinite(latitude)
+      && Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
       /*
        * 1. Query the `locations` collection with 2dsphere near-filter.
        *    Each document stores { userId, ownerType, coordinates }.
@@ -124,6 +119,8 @@ export const MatchingService = {
       const nearbyLocations = await Location.find({
         ownerType: "provider",
         isActive: true,
+        isDeleted: false,
+        userId: { $in: eligibleProviderUserIds },
         coordinates: {
           $nearSphere: {
             $geometry: {
@@ -134,7 +131,6 @@ export const MatchingService = {
           },
         },
       })
-        .limit(candidateLimit) // over-fetch để còn ứng viên sau khi lọc điều kiện
         .lean();
 
       if (nearbyLocations.length === 0) {
@@ -157,21 +153,16 @@ export const MatchingService = {
           ...(requireOnline && { availabilityStatus: "online" }),
           verified: true,
           isDeleted: false,
-          ...(onlyProviderId && { _id: onlyProviderId }),
-          ...(excludeIds.length > 0 && {
-            _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
+          ...((onlyProviderId || excludeIds.length > 0) && {
+            _id: {
+              ...(onlyProviderId && { $eq: onlyProviderId }),
+              $nin: excludeProviderIds,
+            },
           }),
         })
-          .limit(candidateLimit)
           .lean();
 
-        const providersInArea = providers.filter((provider) =>
-            isAddressInProviderWorkingAreas(
-              provider.workingAreas,
-              { province, ward },
-              provider.serviceArea,
-            ),
-          );
+        const providersInArea = providers;
 
         if (providersInArea.length > 0) {
           // 3. Sort by geo distance order (index in nearbyLocations)
@@ -203,6 +194,8 @@ export const MatchingService = {
               providerId: p._id as Types.ObjectId,
               userId: p.userId as Types.ObjectId,
               distanceMeters: dist,
+              latitude: loc?.coordinates.coordinates[1],
+              longitude: loc?.coordinates.coordinates[0],
               averageRating: p.averageRating,
               totalCompletedOrders: p.totalCompletedOrders,
             };
@@ -215,64 +208,8 @@ export const MatchingService = {
       return [];
     }
 
-    // ── Path B: no coordinates or no geo-matches found → simple filter ─────
-    const providers = await Provider.find({
-      userId: { $in: eligibleProviderUserIds },
-      serviceIds: serviceObjectId,
-      ...(requireOnline && { availabilityStatus: "online" }),
-      verified: true,
-      isDeleted: false,
-      ...(onlyProviderId && { _id: onlyProviderId }),
-      ...(excludeIds.length > 0 && {
-        _id: { $nin: excludeIds.map((id) => new Types.ObjectId(id)) },
-      }),
-    })
-      .sort({ averageRating: -1, totalCompletedOrders: -1 })
-      .limit(candidateLimit)
-      .lean();
-
-    const providersInArea = providers.filter((provider) =>
-        isAddressInProviderWorkingAreas(
-          provider.workingAreas,
-          { province, ward },
-          provider.serviceArea,
-        ),
-      );
-    const availableProviders = await filterProvidersWithoutScheduleConflicts(
-      providersInArea,
-      scheduledDates,
-    );
-
-    if (providers.length === 0) {
-      matchingLogger.warn("Không có provider hợp lệ cho dịch vụ.", {
-        serviceId,
-        excludedProviderCount: excludeIds.length,
-      });
-    } else if (providersInArea.length === 0) {
-      matchingLogger.warn("Có provider đúng dịch vụ và đang online nhưng khu vực không khớp.", {
-        serviceId,
-        providerCount: providers.length,
-        ward,
-        province,
-      });
-      matchingLogger.debug("Danh sách khu vực provider bị loại.", {
-        providers: providers.map((provider) => ({
-          providerId: provider._id.toString(),
-          workingAreas: provider.workingAreas,
-          serviceArea: provider.serviceArea,
-        })),
-      });
-    }
-
-    return availableProviders
-      .slice(0, limit)
-      .map((p) => ({
-      providerId: p._id as Types.ObjectId,
-      userId: p.userId as Types.ObjectId,
-      distanceMeters: -1,
-      averageRating: p.averageRating,
-      totalCompletedOrders: p.totalCompletedOrders,
-      }));
+    // Không suy đoán khoảng cách từ phường/xã khi thiếu tọa độ.
+    return [];
   },
 };
 

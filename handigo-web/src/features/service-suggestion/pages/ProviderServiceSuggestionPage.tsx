@@ -3,8 +3,10 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { categoryServiceApi } from "@/features/admin/api/categoryService.api";
 import type { Category } from "@/features/admin/types/categoryService.types";
 import { serviceSuggestionApi } from "../api/serviceSuggestion.api";
-
-const NEW_CATEGORY_VALUE = "new-category";
+import {
+  NEW_CATEGORY_VALUE,
+  ProviderServiceSuggestionForm,
+} from "../components/ProviderServiceSuggestionForm";
 
 const getErrorMessage = (error: unknown) => {
   const err = error as { response?: { data?: { message?: string } } };
@@ -90,7 +92,7 @@ export default function ProviderServiceSuggestionPage() {
   return (
     <DashboardShell role="PROVIDER">
       <div className="space-y-6">
-        <header className="rounded-xl border border-outline-variant/30 bg-white p-6 shadow-sm">
+        <header className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
           <p className="text-sm font-bold uppercase text-primary">
             Đề xuất mở rộng dịch vụ
           </p>
@@ -103,102 +105,23 @@ export default function ProviderServiceSuggestionPage() {
           </p>
         </header>
 
-        <form
-          onSubmit={handleSubmit}
-          className="grid grid-cols-1 gap-5 rounded-xl border border-outline-variant/30 bg-white p-6 shadow-sm lg:grid-cols-3"
-        >
-          {(message || error) && (
-            <div
-              className={`lg:col-span-3 rounded-lg px-4 py-3 text-sm font-medium ${
-                error
-                  ? "bg-error/10 text-error"
-                  : "bg-emerald-100 text-emerald-700"
-              }`}
-            >
-              {error || message}
-            </div>
-          )}
-
-          <label className="block lg:col-span-2">
-            <span className="mb-2 block text-sm font-bold text-on-surface">
-              Tên dịch vụ đề xuất
-            </span>
-            <input
-              value={serviceName}
-              onChange={(event) => setServiceName(event.target.value)}
-              className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-              placeholder="Ví dụ: Vệ sinh máy lạnh treo tường"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-sm font-bold text-on-surface">
-              Danh mục liên quan
-            </span>
-            <select
-              value={categoryId}
-              disabled={isLoadingCategories}
-              onChange={(event) => {
-                setCategoryId(event.target.value);
-                setCategoryName("");
-              }}
-              className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-            >
-              <option value="">Chưa xác định</option>
-              {categories.map((category) => (
-                <option key={category._id} value={category._id}>
-                  {category.name}
-                </option>
-              ))}
-              <option value={NEW_CATEGORY_VALUE}>Gợi ý danh mục mới</option>
-            </select>
-          </label>
-
-          {categoryId === NEW_CATEGORY_VALUE && (
-            <label className="block lg:col-span-3">
-              <span className="mb-2 block text-sm font-bold text-on-surface">
-                Tên danh mục mới
-              </span>
-              <input
-                value={categoryName}
-                onChange={(event) => setCategoryName(event.target.value)}
-                className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                placeholder="Ví dụ: Chăm sóc thú cưng tại nhà"
-              />
-            </label>
-          )}
-
-          <label className="block lg:col-span-3">
-            <span className="mb-2 block text-sm font-bold text-on-surface">
-              Mô tả đề xuất
-            </span>
-            <textarea
-              value={description}
-              rows={6}
-              onChange={(event) => setDescription(event.target.value)}
-              className="w-full rounded-lg border border-outline-variant/40 bg-white px-3 py-2 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-              placeholder="Nêu lý do nên bổ sung, nhu cầu khách hàng, phạm vi công việc hoặc gợi ý cách triển khai."
-            />
-          </label>
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end lg:col-span-3">
-            <button
-              type="button"
-              className="min-h-11 w-full rounded-lg bg-surface-container px-5 py-2.5 font-bold sm:w-auto"
-              disabled={isSubmitting}
-              onClick={resetForm}
-            >
-              Làm mới
-            </button>
-            <button
-              type="submit"
-              className="min-h-11 w-full rounded-lg bg-primary px-5 py-2.5 font-bold text-on-primary disabled:opacity-60 sm:w-auto"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Đang gửi..." : "Gửi đề xuất"}
-            </button>
-          </div>
-        </form>
+        <ProviderServiceSuggestionForm
+          categories={categories}
+          serviceName={serviceName}
+          categoryName={categoryName}
+          categoryId={categoryId}
+          description={description}
+          isLoadingCategories={isLoadingCategories}
+          isSubmitting={isSubmitting}
+          message={message}
+          error={error}
+          onServiceNameChange={setServiceName}
+          onCategoryIdChange={setCategoryId}
+          onCategoryNameChange={setCategoryName}
+          onDescriptionChange={setDescription}
+          onSubmit={(event) => void handleSubmit(event)}
+          onReset={resetForm}
+        />
       </div>
     </DashboardShell>
   );

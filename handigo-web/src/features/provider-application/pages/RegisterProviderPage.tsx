@@ -1,91 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Send } from "lucide-react";
+import { useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
-import { CategorySelectionStep } from "../components/CategorySelectionStep";
 import { ProviderApplicationStepper } from "../components/ProviderApplicationStepper";
-import { ProviderDescriptionStep } from "../components/ProviderDescriptionStep";
-import { WorkingAreasStep } from "../components/WorkingAreasStep";
+import { RegisterProviderStepPanel } from "../components/RegisterProviderStepPanel";
 import { useProviderApplication } from "../hooks/useProviderApplication";
-import type {
-  ProviderApplication,
-  ProviderApplicationPayload,
-  Service,
-} from "../types/providerApplication.types";
 import { hasProviderApplicationDateErrors } from "../utils/providerApplicationValidation";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-
-const initial: ProviderApplicationPayload = {
-  description: "",
-  experienceYears: 2,
-  serviceIds: [],
-  workingAreas: [],
-  identityDocument: {
-    type: "cccd",
-    documentNumber: "",
-    fullName: "",
-    issuedPlace: "",
-    frontImageUrl: "",
-    backImageUrl: "",
-    passportImageUrl: "",
-    dateOfBirth: "",
-    gender: undefined,
-    nationality: "",
-    placeOfOrigin: "",
-    placeOfResidence: "",
-  },
-  certificates: [],
-};
-
-const hasRequiredIdentityImage = (form: ProviderApplicationPayload) =>
-  form.identityDocument.type === "cccd"
-    ? Boolean(form.identityDocument.frontImageUrl)
-    : Boolean(form.identityDocument.passportImageUrl);
-
-const serviceId = (service: string | Service) =>
-  typeof service === "string" ? service : service._id;
-
-const applicationToForm = (
-  application: ProviderApplication,
-): ProviderApplicationPayload => ({
-  description: application.description || "",
-  experienceYears: application.experienceYears || 0,
-  serviceIds: (application.serviceIds || []).map(serviceId).filter(Boolean),
-  workingAreas: application.workingAreas || [],
-  identityDocument: {
-    type: application.identityDocument?.type || "cccd",
-    documentNumber: application.identityDocument?.documentNumber || "",
-    fullName: application.identityDocument?.fullName || "",
-    issuedPlace: application.identityDocument?.issuedPlace || "",
-    issuedAt: application.identityDocument?.issuedAt?.slice(0, 10) || "",
-    expiresAt: application.identityDocument?.expiresAt?.slice(0, 10) || "",
-    frontImageUrl: application.identityDocument?.frontImageUrl || "",
-    backImageUrl: application.identityDocument?.backImageUrl || "",
-    passportImageUrl: application.identityDocument?.passportImageUrl || "",
-    dateOfBirth: application.identityDocument?.dateOfBirth?.slice(0, 10) || "",
-    gender: application.identityDocument?.gender,
-    nationality: application.identityDocument?.nationality || "",
-    placeOfOrigin: application.identityDocument?.placeOfOrigin || "",
-    placeOfResidence: application.identityDocument?.placeOfResidence || "",
-  },
-  certificates: (application.certificates || []).map((certificate) => ({
-    title: certificate.title || "",
-    certificateNumber: certificate.certificateNumber || "",
-    issuer: certificate.issuer || "",
-    issuedAt: certificate.issuedAt?.slice(0, 10) || "",
-    expiresAt: certificate.expiresAt?.slice(0, 10) || "",
-    imageUrls: certificate.imageUrls || [],
-  })),
-});
-
-const hasUploadedAsset = (form: ProviderApplicationPayload) =>
-  Boolean(
-    form.identityDocument.frontImageUrl ||
-    form.identityDocument.backImageUrl ||
-    form.identityDocument.passportImageUrl ||
-    form.certificates.some((certificate) => certificate.imageUrls.length),
-  );
+import {
+  hasRequiredIdentityImage,
+  initialProviderApplicationForm,
+} from "../components/registerProviderPageHelpers";
+import { useRegisterProviderFormSync } from "../components/useRegisterProviderFormSync";
 
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
@@ -95,60 +21,22 @@ export default function RegisterProviderPage() {
   const setUser = useAuthStore((state) => state.setUser);
   const isDirectProvider = user?.role.toUpperCase() === "PROVIDER";
   const providerApplication = useProviderApplication(applicationId);
-  const saveDraft = providerApplication.saveDraft;
   const [step, setStep] = useState<1 | 2 | 3>(
     isDirectProvider ? user?.providerOnboardingStep || 1 : 1,
   );
-  const [form, setForm] = useState(initial);
+  const [form, setForm] = useState(initialProviderApplicationForm);
   const [success, setSuccess] = useState("");
-  const hydratedApplicationIdRef = useRef<string | null>(null);
-  const didHydrateRef = useRef(false);
 
-  useEffect(() => {
-    if (user?.providerOnboardingStatus === "APPROVED") {
-      navigate("/provider", { replace: true });
-    }
-  }, [navigate, user?.providerOnboardingStatus]);
-
-  useEffect(() => {
-    const application = providerApplication.application;
-    if (!application || hydratedApplicationIdRef.current === application._id) {
-      if (!providerApplication.loading) didHydrateRef.current = true;
-      return;
-    }
-
-    setForm(applicationToForm(application));
-    hydratedApplicationIdRef.current = application._id;
-    didHydrateRef.current = true;
-  }, [providerApplication.application, providerApplication.loading]);
-
-  useEffect(() => {
-    if (
-      applicationId ||
-      !didHydrateRef.current ||
-      providerApplication.application?.status === "pending" ||
-      providerApplication.application?.status === "resubmitted" ||
-      providerApplication.application?.status === "rejected" ||
-      (!isDirectProvider && (step !== 3 || !hasUploadedAsset(form)))
-    ) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      void saveDraft({ ...form, onboardingStep: step }).catch(() => {
-        // The hook exposes the draft error for rendering.
-      });
-    }, 700);
-
-    return () => window.clearTimeout(timeout);
-  }, [
+  useRegisterProviderFormSync({
+    user,
+    navigate,
+    providerApplication,
     applicationId,
-    form,
     isDirectProvider,
-    providerApplication.application?.status,
-    saveDraft,
     step,
-  ]);
+    form,
+    setForm,
+  });
 
   const toggleService = (id: string) =>
     setForm((value) => ({
@@ -167,6 +55,12 @@ export default function RegisterProviderPage() {
       }));
     }
   };
+
+  const removeArea = (value: string) =>
+    setForm((current) => ({
+      ...current,
+      workingAreas: current.workingAreas.filter((item) => item !== value),
+    }));
 
   const canContinue =
     step === 1
@@ -250,95 +144,31 @@ export default function RegisterProviderPage() {
           error={providerApplication.loadError}
           onRetry={providerApplication.loadCategories}
         >
-          <div className="glass-card rounded-3xl p-6 md:p-8">
-            {step === 1 && (
-              <CategorySelectionStep
-                categories={providerApplication.categories}
-                selectedIds={form.serviceIds}
-                experienceYears={form.experienceYears}
-                onToggle={toggleService}
-                onExperienceChange={(experienceYears) =>
-                  setForm({ ...form, experienceYears })
-                }
-              />
-            )}
-            {step === 2 && (
-              <WorkingAreasStep
-                areas={form.workingAreas}
-                onAdd={addArea}
-                onRemove={(value) =>
-                  setForm({
-                    ...form,
-                    workingAreas: form.workingAreas.filter(
-                      (item) => item !== value,
-                    ),
-                  })
-                }
-              />
-            )}
-            {step === 3 && (
-              <ProviderDescriptionStep
-                form={form}
-                categories={providerApplication.categories}
-                onChange={setForm}
-                onUploadAsset={providerApplication.uploadImage}
-              />
-            )}
-
-            {providerApplication.savingDraft && step === 3 && (
-              <p className="mt-5 rounded-2xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
-                Đang lưu ảnh và hồ sơ xác thực...
-              </p>
-            )}
-
-            {(providerApplication.submitError ||
-              providerApplication.draftError ||
-              success) && (
-              <p
-                className={`mt-5 rounded-2xl p-3 ${
-                  success
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-error/10 text-error"
-                }`}
-              >
-                {success ||
-                  providerApplication.submitError ||
-                  providerApplication.draftError}
-              </p>
-            )}
-
-            <div className="mt-8 flex flex-col-reverse justify-between gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() =>
-                  step === 1 ? navigate(-1) : setStep((step - 1) as 1 | 2)
-                }
-                className="btn-secondary"
-              >
-                <ArrowLeft size={18} /> {step === 1 ? "Hủy" : "Quay lại"}
-              </button>
-              {step < 3 ? (
-                <button
-                  type="button"
-                  disabled={!canContinue}
-                  onClick={() => setStep((step + 1) as 2 | 3)}
-                  className="btn-primary"
-                >
-                  Tiếp tục <ArrowRight size={18} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={send}
-                  disabled={providerApplication.submitting || !canSubmit}
-                  className="btn-primary"
-                >
-                  <Send size={18} />{" "}
-                  {providerApplication.submitting ? "Đang gửi..." : "Gửi hồ sơ"}
-                </button>
-              )}
-            </div>
-          </div>
+          <RegisterProviderStepPanel
+            step={step}
+            form={form}
+            categories={providerApplication.categories}
+            onFormChange={setForm}
+            onToggleService={toggleService}
+            onExperienceChange={(experienceYears) =>
+              setForm({ ...form, experienceYears })
+            }
+            onAddArea={addArea}
+            onRemoveArea={removeArea}
+            onUploadAsset={providerApplication.uploadImage}
+            savingDraft={providerApplication.savingDraft}
+            submitError={providerApplication.submitError}
+            draftError={providerApplication.draftError}
+            success={success}
+            canContinue={canContinue}
+            canSubmit={canSubmit}
+            submitting={providerApplication.submitting}
+            onBack={() =>
+              step === 1 ? navigate(-1) : setStep((step - 1) as 1 | 2)
+            }
+            onNext={() => setStep((step + 1) as 2 | 3)}
+            onSubmit={() => void send()}
+          />
         </AsyncState>
       </div>
     </DashboardShell>

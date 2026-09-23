@@ -110,6 +110,13 @@ spacing:
   gutter: 24px
 ---
 
+> **Đây là bản thiết kế ý tưởng ban đầu, không phải quy ước đang thi hành.**
+> Một số phần đã lệch so với mã nguồn: body dùng Be Vietnam Pro chứ không phải
+> Inter, Dark Mode chưa được triển khai, màu badge đã quy về hệ token ngữ nghĩa
+> thay cho Orange/Cyan/Indigo. Quy ước đang có hiệu lực nằm ở
+> [`docs/code-standards.md`](../docs/code-standards.md); khi hai bên mâu thuẫn,
+> file đó đúng.
+
 ## Brand & Style
 The design system is engineered for a premium home services marketplace, balancing high-end reliability with the rapid efficiency of a modern tech startup. The brand personality is "The Dependable Expert"—highly professional, technologically advanced, and frictionless.
 

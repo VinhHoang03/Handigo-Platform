@@ -169,6 +169,13 @@ const quotationItemSchema = z.object({
   ),
 });
 
+export const quotationItemsRelevanceSchema = z.object({
+  items: z
+    .array(quotationItemSchema)
+    .min(1, "Báo giá phải có ít nhất một hạng mục")
+    .max(100, "Báo giá không được vượt quá 100 hạng mục"),
+});
+
 export const createRepairQuotationSchema = z
   .object({
     inspectionNote: optionalTextSchema(
@@ -192,6 +199,7 @@ export const createRepairQuotationSchema = z
       .finite()
       .nonnegative("Số tiền giảm giá không được âm")
       .optional(),
+    relevanceConfirmed: z.boolean().optional(),
   })
   .superRefine((payload, context) => {
     const subtotal = payload.items.reduce(
