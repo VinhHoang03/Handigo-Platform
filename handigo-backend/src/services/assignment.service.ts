@@ -14,6 +14,10 @@ import { assertProviderWalletEligible } from "./providerWalletEligibility.servic
 import type { UserRole } from "../models/user.model";
 import { createNotificationRecord } from "./notification.service";
 import { requestDirectProviderReassignment } from "./orderReassignment.service";
+import {
+  evaluateQuotationItemsForOrder,
+  getBlockedRelevanceItems,
+} from "./quotationRelevance.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +42,7 @@ export interface CreateQuotationPayload {
   attachments?: string[];
   items: QuotationItemInput[];
   discountAmount?: number;
+  relevanceConfirmed?: boolean;
 }
 
 const closeCompetingAssignments = async (
@@ -571,6 +576,28 @@ export const AssignmentService = {
       throw new AppError(
         "Chỉ có thể tạo báo giá khi đơn hàng đang ở trạng thái accepted hoặc in_progress.",
         400,
+      );
+    }
+
+    const relevance = await evaluateQuotationItemsForOrder(
+      order,
+      payload.items,
+    );
+    const blockedItems = getBlockedRelevanceItems(relevance);
+    if (blockedItems.length) {
+      const titles = blockedItems
+        .slice(0, 3)
+        .map((item) => `"${item.title}"`)
+        .join(", ");
+      throw new AppError(
+        `Không thể gửi báo giá vì có hạng mục không phù hợp với dịch vụ ${relevance.serviceName}: ${titles}.`,
+        422,
+      );
+    }
+    if (relevance.status === "warning" && !payload.relevanceConfirmed) {
+      throw new AppError(
+        "Báo giá có hạng mục cần kiểm tra thêm. Vui lòng xem cảnh báo và xác nhận trước khi gửi.",
+        409,
       );
     }
 

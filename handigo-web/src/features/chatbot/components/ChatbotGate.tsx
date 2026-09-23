@@ -1,5 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/store/auth.store";
+import { useChatUiStore } from "@/features/chat/store/chatUi.store";
 import type { ChatbotAudience } from "../types/chatbot.types";
 import { ChatbotWidget } from "./ChatbotWidget";
 
@@ -18,17 +19,22 @@ export function ChatbotGate() {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isInitializing = useAuthStore((state) => state.isInitializing);
+  const activeChatPopupCount = useChatUiStore(
+    (state) => state.activePopupCount,
+  );
   const normalizedRole = user?.role.toUpperCase();
 
-  if (isInitializing || isAuthenticationPath(location.pathname)) return null;
+  if (
+    isInitializing ||
+    !isAuthenticated ||
+    activeChatPopupCount > 0 ||
+    isAuthenticationPath(location.pathname) ||
+    (normalizedRole !== "CUSTOMER" && normalizedRole !== "PROVIDER")
+  ) {
+    return null;
+  }
 
-  const audience: ChatbotAudience = !isAuthenticated
-    ? "GUEST"
-    : normalizedRole === "CUSTOMER" ||
-        normalizedRole === "PROVIDER" ||
-        normalizedRole === "ADMIN"
-      ? normalizedRole
-      : "GUEST";
+  const audience: ChatbotAudience = normalizedRole;
 
   return <ChatbotWidget audience={audience} />;
 }

@@ -7,22 +7,6 @@ export const currencyFormatter = new Intl.NumberFormat('vi-VN', {
   maximumFractionDigits: 0,
 });
 
-export const providerStatusLabels: Record<Order['status'], string> = {
-  created: 'Chờ xử lý',
-  accepted: 'Đã nhận',
-  in_progress: 'Đang làm',
-  completed: 'Hoàn tất',
-  cancelled: 'Đã hủy',
-};
-
-export const providerStatusStyles: Record<Order['status'], string> = {
-  created: 'border-primary text-primary bg-primary/5',
-  accepted: 'border-accent-cyan text-accent-cyan bg-accent-cyan/5',
-  in_progress: 'border-secondary text-secondary bg-secondary/5',
-  completed: 'border-emerald-500 text-emerald-600 bg-emerald-50',
-  cancelled: 'border-error text-error bg-error/5',
-};
-
 export function formatMoney(value?: number) {
   return currencyFormatter.format(typeof value === 'number' && Number.isFinite(value) ? value : 0);
 }

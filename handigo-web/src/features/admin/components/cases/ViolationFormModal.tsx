@@ -97,7 +97,7 @@ export function ViolationFormModal({
         {penaltyType === "RESTRICT_FEATURE" && <label className="block text-sm font-semibold">Tính năng bị hạn chế<input value={feature} onChange={(event) => setFeature(event.target.value)} maxLength={100} required disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3" /></label>}
         <label className="block text-sm font-semibold">Ghi chú hình phạt<textarea value={penaltyNote} onChange={(event) => setPenaltyNote(event.target.value)} maxLength={1000} rows={3} disabled={busy} className="mt-2 w-full rounded-xl border border-outline-variant p-3" /></label>
         {error && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{error}</p>}
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button><button type="submit" disabled={busy || (sourceType === "SUPPORT_TICKET" && !targetUserId)} className="rounded-xl bg-error px-5 py-2.5 font-semibold text-white disabled:opacity-40">{busy ? "Đang áp dụng..." : "Xác nhận vi phạm"}</button></div>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button><button type="submit" disabled={busy || (sourceType === "SUPPORT_TICKET" && !targetUserId)} className="rounded-xl bg-error px-5 py-2.5 font-semibold text-on-error disabled:opacity-40">{busy ? "Đang áp dụng..." : "Xác nhận vi phạm"}</button></div>
       </form>
     </Modal>
   );

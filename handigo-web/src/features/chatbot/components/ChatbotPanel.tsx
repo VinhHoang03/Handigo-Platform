@@ -1,7 +1,9 @@
+import { Skeleton } from "@/components/common/Skeleton";
 import type { ChatbotAudience, ChatbotMessage } from "../types/chatbot.types";
 import { ChatbotComposer } from "./ChatbotComposer";
 import { ChatbotMessageList } from "./ChatbotMessageList";
 import { ChatbotAvatar } from "./ChatbotAvatar";
+import { X } from "lucide-react";
 
 const getAudienceLabel = (audience: ChatbotAudience) => {
   if (audience === "CUSTOMER") return "Hỗ trợ dành cho khách hàng";
@@ -57,22 +59,22 @@ export function ChatbotPanel({
               aria-label="Đóng trợ lý"
               className="rounded-full p-2 hover:bg-white/15"
             >
-              <span className="material-symbols-outlined block text-xl">
-                close
-              </span>
+              <X aria-hidden="true" size={20} className="block" />
             </button>
           </div>
         </div>
       </header>
 
       {isLoading ? (
-        <div className="grid flex-1 place-items-center text-sm text-on-surface-variant">
-          <div className="text-center">
-            <span className="material-symbols-outlined animate-spin text-3xl text-primary">
-              progress_activity
-            </span>
-            <p className="mt-2">Đang tải cuộc trò chuyện...</p>
-          </div>
+        <div
+          className="flex-1 space-y-3 overflow-y-auto p-4"
+          role="status"
+          aria-busy="true"
+          aria-label="Đang tải cuộc trò chuyện"
+        >
+          <Skeleton className="h-16 w-3/5" rounded="rounded-2xl" />
+          <Skeleton className="ml-auto h-10 w-2/5" rounded="rounded-2xl" />
+          <Skeleton className="h-14 w-1/2" rounded="rounded-2xl" />
         </div>
       ) : (
         <ChatbotMessageList

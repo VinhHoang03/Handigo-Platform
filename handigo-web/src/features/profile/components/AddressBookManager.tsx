@@ -1,18 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { Skeleton } from "@/components/common/Skeleton";
 import { AddressBookModal } from "./AddressBookModal";
-import {
-  createUserAddress,
-  deleteUserAddress,
-  getUserAddresses,
-  updateUserAddress,
-} from "@/features/profile/api/addressBook.api";
-import type {
-  UserAddress,
-  UserAddressPayload,
-} from "@/features/profile/types/profile.types";
-import { getErrorMessage } from "@/utils/apiError";
+import { AddressBookManagerRow } from "./AddressBookManagerRow";
+import { useAddressBookManager } from "@/features/profile/hooks/useAddressBookManager";
+import type { UserAddress } from "@/features/profile/types/profile.types";
 
 interface AddressBookManagerProps {
   defaultRecipient: { name: string; phone: string };
@@ -24,44 +16,6 @@ interface AddressBookManagerProps {
   onSelectAddress?: (address: UserAddress | null) => void;
 }
 
-const extractAddressTitle = (address: UserAddress) => {
-  const segments = address.fullAddress
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (!segments.length) return "";
-
-  const [streetSegment] = segments;
-  const secondSegment = segments[1];
-  const isWardSegment =
-    Boolean(secondSegment) &&
-    Boolean(address.ward) &&
-    secondSegment.localeCompare(address.ward, "vi", {
-      sensitivity: "accent",
-    }) === 0;
-
-  return isWardSegment ? streetSegment : segments.slice(0, 2).join(" ");
-};
-
-const getAddressDisplay = (address: UserAddress) =>
-  [extractAddressTitle(address), address.ward, address.province]
-    .filter(Boolean)
-    .join(", ");
-
-const CURRENT_LOCATION_LEGACY_NOTE = "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
-
-const getVisibleAddressNote = (address: UserAddress) => {
-  const note = address.note?.trim();
-  return note === CURRENT_LOCATION_LEGACY_NOTE ? "" : note || "";
-};
-
-const getAddressTitle = (address: UserAddress) =>
-  getVisibleAddressNote(address) ||
-  getAddressDisplay(address) ||
-  [address.ward, address.province].filter(Boolean).join(", ") ||
-  "Địa chỉ";
-
 export function AddressBookManager({
   defaultRecipient,
   selectedAddressId,
@@ -71,119 +25,37 @@ export function AddressBookManager({
   onManageAddresses,
   onSelectAddress,
 }: AddressBookManagerProps) {
-  const [addresses, setAddresses] = useState<UserAddress[]>([]);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<UserAddress | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  const loadAddresses = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await getUserAddresses();
-      setAddresses(data);
-      setError("");
-    } catch {
-      setError("Không tải được danh sách địa chỉ đã lưu.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Chỉ tải từ API khi component được gắn; đổi lựa chọn dùng danh sách hiện có.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadAddresses();
-  }, [loadAddresses]);
-
-  useEffect(() => {
-    if (!selectable || addresses.length === 0) return;
-
-    const selectedAddress = addresses.find(
-      (item) => item.id === selectedAddressId,
-    );
-    const nextAddress =
-      selectedAddress || addresses.find((item) => item.isDefault) || addresses[0];
-    if (nextAddress.id !== selectedAddressId) {
-      onSelectAddress?.(nextAddress);
-    }
-  }, [addresses, onSelectAddress, selectable, selectedAddressId]);
-
-  const openCreate = () => {
-    setEditingAddress(null);
-    setError("");
-    setIsModalOpen(true);
-  };
-
-  const openEdit = (address: UserAddress) => {
-    setEditingAddress(address);
-    setError("");
-    setIsModalOpen(true);
-  };
-
-  const activeAddress =
-    addresses.find((item) => item.id === selectedAddressId)
-    || addresses.find((item) => item.isDefault)
-    || addresses[0]
-    || null;
-  const displayedAddresses = singleAddressMode && activeAddress
-    ? [activeAddress]
-    : addresses;
-
-  const handleSubmit = async (
-    payload: UserAddressPayload,
-    address: UserAddress | null,
-  ) => {
-    try {
-      setIsSaving(true);
-      const savedAddress = address
-        ? await updateUserAddress(address.id, payload)
-        : await createUserAddress(payload);
-      await loadAddresses();
-      onSelectAddress?.(savedAddress);
-    } catch (submitError) {
-      const message = getErrorMessage(
-        submitError,
-        "Không thể lưu địa chỉ. Vui lòng thử lại.",
-      );
-      setError(message);
-      throw submitError;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      setIsSaving(true);
-      await deleteUserAddress(deleteTarget.id);
-      const nextAddresses = addresses.filter(
-        (item) => item.id !== deleteTarget.id,
-      );
-      setAddresses(nextAddresses);
-      setError("");
-      if (selectedAddressId === deleteTarget.id && nextAddresses.length > 0) {
-        onSelectAddress?.(
-          nextAddresses.find((item) => item.isDefault) || nextAddresses[0],
-        );
-      } else if (selectedAddressId === deleteTarget.id) {
-        onSelectAddress?.(null);
-      }
-      setDeleteTarget(null);
-    } catch (deleteError) {
-      setError(
-        getErrorMessage(deleteError, "Không thể xóa địa chỉ. Vui lòng thử lại."),
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const {
+    addresses,
+    displayedAddresses,
+    editingAddress,
+    deleteTarget,
+    isModalOpen,
+    isLoading,
+    isSaving,
+    error,
+    openCreate,
+    openEdit,
+    setIsModalOpen,
+    setDeleteTarget,
+    handleSubmit,
+    confirmDelete,
+  } = useAddressBookManager({
+    selectedAddressId,
+    selectable,
+    singleAddressMode,
+    onSelectAddress,
+  });
 
   return (
-    <div id="saved-addresses" className={compact ? "space-y-3" : "rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5"}>
+    <div
+      id="saved-addresses"
+      className={
+        compact
+          ? "space-y-3"
+          : "rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5"
+      }
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h4 className="font-headline-sm text-headline-sm text-on-surface">
@@ -214,8 +86,14 @@ export function AddressBookManager({
       )}
 
       {isLoading ? (
-        <div className="rounded-lg bg-surface-container-low p-4 text-on-surface-variant">
-          Đang tải địa chỉ...
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Đang tải địa chỉ"
+          className="space-y-2"
+        >
+          <Skeleton className="h-16 w-full" rounded="rounded-xl" />
+          <Skeleton className="h-16 w-full" rounded="rounded-xl" />
         </div>
       ) : addresses.length === 0 ? (
         <button
@@ -229,63 +107,26 @@ export function AddressBookManager({
           Bạn chưa có địa chỉ. Nhấn để thêm địa chỉ mới.
         </button>
       ) : (
-        <div className={compact ? "max-h-52 space-y-2 overflow-y-auto pr-1" : "space-y-3"}>
-          {displayedAddresses.map((address) => {
-            const selected = selectedAddressId === address.id;
-            return (
-              <div
-                key={address.id}
-                className={`flex items-start gap-3 rounded-xl border p-3 transition ${
-                  selected
-                    ? "border-primary bg-primary/5"
-                    : "border-outline-variant/30 bg-surface-container-low hover:border-primary/50"
-                }`}
-              >
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                  onClick={() => selectable && onSelectAddress?.(address)}
-                >
-                  <span
-                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${
-                      selected ? "bg-primary text-on-primary" : "bg-primary/10 text-primary"
-                    }`}
-                  >
-                    <MapPin size={18} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="flex flex-wrap items-center gap-2 font-bold text-on-surface">
-                      {getAddressTitle(address)}
-                      {address.isDefault && (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase text-primary">
-                          Mặc định
-                        </span>
-                      )}
-                    </span>
-                    {getVisibleAddressNote(address) && (
-                      <span className="mt-1 block text-sm text-on-surface-variant">
-                        {getAddressDisplay(address)}
-                      </span>
-                    )}
-                    <span className="mt-1 block text-xs text-on-surface-variant">
-                      Người nhận: {address.recipientName || "Chưa cập nhật"}
-                      {address.recipientPhone ? ` • ${address.recipientPhone}` : ""}
-                    </span>
-                  </span>
-                </button>
-                {!singleAddressMode && (
-                  <div className="flex shrink-0 gap-1">
-                    <button type="button" aria-label="Sửa địa chỉ" className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary" disabled={isSaving} onClick={() => openEdit(address)}>
-                      <Pencil size={16} />
-                    </button>
-                    <button type="button" aria-label="Xóa địa chỉ" className="grid h-9 w-9 place-items-center rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error" disabled={isSaving} onClick={() => setDeleteTarget(address)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div
+          className={
+            compact
+              ? "max-h-52 space-y-2 overflow-y-auto pr-1"
+              : "space-y-3"
+          }
+        >
+          {displayedAddresses.map((address) => (
+            <AddressBookManagerRow
+              key={address.id}
+              address={address}
+              selected={selectedAddressId === address.id}
+              selectable={selectable}
+              singleAddressMode={singleAddressMode}
+              isSaving={isSaving}
+              onSelect={() => onSelectAddress?.(address)}
+              onEdit={() => openEdit(address)}
+              onDelete={() => setDeleteTarget(address)}
+            />
+          ))}
         </div>
       )}
 

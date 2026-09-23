@@ -8,6 +8,7 @@ import {
   getOrderFromAssignment,
   shortAddress,
 } from '../utils/providerOrder.utils';
+import { BellRing, ShieldCheck } from "lucide-react";
 
 interface PendingAssignmentCardProps {
   assignment: OrderAssignment;
@@ -40,11 +41,11 @@ export function PendingAssignmentCard({
   const isDirectRequest = assignment.assignmentType === 'direct_request';
 
   return (
-    <div className="glass-card overflow-hidden rounded-3xl border border-primary/15">
+    <div className="overflow-hidden rounded-3xl border border-primary/15 bg-surface-container-lowest">
       <div className="border-b border-outline-variant/20 bg-primary/5 px-md py-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">notifications_active</span>
+            <BellRing aria-hidden="true" size={24} className="text-primary" />
             <span className="font-label-md text-primary">
               {isAppointment
                 ? 'Yêu cầu lịch hẹn'
@@ -85,7 +86,7 @@ export function PendingAssignmentCard({
             <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
               Thu nhập dự kiến
             </p>
-            <p className="mt-1 text-sm font-bold text-primary">
+            <p className="mt-1 text-sm font-bold text-primary tabular-nums">
               {formatMoney(order.pricing?.providerEarningAmount)}
             </p>
           </div>
@@ -114,7 +115,7 @@ export function PendingAssignmentCard({
         </div>
 
         {order.problemDescription && (
-          <div className="rounded-2xl border border-outline-variant/30 bg-white p-sm">
+          <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-sm">
             <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
               Mô tả vấn đề
             </p>
@@ -123,7 +124,7 @@ export function PendingAssignmentCard({
         )}
 
         <div className="flex items-start gap-2 rounded-2xl bg-surface-container-low p-sm text-sm text-on-surface-variant">
-          <span className="material-symbols-outlined text-base text-primary">shield_lock</span>
+          <ShieldCheck aria-hidden="true" size={16} className="text-primary" />
           <span>Thông tin liên hệ và địa chỉ chi tiết sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
         </div>
 

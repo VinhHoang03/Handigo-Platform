@@ -3,6 +3,7 @@ import type {
   ChatbotAudience,
   ChatbotMessage,
 } from "../types/chatbot.types";
+import { Bot } from "lucide-react";
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString("vi-VN", {
@@ -29,9 +30,7 @@ export function ChatbotMessageList({
     return (
       <div className="grid flex-1 place-items-center px-7 py-10 text-center">
         <div>
-          <span className="material-symbols-outlined grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-3xl text-primary">
-            smart_toy
-          </span>
+          <Bot aria-hidden="true" size={30} className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary" />
           <h3 className="mt-4 font-headline-md text-lg text-on-surface">
             Tôi có thể hỗ trợ gì?
           </h3>
@@ -60,7 +59,7 @@ export function ChatbotMessageList({
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                 isUser
                   ? "rounded-br-md bg-primary text-on-primary"
-                  : "rounded-bl-md border border-outline-variant/30 bg-white text-on-surface"
+                  : "rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest text-on-surface"
               }`}
             >
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -77,7 +76,7 @@ export function ChatbotMessageList({
       })}
       {isReplying && (
         <div className="flex justify-start" aria-live="polite">
-          <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-outline-variant/30 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 shadow-sm">
             {[0, 1, 2].map((index) => (
               <span
                 key={index}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { Order } from '@/types/booking';
 import { ReliableImage } from '@/components/common/ReliableImage';
+import { CircleCheckBig, ImagePlus, X } from "lucide-react";
 
 interface FixedPriceActionFormProps {
   order: Order;
@@ -85,10 +86,10 @@ export function FixedPriceActionForm({
   };
 
   return (
-    <div className="glass-card flex h-full flex-col space-y-md rounded-3xl border border-outline-variant/30 p-md sm:p-lg">
+    <div className="flex h-full flex-col space-y-md rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg">
       <div>
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">task_alt</span>
+          <CircleCheckBig aria-hidden="true" size={24} className="text-primary" />
           <h3 className="font-headline-md text-on-surface">Thao tác đơn hàng</h3>
         </div>
         <p className="mt-1 text-sm text-on-surface-variant">
@@ -108,7 +109,7 @@ export function FixedPriceActionForm({
               </span>
             </div>
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-outline-variant bg-surface-container-low px-4 py-5 text-sm font-medium text-primary transition-colors hover:border-primary">
-              <span className="material-symbols-outlined">add_photo_alternate</span>
+              <ImagePlus aria-hidden="true" size={24} />
               Chọn ảnh hoàn thành
               <input
                 type="file"
@@ -132,7 +133,7 @@ export function FixedPriceActionForm({
                       className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white"
                       aria-label={`Xóa ảnh ${index + 1}`}
                     >
-                      <span className="material-symbols-outlined text-base">close</span>
+                      <X aria-hidden="true" size={16} />
                     </button>
                   </div>
                 ))}
@@ -149,7 +150,7 @@ export function FixedPriceActionForm({
               maxLength={MAX_COMPLETION_NOTE_LENGTH}
               rows={4}
               disabled={busy}
-              className="w-full rounded-2xl border border-outline-variant bg-white px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+              className="w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-3 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
               placeholder="Mô tả công việc đã thực hiện..."
             />
           </label>
