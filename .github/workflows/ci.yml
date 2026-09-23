@@ -1,0 +1,116 @@
+name: CI Handigo
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+
+jobs:
+  backend:
+    name: Backend - build và kiểm thử
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: handigo-backend
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Thiết lập Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: handigo-backend/package-lock.json
+      - name: Cài dependency theo lockfile
+        run: npm ci
+      - name: Build backend
+        run: npm run build
+      - name: Kiểm thử chính sách hoàn tiền
+        run: npm run test:refund-policy
+      - name: Kiểm thử xử lý hoàn tiền
+        run: npm run test:refund-processing
+      - name: Kiểm thử trợ lý chăm sóc khách hàng
+        run: npm run test:agent-customer-care
+
+  web:
+    name: Web - lint và build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: handigo-web
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Thiết lập Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: handigo-web/package-lock.json
+      - name: Cài dependency theo lockfile
+        run: npm ci
+      - name: Kiểm tra ESLint
+        run: npm run lint
+      - name: Kiểm tra TypeScript và build web
+        run: npm run build
+
+  e2e:
+    name: Web - kiểm thử Chromium
+    needs: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Giá trị giả chỉ để dựng giao diện; bộ test không thực hiện OAuth.
+      VITE_GOOGLE_CLIENT_ID: handigo-ci.apps.googleusercontent.com
+    defaults:
+      run:
+        working-directory: handigo-web
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Thiết lập Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: handigo-web/package-lock.json
+      - name: Cài dependency theo lockfile
+        run: npm ci
+      - name: Cài Chromium và thư viện hệ thống
+        run: npx playwright install --with-deps chromium
+      - name: Chạy kiểm thử giao diện với API mô phỏng
+        run: npm run test:e2e
+      - name: Lưu báo cáo kiểm thử
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bao-cao-playwright
+          path: |
+            handigo-web/playwright-report/
+            handigo-web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
