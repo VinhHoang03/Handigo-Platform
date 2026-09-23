@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { Children, useEffect, useRef, type ReactNode } from "react";
 import type {
   ChatbotAudience,
   ChatbotMessage,
@@ -28,11 +28,11 @@ export function ChatbotMessageList({
     bottomRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
   }, [isReplying, messages, children]);
 
-  if (!messages.length && !isReplying && !children) {
+  if (!messages.length && !isReplying && Children.toArray(children).length === 0) {
     return (
       <div className="grid flex-1 place-items-center px-7 py-10 text-center">
         <div>
-          <Bot aria-hidden="true" size={30} className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary" />
+          <Bot aria-hidden="true" size={30} className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary" />
           <h3 className="mt-4 font-headline-md text-lg text-on-surface">
             Tôi có thể hỗ trợ gì?
           </h3>

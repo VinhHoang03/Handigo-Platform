@@ -96,6 +96,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use((req, res, next) => {
+  if (req.method === "GET" && /^\/notifications\/unread-count\/?$/i.test(req.path)) {
+    next();
+    return;
+  }
+
   const startedAt = process.hrtime.bigint();
 
   res.once("finish", () => {
