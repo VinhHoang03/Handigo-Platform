@@ -47,7 +47,7 @@ export const updateAddress = async (req: Request, res: Response) => {
       message: "Address updated successfully",
     });
   } catch (error: any) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message,
     });

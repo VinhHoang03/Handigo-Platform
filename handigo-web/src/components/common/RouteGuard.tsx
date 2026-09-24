@@ -21,7 +21,7 @@ export function RouteGuard({
 
   if (isInitializing) {
     return (
-      <div className="grid min-h-screen place-items-center text-on-surface-variant">
+      <div className="grid min-h-dvh place-items-center text-on-surface-variant">
         Đang khôi phục phiên đăng nhập...
       </div>
     );

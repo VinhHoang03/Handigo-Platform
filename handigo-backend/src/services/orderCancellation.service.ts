@@ -12,6 +12,7 @@ import { WalletTransaction } from "../models/walletTransaction.model";
 import { Refund, IRefund } from "../models/refund.model";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { createLogger } from "../utils/logger";
 import { buildTransactionCode } from "../utils/transaction";
 import { createNotificationRecord } from "./notification.service";
@@ -25,6 +26,7 @@ type CancellationRole = "customer" | "provider" | "admin";
 type SystemCancellationType = "payment_timeout" | "provider_unavailable";
 
 interface CancelOrderInput {
+  confirmedExpectation?: { paidAmount: number; refundAmount: number; cancellationFee: number };
   orderId: string;
   actorId?: string;
   role: CancellationRole;
@@ -1323,6 +1325,7 @@ export const cancelOrderWithSettlement = async (
 
   const session = await mongoose.startSession();
   let cancelledOrder: IOrder | null = null;
+  let skippedOrder: IOrder | null = null;
   let newlyCancelled = false;
   let walletRefunds: WalletRefundResult[] = [];
 
@@ -1334,6 +1337,13 @@ export const cancelOrderWithSettlement = async (
       }
 
       await assertCancellationAccess(order, input, session);
+
+      // Thợ có thể vừa nhận đơn khi bộ quét hết hạn đang chạy.
+      if (input.system && input.systemCancellationType === "provider_unavailable"
+        && order.status !== "created") {
+        skippedOrder = order;
+        return;
+      }
 
       if (order.status === "cancelled") {
         cancelledOrder = order;
@@ -1360,6 +1370,13 @@ export const cancelOrderWithSettlement = async (
       );
       if (!refundPolicy.canCancel) {
         throw new AppError(refundPolicy.policyReason, 409);
+      }
+      if (input.confirmedExpectation && (
+        refundPolicy.paidAmount !== input.confirmedExpectation.paidAmount
+        || refundPolicy.refundAmount !== input.confirmedExpectation.refundAmount
+        || refundPolicy.cancellationFee !== input.confirmedExpectation.cancellationFee
+      )) {
+        throw new ActionPreconditionError();
       }
 
       const cancellation: Record<string, unknown> = {
@@ -1469,6 +1486,8 @@ export const cancelOrderWithSettlement = async (
   } finally {
     await session.endSession();
   }
+
+  if (skippedOrder) return skippedOrder;
 
   if (!cancelledOrder) {
     throw new AppError("Không thể hủy đơn hàng", 500);

@@ -242,6 +242,20 @@ export const loadPlacesNewLibrary = async () => {
   return placesLibraryPromise;
 };
 
+/**
+ * Dropdown gợi ý địa chỉ của Google Places được dựng bằng DOM thuần, không qua
+ * React, nên không dùng được component của lucide. Hai icon dưới đây là SVG lấy
+ * đúng từ lucide (`MapPin`, `LoaderCircle`) để đồng bộ nét vẽ với phần còn lại.
+ */
+const LUCIDE_SVG_ATTRS =
+  'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+
+const MAP_PIN_SVG = (size: number) =>
+  `<svg ${LUCIDE_SVG_ATTRS} width="${size}" height="${size}"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>`;
+
+const SPINNER_SVG = (size: number) =>
+  `<svg ${LUCIDE_SVG_ATTRS} width="${size}" height="${size}"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`;
+
 export const mountPlaceAutocompleteElement = async ({
   container,
   value = "",
@@ -257,8 +271,8 @@ export const mountPlaceAutocompleteElement = async ({
   const wrapper = document.createElement("div");
   wrapper.className = "places-address-field";
   const icon = document.createElement("span");
-  icon.className = "material-symbols-outlined places-address-field__icon";
-  icon.textContent = "location_on";
+  icon.className = "places-address-field__icon";
+  icon.innerHTML = MAP_PIN_SVG(21);
   const input = document.createElement("input");
   input.id = "address-line-google-places";
   input.className = "google-place-autocomplete places-address-field__input";
@@ -270,8 +284,8 @@ export const mountPlaceAutocompleteElement = async ({
   input.placeholder = placeholder;
   input.value = value;
   const loading = document.createElement("span");
-  loading.className = "material-symbols-outlined places-address-field__loading";
-  loading.textContent = "progress_activity";
+  loading.className = "places-address-field__loading";
+  loading.innerHTML = SPINNER_SVG(20);
   loading.hidden = true;
   const dropdown = document.createElement("div");
   dropdown.className = "places-address-dropdown";
@@ -352,8 +366,8 @@ export const mountPlaceAutocompleteElement = async ({
       button.setAttribute("role", "option");
       button.setAttribute("aria-selected", "false");
       const optionIcon = document.createElement("span");
-      optionIcon.className = "material-symbols-outlined places-address-option__icon";
-      optionIcon.textContent = "location_on";
+      optionIcon.className = "places-address-option__icon";
+      optionIcon.innerHTML = MAP_PIN_SVG(20);
       const content = document.createElement("span");
       content.className = "places-address-option__content";
       const main = document.createElement("strong");

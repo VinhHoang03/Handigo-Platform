@@ -15,7 +15,7 @@ interface DashboardShellProps {
   switchLabel?: string;
   onSwitch?: () => void;
   switchVariant?: "outline" | "gradient";
-  userAvatar?: string;
+  userAvatar?: string | null;
   hideSidebar?: boolean;
 }
 
@@ -44,10 +44,9 @@ export function DashboardShell({
     role === "PROVIDER" ? undefined : () => navigate(switchConfig.path);
   const defaultSwitchVariant =
     role === "PROVIDER" ? undefined : switchConfig.variant;
-  const avatar =
-    userAvatar ||
-    user?.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || "Handigo")}&background=4f46e5&color=fff`;
+  // Thiếu ảnh thì để `InitialsAvatar` trong DashboardLayout tự lùi về chữ cái đầu,
+  // không gọi CDN ngoài nữa.
+  const avatar = userAvatar || user?.avatar;
 
   return (
     <DashboardLayout

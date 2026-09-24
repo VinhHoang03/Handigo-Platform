@@ -22,7 +22,7 @@ export function ConfirmDialog({
   const confirmClass =
     variant === "danger"
       ? "min-h-12 rounded-lg px-5 py-2.5 font-semibold shadow-md transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 bg-error text-on-error hover:bg-error/90 focus-visible:ring-error/20"
-      : "min-h-12 rounded-lg px-5 py-2.5 font-semibold shadow-md transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 bg-primary text-on-primary hover:bg-primary-container focus-visible:ring-primary/20";
+      : "min-h-12 rounded-lg px-5 py-2.5 font-semibold shadow-md transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 bg-primary text-on-primary hover:bg-primary-hover focus-visible:ring-primary/20";
   return (
     <Modal
       open={open}

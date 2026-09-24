@@ -1,5 +1,4 @@
 import api from "@/api/client";
-import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutocomplete";
 import type {
   Address,
   CancellationPreview,
@@ -60,28 +59,7 @@ export const bookingApi = {
     const response = await api.get<{ success: boolean; data: Address[] }>(
       "/addresses",
     );
-    const addresses = response.data.data;
-    const normalized = await Promise.all(
-      addresses.map(async (address) => {
-        if (
-          Number.isFinite(address.latitude) &&
-          Number.isFinite(address.longitude)
-        ) {
-          return address;
-        }
-
-        try {
-          const coordinates = await geocodeSavedAddress(
-            address.fullAddress || "",
-          );
-          await api.put(`/addresses/${address._id}`, coordinates);
-          return { ...address, ...coordinates };
-        } catch {
-          return address;
-        }
-      }),
-    );
-    return normalized;
+    return response.data.data;
   },
 
   createAddress: async (payload: CreateAddressPayload) => {

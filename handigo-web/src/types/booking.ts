@@ -178,6 +178,12 @@ export interface Order {
   paymentDueAt?: string | null;
   matchingStartedAt?: string | null;
   matchingExpiresAt?: string | null;
+  matchingSearch?: {
+    initialRadiusKm: number;
+    expandedRadiusKm: number;
+    expandsAt: string;
+    expiresAt: string;
+  } | null;
   recurringGroupId?: string | null;
   recurrenceUnit?: "weekly" | "monthly" | null;
   occurrenceNumber?: number | null;

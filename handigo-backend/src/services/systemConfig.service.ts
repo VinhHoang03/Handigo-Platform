@@ -83,6 +83,29 @@ const assertConfigValueMatchesType = (value: unknown, type: SystemConfigType) =>
   }
 };
 
+const assertMatchingConfig = async (key: string, value: unknown, type: SystemConfigType) => {
+  const limits: Record<string, number> = {
+    INITIAL_PROVIDER_RADIUS_KM: 200,
+    MAX_PROVIDER_RADIUS_KM: 200,
+    MATCHING_EXPAND_AFTER_MINUTES: 60,
+    MATCHING_EXPANDED_DURATION_MINUTES: 60,
+  };
+  if (!(key in limits)) return;
+  if (type !== "NUMBER" || typeof value !== "number" || !Number.isFinite(value)
+    || value < 0.1 || value > limits[key]) {
+    throw new AppError(`Cấu hình tìm thợ phải là số từ 0,1 đến ${limits[key]}.`, 400);
+  }
+  if (key === "INITIAL_PROVIDER_RADIUS_KM" || key === "MAX_PROVIDER_RADIUS_KM") {
+    const initial = key === "INITIAL_PROVIDER_RADIUS_KM" ? value
+      : await getNumberConfigValue("INITIAL_PROVIDER_RADIUS_KM", 5);
+    const expanded = key === "MAX_PROVIDER_RADIUS_KM" ? value
+      : await getNumberConfigValue("MAX_PROVIDER_RADIUS_KM", 10);
+    if (expanded <= initial) {
+      throw new AppError("Bán kính mở rộng phải lớn hơn bán kính ban đầu.", 400);
+    }
+  }
+};
+
 const createAuditLog = async (
   admin: RequestUser,
   action: string,
@@ -162,6 +185,7 @@ export const getConfigByKey = async (admin: RequestUser, key: string) => {
 export const createConfig = async (admin: RequestUser, input: CreateSystemConfigInput) => {
   assertAdmin(admin);
   assertConfigValueMatchesType(input.value, input.type);
+  await assertMatchingConfig(input.key, input.value, input.type);
   await ensureIndexes();
 
   const now = new Date();
@@ -212,6 +236,7 @@ export const updateConfig = async (
 
   const nextType = input.type ?? existing.type;
   assertConfigValueMatchesType(input.value, nextType);
+  await assertMatchingConfig(key, input.value, nextType);
 
   const now = new Date();
   const update = {

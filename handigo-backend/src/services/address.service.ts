@@ -1,4 +1,5 @@
-import { Address } from "../models/address.model";
+import { Address, IAddress } from "../models/address.model";
+import { geocodeSavedAddress } from "./reverseGeocoding.service";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
 // import ServiceRequest from "../models/request.model";
@@ -20,6 +21,24 @@ type AddressPayload = {
 
 const CURRENT_LOCATION_NOTE =
   "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
+
+// Chỉ tra cứu địa chỉ khách đã chọn khi chưa có tọa độ hợp lệ.
+export const ensureAddressCoordinates = async (address: IAddress): Promise<IAddress> => {
+  if (Number.isFinite(address.latitude) && Number.isFinite(address.longitude)
+    && Math.abs(address.latitude!) <= 90 && Math.abs(address.longitude!) <= 180) {
+    return address;
+  }
+  const coordinates = await geocodeSavedAddress(address);
+  const updated = await Address.findOneAndUpdate(
+    { _id: address._id, userId: address.userId, updatedAt: address.updatedAt },
+    { $set: { latitude: coordinates.latitude, longitude: coordinates.longitude } },
+    { new: true, runValidators: true },
+  );
+  if (!updated) {
+    throw new AppError("Địa chỉ vừa được thay đổi. Vui lòng chọn lại địa chỉ và đặt đơn.", 409);
+  }
+  return updated;
+};
 
 const pickAddressPayload = (data: AddressPayload): AddressPayload => {
   const payload: AddressPayload = {};
@@ -52,6 +71,36 @@ const pickAddressPayload = (data: AddressPayload): AddressPayload => {
 
 const normalizeAddressPart = (value?: string) =>
   value?.trim().toLocaleLowerCase("vi-VN").replace(/\s+/g, " ") || "";
+
+// Lấy tọa độ trước khi ghi để không lưu địa chỉ mới với vị trí cũ.
+const resolveAddressPayload = async (payload: AddressPayload, current?: IAddress) => {
+  const hasCoordinates = (value: AddressPayload) =>
+    Number.isFinite(value.latitude) && Number.isFinite(value.longitude)
+    && Math.abs(value.latitude!) <= 90 && Math.abs(value.longitude!) <= 180;
+  if ((payload.latitude !== undefined || payload.longitude !== undefined)
+    && !hasCoordinates(payload)) {
+    throw new AppError("Vui lòng cung cấp đầy đủ kinh độ và vĩ độ hợp lệ.", 422);
+  }
+  const locationChanged = current && (
+    (["fullAddress", "province", "ward"] as const).some((field) =>
+      payload[field] !== undefined
+      && normalizeAddressPart(payload[field]) !== normalizeAddressPart(current[field]))
+    || (["provinceCode", "wardCode"] as const).some((field) =>
+      payload[field] !== undefined && payload[field] !== current[field])
+  );
+  const hasNewPin = hasCoordinates(payload) && (!current
+    || payload.latitude !== current.latitude || payload.longitude !== current.longitude);
+  if (hasNewPin || (!locationChanged && hasCoordinates(current || payload))) return payload;
+
+  const coordinates = await geocodeSavedAddress({
+    fullAddress: payload.fullAddress ?? current?.fullAddress ?? "",
+    province: payload.province ?? current?.province ?? "",
+    ward: payload.ward ?? current?.ward ?? "",
+  });
+  const resolved = { ...payload, latitude: coordinates.latitude, longitude: coordinates.longitude };
+  delete resolved.placeId;
+  return resolved;
+};
 
 const hasSameAdministrativeUnit = (
   currentCode: number | undefined,
@@ -96,7 +145,7 @@ const findDuplicateAddress = async (userId: string, payload: AddressPayload) => 
 };
 
 export const createAddress = async (userId: string, data: AddressPayload) => {
-  const payload = pickAddressPayload(data);
+  let payload = pickAddressPayload(data);
 
   if (payload.note === CURRENT_LOCATION_NOTE) {
     const locationConditions: Record<string, unknown>[] = [];
@@ -127,6 +176,8 @@ export const createAddress = async (userId: string, data: AddressPayload) => {
     throw new AppError("Địa chỉ này đã tồn tại trong sổ địa chỉ.", 409);
   }
 
+  payload = await resolveAddressPayload(payload);
+
   if (payload.isDefault) {
     await Address.updateMany(
       { userId },
@@ -147,7 +198,9 @@ export const updateAddress = async (
   userId: string,
   data: AddressPayload
 ) => {
-  const payload = pickAddressPayload(data);
+  const current = await Address.findOne({ _id: addressId, userId });
+  if (!current) throw new AppError("Không tìm thấy địa chỉ", 404);
+  const payload = await resolveAddressPayload(pickAddressPayload(data), current);
 
   if (payload.isDefault) {
     await Address.updateMany(
@@ -157,11 +210,14 @@ export const updateAddress = async (
   }
 
   const address = await Address.findOneAndUpdate(
-    { _id: addressId, userId },
-    payload,
+    { _id: addressId, userId, updatedAt: current.updatedAt },
+    {
+      $set: payload,
+      ...(payload.latitude !== undefined && !payload.placeId ? { $unset: { placeId: 1 } } : {}),
+    },
     { new: true, runValidators: true }
   );
-
+  if (!address) throw new AppError("Địa chỉ vừa được thay đổi. Vui lòng tải lại và thử lại.", 409);
   return address;
 };
 
@@ -249,13 +305,5 @@ export const confirmAddressUpdate = async (
   userId: string,
   candidate: AddressPayload,
 ) => {
-  const address = await Address.findOneAndUpdate(
-    { _id: addressId, userId },
-    pickAddressPayload(candidate),
-    { new: true, runValidators: true },
-  );
-  if (!address) {
-    throw new AppError("Không tìm thấy địa chỉ", 404);
-  }
-  return address;
+  return updateAddress(addressId, userId, candidate);
 };

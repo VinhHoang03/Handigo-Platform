@@ -55,6 +55,7 @@ export const hasValidFileSignature = (
         [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
       );
     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
       return hasZipSignature(buffer);
     default:
       return false;

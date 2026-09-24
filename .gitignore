@@ -7,6 +7,7 @@ handigo-web/FRONTEND_WEB_INFO.md
 .agents/
 !.agents/
 !.agents/**
+.claude/
 .codex/
 !.codex/agents/
 !.codex/agents/**
@@ -19,7 +20,12 @@ codex/
 !codex/**
 credentials/
 *.json
+# Cấu hình MCP dùng chung cho cả đội — phải nằm sau quy tắc *.json ở trên
+!.mcp.json
 docs/
+
+# Ảnh chụp / snapshot / log do Playwright MCP sinh ra khi kiểm tra giao diện
+.playwright-mcp/
 # Node modules cho cả 2 ứng dụng
 node_modules/
 node_modules

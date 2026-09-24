@@ -29,6 +29,7 @@ import providerRoutes from "./routes/provider.routes";
 import adminRoutes from "./routes/admin.routes";
 import chatRoutes from "./routes/chat.routes";
 import chatbotRoutes from "./routes/chatbot.routes";
+import aiRoutes from "./ai/ai.routes";
 import locationRoutes from "./routes/location.routes";
 import orderRoutes from "./routes/order.routes";
 import adminAssetRoutes from "./routes/adminAsset.routes";
@@ -95,6 +96,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use((req, res, next) => {
+  if (req.method === "GET" && /^\/notifications\/unread-count\/?$/i.test(req.path)) {
+    next();
+    return;
+  }
+
   const startedAt = process.hrtime.bigint();
 
   res.once("finish", () => {
@@ -140,6 +146,7 @@ app.use("/vietnam-addresses", vietnamAddressRoutes);
 app.use("/orders", orderRoutes);
 app.use("/chat", chatRoutes);
 app.use("/chatbot", chatbotRoutes);
+app.use("/ai", aiRoutes);
 app.use("/locations", locationRoutes);
 
 app.use((req, res) => {

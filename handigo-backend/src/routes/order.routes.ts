@@ -3,9 +3,11 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { approvedProviderMiddleware } from "../middlewares/approvedProvider.middleware";
 import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
+import { uploadQuotationImage } from "../middlewares/quotationImageUpload.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import {
   dispatchRateLimit,
+  ocrRateLimit,
   routingRateLimit,
   uploadRateLimit,
 } from "../middlewares/rateLimit.middleware";
@@ -19,6 +21,7 @@ import {
   orderIdParamSchema,
   orderListQuerySchema,
   quotationIdParamSchema,
+  quotationItemsRelevanceSchema,
   recentOrderQuerySchema,
   reassignmentResponseSchema,
   rejectAssignmentSchema,
@@ -52,7 +55,11 @@ import {
   selectAppointmentProvider,
   respondToReassignment,
 } from "../controllers/order.controller";
-import { getOrderTrackingRoute } from "../controllers/orderTracking.controller";
+import { getOrderMatchingProviders, getOrderTrackingRoute } from "../controllers/orderTracking.controller";
+import {
+  scanQuotationItems,
+  validateQuotationItemsRelevance,
+} from "../controllers/quotationImageAnalysis.controller";
 
 const router = Router();
 
@@ -105,6 +112,25 @@ router.post(
   uploadOrderAttachment,
 );
 
+router.post(
+  "/quotation-items/scan-image",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  ocrRateLimit,
+  uploadQuotationImage,
+  scanQuotationItems,
+);
+
+router.post(
+  "/:orderId/quotation-items/validate",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  ocrRateLimit,
+  validate(orderIdParamSchema, "params"),
+  validate(quotationItemsRelevanceSchema),
+  validateQuotationItemsRelevance,
+);
+
 router.get(
   "/:orderId/tracking-route",
   roleMiddleware("CUSTOMER", "PROVIDER"),
@@ -113,6 +139,8 @@ router.get(
   validate(trackingRouteQuerySchema, "query"),
   getOrderTrackingRoute,
 );
+
+router.get("/:orderId/matching-providers", roleMiddleware("CUSTOMER"), validate(orderIdParamSchema, "params"), getOrderMatchingProviders);
 
 router.get("/:orderId", validate(orderIdParamSchema, "params"), getOrderById);
 
@@ -243,6 +271,7 @@ router.post(
   "/:orderId/quotations",
   roleMiddleware("PROVIDER"),
   approvedProviderMiddleware,
+  ocrRateLimit,
   validate(orderIdParamSchema, "params"),
   validate(createRepairQuotationSchema),
   createRepairQuotation,

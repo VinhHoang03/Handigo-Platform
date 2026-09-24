@@ -57,7 +57,8 @@ export function LocationPickerMap({
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> | Search by <a href="https://locationiq.com/">LocationIQ.com</a>',
     }).addTo(map);
     lastCenterRef.current = map.getCenter();
 
@@ -146,7 +147,7 @@ export function LocationPickerMap({
         </span>
       </div>
 
-      <div className="relative select-none overflow-hidden rounded-2xl border border-outline-variant/50 bg-surface-container-low shadow-sm">
+      <div className="relative isolate z-0 select-none overflow-hidden rounded-2xl border border-outline-variant/50 bg-surface-container-low shadow-sm">
         <div
           ref={containerRef}
           role="application"

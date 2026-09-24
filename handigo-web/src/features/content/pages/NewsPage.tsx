@@ -57,30 +57,27 @@ export default function NewsPage() {
     <PublicContentLayout>
       {featuredArticle && (
         <section className="mx-auto max-w-7xl px-6 py-10 lg:py-16">
-          <div className="grid overflow-hidden rounded-3xl bg-primary text-white shadow-xl lg:grid-cols-2">
+          <div className="grid overflow-hidden rounded-3xl bg-primary text-on-primary shadow-xl lg:grid-cols-2">
             <div className="flex flex-col justify-center p-8 sm:p-12">
-              <span className="w-fit rounded-full bg-white/15 px-4 py-2 text-xs font-bold uppercase tracking-wider">
+              <span className="w-fit rounded-full bg-on-primary/15 px-4 py-2 text-xs font-bold uppercase tracking-wider">
                 Nổi bật
               </span>
               <h1 className="mt-6 font-headline-xl text-3xl font-bold leading-tight sm:text-5xl">
                 {featuredArticle.title}
               </h1>
-              <p className="mt-5 leading-7 text-white/80">
+              <p className="mt-5 leading-7 text-on-primary/80">
                 {featuredArticle.excerpt}
               </p>
-              <div className="mt-7 flex flex-wrap gap-3">
+              {/* Một nút duy nhất. Trước đây có thêm "Xem bài viết" trỏ xuống
+                  danh sách ngay bên dưới: hai nút, hai nhãn, cùng một ý "đọc
+                  bài", buộc người dùng phải đoán xem chúng khác nhau chỗ nào. */}
+              <div className="mt-7">
                 <Link
                   to={`/tin-tuc/${featuredArticle.slug}`}
-                  className="rounded-xl bg-white px-5 py-3 font-semibold text-primary"
+                  className="inline-flex min-h-14 items-center rounded-xl bg-on-primary px-6 py-3 font-semibold text-primary"
                 >
-                  Đọc chi tiết
+                  Đọc bài viết
                 </Link>
-                <a
-                  href="#danh-sach"
-                  className="rounded-xl border border-white/40 px-5 py-3 font-semibold text-white hover:bg-white/10"
-                >
-                  Xem bài viết
-                </a>
               </div>
             </div>
             <img
@@ -117,9 +114,9 @@ export default function NewsPage() {
                 role="tab"
                 aria-selected={category === item}
                 onClick={() => setCategory(item)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold ${
                   category === item
-                    ? "bg-primary text-white"
+                    ? "bg-primary text-on-primary"
                     : "bg-surface-container-low text-on-surface-variant hover:text-primary"
                 }`}
               >
@@ -147,7 +144,7 @@ export default function NewsPage() {
               <Link
                 key={`${article.id}-${article.slug}`}
                 to={`/tin-tuc/${article.slug}`}
-                className="group overflow-hidden rounded-3xl border border-outline-variant/30 bg-white shadow-sm transition hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
+                className="group overflow-hidden rounded-3xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm transition hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
               >
                 <div className="h-52 overflow-hidden">
                   <img
