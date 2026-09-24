@@ -47,7 +47,8 @@ export const test = base.extend<{ api: ApiState }>({
       user: null, loginUser: { ...customer }, loginError: null, orderError: null,
       providersAvailable: true, createdOrder: null, writes: [],
     };
-    await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
+    if (process.env.E2E_REAL_API !== '1') {
+      await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname.replace(/^\/api/, '');
       const method = request.method();
@@ -94,19 +95,28 @@ export const test = base.extend<{ api: ApiState }>({
       });
       // Các tiện ích ngoài phạm vi (chat, thông báo, ví...) nhận lỗi có kiểm soát.
       return reply({ message: 'API ngoài phạm vi bộ kiểm thử giao diện' }, 503);
-    });
-    await page.route('**/socket.io/**', (route) => route.abort());
+      });
+      await page.route('**/socket.io/**', (route) => route.abort());
+    }
     await use(state);
   }, { auto: true }],
 });
 
 export { expect };
 
-export async function login(page: Page) {
+export async function login(page: Page): Promise<string | null> {
   await page.goto('/login');
-  await page.getByLabel('Email', { exact: true }).fill(customer.email);
-  await page.getByLabel('Mật khẩu', { exact: true }).fill('MatKhauGiaLap123!');
+  const email = process.env.E2E_CUSTOMER_EMAIL || customer.email;
+  const password = process.env.E2E_CUSTOMER_PASSWORD || 'MatKhauGiaLap123!';
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
+  const loginResponse = page.waitForResponse((response) => {
+    return new URL(response.url()).pathname === '/api/auth/login';
+  });
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  const response = await loginResponse;
+  const body = await response.json().catch(() => null) as { token?: unknown } | null;
+  return typeof body?.token === 'string' ? body.token : null;
 }
 
 export async function selectService(page: Page) {

@@ -15,6 +15,22 @@ npm run test:e2e:ui
 npm run test:e2e:report
 ```
 
+## Chạy với backend thật
+
+Chế độ backend thật không dùng fixture mock và không chạy trong `npm run test:e2e` mặc định.
+Cần khởi động backend với database kiểm thử trước, sau đó mở PowerShell mới:
+
+```powershell
+$env:E2E_REAL_API = "1"
+$env:E2E_CUSTOMER_EMAIL = "tai-khoan-customer-test@example.com"
+$env:E2E_CUSTOMER_PASSWORD = "mat-khau-customer-test"
+npm run test:e2e:real
+```
+
+Chế độ này chạy `real-api.spec.ts`, gọi backend qua Vite proxy `/api` và dùng dữ liệu từ database thật.
+Không đặt các biến trên cho database production; nên dùng tài khoản, địa chỉ và database dành riêng cho kiểm thử.
+Các test mock trong `login.spec.ts`, `authorization.spec.ts` và `booking.spec.ts` vẫn nên chạy riêng bằng `npm run test:e2e`.
+
 Chạy một nhóm:
 
 ```powershell
