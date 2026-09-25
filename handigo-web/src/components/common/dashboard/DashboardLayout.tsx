@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Navbar } from "@/components/common/Navbar";
+import { AnimatedBackground } from "@/components/home/AnimatedBackground";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { ProviderTopbar } from "./ProviderTopbar";
 import { isNavItemActive } from "./dashboardNavigation";
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
+import "./provider-content.css";
 
 const normalizeRole = (role?: string | null): DashboardRole | undefined => {
   const value = role?.toUpperCase();
@@ -55,7 +57,8 @@ export function DashboardLayout({
   );
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-background font-body-md text-body-md">
+    <div className={`min-h-dvh overflow-x-hidden bg-background font-body-md text-body-md ${isProvider ? "relative isolate" : ""}`}>
+      {isProvider && <AnimatedBackground />}
       {isProvider ? (
         <ProviderTopbar
           userAvatar={userAvatar}
@@ -89,7 +92,7 @@ export function DashboardLayout({
         className={`relative min-h-dvh pb-12 pt-32 ${hasSidebar ? "lg:pl-80 xl:pl-[21rem]" : ""}`}
       >
         <div
-          className={`mx-auto space-y-8 px-4 sm:px-5 ${
+          className={`mx-auto px-4 sm:px-5 ${isProvider ? "provider-content space-y-5" : "space-y-8"} ${
             isAdmin
               ? "max-w-none lg:px-5 xl:px-6"
               : isProvider

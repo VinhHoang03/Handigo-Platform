@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import "./home-motion.css";
 import { SectionHeader } from "../common/SectionHeader";
 import { ProviderCard } from "./HomeCards";
 import { HomeEmptyState, ProviderCardSkeleton } from "./HomeSkeletons";
@@ -77,7 +78,7 @@ export const ProvidersSection = () => {
               ref={carouselRef}
               role="region"
               aria-label="Danh sách thợ trong hệ thống"
-              className="flex cursor-grab touch-pan-y snap-x snap-mandatory select-none gap-4 overflow-x-auto pb-3 active:cursor-grabbing md:gap-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex cursor-grab touch-pan-y select-none gap-4 overflow-x-auto px-1 pb-6 pt-2 active:cursor-grabbing md:gap-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -91,10 +92,12 @@ export const ProvidersSection = () => {
                     data-cycle-start={
                       cycle === 1 && index === 0 ? "true" : undefined
                     }
-                    className={`${CARD_WIDTH} snap-start`}
+                    className={`${CARD_WIDTH} home-provider-entry`}
+                    style={{ "--provider-delay": `${Math.min(index, 5) * 65}ms` } as CSSProperties}
                     aria-hidden={cycle !== 1}
                   >
                     <ProviderCard
+                      tabIndex={cycle === 1 ? 0 : -1}
                       name={provider.user.fullName}
                       img={provider.user.avatar}
                       rating={provider.averageRating}

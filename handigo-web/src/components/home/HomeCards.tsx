@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { InitialsAvatar } from '../common/InitialsAvatar';
 import { normalizeImageUrl } from '@/utils/imageUrl';
-import { MapPin, Star, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, MapPin, Star, type LucideIcon } from "lucide-react";
 interface ProviderCardProps {
   name: string;
   rating: number;
@@ -10,6 +10,7 @@ interface ProviderCardProps {
   services: string[];
   area: string;
   img?: string | null;
+  tabIndex?: number;
 }
 
 /**
@@ -27,14 +28,16 @@ const ProviderCardMedia = ({ name, img }: { name: string; img?: string | null })
         alt={name}
         loading="lazy"
         draggable={false}
+        width={500}
+        height={300}
         onError={() => setFailed(true)}
-        className="h-32 w-full rounded-xl bg-surface-container object-cover sm:h-36"
+        className="home-provider-image h-32 w-full bg-surface-container object-cover sm:h-36"
       />
     );
   }
 
   return (
-    <div className="grid h-32 w-full place-items-center rounded-xl bg-surface-container sm:h-36">
+    <div className="home-provider-image grid h-32 w-full place-items-center bg-surface-container sm:h-36">
       <InitialsAvatar name={name} className="h-14 w-14" textClassName="text-lg" />
     </div>
   );
@@ -63,23 +66,23 @@ const ProviderRatingBadge = ({ rating, totalFeedbacks }: { rating: number; total
   );
 };
 
-export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img }: ProviderCardProps) => (
-  <article className="group flex h-full flex-col border-t border-outline-variant/50 py-4">
-    <div className="relative mb-3">
+export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img, tabIndex }: ProviderCardProps) => (
+  <article className="home-provider-card group flex h-full flex-col rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-3">
+    <div className="relative mb-4 overflow-hidden rounded-xl">
       <ProviderCardMedia name={name} img={img} />
       <ProviderRatingBadge rating={rating} totalFeedbacks={totalFeedbacks} />
     </div>
 
-    <h3 className="truncate font-headline-md text-base font-semibold text-on-surface">{name}</h3>
+    <h3 title={name} className="truncate font-headline-md text-lg font-semibold tracking-tight text-on-surface">{name}</h3>
 
     <p className="mt-2 flex min-h-8 items-start gap-1 text-on-surface-variant">
-      <MapPin aria-hidden="true" size={14} />
-      <span className="line-clamp-2 text-xs">{area || 'Chưa cập nhật khu vực hoạt động'}</span>
+      <MapPin aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-primary" />
+      <span title={area} className="line-clamp-2 text-xs leading-5">{area || 'Chưa cập nhật khu vực hoạt động'}</span>
     </p>
 
-    <div className="mt-2 flex min-h-6 flex-wrap gap-1">
+    <div className="mb-5 mt-3 flex min-h-6 flex-wrap gap-1.5">
       {services.slice(0, 2).map((service) => (
-        <span key={service} className="max-w-full truncate rounded-md bg-surface-container px-2 py-1 text-[10px] font-medium text-on-surface-variant">
+        <span key={service} title={service} className="max-w-full truncate rounded-md bg-surface-container-low px-2 py-1 text-xs font-medium text-on-surface-variant">
           {service}
         </span>
       ))}
@@ -88,9 +91,11 @@ export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img
     {/* mt-auto ghim nút xuống đáy để các thẻ cạnh nhau thẳng hàng dù nội dung dài ngắn khác nhau */}
     <Link
       to="/customer/services"
-      className="mt-auto flex min-h-11 w-full items-center justify-center rounded-lg bg-primary/6 text-sm font-semibold text-primary transition-colors group-hover:bg-primary group-hover:text-on-primary"
+      tabIndex={tabIndex}
+      className="home-provider-link mt-auto flex min-h-11 w-full items-center justify-between gap-2 rounded-lg bg-primary/6 px-3 text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:bg-primary-pressed active:text-on-primary"
     >
       Xem dịch vụ
+      <ArrowUpRight aria-hidden="true" size={18} className="home-provider-arrow" />
     </Link>
   </article>
 );
