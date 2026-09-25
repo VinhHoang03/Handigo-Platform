@@ -66,6 +66,7 @@ export const resolveVoucherForAmount = async (
   code: string,
   amountBeforeVoucher: number,
   session?: ClientSession,
+  customerId?: string,
 ) => {
   const normalizedCode = normalizeCode(code);
   const query = Promotion.findOne({ code: normalizedCode });
@@ -74,6 +75,9 @@ export const resolveVoucherForAmount = async (
 
   if (!promotion) {
     throw new AppError("Voucher không tồn tại", 404);
+  }
+  if (promotion.ownerId && promotion.ownerId.toString() !== customerId) {
+    throw new AppError("Mã giảm giá không thuộc tài khoản của bạn.", 403);
   }
   if (!isPromotionActive(promotion)) {
     throw new AppError("Voucher không hoạt động hoặc đã hết hạn", 400);
@@ -111,6 +115,12 @@ export const markOrderVoucherAsUsed = async (
   const voucherId = order.voucherSnapshot?.voucherId;
   if (!voucherId || order.voucherUsedAt) return false;
 
+  const personalVoucher = await Promotion.findOne({ _id: voucherId, ownerId: { $ne: null } }).session(session);
+  if (personalVoucher && (
+    personalVoucher.ownerId?.toString() !== order.customerId.toString() ||
+    personalVoucher.reservedOrderId?.toString() !== order._id.toString() || personalVoucher.usedCount >= 1
+  )) throw new AppError("Mã giảm giá đã được sử dụng hoặc không được giữ cho đơn này.", 409);
+
   const usedAt = new Date();
   const claimedOrder = await Order.findOneAndUpdate(
     {
@@ -130,6 +140,27 @@ export const markOrderVoucherAsUsed = async (
   );
   order.voucherUsedAt = usedAt;
   return true;
+};
+
+/** Giữ mã cá nhân cho một đơn duy nhất trước khi mở luồng thanh toán. */
+export const reservePersonalVoucher = async (
+  voucherId: Types.ObjectId, customerId: string, orderId: Types.ObjectId,
+  inspectionRequired: boolean, session: ClientSession,
+) => {
+  const voucher = await Promotion.findById(voucherId).session(session);
+  if (!voucher?.ownerId) return;
+  if (voucher.ownerId.toString() !== customerId) throw new AppError("Mã giảm giá không thuộc tài khoản của bạn.", 403);
+  if (inspectionRequired) throw new AppError("Mã đổi điểm chỉ áp dụng cho dịch vụ có giá cố định.", 400);
+  if (!isPromotionActive(voucher) || voucher.usedCount >= 1) throw new AppError("Mã giảm giá đã dùng hoặc hết hạn.", 409);
+  if (voucher.reservedOrderId && !voucher.reservedOrderId.equals(orderId)) {
+    const previous = await Order.findOne({
+      _id: voucher.reservedOrderId, isDeleted: false, status: { $ne: "cancelled" },
+      "voucherSnapshot.voucherId": voucherId,
+    }).session(session);
+    if (previous) throw new AppError("Mã giảm giá đang được giữ cho một đơn khác. Hãy gỡ mã hoặc hủy đơn trước.", 409);
+  }
+  voucher.reservedOrderId = orderId;
+  await voucher.save({ session });
 };
 
 const buildVoucherInfo = (promotion: IPromotion, discountAmount?: number) => ({
@@ -200,7 +231,7 @@ const createVoucherAuditLog = async (
 };
 
 const getVoucherOrFail = async (id: string) => {
-  const voucher = await Promotion.findOne({ _id: id, isDeleted: false });
+  const voucher = await Promotion.findOne({ _id: id, isDeleted: false, ownerId: null });
 
   if (!voucher) {
     throw new AppError("Không tìm thấy voucher", 404);
@@ -323,7 +354,8 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
 
       const amountBeforeVoucher = getAmountBeforeVoucher(order);
       const { promotion, discountAmount, snapshot } =
-        await resolveVoucherForAmount(input.code, amountBeforeVoucher, session);
+        await resolveVoucherForAmount(input.code, amountBeforeVoucher, session, order.customerId.toString());
+      await reservePersonalVoucher(promotion._id as Types.ObjectId, order.customerId.toString(), order._id as Types.ObjectId, order.inspectionRequired, session);
       const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
 
       const updatedOrder = await Order.findOneAndUpdate(
@@ -405,6 +437,10 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
         throw new AppError("Đơn hàng vừa được xử lý bởi yêu cầu khác", 409);
       }
 
+      if (voucherId) await Promotion.updateOne(
+        { _id: voucherId, reservedOrderId: order._id, ownerId: order.customerId, usedCount: 0 },
+        { $set: { reservedOrderId: null } }, { session, runValidators: true },
+      );
       return {
         originalAmount,
         discountAmount: 0,
@@ -436,6 +472,7 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
   }
 
   const promotions = await Promotion.find({
+    $and: [{ $or: [{ ownerId: null }, { ownerId: new Types.ObjectId(user.id) }] }],
     isDeleted: false,
     isActive: true,
     startAt: { $lte: now },
@@ -443,7 +480,16 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
     $or: [{ status: "ACTIVE" }, { status: "active" }, { status: { $exists: false } }],
   }).sort({ createdAt: -1 });
 
+  const reservedOrders = await Order.find({
+    _id: { $in: promotions.flatMap((item) => item.ownerId && item.reservedOrderId ? [item.reservedOrderId] : []) },
+    isDeleted: false, status: { $ne: "cancelled" },
+  }).select("_id voucherSnapshot.voucherId").lean();
+  const reservations = new Set(reservedOrders.map((item) => `${item._id}:${item.voucherSnapshot?.voucherId}`));
   const available = promotions.filter((promotion) => {
+    if (promotion.ownerId && (
+      order?.inspectionRequired || (promotion.reservedOrderId?.toString() !== query.orderId &&
+        reservations.has(`${promotion.reservedOrderId}:${promotion._id}`))
+    )) return false;
     if (!promotion.code || !isPromotionActive(promotion, now)) {
       return false;
     }
@@ -512,7 +558,7 @@ export const createAdminVoucher = async (user: RequestUser, input: CreateAdminVo
 export const getAdminVouchers = async (user: RequestUser, query: AdminVoucherQuery) => {
   ensureAdmin(user);
 
-  const filter: Record<string, unknown> = { isDeleted: false };
+  const filter: Record<string, unknown> = { isDeleted: false, ownerId: null };
 
   if (query.search) {
     const regex = new RegExp(query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");

@@ -7,6 +7,7 @@
     "start": "node dist/server.js",
     "build": "tsc && tsc-alias",
     "test:refund-policy": "ts-node src/scripts/testRefundPolicy.ts",
+    "test:rewards": "ts-node src/scripts/testRewards.ts",
     "test:refund-processing": "ts-node src/scripts/testRefundProcessing.ts",
     "test:agent-customer-care": "ts-node src/scripts/testAgentCustomerCare.ts",
     "ocr:test": "ts-node src/scripts/testGoogleVisionOcr.ts",

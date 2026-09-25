@@ -13,6 +13,7 @@ export interface WalletSectionHandle {
 
 interface WalletTransactionsSectionProps {
   onError: (message: string) => void;
+  pageSize?: number;
   ref?: Ref<WalletSectionHandle>;
 }
 
@@ -31,15 +32,15 @@ const transactionsSkeleton = (
 );
 
 /** Lịch sử giao dịch ví: tự quản lý query/phân trang, cha chỉ nhận lỗi qua onError. */
-export function WalletTransactionsSection({ onError, ref }: WalletTransactionsSectionProps) {
+export function WalletTransactionsSection({ onError, ref, pageSize = 8 }: WalletTransactionsSectionProps) {
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
-  const [query, setQuery] = useState<WalletTransactionQuery>({ page: 1, limit: 8, type: '' });
+  const [query, setQuery] = useState<WalletTransactionQuery>({ page: 1, type: '' });
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const result = await walletApi.listTransactions({ ...query, type: query.type || undefined });
+      const result = await walletApi.listTransactions({ ...query, limit: pageSize, type: query.type || undefined });
       setTransactions(result.items);
       setTotalPages(result.pagination.totalPages || 1);
     } catch (err) {
@@ -47,7 +48,7 @@ export function WalletTransactionsSection({ onError, ref }: WalletTransactionsSe
     } finally {
       setLoading(false);
     }
-  }, [query, onError]);
+  }, [query, onError, pageSize]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

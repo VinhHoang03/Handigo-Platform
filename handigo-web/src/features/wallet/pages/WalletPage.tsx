@@ -92,7 +92,7 @@ export function WalletPage({ role }: { role: WalletRole }) {
 
         <WalletStatsCards stats={stats} loading={loading} error={error && !wallet ? error : ''} onRetry={refreshAll} />
 
-        <WalletTransactionsSection ref={transactionsRef} onError={setError} />
+        <WalletTransactionsSection key={role} ref={transactionsRef} onError={setError} pageSize={isProvider ? 5 : 8} />
 
         <WalletWithdrawalsSection ref={withdrawalsRef} onError={setError} />
       </div>

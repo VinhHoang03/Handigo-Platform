@@ -1,5 +1,6 @@
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
+import { earnOrderRewards } from "./reward.service";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
@@ -30,6 +31,7 @@ import { requestProviderReassignment } from "./orderReassignment.service";
 import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
+  reservePersonalVoucher,
 } from "./voucher.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -337,7 +339,7 @@ export const OrderService = {
       throw new ActionPreconditionError();
     }
     const voucherResult = payload.voucherCode
-      ? await resolveVoucherForAmount(payload.voucherCode, totalAmount)
+      ? await resolveVoucherForAmount(payload.voucherCode, totalAmount, undefined, payload.customerId)
       : null;
 
     const platformCommissionAmount = Math.round(
@@ -353,6 +355,7 @@ export const OrderService = {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
       return {
+      _id: new Types.ObjectId(),
       orderCode: generateOrderCode(),
       customerId: new Types.ObjectId(payload.customerId),
       preferredProviderId: payload.preferredProviderId
@@ -401,9 +404,15 @@ export const OrderService = {
       },
       };
     });
-    const createdOrders = await Order.insertMany(
-      orderDocuments as Array<Partial<IOrder>>,
-    );
+    const createdOrders = voucherResult?.promotion.ownerId
+      ? await mongoose.connection.transaction(async (session) => {
+          await reservePersonalVoucher(
+            voucherResult.promotion._id as Types.ObjectId, payload.customerId,
+            orderDocuments[0]._id, inspectionRequired, session,
+          );
+          return Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
+        })
+      : await Order.insertMany(orderDocuments as Array<Partial<IOrder>>);
     const order = createdOrders[0] as unknown as IOrder;
 
     if (requiresProviderConfirmation && scheduledAt && preferredProvider) {
@@ -1176,6 +1185,7 @@ export const OrderService = {
         await transactionalOrder.save({ session });
 
         transactionalProvider.totalCompletedOrders += 1;
+        await earnOrderRewards(transactionalOrder, session);
         transactionalProvider.availabilityStatus = "online";
         await transactionalProvider.save({ session });
 
