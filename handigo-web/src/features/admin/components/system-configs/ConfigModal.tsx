@@ -3,6 +3,7 @@ import { Modal } from "@/components/common/Modal";
 import type { ConfigFormState, ConfigItem } from "./config-definitions";
 import { formatValue } from "./system-config-format";
 import { ToggleLeft, ToggleRight } from "lucide-react";
+import { BookingPolicyFields } from './BookingPolicyFields';
 
 export function ConfigModal({
   item,
@@ -49,6 +50,7 @@ export function ConfigModal({
           </span>
           <input
             type="checkbox"
+            disabled={item.key === 'BOOKING_POLICY'}
             checked={form.isPublic}
             onChange={(event) =>
               onChange({ ...form, isPublic: event.target.checked })
@@ -88,6 +90,7 @@ function ValueField({
   form: ConfigFormState;
   onChange: (form: ConfigFormState) => void;
 }) {
+  if (item.key === 'BOOKING_POLICY') return <BookingPolicyFields value={form.value} onChange={(value) => onChange({ ...form, value, isPublic: false })} />;
   if (item.type === "BOOLEAN") {
     return (
       <div>

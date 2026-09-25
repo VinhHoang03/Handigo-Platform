@@ -67,6 +67,11 @@ export const getNearbyProviders = async (
       throw new AppError("Vui lòng chọn dịch vụ và địa chỉ.", 400);
     }
 
+    let selectedOptions: unknown;
+    if (req.query.selectedOptions) {
+      try { selectedOptions = JSON.parse(String(req.query.selectedOptions)); }
+      catch { throw new AppError("Tùy chọn dịch vụ không hợp lệ.", 400); }
+    }
     const data = await providerProfileService.getNearbyProvidersForCustomer(
       userId,
       serviceId,
@@ -75,6 +80,7 @@ export const getNearbyProviders = async (
       recurrenceUnit,
       recurrenceCount,
       orderId,
+      selectedOptions,
     );
 
     return res.json({ success: true, data });

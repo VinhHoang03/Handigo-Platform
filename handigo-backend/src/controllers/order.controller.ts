@@ -5,12 +5,25 @@ import { AssignmentService } from "../services/assignment.service";
 import { DispatchService } from "../services/dispatch.service";
 import { OrderService } from "../services/order.service";
 import { AppError } from "../utils/appError";
+import { previewServiceBooking } from "../services/servicePricing.service";
+import { updateExpectedEnd } from "../services/providerSchedule.service";
 import { respondToProviderReassignment } from "../services/orderReassignment.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
 
 const uid = (req: Request): string => requireRequestUser(req).id;
+
+export const previewBooking = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    return ok(res, await previewServiceBooking(req.body));
+  } catch (error) { return next(error); }
+};
+
+export const updateOrderExpectedEnd = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await updateExpectedEnd(String(req.params.orderId), uid(req), new Date(req.body.expectedEndAt))); }
+  catch (error) { return next(error); }
+};
 
 const toOrderActorRole = (role: UserRole): "customer" | "provider" | "admin" =>
   role.toLowerCase() as "customer" | "provider" | "admin";

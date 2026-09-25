@@ -1,4 +1,5 @@
 import type { Order } from '@/types/booking';
+import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
 import type { QuotationDetail } from '../../types/providerOrder.types';
 import { formatMoney, getPaymentMethodLabel } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
@@ -15,6 +16,7 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
   const discountCode = order.voucherSnapshot?.code || order.promotionSnapshot?.code;
   const isQuotationOrder = Boolean(order.inspectionRequired);
   const quotationAmount = quotation?.quotation.finalAmount;
+  const appliedDepositAmount = getAppliedQuotationDeposit(order);
   const orderValue = isQuotationOrder
     ? quotationAmount === undefined
       ? 'Chưa báo giá'
@@ -23,7 +25,7 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
   const providerEarning = isQuotationOrder
     ? quotationAmount === undefined
       ? 'Chưa báo giá'
-      : formatMoney(quotationAmount)
+      : formatMoney(getDirectRepairPayment(quotationAmount, appliedDepositAmount))
     : formatMoney(order.pricing?.providerEarningAmount);
 
   return (
@@ -34,8 +36,10 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{paymentStatus}</span>
       </div>
       <div className="mt-md space-y-3 text-sm">
+        {(order.pricing.immediateFee ?? 0) > 0 && <FinancialRow label="Phụ phí phục vụ ngay (đã gồm)" value={formatMoney(order.pricing.immediateFee)} />}
+        {isQuotationOrder && (order.pricing.immediateFee ?? 0) > 0 && <FinancialRow label="Phụ phí đặt ngay dành cho thợ" value={formatMoney(Math.round((order.pricing.immediateFee ?? 0) * (order.pricing.immediateProviderPercent ?? 80) / 100))} />}
         {isQuotationOrder && (
-          <FinancialRow label="Tiền cọc đơn hàng" value={formatMoney(order.depositAmount)} />
+          <FinancialRow label="Cọc đã trả, khấu trừ vào báo giá (thuộc hệ thống)" value={formatMoney(appliedDepositAmount)} />
         )}
         <FinancialRow label="Giá trị đơn hàng" value={orderValue} strong />
         {(order.cancellation?.refundPolicy?.providerCompensation || 0) > 0 && (
@@ -55,8 +59,9 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
         />
       </div>
       <div className="mt-md rounded-2xl bg-success-container p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-on-success-container">Thu nhập thực nhận</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-on-success-container">{isQuotationOrder ? 'Tiền sửa chữa nhận trực tiếp từ khách' : 'Thu nhập thực nhận'}</p>
         <p className="mt-1 text-2xl font-bold tabular-nums text-on-success-container">{providerEarning}</p>
+        {isQuotationOrder && <p className="mt-2 text-xs text-on-success-container">Tiền cọc thuộc hệ thống; tiền sửa chữa được thu trực tiếp từ khách. Phụ phí đặt ngay được chia theo cấu hình admin.</p>}
       </div>
     </section>
   );

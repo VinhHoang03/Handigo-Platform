@@ -94,6 +94,9 @@ export interface OrderCustomer {
 }
 
 export interface OrderPricing {
+  baseAmount?: number;
+  immediateFee?: number;
+  immediateProviderPercent?: number;
   bookingAmount: number;
   platformCommissionRate: number;
   platformCommissionAmount: number;
@@ -128,6 +131,7 @@ export interface OrderReassignment {
 }
 
 export interface Order {
+  schedule?: { durationMinutes: number; bufferMinutes: number; travelMinutes: number; expectedStartAt?: string | null; expectedEndAt?: string | null } | null;
   _id: string;
   orderCode: string;
   customerId: string | OrderCustomer;
@@ -258,6 +262,7 @@ export interface QuotationItem {
 
 export interface OrderQuotation {
   quotation: {
+    estimatedDurationMinutes?: number;
     _id: string;
     quotationCode?: string;
     status: "pending" | "approved" | "rejected" | "expired" | "cancelled";

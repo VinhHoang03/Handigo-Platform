@@ -8,6 +8,7 @@ import {
   type Step2FormErrors,
   MIN_DESCRIPTION_LENGTH,
   buildRecurringPreview,
+  getEarliestScheduledAt,
   getTodayInputValue,
   getUpcomingDates,
   getUploadErrorMessage,
@@ -161,6 +162,10 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.scheduledAt = 'Vui lòng chọn khung giờ thực hiện dịch vụ.';
     } else if (scheduleDate && scheduleDate < todayInputValue) {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
+    }
+    if (shouldShowSchedulePicker && scheduledAt?.includes('T')
+      && new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime()) {
+      nextErrors.scheduledAt = 'Lịch hẹn sớm nhất là từ 08:00 ngày mai.';
     }
     // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
     // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.

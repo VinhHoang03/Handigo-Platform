@@ -1,5 +1,6 @@
 import type { SystemConfigType } from "../../types/systemConfig.types";
 import type { ConfigDefinition, ConfigGroupKey } from "./config-types";
+import { defaultBookingPolicy } from './booking-policy';
 import { Bell, Braces, ClipboardList, Globe, LayoutDashboard, ShieldUser, Tag, ToggleRight, Type, Wallet, type LucideIcon } from "lucide-react";
 export const groupOptions: Array<{
   key: ConfigGroupKey | "all";
@@ -15,6 +16,12 @@ export const groupOptions: Array<{
 ];
 
 export const configDefinitions: ConfigDefinition[] = [
+  {
+    key: 'BOOKING_POLICY', label: 'Giá và thời lượng đặt dịch vụ', group: 'booking', type: 'JSON',
+    defaultValue: defaultBookingPolicy, isPublic: false, isEffective: true,
+    description: 'Phụ phí đặt ngay, thời gian đặt trước, thời lượng dịch vụ, dự phòng, di chuyển và ca làm việc.',
+    effect: 'Giá và thời lượng được lưu theo đơn mới. Lịch làm việc được kiểm tra lại lúc nhận đơn. Voucher không giảm phụ phí.',
+  },
   {
     key: "PLATFORM_FEE_PERCENT",
     label: "Phí nền tảng",

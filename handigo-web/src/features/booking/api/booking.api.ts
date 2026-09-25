@@ -17,6 +17,7 @@ export interface OrderPaymentsResult {
 }
 
 export interface CreateOrderPayload {
+  expectedBookingAmount?: number;
   serviceId: string;
   selectedOptionIds?: string[];
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
@@ -56,6 +57,10 @@ interface ReverseGeocodedAddress {
 }
 
 export const bookingApi = {
+  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions'>) => {
+    const response = await api.post<{ success: boolean; data: BookingPreview }>('/orders/preview', payload);
+    return response.data.data;
+  },
   getAddresses: async () => {
     const response = await api.get<{ success: boolean; data: Address[] }>(
       "/addresses",
@@ -275,3 +280,12 @@ export const bookingApi = {
     return response.data.data;
   },
 };
+
+export interface BookingPreview {
+  baseAmount: number;
+  bookingAmount: number;
+  immediateFee: number;
+  depositAmount: number;
+  minAdvanceMinutes: number;
+  schedule: { durationMinutes: number; bufferMinutes: number; travelMinutes: number };
+}

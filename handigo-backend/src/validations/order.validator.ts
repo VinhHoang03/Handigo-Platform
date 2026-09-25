@@ -16,6 +16,7 @@ const objectIdSchema = z
   .regex(/^[0-9a-fA-F]{24}$/, "ID không hợp lệ");
 
 export const createOrderSchema = z.object({
+  expectedBookingAmount: z.number().int().min(0).optional(),
   serviceId: objectIdSchema,
   servicePackageId: objectIdSchema.optional(),
   selectedOptionIds: z.array(objectIdSchema).max(50).optional(),
@@ -84,6 +85,13 @@ export const cancelOrderSchema = z.object({
     .max(500, "Lý do hủy không được vượt quá 500 ký tự"),
 });
 
+export const previewBookingSchema = z.object({
+  serviceId: createOrderSchema.shape.serviceId,
+  selectedOptionIds: createOrderSchema.shape.selectedOptionIds,
+  selectedOptions: createOrderSchema.shape.selectedOptions,
+  orderType: createOrderSchema.shape.orderType,
+});
+
 export const reassignmentResponseSchema = z.object({
   decision: z.enum(["accept", "decline"], {
     message: "Quyết định tìm kỹ thuật viên thay thế không hợp lệ",
@@ -93,6 +101,8 @@ export const reassignmentResponseSchema = z.object({
 export const orderIdParamSchema = z.object({
   orderId: objectIdSchema,
 });
+
+export const updateExpectedEndSchema = z.object({ expectedEndAt: z.string().datetime({ offset: true }) });
 
 export const quotationIdParamSchema = z.object({
   quotationId: objectIdSchema,
@@ -178,6 +188,7 @@ export const quotationItemsRelevanceSchema = z.object({
 
 export const createRepairQuotationSchema = z
   .object({
+    estimatedDurationMinutes: z.number().int().min(1).max(1440).optional(),
     inspectionNote: optionalTextSchema(
       2000,
       "Ghi chú khảo sát không được vượt quá 2000 ký tự",

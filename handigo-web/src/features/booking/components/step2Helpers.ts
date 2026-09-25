@@ -27,16 +27,23 @@ export const getUploadErrorMessage = (error: unknown) => {
   return 'Không thể tải ảnh lên. Vui lòng thử lại.';
 };
 
+export const getEarliestScheduledAt = (now = new Date()) => {
+  const earliest = new Date(now);
+  earliest.setDate(earliest.getDate() + 1);
+  earliest.setHours(8, 0, 0, 0);
+  return earliest;
+};
+
 export const getTodayInputValue = () => {
-  const today = new Date();
-  const timezoneOffset = today.getTimezoneOffset() * 60000;
-  return new Date(today.getTime() - timezoneOffset).toISOString().split('T')[0];
+  const earliest = getEarliestScheduledAt();
+  const timezoneOffset = earliest.getTimezoneOffset() * 60000;
+  return new Date(earliest.getTime() - timezoneOffset).toISOString().split('T')[0];
 };
 
 export const getUpcomingDates = () =>
   Array.from({ length: 14 }, (_, index) => {
     const date = new Date();
-    date.setDate(date.getDate() + index);
+    date.setDate(date.getDate() + index + 1);
     const timezoneOffset = date.getTimezoneOffset() * 60000;
     return {
       value: new Date(date.getTime() - timezoneOffset).toISOString().split('T')[0],

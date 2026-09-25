@@ -18,6 +18,8 @@ import {
   completeOrderSchema,
   createRepairQuotationSchema,
   createOrderSchema,
+  previewBookingSchema,
+  updateExpectedEndSchema,
   orderIdParamSchema,
   orderListQuerySchema,
   quotationIdParamSchema,
@@ -31,6 +33,8 @@ import {
 } from "../validations/order.validator";
 import {
   createOrder,
+  previewBooking,
+  updateOrderExpectedEnd,
   discardUnpaidOrder,
   getMyOrders,
   getProviderOrders,
@@ -65,6 +69,8 @@ const router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
+router.post("/preview", roleMiddleware("CUSTOMER"), validate(previewBookingSchema), previewBooking);
+router.patch("/:orderId/expected-end", roleMiddleware("PROVIDER"), approvedProviderMiddleware, validate(orderIdParamSchema, "params"), validate(updateExpectedEndSchema), updateOrderExpectedEnd);
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 

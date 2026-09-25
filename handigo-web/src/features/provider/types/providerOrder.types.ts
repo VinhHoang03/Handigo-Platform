@@ -25,6 +25,7 @@ export interface QuotationItem {
 }
 
 export interface RepairQuotation {
+  estimatedDurationMinutes?: number;
   _id: string;
   quotationCode: string;
   orderId: string;
@@ -47,6 +48,7 @@ export interface QuotationDetail {
 }
 
 export interface CreateQuotationPayload {
+  estimatedDurationMinutes?: number;
   inspectionNote?: string;
   recommendation?: string;
   discountAmount?: number;

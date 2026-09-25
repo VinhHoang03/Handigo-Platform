@@ -7,6 +7,7 @@ import type { Address, Service, ServiceOption } from '../../../types/booking';
 import { isRequiredOptionSelectionMissing } from '../utils/serviceOptionSelection';
 import { useSystemAlert } from '@/components/common/SystemAlert';
 import { useConfirmPaymentVoucher } from './useConfirmPaymentVoucher';
+import { useBookingPreview } from '../hooks/useBookingPreview';
 import {
   PENDING_ORDER_ID_KEY,
   PENDING_ORDER_FINGERPRINT_KEY,
@@ -19,6 +20,7 @@ export const getOptionPrice = (option: ServiceOption) =>
 /** State + logic thanh toán PayOS/ví/tiền mặt cho ConfirmPaymentPage — không đổi hành vi, chỉ tách khỏi trang. */
 export const useConfirmPaymentFlow = () => {
   const { showSystemAlert } = useSystemAlert();
+  const { preview, error: previewError, retry: retryPreview } = useBookingPreview();
   const {
     categoryId, serviceId, selectedOptionIds, selectedOptionQuantities, addressId,
     orderType, preferredProviderId, preferredProviderName, scheduledAt,
@@ -29,6 +31,7 @@ export const useConfirmPaymentFlow = () => {
   const bookingFingerprint = JSON.stringify({
     serviceId,
     selectedOptionIds: [...selectedOptionIds].sort(),
+    selectedOptionQuantities,
     addressId,
     orderType,
     preferredProviderId,
@@ -74,11 +77,7 @@ export const useConfirmPaymentFlow = () => {
   const selectedOptions = options.filter((opt) =>
     selectedOptionIds.includes(opt._id),
   );
-  const orderAmount =
-    service?.serviceType === 'variable_price'
-      ? service.depositAmount || 0
-      : (service?.fixedPrice || 0) +
-        selectedOptions.reduce((sum, option) => sum + getOptionPrice(option), 0);
+  const orderAmount = preview?.baseAmount ?? 0;
   const effectivePaymentMethod =
     service?.serviceType === 'variable_price' && paymentMethod === 'cash'
       ? 'bank'
@@ -88,8 +87,10 @@ export const useConfirmPaymentFlow = () => {
   const voucher = useConfirmPaymentVoucher(orderAmount);
   const { voucherCode, appliedVoucher, setVoucherError } = voucher;
 
-  const handleConfirm = () =>
-    runConfirmPaymentSubmit({
+  const handleConfirm = () => {
+    if (!preview) { setPaymentError(previewError ?? 'Vui lòng chờ cập nhật giá.'); retryPreview(); return; }
+    return runConfirmPaymentSubmit({
+      expectedBookingAmount: preview.bookingAmount,
       serviceId,
       addressId,
       orderType,
@@ -116,7 +117,8 @@ export const useConfirmPaymentFlow = () => {
       setPendingOrderId,
       reset,
       navigate,
-    });
+    }).finally(retryPreview);
+  };
 
   return {
     service, address, selectedOptions,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useBookingStore } from '@/features/booking/hooks/useBookingStore';
 import {
   customerServiceApi,
   type NearbyProvider,
@@ -44,6 +45,9 @@ export function useNearbyProviders({
   onAvailabilityChange,
 }: UseNearbyProvidersArgs) {
   const [providers, setProviders] = useState<NearbyProvider[]>([]);
+  const booking = useBookingStore();
+  const selectedOptions = !orderId && booking.serviceId === serviceId && booking.selectedOptionIds.length
+    ? JSON.stringify(booking.selectedOptionIds.map((optionId) => ({ optionId, quantity: booking.selectedOptionQuantities?.[optionId] ?? 1 }))) : undefined;
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -72,6 +76,7 @@ export function useNearbyProviders({
           recurrenceUnit,
           recurrenceCount,
           orderId,
+          selectedOptions,
         );
         if (isMounted) {
           setProviders(data);
@@ -95,7 +100,7 @@ export function useNearbyProviders({
     return () => {
       isMounted = false;
     };
-  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
+  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId, selectedOptions]);
 
   useEffect(() => {
     if (!allowSelection || !hasLoaded || !onSelectProvider || !selectedProviderId) return;

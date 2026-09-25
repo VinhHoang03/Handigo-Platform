@@ -1,11 +1,14 @@
 import { Types } from "mongoose";
 import { Provider, IProvider } from "../models/provider.model";
 import { Location } from "../models/location.model";
-import { Order } from "../models/order.model";
+import { Service } from "../models/service.model";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { getEligibleProviderUserIds } from "./providerWalletEligibility.service";
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { createLogger } from "../utils/logger";
+import { getAvailableProviderIds } from "./providerSchedule.service";
+import { getBookingPolicy } from "./systemConfig.service";
+import { calculateDuration, ScheduleInterval } from "../utils/bookingPolicy";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -20,6 +23,7 @@ export interface ProviderCandidate {
 }
 
 export interface FindNearestProvidersOptions {
+  scheduleIntervals?: ScheduleInterval[];
   latitude?: number;
   longitude?: number;
   serviceId: string;
@@ -41,26 +45,11 @@ export interface FindNearestProvidersOptions {
 
 const filterProvidersWithoutScheduleConflicts = async <T extends IProvider>(
   providers: T[],
-  scheduledDates: Date[],
+  intervals: ScheduleInterval[],
 ): Promise<T[]> => {
-  if (providers.length === 0 || scheduledDates.length === 0) return providers;
-
-  const conflictingProviderIds = await Order.distinct("providerId", {
-    providerId: { $in: providers.map((provider) => provider._id) },
-    status: { $in: ["accepted", "in_progress"] },
-    $or: scheduledDates.map((date) => ({
-      scheduledAt: {
-        $gt: new Date(date.getTime() - 60 * 60 * 1000),
-        $lt: new Date(date.getTime() + 60 * 60 * 1000),
-      },
-    })),
-    isDeleted: false,
-  });
-  const conflictingIdSet = new Set(conflictingProviderIds.map(String));
-
-  return providers.filter(
-    (provider) => !conflictingIdSet.has(provider._id.toString()),
-  );
+  if (!providers.length) return providers;
+  const available = await getAvailableProviderIds(providers.map((provider) => provider._id as Types.ObjectId), intervals);
+  return providers.filter((provider) => available.has(provider._id.toString()));
 };
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -99,6 +88,11 @@ export const MatchingService = {
       requireOnline = true,
       scheduledDates = [],
     } = options;
+    const policy = await getBookingPolicy();
+    const service = options.scheduleIntervals ? null : await Service.findById(serviceId).select("serviceType").lean();
+    const duration = calculateDuration(serviceId, service?.serviceType === "variable_price", [], policy);
+    const intervals = options.scheduleIntervals ?? (scheduledDates.length ? scheduledDates : [new Date(Date.now() + policy.travelMinutes * 60000)])
+      .map((date) => ({ start: date.getTime(), end: date.getTime() + duration * 60000, bufferMinutes: policy.bufferMinutes, travelMinutes: policy.travelMinutes }));
     const candidateLimit = scheduledDates.length > 0
       ? Math.max(limit * 5, 100)
       : limit * 5;
@@ -182,7 +176,7 @@ export const MatchingService = {
           });
           const availableProviders = await filterProvidersWithoutScheduleConflicts(
             sorted,
-            scheduledDates,
+            intervals,
           );
 
           // 4. Compute approximate distance using Haversine
@@ -210,12 +204,12 @@ export const MatchingService = {
         }
       }
 
-      // Khi địa chỉ có tọa độ, chỉ trả về khoảng cách địa lý thực tế.
-      // Không fallback theo tên phường vì có thể đưa provider ngoài bán kính vào kết quả.
-      return [];
+      matchingLogger.info(
+        "Không có provider phù hợp theo khoảng cách; chuyển sang tìm theo khu vực phục vụ.",
+      );
     }
 
-    // ── Path B: no coordinates or no geo-matches found → simple filter ─────
+    // ── Path B: không có tọa độ hoặc không tìm thấy theo khoảng cách → lọc khu vực ──
     const providers = await Provider.find({
       userId: { $in: eligibleProviderUserIds },
       serviceIds: serviceObjectId,
@@ -240,7 +234,7 @@ export const MatchingService = {
       );
     const availableProviders = await filterProvidersWithoutScheduleConflicts(
       providersInArea,
-      scheduledDates,
+      intervals,
     );
 
     if (providers.length === 0) {

@@ -38,6 +38,7 @@ export const BookingQuotationDetails = ({
     </div>
 
     <div className="grid gap-sm mb-lg sm:grid-cols-2">
+      {quotation.quotation.estimatedDurationMinutes && <p className="text-sm">Thời lượng sửa chữa dự kiến: {quotation.quotation.estimatedDurationMinutes} phút. Khả năng thực hiện ngay sẽ được kiểm tra theo lịch của chuyên gia.</p>}
       {quotation.quotation.quotationCode && (
         <div className="rounded-2xl bg-surface-container-low p-sm">
           <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
