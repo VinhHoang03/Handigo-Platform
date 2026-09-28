@@ -11,6 +11,7 @@ export interface AgentConfirmation {
   expiresAt: string;
 }
 export interface AgentSession {
+  bookingDraft?: { status: "active" | "paused" | "discarded" | "booked"; revision: number; summary: string[]; missing: string[] } | null;
   expiresAt?: string | null;
   payment?: AgentPayment | null;
   sessionId: string;
@@ -30,4 +31,11 @@ export interface AgentPayment {
   message: string;
   amount?: number;
   checkoutUrl?: string;
+}
+
+export interface AgentProgress {
+  sessionId: string;
+  requestId: string | null;
+  state: AgentSession["state"];
+  activity: { requestId: string; message: string; updatedAt: string } | null;
 }

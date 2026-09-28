@@ -10,12 +10,18 @@ import { agentPaymentResultSchema } from "../../services/agentPayment.service";
 import { withAgentTimeout } from "./timeout";
 import { z } from "zod";
 import { sessionLifecycle } from "./session-lifecycle";
+import { bookingSchema } from "../tools/implementations/booking.schemas";
 
 export function sessionView(session: AgentSession) {
   const lifecycle = sessionLifecycle(session);
   const requiresReconciliation = session.requiresReconciliation
     || session.pendingAction?.status === "EXECUTING" || session.pendingAction?.status === "UNKNOWN";
-  const paymentResult = [...session.conversation].reverse().find((item) => item.role === "tool"
+  const recentMessages = [...session.conversation].reverse();
+  const latestUserIndex = recentMessages.findIndex((item) => item.role === "user");
+  // Chỉ gắn thẻ thanh toán với lượt hiện tại; giữ dữ liệu cũ khi cần đối soát.
+  const paymentMessages = requiresReconciliation || latestUserIndex < 0
+    ? recentMessages : recentMessages.slice(0, latestUserIndex);
+  const paymentResult = paymentMessages.find((item) => item.role === "tool"
     && ["create_payment", "get_payment_status"].includes(item.tool ?? "")
     && (() => { try { return agentPaymentResultSchema.safeParse(JSON.parse(item.content)).success; } catch { return false; } })());
   let payment = paymentResult ? agentPaymentResultSchema.parse(JSON.parse(paymentResult.content)) : null;
@@ -29,8 +35,11 @@ export function sessionView(session: AgentSession) {
   return { sessionId: session.id, state: session.state, currentGoal: session.currentGoal,
     expiresAt: lifecycle.expiresAt,
     payment,
+    bookingDraft: session.bookingDraft ? { status: session.bookingDraft.status, revision: session.bookingDraft.revision,
+      summary: session.bookingDraft.summary, missing: session.bookingDraft.missing } : null,
     messages: session.conversation.filter((item) => item.role !== "tool").map((item) => ({
       _id: item.id, sender: item.role, content: item.content, createdAt: item.createdAt,
+      ...(item.choiceGroups?.length ? { choiceGroups: item.choiceGroups } : {}),
     })), pendingConfirmation: session.pendingAction?.status === "WAITING_CONFIRMATION" ? {
       actionId: session.pendingAction.id, tool: session.pendingAction.tool,
       preview: session.pendingAction.preview, expiresAt: session.pendingAction.expiresAt,
@@ -106,7 +115,12 @@ export class AgentService {
         if (session.pendingAction?.status === "WAITING_CONFIRMATION") {
           this.loop.reply(session, "WAITING_CONFIRMATION", "Vui lòng kiểm tra và xác nhận hành động đang chờ.");
         } else {
-          await this.loop.run(session, context, checkpoint);
+          const completedBooking = "confirmation" in input && input.confirmation.decision === "CONFIRM"
+            ? session.actions.find((action) => action.id === input.confirmation.actionId
+              && action.tool === "create_booking" && action.status === "SUCCEEDED") : undefined;
+          if (!completedBooking || !(await this.continueBooking(session, context, completedBooking.result))) {
+            await this.loop.run(session, context, checkpoint);
+          }
         }
       } else {
         if ("confirmation" in input) this.loop.confirmation.requirePending(session, input.confirmation.actionId);
@@ -115,6 +129,18 @@ export class AgentService {
           await this.confirm(session, context, input.confirmation, checkpoint);
         } else {
           new MessageRepository().append(session, "user", input.message);
+          if (session.pendingAction?.tool === "create_booking" && session.pendingAction.status === "WAITING_CONFIRMATION") {
+            const action = session.pendingAction;
+            if (!session.bookingDraft) {
+              const previous = bookingSchema.safeParse(action.arguments);
+              if (previous.success) session.bookingDraft = { revision: 0, status: "active", values: previous.data,
+                sources: {}, missing: [], summary: [], choiceGroups: [] };
+            }
+            action.status = "EXPIRED";
+            session.actions.push({ ...action });
+            session.pendingAction = null;
+            new MessageRepository().append(session, "tool", "Khách gửi yêu cầu mới. Bản xác nhận đặt lịch cũ đã hết hiệu lực; đọc yêu cầu mới và cập nhật bản nháp hoặc trả lời câu hỏi. Không tạo đơn bằng xác nhận cũ.", "agent_protocol");
+          }
           if (session.pendingAction) {
             this.loop.reply(session, "WAITING_CONFIRMATION", "Hãy dùng nút xác nhận cho hành động đang chờ, hoặc từ chối trước khi sửa yêu cầu.");
           } else {
@@ -123,6 +149,7 @@ export class AgentService {
               session.taskVersion += 1;
               session.collectedInformation = {};
             }
+            session.currentGoal = input.message;
             await this.loop.run(session, context, checkpoint);
           }
         }
@@ -177,30 +204,33 @@ export class AgentService {
     }
     const finished = await this.loop.execute(session, context, tool, args, checkpoint, action);
     if (!finished && action.tool === "create_booking" && action.status === "SUCCEEDED") {
-      const booking = z.object({ orderId: z.string().regex(/^[a-f\d]{24}$/i), orderCode: z.string(),
-        orderType: z.string(), bookingStatus: z.string(), paymentMethod: z.enum(["bank", "wallet", "cash"]) }).safeParse(action.result);
-      if (booking.success) {
-        const order = booking.data;
-        let message: string;
-        if (["scheduled", "recurring"].includes(order.orderType) && order.bookingStatus !== "awaiting_payment") {
-          message = "Đã tạo lịch hẹn. Vui lòng chờ chuyên gia xác nhận trước khi thanh toán.";
-        } else {
-          try {
-            const paymentTool = this.loop.tools.get("create_payment", context);
-            const paymentArgs = paymentTool.inputSchema.parse({ orderId: order.orderId,
-              method: { bank: "PAYOS", wallet: "WALLET", cash: "CASH" }[order.paymentMethod] });
-            session.pendingAction = await this.loop.confirmation.prepare(paymentTool, context, paymentArgs);
-            session.pendingAction.taskVersion = session.taskVersion;
-            this.loop.reply(session, "WAITING_CONFIRMATION", "Đã tạo đơn. Vui lòng kiểm tra và xác nhận riêng bước thanh toán bên dưới.");
-            return;
-          } catch (error) { message = `Đã tạo đơn. ${toolError(error)}`; }
-        }
-        new MessageRepository().append(session, "tool", JSON.stringify({ orderId: order.orderId,
-          orderCode: order.orderCode, status: "blocked", message }), "create_payment");
-        this.loop.reply(session, "WAITING_USER_INPUT", message);
-        return;
-      }
+      if (await this.continueBooking(session, context, action.result)) return;
     }
     if (!finished) await this.loop.run(session, context, checkpoint);
+  }
+
+  private async continueBooking(session: AgentSession, context: ToolContext, result: unknown) {
+    const booking = z.object({ orderId: z.string().regex(/^[a-f\d]{24}$/i), orderCode: z.string(),
+      orderType: z.string(), bookingStatus: z.string(), paymentMethod: z.enum(["bank", "wallet", "cash"]) }).safeParse(result);
+    if (!booking.success) return false;
+    const order = booking.data;
+    let message: string;
+    if (["scheduled", "recurring"].includes(order.orderType) && order.bookingStatus !== "awaiting_payment") {
+      message = "Đã tạo lịch hẹn. Vui lòng chờ chuyên gia xác nhận trước khi thanh toán.";
+    } else {
+      try {
+        const paymentTool = this.loop.tools.get("create_payment", context);
+        const paymentArgs = paymentTool.inputSchema.parse({ orderId: order.orderId,
+          method: { bank: "PAYOS", wallet: "WALLET", cash: "CASH" }[order.paymentMethod] });
+        session.pendingAction = await this.loop.confirmation.prepare(paymentTool, context, paymentArgs);
+        session.pendingAction.taskVersion = session.taskVersion;
+        this.loop.reply(session, "WAITING_CONFIRMATION", "Đã tạo đơn. Vui lòng kiểm tra và xác nhận riêng bước thanh toán bên dưới.");
+        return true;
+      } catch (error) { message = `Đã tạo đơn. ${toolError(error)}`; }
+    }
+    new MessageRepository().append(session, "tool", JSON.stringify({ orderId: order.orderId,
+      orderCode: order.orderCode, status: "blocked", message }), "create_payment");
+    this.loop.reply(session, "WAITING_USER_INPUT", message);
+    return true;
   }
 }

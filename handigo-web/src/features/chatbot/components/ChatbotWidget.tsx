@@ -21,6 +21,7 @@ export function ChatbotWidget({
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
+  const [activity, setActivity] = useState("");
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
   const [error, setError] = useState("");
   const [agentSession, setAgentSession] = useState<AgentSession | null>(null);
@@ -92,6 +93,7 @@ export function ChatbotWidget({
     }
     try {
       setIsReplying(true);
+      setActivity("");
       setError("");
       if (usesAgent) {
         pendingRequest.current ??= { sessionId: sessionId.current, requestId: crypto.randomUUID(), message: content };
@@ -130,6 +132,25 @@ export function ChatbotWidget({
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [isOpen, agentSession?.expiresAt]);
+
+  useEffect(() => {
+    if (!usesAgent || !isReplying || !isOpen) return;
+    const controller = new AbortController();
+    const request = pendingRequest.current;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      if (!request || controller.signal.aborted) return;
+      try {
+        const progress = await agentApi.progress(request.sessionId, controller.signal);
+        if (!controller.signal.aborted && progress.requestId === request.requestId) {
+          setActivity(progress.activity?.requestId === request.requestId ? progress.activity.message : "Đang xử lý yêu cầu");
+        }
+      } catch { /* Tiến trình chỉ để hiển thị; request chính vẫn tiếp tục khi polling lỗi. */ }
+      if (!controller.signal.aborted) timer = setTimeout(() => void poll(), 1500);
+    };
+    timer = setTimeout(() => void poll(), 500);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [usesAgent, isReplying, isOpen]);
 
   const decide = async (decision: "CONFIRM" | "REJECT") => {
     if (sending.current || !agentSession?.pendingConfirmation) return;
@@ -180,6 +201,7 @@ export function ChatbotWidget({
           messages={messages}
           isLoading={isLoading}
           isReplying={isReplying}
+          activity={activity}
           error={error}
           availabilityMessage={sessionExpired
             ? "Phiên đã hết hạn sau 30 phút không hoạt động. Chọn Bắt đầu tác vụ mới rồi gửi yêu cầu. Đơn đã tạo vẫn được giữ nguyên."

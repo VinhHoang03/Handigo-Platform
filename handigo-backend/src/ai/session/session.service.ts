@@ -25,6 +25,13 @@ export interface SessionStore {
 }
 
 export class SessionService implements SessionStore {
+  async progress(id: string, userId: string) {
+    const doc = await SessionModel.findOne({ _id: id, userId }).select("data.state data.activity data.activeRequest.requestId").lean();
+    if (!doc) throw new AppError("Không tìm thấy phiên trợ lý.", 404);
+    return { sessionId: id, requestId: doc.data.activeRequest?.requestId ?? null,
+      state: doc.data.state, activity: doc.data.activity ?? null };
+  }
+
   async reset(id: string, userId: string) {
     const { session, lockId } = await this.acquire(id, userId);
     try {

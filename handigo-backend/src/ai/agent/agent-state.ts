@@ -1,6 +1,7 @@
 export type AgentState = "RUNNING" | "WAITING_USER_INPUT" | "WAITING_CONFIRMATION" | "EXECUTING_TOOL" | "COMPLETED" | "FAILED";
 
 export interface AgentMessage {
+  choiceGroups?: import("../llm/llm.interface").AgentChoiceGroup[];
   id: string;
   role: "user" | "assistant" | "tool";
   content: string;
@@ -21,6 +22,8 @@ export interface PendingAction {
 }
 
 export interface AgentSession {
+  bookingDraft?: import("./booking-draft").BookingDraft;
+  activity?: { requestId: string; message: string; updatedAt: string };
   taskVersion: number;
   id: string;
   userId: string;

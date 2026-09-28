@@ -157,7 +157,7 @@ export interface Order {
   serviceId: Service;
   selectedOptionIds: string[];
   selectedOptionsSnapshot?: Array<{
-    optionId: string;
+    optionId: string | null;
     name: string;
     optionType: string;
     price: number;

@@ -3,6 +3,7 @@ import type { IService } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
+import { getUniformServicePrice } from "../utils/uniformServicePrice";
 
 const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
   "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
@@ -14,6 +15,7 @@ export const buildServicePricingSnapshot = async (
   service: IService,
   selectedOptionIdsInput: unknown = [],
   selectedOptionsInput?: unknown,
+  uniformQuantity?: number,
 ) => {
   if (
     !Array.isArray(selectedOptionIdsInput) ||
@@ -55,11 +57,25 @@ export const buildServicePricingSnapshot = async (
     isActive: true,
     isDeleted: false,
   }).sort({ sortOrder: 1, createdAt: 1 });
+  if (uniformQuantity !== undefined) {
+    const uniform = getUniformServicePrice(service.serviceType, availableOptions);
+    if (!uniform || !Number.isInteger(uniformQuantity) || uniformQuantity < 1 || uniformQuantity > 99
+      || (!uniform.allowsQuantity && uniformQuantity !== 1) || uniqueOptionIds.length > 0) {
+      throw new AppError("Dịch vụ không còn áp dụng giá chung cho yêu cầu này. Vui lòng chọn lại tùy chọn phù hợp.", 400);
+    }
+    const amount = uniform.unitPrice * uniformQuantity;
+    return {
+      optionIds: [] as Types.ObjectId[], selectedOptionsSnapshot: [{
+        optionId: null, name: service.name, optionType: "other", price: uniform.unitPrice,
+        quantity: uniformQuantity, subtotal: amount,
+      }], bookingAmount: amount, depositAmount: 0
+    };
+  }
   const selectedIdSet = new Set(uniqueOptionIds);
   const quantityByOptionId = new Map(
     selectedOptionsPayload.map((item) => [item.optionId, item.quantity]),
   );
-  const selectedOptions = availableOptions.filter((option) =>
+  let selectedOptions = availableOptions.filter((option) =>
     selectedIdSet.has(option._id.toString()),
   );
 
@@ -82,8 +98,11 @@ export const buildServicePricingSnapshot = async (
     );
   }
 
-  if (service.requiresOptionSelection && selectedOptions.length === 0) {
-    throw new AppError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.", 400);
+  if (selectedOptions.length === 0 && availableOptions.length > 0) {
+    const defaultOpt = availableOptions.find((opt) => opt.price > 0) || availableOptions[0];
+    selectedOptions = [defaultOpt];
+    selectedIdSet.add(defaultOpt._id.toString());
+    quantityByOptionId.set(defaultOpt._id.toString(), 1);
   }
 
   const groups = new Map<string, typeof availableOptions>();
@@ -138,7 +157,7 @@ export const buildServicePricingSnapshot = async (
       ? optionAmount
       : depositAmount;
 
-  if (service.serviceType === "fixed_price" && bookingAmount <= 0) {
+  if (service.serviceType === "fixed_price" && bookingAmount <= 0 && selectedOptions.length === 0) {
     throw new AppError(
       "Vui lòng chọn ít nhất một tùy chọn có giá cho dịch vụ này.",
       400,

@@ -150,6 +150,7 @@ export async function dispatchOrderForMatching(orderId: string) {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CreateOrderPayload {
+  uniformQuantity?: number;
   confirmedExpectation?: { amount: number; addressVersion: string };
   customerId: string;
   serviceId: string;
@@ -323,6 +324,7 @@ export const OrderService = {
       service,
       payload.selectedOptionIds,
       payload.selectedOptions,
+      payload.uniformQuantity,
     );
 
     const inspectionRequired = service.serviceType === "variable_price";

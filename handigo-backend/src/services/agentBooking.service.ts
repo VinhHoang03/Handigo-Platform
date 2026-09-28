@@ -6,7 +6,7 @@ import { getUserAddresses } from "./address.service";
 import { MatchingService } from "./matching.service";
 import { OrderService, type CreateOrderPayload } from "./order.service";
 
-type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions">;
+type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions" | "uniformQuantity">;
 type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "paymentMethod" | "problemDescription"> & {
   orderType: "normal" | "scheduled";
   scheduledAt?: string;
@@ -36,16 +36,20 @@ export const AgentBookingService = {
     const service = await activeService(serviceId);
     const options = await getOptionsByServiceId(serviceId);
     return { id: String(service._id), name: service.name, serviceType: service.serviceType,
-      requiresOptionSelection: service.requiresOptionSelection, options };
+      requiresOptionSelection: service.requiresOptionSelection, options: options.map((option) => ({
+        _id: String(option._id), name: option.name, description: option.description,
+        price: option.price, optionType: option.optionType, selectionGroup: option.selectionGroup,
+        selectionMode: option.selectionMode, allowsQuantity: option.allowsQuantity, isRequired: option.isRequired,
+      })) };
   },
   async addresses(userId: string) {
-    return (await getUserAddresses(userId)).slice(0, 30).map((item) => ({
+    return (await getUserAddresses(userId)).sort((a, b) => Number(b.isDefault) - Number(a.isDefault)).slice(0, 30).map((item) => ({
       id: String(item._id), fullAddress: item.fullAddress, ward: item.ward, province: item.province, isDefault: item.isDefault,
     }));
   },
   async price(args: PriceArguments) {
     const service = await activeService(args.serviceId);
-    const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions);
+    const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions, args.uniformQuantity);
     return { serviceName: service.name, serviceType: service.serviceType, amount: snapshot.bookingAmount,
       depositAmount: snapshot.depositAmount, currency: "VND", options: snapshot.selectedOptionsSnapshot };
   },
@@ -77,6 +81,7 @@ export const AgentBookingService = {
       paymentMethod: args.paymentMethod, amount: price.amount, currency: price.currency,
       description: args.problemDescription ?? "", serviceType: price.serviceType,
       note: price.serviceType === "variable_price" ? "Đây là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát."
+        : args.uniformQuantity !== undefined ? "Áp dụng giá chung; chưa xác định loại thiết bị. Đơn mới chưa thanh toán; lịch hẹn cần kỹ thuật viên chấp nhận."
         : "Đơn mới chưa thanh toán; lịch hẹn cần kỹ thuật viên chấp nhận." };
   },
   async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string }) {

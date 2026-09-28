@@ -34,7 +34,28 @@ stubModule("../services/order.service", { OrderService: {
 async function main() {
   const { registerTools } = await import("../ai/tools/register-tools");
   const { AgentCustomerCareService: care, customerCaseView } = await import("../services/agentCustomerCare.service");
-  const { AgentService } = await import("../ai/agent/agent.service");
+  const { AgentService, sessionView } = await import("../ai/agent/agent.service");
+  const paymentSession = newSession(randomUUID(), userId);
+  const paymentResult = { orderId, orderCode: "HD-TEST", status: "pending", message: "Đang chờ thanh toán." };
+  const appendPaymentMessage = (role: "user" | "assistant" | "tool", content: string, tool?: string) => {
+    paymentSession.conversation.push({ id: randomUUID(), role, content, tool, createdAt: new Date().toISOString() });
+  };
+  appendPaymentMessage("user", "Thanh toán đơn này");
+  appendPaymentMessage("tool", JSON.stringify(paymentResult), "create_payment");
+  appendPaymentMessage("assistant", "Bạn có thể kiểm tra thanh toán.");
+  assert.equal(sessionView(paymentSession).payment?.orderId, orderId);
+  appendPaymentMessage("user", "Handigo có những dịch vụ nào?");
+  appendPaymentMessage("assistant", "Đây là danh sách dịch vụ.");
+  assert.equal(sessionView(paymentSession).payment, null);
+  assert.equal(sessionView(JSON.parse(JSON.stringify(paymentSession))).payment, null);
+  paymentSession.requiresReconciliation = true;
+  assert.equal(sessionView(paymentSession).payment?.orderId, orderId);
+  paymentSession.requiresReconciliation = false;
+  appendPaymentMessage("tool", JSON.stringify(paymentResult), "get_payment_status");
+  assert.equal(sessionView(paymentSession).payment?.orderId, orderId);
+  appendPaymentMessage("user", "Tôi cần hỗ trợ tài khoản");
+  appendPaymentMessage("tool", JSON.stringify({ error: "Không có kết quả thanh toán mới." }), "get_payment_status");
+  assert.equal(sessionView(paymentSession).payment, null);
   const { SupportTicket } = await import("../models/supportTicket.model");
   const { Complaint } = await import("../models/complaint.model");
   const { Order } = await import("../models/order.model");
@@ -44,7 +65,7 @@ async function main() {
   const tickets = await import("../services/supportTicket.service");
   const context: ToolContext = { user: { id: userId, role: "CUSTOMER" }, sessionId: randomUUID(), signal: new AbortController().signal };
   const registry = registerTools({});
-  assert.equal(registry.list(context).length, 24);
+  assert.equal(registry.list(context).length, 25);
   for (const name of ["create_booking", "cancel_booking", "create_payment", "get_payment_status", "get_service_catalog"]) {
     assert.ok(registry.get(name, context));
   }

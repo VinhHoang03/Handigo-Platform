@@ -171,7 +171,7 @@ export const evaluateQuotationItemsForOrder = async (
   items: QuotationItemInput[],
 ): Promise<QuotationRelevanceResult> => {
   const context = await loadServiceContext(order);
-  const apiKey = process.env.GEMINI_API_KEY_1?.trim();
+  const apiKey = process.env.QUOTATION_AI_API_KEY?.trim();
   if (!apiKey) return buildFallbackResult(context.serviceName, items);
 
   const compactItems = items.map((item, index) => ({

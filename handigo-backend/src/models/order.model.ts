@@ -9,7 +9,7 @@ export type OrderStatusValue =
   | "cancelled";
 
 export interface ISelectedOptionSnapshot {
-  optionId: Types.ObjectId;
+  optionId: Types.ObjectId | null;
   name: string;
   optionType: string;
   price: Money;
@@ -136,7 +136,7 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
     optionId: {
       type: Schema.Types.ObjectId,
       ref: "ServiceOption",
-      required: true,
+      default: null,
     },
     name: { type: String, required: true },
     optionType: { type: String, required: true },

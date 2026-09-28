@@ -19,6 +19,7 @@ export function ChatbotPanel({
   messages,
   isLoading,
   isReplying,
+  activity,
   error,
   availabilityMessage,
   onClose,
@@ -36,6 +37,7 @@ export function ChatbotPanel({
   messages: ChatbotMessage[];
   isLoading: boolean;
   isReplying: boolean;
+  activity?: string;
   error: string;
   availabilityMessage: string;
   onClose: () => void;
@@ -95,8 +97,11 @@ export function ChatbotPanel({
         </div>
       ) : (
         <ChatbotMessageList
+          onSend={onSend}
+          choicesDisabled={taskBlocked || Boolean(pendingConfirmation) || Boolean(availabilityMessage) || Boolean(error)}
           messages={messages}
           isReplying={isReplying}
+          activity={activity}
           audience={audience}
         >
           {pendingConfirmation && onDecision && (
@@ -135,7 +140,7 @@ export function ChatbotPanel({
         </div>
       )}
       <ChatbotComposer
-        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation) || taskBlocked}
+        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking") || taskBlocked}
         onSend={onSend}
         onNewSession={onNewSession}
         resetDisabled={isLoading || isReplying || Boolean(pendingConfirmation) || taskBlocked}

@@ -23,9 +23,11 @@ import { cancelComplaintTool } from "./implementations/cancel-complaint.tool";
 import { searchCustomerKnowledgeTool } from "./implementations/search-customer-knowledge.tool";
 import { getSystemInfoTool } from "./implementations/get-system-info.tool";
 import { getCancellationPreviewTool } from "./implementations/get-cancellation-preview.tool";
+import { updateBookingDraftTool } from "./implementations/update-booking-draft.tool";
 
 export function registerTools(policies: Record<string, ToolPolicy>) {
   return new ToolRegistry(policies)
+    .register(updateBookingDraftTool)
     .register(createSupportTicketTool).register(getMySupportTicketsTool).register(getSupportTicketTool)
     .register(replySupportTicketTool).register(cancelSupportTicketTool)
     .register(createComplaintTool).register(getMyComplaintsTool).register(getComplaintTool).register(cancelComplaintTool)
