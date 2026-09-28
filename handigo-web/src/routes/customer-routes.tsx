@@ -36,6 +36,9 @@ const PublicProviderProfilePage = lazy(
 const CustomerFeedbackPage = lazy(
   () => import("@/features/feedback/pages/CustomerFeedbackPage"),
 );
+const CustomerBankAccountsPage = lazy(
+  () => import("@/features/bank-account/pages/ProviderBankAccountsPage"),
+);
 
 /** Customer-area routes (guarded by RouteGuard where required). Called as a
  * function inside <Routes> so the returned Fragment's <Route> children are
@@ -128,6 +131,14 @@ export function CustomerRoutes() {
         element={
           <RouteGuard roles={["CUSTOMER"]}>
             <WalletPage role="CUSTOMER" />
+          </RouteGuard>
+        }
+      />
+      <Route
+        path="/customer/bank-accounts"
+        element={
+          <RouteGuard roles={["CUSTOMER"]}>
+            <CustomerBankAccountsPage role="CUSTOMER" />
           </RouteGuard>
         }
       />

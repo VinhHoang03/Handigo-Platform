@@ -119,6 +119,7 @@ export function NearbyProviderSelector({
             <NearbyProviderCard
               key={provider.id}
               provider={provider}
+              serviceId={serviceId}
               isSelected={allowSelection && selectedProviderId === provider.id}
               allowSelection={allowSelection}
               requireSelection={requireSelection}

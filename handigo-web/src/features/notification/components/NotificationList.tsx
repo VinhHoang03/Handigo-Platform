@@ -15,11 +15,13 @@ export function NotificationList({
   busy,
   showRecipient,
   onMarkRead,
+  onOpen,
 }: {
   items: AppNotification[];
   busy: boolean;
   showRecipient?: boolean;
   onMarkRead: (notification: AppNotification) => void;
+  onOpen: (notification: AppNotification) => void;
 }) {
   return (
     <div className="divide-y divide-outline-variant/10">
@@ -30,6 +32,7 @@ export function NotificationList({
           busy={busy}
           showRecipient={showRecipient}
           onMarkRead={onMarkRead}
+          onOpen={onOpen}
         />
       ))}
     </div>
@@ -41,14 +44,22 @@ function NotificationListItem({
   busy,
   showRecipient,
   onMarkRead,
+  onOpen,
 }: {
   item: AppNotification;
   busy: boolean;
   showRecipient?: boolean;
   onMarkRead: (notification: AppNotification) => void;
+  onOpen: (notification: AppNotification) => void;
 }) {
   return (
     <article
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(item)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onOpen(item);
+      }}
       className={`flex gap-4 py-4 ${item.isRead ? "" : "bg-primary/5 px-3 sm:-mx-3"}`}
     >
       <span
@@ -94,7 +105,10 @@ function NotificationListItem({
           {!showRecipient && (
             <button
               type="button"
-              onClick={() => onMarkRead(item)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onMarkRead(item);
+              }}
               disabled={busy || item.isRead}
               className="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
             >

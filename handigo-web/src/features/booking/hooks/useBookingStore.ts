@@ -79,7 +79,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   setAddressId: (id) =>
     set((state) => ({
       addressId: id,
-      ...(state.addressId !== id && {
+      ...(state.addressId !== id && !state.requestedProviderId && {
         preferredProviderId: undefined,
         preferredProviderName: undefined,
       }),

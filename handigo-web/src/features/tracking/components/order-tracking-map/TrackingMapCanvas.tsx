@@ -24,7 +24,7 @@ export function TrackingMapCanvas({
 }: TrackingMapCanvasProps) {
   return (
     <div
-      className={`relative w-full overflow-hidden bg-surface-container-low ${
+      className={`relative isolate z-0 w-full overflow-hidden bg-surface-container-low ${
         compact ? "h-[320px] sm:h-[360px]" : "h-[400px] sm:h-[460px]"
       }`}
     >

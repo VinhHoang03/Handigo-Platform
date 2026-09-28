@@ -15,11 +15,15 @@ export const feedbackApi = {
   uploadImages: async (files: File[]) => {
     const form = new FormData();
     files.forEach((file) => form.append('images', file));
-    return data<string[]>(await api.post('/feedback/images', form));
+    return data<string[]>(await api.post('/feedback/images', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }));
   },
   uploadReplyImages: async (files: File[]) => {
     const form = new FormData();
     files.forEach((file) => form.append('images', file));
-    return data<string[]>(await api.post('/feedback/provider/images', form));
+    return data<string[]>(await api.post('/feedback/provider/images', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }));
   },
 };

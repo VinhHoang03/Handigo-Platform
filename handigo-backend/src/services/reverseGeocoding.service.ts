@@ -25,6 +25,7 @@ type LocationIqAddress = {
   hamlet?: string;
   municipality?: string;
   city_district?: string;
+  state_district?: string;
   district?: string;
   county?: string;
   city?: string;
@@ -76,7 +77,7 @@ const getProvinceFromDisplayName = (
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
-  const normalizedCountry = country?.trim().toLocaleLowerCase("vi-VN");
+  const normalizedCountry = country?.trim()?.toLocaleLowerCase("vi-VN");
 
   while (parts.length > 0) {
     const lastPart = parts[parts.length - 1];
@@ -98,6 +99,19 @@ const getProvinceFromDisplayName = (
 
 const getCacheKey = ({ latitude, longitude }: ReverseGeocodeQuery) =>
   `${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+
+const validateCoordinates = ({ latitude, longitude }: ReverseGeocodeQuery) => {
+  if (
+    !Number.isFinite(latitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    !Number.isFinite(longitude) ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    throw new AppError("Tọa độ vị trí không hợp lệ.", 400);
+  }
+};
 
 const getCached = (key: string) => {
   const entry = cache.get(key);
@@ -167,6 +181,7 @@ const normalizeResponse = (
     address?.municipality,
     address?.borough,
     address?.city_district,
+    address?.state_district,
     address?.district,
     address?.county,
     address?.city,
@@ -218,6 +233,7 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
         format: "json",
         zoom: 18,
         addressdetails: 1,
+        normalizeaddress: 1,
         "accept-language": "vi",
       },
       headers: {
@@ -244,6 +260,20 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
           code: error.code,
         },
       );
+
+      if ([401, 403].includes(error.response?.status ?? 0)) {
+        throw new AppError(
+          "Dịch vụ xác định địa chỉ chưa được cấu hình đúng.",
+          503,
+        );
+      }
+
+      if (error.response?.status === 429) {
+        throw new AppError(
+          "Dịch vụ xác định địa chỉ đang quá tải. Vui lòng thử lại sau.",
+          503,
+        );
+      }
     }
     throw new AppError(
       "Dịch vụ xác định địa chỉ đang tạm thời gián đoạn. Vui lòng thử lại sau.",
@@ -253,6 +283,7 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
 };
 
 export const reverseGeocode = async (query: ReverseGeocodeQuery) => {
+  validateCoordinates(query);
   const cacheKey = getCacheKey(query);
   const cached = getCached(cacheKey);
   if (cached) return cached;
