@@ -59,7 +59,7 @@ import {
   selectAppointmentProvider,
   respondToReassignment,
 } from "../controllers/order.controller";
-import { getOrderTrackingRoute } from "../controllers/orderTracking.controller";
+import { getOrderMatchingProviders, getOrderTrackingRoute } from "../controllers/orderTracking.controller";
 import {
   scanQuotationItems,
   validateQuotationItemsRelevance,
@@ -145,6 +145,8 @@ router.get(
   validate(trackingRouteQuerySchema, "query"),
   getOrderTrackingRoute,
 );
+
+router.get("/:orderId/matching-providers", roleMiddleware("CUSTOMER"), validate(orderIdParamSchema, "params"), getOrderMatchingProviders);
 
 router.get("/:orderId", validate(orderIdParamSchema, "params"), getOrderById);
 

@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 import { Navbar } from "@/components/common/Navbar";
 import { HomeFooter } from "@/components/home/HomeFooter";
+import { AnimatedBackground } from "@/components/home/AnimatedBackground";
 
 export function PublicContentLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-background text-on-surface">
+    <div className="relative isolate min-h-dvh text-on-surface">
+      <AnimatedBackground />
       <Navbar />
       <main id="main-content" className="pt-24">{children}</main>
-      <HomeFooter />
+      <HomeFooter transparent />
     </div>
   );
 }

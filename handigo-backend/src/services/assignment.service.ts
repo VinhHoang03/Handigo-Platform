@@ -8,7 +8,6 @@ import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AppError } from "../utils/appError";
 import { Address } from "../models/address.model";
-import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 import { emitToUser } from "../sockets/socketServer";
 import { cancelOrderWithSettlement } from "./orderCancellation.service";
 import { assertProviderWalletEligible } from "./providerWalletEligibility.service";
@@ -23,6 +22,7 @@ import {
   evaluateQuotationItemsForOrder,
   getBlockedRelevanceItems,
 } from "./quotationRelevance.service";
+import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 
 const assignmentLogger = createLogger("AssignmentService");
 
@@ -612,8 +612,8 @@ export const AssignmentService = {
         .lean();
       hasAccess = Boolean(
         provider &&
-          order.providerId &&
-          order.providerId.toString() === provider._id.toString(),
+        order.providerId &&
+        order.providerId.toString() === provider._id.toString(),
       );
     }
     if (!hasAccess) {

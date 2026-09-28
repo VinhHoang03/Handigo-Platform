@@ -36,5 +36,5 @@ export function ChatbotGate() {
 
   const audience: ChatbotAudience = normalizedRole;
 
-  return <ChatbotWidget audience={audience} />;
+  return <ChatbotWidget key={user?.id ?? user?._id} audience={audience} />;
 }

@@ -11,6 +11,9 @@ export function OrderTrackingMap({
   compact = false,
 }: OrderTrackingMapProps) {
   const {
+    searchMessage,
+    nearbyMessage,
+    routeMessage,
     address,
     addressLine,
     trackingEnabled,
@@ -37,6 +40,13 @@ export function OrderTrackingMap({
         distanceLabel={distanceLabel}
       />
 
+      {searchMessage && (
+        <p role="status" className="border-y border-primary/20 bg-primary/10 px-5 py-3 text-sm font-medium text-primary">
+          {searchMessage}
+        </p>
+      )}
+      {nearbyMessage && <p role="status" className="px-5 py-3 text-sm text-on-surface-variant">{nearbyMessage}</p>}
+      {routeMessage && <p className="px-5 pb-3 text-sm text-on-surface-variant">{routeMessage}</p>}
       <TrackingMapCanvas
         compact={compact}
         hasMapCoordinate={hasMapCoordinate}

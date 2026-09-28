@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { Route } from "react-router-dom";
 import { RouteGuard } from "@/components/common/RouteGuard";
 import { HomeRoute, WalletPage, CaseManagementPage } from "./shared-lazy-pages";
+const CustomerRewardsPage = lazy(() => import("@/features/rewards/pages/CustomerRewardsPage"));
 
 const BookingDetailPage = lazy(
   () => import("@/features/booking/pages/BookingDetailPage"),
@@ -46,6 +47,7 @@ const CustomerBankAccountsPage = lazy(
 export function CustomerRoutes() {
   return (
     <>
+      <Route path="/customer/rewards" element={<RouteGuard roles={["CUSTOMER"]}><CustomerRewardsPage /></RouteGuard>} />
       <Route
         path="/customer/bookings"
         element={

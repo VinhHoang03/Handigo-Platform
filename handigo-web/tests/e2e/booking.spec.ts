@@ -8,17 +8,17 @@ test('Chặn bước tiếp theo khi chưa chọn dịch vụ', async ({ page })
   await expect(page).toHaveURL(/\/customer\/bookings\/new$/);
 });
 
-test('Chặn mô tả ngắn và trường hợp không có chuyên gia', async ({ page, api }) => {
+test('Chặn mô tả ngắn và cho phép tìm thợ tự động khi chưa có chuyên gia', async ({ page, api }) => {
   api.providersAvailable = false;
   await selectService(page);
-  await expect(page.getByText('Chưa có chuyên gia phù hợp với địa chỉ đã chọn.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Chưa có thợ phù hợp gần địa chỉ này. Bạn có thể tiếp tục để hệ thống tìm và mở rộng bán kính tự động.', { exact: true })).toBeVisible();
   await page.getByLabel('Mô tả tình trạng').fill('Ngắn');
   await page.getByRole('button', { name: 'Tiếp tục bước 3' }).click();
   await expect(page.getByText('Vui lòng mô tả tình trạng tối thiểu 10 ký tự.', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/location$/);
   await page.getByLabel('Mô tả tình trạng').fill('Cần vệ sinh nhà và phòng khách.');
   await page.getByRole('button', { name: 'Tiếp tục bước 3' }).click();
-  await expect(page.getByText('Chưa có chuyên gia phù hợp với địa chỉ đã chọn.', { exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/\/location$/);
+  await expect(page).toHaveURL(/\/payment$/);
   expect(api.writes.filter(({ path }) => path === '/orders')).toHaveLength(0);
 });
 

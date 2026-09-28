@@ -32,8 +32,8 @@ export default function SupportPage({ role }: SupportPageProps) {
   const content = (
     <>
       <section
-        className={`bg-surface-container-low px-5 py-12 text-center sm:px-6 sm:py-16 ${
-          role ? "rounded-3xl border border-outline-variant/20" : "sm:py-20"
+        className={`px-5 py-12 text-center sm:px-6 sm:py-16 ${
+          role ? "rounded-3xl border border-outline-variant/20 bg-surface-container-low" : "sm:py-20"
         }`}
       >
         <p className="text-label-sm font-semibold uppercase tracking-[0.18em] text-secondary">

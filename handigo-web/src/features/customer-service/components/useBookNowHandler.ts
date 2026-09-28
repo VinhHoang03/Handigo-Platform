@@ -1,6 +1,5 @@
 import type { NavigateFunction } from "react-router-dom";
 import type { Address, Service } from "@/types/booking";
-import type { ProviderAvailabilityStatus } from "./NearbyProviderSelector";
 import { getCategoryId } from "../utils/serviceDisplay";
 import { isRequiredOptionSelectionMissing } from "@/features/booking/utils/serviceOptionSelection";
 
@@ -10,7 +9,6 @@ interface UseBookNowHandlerParams {
   navigate: NavigateFunction;
   addressId: string | undefined;
   addresses: Address[];
-  providerAvailability: ProviderAvailabilityStatus;
   selectedOptionIds: string[];
   selectedOptionQuantities: Record<string, number>;
   setAddressSelectionError: (message: string) => void;
@@ -30,7 +28,6 @@ export function useBookNowHandler({
   navigate,
   addressId,
   addresses,
-  providerAvailability,
   selectedOptionIds,
   selectedOptionQuantities,
   setAddressSelectionError,
@@ -45,14 +42,6 @@ export function useBookNowHandler({
     }
     if (!addressId || !addresses.some((address) => address._id === addressId)) {
       setAddressSelectionError("Vui lòng chọn địa chỉ thực hiện trước khi đặt lịch.");
-      return;
-    }
-    if (providerAvailability !== "available") {
-      setAddressSelectionError(
-        providerAvailability === "loading" || providerAvailability === "idle"
-          ? "Vui lòng chờ hệ thống tìm thợ phù hợp."
-          : "Chưa có thợ phù hợp với dịch vụ và địa chỉ đã chọn.",
-      );
       return;
     }
     if (isRequiredOptionSelectionMissing(service, selectedOptionIds)) {

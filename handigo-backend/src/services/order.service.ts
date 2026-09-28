@@ -1,12 +1,15 @@
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
+import { earnOrderRewards } from "./reward.service";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
 import { Address } from "../models/address.model";
+import { ensureAddressCoordinates } from "./address.service";
 import { AppError } from "../utils/appError";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
 import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
 import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt } from "../utils/bookingPolicy";
@@ -30,6 +33,7 @@ import { requestProviderReassignment } from "./orderReassignment.service";
 import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
+  reservePersonalVoucher,
 } from "./voucher.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -166,6 +170,7 @@ export async function dispatchOrderForMatching(orderId: string) {
 
 export interface CreateOrderPayload {
   expectedBookingAmount?: number;
+  confirmedExpectation?: { amount: number; addressVersion?: string };
   customerId: string;
   serviceId: string;
   servicePackageId?: string;
@@ -234,10 +239,10 @@ export const OrderService = {
     const occurrenceDates =
       orderType === "recurring" && scheduledAt
         ? buildRecurringDates(
-            scheduledAt,
-            payload.recurrenceUnit as "weekly" | "monthly",
-            payload.recurrenceCount as number,
-          )
+          scheduledAt,
+          payload.recurrenceUnit as "weekly" | "monthly",
+          payload.recurrenceCount as number,
+        )
         : scheduledAt
           ? [scheduledAt]
           : [];
@@ -279,13 +284,14 @@ export const OrderService = {
     if (!Types.ObjectId.isValid(payload.addressId)) {
       throw new AppError("Địa chỉ không hợp lệ.", 400);
     }
-    const address = await Address.findOne({
+    const selectedAddress = await Address.findOne({
       _id: payload.addressId,
       userId: payload.customerId,
     });
-    if (!address) {
+    if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
+    const address = await ensureAddressCoordinates(selectedAddress);
 
     const pricingSnapshot = await buildServicePricingSnapshot(
       service, payload.selectedOptionIds, payload.selectedOptions, orderType,
@@ -365,19 +371,19 @@ export const OrderService = {
     const autoAcceptProvider =
       requiresProviderConfirmation && scheduledAt && preferredProvider
         ? await Provider.findOne({
-            _id: preferredProvider.providerId,
-            verified: true,
-            isDeleted: false,
-            autoAcceptScheduledBookings: true,
-          }).select("_id autoAcceptScheduledBookings autoAcceptScheduledBookingHorizonDays")
+          _id: preferredProvider.providerId,
+          verified: true,
+          isDeleted: false,
+          autoAcceptScheduledBookings: true,
+        }).select("_id autoAcceptScheduledBookings autoAcceptScheduledBookingHorizonDays")
         : null;
     const autoAcceptPreferredAppointment = Boolean(
       autoAcceptProvider &&
-        scheduledAt &&
-        isScheduledDateWithinProviderHorizon(
-          scheduledAt,
-          autoAcceptProvider.autoAcceptScheduledBookingHorizonDays,
-        ),
+      scheduledAt &&
+      isScheduledDateWithinProviderHorizon(
+        scheduledAt,
+        autoAcceptProvider.autoAcceptScheduledBookingHorizonDays,
+      ),
     );
 
     const inspectionRequired = service.serviceType === "variable_price";
@@ -390,6 +396,9 @@ export const OrderService = {
       : Math.max(platformCommissionPercent, 0) / 100;
     // Tiền đặt dịch vụ gồm giá gốc/cọc và phụ phí phục vụ ngay nếu có.
     const totalAmount = pricingSnapshot.bookingAmount;
+    if (payload.confirmedExpectation && totalAmount !== payload.confirmedExpectation.amount) {
+      throw new ActionPreconditionError();
+    }
     const voucherResult = payload.voucherCode
       ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount)
       : null;
@@ -403,71 +412,72 @@ export const OrderService = {
       requiresProviderConfirmation && inspectionRequired;
     const initialInspectionPaymentDueAt = requiresImmediateInspectionPayment && scheduledAt
       ? new Date(
-          Math.min(
-            Date.now() + pricingSnapshot.paymentHoldMinutes * 60 * 1000,
-            scheduledAt.getTime(),
-          ),
-        )
+        Math.min(
+          Date.now() + pricingSnapshot.paymentHoldMinutes * 60 * 1000,
+          scheduledAt.getTime(),
+        ),
+      )
       : null;
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
       return {
-      orderCode: generateOrderCode(),
-      customerId: new Types.ObjectId(payload.customerId),
-      preferredProviderId: payload.preferredProviderId
-        ? new Types.ObjectId(payload.preferredProviderId)
-        : null,
-      serviceId: new Types.ObjectId(payload.serviceId),
-      servicePackageId: null,
-      selectedOptionIds: pricingSnapshot.optionIds,
-      selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
-      addressId: new Types.ObjectId(payload.addressId),
-      orderType,
-      scheduledAt: orderDate,
-      schedule: {
-        ...pricingSnapshot.schedule,
-        expectedStartAt: orderDate,
-        expectedEndAt: orderDate ? new Date(orderDate.getTime() + pricingSnapshot.schedule.durationMinutes * 60000) : null,
-      },
-      bookingStatus: requiresImmediateInspectionPayment
-        ? "awaiting_payment"
-        : requiresProviderConfirmation
-          ? "awaiting_provider"
-        : "not_required",
-      paymentDueAt: initialInspectionPaymentDueAt,
-      recurringGroupId,
-      recurrenceUnit: orderType === "recurring" ? payload.recurrenceUnit : null,
-      occurrenceNumber: orderType === "recurring" ? index + 1 : null,
-      totalOccurrences: orderType === "recurring" ? orderDates.length : null,
-      status: "created",
-      paymentMethod: payload.paymentMethod,
-      paymentStatus: "unpaid",
-      readyForMatching: isAutoAppointment && !inspectionRequired && index === 0,
-      matchingStartedAt: isAutoAppointment && !inspectionRequired && index === 0
-        ? autoMatchingStartedAt
-        : null,
-      depositAmount: pricingSnapshot.depositAmount,
-      inspectionRequired,
-      hasAdditionalQuotation: false,
-      problemDescription: payload.problemDescription ?? null,
-      customerAttachments: payload.customerAttachments ?? [],
-      pricing: {
-        baseAmount: pricingSnapshot.baseAmount,
-        immediateFee: pricingSnapshot.immediateFee,
-        immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
-        bookingAmount: totalAmount, // The amount including options for the current payment phase
-        platformCommissionRate,
-        ...calculateBookingSettlement(Math.max(totalAmount - voucherDiscountAmount, 0), pricingSnapshot.immediateFee, platformCommissionRate, pricingSnapshot.immediateProviderPercent, inspectionRequired),
-        promotionDiscountAmount: 0,
-        voucherDiscountAmount,
-        totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
-      },
-      voucherSnapshot: orderVoucher?.snapshot ?? null,
-      confirmation: {
-        customerConfirmedAt: null,
-        providerConfirmedAt: null,
-      },
+        _id: new Types.ObjectId(),
+        orderCode: generateOrderCode(),
+        customerId: new Types.ObjectId(payload.customerId),
+        preferredProviderId: payload.preferredProviderId
+          ? new Types.ObjectId(payload.preferredProviderId)
+          : null,
+        serviceId: new Types.ObjectId(payload.serviceId),
+        servicePackageId: null,
+        selectedOptionIds: pricingSnapshot.optionIds,
+        selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
+        addressId: new Types.ObjectId(payload.addressId),
+        orderType,
+        scheduledAt: orderDate,
+        schedule: {
+          ...pricingSnapshot.schedule,
+          expectedStartAt: orderDate,
+          expectedEndAt: orderDate ? new Date(orderDate.getTime() + pricingSnapshot.schedule.durationMinutes * 60000) : null,
+        },
+        bookingStatus: requiresImmediateInspectionPayment
+          ? "awaiting_payment"
+          : requiresProviderConfirmation
+            ? "awaiting_provider"
+            : "not_required",
+        paymentDueAt: initialInspectionPaymentDueAt,
+        recurringGroupId,
+        recurrenceUnit: orderType === "recurring" ? payload.recurrenceUnit : null,
+        occurrenceNumber: orderType === "recurring" ? index + 1 : null,
+        totalOccurrences: orderType === "recurring" ? orderDates.length : null,
+        status: "created",
+        paymentMethod: payload.paymentMethod,
+        paymentStatus: "unpaid",
+        readyForMatching: isAutoAppointment && !inspectionRequired && index === 0,
+        matchingStartedAt: isAutoAppointment && !inspectionRequired && index === 0
+          ? autoMatchingStartedAt
+          : null,
+        depositAmount: pricingSnapshot.depositAmount,
+        inspectionRequired,
+        hasAdditionalQuotation: false,
+        problemDescription: payload.problemDescription ?? null,
+        customerAttachments: payload.customerAttachments ?? [],
+        pricing: {
+          baseAmount: pricingSnapshot.baseAmount,
+          immediateFee: pricingSnapshot.immediateFee,
+          immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
+          bookingAmount: totalAmount, // The amount including options for the current payment phase
+          platformCommissionRate,
+          ...calculateBookingSettlement(Math.max(totalAmount - voucherDiscountAmount, 0), pricingSnapshot.immediateFee, platformCommissionRate, pricingSnapshot.immediateProviderPercent, inspectionRequired),
+          promotionDiscountAmount: 0,
+          voucherDiscountAmount,
+          totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
+        },
+        voucherSnapshot: orderVoucher?.snapshot ?? null,
+        confirmation: {
+          customerConfirmedAt: null,
+          providerConfirmedAt: null,
+        },
       };
     });
     let createdOrders: Array<IOrder>;
@@ -663,10 +673,10 @@ export const OrderService = {
 
     const relatedOrderIds = order.recurringGroupId
       ? await Order.find({
-          recurringGroupId: order.recurringGroupId,
-          customerId: new Types.ObjectId(customerId),
-          isDeleted: false,
-        }).distinct("_id")
+        recurringGroupId: order.recurringGroupId,
+        customerId: new Types.ObjectId(customerId),
+        isDeleted: false,
+      }).distinct("_id")
       : [order._id];
     const hasDeclinedAssignment = await OrderAssignment.exists({
       orderId: { $in: relatedOrderIds },
@@ -718,9 +728,9 @@ export const OrderService = {
       responseDeadline = new Date(
         order.scheduledAt
           ? Math.min(
-              Date.now() + responseMinutes * 60 * 1000,
-              order.scheduledAt.getTime(),
-            )
+            Date.now() + responseMinutes * 60 * 1000,
+            order.scheduledAt.getTime(),
+          )
           : Date.now() + responseMinutes * 60 * 1000,
       );
     } else {
@@ -773,9 +783,9 @@ export const OrderService = {
         candidate.userId.toString(),
         isAppointment ? "assignment:new" : "direct-request:new",
         {
-        assignmentId: assignment._id.toString(),
-        orderId: order._id.toString(),
-        responseDeadline,
+          assignmentId: assignment._id.toString(),
+          orderId: order._id.toString(),
+          responseDeadline,
         },
       );
       await createNotificationRecord({
@@ -1016,14 +1026,15 @@ export const OrderService = {
       throw new AppError("Bạn không có quyền xem đơn hàng này.", 403);
     }
 
+    const matchingSearch = order.matchingStartedAt && !order.preferredProviderId
+      ? order.matchingSearch : null;
     const matchingExpiresAt = order.matchingStartedAt
-      ? new Date(
-          order.matchingStartedAt.getTime() +
-            (await getMaxMatchingDurationSeconds()) * 1000,
-        )
+      ? matchingSearch?.expiresAt ?? new Date(order.matchingStartedAt.getTime()
+        + (order.preferredProviderId ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
+          : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
-    return { ...order, matchingExpiresAt };
+    return { ...order, matchingSearch, matchingExpiresAt };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {
@@ -1162,7 +1173,7 @@ export const OrderService = {
         if (
           !transactionalOrder.providerId ||
           transactionalOrder.providerId.toString() !==
-            transactionalProvider._id.toString()
+          transactionalProvider._id.toString()
         ) {
           throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
         }
@@ -1260,6 +1271,7 @@ export const OrderService = {
         await transactionalOrder.save({ session });
 
         transactionalProvider.totalCompletedOrders += 1;
+        await earnOrderRewards(transactionalOrder, session);
         transactionalProvider.availabilityStatus = "online";
         await transactionalProvider.save({ session });
 
@@ -1283,6 +1295,7 @@ export const OrderService = {
     userId: string,
     role: "customer" | "provider" | "admin",
     reason: string,
+    confirmedExpectation?: { paidAmount: number; refundAmount: number; cancellationFee: number },
   ): Promise<IOrder> {
     if (role === "provider") {
       const order = await Order.findById(orderId).select("status orderType");
@@ -1299,6 +1312,7 @@ export const OrderService = {
       actorId: userId,
       role,
       reason,
+      confirmedExpectation,
     });
   },
 

@@ -1,4 +1,5 @@
 export * from './HeroSection';
+export * from './AiIntroductionSection';
 export * from './TrustStrip';
 export * from './CategoriesSection';
 export * from './HowItWorksSection';

@@ -1,3 +1,4 @@
+import { getMatchingMapProviders } from "../services/dispatch.service";
 import type { NextFunction, Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import { getOrderTrackingRoute as getTrackingRoute } from "../services/orderTracking.service";
@@ -29,6 +30,16 @@ export const getOrderTrackingRoute = async (
       user.role,
       req.query as unknown as TrackingRouteQuery,
     );
+    return res.json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getOrderMatchingProviders = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await getMatchingMapProviders(getParam(req, "orderId"), user.id);
     return res.json({ success: true, data });
   } catch (error) {
     return next(error);

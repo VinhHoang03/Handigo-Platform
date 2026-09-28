@@ -9,8 +9,8 @@ export const ProfileSection: React.FC<{
   actions?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, actionLabel, onAction, actions, children }) => (
-  <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm">
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-md shadow-sm">
+    <div className="mb-md flex flex-wrap items-center justify-between gap-3">
       <h3 className="text-pretty font-headline-md text-headline-md text-on-surface">
         {title}
       </h3>

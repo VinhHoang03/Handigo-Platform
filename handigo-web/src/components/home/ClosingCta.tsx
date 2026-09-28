@@ -11,24 +11,24 @@ import { ArrowRight } from "lucide-react";
 export const ClosingCta = () => (
   <section
     aria-labelledby="closing-cta-heading"
-    className="mt-lg bg-primary py-lg text-on-primary"
+    className="mx-auto mt-14 max-w-7xl px-4 py-10 text-on-surface md:mt-20 md:px-8 md:py-14"
   >
-    <div className="mx-auto flex max-w-7xl flex-col items-start gap-8 px-4 md:px-8 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col items-start gap-8 border-t border-outline-variant/50 pt-10 lg:flex-row lg:items-center lg:justify-between">
       <div className="max-w-2xl">
         <h2
           id="closing-cta-heading"
           className="text-balance font-headline-lg text-headline-lg tracking-[-0.02em]"
         >
-          Nhà đang hỏng thứ gì?
+          Bớt một việc lo, thêm thời gian cho bạn.
         </h2>
-        <p className="mt-3 text-pretty text-body-lg text-on-primary/80">
+        <p className="mt-3 text-pretty text-body-lg text-on-surface-variant">
           Mô tả việc cần làm, xem báo giá rồi mới quyết định.
         </p>
       </div>
 
       <Link
         to="/customer/services"
-        className="inline-flex min-h-14 shrink-0 items-center justify-center gap-2 rounded-lg bg-surface px-8 py-3 text-label-md font-semibold text-primary transition-colors duration-200 hover:bg-surface-container active:scale-[0.98]"
+        className="inline-flex min-h-14 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-8 py-3 text-label-md font-semibold text-on-primary transition-colors duration-200 hover:bg-primary-hover focus-visible:ring-4 focus-visible:ring-primary/30 active:scale-[0.98] sm:w-auto"
       >
         Tìm thợ
         <ArrowRight aria-hidden="true" size={18} />

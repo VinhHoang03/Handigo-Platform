@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cổng thông tin đối tác FixNow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html {
+        font-family: 'Inter', sans-serif;
+      }
+      body {
+        min-height: 100vh;
+        background-color: #f8f9ff;
+        color: #0b1c30;
+      }
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    @keyframes pulse-green {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+    .status-online { animation: pulse-green 2s infinite; }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-tertiary": "#ffffff",
+            "surface-variant": "#d3e4fe",
+            "tertiary-container": "#bc4800",
+            "primary-fixed-dim": "#b4c5ff",
+            "surface-tint": "#0053db",
+            "secondary-fixed": "#acedff",
+            "on-tertiary-fixed": "#360f00",
+            "on-primary": "#ffffff",
+            "tertiary-fixed-dim": "#ffb596",
+            "surface-dim": "#cbdbf5",
+            "inverse-surface": "#213145",
+            "surface-container": "#e5eeff",
+            "on-error-container": "#93000a",
+            "primary-container": "#2563eb",
+            "secondary": "#00687a",
+            "on-secondary-fixed": "#001f26",
+            "on-primary-fixed-variant": "#003ea8",
+            "background": "#f8f9ff",
+            "on-tertiary-fixed-variant": "#7d2d00",
+            "surface": "#f8f9ff",
+            "on-primary-container": "#eeefff",
+            "on-surface": "#0b1c30",
+            "on-tertiary-container": "#ffede6",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary": "#ffffff",
+            "on-secondary-fixed-variant": "#004e5c",
+            "primary-fixed": "#dbe1ff",
+            "primary": "#004ac6",
+            "surface-container-highest": "#d3e4fe",
+            "error": "#ba1a1a",
+            "inverse-on-surface": "#eaf1ff",
+            "on-primary-fixed": "#00174b",
+            "surface-container-high": "#dce9ff",
+            "on-surface-variant": "#434655",
+            "surface-container-low": "#eff4ff",
+            "on-secondary-container": "#006172",
+            "on-background": "#0b1c30",
+            "surface-bright": "#f8f9ff",
+            "inverse-primary": "#b4c5ff",
+            "tertiary": "#943700",
+            "secondary-fixed-dim": "#4cd7f6",
+            "tertiary-fixed": "#ffdbcd",
+            "error-container": "#ffdad6",
+            "on-error": "#ffffff",
+            "outline-variant": "#c3c6d7",
+            "secondary-container": "#57dffe",
+            "outline": "#737686"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xs": "8px",
+            "md": "24px",
+            "container-max": "1440px",
+            "xl": "48px",
+            "2xl": "64px",
+            "margin-mobile": "16px",
+            "gutter": "24px",
+            "sm": "16px",
+            "lg": "32px",
+            "base": "4px"
+          },
+          "fontFamily": {
+            "headline-md": ["Inter"],
+            "body-md": ["Inter"],
+            "headline-lg": ["Inter"],
+            "headline-lg-mobile": ["Inter"],
+            "body-sm": ["Inter"],
+            "display-lg": ["Inter"],
+            "label-md": ["Inter"],
+            "body-lg": ["Inter"],
+            "label-sm": ["Inter"]
+          },
+          "fontSize": {
+            "headline-md": ["20px", {"lineHeight": "1.4", "fontWeight": "600"}],
+            "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+            "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+            "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+            "body-sm": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+            "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+            "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "600"}],
+            "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+            "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "500"}]
+          }
+        }
+      }
+    };
+  </script>
+<meta content="web_dashboard" name="shell-type"/>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- Header Navigation -->
+<header class="fixed top-0 left-0 right-0 z-40 bg-surface-container-lowest/90 backdrop-blur-md shadow-sm pl-64">
+<div class="h-16 px-lg flex items-center justify-between gap-md">
+<div class="flex-1 max-w-md relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low rounded-xl text-body-sm text-on-surface placeholder:text-outline border-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all" placeholder="Tìm kiếm dịch vụ, mã đơn, khách hàng..." type="text"/>
+</div>
+<div class="flex items-center gap-md">
+<div class="hidden md:flex items-center gap-xs px-3 py-1.5 rounded-full bg-surface-container text-secondary text-label-sm font-semibold">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 status-online"></span>
+<span>Sẵn sàng nhận việc</span>
+</div>
+<button class="relative p-2 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors" title="Thông báo">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error"></span>
+</button>
+<div class="flex items-center gap-xs pl-2 border-l border-surface-container-high">
+<img alt="Alex Rivera" class="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCh2GWUY63wLBrtaf1ouaH74DCS_0qjC7PcAn930UHQ4qlLsZ7Od1aMEgKMCI-l6KlhUkr2L52vNPoW2FH_LvKkvLBE-kG8f7GAl-yv4iWZRzPAwCQr9-3A_98PaC-3KtfGNNDZQOBeYVzOIFy_R3FxRHvlsGuSuDvnTNjUQS6urqTp8Sz09OZ94FHw6xYaF9dHfGJq-yBLgBjK3WJIf4lCKDmsTglmktwOqxbjTu93BtdRWvKCJ1-J1HQ_GSsOu7gwwv5fl-yKDXA"/>
+<div class="hidden sm:block text-left">
+<p class="text-label-md font-bold text-on-surface leading-tight">Alex Rivera</p>
+<p class="text-[11px] text-primary font-medium leading-none">Đối tác Cấp 5</p>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Left Sidebar Navigation -->
+<aside class="fixed left-0 top-0 bottom-0 w-64 bg-surface-container-low shadow-sm flex flex-col py-lg px-sm z-50 overflow-y-auto">
+<div class="mb-lg px-sm flex items-center gap-sm">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-md">
+<span class="material-symbols-outlined text-[24px]">construction</span>
+</div>
+<div>
+<h1 class="text-headline-md font-bold text-primary tracking-tight">FixNow</h1>
+<p class="text-label-sm text-on-surface-variant font-medium">Cổng đối tác</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1" data-active-classes="bg-primary text-on-primary shadow-sm font-bold">
+<a class="flex items-center px-md py-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 text-label-md font-label-md" data-path="bang-dieu-khien" href="#">Bảng điều khiển</a>
+<a class="flex items-center px-md py-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 text-label-md font-label-md" data-path="cong-viec" href="#">Công việc</a>
+<a class="flex items-center px-md py-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 text-label-md font-label-md" data-path="dich-vu" href="#">Dịch vụ</a>
+<a class="flex items-center px-md py-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 text-label-md font-label-md" data-path="thu-nhap" href="#">Thu nhập</a>
+<a aria-current="page" class="flex items-center px-md py-sm rounded-xl transition-colors duration-150 bg-primary text-on-primary shadow-sm font-bold" data-path="uu-dai-va-diem-thuong" href="#">Ưu đãi &amp; Điểm thưởng</a>
+<a class="flex items-center px-md py-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 text-label-md font-label-md" data-path="tin-nhan" href="#">Tin nhắn</a>
+<a class="flex items-center px-md py-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 text-label-md font-label-md" data-path="danh-gia" href="#">Đánh giá</a>
+<a class="flex items-center px-md py-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors duration-150 text-label-md font-label-md" data-path="ho-so" href="#">Hồ sơ</a>
+</nav>
+<div class="mt-auto px-sm pt-md border-t border-outline-variant/30">
+<div class="flex items-center gap-sm bg-surface-container-lowest/60 p-2 rounded-xl">
+<div class="relative flex-shrink-0">
+<img alt="Alex Rivera" class="w-10 h-10 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCh2GWUY63wLBrtaf1ouaH74DCS_0qjC7PcAn930UHQ4qlLsZ7Od1aMEgKMCI-l6KlhUkr2L52vNPoW2FH_LvKkvLBE-kG8f7GAl-yv4iWZRzPAwCQr9-3A_98PaC-3KtfGNNDZQOBeYVzOIFy_R3FxRHvlsGuSuDvnTNjUQS6urqTp8Sz09OZ94FHw6xYaF9dHfGJq-yBLgBjK3WJIf4lCKDmsTglmktwOqxbjTu93BtdRWvKCJ1-J1HQ_GSsOu7gwwv5fl-yKDXA"/>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full status-online"></div>
+</div>
+<div class="overflow-hidden min-w-0">
+<p class="text-label-md font-bold truncate text-on-surface">Alex Rivera</p>
+<p class="text-[11px] text-on-surface-variant truncate">Thợ trưởng • Hạng Ưu</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="pl-64 pt-16 min-h-screen"><div class="flex flex-col w-full">
+<!-- Content Body Canvas -->
+<div class="p-lg max-w-container-max mx-auto w-full space-y-xl">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-md">
+<div class="space-y-base">
+<div class="flex items-center gap-xs text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span>CHƯƠNG TRÌNH ĐỐI TÁC TIN CẬY FIXNOW</span>
+</div>
+<h1 class="text-headline-lg font-headline-lg text-on-surface tracking-tight">Ưu đãi &amp; Đổi điểm thưởng</h1>
+<p class="text-body-md font-body-md text-on-surface-variant max-w-3xl">
+          Tích lũy điểm từ mỗi đơn hoàn thành đúng hẹn, giữ vững đánh giá 5 sao để đổi voucher vật tư chính hãng, giảm phí nền tảng và quà tặng trợ lực tay nghề.
+        </p>
+</div>
+<!-- Quick Action Controls -->
+<div class="flex items-center gap-xs flex-wrap">
+<button class="inline-flex items-center gap-xs px-md py-2.5 rounded-xl bg-surface-container-high text-primary font-label-md text-label-md hover:bg-surface-container-highest transition-all shadow-sm" id="btn-show-rules">
+<span class="material-symbols-outlined text-[18px]">lightbulb</span>
+<span>Cách tích điểm thêm</span>
+</button>
+<button class="inline-flex items-center gap-xs px-md py-2.5 rounded-xl bg-surface-container-lowest text-on-surface font-label-md text-label-md hover:bg-surface-container-low transition-all shadow-sm" id="btn-show-history">
+<span class="material-symbols-outlined text-[18px]">history</span>
+<span>Lịch sử tích / đổi</span>
+</button>
+</div>
+</div>
+<!-- Reward Hero Card (Bento Style with Elevation Level 1) -->
+<div class="relative overflow-hidden rounded-xl bg-surface-container-lowest shadow-md p-md md:p-xl">
+<!-- Decorative Accent Gradients -->
+<div class="absolute -right-16 -top-16 w-80 h-80 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none"></div>
+<div class="absolute right-1/3 -bottom-16 w-64 h-64 rounded-full bg-primary/10 blur-2xl pointer-events-none"></div>
+<div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-lg items-center">
+<!-- Left Column: Points & Value Equivalent -->
+<div class="lg:col-span-6 space-y-md">
+<div class="inline-flex items-center gap-xs px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span>Hạng Vàng (Gold Partner)</span>
+</div>
+<div class="space-y-base">
+<p class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Tổng điểm khả dụng</p>
+<div class="flex items-baseline gap-xs flex-wrap">
+<span class="text-display-lg font-display-lg text-primary tracking-tight">14,850</span>
+<span class="text-headline-md font-headline-md text-on-surface-variant">Điểm FixPoint</span>
+</div>
+<div class="flex items-center gap-xs text-on-surface font-body-sm text-body-sm bg-surface-container-low px-3 py-1.5 rounded-lg w-fit">
+<span class="material-symbols-outlined text-secondary text-[18px]">payments</span>
+<span>Giá trị quy đổi tương đương: <strong class="text-primary font-semibold">1,485,000 VNĐ</strong></span>
+</div>
+</div>
+<!-- Progress Bar to Next Tier -->
+<div class="space-y-1.5 pt-base">
+<div class="flex justify-between text-body-sm font-body-sm">
+<span class="text-on-surface-variant font-medium">Hạng Vàng</span>
+<span class="text-primary font-semibold">Còn 1,150 điểm để đạt Hạng Kim Cương</span>
+</div>
+<div class="h-3 w-full bg-surface-container-high rounded-full overflow-hidden p-0.5">
+<div class="h-full bg-primary rounded-full transition-all duration-700" style="width: 82%;"></div>
+</div>
+<p class="text-label-sm font-label-sm text-on-surface-variant">Quyền lợi Kim Cương: Giảm thêm 2% chiết khấu sàn cố định &amp; ưu tiên nhận cuốc giờ cao điểm.</p>
+</div>
+</div>
+<!-- Right Column: Quick Stats Mini Grid & Badge Visual -->
+<div class="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-md">
+<div class="p-md rounded-xl bg-surface-container-low flex flex-col justify-between space-y-sm">
+<div class="flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant">Điểm nhận tháng này</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">trending_up</span>
+</div>
+</div>
+<p class="text-headline-md font-headline-md text-primary">+2,400 <span class="text-body-sm font-body-sm text-on-surface-variant font-normal">điểm</span></p>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Cao hơn 18% so với tháng trước</span>
+</div>
+<div class="p-md rounded-xl bg-surface-container-low flex flex-col justify-between space-y-sm">
+<div class="flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant">Voucher đang có</span>
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+</div>
+</div>
+<p class="text-headline-md font-headline-md text-on-surface">5 <span class="text-body-sm font-body-sm text-on-surface-variant font-normal">mã còn hạn</span></p>
+<a class="text-label-sm font-label-sm text-primary font-semibold hover:underline inline-flex items-center gap-0.5" href="#my-vouchers">
+<span>Kiểm tra ngay</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</a>
+</div>
+<div class="sm:col-span-2 p-md rounded-xl bg-primary-container text-on-primary flex items-center justify-between gap-md">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-xl bg-on-primary/10 flex items-center justify-center text-on-primary flex-shrink-0">
+<span class="material-symbols-outlined text-[24px]">electric_meter</span>
+</div>
+<div>
+<p class="text-label-md font-label-md font-bold text-on-primary">Tuần lễ Vàng Ngành Điện Lạnh</p>
+<p class="text-body-sm font-body-sm text-on-primary-container">Nhân đôi FixPoint cho tất cả đơn vệ sinh máy lạnh từ 20/02 đến 28/02.</p>
+</div>
+</div>
+<button class="px-md py-2 rounded-lg bg-on-primary text-primary text-label-md font-label-md hover:bg-surface-container transition-colors shadow-sm whitespace-nowrap">
+              Xem chi tiết
+            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Section 2: Active Vouchers Carousel/Grid -->
+<section class="space-y-md" id="my-vouchers">
+<div class="flex items-center justify-between">
+<div class="space-y-base">
+<div class="flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<h2 class="text-headline-md font-headline-md text-on-surface">Voucher của tôi đang có</h2>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Các phiếu giảm giá, đặc quyền đã đổi hoặc được thưởng từ tổng đài FixNow.</p>
+</div>
+<span class="text-label-sm font-label-sm text-on-surface-variant font-medium bg-surface-container px-3 py-1 rounded-full">
+          3 mã sắp hết hạn
+        </span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- Voucher 1 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between relative overflow-hidden group hover:shadow-lg transition-shadow">
+<div class="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-primary/10 pointer-events-none"></div>
+<div class="space-y-sm">
+<div class="flex items-center justify-between">
+<span class="px-2.5 py-1 rounded-md bg-surface-container text-primary font-label-sm text-label-sm font-semibold">Chiết khấu 0%</span>
+<span class="material-symbols-outlined text-outline text-[20px]">workspace_premium</span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Miễn 100% Phí Sàn FixNow</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Áp dụng cho 3 đơn hàng sửa điện nước tiếp theo nhận qua hệ thống.</p>
+</div>
+<div class="p-2.5 rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="space-y-0.5">
+<p class="text-[11px] text-on-surface-variant uppercase font-medium">Mã ưu đãi</p>
+<p class="font-mono text-label-md font-bold text-primary tracking-wider">FIXPRO100</p>
+</div>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant" onclick="navigator.clipboard.writeText('FIXPRO100'); alert('Đã sao chép mã: FIXPRO100')" title="Sao chép mã">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Hạn dùng: 28/02/2025</span>
+<button class="px-md py-1.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm">
+              Sử dụng ngay
+            </button>
+</div>
+</div>
+<!-- Voucher 2 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between relative overflow-hidden group hover:shadow-lg transition-shadow">
+<div class="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-secondary-container/20 pointer-events-none"></div>
+<div class="space-y-sm">
+<div class="flex items-center justify-between">
+<span class="px-2.5 py-1 rounded-md bg-secondary-container/30 text-secondary font-label-sm text-label-sm font-semibold">Vật tư chính hãng</span>
+<span class="material-symbols-outlined text-outline text-[20px]">construction</span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Giảm 150.000đ Mua Phụ Tùng</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Áp dụng cho đơn ống nhựa &amp; cáp điện tại đại lý ủy quyền Bosch/Panasonic.</p>
+</div>
+<div class="p-2.5 rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="space-y-0.5">
+<p class="text-[11px] text-on-surface-variant uppercase font-medium">Mã ưu đãi</p>
+<p class="font-mono text-label-md font-bold text-secondary tracking-wider">BOSCH150K</p>
+</div>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant" onclick="navigator.clipboard.writeText('BOSCH150K'); alert('Đã sao chép mã: BOSCH150K')" title="Sao chép mã">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Hạn dùng: 15/03/2025</span>
+<button class="px-md py-1.5 rounded-lg bg-surface-container-high text-secondary font-label-md text-label-md hover:bg-surface-container-highest transition-colors">
+              Xem mã QR
+            </button>
+</div>
+</div>
+<!-- Voucher 3 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between relative overflow-hidden group hover:shadow-lg transition-shadow">
+<div class="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-amber-100 pointer-events-none"></div>
+<div class="space-y-sm">
+<div class="flex items-center justify-between">
+<span class="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 font-label-sm text-label-sm font-semibold">Hỗ trợ di chuyển</span>
+<span class="material-symbols-outlined text-outline text-[20px]">local_gas_station</span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Giảm 50.000đ Xăng Petrolimex</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Hỗ trợ chi phí đi lại làm việc tại các quận nội thành qua ứng dụng Petrolimex.</p>
+</div>
+<div class="p-2.5 rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="space-y-0.5">
+<p class="text-[11px] text-on-surface-variant uppercase font-medium">Mã ưu đãi</p>
+<p class="font-mono text-label-md font-bold text-amber-800 tracking-wider">PETRO50</p>
+</div>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant" onclick="navigator.clipboard.writeText('PETRO50'); alert('Đã sao chép mã: PETRO50')" title="Sao chép mã">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Hạn dùng: 10/03/2025</span>
+<button class="px-md py-1.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm">
+              Dùng ngay
+            </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Section: Tabs, Filters & Rewards Catalog with Side Missions -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-lg">
+<!-- Left 8 Columns: Rewards Catalog -->
+<div class="lg:col-span-8 space-y-md">
+<!-- Category Filter Tabs -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-sm">
+<div class="flex items-center gap-xs overflow-x-auto pb-1 scrollbar-none">
+<button class="px-md py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md shadow-sm whitespace-nowrap">Tất cả ưu đãi</button>
+<button class="px-md py-2 rounded-xl bg-surface-container-low text-on-surface-variant hover:bg-surface-container font-label-md text-label-md transition-colors whitespace-nowrap">Vật tư &amp; Thiết bị</button>
+<button class="px-md py-2 rounded-xl bg-surface-container-low text-on-surface-variant hover:bg-surface-container font-label-md text-label-md transition-colors whitespace-nowrap">Giảm chiết khấu sàn</button>
+<button class="px-md py-2 rounded-xl bg-surface-container-low text-on-surface-variant hover:bg-surface-container font-label-md text-label-md transition-colors whitespace-nowrap">Nhiên liệu &amp; Đời sống</button>
+</div>
+<!-- Points Filter Dropdown -->
+<div class="flex items-center gap-xs flex-shrink-0">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Mức điểm:</span>
+<select class="text-body-sm font-body-sm bg-surface-container-lowest rounded-xl px-3 py-1.5 text-on-surface focus:ring-1 focus:ring-primary">
+<option value="all">Tất cả mức điểm</option>
+<option value="low">Dưới 1,000 Điểm</option>
+<option value="mid">1,000 - 5,000 Điểm</option>
+<option value="high">Trên 5,000 Điểm</option>
+</select>
+</div>
+</div>
+<!-- Catalog Grid (6 Items) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-md">
+<!-- Card 1 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between hover:shadow-lg transition-shadow">
+<div class="space-y-sm">
+<div class="relative h-44 rounded-xl overflow-hidden bg-surface-container-low">
+<img class="w-full h-full object-cover" data-alt="Professional modern handyman receipt voucher coupon with blue tech badge, clean studio product photography with smooth lighting and minimal blue background, professional SaaS asset style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCo-7bIit3ZiKz3MdvvEKPV9iWfygnSROMkVYVMPF3oKiY1XmqKJ0nqe3jj87nopufCY0hDVVWVUfThXF_x6PlH2n6ZheXA1kE8RNWlEBTadE3HQmhLHv3mfLeHwDdNjr0aFdwp762gw83kDkgKd9tSj7DGAz3bsP2BmfxKTOVmLggF-tsVqy9psAmXnmJsTGfSDgnMfbz76YaSLHGUMBnn6CzmaVZkRJx7pp8YYkvzto7RxPeiOSo9"/>
+<span class="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md bg-tertiary-container text-on-tertiary-container font-label-sm text-label-sm font-bold shadow-sm">
+                  Bán chạy nhất
+                </span>
+<span class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/90 backdrop-blur-sm text-primary font-label-md text-label-md font-bold">
+                  1,200 Điểm
+                </span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Gói 0% Chiết khấu 5 đơn tiếp theo</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2">Giữ nguyên 100% doanh thu kiếm được từ 5 cuốc nhận việc tiếp theo trên ứng dụng FixNow.</p>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-secondary font-medium">Còn lại: 48 suất</span>
+<button class="px-md py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm" onclick="alert('Xác nhận đổi Gói 0% Chiết khấu với 1,200 Điểm?')">
+                Đổi ngay
+              </button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between hover:shadow-lg transition-shadow">
+<div class="space-y-sm">
+<div class="relative h-44 rounded-xl overflow-hidden bg-surface-container-low">
+<img class="w-full h-full object-cover" data-alt="Professional heavy duty Stanley multipurpose wrench and contactless voltage tester detector pen neatly laid on clean workshop table, technical tools photography, soft natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQq4mj2CS5X3rVuYVhTBZsaIMA3mRoA8OrDv47YkAQI4wo8oiuPW4GFNC4uniGGAmU9Zs9QOdAR0z8DTff5IlwNVbIK-gjqflJQic_dYgorBUs3_ptYdXb1a4dTwZZhDQ1Tm0p7iLviWYMCuajdrvVtOxA2O6Vaw62hF-Xo9EZyySLvek_hNgPCiYmrnrh-VBzUF0ExFX5-R1Yg0EH258jQd8utpNVh3qEgt6ypetKL_Kd5pcOgMse"/>
+<span class="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md bg-secondary text-on-secondary font-label-sm text-label-sm font-bold shadow-sm">
+                  Vật tư thợ
+                </span>
+<span class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/90 backdrop-blur-sm text-primary font-label-md text-label-md font-bold">
+                  3,500 Điểm
+                </span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Bộ cờ lê đa năng &amp; Bút thử điện Stanley</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2">Bộ công cụ chuyên dụng cách điện tiêu chuẩn 1000V và bộ cờ lê hợp kim siêu bền.</p>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-secondary font-medium">Còn lại: 15 bộ</span>
+<button class="px-md py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm" onclick="alert('Xác nhận đổi Bộ dụng cụ Stanley với 3,500 Điểm?')">
+                Đổi ngay
+              </button>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between hover:shadow-lg transition-shadow">
+<div class="space-y-sm">
+<div class="relative h-44 rounded-xl overflow-hidden bg-surface-container-low">
+<img class="w-full h-full object-cover" data-alt="Schneider and RangDong modern electrical smart switches circuit breakers and LED light bulbs neatly arranged on minimal architectural surface, clean commercial product photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDd_t9Yf0uhBCQ5ADeIm-xaCe--nxvrfp1VAPou3w_ChjKUk8NiGCvAE5Bfx58FgHF-_OVULoxqiJEKrITg48bzg1QV4GZsdb4RAYseuFjnZm01uamLN-9nyxJjroYEB9ZZU5dIrciqK0JhEwQFrKoqk-CXIOQJofASDm2_jT4b7CNM5KpEV925-0my0qzZ1A7mVDKudPR4LmE08i-YvquhM0v16Qd8H4-AsevY2agilVr5Lb8gtmis"/>
+<span class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/90 backdrop-blur-sm text-primary font-label-md text-label-md font-bold">
+                  2,000 Điểm
+                </span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Voucher 200.000đ RangDong/Schneider</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2">Áp dụng trực tiếp khi mua thiết bị điện chiếu sáng, aptomat chống giật tại các đại lý liên kết.</p>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-secondary font-medium">Còn lại: 82 voucher</span>
+<button class="px-md py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm" onclick="alert('Xác nhận đổi Voucher 200k Thiết bị điện với 2,000 Điểm?')">
+                Đổi ngay
+              </button>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between hover:shadow-lg transition-shadow">
+<div class="space-y-sm">
+<div class="relative h-44 rounded-xl overflow-hidden bg-surface-container-low">
+<img class="w-full h-full object-cover" data-alt="High tech dark blue waterproof technical service jacket uniform with reflective safety strips and FixNow Pro embroidered patch, high end apparel product shoot with soft gradient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRWKdTVuuSvLiiB0iQGg6YVhsf8Cr0pwi5-k_yM5HGJSmZoJ5Due6PqXHwVsYDC79w1PuqVZKoMqvJYW7Lp9xH4fD04Ixd8-Otsd6p_sGv43v-n5oPFjOdjxDCpVg5gNndPv0FOXqqMh0PW_-uW0s9IbrLRR3Y1auLJtFjwAXowaFVU3_w8o2To2KS1faGdXOTj6u4mTrZk_JAIX_TPs9bFXnq7lNTctc5ZEtvG-ocPwAnChJvU-Rc"/>
+<span class="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md bg-primary text-on-primary font-label-sm text-label-sm font-bold shadow-sm">
+                  Độc quyền
+                </span>
+<span class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/90 backdrop-blur-sm text-primary font-label-md text-label-md font-bold">
+                  2,800 Điểm
+                </span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Áo khoác thợ FixNow Pro Chống Nước</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2">Chất liệu Gore-Tex cao cấp, phản quang an toàn ban đêm, nhiều túi chứa dụng cụ tiện lợi.</p>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-secondary font-medium">Đủ size: M, L, XL, XXL</span>
+<button class="px-md py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm" onclick="alert('Xác nhận đổi Áo khoác FixNow Pro với 2,800 Điểm?')">
+                Đổi ngay
+              </button>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between hover:shadow-lg transition-shadow">
+<div class="space-y-sm">
+<div class="relative h-44 rounded-xl overflow-hidden bg-surface-container-low">
+<img class="w-full h-full object-cover" data-alt="Minimalist digital mobile phone recharge topup card card illustration with 5G telecommunication antenna in clean modern vector aesthetic, blue and white corporate palette" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwofUwCm0i-Hp0hQDznORBg77F6pR3lOWiSwREWhebUy0nAPHCS9ONo3J34PblEpzTL2VimGj00p02_sh0DzWt-g-Zb93k64Qp_3bI1fgBZaglqTi-8AIsBi5hroGHKHhyplEZ9M8njP7Ifqob1VmK99nRdV-H1AZjZaDe7S-mv_95gN45hM2NtAdVTQdvBWRZcSEIyJ-eikYf1cPdsUAChInFNT1wfh1mWXrL3giLTyB4OljjpcYL"/>
+<span class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/90 backdrop-blur-sm text-primary font-label-md text-label-md font-bold">
+                  1,000 Điểm
+                </span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Thẻ nạp điện thoại 100.000đ</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2">Gửi mã thẻ cào tự động qua SMS ngay sau khi đổi (Hỗ trợ Viettel, Vinaphone, Mobifone).</p>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-secondary font-medium">Không giới hạn</span>
+<button class="px-md py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm" onclick="alert('Xác nhận đổi Thẻ nạp 100k với 1,000 Điểm?')">
+                Đổi ngay
+              </button>
+</div>
+</div>
+<!-- Card 6 -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md flex flex-col justify-between hover:shadow-lg transition-shadow">
+<div class="space-y-sm">
+<div class="relative h-44 rounded-xl overflow-hidden bg-surface-container-low">
+<img class="w-full h-full object-cover" data-alt="Insurance safety shield concept with heart and medical cross icon on sleek glass tablet, blue security glow, professional financial protection photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJx5aKMxNp2iDsT4-TUJdOT_dPkR331Yh7Qi7WfPA5RY2FKfQpsXPPKKDrFJsTmRsAp1gqxY-eLmBLccEmmFHxgdFg00I3R2I_dcKsXQtdrV8KJixEAbiCTKygplOEbmI9yz-fzcdpxiUbqyAx-bkoMB5CnsSSRkv18Wqdfc9Nf_tyEwfJQzlG24b7WO4MCWTVVJqZ_p66s5zjca6r9-A1pPDt6SkLHeGBSFNQzdqMUB2C1a5GMcJu"/>
+<span class="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-md bg-emerald-600 text-white font-label-sm text-label-sm font-bold shadow-sm">
+                  An tâm nghề nghiệp
+                </span>
+<span class="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/90 backdrop-blur-sm text-primary font-label-md text-label-md font-bold">
+                  8,000 Điểm
+                </span>
+</div>
+<div class="space-y-1">
+<h3 class="text-body-lg font-headline-md text-on-surface">Gói Bảo Hiểm Tai Nạn Nghề Nghiệp 1 Năm</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2">Bảo hiểm toàn diện cho kỹ thuật viên trong suốt quá trình di chuyển và thao tác sửa chữa.</p>
+</div>
+</div>
+<div class="pt-md mt-sm flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-secondary font-medium">Hợp tác cùng Bảo Việt</span>
+<button class="px-md py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary-container transition-colors shadow-sm" onclick="alert('Xác nhận đổi Gói Bảo Hiểm Nghề Nghiệp 1 Năm với 8,000 Điểm?')">
+                Đổi ngay
+              </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right 4 Columns: Side Missions & Recent Points Activity -->
+<div class="lg:col-span-4 space-y-lg">
+<!-- Missions Card -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md space-y-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[22px]">flag</span>
+<h3 class="text-headline-md font-headline-md text-on-surface">Nhiệm vụ tuần này</h3>
+</div>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Còn 3 ngày</span>
+</div>
+<div class="space-y-sm">
+<!-- Mission 1 -->
+<div class="p-3 rounded-xl bg-surface-container-low space-y-2">
+<div class="flex items-start justify-between gap-xs">
+<div>
+<p class="text-label-md font-label-md font-semibold text-on-surface">Hoàn thành 10 đơn đúng hẹn</p>
+<p class="text-[12px] text-on-surface-variant">Không hủy đơn hoặc đến trễ</p>
+</div>
+<span class="text-label-md font-bold text-primary whitespace-nowrap">+500 đ</span>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] text-on-surface-variant font-medium">
+<span>Tiến độ: 7 / 10 đơn</span>
+<span>70%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 70%;"></div>
+</div>
+</div>
+</div>
+<!-- Mission 2 -->
+<div class="p-3 rounded-xl bg-surface-container-low space-y-2">
+<div class="flex items-start justify-between gap-xs">
+<div>
+<p class="text-label-md font-label-md font-semibold text-on-surface">Đạt 5 đánh giá 5 sao liên tiếp</p>
+<p class="text-[12px] text-on-surface-variant">Thái độ lịch sự và bảo hành uy tín</p>
+</div>
+<span class="text-label-md font-bold text-primary whitespace-nowrap">+300 đ</span>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] text-emerald-600 font-bold">
+<span>Tiến độ: 5 / 5 (Đã hoàn thành!)</span>
+<span>100%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 100%;"></div>
+</div>
+</div>
+<button class="w-full py-1.5 rounded-lg bg-emerald-500 text-white text-label-sm font-label-sm font-bold shadow-sm hover:bg-emerald-600 transition-colors" onclick="alert('Chúc mừng bạn đã nhận +300 Điểm FixPoint!')">
+                Nhận thưởng ngay
+              </button>
+</div>
+<!-- Mission 3 -->
+<div class="p-3 rounded-xl bg-surface-container-low space-y-2">
+<div class="flex items-start justify-between gap-xs">
+<div>
+<p class="text-label-md font-label-md font-semibold text-on-surface">2 cuốc sửa khẩn cấp ban đêm</p>
+<p class="text-[12px] text-on-surface-variant">Nhận đơn sau 21:00 tối</p>
+</div>
+<span class="text-label-md font-bold text-primary whitespace-nowrap">+400 đ</span>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-[11px] text-on-surface-variant font-medium">
+<span>Tiến độ: 1 / 2 đơn</span>
+<span>50%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 50%;"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Recent Points Activity Log -->
+<div class="rounded-xl bg-surface-container-lowest shadow-md p-md space-y-md">
+<div class="flex items-center justify-between">
+<h3 class="text-headline-md font-headline-md text-on-surface">Lịch sử điểm gần đây</h3>
+<button class="text-label-sm font-label-sm text-primary font-semibold hover:underline">Tất cả</button>
+</div>
+<div class="space-y-sm">
+<!-- Log Item 1 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-xs min-w-0">
+<div class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+</div>
+<div class="min-w-0">
+<p class="text-body-sm font-label-md font-semibold text-on-surface truncate">Hoàn thành đơn #FX-8821</p>
+<p class="text-[11px] text-on-surface-variant">Hôm nay, 14:30</p>
+</div>
+</div>
+<span class="text-label-md font-bold text-emerald-600 whitespace-nowrap pl-2">+150 đ</span>
+</div>
+<!-- Log Item 2 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-xs min-w-0">
+<div class="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[18px]">star</span>
+</div>
+<div class="min-w-0">
+<p class="text-body-sm font-label-md font-semibold text-on-surface truncate">Thưởng đánh giá 5 sao #FX-8821</p>
+<p class="text-[11px] text-on-surface-variant">Hôm nay, 14:35</p>
+</div>
+</div>
+<span class="text-label-md font-bold text-amber-600 whitespace-nowrap pl-2">+50 đ</span>
+</div>
+<!-- Log Item 3 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-xs min-w-0">
+<div class="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[18px]">remove_circle</span>
+</div>
+<div class="min-w-0">
+<p class="text-body-sm font-label-md font-semibold text-on-surface truncate">Đổi voucher Miễn phí sàn</p>
+<p class="text-[11px] text-on-surface-variant">Hôm qua, 09:15</p>
+</div>
+</div>
+<span class="text-label-md font-bold text-rose-600 whitespace-nowrap pl-2">-1,200 đ</span>
+</div>
+<!-- Log Item 4 -->
+<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-xs min-w-0">
+<div class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[18px]">workspace_premium</span>
+</div>
+<div class="min-w-0">
+<p class="text-body-sm font-label-md font-semibold text-on-surface truncate">Thưởng chuỗi việc cuối tuần</p>
+<p class="text-[11px] text-on-surface-variant">18 Th01, 20:00</p>
+</div>
+</div>
+<span class="text-label-md font-bold text-emerald-600 whitespace-nowrap pl-2">+600 đ</span>
+</div>
+</div>
+</div>
+<!-- Support Callout Box -->
+<div class="rounded-xl bg-surface-container p-md space-y-sm">
+<div class="flex items-center gap-xs text-primary font-semibold text-label-md font-label-md">
+<span class="material-symbols-outlined text-[20px]">support_agent</span>
+<span>Cần hỗ trợ điểm thưởng?</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant">
+            Nếu điểm tích lũy của bạn chưa được cập nhật sau khi kết thúc chuyến công tác hoặc giao hàng, liên hệ ngay Hotline Đối Tác <strong>1900 6868</strong> để được hỗ trợ 24/7.
+          </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Interactive Client-side Script for Filters and Triggers -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const historyBtn = document.getElementById('btn-show-history');
+      const rulesBtn = document.getElementById('btn-show-rules');
+
+      if (historyBtn) {
+        historyBtn.addEventListener('click', () => {
+          alert('Đang tải danh sách đầy đủ 45 giao dịch điểm FixPoints trong 6 tháng qua.');
+        });
+      }
+
+      if (rulesBtn) {
+        rulesBtn.addEventListener('click', () => {
+          alert('Chính sách tích điểm FixNow:\n- Hoàn thành đơn chuẩn: +150 FixPoint\n- Khách đánh giá 5 sao: +50 FixPoint\n- Đơn đêm (sau 21h): +100 FixPoint bổ sung\n- Tỷ lệ quy đổi: 1 FixPoint = 100 VNĐ');
+        });
+      }
+    });
+  </script>
+</div></main>
+</body></html>

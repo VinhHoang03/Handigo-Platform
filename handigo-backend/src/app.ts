@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.routes";
 import voucherRoutes from "./routes/voucher.routes";
+import rewardRoutes from "./routes/reward.routes";
 import walletRoutes from "./routes/wallet.routes";
 import withdrawalRoutes from "./routes/withdrawal.routes";
 import bankAccountRoutes from "./routes/bankAccount.routes";
@@ -29,6 +30,7 @@ import providerRoutes from "./routes/provider.routes";
 import adminRoutes from "./routes/admin.routes";
 import chatRoutes from "./routes/chat.routes";
 import chatbotRoutes from "./routes/chatbot.routes";
+import aiRoutes from "./ai/ai.routes";
 import locationRoutes from "./routes/location.routes";
 import orderRoutes from "./routes/order.routes";
 import adminAssetRoutes from "./routes/adminAsset.routes";
@@ -95,6 +97,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use((req, res, next) => {
+  if (req.method === "GET" && /^\/notifications\/unread-count\/?$/i.test(req.path)) {
+    next();
+    return;
+  }
+
   const startedAt = process.hrtime.bigint();
 
   res.once("finish", () => {
@@ -111,6 +118,7 @@ app.use((req, res, next) => {
 app.use("/auth", authRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/vouchers", voucherRoutes);
+app.use("/rewards", rewardRoutes);
 app.use("/withdrawals", withdrawalRoutes);
 app.use("/wallets", walletRoutes);
 app.use("/bank-accounts", bankAccountRoutes);
@@ -140,6 +148,7 @@ app.use("/vietnam-addresses", vietnamAddressRoutes);
 app.use("/orders", orderRoutes);
 app.use("/chat", chatRoutes);
 app.use("/chatbot", chatbotRoutes);
+app.use("/ai", aiRoutes);
 app.use("/locations", locationRoutes);
 
 app.use((req, res) => {

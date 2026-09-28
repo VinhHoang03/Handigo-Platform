@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import type { User } from "@/features/auth/types/auth.types";
 import { getProfilePath, getRoleLabel, getWalletPath, type AppRole } from "./navbar.types";
-import { LifeBuoy, LogOut, ReceiptText, ShieldUser, User as UserIcon, Wallet } from "lucide-react";
+import { Gift, LifeBuoy, LogOut, ReceiptText, ShieldUser, User as UserIcon, Wallet } from "lucide-react";
 
 interface NavbarAccountDropdownProps {
   user: User;
@@ -41,6 +41,10 @@ export function NavbarAccountDropdown({
         </Link>
         {currentRole === "CUSTOMER" && (
           <>
+            <Link to="/customer/rewards" onClick={onNavigate} className="flex min-h-11 w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary">
+              <Gift aria-hidden="true" size={20} />
+              Mã giảm giá & điểm thưởng
+            </Link>
             <Link
               to="/customer/bookings"
               onClick={onNavigate}

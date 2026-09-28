@@ -20,8 +20,8 @@ const FooterColumn = ({ title, links }: { title: string; links: string[] }) => (
   </div>
 );
 
-export const HomeFooter = () => (
-  <footer className="mt-xl border-t border-outline-variant/50 bg-surface-container-lowest">
+export const HomeFooter = ({ transparent = false }: { transparent?: boolean }) => (
+  <footer className={`mt-xl border-t border-outline-variant/50 ${transparent ? "" : "bg-surface-container-lowest"}`}>
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 px-4 md:px-8 py-16 max-w-7xl mx-auto">
       <div className="col-span-2 space-y-4">
         <BrandLogo compact />

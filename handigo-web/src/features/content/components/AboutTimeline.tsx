@@ -1,18 +1,13 @@
-import { ReliableImage } from "@/components/common/ReliableImage";
+import { AboutScene } from "./AboutScene";
 import { milestones } from "../data/aboutData";
 
-interface AboutTimelineProps {
-  image?: string;
-  imageAlt?: string;
-}
-
 /**
- * Dòng thời gian giữ nguyên nội dung, chuyển sang bố cục hai cột kèm ảnh.
+ * Dòng thời gian giữ nguyên nội dung, kèm minh họa các bậc phát triển bằng CSS 3D.
  *
  * Sau khi gỡ dải số liệu thổi phồng, mốc 5/2026 đến 7/2026 trở nên trung thực và
  * hợp lý: một sản phẩm hai tháng tuổi kể đúng hai tháng của mình.
  */
-export function AboutTimeline({ image, imageAlt }: AboutTimelineProps) {
+export function AboutTimeline() {
   return (
     <section
       aria-labelledby="about-timeline-heading"
@@ -25,11 +20,7 @@ export function AboutTimeline({ image, imageAlt }: AboutTimelineProps) {
         >
           Hành trình phát triển
         </h2>
-        <ReliableImage
-          src={image}
-          alt={imageAlt || ""}
-          className="mt-8 aspect-[5/4] w-full rounded-3xl bg-surface-container object-cover"
-        />
+        <div className="mt-8"><AboutScene variant="journey" /></div>
       </div>
 
       <ol className="relative space-y-4 lg:col-span-7">

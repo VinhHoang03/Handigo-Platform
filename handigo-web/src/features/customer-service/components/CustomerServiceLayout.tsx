@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Navbar } from "@/components/common/Navbar";
+import { AnimatedBackground } from "@/components/home/AnimatedBackground";
 
 interface CustomerServiceLayoutProps {
   children: ReactNode;
@@ -7,7 +8,8 @@ interface CustomerServiceLayoutProps {
 
 export function CustomerServiceLayout({ children }: CustomerServiceLayoutProps) {
   return (
-    <div className="min-h-dvh overflow-x-clip bg-background font-body-md text-body-md">
+    <div className="relative isolate min-h-dvh overflow-x-clip font-body-md text-body-md">
+      <AnimatedBackground />
       <Navbar role="CUSTOMER" />
 
       <main id="main-content" className="relative min-h-dvh pb-12 pt-32">

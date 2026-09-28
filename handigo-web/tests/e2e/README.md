@@ -33,7 +33,7 @@ Khi cổng 5173 đang được ứng dụng khác dùng, dừng ứng dụng đ�
 | --- | --- |
 | `login.spec.ts` | Hiển thị form, hiện/ẩn mật khẩu, dữ liệu thiếu/email sai, API từ chối, CUSTOMER ghi nhớ hoặc không ghi nhớ, khôi phục phiên, chuyển trang quên mật khẩu/đăng ký, đăng nhập ADMIN/PROVIDER |
 | `authorization.spec.ts` | Chặn khách chưa đăng nhập, ma trận chuyển hướng sai role, cho ADMIN/PROVIDER vào trang đúng quyền, chặn provider chưa duyệt, phiên hết hiệu lực |
-| `booking.spec.ts` | Chưa chọn dịch vụ, mô tả quá ngắn, không có chuyên gia, tạo đơn tiền mặt thành công và xuất hiện trong lịch sử, API tạo đơn thất bại |
+| `booking.spec.ts` | Chưa chọn dịch vụ, mô tả quá ngắn, cho phép tiếp tục tìm thợ tự động khi chưa có chuyên gia, tạo đơn tiền mặt thành công và xuất hiện trong lịch sử, API tạo đơn thất bại |
 
 Luồng chính được chọn: dịch vụ giá cố định → địa chỉ mặc định → đặt lịch ngay → mô tả → tiền mặt → thành công → lịch sử.
 Test kiểm tra cả payload tạo đơn, phương thức thanh toán và mã đơn trong liên kết chi tiết.
@@ -54,10 +54,11 @@ Chưa bao phủ OAuth, OTP, PayOS, ví, upload ảnh, đặt định kỳ, toàn
 
 ```powershell
 npx eslint tests/e2e playwright.config.ts
-npx tsc -p tests/e2e/tsconfig.json
+npx tsc -p tsconfig.node.json --noEmit
 ```
 
-TypeScript của bộ test được kiểm tra riêng; không thay đổi cấu hình build ứng dụng.
+TypeScript của bộ test được kiểm tra cùng cấu hình công cụ trong `tsconfig.node.json`,
+bao gồm kiểu DOM cho các hàm chạy trong trình duyệt. Lệnh `npm run build` cũng kiểm tra phần này.
 Khi test thất bại, mở báo cáo HTML để xem ảnh, video và trace. Không dùng thời gian chờ cố định để che lỗi.
 
 ## Vấn đề ứng dụng quan sát được

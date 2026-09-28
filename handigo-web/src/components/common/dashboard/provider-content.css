@@ -1,0 +1,50 @@
+/* Chỉ thu gọn nội dung provider và hộp thoại đang mở trong khu vực này.
+   Hộp thoại dùng portal nên nhận cùng bộ kích thước qua phạm vi trang. */
+:where(.provider-content, body:has(.provider-content) [role="dialog"]) {
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.5;
+  --text-lg: 0.9375rem;
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.0625rem;
+  --text-xl--line-height: 1.5;
+  --text-2xl: 1.25rem;
+  --text-2xl--line-height: 1.4;
+  --text-3xl: 1.5rem;
+  --text-3xl--line-height: 1.35;
+  --text-4xl: 1.875rem;
+  --text-4xl--line-height: 1.25;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 21px;
+  --text-body-lg: 15px;
+  --text-body-lg--line-height: 23px;
+  --text-label-md: 13px;
+  --text-label-md--line-height: 20px;
+  --text-title-md: 14px;
+  --text-title-md--line-height: 21px;
+  --text-title-lg: 19px;
+  --text-title-lg--line-height: 25px;
+  --text-headline-sm: 17px;
+  --text-headline-sm--line-height: 24px;
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 27px;
+  --text-headline-lg-mobile: 20px;
+  --text-headline-lg-mobile--line-height: 27px;
+  --text-headline-lg: 26px;
+  --text-headline-lg--line-height: 34px;
+  --text-headline-xl: 38px;
+  --text-headline-xl--line-height: 46px;
+  --spacing-md: 18px;
+  --spacing-lg: 36px;
+  --spacing-gutter: 18px;
+  font-size: var(--text-body-md);
+  line-height: var(--text-body-md--line-height);
+}
+
+/* Giữ chữ nhập liệu dễ đọc trên thiết bị cảm ứng. */
+@media (pointer: coarse) {
+  :is(.provider-content, body:has(.provider-content) [role="dialog"]) :is(input, select, textarea) {
+    font-size: 16px;
+  }
+}

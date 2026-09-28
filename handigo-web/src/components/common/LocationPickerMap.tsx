@@ -147,7 +147,7 @@ export function LocationPickerMap({
         </span>
       </div>
 
-      <div className="relative select-none overflow-hidden rounded-2xl border border-outline-variant/50 bg-surface-container-low shadow-sm">
+      <div className="relative isolate z-0 select-none overflow-hidden rounded-2xl border border-outline-variant/50 bg-surface-container-low shadow-sm">
         <div
           ref={containerRef}
           role="application"

@@ -2,7 +2,6 @@
 
 export const mapText = {
   connecting: "Đang kết nối vị trí realtime...",
-  ready: "Đã đồng bộ vị trí từ hệ thống tracking.",
   missingCoordinate:
     "Địa chỉ đơn hàng chưa có toạ độ. Vui lòng chọn địa chỉ từ gợi ý Google Maps hoặc cập nhật địa chỉ có kinh độ và vĩ độ.",
   customerMarker: "Vị trí khách hàng",
@@ -17,7 +16,7 @@ export const mapText = {
   addressTitle: "Bản đồ vị trí đơn hàng",
   fallbackAddress: "Bản đồ hiển thị theo toạ độ đã lưu trong đơn hàng.",
   liveBadge: "Trực tiếp",
-  addressLegend: "Khách hàng",
+  addressLegend: "Địa chỉ khách đặt dịch vụ",
   providerLegend: "Kỹ thuật viên",
   lastUpdated: "Cập nhật",
   waitingProvider: "Đang chờ toạ độ kỹ thuật viên...",
