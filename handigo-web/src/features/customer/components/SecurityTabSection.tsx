@@ -3,9 +3,10 @@ import { Lock, MoreHorizontal, Shield } from "lucide-react";
 
 interface SecurityTabSectionProps {
   onPasswordClick: () => void;
+  canChangePassword: boolean;
 }
 
-export function SecurityTabSection({ onPasswordClick }: SecurityTabSectionProps) {
+export function SecurityTabSection({ onPasswordClick, canChangePassword }: SecurityTabSectionProps) {
   return (
     <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm md:p-8">
       <h3 className="mb-5 font-headline-md text-headline-md text-on-surface">
@@ -15,8 +16,11 @@ export function SecurityTabSection({ onPasswordClick }: SecurityTabSectionProps)
         <AccountActionRow
           icon={Lock}
           title="Mật khẩu và bảo mật"
-          description="Cập nhật mật khẩu để bảo vệ tài khoản."
-          onClick={onPasswordClick}
+          description={canChangePassword
+            ? "Cập nhật mật khẩu để bảo vệ tài khoản."
+            : "Tài khoản Google không đổi mật khẩu tại đây."}
+          onClick={canChangePassword ? onPasswordClick : undefined}
+          disabled={!canChangePassword}
         />
         <AccountActionRow
           icon={Shield}

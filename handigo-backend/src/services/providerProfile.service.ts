@@ -16,6 +16,10 @@ import { Address } from "../models/address.model";
 import { Feedback } from "../models/feedback.model";
 import { Category } from "../models/category.model";
 import { MatchingService } from "./matching.service";
+import { buildServicePricingSnapshot } from "./servicePricing.service";
+import { getBookingPolicy } from "./systemConfig.service";
+import { getOrderInterval } from "../utils/providerSchedule";
+import type { ScheduleInterval } from "../utils/bookingPolicy";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import {
@@ -219,6 +223,11 @@ const formatProviderProfile = async (provider: IProvider) => {
       mainServiceText: provider.mainServiceText,
       experienceYears: provider.experienceYears,
       availabilityStatus: provider.availabilityStatus,
+      autoAcceptScheduledBookings: provider.autoAcceptScheduledBookings,
+      autoAcceptScheduledBookingMinAdvanceMinutes:
+        provider.autoAcceptScheduledBookingMinAdvanceMinutes,
+      autoAcceptScheduledBookingHorizonDays:
+        provider.autoAcceptScheduledBookingHorizonDays,
       verified: provider.verified,
       serviceIds: (provider.serviceIds as unknown[]).map(toIdString),
       services: formatServices(provider),
@@ -282,6 +291,7 @@ export const getNearbyProvidersForCustomer = async (
   recurrenceUnitValue?: string,
   recurrenceCountValue?: number,
   orderIdValue?: string,
+  selectedOptions?: unknown,
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(serviceId, "service id");
@@ -293,7 +303,7 @@ export const getNearbyProvidersForCustomer = async (
       _id: serviceId,
       isActive: true,
       isDeleted: false,
-    }).lean(),
+    }),
     Address.findOne({
       _id: addressId,
       userId: new Types.ObjectId(userId),
@@ -346,25 +356,34 @@ export const getNearbyProvidersForCustomer = async (
     : [];
 
   let excludeProviderIds: Types.ObjectId[] = [];
+  let savedIntervals: ScheduleInterval[] | undefined;
   if (orderIdValue) {
     const order = await Order.findOne({
       _id: orderIdValue,
       customerId: new Types.ObjectId(userId),
       isDeleted: false,
     })
-      .select("_id recurringGroupId")
       .lean();
     if (!order) {
       throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
     }
 
-    const relatedOrderIds = order.recurringGroupId
+    const relatedOrders = order.recurringGroupId
       ? await Order.find({
           recurringGroupId: order.recurringGroupId,
           customerId: new Types.ObjectId(userId),
+          status: "created",
           isDeleted: false,
-        }).distinct("_id")
-      : [order._id];
+        }).lean()
+      : [order];
+    const policy = await getBookingPolicy();
+    savedIntervals = relatedOrders.map((item) => {
+      const interval = getOrderInterval(item, policy);
+      if (item.scheduledAt) return interval;
+      const start = Date.now() + interval.travelMinutes * 60000;
+      return { ...interval, start, end: start + (interval.end - interval.start) };
+    });
+    const relatedOrderIds = relatedOrders.map((item) => item._id);
     excludeProviderIds = await OrderAssignment.find({
       orderId: { $in: relatedOrderIds },
       status: { $in: ["rejected", "timeout"] },
@@ -372,6 +391,11 @@ export const getNearbyProvidersForCustomer = async (
     }).distinct("providerId");
   }
 
+  const pricing = selectedOptions !== undefined
+    ? await buildServicePricingSnapshot(service, [], selectedOptions, scheduledAt ? "scheduled" : "normal")
+    : null;
+  const scheduleIntervals = pricing ? (occurrenceDates.length ? occurrenceDates : [new Date(Date.now() + pricing.schedule.travelMinutes * 60000)])
+    .map((date) => ({ ...pricing.schedule, start: date.getTime(), end: date.getTime() + pricing.schedule.durationMinutes * 60000 })) : undefined;
   const candidates = await MatchingService.findNearestProviders({
     latitude: address.latitude,
     longitude: address.longitude,
@@ -381,6 +405,7 @@ export const getNearbyProvidersForCustomer = async (
     limit: 5,
     requireOnline: !scheduledAt,
     scheduledDates: occurrenceDates,
+    scheduleIntervals: savedIntervals ?? scheduleIntervals,
     excludeProviderIds,
   });
 
@@ -637,6 +662,17 @@ export const updateMyProviderProfile = async (
   }
   if (payload.workingAreas !== undefined) {
     provider.workingAreas = [...new Set(payload.workingAreas)];
+  }
+  if (payload.autoAcceptScheduledBookings !== undefined) {
+    provider.autoAcceptScheduledBookings = payload.autoAcceptScheduledBookings;
+  }
+  if (payload.autoAcceptScheduledBookingMinAdvanceMinutes !== undefined) {
+    provider.autoAcceptScheduledBookingMinAdvanceMinutes =
+      payload.autoAcceptScheduledBookingMinAdvanceMinutes;
+  }
+  if (payload.autoAcceptScheduledBookingHorizonDays !== undefined) {
+    provider.autoAcceptScheduledBookingHorizonDays =
+      payload.autoAcceptScheduledBookingHorizonDays;
   }
 
   await provider.save();

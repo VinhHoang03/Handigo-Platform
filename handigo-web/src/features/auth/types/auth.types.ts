@@ -10,6 +10,7 @@ export interface User {
   gender?: 'male' | 'female' | 'other' | null;
   status?: 'active' | 'locked';
   isEmailVerified?: boolean;
+  isGoogleAccount?: boolean;
   providerOnboardingStatus?:
     | 'PROFILE_INCOMPLETE'
     | 'PENDING_REVIEW'

@@ -1,18 +1,27 @@
 import { useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { AppRole } from "./Navbar";
 import { NotificationBellPanel } from "./notification-bell/NotificationBellPanel";
 import { ReassignmentPromptModal } from "./notification-bell/ReassignmentPromptModal";
 import { useNotificationFeed } from "./notification-bell/useNotificationFeed";
 import { useReassignmentPrompt } from "./notification-bell/useReassignmentPrompt";
 import { Bell } from "lucide-react";
+import { getNotificationTarget } from "./notification-bell/notificationBell.utils";
 
 export function NotificationBell({ role }: { role?: AppRole }) {
+  const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const reassignment = useReassignmentPrompt();
   const feed = useNotificationFeed(role, {
     onReassignmentRequired: reassignment.present,
   });
+
+  const openNotification = async (item: Parameters<typeof getNotificationTarget>[0]) => {
+    await feed.markAsRead(item);
+    feed.setOpen(false);
+    const target = getNotificationTarget(item, role);
+    if (target) navigate(target);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,7 +76,7 @@ export function NotificationBell({ role }: { role?: AppRole }) {
           loading={feed.loading}
           error={feed.error}
           items={feed.items}
-          onMarkAsRead={(item) => void feed.markAsRead(item)}
+          onOpen={(item) => void openNotification(item)}
           hasMore={(feed.query.page || 1) < feed.totalPages}
           loadingMore={feed.loadingMore}
           onLoadMore={feed.loadMore}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
 import { useParams } from "react-router-dom";
 import { useBookingDetailData } from "./useBookingDetailData";
 import { useMatchingCountdown } from "./useMatchingCountdown";
@@ -66,13 +67,9 @@ export const useBookingDetail = () => {
         payment.paymentType === "inspection_deposit",
     )
     .reduce((total, payment) => total + payment.amount, 0);
-  // Đơn đã ghi nhận `depositPaidAt` thì lấy mức cọc lớn hơn giữa khoản đã thu và
-  // mức cọc của đơn — tránh hụt khi bản ghi payment chưa khớp đủ.
-  const appliedDepositAmount = order?.depositPaidAt
-    ? Math.max(paidDepositAmount, order.depositAmount || 0)
-    : paidDepositAmount;
+  const appliedDepositAmount = order ? getAppliedQuotationDeposit(order, paidDepositAmount) : paidDepositAmount;
   const remainingQuotationAmount = quotation
-    ? Math.max(quotation.quotation.finalAmount - appliedDepositAmount, 0)
+    ? getDirectRepairPayment(quotation.quotation.finalAmount, appliedDepositAmount)
     : 0;
   const canMakeInitialPayment = Boolean(
     order &&

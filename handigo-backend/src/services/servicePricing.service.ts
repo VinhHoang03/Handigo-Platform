@@ -2,7 +2,9 @@ import { Types } from "mongoose";
 import type { IService } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
-import { getNumberConfigValue } from "./systemConfig.service";
+import { Service } from "../models/service.model";
+import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
+import { calculateDuration, calculateImmediateFee } from "../utils/bookingPolicy";
 
 const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
   "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
@@ -10,10 +12,17 @@ const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
 const normalizeGroup = (value?: string | null) =>
   value?.trim().toLowerCase() || null;
 
+export const previewServiceBooking = async (payload: { serviceId: string; selectedOptionIds?: string[]; selectedOptions?: unknown; orderType?: string }) => {
+  const service = await Service.findOne({ _id: payload.serviceId, isActive: true, isDeleted: false });
+  if (!service) throw new AppError("Dịch vụ không còn khả dụng.", 404);
+  return buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, payload.orderType ?? "normal");
+};
+
 export const buildServicePricingSnapshot = async (
   service: IService,
   selectedOptionIdsInput: unknown = [],
   selectedOptionsInput?: unknown,
+  orderType = "scheduled",
 ) => {
   if (
     !Array.isArray(selectedOptionIdsInput) ||
@@ -40,6 +49,7 @@ export const buildServicePricingSnapshot = async (
   const selectedOptionsPayload = (selectedOptionsInput ?? legacySelectedOptionIds.map(
     (optionId) => ({ optionId, quantity: 1 }),
   )) as Array<{ optionId: string; quantity: number }>;
+  if (selectedOptionsPayload.length > 50) throw new AppError("Chỉ được chọn tối đa 50 tùy chọn dịch vụ.", 400);
   const selectedOptionIds = selectedOptionsPayload.map((item) => item.optionId);
   if (selectedOptionIds.some((id) => !Types.ObjectId.isValid(id))) {
     throw new AppError("Danh sách tùy chọn dịch vụ không hợp lệ.", 400);
@@ -145,10 +155,22 @@ export const buildServicePricingSnapshot = async (
     );
   }
 
+  const policy = await getBookingPolicy();
+  const immediateFee = calculateImmediateFee(bookingAmount, service.serviceType === "variable_price", orderType, policy);
   return {
     optionIds: selectedOptions.map((option) => option._id as Types.ObjectId),
     selectedOptionsSnapshot,
-    bookingAmount,
+    bookingAmount: bookingAmount + immediateFee,
+    baseAmount: bookingAmount,
+    immediateFee,
+    immediateProviderPercent: policy.providerFeePercent,
+    minAdvanceMinutes: policy.minAdvanceMinutes,
+    paymentHoldMinutes: policy.paymentHoldMinutes,
+    schedule: {
+      durationMinutes: calculateDuration(service._id.toString(), service.serviceType === "variable_price", selectedOptionsSnapshot, policy),
+      bufferMinutes: policy.bufferMinutes,
+      travelMinutes: policy.travelMinutes,
+    },
     depositAmount: service.serviceType === "variable_price" ? depositAmount : 0,
   };
 };

@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import multer from "multer";
-import cloudinary from "../configs/cloudinary";
+import cloudinary, { isCloudinaryConfigured } from "../configs/cloudinary";
 import {
   extractDocumentSuggestion,
   OcrDocumentKind,
@@ -9,6 +9,8 @@ import { createLogger } from "../utils/logger";
 import { hasValidFileSignature } from "../utils/fileSignature";
 
 const providerApplicationAssetLogger = createLogger("ProviderApplicationAssetUpload");
+const UPLOAD_TIMEOUT_MS = 45_000;
+const OCR_TIMEOUT_MS = 20_000;
 
 const allowedMimeTypes = new Set([
   "image/jpeg",
@@ -62,11 +64,35 @@ const uploadBuffer = (buffer: Buffer, folder: string) =>
     stream.end(buffer);
   });
 
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+) => {
+  let timeoutId: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 export const uploadProviderApplicationAsset = (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
+  if (!isCloudinaryConfigured) {
+    return res.status(503).json({
+      success: false,
+      message: "Dịch vụ lưu trữ ảnh chưa được cấu hình đầy đủ.",
+    });
+  }
+
   upload(req, res, async (error) => {
     if (error) {
       return res.status(400).json({ success: false, message: error.message });
@@ -96,8 +122,8 @@ export const uploadProviderApplicationAsset = (
       });
     }
 
+    const requestedKind = String(req.body?.documentKind || "");
     try {
-      const requestedKind = String(req.body?.documentKind || "");
       const kind = ocrKinds.has(requestedKind as OcrDocumentKind)
         ? (requestedKind as OcrDocumentKind)
         : undefined;
@@ -113,19 +139,23 @@ export const uploadProviderApplicationAsset = (
       }
 
       const userId = req.user!.id;
-      res.locals.imageUrl = await uploadBuffer(
-        req.file.buffer,
-        `handigo/provider-applications/${userId}/${folder}`,
+      res.locals.imageUrl = await withTimeout(
+        uploadBuffer(
+          req.file.buffer,
+          `handigo/provider-applications/${userId}/${folder}`,
+        ),
+        UPLOAD_TIMEOUT_MS,
+        "Tải tệp lên dịch vụ lưu trữ quá thời gian cho phép",
       );
 
       const supportsOcr = req.file.mimetype.startsWith("image/") || req.file.mimetype === "application/pdf";
 
       if (kind && supportsOcr) {
         try {
-          res.locals.ocrSuggestion = await extractDocumentSuggestion(
-            req.file.buffer,
-            req.file.mimetype,
-            kind,
+          res.locals.ocrSuggestion = await withTimeout(
+            extractDocumentSuggestion(req.file.buffer, req.file.mimetype, kind),
+            OCR_TIMEOUT_MS,
+            "OCR tài liệu quá thời gian cho phép",
           );
           if (process.env.NODE_ENV !== "production") {
             providerApplicationAssetLogger.info("Google Cloud Vision OCR thành công.", {
@@ -149,7 +179,17 @@ export const uploadProviderApplicationAsset = (
         };
       }
       next();
-    } catch {
+    } catch (uploadError) {
+      providerApplicationAssetLogger.error(
+        "Không thể tải hồ sơ provider lên.",
+        uploadError,
+        {
+          purpose,
+          documentKind: requestedKind,
+          mimetype: req.file.mimetype,
+          fileSize: req.file.size,
+        },
+      );
       return res.status(502).json({
         success: false,
         message: "Không thể tải tệp lên",

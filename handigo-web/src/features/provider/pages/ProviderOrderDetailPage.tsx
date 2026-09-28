@@ -15,6 +15,7 @@ import { ProviderOrderDetailSkeleton } from '../components/orders/ProviderOrderD
 import { useProviderOrderDetail } from '../hooks/useProviderOrderDetail';
 import { getPaymentStatusLabel, orderTypeLabels } from '../utils/providerOrderDetailLabels';
 import { ArrowLeft, CircleAlert } from "lucide-react";
+import { OrderScheduleCard } from '../components/orders/OrderScheduleCard';
 
 export default function ProviderOrderDetailPage() {
   const navigate = useNavigate();
@@ -85,8 +86,10 @@ export default function ProviderOrderDetailPage() {
   const isUnconfirmedAppointment =
     ['scheduled', 'recurring'].includes(order.orderType) &&
     order.bookingStatus !== 'confirmed';
+  const isQuotationOrder =
+    order.inspectionRequired || order.serviceId.serviceType === 'variable_price';
   const showQuotationForm =
-    order.inspectionRequired &&
+    isQuotationOrder &&
     !isUnconfirmedAppointment &&
     ['accepted', 'in_progress'].includes(order.status) &&
     !quotation;
@@ -94,6 +97,7 @@ export default function ProviderOrderDetailPage() {
   return (
     <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
+        {['accepted', 'in_progress'].includes(order.status) && <OrderScheduleCard key={order._id} order={order} />}
         <Link to="/provider/orders" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
           <ArrowLeft aria-hidden="true" size={16} />
           Quay lại danh sách
@@ -133,7 +137,7 @@ export default function ProviderOrderDetailPage() {
         <OrderTrackingMap order={order} viewerRole="PROVIDER" />
 
         <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-2">
-          {order.inspectionRequired ? (
+          {isQuotationOrder ? (
             <QuotationOrderPanel
               order={order}
               quotation={quotation}

@@ -2,6 +2,7 @@ import mongoose, { Types } from "mongoose";
 import { AuditLog } from "../models/auditLog.model";
 import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
+import { bookingPolicySchema, DEFAULT_BOOKING_POLICY } from "../validations/bookingPolicy.validator";
 import type {
   CreateSystemConfigInput,
   SystemConfigListQuery,
@@ -184,6 +185,7 @@ export const getConfigByKey = async (admin: RequestUser, key: string) => {
 
 export const createConfig = async (admin: RequestUser, input: CreateSystemConfigInput) => {
   assertAdmin(admin);
+  validateBookingPolicy(input.key, input.value, input.type, input.isPublic);
   assertConfigValueMatchesType(input.value, input.type);
   await assertMatchingConfig(input.key, input.value, input.type);
   await ensureIndexes();
@@ -235,6 +237,7 @@ export const updateConfig = async (
   }
 
   const nextType = input.type ?? existing.type;
+  validateBookingPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   assertConfigValueMatchesType(input.value, nextType);
   await assertMatchingConfig(key, input.value, nextType);
 
@@ -272,4 +275,19 @@ export const getNumberConfigValue = async (key: string, fallbackValue: number) =
 
   const value = Number(config.value);
   return Number.isFinite(value) ? value : fallbackValue;
+};
+
+const validateBookingPolicy = (key: string, value: unknown, type: SystemConfigType, isPublic: boolean) => {
+  if (key !== "BOOKING_POLICY") return;
+  if (type !== "JSON" || isPublic) throw new AppError("Chính sách đặt dịch vụ phải là JSON nội bộ.", 400);
+  const result = bookingPolicySchema.safeParse(value);
+  if (!result.success) throw new AppError(`Cấu hình đặt dịch vụ không hợp lệ: ${result.error.issues.map((issue) => issue.code === "custom" ? issue.message : `Kiểm tra kiểu dữ liệu và giới hạn của ${issue.path.join(".")}`).join("; ")}`, 400);
+};
+
+export const getBookingPolicy = async () => {
+  const config = await collection().findOne({ key: "BOOKING_POLICY" });
+  if (!config) return DEFAULT_BOOKING_POLICY;
+  const parsed = bookingPolicySchema.safeParse(config.value);
+  if (!parsed.success) throw new AppError("Chính sách đặt dịch vụ không hợp lệ. Vui lòng liên hệ quản trị viên.", 503);
+  return parsed.data;
 };

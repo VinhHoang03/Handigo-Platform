@@ -4,6 +4,7 @@ interface AccountActionRowProps {
   title: string;
   description: string;
   onClick?: () => void;
+  disabled?: boolean;
 }
 
 export function AccountActionRow({
@@ -11,12 +12,14 @@ export function AccountActionRow({
   title,
   description,
   onClick,
+  disabled = false,
 }: AccountActionRowProps) {
   return (
     <button
       type="button"
-      className="flex w-full items-center justify-between gap-3 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4 text-left transition hover:border-primary/40 hover:bg-surface-container"
+      className={`flex w-full items-center justify-between gap-3 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4 text-left transition ${disabled ? "cursor-not-allowed opacity-60" : "hover:border-primary/40 hover:bg-surface-container"}`}
       onClick={onClick}
+      disabled={disabled}
     >
       <span className="flex min-w-0 items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">

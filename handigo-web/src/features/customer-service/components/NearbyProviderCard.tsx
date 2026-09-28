@@ -11,6 +11,7 @@ const formatDistance = (distanceMeters: number) => {
 
 interface NearbyProviderCardProps {
   provider: NearbyProvider;
+  serviceId?: string;
   isSelected: boolean;
   allowSelection: boolean;
   requireSelection: boolean;
@@ -20,6 +21,7 @@ interface NearbyProviderCardProps {
 /** Thẻ hiển thị một thợ phù hợp, kèm nút chọn/ưu tiên thợ. */
 export function NearbyProviderCard({
   provider,
+  serviceId,
   isSelected,
   allowSelection,
   requireSelection,
@@ -61,7 +63,7 @@ export function NearbyProviderCard({
           </div>
         </div>
         <Link
-          to={`/customer/providers/${provider.id}`}
+          to={`/customer/providers/${provider.id}${serviceId ? `?serviceId=${encodeURIComponent(serviceId)}` : ""}`}
           className="grid h-10 w-10 place-items-center rounded-full bg-primary-container/10 text-primary hover:bg-primary-container/20"
           aria-label={`Xem hồ sơ thợ ${provider.user.fullName}`}
         >

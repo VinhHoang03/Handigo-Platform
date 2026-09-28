@@ -37,6 +37,19 @@ export const updateCurrentLocation = async (
   }
 };
 
+export const deactivateCurrentLocation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    await locationService.deactivateCurrentLocation(requireAuthenticatedUser(req).id);
+    return res.json({ success: true, data: null, message: "Đã tắt chia sẻ vị trí hiện tại" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const reverseGeocodeCurrentLocation = async (
   req: Request,
   res: Response,
