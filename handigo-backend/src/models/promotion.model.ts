@@ -1,4 +1,4 @@
-import { Document, Schema, model } from "mongoose";
+import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument, Money } from "./common";
 
 export interface IPromotion extends Document, IBaseDocument {
@@ -15,11 +15,15 @@ export interface IPromotion extends Document, IBaseDocument {
   endAt: Date;
   status?: "ACTIVE" | "INACTIVE" | "EXPIRED" | "active" | "inactive" | "expired";
   isActive: boolean;
+  ownerId?: Types.ObjectId | null;
+  reservedOrderId?: Types.ObjectId | null;
 }
 
 const PromotionSchema = new Schema<IPromotion>(
   {
     name: { type: String, required: true },
+    ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    reservedOrderId: { type: Schema.Types.ObjectId, ref: "Order", default: null },
     code: { type: String, default: null, uppercase: true, trim: true },
     description: { type: String, default: null },
     discountType: { type: String, enum: ["fixed", "percentage", "AMOUNT", "PERCENT"], required: true },
@@ -43,5 +47,6 @@ PromotionSchema.index(
   { unique: true, partialFilterExpression: { code: { $type: "string" } } },
 );
 PromotionSchema.index({ status: 1, startAt: 1, endAt: 1 });
+PromotionSchema.index({ ownerId: 1, createdAt: -1 });
 
 export const Promotion = model<IPromotion>("Promotion", PromotionSchema, "promotions");

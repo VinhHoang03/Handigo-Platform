@@ -18,10 +18,10 @@ export function ProviderOrderCard({ order }: { order: Order }) {
   return (
     <Link
       to={`/provider/orders/${order._id}`}
-      className={`group flex flex-col gap-md rounded-2xl border-l-4 bg-surface-container-low p-md transition-all hover:-translate-y-0.5 hover:bg-surface-container-lowest sm:flex-row sm:items-center sm:justify-between ${toneBorderClasses[status.tone]}`}
+      className={`group flex flex-col gap-3 rounded-2xl border-l-4 bg-surface-container-low px-4 py-3 text-sm transition-all hover:-translate-y-0.5 hover:bg-surface-container-lowest sm:flex-row sm:items-center sm:justify-between ${toneBorderClasses[status.tone]}`}
     >
-      <div className="flex min-w-0 items-center gap-md">
-        <InitialsAvatar name={customer?.fullName || order.orderCode} src={customer?.avatar} />
+      <div className="flex min-w-0 items-center gap-3">
+        <InitialsAvatar name={customer?.fullName || order.orderCode} src={customer?.avatar} className="h-10 w-10 shrink-0" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="truncate font-bold text-on-surface">

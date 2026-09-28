@@ -8,7 +8,6 @@ import { formatProviderOrderAmount } from "../../utils/providerOrder.utils";
 import {
   formatDateTime,
   getCustomer,
-  shortAddress,
 } from "./providerHome.utils";
 import { Clock } from "lucide-react";
 
@@ -33,7 +32,6 @@ function BookingItem({ order }: { order: Order }) {
           </h4>
           <p className="truncate text-sm text-on-surface-variant">
             {order.serviceId.name}
-            {shortAddress(order) ? ` - ${shortAddress(order)}` : ""}
           </p>
           <div className="mt-1 flex items-center gap-xs">
             <Clock aria-hidden="true" size={14} className="text-on-surface-variant" />
@@ -98,7 +96,7 @@ export function ProviderRecentBookings({
         )}
         {!isLoadingOrders &&
           !ordersError &&
-          recentOrders.map((order) => (
+          recentOrders.slice(0, 3).map((order) => (
             <BookingItem key={order._id} order={order} />
           ))}
       </div>

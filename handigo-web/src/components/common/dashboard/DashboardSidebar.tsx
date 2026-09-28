@@ -26,10 +26,13 @@ export function DashboardSidebar({
   const homePath = dashboardHomePath[role];
   const subtitle = dashboardSubtitle[role];
   const sidebarTopClass = role === "PROVIDER" ? "top-6" : "top-28";
+  const sidebarSurfaceClass = role === "PROVIDER"
+    ? "bg-surface-container-lowest/20 backdrop-blur-[1px]"
+    : "bg-surface-container-lowest/92 backdrop-blur-xl";
 
   return (
     <aside
-      className={`fixed bottom-6 left-4 z-40 hidden w-72 flex-col gap-5 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/92 p-5 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl lg:flex xl:left-6 ${sidebarTopClass}`}
+      className={`fixed bottom-6 left-4 z-40 hidden w-72 flex-col gap-5 rounded-2xl border border-outline-variant/30 p-5 shadow-[0_14px_40px_rgba(19,27,46,0.08)] lg:flex xl:left-6 ${sidebarTopClass} ${sidebarSurfaceClass}`}
     >
       <Link
         to={homePath}

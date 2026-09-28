@@ -1,4 +1,5 @@
 import {
+  AiIntroductionSection,
   CategoriesSection,
   ClosingCta,
   FeaturesSection,
@@ -37,6 +38,9 @@ const LandingPage = () => {
         </Reveal>
         <Reveal>
           <HowItWorksSection />
+        </Reveal>
+        <Reveal>
+          <AiIntroductionSection />
         </Reveal>
         <Reveal>
           <ProvidersSection />
