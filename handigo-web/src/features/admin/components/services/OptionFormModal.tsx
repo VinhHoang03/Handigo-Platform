@@ -85,7 +85,6 @@ export function OptionFormModal({
             </select>
           </label>
         </div>
-        <FormInput label="Thứ tự hiển thị" name="option-sort-order" type="number" value={form.sortOrder} onChange={(value) => onChange({ ...form, sortOrder: value })} />
         {selectedService?.serviceType === 'fixed_price' ? (
           <FormInput label="Giá (VNĐ)" name="option-price" type="number" required value={form.price} onChange={(value) => onChange({ ...form, price: value })} />
         ) : (

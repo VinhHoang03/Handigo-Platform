@@ -13,7 +13,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addToast = useCallback(
-    (message: string, type: ToastType, duration = 3000) => {
+    (message: string, type: ToastType, duration = 5000) => {
       const id = `${Date.now()}-${Math.random()}`;
       const toast: Toast = { id, message, type, duration };
 

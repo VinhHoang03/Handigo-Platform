@@ -23,10 +23,10 @@ function ToastItem({
         };
       case "error":
         return {
-          bg: "bg-error/10",
-          border: "border-error/30",
-          text: "text-error",
-          icon: "text-error",
+          bg: "bg-error",
+          border: "border-error",
+          text: "text-on-error",
+          icon: "text-on-error",
         };
       case "info":
       default:
@@ -89,7 +89,7 @@ export function ToastContainer() {
   const { toasts, removeToast } = useToast();
 
   return (
-    <div className="pointer-events-none fixed right-0 top-20 z-50 flex flex-col gap-3 p-4 sm:gap-4 sm:p-6">
+    <div className="pointer-events-none fixed right-0 top-20 z-[300] flex flex-col gap-3 p-4 sm:gap-4 sm:p-6">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <ToastItem

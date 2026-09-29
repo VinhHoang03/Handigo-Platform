@@ -41,7 +41,9 @@ export function ConfigModal({
 
         <label className="flex items-center justify-between gap-4 rounded-lg bg-surface-container-low p-3">
           <span>
-            <span className="block font-semibold">Công khai cho client</span>
+            <span className="block font-semibold">
+              Công khai cho người dùng
+            </span>
             <span className="text-sm text-on-surface-variant">
               Chỉ bật cho dữ liệu hiển thị công khai, không dùng cho cấu hình
               nghiệp vụ nội bộ.
@@ -112,7 +114,11 @@ function ValueField({
             </span>
             <span className="text-sm">Bấm để chuyển trạng thái bật/tắt.</span>
           </span>
-          {form.value === "true" ? <ToggleRight aria-hidden="true" size={28} /> : <ToggleLeft aria-hidden="true" size={28} />}
+          {form.value === "true" ? (
+            <ToggleRight aria-hidden="true" size={28} />
+          ) : (
+            <ToggleLeft aria-hidden="true" size={28} />
+          )}
         </button>
       </div>
     );

@@ -12,9 +12,6 @@ export const AdminProviderApplicationsPage = lazy(
 export const AdminCategoriesPage = lazy(
   () => import("@/features/admin/pages/AdminCategoriesPage"),
 );
-export const AdminServicesPage = lazy(
-  () => import("@/features/admin/pages/AdminServicesPage"),
-);
 export const AdminPromotionsPage = lazy(
   () => import("@/features/admin/pages/AdminPromotionsPage"),
 );
