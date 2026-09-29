@@ -59,6 +59,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   let orderId = pendingOrderId;
   try {
     const payload: CreateOrderPayload = {
+      expectedBookingAmount: params.expectedBookingAmount,
       serviceId,
       selectedOptionIds,
       selectedOptions: selectedOptionIds.map((optionId) => ({
@@ -88,9 +89,22 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         PENDING_ORDER_FINGERPRINT_KEY,
         bookingFingerprint,
       );
+    } else {
+      const existingOrder = await bookingApi.getOrderById(orderId);
+      if (existingOrder.pricing.bookingAmount !== params.expectedBookingAmount) {
+        navigate(`/customer/bookings/${orderId}`);
+        return;
+      }
     }
 
-    if (orderType === 'scheduled' || orderType === 'recurring') {
+    const requiresImmediateInspectionPayment =
+      (orderType === 'scheduled' || orderType === 'recurring') &&
+      service?.serviceType === 'variable_price';
+
+    if (
+      (orderType === 'scheduled' || orderType === 'recurring') &&
+      !requiresImmediateInspectionPayment
+    ) {
       sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
       sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
       reset();
@@ -145,7 +159,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     navigate('/customer/bookings/success', { state: { order: orderDetail } });
   } catch (error) {
     const message = getConfirmPaymentErrorMessage(error);
-    if (orderId && !isAppointment) {
+    if (orderId && (!isAppointment || service?.serviceType === 'variable_price')) {
       try {
         await bookingApi.discardUnpaidOrder(orderId);
         setPendingOrderId('');

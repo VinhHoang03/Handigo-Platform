@@ -51,8 +51,11 @@ const ConfirmPaymentPage = () => {
             step={3}
             discountAmount={voucherDiscountAmount}
             actionLabel={
-              orderType === 'scheduled' || orderType === 'recurring'
-                ? 'Gửi yêu cầu lịch hẹn'
+              (orderType === 'scheduled' || orderType === 'recurring') &&
+              service?.serviceType === 'variable_price'
+                ? 'Đặt lịch & Thanh toán cọc'
+                : orderType === 'scheduled' || orderType === 'recurring'
+                  ? 'Gửi yêu cầu lịch hẹn'
                 : 'Xác nhận & Thanh toán'
             }
             onAction={handleConfirm}

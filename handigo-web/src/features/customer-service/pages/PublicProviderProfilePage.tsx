@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import { AsyncState } from "@/components/common/AsyncState";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
@@ -37,7 +37,8 @@ export default function PublicProviderProfilePage() {
   const [profile, setProfile] = useState<PublicProviderProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedServiceId = searchParams.get("serviceId") || "";
   const selectService = useBookingStore((state) => state.selectService);
   const setPreferredProviderId = useBookingStore(
     (state) => state.setPreferredProviderId,
@@ -77,7 +78,7 @@ export default function PublicProviderProfilePage() {
     (service) => service.id === selectedServiceId,
   )
     ? selectedServiceId
-    : (profile?.provider.services[0]?.id ?? "");
+    : selectedServiceId ? "" : (profile?.provider.services[0]?.id ?? "");
 
   const handleBookProvider = () => {
     if (!profile) return;
@@ -90,7 +91,7 @@ export default function PublicProviderProfilePage() {
     selectService(selectedService.categoryId, selectedService.id);
     setRequestedProvider(profile.provider.id, profile.user.fullName);
     setPreferredProviderId(profile.provider.id, profile.user.fullName);
-    navigate("/customer/bookings/new/location", {
+    navigate("/customer/bookings/new", {
       state: { fromProviderProfile: true },
     });
   };
@@ -140,7 +141,13 @@ export default function PublicProviderProfilePage() {
                     averageRating={profile.provider.averageRating}
                     services={profile.provider.services}
                     selectedServiceId={effectiveSelectedServiceId}
-                    onSelectService={setSelectedServiceId}
+                    onSelectService={(serviceId) => {
+                      setSearchParams((current) => {
+                        const next = new URLSearchParams(current);
+                        next.set("serviceId", serviceId);
+                        return next;
+                      }, { replace: true });
+                    }}
                     onBook={handleBookProvider}
                   />
 

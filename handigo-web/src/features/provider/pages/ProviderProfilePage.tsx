@@ -21,6 +21,9 @@ function ProviderProfileContent() {
   const onboardingStatus = useAuthStore(
     (state) => state.user?.providerOnboardingStatus,
   );
+  const isGoogleAccount = useAuthStore(
+    (state) => state.user?.isGoogleAccount === true,
+  );
   const canReceiveJobs = !onboardingStatus || onboardingStatus === "APPROVED";
   const storedAvailabilityStatus = useProviderAvailabilityStore(
     (state) => state.availabilityStatus,
@@ -122,6 +125,7 @@ function ProviderProfileContent() {
         canReceiveJobs={canReceiveJobs}
         verificationItems={verificationItems}
         onPasswordClick={() => password.setIsPwdConfirmOpen(true)}
+        canChangePassword={!isGoogleAccount}
         serviceArea={data.serviceArea}
         onEditServiceArea={serviceAreaFlow.openServiceAreaEdit}
         applicationHistoryKey={ui.applicationHistoryKey}

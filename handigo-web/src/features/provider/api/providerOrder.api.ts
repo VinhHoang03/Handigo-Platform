@@ -10,6 +10,10 @@ import type {
 } from '../types/providerOrder.types';
 
 export const providerOrderApi = {
+  updateExpectedEnd: async (orderId: string, expectedEndAt: string) => {
+    const response = await api.patch<{ success: boolean; data: { order: Order; affectedOrderCount: number } }>(`/orders/${orderId}/expected-end`, { expectedEndAt });
+    return response.data.data;
+  },
   getPendingAssignments: async () => {
     const response = await api.get<{ success: boolean; data: OrderAssignment[] }>(
       '/orders/assignments/pending',

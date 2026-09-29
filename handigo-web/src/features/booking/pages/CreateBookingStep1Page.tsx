@@ -14,6 +14,7 @@ const CreateBookingStep1Page = () => {
   const {
     categoryId, setCategoryId, serviceId, setServiceId, toggleOption,
     selectedOptionIds, selectedOptionQuantities, setOptionQuantity,
+    requestedProviderId, requestedProviderName, setPreferredProviderId,
   } = useBookingStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -77,6 +78,9 @@ const CreateBookingStep1Page = () => {
     if (isRequiredOptionSelectionMissing(selectedService, selectedOptionIds)) {
       setSelectionError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
       return;
+    }
+    if (requestedProviderId) {
+      setPreferredProviderId(requestedProviderId, requestedProviderName);
     }
     setSelectionError('');
     navigate('/customer/bookings/new/location');

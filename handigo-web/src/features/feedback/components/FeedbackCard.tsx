@@ -7,9 +7,13 @@ const nameOf = (value: string | PersonRef) =>
 export function FeedbackCard({
   feedback,
   actions,
+  headerActions,
+  replyLabel = "Phản hồi của tôi",
 }: {
   feedback: Feedback;
   actions?: React.ReactNode;
+  headerActions?: React.ReactNode;
+  replyLabel?: string;
 }) {
   const service =
     typeof feedback.serviceId === "string" ? "" : feedback.serviceId.name;
@@ -24,7 +28,10 @@ export function FeedbackCard({
             {new Date(feedback.createdAt).toLocaleDateString("vi-VN")}
           </p>
         </div>
-        <RatingStars value={feedback.rating} size="sm" />
+        <div className="flex items-center gap-3">
+          <RatingStars value={feedback.rating} size="sm" />
+          {headerActions}
+        </div>
       </div>
 
       {feedback.comment && (
@@ -45,7 +52,7 @@ export function FeedbackCard({
       {feedback.providerReply && (
         <div className="mt-4 rounded-xl bg-primary/5 p-4">
           <p className="text-xs font-bold uppercase text-primary">
-            Phản hồi của tôi
+            {replyLabel}
           </p>
           <p className="mt-1">{feedback.providerReply.content}</p>
         </div>

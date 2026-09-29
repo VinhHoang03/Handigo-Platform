@@ -10,7 +10,9 @@ import { Address } from "../models/address.model";
 import { ensureAddressCoordinates } from "./address.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
-import { getNumberConfigValue } from "./systemConfig.service";
+import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
+import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
+import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt } from "../utils/bookingPolicy";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import {
   DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
@@ -38,7 +40,24 @@ import {
 
 const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
 const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
-const DEFAULT_APPOINTMENT_RESPONSE_MINUTES = 30;
+const DEFAULT_APPOINTMENT_RESPONSE_MINUTES = 2;
+
+const isScheduledDateWithinProviderHorizon = (
+  scheduledAt: Date,
+  horizonDays: number,
+  now = new Date(),
+) => {
+  const formatDate = (value: Date) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+  const today = new Date(`${formatDate(now)}T00:00:00Z`);
+  const selected = new Date(`${formatDate(scheduledAt)}T00:00:00Z`);
+  const dayDifference = Math.round((selected.getTime() - today.getTime()) / 86400000);
+  return dayDifference >= 1 && dayDifference <= horizonDays;
+};
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -150,7 +169,8 @@ export async function dispatchOrderForMatching(orderId: string) {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CreateOrderPayload {
-  confirmedExpectation?: { amount: number; addressVersion: string };
+  expectedBookingAmount?: number;
+  confirmedExpectation?: { amount: number; addressVersion?: string };
   customerId: string;
   serviceId: string;
   servicePackageId?: string;
@@ -219,10 +239,10 @@ export const OrderService = {
     const occurrenceDates =
       orderType === "recurring" && scheduledAt
         ? buildRecurringDates(
-            scheduledAt,
-            payload.recurrenceUnit as "weekly" | "monthly",
-            payload.recurrenceCount as number,
-          )
+          scheduledAt,
+          payload.recurrenceUnit as "weekly" | "monthly",
+          payload.recurrenceCount as number,
+        )
         : scheduledAt
           ? [scheduledAt]
           : [];
@@ -271,11 +291,56 @@ export const OrderService = {
     if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
-    if (payload.confirmedExpectation && selectedAddress.updatedAt.toISOString() !== payload.confirmedExpectation.addressVersion) {
-      throw new ActionPreconditionError();
-    }
-
     const address = await ensureAddressCoordinates(selectedAddress);
+
+    const pricingSnapshot = await buildServicePricingSnapshot(
+      service, payload.selectedOptionIds, payload.selectedOptions, orderType,
+    );
+    if (payload.expectedBookingAmount !== undefined && payload.expectedBookingAmount !== pricingSnapshot.bookingAmount) {
+      throw new AppError("Giá vừa thay đổi. Vui lòng kiểm tra lại tổng tiền trước khi xác nhận.", 409);
+    }
+    if (requiresProviderConfirmation && scheduledAt && scheduledAt.getTime() < getEarliestScheduledAt().getTime()) {
+      throw new AppError("Lịch hẹn sớm nhất là từ 08:00 ngày mai.", 400);
+    }
+    const scheduleIntervals = (requiresProviderConfirmation ? occurrenceDates : [new Date(Date.now() + pricingSnapshot.schedule.travelMinutes * 60000)])
+      .map((date) => ({ start: date.getTime(), end: date.getTime() + pricingSnapshot.schedule.durationMinutes * 60000, ...pricingSnapshot.schedule }));
+
+    if (!requiresProviderConfirmation) {
+      const availableProviders = await MatchingService.findNearestProviders({
+        latitude: address.latitude,
+        longitude: address.longitude,
+        serviceId: service._id.toString(),
+        province: address.province,
+        ward: address.ward,
+        limit: 1,
+        requireOnline: true,
+        scheduleIntervals,
+      });
+      if (availableProviders.length === 0) {
+        throw new AppError(
+          "Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.",
+          409,
+        );
+      }
+    } else if (isAutoAppointment) {
+      const availableProviders = await MatchingService.findNearestProviders({
+        latitude: address.latitude,
+        longitude: address.longitude,
+        serviceId: service._id.toString(),
+        province: address.province,
+        ward: address.ward,
+        limit: 1,
+        requireOnline: false,
+        scheduledDates: occurrenceDates,
+        scheduleIntervals,
+      });
+      if (availableProviders.length === 0) {
+        throw new AppError(
+          "Chưa có chuyên gia phù hợp và còn trống trong thời gian đã chọn.",
+          409,
+        );
+      }
+    }
 
     let preferredProvider: Awaited<
       ReturnType<typeof MatchingService.findNearestProviders>
@@ -289,8 +354,9 @@ export const OrderService = {
         ward: address.ward,
         onlyProviderId: new Types.ObjectId(payload.preferredProviderId),
         limit: 1,
-        requireOnline: false,
+        requireOnline: requiresProviderConfirmation ? false : true,
         scheduledDates: requiresProviderConfirmation ? occurrenceDates : [],
+        scheduleIntervals,
       });
       preferredProvider = candidates[0] ?? null;
       if (!preferredProvider) {
@@ -300,29 +366,24 @@ export const OrderService = {
         );
       }
 
-      for (const occurrenceDate of requiresProviderConfirmation ? occurrenceDates : []) {
-        const conflictStart = new Date(occurrenceDate.getTime() - 60 * 60 * 1000);
-        const slotEnd = new Date(occurrenceDate.getTime() + 60 * 60 * 1000);
-        const hasConflict = await Order.exists({
-          providerId: preferredProvider.providerId,
-          status: { $in: ["accepted", "in_progress"] },
-          scheduledAt: { $gt: conflictStart, $lt: slotEnd },
-          isDeleted: false,
-        });
-        if (hasConflict) {
-          throw new AppError(
-            `Chuyên gia đã có lịch vào ${occurrenceDate.toLocaleString("vi-VN")}.`,
-            409,
-          );
-        }
-      }
     }
 
-    // 3. Validate & snapshot selected options
-    const pricingSnapshot = await buildServicePricingSnapshot(
-      service,
-      payload.selectedOptionIds,
-      payload.selectedOptions,
+    const autoAcceptProvider =
+      requiresProviderConfirmation && scheduledAt && preferredProvider
+        ? await Provider.findOne({
+          _id: preferredProvider.providerId,
+          verified: true,
+          isDeleted: false,
+          autoAcceptScheduledBookings: true,
+        }).select("_id autoAcceptScheduledBookings autoAcceptScheduledBookingHorizonDays")
+        : null;
+    const autoAcceptPreferredAppointment = Boolean(
+      autoAcceptProvider &&
+      scheduledAt &&
+      isScheduledDateWithinProviderHorizon(
+        scheduledAt,
+        autoAcceptProvider.autoAcceptScheduledBookingHorizonDays,
+      ),
     );
 
     const inspectionRequired = service.serviceType === "variable_price";
@@ -333,95 +394,171 @@ export const OrderService = {
     const platformCommissionRate = inspectionRequired
       ? 0
       : Math.max(platformCommissionPercent, 0) / 100;
-    // 4. Giá cố định là tổng thành tiền của các tùy chọn; giá linh hoạt chỉ thu tiền cọc.
+    // Tiền đặt dịch vụ gồm giá gốc/cọc và phụ phí phục vụ ngay nếu có.
     const totalAmount = pricingSnapshot.bookingAmount;
     if (payload.confirmedExpectation && totalAmount !== payload.confirmedExpectation.amount) {
       throw new ActionPreconditionError();
     }
     const voucherResult = payload.voucherCode
-      ? await resolveVoucherForAmount(payload.voucherCode, totalAmount, undefined, payload.customerId)
+      ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount)
       : null;
 
-    const platformCommissionAmount = Math.round(
-      totalAmount * platformCommissionRate,
-    );
-    const providerEarningAmount = totalAmount - platformCommissionAmount;
 
     // 6. Persist order
     const recurringGroupId = orderType === "recurring" ? new Types.ObjectId() : null;
-    const orderDates = orderType === "normal" ? [null] : occurrenceDates;
+    const orderDates = requiresProviderConfirmation ? occurrenceDates : [null];
     const autoMatchingStartedAt = isAutoAppointment ? new Date() : null;
+    const requiresImmediateInspectionPayment =
+      requiresProviderConfirmation && inspectionRequired;
+    const initialInspectionPaymentDueAt = requiresImmediateInspectionPayment && scheduledAt
+      ? new Date(
+        Math.min(
+          Date.now() + pricingSnapshot.paymentHoldMinutes * 60 * 1000,
+          scheduledAt.getTime(),
+        ),
+      )
+      : null;
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
       return {
-      _id: new Types.ObjectId(),
-      orderCode: generateOrderCode(),
-      customerId: new Types.ObjectId(payload.customerId),
-      preferredProviderId: payload.preferredProviderId
-        ? new Types.ObjectId(payload.preferredProviderId)
-        : null,
-      serviceId: new Types.ObjectId(payload.serviceId),
-      servicePackageId: null,
-      selectedOptionIds: pricingSnapshot.optionIds,
-      selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
-      addressId: new Types.ObjectId(payload.addressId),
-      orderType,
-      scheduledAt: orderDate,
-      bookingStatus: requiresProviderConfirmation
-        ? "awaiting_provider"
-        : "not_required",
-      paymentDueAt: null,
-      recurringGroupId,
-      recurrenceUnit: orderType === "recurring" ? payload.recurrenceUnit : null,
-      occurrenceNumber: orderType === "recurring" ? index + 1 : null,
-      totalOccurrences: orderType === "recurring" ? orderDates.length : null,
-      status: "created",
-      paymentMethod: payload.paymentMethod,
-      paymentStatus: "unpaid",
-      readyForMatching: isAutoAppointment && index === 0,
-      matchingStartedAt: isAutoAppointment && index === 0
-        ? autoMatchingStartedAt
-        : null,
-      depositAmount: pricingSnapshot.depositAmount,
-      inspectionRequired,
-      hasAdditionalQuotation: false,
-      problemDescription: payload.problemDescription ?? null,
-      customerAttachments: payload.customerAttachments ?? [],
-      pricing: {
-        bookingAmount: totalAmount, // The amount including options for the current payment phase
-        platformCommissionRate,
-        platformCommissionAmount,
-        providerEarningAmount,
-        promotionDiscountAmount: 0,
-        voucherDiscountAmount,
-        totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
-      },
-      voucherSnapshot: orderVoucher?.snapshot ?? null,
-      confirmation: {
-        customerConfirmedAt: null,
-        providerConfirmedAt: null,
-      },
+        _id: new Types.ObjectId(),
+        orderCode: generateOrderCode(),
+        customerId: new Types.ObjectId(payload.customerId),
+        preferredProviderId: payload.preferredProviderId
+          ? new Types.ObjectId(payload.preferredProviderId)
+          : null,
+        serviceId: new Types.ObjectId(payload.serviceId),
+        servicePackageId: null,
+        selectedOptionIds: pricingSnapshot.optionIds,
+        selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
+        addressId: new Types.ObjectId(payload.addressId),
+        orderType,
+        scheduledAt: orderDate,
+        schedule: {
+          ...pricingSnapshot.schedule,
+          expectedStartAt: orderDate,
+          expectedEndAt: orderDate ? new Date(orderDate.getTime() + pricingSnapshot.schedule.durationMinutes * 60000) : null,
+        },
+        bookingStatus: requiresImmediateInspectionPayment
+          ? "awaiting_payment"
+          : requiresProviderConfirmation
+            ? "awaiting_provider"
+            : "not_required",
+        paymentDueAt: initialInspectionPaymentDueAt,
+        recurringGroupId,
+        recurrenceUnit: orderType === "recurring" ? payload.recurrenceUnit : null,
+        occurrenceNumber: orderType === "recurring" ? index + 1 : null,
+        totalOccurrences: orderType === "recurring" ? orderDates.length : null,
+        status: "created",
+        paymentMethod: payload.paymentMethod,
+        paymentStatus: "unpaid",
+        readyForMatching: isAutoAppointment && !inspectionRequired && index === 0,
+        matchingStartedAt: isAutoAppointment && !inspectionRequired && index === 0
+          ? autoMatchingStartedAt
+          : null,
+        depositAmount: pricingSnapshot.depositAmount,
+        inspectionRequired,
+        hasAdditionalQuotation: false,
+        problemDescription: payload.problemDescription ?? null,
+        customerAttachments: payload.customerAttachments ?? [],
+        pricing: {
+          baseAmount: pricingSnapshot.baseAmount,
+          immediateFee: pricingSnapshot.immediateFee,
+          immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
+          bookingAmount: totalAmount, // The amount including options for the current payment phase
+          platformCommissionRate,
+          ...calculateBookingSettlement(Math.max(totalAmount - voucherDiscountAmount, 0), pricingSnapshot.immediateFee, platformCommissionRate, pricingSnapshot.immediateProviderPercent, inspectionRequired),
+          promotionDiscountAmount: 0,
+          voucherDiscountAmount,
+          totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
+        },
+        voucherSnapshot: orderVoucher?.snapshot ?? null,
+        confirmation: {
+          customerConfirmedAt: null,
+          providerConfirmedAt: null,
+        },
       };
     });
-    const createdOrders = voucherResult?.promotion.ownerId
-      ? await mongoose.connection.transaction(async (session) => {
-          await reservePersonalVoucher(
-            voucherResult.promotion._id as Types.ObjectId, payload.customerId,
-            orderDocuments[0]._id, inspectionRequired, session,
+    let createdOrders: Array<IOrder>;
+    if (autoAcceptPreferredAppointment && preferredProvider && scheduledAt) {
+      const policy = await getBookingPolicy();
+      const session = await mongoose.startSession();
+      try {
+        const result = await session.withTransaction(async () => {
+          const provider = await lockProviderSchedule(
+            preferredProvider.providerId as Types.ObjectId,
+            session,
           );
-          return Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
-        })
-      : await Order.insertMany(orderDocuments as Array<Partial<IOrder>>);
+          if (!provider.autoAcceptScheduledBookings) {
+            throw new AppError("Chuyên gia hiện không bật tự động nhận lịch hẹn.", 409);
+          }
+          if (!isScheduledDateWithinProviderHorizon(
+            scheduledAt,
+            provider.autoAcceptScheduledBookingHorizonDays,
+          )) {
+            throw new AppError("Lịch hẹn không nằm trong phạm vi tự nhận của chuyên gia.", 409);
+          }
+
+          const orders = await Order.insertMany(
+            orderDocuments as Array<Partial<IOrder>>,
+            { session },
+          );
+          await assertProviderSchedule(
+            provider._id as Types.ObjectId,
+            orders as Array<IOrder>,
+            session,
+            policy,
+          );
+
+          const paymentDueAt = new Date(
+            Math.min(
+              Date.now() + policy.paymentHoldMinutes * 60 * 1000,
+              scheduledAt.getTime(),
+            ),
+          );
+          for (const [index, current] of orders.entries()) {
+            current.providerId = provider._id as Types.ObjectId;
+            current.status = "accepted";
+            current.readyForMatching = false;
+            current.bookingStatus = index === 0 ? "awaiting_payment" : "reserved";
+            current.paymentDueAt = index === 0 ? paymentDueAt : null;
+            await current.save({ session });
+          }
+          return orders;
+        });
+        if (!result) throw new AppError("Không thể tự động xác nhận lịch hẹn.", 409);
+        createdOrders = result as Array<IOrder>;
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      createdOrders = (await Order.insertMany(
+        orderDocuments as Array<Partial<IOrder>>,
+      )) as Array<IOrder>;
+    }
     const order = createdOrders[0] as unknown as IOrder;
 
-    if (requiresProviderConfirmation && scheduledAt && preferredProvider) {
+    if (autoAcceptPreferredAppointment && preferredProvider) {
+      await createNotificationRecord({
+        userId: preferredProvider.userId,
+        type: "ORDER",
+        title: "Lịch hẹn mới đã được tự động nhận",
+        content: `Bạn có lịch hẹn mới vào ${scheduledAt?.toLocaleString("vi-VN")}. Khách hàng đang thanh toán tiền giữ lịch.`,
+        data: { orderId: order._id },
+      }, { emitRealtime: true });
+    } else if (
+      requiresProviderConfirmation &&
+      scheduledAt &&
+      preferredProvider &&
+      !requiresImmediateInspectionPayment
+    ) {
       const responseMinutes = Math.max(
         await getNumberConfigValue(
           "APPOINTMENT_RESPONSE_MINUTES",
           DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
         ),
-        5,
+        2,
       );
       const responseDeadline = new Date(
         Math.min(
@@ -536,10 +673,10 @@ export const OrderService = {
 
     const relatedOrderIds = order.recurringGroupId
       ? await Order.find({
-          recurringGroupId: order.recurringGroupId,
-          customerId: new Types.ObjectId(customerId),
-          isDeleted: false,
-        }).distinct("_id")
+        recurringGroupId: order.recurringGroupId,
+        customerId: new Types.ObjectId(customerId),
+        isDeleted: false,
+      }).distinct("_id")
       : [order._id];
     const hasDeclinedAssignment = await OrderAssignment.exists({
       orderId: { $in: relatedOrderIds },
@@ -560,50 +697,24 @@ export const OrderService = {
     });
     if (!address) throw new AppError("Địa chỉ không hợp lệ.", 404);
 
+    const appointmentOrders = order.recurringGroupId
+      ? await Order.find({ recurringGroupId: order.recurringGroupId, status: "created", isDeleted: false })
+      : [order];
+    const policy = await getBookingPolicy();
+    const scheduleIntervals = appointmentOrders.map((current) => {
+      const interval = getOrderInterval(current, policy);
+      if (current.scheduledAt) return interval;
+      const start = Date.now() + interval.travelMinutes * 60000;
+      return { ...interval, start, end: start + (interval.end - interval.start) };
+    });
     const candidates = await MatchingService.findNearestProviders({
-      latitude: address.latitude,
-      longitude: address.longitude,
-      serviceId: order.serviceId.toString(),
-      province: address.province,
-      ward: address.ward,
-      onlyProviderId: new Types.ObjectId(providerId),
-      limit: 1,
-      requireOnline: false,
+      latitude: address.latitude, longitude: address.longitude,
+      serviceId: order.serviceId.toString(), province: address.province, ward: address.ward,
+      onlyProviderId: new Types.ObjectId(providerId), limit: 1,
+      requireOnline: !isAppointment, scheduleIntervals,
     });
     const candidate = candidates[0];
-    if (!candidate) {
-      throw new AppError("Chuyên gia không còn phù hợp với lịch hẹn này.", 409);
-    }
-
-    const appointmentOrders = order.recurringGroupId
-      ? await Order.find({
-          recurringGroupId: order.recurringGroupId,
-          status: "created",
-          isDeleted: false,
-        }).select("_id scheduledAt")
-      : [order];
-    for (const appointmentOrder of appointmentOrders) {
-      if (!appointmentOrder.scheduledAt) continue;
-      const conflictStart = new Date(
-        appointmentOrder.scheduledAt.getTime() - 60 * 60 * 1000,
-      );
-      const slotEnd = new Date(
-        appointmentOrder.scheduledAt.getTime() + 60 * 60 * 1000,
-      );
-      const hasConflict = await Order.exists({
-        _id: { $nin: appointmentOrders.map((item) => item._id) },
-        providerId: candidate.providerId,
-        status: { $in: ["accepted", "in_progress"] },
-        scheduledAt: { $gt: conflictStart, $lt: slotEnd },
-        isDeleted: false,
-      });
-      if (hasConflict) {
-        throw new AppError(
-          `Chuyên gia đã có lịch vào ${appointmentOrder.scheduledAt.toLocaleString("vi-VN")}.`,
-          409,
-        );
-      }
-    }
+    if (!candidate) throw new AppError("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.", 409);
 
     let responseDeadline: Date;
     if (isAppointment) {
@@ -612,14 +723,14 @@ export const OrderService = {
           "APPOINTMENT_RESPONSE_MINUTES",
           DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
         ),
-        5,
+        2,
       );
       responseDeadline = new Date(
         order.scheduledAt
           ? Math.min(
-              Date.now() + responseMinutes * 60 * 1000,
-              order.scheduledAt.getTime(),
-            )
+            Date.now() + responseMinutes * 60 * 1000,
+            order.scheduledAt.getTime(),
+          )
           : Date.now() + responseMinutes * 60 * 1000,
       );
     } else {
@@ -672,9 +783,9 @@ export const OrderService = {
         candidate.userId.toString(),
         isAppointment ? "assignment:new" : "direct-request:new",
         {
-        assignmentId: assignment._id.toString(),
-        orderId: order._id.toString(),
-        responseDeadline,
+          assignmentId: assignment._id.toString(),
+          orderId: order._id.toString(),
+          responseDeadline,
         },
       );
       await createNotificationRecord({
@@ -919,8 +1030,8 @@ export const OrderService = {
       ? order.matchingSearch : null;
     const matchingExpiresAt = order.matchingStartedAt
       ? matchingSearch?.expiresAt ?? new Date(order.matchingStartedAt.getTime()
-          + (order.preferredProviderId ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
-            : (await getMaxMatchingDurationSeconds()) * 1000))
+        + (order.preferredProviderId ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
+          : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
     return { ...order, matchingSearch, matchingExpiresAt };
@@ -951,79 +1062,40 @@ export const OrderService = {
    * Provider bắt đầu thực hiện đơn đã nhận.
    */
   async startOrder(orderId: string, providerUserId: string): Promise<IOrder> {
-    const provider = await getProviderByUserId(providerUserId);
-    const order = await Order.findById(orderId);
-    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
-
-    if (
-      !order.providerId ||
-      order.providerId.toString() !== provider._id.toString()
-    ) {
-      throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
-    }
-
-    if (order.status !== "accepted") {
-      throw new AppError(
-        `Không thể bắt đầu đơn hàng ở trạng thái "${order.status}".`,
-        400,
-      );
-    }
-
-    if (["scheduled", "recurring"].includes(order.orderType)) {
-      if (order.bookingStatus !== "confirmed") {
-        throw new AppError("Lịch hẹn chưa được khách hàng thanh toán và xác nhận.", 409);
-      }
-      if (
-        order.scheduledAt &&
-        order.scheduledAt.getTime() - 30 * 60 * 1000 > Date.now()
-      ) {
-        throw new AppError("Chỉ có thể bắt đầu trước giờ hẹn tối đa 30 phút.", 400);
-      }
-      if (
-        !order.inspectionRequired &&
-        order.paymentMethod !== "cash" &&
-        order.paymentStatus !== "paid"
-      ) {
-        throw new AppError("Lịch hẹn chưa được thanh toán thành công.", 409);
-      }
-      await Provider.findByIdAndUpdate(provider._id, {
-        $set: { availabilityStatus: "busy" },
+    const identity = await getProviderByUserId(providerUserId);
+    const policy = await getBookingPolicy();
+    const session = await mongoose.startSession();
+    try {
+      const result = await session.withTransaction(async () => {
+        const provider = await lockProviderSchedule(identity._id as Types.ObjectId, session);
+        const order = await Order.findOne({ _id: orderId, providerId: provider._id, status: "accepted", isDeleted: false }).session(session);
+        if (!order) throw new AppError("Đơn không thuộc về bạn hoặc không ở trạng thái đã nhận.", 409);
+        if (["scheduled", "recurring"].includes(order.orderType)) {
+          if (order.bookingStatus !== "confirmed") throw new AppError("Lịch hẹn chưa được thanh toán và xác nhận.", 409);
+          if (order.scheduledAt && order.scheduledAt.getTime() - 30 * 60000 > Date.now()) throw new AppError("Chỉ có thể bắt đầu trước giờ hẹn tối đa 30 phút.", 400);
+        }
+        if (!order.inspectionRequired && order.paymentMethod !== "cash" && order.paymentStatus !== "paid") throw new AppError("Đơn chưa được thanh toán thành công.", 409);
+        let duration = order.schedule?.durationMinutes ?? calculateDuration(order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot, policy);
+        if (order.inspectionRequired) {
+          if (!order.depositPaidAt) throw new AppError("Tiền cọc chưa được thanh toán.", 409);
+          const quotation = await RepairQuotation.findOne({ _id: order.currentQuotationId, orderId: order._id, providerId: provider._id, status: "approved", customerConfirmed: true, isDeleted: false }).session(session);
+          if (!quotation) throw new AppError("Khách hàng chưa đồng ý báo giá hiện tại.", 409);
+          if (order.schedule && !quotation.estimatedDurationMinutes) throw new AppError("Vui lòng bổ sung thời lượng sửa chữa vào báo giá.", 409);
+          duration = quotation.estimatedDurationMinutes ?? duration;
+        }
+        if (await Order.exists({ providerId: provider._id, _id: { $ne: order._id }, status: "in_progress", isDeleted: false }).session(session)) throw new AppError("Bạn đang thực hiện một đơn khác.", 409);
+        const now = new Date();
+        order.schedule = { durationMinutes: duration, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes, expectedStartAt: now, expectedEndAt: new Date(now.getTime() + duration * 60000) };
+        await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy);
+        order.status = "in_progress";
+        provider.availabilityStatus = "busy";
+        await provider.save({ session });
+        await order.save({ session });
+        return order;
       });
-    }
-
-    if (order.inspectionRequired) {
-      if (!order.currentQuotationId) {
-        throw new AppError(
-          "Đơn hàng báo giá cần có báo giá sửa chữa trước khi bắt đầu.",
-          409,
-        );
-      }
-
-      const approvedQuotation = await RepairQuotation.exists({
-        _id: order.currentQuotationId,
-        orderId: order._id,
-        providerId: provider._id,
-        status: "approved",
-        customerConfirmed: true,
-        isDeleted: { $ne: true },
-      });
-      if (!approvedQuotation) {
-        throw new AppError(
-          "Chỉ có thể bắt đầu khi khách hàng đã đồng ý báo giá hiện tại.",
-          409,
-        );
-      }
-      if (!order.depositPaidAt) {
-        throw new AppError(
-          "Không thể bắt đầu khi tiền cọc chưa được thanh toán thành công.",
-          409,
-        );
-      }
-    }
-
-    order.status = "in_progress";
-    await order.save();
-    return order;
+      if (!result) throw new AppError("Không thể bắt đầu đơn.", 409);
+      return result;
+    } finally { await session.endSession(); }
   },
 
   /**
@@ -1101,7 +1173,7 @@ export const OrderService = {
         if (
           !transactionalOrder.providerId ||
           transactionalOrder.providerId.toString() !==
-            transactionalProvider._id.toString()
+          transactionalProvider._id.toString()
         ) {
           throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
         }
@@ -1120,6 +1192,22 @@ export const OrderService = {
             400,
           );
         }
+        if (transactionalOrder.inspectionRequired) {
+          const quotation = await RepairQuotation.findOne({
+            _id: transactionalOrder.currentQuotationId,
+            orderId: transactionalOrder._id,
+            providerId: transactionalProvider._id,
+            status: "approved",
+            customerConfirmed: true,
+            isDeleted: false,
+          }).session(session);
+          if (!quotation) {
+            throw new AppError(
+              "Khách hàng chưa đồng ý báo giá hiện tại nên chưa thể hoàn thành đơn.",
+              409,
+            );
+          }
+        }
         if (
           !transactionalOrder.inspectionRequired &&
           transactionalOrder.paymentMethod !== "cash" &&
@@ -1131,16 +1219,14 @@ export const OrderService = {
           );
         }
 
-        const totalAmount = transactionalOrder.inspectionRequired
+        const totalAmount = transactionalOrder.inspectionRequired && transactionalOrder.pricing.baseAmount === undefined
           ? transactionalOrder.depositAmount
           : transactionalOrder.pricing.totalPaidAmount;
         const commissionRate = transactionalOrder.inspectionRequired
           ? 0
           : Math.max(transactionalOrder.pricing.platformCommissionRate, 0);
-        const platformCommissionAmount = Math.min(
-          Math.round(totalAmount * commissionRate),
-          totalAmount,
-        );
+        const immediateFee = transactionalOrder.pricing.immediateFee ?? 0;
+        const { platformCommissionAmount } = calculateBookingSettlement(totalAmount, immediateFee, commissionRate, transactionalOrder.pricing.immediateProviderPercent ?? 80, transactionalOrder.inspectionRequired);
         transactionalOrder.pricing.platformCommissionAmount =
           platformCommissionAmount;
         transactionalOrder.pricing.totalPaidAmount = totalAmount;

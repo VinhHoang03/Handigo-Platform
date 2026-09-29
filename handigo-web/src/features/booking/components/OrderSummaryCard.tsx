@@ -7,6 +7,7 @@ import type { Service, ServiceOption } from '../../../types/booking';
 import { OrderSummaryPriceDetails } from './OrderSummaryPriceDetails';
 import { OrderSummaryActions } from './OrderSummaryActions';
 import { Calendar, User } from "lucide-react";
+import { useBookingPreview } from '../hooks/useBookingPreview';
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
@@ -39,6 +40,7 @@ export const OrderSummaryCard: React.FC<{
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const navigate = useNavigate();
+  const { preview, loading: priceLoading, error: priceError, retry } = useBookingPreview();
 
   useEffect(() => {
     let isMounted = true;
@@ -80,8 +82,8 @@ export const OrderSummaryCard: React.FC<{
     return total;
   };
 
-  const total = calculateTotal();
-  const finalTotal = Math.max(total - discountAmount, 0);
+  const total = preview?.bookingAmount ?? calculateTotal();
+  const finalTotal = Math.max(total - Math.min(discountAmount, preview?.baseAmount ?? total), 0);
 
   const handleAction = () => {
     if (onAction) {
@@ -112,7 +114,7 @@ export const OrderSummaryCard: React.FC<{
                 {service?.serviceType === 'fixed_price'
                   ? 'Giá theo tùy chọn'
                   : service?.serviceType === 'variable_price'
-                    ? `Phí cọc: ${(service.depositAmount || 0).toLocaleString()}đ`
+                    ? `Phí cọc: ${(preview?.depositAmount ?? service.depositAmount ?? 0).toLocaleString()}đ`
                     : '0đ'}
               </p>
             </div>
@@ -144,6 +146,8 @@ export const OrderSummaryCard: React.FC<{
           )}
 
           <OrderSummaryPriceDetails
+            immediateFee={preview?.immediateFee}
+            depositAmount={preview?.depositAmount}
             service={service}
             selectedOptions={selectedOptions}
             selectedOptionQuantities={selectedOptionQuantities}
@@ -152,6 +156,9 @@ export const OrderSummaryCard: React.FC<{
             discountAmount={discountAmount}
             summaryContent={summaryContent}
           />
+      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn sớm nhất từ 08:00 ngày mai. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
+          {priceLoading && <p role="status" className="text-sm">Đang cập nhật giá…</p>}
+          {priceError && <p role="alert" className="text-sm text-error">{priceError} <button type="button" onClick={retry} className="underline">Thử lại</button></p>}
         </div>
 
         <OrderSummaryActions
@@ -159,7 +166,7 @@ export const OrderSummaryCard: React.FC<{
           orderType={orderType}
           actionLabel={actionLabel}
           isLoading={isLoading}
-          disableAction={Boolean(isLoading || (step === 1 && !serviceId))}
+          disableAction={Boolean(isLoading || priceLoading || priceError || !preview || (step === 1 && !serviceId))}
           onBack={() => navigate(-1)}
           onAction={handleAction}
         />

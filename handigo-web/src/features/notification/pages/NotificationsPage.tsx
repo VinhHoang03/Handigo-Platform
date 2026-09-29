@@ -1,6 +1,8 @@
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
+import { useNavigate } from "react-router-dom";
+import { getNotificationTarget } from "@/components/common/notification-bell/notificationBell.utils";
 import { NotificationBanner } from "../components/NotificationBanner";
 import { NotificationFilterSelects } from "../components/NotificationFilterSelects";
 import { NotificationList } from "../components/NotificationList";
@@ -20,6 +22,7 @@ export default function NotificationsPage({
 }: {
   role: NotificationRole;
 }) {
+  const navigate = useNavigate();
   const {
     isAdmin,
     query,
@@ -43,6 +46,12 @@ export default function NotificationsPage({
     markAll,
     submitSystemNotification,
   } = useNotificationsPageController(role);
+
+  const openNotification = async (item: Parameters<typeof getNotificationTarget>[0]) => {
+    await markOne(item);
+    const target = getNotificationTarget(item, role);
+    if (target) navigate(target);
+  };
 
   return (
     <DashboardShell role={role}>
@@ -100,6 +109,7 @@ export default function NotificationsPage({
               busy={busy}
               showRecipient={isAdmin}
               onMarkRead={markOne}
+              onOpen={(item) => void openNotification(item)}
             />
           </AsyncState>
           {isAdmin ? (

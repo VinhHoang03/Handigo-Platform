@@ -3,8 +3,8 @@ type SelectableOrderType = 'normal' | 'scheduled' | 'recurring';
 type OrderType = SelectableOrderType | 'urgent';
 
 const orderTypeOptions = [
-  { icon: Zap, type: 'normal' as const, title: 'Đặt lịch ngay', desc: 'Có mặt sớm nhất' },
-  { icon: CalendarDays, type: 'scheduled' as const, title: 'Lên lịch hẹn', desc: 'Chọn giờ cụ thể' },
+  { icon: Zap, type: 'normal' as const, title: 'Đặt lịch ngay', desc: 'Phục vụ sớm · có phụ phí' },
+  { icon: CalendarDays, type: 'scheduled' as const, title: 'Lên lịch hẹn', desc: 'Đặt trước · không phí ưu tiên' },
   { icon: RefreshCcw, type: 'recurring' as const, title: 'Đặt định kỳ', desc: 'Theo tuần hoặc tháng' },
 ];
 
