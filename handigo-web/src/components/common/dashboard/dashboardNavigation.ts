@@ -3,7 +3,26 @@ import type {
   DashboardRole,
   DashboardSwitchConfig,
 } from "./dashboard.types";
-import { Banknote, Bell, CalendarCheck, Gavel, Grid2X2, HardHat, Landmark, LayoutDashboard, LayoutGrid, LifeBuoy, Lightbulb, Newspaper, ReceiptText, Settings, ShieldCheck, Star, Tag, Users, Wallet } from "lucide-react";
+import {
+  Banknote,
+  Bell,
+  CalendarCheck,
+  Gavel,
+  Grid2X2,
+  Landmark,
+  LayoutDashboard,
+  LayoutGrid,
+  LifeBuoy,
+  Lightbulb,
+  Newspaper,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  Star,
+  Tag,
+  Users,
+  Wallet,
+} from "lucide-react";
 
 export const dashboardHomePath: Record<DashboardRole, string> = {
   CUSTOMER: "/customer",
@@ -55,8 +74,7 @@ export const adminNavItems: DashboardNavItem[] = [
     path: "/admin/provider-applications",
   },
   { icon: Star, label: "Đánh giá", path: "/admin/feedbacks" },
-  { icon: Grid2X2, label: "Danh mục dịch vụ", path: "/admin/categories" },
-  { icon: HardHat, label: "Dịch vụ", path: "/admin/services" },
+  { icon: Grid2X2, label: "Danh mục và dịch vụ", path: "/admin/categories" },
   {
     icon: Lightbulb,
     label: "Đề xuất dịch vụ",

@@ -1,0 +1,28 @@
+name: handigo_app
+description: "Ứng dụng di động Handigo"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_riverpod: ^3.0.0
+  go_router: ^17.0.0
+  dio: ^5.9.0
+  cookie_jar: ^4.0.8
+  dio_cookie_manager: ^3.3.0
+  flutter_secure_storage: ^10.0.0
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
