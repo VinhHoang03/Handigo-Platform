@@ -16,6 +16,9 @@ export const orderTypeLabels: Record<Order['orderType'], string> = {
 };
 
 export function getPaymentStatusLabel(order: Order) {
+  if (order.status === 'cancelled' && order.cancellation?.refundPolicy?.policyVersion === 'HANDIGO_QUOTATION_DEPOSIT_V1') {
+    return 'Cọc chuyển cho thợ; khoản trả thêm xử lý hoàn riêng';
+  }
   if (order.status === 'cancelled' && ['paid', 'partially_paid'].includes(order.paymentStatus)) {
     return 'Đang xử lý hoàn tiền';
   }

@@ -2,6 +2,7 @@ import { Modal } from '@/components/common/Modal';
 import { Trash, TriangleAlert } from "lucide-react";
 
 const cancellationReasons = [
+  'Khách hàng không đồng ý báo giá',
   'Không thể sửa chữa hoặc thực hiện dịch vụ',
   'Khách hàng cung cấp thông tin chưa đầy đủ',
   'Không thể liên hệ với khách hàng',
@@ -10,6 +11,8 @@ const cancellationReasons = [
 ];
 
 interface CancellationDialogProps {
+  isAwaitingQuotation: boolean;
+  canDeclineQuotation: boolean;
   reason: string;
   explanation: string;
   error: string;
@@ -21,6 +24,8 @@ interface CancellationDialogProps {
 }
 
 export function CancellationDialog({
+  isAwaitingQuotation,
+  canDeclineQuotation,
   reason,
   explanation,
   error,
@@ -33,8 +38,9 @@ export function CancellationDialog({
   return (
     <Modal open title="Hủy đơn dịch vụ" onClose={onClose} size="lg" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <p className="text-sm text-on-surface-variant">Lý do hủy sẽ được lưu cùng đơn hàng và thông báo cho khách hàng.</p>
+      {(isAwaitingQuotation || (canDeclineQuotation && reason === cancellationReasons[0])) && <p className="mt-2 text-sm text-on-surface-variant">Nếu khách không đồng ý mức giá trao đổi trực tiếp, bạn có thể hủy mà không cần nhập form báo giá. Khi hủy ở bước này, toàn bộ tiền cọc đã thanh toán sẽ được chuyển vào ví bạn.</p>}
       <div className="mt-md space-y-2">
-        {cancellationReasons.map((item) => (
+        {cancellationReasons.filter((item) => canDeclineQuotation || item !== cancellationReasons[0]).map((item) => (
           <label key={item} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${reason === item ? 'border-error bg-error/5' : 'border-outline-variant/40 hover:bg-surface-container-low'}`}>
             <input type="radio" name="cancel-reason" value={item} checked={reason === item} onChange={() => onReasonChange(item)} className="mt-1 text-error focus:ring-error" />
             <span className="text-sm font-medium text-on-surface">{item}</span>
@@ -56,19 +62,21 @@ export function CancellationDialog({
 }
 
 interface CancelConfirmationDialogProps {
+  isAwaitingQuotation: boolean;
   reason: string;
   busy: boolean;
   onBack: () => void;
   onConfirm: () => void;
 }
 
-export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: CancelConfirmationDialogProps) {
+export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm, isAwaitingQuotation }: CancelConfirmationDialogProps) {
   return (
     <Modal open title="Xác nhận hủy đơn?" onClose={onBack} size="md" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error">
         <TriangleAlert aria-hidden="true" size={30} />
       </div>
       <p className="mt-2 text-sm leading-6 text-on-surface-variant">Hành động này sẽ hủy đơn dịch vụ và thông báo cho khách hàng. Vui lòng kiểm tra lại trước khi xác nhận.</p>
+      {(isAwaitingQuotation || reason === cancellationReasons[0]) && <p className="mt-2 text-sm text-on-surface-variant">Khi xác nhận hủy ở bước báo giá, tiền cọc đã thanh toán được chuyển vào ví bạn, không hoàn cho khách. Bạn không cần tạo báo giá để thực hiện thao tác này.</p>}
       <div className="mt-4 rounded-2xl bg-error/5 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-error">Lý do đã chọn</p>
         <p className="mt-1 text-sm font-medium text-on-surface">{reason}</p>

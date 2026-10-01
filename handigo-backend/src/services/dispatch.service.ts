@@ -477,7 +477,7 @@ export const DispatchService = {
       matchingBatchSize,
     } = await getMatchingConfig();
     let order = await Order.findById(orderId).select(
-      "status createdAt matchingStartedAt reassignment",
+      "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment",
     );
     if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId) return;
     if (!order.matchingSearch) {
@@ -486,9 +486,11 @@ export const DispatchService = {
         { $set: { matchingSearch: await createMatchingSearch(order.matchingStartedAt || new Date()) } },
         { runValidators: true },
       );
-      order = await Order.findById(orderId).select("status matchingSearch");
+      order = await Order.findById(orderId).select(
+        "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment",
+      );
     }
-    if (!order || order.status !== "created" || !order.matchingSearch) return;
+    if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId || !order.matchingSearch) return;
     const stage = getMatchingSearchStage(order.matchingSearch);
     if (stage.expired) {
       await cancelUnmatchedOrder(orderId,

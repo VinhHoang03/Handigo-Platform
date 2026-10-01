@@ -30,6 +30,12 @@ export const getPaymentStatusDisplay = (
     currentOrder.serviceId?.serviceType !== "fixed_price";
 
   if (currentOrder.status === "cancelled") {
+    if (currentOrder.cancellation?.refundPolicy?.policyVersion === "HANDIGO_QUOTATION_DEPOSIT_V1") {
+      return {
+        label: "Cọc chuyển cho thợ; khoản trả thêm xử lý hoàn riêng",
+        className: toneTextClasses.neutral,
+      };
+    }
     if (currentOrder.paymentStatus === "refunded") {
       const refundPolicy = currentOrder.cancellation?.refundPolicy;
       return {

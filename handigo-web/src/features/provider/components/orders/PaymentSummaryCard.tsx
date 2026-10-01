@@ -22,7 +22,10 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
       ? 'Chưa báo giá'
       : formatMoney(quotationAmount)
     : formatMoney(order.pricing?.totalPaidAmount);
-  const providerEarning = isQuotationOrder
+  const isCancelled = order.status === 'cancelled';
+  const providerEarning = isCancelled
+    ? formatMoney(order.cancellation?.refundPolicy?.providerCompensation || 0)
+    : isQuotationOrder
     ? quotationAmount === undefined
       ? 'Chưa báo giá'
       : formatMoney(getDirectRepairPayment(quotationAmount, appliedDepositAmount))
@@ -55,9 +58,9 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
         />
       </div>
       <div className="mt-md rounded-2xl bg-success-container p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-on-success-container">{isQuotationOrder ? 'Tiền sửa chữa nhận trực tiếp từ khách' : 'Thu nhập thực nhận'}</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-on-success-container">{isCancelled ? 'Khoản nhận vào ví khi hủy đơn' : isQuotationOrder ? 'Tiền sửa chữa nhận trực tiếp từ khách' : 'Thu nhập thực nhận'}</p>
         <p className="mt-1 text-2xl font-bold tabular-nums text-on-success-container">{providerEarning}</p>
-        {isQuotationOrder && <p className="mt-2 text-xs text-on-success-container">Tiền cọc thuộc hệ thống; tiền sửa chữa được thu trực tiếp từ khách.</p>}
+        {isQuotationOrder && !isCancelled && <p className="mt-2 text-xs text-on-success-container">Khi hoàn thành đơn, tiền cọc thuộc hệ thống; tiền sửa chữa được thu trực tiếp từ khách.</p>}
       </div>
     </section>
   );

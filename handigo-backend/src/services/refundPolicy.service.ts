@@ -1,4 +1,8 @@
 export const REFUND_POLICY_VERSION = "HANDIGO_REFUND_V1";
+export const QUOTATION_DEPOSIT_POLICY_VERSION = "HANDIGO_QUOTATION_DEPOSIT_V1";
+export const QUOTATION_DECLINED_REASON = "Khách hàng không đồng ý báo giá";
+export const isQuotationDeclinedReason = (reason = "") =>
+  reason.trim() === QUOTATION_DECLINED_REASON || reason.trim().startsWith(`${QUOTATION_DECLINED_REASON}:`);
 
 export type RefundPolicyRole = "customer" | "provider" | "admin";
 export type RefundPolicyOrderType =
@@ -15,6 +19,10 @@ export interface RefundPolicyInput {
   hasAssignedProvider: boolean;
   paidAmount: number;
   now?: Date;
+  hasRepairQuotation?: boolean;
+  inspectionRequired?: boolean;
+  paidInspectionDeposit?: number;
+  cancellationReason?: string;
 }
 
 export interface RefundPolicyResult {
@@ -40,6 +48,22 @@ export const calculateRefundPolicy = (
   const hoursBeforeStart = input.scheduledAt
     ? (input.scheduledAt.getTime() - now.getTime()) / 3_600_000
     : null;
+
+  if (input.role === "provider" && input.orderStatus === "accepted"
+    && input.hasAssignedProvider && input.inspectionRequired
+    && (!input.hasRepairQuotation || isQuotationDeclinedReason(input.cancellationReason))) {
+    const deposit = Math.min(paidAmount, roundMoney(input.paidInspectionDeposit || 0));
+    const refundAmount = paidAmount - deposit;
+    return {
+      policyVersion: QUOTATION_DEPOSIT_POLICY_VERSION,
+      canCancel: true,
+      refundRate: paidAmount ? refundAmount / paidAmount * 100 : 100,
+      paidAmount, refundAmount, cancellationFee: deposit,
+      providerCompensation: deposit, platformRetainedAmount: 0,
+      hoursBeforeStart,
+      policyReason: "Thợ hủy tại giai đoạn trao đổi báo giá: tiền cọc được chuyển cho thợ; tiền sửa chữa đã thanh toán thêm được hoàn cho khách.",
+    };
+  }
 
   let canCancel = ["created", "accepted"].includes(input.orderStatus);
   let refundRate = 100;
