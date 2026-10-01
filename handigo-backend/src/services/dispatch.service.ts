@@ -331,7 +331,7 @@ async function sendDirectProviderRequest(
   const assignment = await OrderAssignment.create({
     orderId: new Types.ObjectId(orderId),
     providerId: candidate.providerId,
-    assignmentType: "direct_request",
+    assignmentType: ctx.scheduledDates?.length ? "appointment" : "direct_request",
     status: "pending",
     assignedAt: new Date(),
     responseDeadline: deadline,
@@ -373,7 +373,7 @@ async function sendDirectProviderRequest(
 export const DispatchService = {
   /**
    * Khởi động matching đúng một lần sau khi đơn đã đủ điều kiện thanh toán
-   * để thợ có thể xác nhận lịch hẹn ngay sau khi khách thanh toán.
+   * cho cả đơn đặt ngay và lịch hẹn.
    */
   async dispatchReadyOrder(orderId: string): Promise<void> {
     const order = await Order.findOne({
@@ -710,9 +710,6 @@ export const DispatchService = {
     if (timeoutMonitor) return;
 
     const scan = async (recoverStalledOrders = false) => {
-      const {
-        maxMatchingDurationSeconds,
-      } = await getMatchingConfig();
       const now = new Date();
       const overdueHours = Math.max(await getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24), 1);
       const overdueOrders = await Order.find({

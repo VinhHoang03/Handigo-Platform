@@ -1,5 +1,5 @@
 import { Modal } from '@/components/common/Modal';
-import { formatDateTime, formatMoney, shortAddress } from '../utils/providerOrder.utils';
+import { formatDateTime, shortAddress } from '../utils/providerOrder.utils';
 import { useProviderAssignmentGate } from './useProviderAssignmentGate';
 import { BellRing, Shield } from "lucide-react";
 
@@ -55,10 +55,7 @@ export function ProviderAssignmentModal() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-sm">
-          <InfoTile label="Thời gian" value={formatDateTime(order.scheduledAt || order.createdAt)} />
-          <InfoTile label="Thu nhập dự kiến" value={formatMoney(order.pricing?.providerEarningAmount)} highlight />
-        </div>
+        <InfoTile label="Thời gian" value={formatDateTime(order.scheduledAt || order.createdAt)} />
 
         {order.orderType === 'recurring' && (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-sm text-sm text-on-surface">
@@ -133,11 +130,11 @@ export function ProviderAssignmentModal() {
   );
 }
 
-function InfoTile({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-surface-container-low p-sm">
       <p className="text-[10px] font-bold uppercase text-on-surface-variant">{label}</p>
-      <p className={`mt-1 text-sm font-bold ${highlight ? 'text-primary' : 'text-on-surface'}`}>{value}</p>
+      <p className="mt-1 text-sm font-bold text-on-surface">{value}</p>
     </div>
   );
 }

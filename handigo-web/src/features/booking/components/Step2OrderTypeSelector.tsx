@@ -1,36 +1,30 @@
-import { CalendarDays, RefreshCcw, Zap } from "lucide-react";
+import { CalendarDays, Zap } from "lucide-react";
 type SelectableOrderType = 'normal' | 'scheduled' | 'recurring';
 type OrderType = SelectableOrderType | 'urgent';
-
-const orderTypeOptions = [
-  { icon: Zap, type: 'normal' as const, title: 'Đặt lịch ngay', desc: 'Phục vụ sớm · có phụ phí' },
-  { icon: CalendarDays, type: 'scheduled' as const, title: 'Lên lịch hẹn', desc: 'Đặt trước · không phí ưu tiên' },
-  { icon: RefreshCcw, type: 'recurring' as const, title: 'Đặt định kỳ', desc: 'Theo tuần hoặc tháng' },
-];
 
 interface Step2OrderTypeSelectorProps {
   orderType: OrderType;
   onChange: (type: SelectableOrderType) => void;
 }
 
-/** 3 lựa chọn kiểu đặt lịch: ngay / hẹn giờ / định kỳ. */
-export const Step2OrderTypeSelector = ({ orderType, onChange }: Step2OrderTypeSelectorProps) => (
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-sm">
-    {orderTypeOptions.map(({ icon: Icon, type, title, desc }) => (
-      <label key={title} className="cursor-pointer">
-        <input
-          checked={orderType === type}
-          onChange={() => onChange(type)}
-          className="peer sr-only"
-          name="booking_type"
-          type="radio"
-        />
-        <div className="p-sm rounded-2xl border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary-container/5 peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15 text-center transition-colors h-full flex flex-col items-center">
-          <Icon aria-hidden="true" size={24} className="mb-xs" />
-          <p className="font-bold text-sm">{title}</p>
-          <p className="text-xs text-on-surface-variant mt-1">{desc}</p>
-        </div>
+export const Step2OrderTypeSelector = ({ orderType, onChange }: Step2OrderTypeSelectorProps) => {
+  const hasSchedule = orderType === 'scheduled' || orderType === 'recurring';
+  return (
+    <div className="space-y-sm">
+      <div className="flex items-center gap-sm rounded-xl bg-primary/5 p-sm">
+        {hasSchedule ? <CalendarDays size={20} aria-hidden="true" /> : <Zap size={20} aria-hidden="true" />}
+        <p className="flex-1 text-sm font-semibold">{hasSchedule ? 'Thực hiện theo lịch hẹn' : 'Sớm nhất có thể'}</p>
+      </div>
+      <label className="flex cursor-pointer items-center gap-2 text-sm">
+        <input type="checkbox" checked={hasSchedule} onChange={(event) => onChange(event.target.checked ? 'scheduled' : 'normal')} className="size-4 accent-primary" />
+        Chọn ngày giờ cụ thể
       </label>
-    ))}
-  </div>
-);
+      {hasSchedule && (
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-on-surface-variant">
+          <input type="checkbox" checked={orderType === 'recurring'} onChange={(event) => onChange(event.target.checked ? 'recurring' : 'scheduled')} className="size-4 accent-primary" />
+          Lặp lại định kỳ
+        </label>
+      )}
+    </div>
+  );
+};

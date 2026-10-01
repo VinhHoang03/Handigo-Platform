@@ -36,7 +36,7 @@ export const calculateBookingSettlement = (paidAmount: number, fee: number, comm
 export const calculateDuration = (
   serviceId: string,
   inspection: boolean,
-  options: Array<{ optionId: { toString(): string }; quantity?: number }>,
+  options: Array<{ optionId: { toString(): string } | null; quantity?: number }>,
   policy: BookingPolicy,
 ) => {
   const service = policy.services[serviceId];
@@ -45,6 +45,7 @@ export const calculateDuration = (
   let extra = 0;
   const replacements: number[] = [];
   for (const option of options) {
+    if (!option.optionId) continue;
     const rule = policy.options[option.optionId.toString()];
     if (!rule) continue;
     const time = rule.minutes * (option.quantity ?? 1);

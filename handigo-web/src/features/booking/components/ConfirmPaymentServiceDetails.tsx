@@ -1,4 +1,5 @@
 import type { Address, Service, ServiceOption } from '../../../types/booking';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { getOptionPrice } from './useConfirmPaymentFlow';
 import { Calendar, CalendarCheck, MapPin, ReceiptText, SprayCan, UserSearch, type LucideIcon } from "lucide-react";
 
@@ -24,16 +25,19 @@ interface ConfirmPaymentServiceDetailsProps {
   preferredProviderName?: string;
   selectedOptions: ServiceOption[];
   selectedOptionQuantities?: Record<string, number>;
+  uniformQuantity?: number;
 }
 
 /** Banner lịch hẹn (nếu có) + thẻ "Chi tiết dịch vụ" của bước xác nhận thanh toán. */
 export const ConfirmPaymentServiceDetails = ({
   isAppointment, service, scheduledAt, address,
-  preferredProviderId, preferredProviderName, selectedOptions, selectedOptionQuantities,
+  preferredProviderId, preferredProviderName, selectedOptions, selectedOptionQuantities, uniformQuantity = 1,
 }: ConfirmPaymentServiceDetailsProps) => {
   const addressText = formatAddress(address);
   const detailItems: Array<[LucideIcon, string, string]> = [
     [SprayCan, 'Dịch vụ', service?.name || '…'],
+    ...(isAirConditionerCleaning(service)
+      ? [[SprayCan, 'Số lượng', `${uniformQuantity} máy`] as [LucideIcon, string, string]] : []),
     [
       Calendar,
       'Thời gian',
@@ -61,25 +65,24 @@ export const ConfirmPaymentServiceDetails = ({
           <div>
             <h2 className="font-bold text-on-surface">Xác nhận yêu cầu lịch hẹn</h2>
             <p className="mt-1 text-sm leading-6 text-on-surface-variant">
-              Handigo chưa thu tiền ở bước này. Chuyên gia sẽ xác nhận lịch trước,
-              sau đó bạn có 15 phút để thanh toán và giữ chỗ.
+              Hoàn tất bước thanh toán để Handigo gửi đơn cho chuyên gia theo lịch đã chọn.
             </p>
           </div>
         </section>
       )}
       <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
-        <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
+        <h2 className="font-headline-md text-headline-md mb-5 flex items-center gap-2">
           <ReceiptText aria-hidden="true" size={24} className="text-primary" />
           Chi tiết dịch vụ
         </h2>
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-5">
           {detailItems.map(([Icon, label, value], index) => (
             <div
               key={label}
-              className={`flex items-start gap-4 ${index === 2 ? 'md:col-span-2' : ''}`}
+              className={`flex items-start gap-3 ${index === 2 ? 'md:col-span-2' : ''}`}
             >
-              <div className="bg-primary-fixed-dim/30 p-3 rounded-lg text-primary">
-                <Icon aria-hidden="true" size={24} />
+              <div className="bg-primary-fixed-dim/30 p-2.5 rounded-lg text-primary">
+                <Icon aria-hidden="true" size={20} />
               </div>
               <div>
                 <p className="font-label-md text-label-md text-on-surface-variant">
@@ -94,7 +97,7 @@ export const ConfirmPaymentServiceDetails = ({
         </div>
 
         {selectedOptions.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-outline-variant">
+          <div className="mt-5 pt-5 border-t border-outline-variant">
             <p className="font-label-md text-on-surface-variant mb-3">
               Dịch vụ bổ sung:
             </p>

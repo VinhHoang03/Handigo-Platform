@@ -4,6 +4,7 @@ import { AppError } from "../../utils/appError";
 import { newSession, type AgentSession } from "../agent/agent-state";
 
 interface SessionDocument {
+  updatedAt: Date;
   _id: string;
   userId: string;
   data: AgentSession;
@@ -16,6 +17,7 @@ const schema = new Schema<SessionDocument>({
   lockedUntil: { type: Date, default: () => new Date(0) },
 }, { timestamps: true, collection: "ai_agent_sessions" });
 schema.index({ userId: 1, updatedAt: -1 });
+schema.index({ userId: 1, updatedAt: -1, _id: -1 });
 const SessionModel = model<SessionDocument>("AiAgentSession", schema);
 
 export interface SessionStore {
@@ -25,6 +27,45 @@ export interface SessionStore {
 }
 
 export class SessionService implements SessionStore {
+  async list(userId: string, page: number, limit: number) {
+    const [documents, total] = await Promise.all([
+      SessionModel.find({ userId }).sort({ updatedAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
+        .select("data.id data.currentGoal data.state data.conversation data.pendingAction.status data.requiresReconciliation updatedAt")
+        .slice("data.conversation", 1).lean(),
+      SessionModel.countDocuments({ userId }),
+    ]);
+    return { items: documents.map((doc) => ({ sessionId: doc.data.id,
+      title: (doc.data.conversation[0]?.content || doc.data.currentGoal || "Cuộc trò chuyện mới").slice(0, 120),
+      state: doc.data.state, updatedAt: doc.updatedAt,
+      needsAttention: Boolean(doc.data.pendingAction || doc.data.requiresReconciliation),
+    })), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async get(id: string, userId: string) {
+    const doc = await SessionModel.findOne({ _id: id, userId }).lean();
+    if (!doc) throw new AppError("Không tìm thấy cuộc trò chuyện.", 404);
+    return doc.data;
+  }
+
+  async progress(id: string, userId: string) {
+    const doc = await SessionModel.findOne({ _id: id, userId }).select("data.state data.activity data.activeRequest.requestId").lean();
+    if (!doc) throw new AppError("Không tìm thấy phiên trợ lý.", 404);
+    return { sessionId: id, requestId: doc.data.activeRequest?.requestId ?? null,
+      state: doc.data.state, activity: doc.data.activity ?? null };
+  }
+
+  async delete(id: string, userId: string) {
+    const deleted = await SessionModel.findOneAndDelete({
+      _id: id, userId, lockedUntil: { $lte: new Date() },
+      "data.pendingAction": null, "data.activeRequest": null,
+      "data.requiresReconciliation": { $ne: true },
+      "data.actions.status": { $nin: ["UNKNOWN", "EXECUTING"] },
+    }).lean();
+    if (deleted) return;
+    await this.get(id, userId);
+    throw new AppError("Vui lòng hoàn tất lượt xử lý, xác nhận hoặc đối soát trước khi xóa cuộc trò chuyện.", 409);
+  }
+
   async reset(id: string, userId: string) {
     const { session, lockId } = await this.acquire(id, userId);
     try {

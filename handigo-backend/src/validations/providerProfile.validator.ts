@@ -72,19 +72,6 @@ export const updateProviderProfileSchema = z.object({
   mainServiceText: optionalText(200),
   serviceArea: providerServiceAreaSchema.optional(),
   workingAreas: providerWorkingAreasSchema.optional(),
-  autoAcceptScheduledBookings: z.boolean().optional(),
-  autoAcceptScheduledBookingMinAdvanceMinutes: z
-    .number()
-    .int()
-    .min(60)
-    .max(4320)
-    .optional(),
-  autoAcceptScheduledBookingHorizonDays: z
-    .number()
-    .int()
-    .min(1)
-    .max(30)
-    .optional(),
 }).superRefine((payload, context) => {
   if (payload.birthday && new Date(payload.birthday) > endOfToday()) {
     context.addIssue({

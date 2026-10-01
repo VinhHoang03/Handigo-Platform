@@ -5,6 +5,7 @@ import type {
   ServiceOptionType,
   ServicePayload,
 } from '../../types/categoryService.types';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 
 export const serviceMoney = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
@@ -89,12 +90,12 @@ export const toServicePayload = (form: ServiceForm): ServicePayload => ({
   slug: form.slug.trim() || undefined,
   image: form.image.trim() || undefined,
   description: form.description.trim() || undefined,
-  serviceType: form.serviceType,
-  fixedPrice: null,
+  serviceType: isAirConditionerCleaning(form) ? 'fixed_price' : form.serviceType,
+  fixedPrice: isAirConditionerCleaning(form) ? Number(form.fixedPrice) : null,
   depositAmount: form.serviceType === 'variable_price' ? Number(form.depositAmount) : null,
-  requiresOptionSelection: form.serviceType === 'fixed_price' ? true : form.requiresOptionSelection,
+  requiresOptionSelection: isAirConditionerCleaning(form) ? false : form.serviceType === 'fixed_price' ? true : form.requiresOptionSelection,
   isActive: form.isActive,
 });
 
 export const getPriceLabel = (service: Service) =>
-  service.serviceType === 'variable_price' ? 'Giá linh hoạt' : 'Theo tùy chọn';
+  isAirConditionerCleaning(service) ? `${serviceMoney.format(service.fixedPrice || 0)} / máy` : service.serviceType === 'variable_price' ? 'Giá linh hoạt' : 'Theo tùy chọn';

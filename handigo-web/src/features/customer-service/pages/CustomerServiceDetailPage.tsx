@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import { ServiceQuantityPanel } from '@/features/booking/components/ServiceQuantityPanel';
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
@@ -40,6 +42,9 @@ export default function CustomerServiceDetailPage() {
     Record<string, number>
   >({});
   const [optionSelectionError, setOptionSelectionError] = useState("");
+  const [quantitySelection, setQuantitySelection] = useState({ serviceId, quantity: 1 });
+  const uniformQuantity = quantitySelection.serviceId === serviceId ? quantitySelection.quantity : 1;
+  const isCleaning = isAirConditionerCleaning(service);
 
   const { estimatePrice } = useServicePricing(
     service,
@@ -92,6 +97,7 @@ export default function CustomerServiceDetailPage() {
     selectedOptionIds,
     selectedOptionQuantities,
     setAddressSelectionError,
+    uniformQuantity,
     setOptionSelectionError,
     selectService,
   });
@@ -124,7 +130,11 @@ export default function CustomerServiceDetailPage() {
                   categoryName={getCategoryName(service, categories)}
                 />
                 <ServiceDescriptionSection service={service} />
-                <ServiceOptionsSection
+                {isCleaning ? <>
+                  <ServiceQuantityPanel price={service.fixedPrice} quantity={uniformQuantity}
+                    onChange={(quantity) => setQuantitySelection({ serviceId, quantity })} />
+                  {optionSelectionError && <p className="text-error">{optionSelectionError}</p>}
+                </> : <ServiceOptionsSection
                   service={service}
                   options={options}
                   optionGroups={optionGroups}
@@ -138,7 +148,7 @@ export default function CustomerServiceDetailPage() {
                       [optionId]: quantity,
                     }))
                   }
-                />
+                />}
                 <ServiceChecklistSection />
                 <RelatedServicesSection relatedServices={relatedServices} />
               </div>
@@ -146,7 +156,7 @@ export default function CustomerServiceDetailPage() {
               <aside className="space-y-5 lg:sticky lg:top-28 lg:col-span-4">
                 <BookingSidebar
                   service={service}
-                  estimatePrice={estimatePrice}
+                  estimatePrice={isCleaning ? (service.fixedPrice || 0) * uniformQuantity : estimatePrice}
                   addresses={addresses}
                   addressId={addressId}
                   isLoadingAddresses={isLoadingAddresses}
@@ -154,7 +164,7 @@ export default function CustomerServiceDetailPage() {
                   addressSelectionError={addressSelectionError}
                   requiresPhoneUpdate={requiresPhoneUpdate}
                   onAddressChange={handleAddressChange}
-                  isBookDisabled={false}
+                  isBookDisabled={isCleaning && !(service.fixedPrice && service.fixedPrice > 0)}
                   onBookNow={handleBookNow}
                 />
 

@@ -8,6 +8,32 @@ import { SessionService } from "./session/session.service";
 import { registerTools } from "./tools/register-tools";
 
 const sessions = new SessionService();
+export async function deleteSession(req: Request, res: Response) {
+  try {
+    await sessions.delete(String(req.params.sessionId), requireRequestUser(req).id);
+    return res.json({ success: true, data: null, message: "Đã xóa cuộc trò chuyện." });
+  } catch (error) { return sendControllerError(res, error); }
+}
+
+export async function listSessions(req: Request, res: Response) {
+  try {
+    const data = await sessions.list(requireRequestUser(req).id, Number(req.query.page ?? 1), Number(req.query.limit ?? 20));
+    return res.json({ success: true, data, message: "Đã tải danh sách cuộc trò chuyện." });
+  } catch (error) { return sendControllerError(res, error); }
+}
+
+export async function getSession(req: Request, res: Response) {
+  try {
+    const session = await sessions.get(String(req.params.sessionId), requireRequestUser(req).id);
+    return res.json({ success: true, data: sessionView(session), message: "Đã tải cuộc trò chuyện." });
+  } catch (error) { return sendControllerError(res, error); }
+}
+export async function getSessionProgress(req: Request, res: Response) {
+  try {
+    const data = await sessions.progress(String(req.params.sessionId), requireRequestUser(req).id);
+    return res.json({ success: true, data, message: "Đã tải tiến trình trợ lý." });
+  } catch (error) { return sendControllerError(res, error); }
+}
 export async function resetSession(req: Request, res: Response) {
   try {
     const session = await sessions.reset(req.body.sessionId, requireRequestUser(req).id);

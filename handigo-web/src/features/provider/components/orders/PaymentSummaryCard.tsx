@@ -36,10 +36,8 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{paymentStatus}</span>
       </div>
       <div className="mt-md space-y-3 text-sm">
-        {(order.pricing.immediateFee ?? 0) > 0 && <FinancialRow label="Phụ phí phục vụ ngay (đã gồm)" value={formatMoney(order.pricing.immediateFee)} />}
-        {isQuotationOrder && (order.pricing.immediateFee ?? 0) > 0 && <FinancialRow label="Phụ phí đặt ngay dành cho thợ" value={formatMoney(Math.round((order.pricing.immediateFee ?? 0) * (order.pricing.immediateProviderPercent ?? 80) / 100))} />}
         {isQuotationOrder && (
-          <FinancialRow label="Cọc đã trả, khấu trừ vào báo giá (thuộc hệ thống)" value={formatMoney(appliedDepositAmount)} />
+          <FinancialRow label="Phí đặt cọc" value={formatMoney(appliedDepositAmount)} />
         )}
         <FinancialRow label="Giá trị đơn hàng" value={orderValue} strong />
         {(order.cancellation?.refundPolicy?.providerCompensation || 0) > 0 && (
@@ -51,8 +49,6 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
         )}
         {!isQuotationOrder && discountCode && <FinancialRow label="Mã giảm giá" value={discountCode} />}
         {!isQuotationOrder && <FinancialRow label="Số tiền giảm giá" value={`-${formatMoney(discount)}`} tone="discount" />}
-        {!isQuotationOrder && <FinancialRow label="Phí nền tảng" value={`-${formatMoney(order.pricing?.platformCommissionAmount)}`} tone="fee" />}
-        {!isQuotationOrder && <FinancialRow label="Tỷ lệ phí nền tảng" value={`${Math.round((order.pricing?.platformCommissionRate || 0) * 100)}%`} />}
         <FinancialRow
           label={isQuotationOrder ? 'Phương thức thanh toán tiền cọc' : 'Phương thức thanh toán'}
           value={getPaymentMethodLabel(order.paymentMethod)}
@@ -61,7 +57,7 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
       <div className="mt-md rounded-2xl bg-success-container p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-on-success-container">{isQuotationOrder ? 'Tiền sửa chữa nhận trực tiếp từ khách' : 'Thu nhập thực nhận'}</p>
         <p className="mt-1 text-2xl font-bold tabular-nums text-on-success-container">{providerEarning}</p>
-        {isQuotationOrder && <p className="mt-2 text-xs text-on-success-container">Tiền cọc thuộc hệ thống; tiền sửa chữa được thu trực tiếp từ khách. Phụ phí đặt ngay được chia theo cấu hình admin.</p>}
+        {isQuotationOrder && <p className="mt-2 text-xs text-on-success-container">Tiền cọc thuộc hệ thống; tiền sửa chữa được thu trực tiếp từ khách.</p>}
       </div>
     </section>
   );
@@ -76,9 +72,9 @@ function FinancialRow({
   label: string;
   value: string;
   strong?: boolean;
-  tone?: 'discount' | 'fee';
+  tone?: 'discount';
 }) {
-  const valueColor = tone === 'discount' ? 'text-success' : tone === 'fee' ? 'text-error' : 'text-on-surface';
+  const valueColor = tone === 'discount' ? 'text-success' : 'text-on-surface';
   return (
     <div className="flex items-start justify-between gap-4 border-b border-outline-variant/20 pb-3 last:border-0 last:pb-0">
       <span className="text-on-surface-variant">{label}</span>

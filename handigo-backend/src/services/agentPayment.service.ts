@@ -71,6 +71,7 @@ export function createAgentPaymentService(deps = dependencies) {
         message: "Giao dịch đang chờ thanh toán. Mở PayOS để thanh toán hoặc hủy giao dịch trước khi đổi phương thức, sau đó chọn Kiểm tra thanh toán. Không tạo đơn mới." };
     }
     if (["scheduled", "recurring"].includes(order.orderType)
+      && !(order.status === "created" && !order.providerId && order.bookingStatus !== "reserved")
       && (order.status !== "accepted" || order.bookingStatus !== "awaiting_payment" || !order.providerId)) {
       return { ...base, status: "blocked", message: "Lịch hẹn đang chờ chuyên gia xác nhận. Chỉ thanh toán khi đơn chuyển sang chờ thanh toán." };
     }

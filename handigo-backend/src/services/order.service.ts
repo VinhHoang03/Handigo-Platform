@@ -42,23 +42,6 @@ const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
 const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
 const DEFAULT_APPOINTMENT_RESPONSE_MINUTES = 2;
 
-const isScheduledDateWithinProviderHorizon = (
-  scheduledAt: Date,
-  horizonDays: number,
-  now = new Date(),
-) => {
-  const formatDate = (value: Date) => new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value);
-  const today = new Date(`${formatDate(now)}T00:00:00Z`);
-  const selected = new Date(`${formatDate(scheduledAt)}T00:00:00Z`);
-  const dayDifference = Math.round((selected.getTime() - today.getTime()) / 86400000);
-  return dayDifference >= 1 && dayDifference <= horizonDays;
-};
-
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
 }
@@ -170,7 +153,8 @@ export async function dispatchOrderForMatching(orderId: string) {
 
 export interface CreateOrderPayload {
   expectedBookingAmount?: number;
-  confirmedExpectation?: { amount: number; addressVersion?: string };
+  uniformQuantity?: number;
+  confirmedExpectation?: { amount: number; addressVersion: string };
   customerId: string;
   serviceId: string;
   servicePackageId?: string;
@@ -225,8 +209,7 @@ export const OrderService = {
         400,
       );
     }
-    const requiresProviderConfirmation = ["scheduled", "recurring"].includes(orderType);
-    const isAutoAppointment = requiresProviderConfirmation && !payload.preferredProviderId;
+    const isAppointment = ["scheduled", "recurring"].includes(orderType);
     const validRecurrenceCount =
       payload.recurrenceUnit === "weekly"
         ? [1, 2, 3, 4].includes(payload.recurrenceCount || 0)
@@ -294,18 +277,18 @@ export const OrderService = {
     const address = await ensureAddressCoordinates(selectedAddress);
 
     const pricingSnapshot = await buildServicePricingSnapshot(
-      service, payload.selectedOptionIds, payload.selectedOptions, orderType,
+      service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, orderType,
     );
     if (payload.expectedBookingAmount !== undefined && payload.expectedBookingAmount !== pricingSnapshot.bookingAmount) {
       throw new AppError("Giá vừa thay đổi. Vui lòng kiểm tra lại tổng tiền trước khi xác nhận.", 409);
     }
-    if (requiresProviderConfirmation && scheduledAt && scheduledAt.getTime() < getEarliestScheduledAt().getTime()) {
+    if (isAppointment && scheduledAt && scheduledAt.getTime() < getEarliestScheduledAt().getTime()) {
       throw new AppError("Lịch hẹn sớm nhất là từ 08:00 ngày mai.", 400);
     }
-    const scheduleIntervals = (requiresProviderConfirmation ? occurrenceDates : [new Date(Date.now() + pricingSnapshot.schedule.travelMinutes * 60000)])
+    const scheduleIntervals = (isAppointment ? occurrenceDates : [new Date(Date.now() + pricingSnapshot.schedule.travelMinutes * 60000)])
       .map((date) => ({ start: date.getTime(), end: date.getTime() + pricingSnapshot.schedule.durationMinutes * 60000, ...pricingSnapshot.schedule }));
 
-    if (!requiresProviderConfirmation) {
+    if (!isAppointment) {
       const availableProviders = await MatchingService.findNearestProviders({
         latitude: address.latitude,
         longitude: address.longitude,
@@ -322,7 +305,7 @@ export const OrderService = {
           409,
         );
       }
-    } else if (isAutoAppointment) {
+    } else if (!payload.preferredProviderId) {
       const availableProviders = await MatchingService.findNearestProviders({
         latitude: address.latitude,
         longitude: address.longitude,
@@ -354,9 +337,8 @@ export const OrderService = {
         ward: address.ward,
         onlyProviderId: new Types.ObjectId(payload.preferredProviderId),
         limit: 1,
-        requireOnline: requiresProviderConfirmation ? false : true,
-        scheduledDates: requiresProviderConfirmation ? occurrenceDates : [],
-        scheduleIntervals,
+        requireOnline: false,
+        scheduledDates: isAppointment ? occurrenceDates : [],
       });
       preferredProvider = candidates[0] ?? null;
       if (!preferredProvider) {
@@ -366,25 +348,23 @@ export const OrderService = {
         );
       }
 
-    }
-
-    const autoAcceptProvider =
-      requiresProviderConfirmation && scheduledAt && preferredProvider
-        ? await Provider.findOne({
-          _id: preferredProvider.providerId,
-          verified: true,
+      for (const occurrenceDate of isAppointment ? occurrenceDates : []) {
+        const conflictStart = new Date(occurrenceDate.getTime() - 60 * 60 * 1000);
+        const slotEnd = new Date(occurrenceDate.getTime() + 60 * 60 * 1000);
+        const hasConflict = await Order.exists({
+          providerId: preferredProvider.providerId,
+          status: { $in: ["accepted", "in_progress"] },
+          scheduledAt: { $gt: conflictStart, $lt: slotEnd },
           isDeleted: false,
-          autoAcceptScheduledBookings: true,
-        }).select("_id autoAcceptScheduledBookings autoAcceptScheduledBookingHorizonDays")
-        : null;
-    const autoAcceptPreferredAppointment = Boolean(
-      autoAcceptProvider &&
-      scheduledAt &&
-      isScheduledDateWithinProviderHorizon(
-        scheduledAt,
-        autoAcceptProvider.autoAcceptScheduledBookingHorizonDays,
-      ),
-    );
+        });
+        if (hasConflict) {
+          throw new AppError(
+            `Chuyên gia đã có lịch vào ${occurrenceDate.toLocaleString("vi-VN")}.`,
+            409,
+          );
+        }
+      }
+    }
 
     const inspectionRequired = service.serviceType === "variable_price";
     const platformCommissionPercent = await getNumberConfigValue(
@@ -406,190 +386,71 @@ export const OrderService = {
 
     // 6. Persist order
     const recurringGroupId = orderType === "recurring" ? new Types.ObjectId() : null;
-    const orderDates = requiresProviderConfirmation ? occurrenceDates : [null];
-    const autoMatchingStartedAt = isAutoAppointment ? new Date() : null;
-    const requiresImmediateInspectionPayment =
-      requiresProviderConfirmation && inspectionRequired;
-    const initialInspectionPaymentDueAt = requiresImmediateInspectionPayment && scheduledAt
-      ? new Date(
-        Math.min(
-          Date.now() + pricingSnapshot.paymentHoldMinutes * 60 * 1000,
-          scheduledAt.getTime(),
-        ),
-      )
-      : null;
+    const orderDates = orderType === "normal" ? [null] : occurrenceDates;
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
-      return {
-        _id: new Types.ObjectId(),
-        orderCode: generateOrderCode(),
-        customerId: new Types.ObjectId(payload.customerId),
-        preferredProviderId: payload.preferredProviderId
-          ? new Types.ObjectId(payload.preferredProviderId)
-          : null,
-        serviceId: new Types.ObjectId(payload.serviceId),
-        servicePackageId: null,
-        selectedOptionIds: pricingSnapshot.optionIds,
-        selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
-        addressId: new Types.ObjectId(payload.addressId),
-        orderType,
-        scheduledAt: orderDate,
-        schedule: {
-          ...pricingSnapshot.schedule,
-          expectedStartAt: orderDate,
-          expectedEndAt: orderDate ? new Date(orderDate.getTime() + pricingSnapshot.schedule.durationMinutes * 60000) : null,
-        },
-        bookingStatus: requiresImmediateInspectionPayment
-          ? "awaiting_payment"
-          : requiresProviderConfirmation
-            ? "awaiting_provider"
-            : "not_required",
-        paymentDueAt: initialInspectionPaymentDueAt,
-        recurringGroupId,
-        recurrenceUnit: orderType === "recurring" ? payload.recurrenceUnit : null,
-        occurrenceNumber: orderType === "recurring" ? index + 1 : null,
-        totalOccurrences: orderType === "recurring" ? orderDates.length : null,
-        status: "created",
-        paymentMethod: payload.paymentMethod,
-        paymentStatus: "unpaid",
-        readyForMatching: isAutoAppointment && !inspectionRequired && index === 0,
-        matchingStartedAt: isAutoAppointment && !inspectionRequired && index === 0
-          ? autoMatchingStartedAt
-          : null,
-        depositAmount: pricingSnapshot.depositAmount,
+      const { platformCommissionAmount, providerEarningAmount } = calculateBookingSettlement(
+        Math.max(totalAmount - voucherDiscountAmount, 0),
+        pricingSnapshot.immediateFee,
+        platformCommissionRate,
+        pricingSnapshot.immediateProviderPercent,
         inspectionRequired,
-        hasAdditionalQuotation: false,
-        problemDescription: payload.problemDescription ?? null,
-        customerAttachments: payload.customerAttachments ?? [],
-        pricing: {
-          baseAmount: pricingSnapshot.baseAmount,
-          immediateFee: pricingSnapshot.immediateFee,
-          immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
-          bookingAmount: totalAmount, // The amount including options for the current payment phase
-          platformCommissionRate,
-          ...calculateBookingSettlement(Math.max(totalAmount - voucherDiscountAmount, 0), pricingSnapshot.immediateFee, platformCommissionRate, pricingSnapshot.immediateProviderPercent, inspectionRequired),
-          promotionDiscountAmount: 0,
-          voucherDiscountAmount,
-          totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
-        },
-        voucherSnapshot: orderVoucher?.snapshot ?? null,
-        confirmation: {
-          customerConfirmedAt: null,
-          providerConfirmedAt: null,
-        },
+      );
+      return {
+      _id: new Types.ObjectId(),
+      orderCode: generateOrderCode(),
+      customerId: new Types.ObjectId(payload.customerId),
+      preferredProviderId: payload.preferredProviderId
+        ? new Types.ObjectId(payload.preferredProviderId)
+        : null,
+      serviceId: new Types.ObjectId(payload.serviceId),
+      servicePackageId: null,
+      selectedOptionIds: pricingSnapshot.optionIds,
+      selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
+      addressId: new Types.ObjectId(payload.addressId),
+      orderType,
+      scheduledAt: orderDate,
+      schedule: pricingSnapshot.schedule,
+      bookingStatus: orderType === "recurring" && index > 0 ? "reserved" : "not_required",
+      paymentDueAt: null,
+      recurringGroupId,
+      recurrenceUnit: orderType === "recurring" ? payload.recurrenceUnit : null,
+      occurrenceNumber: orderType === "recurring" ? index + 1 : null,
+      totalOccurrences: orderType === "recurring" ? orderDates.length : null,
+      status: "created",
+      paymentMethod: payload.paymentMethod,
+      paymentStatus: "unpaid",
+      readyForMatching: false,
+      matchingStartedAt: null,
+      depositAmount: pricingSnapshot.depositAmount,
+      inspectionRequired,
+      hasAdditionalQuotation: false,
+      problemDescription: payload.problemDescription ?? null,
+      customerAttachments: payload.customerAttachments ?? [],
+      pricing: {
+        baseAmount: pricingSnapshot.baseAmount,
+        immediateFee: pricingSnapshot.immediateFee,
+        immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
+        bookingAmount: totalAmount, // The amount including options for the current payment phase
+        platformCommissionRate,
+        platformCommissionAmount,
+        providerEarningAmount,
+        promotionDiscountAmount: 0,
+        voucherDiscountAmount,
+        totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
+      },
+      voucherSnapshot: orderVoucher?.snapshot ?? null,
+      confirmation: {
+        customerConfirmedAt: null,
+        providerConfirmedAt: null,
+      },
       };
     });
-    let createdOrders: Array<IOrder>;
-    if (autoAcceptPreferredAppointment && preferredProvider && scheduledAt) {
-      const policy = await getBookingPolicy();
-      const session = await mongoose.startSession();
-      try {
-        const result = await session.withTransaction(async () => {
-          const provider = await lockProviderSchedule(
-            preferredProvider.providerId as Types.ObjectId,
-            session,
-          );
-          if (!provider.autoAcceptScheduledBookings) {
-            throw new AppError("Chuyên gia hiện không bật tự động nhận lịch hẹn.", 409);
-          }
-          if (!isScheduledDateWithinProviderHorizon(
-            scheduledAt,
-            provider.autoAcceptScheduledBookingHorizonDays,
-          )) {
-            throw new AppError("Lịch hẹn không nằm trong phạm vi tự nhận của chuyên gia.", 409);
-          }
-
-          const orders = await Order.insertMany(
-            orderDocuments as Array<Partial<IOrder>>,
-            { session },
-          );
-          await assertProviderSchedule(
-            provider._id as Types.ObjectId,
-            orders as Array<IOrder>,
-            session,
-            policy,
-          );
-
-          const paymentDueAt = new Date(
-            Math.min(
-              Date.now() + policy.paymentHoldMinutes * 60 * 1000,
-              scheduledAt.getTime(),
-            ),
-          );
-          for (const [index, current] of orders.entries()) {
-            current.providerId = provider._id as Types.ObjectId;
-            current.status = "accepted";
-            current.readyForMatching = false;
-            current.bookingStatus = index === 0 ? "awaiting_payment" : "reserved";
-            current.paymentDueAt = index === 0 ? paymentDueAt : null;
-            await current.save({ session });
-          }
-          return orders;
-        });
-        if (!result) throw new AppError("Không thể tự động xác nhận lịch hẹn.", 409);
-        createdOrders = result as Array<IOrder>;
-      } finally {
-        await session.endSession();
-      }
-    } else {
-      createdOrders = (await Order.insertMany(
-        orderDocuments as Array<Partial<IOrder>>,
-      )) as Array<IOrder>;
-    }
+    const createdOrders = (await Order.insertMany(
+      orderDocuments as Array<Partial<IOrder>>,
+    )) as Array<IOrder>;
     const order = createdOrders[0] as unknown as IOrder;
-
-    if (autoAcceptPreferredAppointment && preferredProvider) {
-      await createNotificationRecord({
-        userId: preferredProvider.userId,
-        type: "ORDER",
-        title: "Lịch hẹn mới đã được tự động nhận",
-        content: `Bạn có lịch hẹn mới vào ${scheduledAt?.toLocaleString("vi-VN")}. Khách hàng đang thanh toán tiền giữ lịch.`,
-        data: { orderId: order._id },
-      }, { emitRealtime: true });
-    } else if (
-      requiresProviderConfirmation &&
-      scheduledAt &&
-      preferredProvider &&
-      !requiresImmediateInspectionPayment
-    ) {
-      const responseMinutes = Math.max(
-        await getNumberConfigValue(
-          "APPOINTMENT_RESPONSE_MINUTES",
-          DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
-        ),
-        2,
-      );
-      const responseDeadline = new Date(
-        Math.min(
-          Date.now() + responseMinutes * 60 * 1000,
-          scheduledAt.getTime(),
-        ),
-      );
-      const assignment = await OrderAssignment.create({
-        orderId: order._id,
-        providerId: preferredProvider.providerId,
-        assignmentType: "appointment",
-        status: "pending",
-        assignedAt: new Date(),
-        responseDeadline,
-      });
-
-      emitToUser(preferredProvider.userId.toString(), "assignment:new", {
-        assignmentId: assignment._id.toString(),
-        orderId: order._id.toString(),
-        responseDeadline,
-      });
-      await createNotificationRecord({
-        userId: preferredProvider.userId,
-        type: "ORDER",
-        title: "Yêu cầu lịch hẹn mới",
-        content: `Khách hàng muốn đặt lịch ${scheduledAt.toLocaleString("vi-VN")}.`,
-        data: { orderId: order._id, assignmentId: assignment._id },
-      });
-    } else if (isAutoAppointment) {
-      await DispatchService.redispatch(order._id.toString());
-    }
 
     return order;
   },

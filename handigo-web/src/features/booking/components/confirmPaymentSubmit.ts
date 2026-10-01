@@ -1,5 +1,6 @@
 import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/booking.api';
 import { tokenStorage } from '@/api/tokenStorage';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import {
   type ConfirmPaymentSubmitParams,
   getConfirmPaymentErrorMessage,
@@ -15,7 +16,7 @@ export const PENDING_ORDER_FINGERPRINT_KEY = 'pendingBookingFingerprint';
 export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams) => {
   const {
     serviceId, addressId, orderType, scheduledAt, service,
-    selectedOptionIds, selectedOptionQuantities, preferredProviderId,
+    selectedOptionIds, selectedOptionQuantities, uniformQuantity, preferredProviderId,
     recurrenceUnit, recurrenceCount, problemDescription, customerAttachments,
     effectivePaymentMethod, appliedVoucher, voucherCode, pendingOrderId, bookingFingerprint,
     isAppointment, isOptionSelectionMissing,
@@ -48,6 +49,10 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     setPaymentError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
     return;
   }
+  if (isAirConditionerCleaning(service) && !(service?.fixedPrice && service.fixedPrice > 0)) {
+    setPaymentError('Dịch vụ chưa có giá hợp lệ. Vui lòng chọn lại dịch vụ.');
+    return;
+  }
   if (voucherCode.trim() && !appliedVoucher) {
     setVoucherError('Vui lòng áp dụng voucher hợp lệ trước khi thanh toán.');
     return;
@@ -61,8 +66,9 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     const payload: CreateOrderPayload = {
       expectedBookingAmount: params.expectedBookingAmount,
       serviceId,
-      selectedOptionIds,
-      selectedOptions: selectedOptionIds.map((optionId) => ({
+      selectedOptionIds: isAirConditionerCleaning(service) ? [] : selectedOptionIds,
+      uniformQuantity: isAirConditionerCleaning(service) ? uniformQuantity ?? 1 : undefined,
+      selectedOptions: (isAirConditionerCleaning(service) ? [] : selectedOptionIds).map((optionId) => ({
         optionId,
         quantity: selectedOptionQuantities?.[optionId] ?? 1,
       })),
@@ -95,21 +101,6 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         navigate(`/customer/bookings/${orderId}`);
         return;
       }
-    }
-
-    const requiresImmediateInspectionPayment =
-      (orderType === 'scheduled' || orderType === 'recurring') &&
-      service?.serviceType === 'variable_price';
-
-    if (
-      (orderType === 'scheduled' || orderType === 'recurring') &&
-      !requiresImmediateInspectionPayment
-    ) {
-      sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
-      sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
-      reset();
-      navigate(`/customer/bookings/${orderId}`);
-      return;
     }
 
     if (effectivePaymentMethod === 'bank') {

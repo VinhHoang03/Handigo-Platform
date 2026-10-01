@@ -23,6 +23,7 @@ const migrate = async () => {
   await mongoose.connect(mongoUri);
   const services = await Service.find({
     serviceType: "fixed_price",
+    slug: { $ne: "ve-sinh-dieu-hoa" },
     isDeleted: false,
   });
   const session = await mongoose.startSession();

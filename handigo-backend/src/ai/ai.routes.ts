@@ -4,7 +4,7 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { chatbotRateLimit } from "../middlewares/rateLimit.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { getLatestSession, resetSession, sendMessage } from "./ai.controller";
+import { deleteSession, getLatestSession, getSession, listSessions, getSessionProgress, resetSession, sendMessage } from "./ai.controller";
 
 export const agentRequestSchema = z.union([
   z.object({ sessionId: z.string().uuid(), requestId: z.string().uuid(), paymentStatus: z.object({
@@ -18,6 +18,19 @@ export const agentRequestSchema = z.union([
 const router = Router();
 router.use(authMiddleware, roleMiddleware("CUSTOMER"));
 router.get("/sessions/latest", getLatestSession);
+router.delete("/sessions/:sessionId", validate(z.object({
+  sessionId: z.string().uuid("Mã cuộc trò chuyện không hợp lệ."),
+}), "params"), deleteSession);
+router.get("/sessions", validate(z.object({
+  page: z.coerce.number().int().min(1).max(100000).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+}), "query"), listSessions);
+router.get("/sessions/:sessionId", validate(z.object({
+  sessionId: z.string().uuid("Mã cuộc trò chuyện không hợp lệ."),
+}), "params"), getSession);
+router.get("/sessions/:sessionId/progress", validate(z.object({
+  sessionId: z.string().uuid("Mã phiên trợ lý không hợp lệ."),
+}), "params"), getSessionProgress);
 router.post("/sessions/reset", chatbotRateLimit, validate(z.object({
   sessionId: z.string().uuid("Mã phiên trợ lý không hợp lệ."),
 }).strict()), resetSession);

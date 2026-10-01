@@ -1,0 +1,12 @@
+.content {
+  --spacing-md: 20px;
+  --spacing-lg: 40px;
+  --spacing-xl: 64px;
+  --spacing-gutter: 20px;
+  --text-body-md: 15px;
+  --text-body-md--line-height: 22px;
+  --text-headline-md: 22px;
+  --text-headline-md--line-height: 30px;
+  --text-headline-sm: 18px;
+  --text-headline-sm--line-height: 26px;
+}

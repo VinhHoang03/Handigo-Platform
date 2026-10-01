@@ -4,6 +4,7 @@ import { Order } from "../models/order.model";
 import { IService, Service } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
+import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
 
 interface ServiceInput {
   categoryId?: string;
@@ -66,6 +67,16 @@ const ensureCategoryExists = async (categoryId: string, requireActive = false) =
 
 const normalizeAndValidatePricing = (data: ServiceInput, defaultActive = true) => {
   const isActive = data.isActive ?? defaultActive;
+
+  if (isAirConditionerCleaning(data)) {
+    if (typeof data.fixedPrice !== "number" || !Number.isFinite(data.fixedPrice) || data.fixedPrice <= 0) {
+      throw new AppError("Vui lòng nhập giá vệ sinh điều hòa lớn hơn 0 cho mỗi máy.", 400);
+    }
+    data.serviceType = "fixed_price";
+    data.depositAmount = null;
+    data.requiresOptionSelection = false;
+    return;
+  }
 
   if (data.serviceType === "fixed_price") {
     data.depositAmount = null;
@@ -168,7 +179,7 @@ export const listServices = async (query: ListServicesQuery) => {
     items: items.map((item) => ({
       ...item.toObject(),
       minOptionPrice:
-        minimumOptionPriceByServiceId.get(item._id.toString()) ?? null,
+        isAirConditionerCleaning(item) ? null : minimumOptionPriceByServiceId.get(item._id.toString()) ?? null,
     })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
