@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
+import { Service } from "../models/service.model";
 import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
@@ -275,6 +276,78 @@ export const AssignmentService = {
         assignmentId: assignment._id.toString(),
         reason: "accepted",
       });
+      await createNotificationRecord({
+        userId: order.customerId,
+        type: "ORDER",
+        title: assignedOrder.recurringGroupId
+          ? "Chuyên gia đã nhận chuỗi lịch"
+          : "Chuyên gia đã nhận lịch",
+        content: `Chuyên gia đã nhận đơn ${order.orderCode} và sẽ thực hiện theo lịch hẹn.`,
+        data: { orderId: order._id },
+      });
+
+      return {
+        assignment: claimedAssignment,
+        order,
+      };
+    }
+
+    const policy = await getBookingPolicy();
+    const session = await mongoose.startSession();
+    let result: AcceptAssignmentResult | null = null;
+    try {
+      result = await session.withTransaction(async () => {
+        const lockedProvider = await lockProviderSchedule(provider._id as Types.ObjectId, session);
+        const order = await Order.findOne({
+          _id: assignment.orderId,
+          status: "created",
+          providerId: null,
+          readyForMatching: true,
+          isDeleted: false,
+        }).session(session);
+        if (!order) throw new AppError("Đơn hàng không còn khả dụng để nhận.", 409);
+
+        const hasInitialPayment = ["paid", "partially_paid"].includes(order.paymentStatus)
+          || (order.paymentMethod === "cash" && await Payment.exists({
+            orderId: order._id, method: "cash", status: "pending", isDeleted: false,
+          }).session(session));
+        if (!hasInitialPayment) throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
+
+        const durationMinutes = order.schedule?.durationMinutes
+          ?? calculateDuration(order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot, policy);
+        const travelMinutes = order.schedule?.travelMinutes ?? policy.travelMinutes;
+        const expectedStartAt = order.scheduledAt ?? new Date(Date.now() + travelMinutes * 60000);
+        order.schedule = {
+          durationMinutes,
+          bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes,
+          travelMinutes,
+          expectedStartAt,
+          expectedEndAt: new Date(expectedStartAt.getTime() + durationMinutes * 60000),
+        };
+        await assertProviderSchedule(lockedProvider._id as Types.ObjectId, [order], session, policy);
+
+        const respondedAt = new Date();
+        const claimedAssignment = await OrderAssignment.findOneAndUpdate(
+          {
+            _id: assignment._id,
+            providerId: lockedProvider._id,
+            status: "pending",
+            responseDeadline: { $gt: respondedAt },
+            isDeleted: false,
+          },
+          { $set: { status: "accepted", respondedAt } },
+          { returnDocument: "after", runValidators: true, session },
+        );
+        if (!claimedAssignment) throw new AppError("Yêu cầu nhận đơn không còn khả dụng.", 409);
+
+        order.providerId = lockedProvider._id as Types.ObjectId;
+        order.status = "accepted";
+        order.readyForMatching = false;
+        lockedProvider.availabilityStatus = "busy";
+        await lockedProvider.save({ session });
+        await order.save({ session });
+        return { assignment: claimedAssignment, order };
+      }) ?? null;
     } finally {
       await session.endSession();
     }
@@ -285,17 +358,12 @@ export const AssignmentService = {
       await createNotificationRecord({
         userId: result.order.customerId,
         type: "ORDER",
-        title: assignedOrder.recurringGroupId
-          ? "Chuyên gia đã nhận chuỗi lịch"
-          : "Chuyên gia đã nhận lịch",
-        content: `Chuyên gia đã nhận đơn ${order.orderCode} và sẽ thực hiện theo lịch hẹn.`,
-        data: { orderId: order._id },
+        title: "Chuyên gia đã nhận đơn",
+        content: `Chuyên gia đã nhận đơn ${result.order.orderCode}.`,
+        data: { orderId: result.order._id },
       });
-
-      return {
-        assignment: claimedAssignment as any,
-        order: order as any,
-      };
+    } catch (error) {
+      assignmentLogger.error("Đã nhận đơn nhưng chưa hoàn tất thông báo.", error, { assignmentId });
     }
     return result;
   },

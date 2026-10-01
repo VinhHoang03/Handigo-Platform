@@ -150,7 +150,6 @@ export const OrderSummaryCard: React.FC<{
           )}
 
           <OrderSummaryPriceDetails
-            immediateFee={preview?.immediateFee}
             depositAmount={preview?.depositAmount}
             service={service}
             selectedOptions={selectedOptions}

@@ -1,8 +1,9 @@
 import { Types } from "mongoose";
-import type { IService } from "../models/service.model";
+import { Service, type IService } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
-import { getNumberConfigValue } from "./systemConfig.service";
+import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
+import { calculateDuration } from "../utils/bookingPolicy";
 import { getUniformServicePrice } from "../utils/uniformServicePrice";
 import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
 
@@ -15,7 +16,7 @@ const normalizeGroup = (value?: string | null) =>
 export const previewServiceBooking = async (payload: { serviceId: string; selectedOptionIds?: string[]; selectedOptions?: unknown; orderType?: string }) => {
   const service = await Service.findOne({ _id: payload.serviceId, isActive: true, isDeleted: false });
   if (!service) throw new AppError("Dịch vụ không còn khả dụng.", 404);
-  return buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, payload.orderType ?? "normal");
+  return buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, undefined, payload.orderType ?? "normal");
 };
 
 export const buildServicePricingSnapshot = async (
@@ -23,6 +24,7 @@ export const buildServicePricingSnapshot = async (
   selectedOptionIdsInput: unknown = [],
   selectedOptionsInput?: unknown,
   uniformQuantity?: number,
+  _orderType = "normal",
 ) => {
   if (
     !Array.isArray(selectedOptionIdsInput) ||
@@ -77,11 +79,24 @@ export const buildServicePricingSnapshot = async (
         : "Dịch vụ không còn áp dụng giá chung cho yêu cầu này. Vui lòng chọn lại tùy chọn phù hợp.", 400);
     }
     const amount = uniform.unitPrice * quantity;
+    const policy = await getBookingPolicy();
     return {
       optionIds: [] as Types.ObjectId[], selectedOptionsSnapshot: [{
         optionId: null, name: service.name, optionType: "other", price: uniform.unitPrice,
         quantity, subtotal: amount,
-      }], bookingAmount: amount, depositAmount: 0
+      }],
+      bookingAmount: amount,
+      baseAmount: amount,
+      immediateFee: 0,
+      immediateProviderPercent: policy.providerFeePercent,
+      minAdvanceMinutes: policy.minAdvanceMinutes,
+      paymentHoldMinutes: policy.paymentHoldMinutes,
+      schedule: {
+        durationMinutes: calculateDuration(service._id.toString(), false, [], policy),
+        bufferMinutes: policy.bufferMinutes,
+        travelMinutes: policy.travelMinutes,
+      },
+      depositAmount: 0,
     };
   }
   const selectedIdSet = new Set(uniqueOptionIds);
@@ -178,13 +193,12 @@ export const buildServicePricingSnapshot = async (
   }
 
   const policy = await getBookingPolicy();
-  const immediateFee = calculateImmediateFee(bookingAmount, service.serviceType === "variable_price", orderType, policy);
   return {
     optionIds: selectedOptions.map((option) => option._id as Types.ObjectId),
     selectedOptionsSnapshot,
-    bookingAmount: bookingAmount + immediateFee,
+    bookingAmount,
     baseAmount: bookingAmount,
-    immediateFee,
+    immediateFee: 0,
     immediateProviderPercent: policy.providerFeePercent,
     minAdvanceMinutes: policy.minAdvanceMinutes,
     paymentHoldMinutes: policy.paymentHoldMinutes,

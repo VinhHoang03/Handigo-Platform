@@ -42,23 +42,6 @@ const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
 const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
 const DEFAULT_APPOINTMENT_RESPONSE_MINUTES = 2;
 
-const isScheduledDateWithinProviderHorizon = (
-  scheduledAt: Date,
-  horizonDays: number,
-  now = new Date(),
-) => {
-  const formatDate = (value: Date) => new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value);
-  const today = new Date(`${formatDate(now)}T00:00:00Z`);
-  const selected = new Date(`${formatDate(scheduledAt)}T00:00:00Z`);
-  const dayDifference = Math.round((selected.getTime() - today.getTime()) / 86400000);
-  return dayDifference >= 1 && dayDifference <= horizonDays;
-};
-
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
 }
@@ -169,6 +152,7 @@ export async function dispatchOrderForMatching(orderId: string) {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CreateOrderPayload {
+  expectedBookingAmount?: number;
   uniformQuantity?: number;
   confirmedExpectation?: { amount: number; addressVersion: string };
   customerId: string;
@@ -293,18 +277,18 @@ export const OrderService = {
     const address = await ensureAddressCoordinates(selectedAddress);
 
     const pricingSnapshot = await buildServicePricingSnapshot(
-      service, payload.selectedOptionIds, payload.selectedOptions, orderType,
+      service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, orderType,
     );
     if (payload.expectedBookingAmount !== undefined && payload.expectedBookingAmount !== pricingSnapshot.bookingAmount) {
       throw new AppError("Giá vừa thay đổi. Vui lòng kiểm tra lại tổng tiền trước khi xác nhận.", 409);
     }
-    if (requiresProviderConfirmation && scheduledAt && scheduledAt.getTime() < getEarliestScheduledAt().getTime()) {
+    if (isAppointment && scheduledAt && scheduledAt.getTime() < getEarliestScheduledAt().getTime()) {
       throw new AppError("Lịch hẹn sớm nhất là từ 08:00 ngày mai.", 400);
     }
-    const scheduleIntervals = (requiresProviderConfirmation ? occurrenceDates : [new Date(Date.now() + pricingSnapshot.schedule.travelMinutes * 60000)])
+    const scheduleIntervals = (isAppointment ? occurrenceDates : [new Date(Date.now() + pricingSnapshot.schedule.travelMinutes * 60000)])
       .map((date) => ({ start: date.getTime(), end: date.getTime() + pricingSnapshot.schedule.durationMinutes * 60000, ...pricingSnapshot.schedule }));
 
-    if (!requiresProviderConfirmation) {
+    if (!isAppointment) {
       const availableProviders = await MatchingService.findNearestProviders({
         latitude: address.latitude,
         longitude: address.longitude,
@@ -321,7 +305,7 @@ export const OrderService = {
           409,
         );
       }
-    } else if (isAutoAppointment) {
+    } else if (!payload.preferredProviderId) {
       const availableProviders = await MatchingService.findNearestProviders({
         latitude: address.latitude,
         longitude: address.longitude,
@@ -382,14 +366,6 @@ export const OrderService = {
       }
     }
 
-    // 3. Validate & snapshot selected options
-    const pricingSnapshot = await buildServicePricingSnapshot(
-      service,
-      payload.selectedOptionIds,
-      payload.selectedOptions,
-      payload.uniformQuantity,
-    );
-
     const inspectionRequired = service.serviceType === "variable_price";
     const platformCommissionPercent = await getNumberConfigValue(
       PLATFORM_FEE_PERCENT_CONFIG_KEY,
@@ -414,6 +390,13 @@ export const OrderService = {
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
+      const { platformCommissionAmount, providerEarningAmount } = calculateBookingSettlement(
+        Math.max(totalAmount - voucherDiscountAmount, 0),
+        pricingSnapshot.immediateFee,
+        platformCommissionRate,
+        pricingSnapshot.immediateProviderPercent,
+        inspectionRequired,
+      );
       return {
       _id: new Types.ObjectId(),
       orderCode: generateOrderCode(),
@@ -428,6 +411,7 @@ export const OrderService = {
       addressId: new Types.ObjectId(payload.addressId),
       orderType,
       scheduledAt: orderDate,
+      schedule: pricingSnapshot.schedule,
       bookingStatus: orderType === "recurring" && index > 0 ? "reserved" : "not_required",
       paymentDueAt: null,
       recurringGroupId,
@@ -445,6 +429,9 @@ export const OrderService = {
       problemDescription: payload.problemDescription ?? null,
       customerAttachments: payload.customerAttachments ?? [],
       pricing: {
+        baseAmount: pricingSnapshot.baseAmount,
+        immediateFee: pricingSnapshot.immediateFee,
+        immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
         bookingAmount: totalAmount, // The amount including options for the current payment phase
         platformCommissionRate,
         platformCommissionAmount,
@@ -460,63 +447,9 @@ export const OrderService = {
       },
       };
     });
-    let createdOrders: Array<IOrder>;
-    if (autoAcceptPreferredAppointment && preferredProvider && scheduledAt) {
-      const policy = await getBookingPolicy();
-      const session = await mongoose.startSession();
-      try {
-        const result = await session.withTransaction(async () => {
-          const provider = await lockProviderSchedule(
-            preferredProvider.providerId as Types.ObjectId,
-            session,
-          );
-          if (!provider.autoAcceptScheduledBookings) {
-            throw new AppError("Chuyên gia hiện không bật tự động nhận lịch hẹn.", 409);
-          }
-          if (!isScheduledDateWithinProviderHorizon(
-            scheduledAt,
-            provider.autoAcceptScheduledBookingHorizonDays,
-          )) {
-            throw new AppError("Lịch hẹn không nằm trong phạm vi tự nhận của chuyên gia.", 409);
-          }
-
-          const orders = await Order.insertMany(
-            orderDocuments as Array<Partial<IOrder>>,
-            { session },
-          );
-          await assertProviderSchedule(
-            provider._id as Types.ObjectId,
-            orders as Array<IOrder>,
-            session,
-            policy,
-          );
-
-          const paymentDueAt = new Date(
-            Math.min(
-              Date.now() + policy.paymentHoldMinutes * 60 * 1000,
-              scheduledAt.getTime(),
-            ),
-          );
-          for (const [index, current] of orders.entries()) {
-            current.providerId = provider._id as Types.ObjectId;
-            current.status = "accepted";
-            current.readyForMatching = false;
-            current.bookingStatus = index === 0 ? "awaiting_payment" : "reserved";
-            current.paymentDueAt = index === 0 ? paymentDueAt : null;
-            await current.save({ session });
-          }
-          return orders;
-        });
-        if (!result) throw new AppError("Không thể tự động xác nhận lịch hẹn.", 409);
-        createdOrders = result as Array<IOrder>;
-      } finally {
-        await session.endSession();
-      }
-    } else {
-      createdOrders = (await Order.insertMany(
-        orderDocuments as Array<Partial<IOrder>>,
-      )) as Array<IOrder>;
-    }
+    const createdOrders = (await Order.insertMany(
+      orderDocuments as Array<Partial<IOrder>>,
+    )) as Array<IOrder>;
     const order = createdOrders[0] as unknown as IOrder;
 
     return order;
