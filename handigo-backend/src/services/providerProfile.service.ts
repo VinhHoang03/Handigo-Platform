@@ -403,7 +403,7 @@ export const getNearbyProvidersForCustomer = async (
     province: address.province,
     ward: address.ward,
     limit: 5,
-    requireOnline: !scheduledAt,
+    requireOnline: true,
     scheduledDates: occurrenceDates,
     scheduleIntervals: savedIntervals ?? scheduleIntervals,
     excludeProviderIds,

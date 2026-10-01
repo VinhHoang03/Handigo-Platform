@@ -65,7 +65,7 @@ export const AgentBookingService = {
       if (Date.parse(time) <= Date.now()) throw new AppError("Giờ hẹn phải nằm trong tương lai.", 400);
       const candidates = await MatchingService.findNearestProviders({
         serviceId: args.serviceId, latitude: address.latitude, longitude: address.longitude,
-        province: address.province, ward: address.ward, scheduledDates: [new Date(time)], requireOnline: false, limit: 1,
+        province: address.province, ward: address.ward, scheduledDates: [new Date(time)], requireOnline: true, limit: 1,
       });
       times.push({ time, hasCandidate: candidates.length > 0 });
     }

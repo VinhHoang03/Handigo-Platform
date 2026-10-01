@@ -244,13 +244,6 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  confirmQuotation: async (quotationId: string) => {
-    const response = await api.post<{ success: boolean; data: OrderQuotation }>(
-      `/orders/quotations/${quotationId}/confirm`,
-    );
-    return response.data.data;
-  },
-
   rejectQuotation: async (quotationId: string, reason?: string) => {
     const response = await api.post<{ success: boolean; data: OrderQuotation }>(
       `/orders/quotations/${quotationId}/reject`,

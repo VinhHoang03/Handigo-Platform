@@ -302,7 +302,7 @@ router.get(
   getRepairQuotation,
 );
 
-// POST   /orders/quotations/:quotationId/confirm → Customer: confirm quotation
+// POST   /orders/quotations/:quotationId/confirm → Customer: tương thích client cũ
 router.post(
   "/quotations/:quotationId/confirm",
   roleMiddleware("CUSTOMER"),

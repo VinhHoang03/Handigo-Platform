@@ -8,7 +8,6 @@ type BookingQuotationPanelProps = {
   busy: boolean;
   appliedDepositAmount: number;
   remainingQuotationAmount: number;
-  onConfirm: () => void;
   onReject: () => void;
 };
 
@@ -22,7 +21,6 @@ export const BookingQuotationPanel = ({
   busy,
   appliedDepositAmount,
   remainingQuotationAmount,
-  onConfirm,
   onReject,
 }: BookingQuotationPanelProps) => {
   const shouldShow =
@@ -40,7 +38,6 @@ export const BookingQuotationPanel = ({
           busy={busy}
           appliedDepositAmount={appliedDepositAmount}
           remainingQuotationAmount={remainingQuotationAmount}
-          onConfirm={onConfirm}
           onReject={onReject}
         />
       ) : (

@@ -86,13 +86,13 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
         className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-1"
       />
       <input
-        type="number"
-        min={0}
-        step={1}
-        value={item.unitPrice}
+        type="text"
+        inputMode="numeric"
+        value={item.unitPrice > 0 ? item.unitPrice.toLocaleString('vi-VN') : ''}
         onChange={(event) => {
-          const unitPrice = event.target.value.replace(/^0+(?=\d)/, '');
-          onUpdate({ unitPrice: Number(unitPrice) });
+          const digits = event.target.value.replace(/\D/g, '');
+          const normalized = digits.replace(/^0+(?=\d)/, '');
+          onUpdate({ unitPrice: normalized ? Number(normalized) : 0 });
         }}
         aria-label="Đơn giá (VND)"
         placeholder="Đơn giá (VND)"

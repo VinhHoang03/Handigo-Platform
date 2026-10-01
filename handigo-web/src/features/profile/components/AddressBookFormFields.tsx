@@ -71,6 +71,7 @@ export function AddressBookFormFields({
         id="address-province"
         label="Tỉnh / Thành phố"
         value={addressForm.provinceCode}
+        displayValue={addressForm.province}
         options={provinceOptions}
         loading={isProvinceLoading}
         placeholder="Nhập để tìm kiếm tỉnh/thành"
@@ -83,6 +84,7 @@ export function AddressBookFormFields({
         id="address-ward"
         label="Phường / Xã"
         value={addressForm.wardCode}
+        displayValue={addressForm.ward}
         options={wardOptions}
         loading={isWardLoading}
         disabled={!addressForm.provinceCode}
