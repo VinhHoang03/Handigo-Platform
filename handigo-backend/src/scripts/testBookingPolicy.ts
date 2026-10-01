@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { Types } from 'mongoose';
 import { bookingPolicySchema, DEFAULT_BOOKING_POLICY } from '../validations/bookingPolicy.validator';
-import { calculateBookingSettlement, calculateDuration, calculateImmediateFee, intervalsConflict } from '../utils/bookingPolicy';
+import { calculateBookingSettlement, calculateDuration, calculateImmediateFee, getEarliestScheduledAt, intervalsConflict } from '../utils/bookingPolicy';
 import { getOrderInterval, isWithinWorkingCalendar } from '../utils/providerSchedule';
-import { previewBookingSchema } from '../validations/order.validator';
+import { createOrderSchema, previewBookingSchema } from '../validations/order.validator';
 
 const policy = DEFAULT_BOOKING_POLICY;
 const serviceId = '100000000000000000000001';
@@ -50,8 +50,28 @@ assert.equal(bookingPolicySchema.safeParse({ defaultDurationMinutes: 0 }).succes
 assert.equal(bookingPolicySchema.safeParse({ workdayStart: 1200, workdayEnd: 480 }).success, false);
 assert.equal(bookingPolicySchema.safeParse({ services: { invalid: { durationMinutes: 60 } } }).success, false);
 assert.equal(previewBookingSchema.safeParse({ serviceId, orderType: 'normal', selectedOptions: [{ optionId, quantity: 2 }] }).success, true);
+// Giữ số lượng máy qua validation của cả xem trước giá và tạo đơn.
+for (const uniformQuantity of [1, 2, 3, 99]) {
+  assert.equal(previewBookingSchema.parse({ serviceId, uniformQuantity }).uniformQuantity, uniformQuantity);
+  assert.equal(createOrderSchema.parse({ serviceId, uniformQuantity, addressId: extraId, paymentMethod: 'bank' }).uniformQuantity, uniformQuantity);
+}
+for (const uniformQuantity of [0, -1, 1.5, 100]) {
+  assert.equal(previewBookingSchema.safeParse({ serviceId, uniformQuantity }).success, false);
+  assert.equal(createOrderSchema.safeParse({ serviceId, uniformQuantity, addressId: extraId, paymentMethod: 'bank' }).success, false);
+}
+assert.equal(previewBookingSchema.parse({ serviceId }).uniformQuantity, undefined);
 
 const at = (time: string) => Date.parse(`2026-09-28T${time}:00+07:00`);
+// Cho phép đặt trong ngày từ 08:00, đủ 2 tiếng đặt trước và xử lý đúng khi qua ngày.
+assert.equal(getEarliestScheduledAt(new Date(at('05:00'))).getTime(), at('08:00'));
+assert.equal(getEarliestScheduledAt(new Date(at('06:00'))).getTime(), at('08:00'));
+assert.equal(getEarliestScheduledAt(new Date(at('09:30'))).getTime(), at('11:30'));
+assert.equal(getEarliestScheduledAt(new Date(at('15:00'))).getTime(), at('17:00'));
+assert.equal(getEarliestScheduledAt(new Date(at('23:30'))).getTime(), Date.parse('2026-09-29T08:00:00+07:00'));
+const earliest = getEarliestScheduledAt(new Date(at('09:30'))).getTime();
+assert.equal(at('11:00') >= earliest, false);
+assert.equal(at('11:30') >= earliest, true);
+assert.equal(at('12:00') >= earliest, true);
 const interval = (start: string, end: string) => ({ start: at(start), end: at(end), bufferMinutes: 15, travelMinutes: 30 });
 const first = interval('09:00', '10:30');
 assert.equal(intervalsConflict(first, interval('11:00', '12:00')), true);

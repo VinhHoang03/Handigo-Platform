@@ -34,8 +34,8 @@ export const useCreateBookingStep2Form = () => {
   const [formErrors, setFormErrors] = useState<Step2FormErrors>({});
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [providerAvailability, setProviderAvailability] = useState<ProviderAvailabilityStatus>('idle');
-  const todayInputValue = useMemo(() => getTodayInputValue(), []);
-  const upcomingDates = useMemo(() => getUpcomingDates(), []);
+  const todayInputValue = getTodayInputValue(new Date(currentTimestamp));
+  const upcomingDates = useMemo(() => getUpcomingDates(new Date(`${todayInputValue}T00:00:00`)), [todayInputValue]);
   const recurringPreview = useMemo(
     () => buildRecurringPreview(scheduledAt, recurrenceUnit, recurrenceCount),
     [recurrenceCount, recurrenceUnit, scheduledAt],
@@ -51,6 +51,13 @@ export const useCreateBookingStep2Form = () => {
     const timer = window.setInterval(() => setCurrentTimestamp(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (orderType === 'normal' || orderType === 'urgent') {
+      setOrderType('scheduled');
+      setPreferredProviderId(undefined);
+    }
+  }, [orderType, setOrderType, setPreferredProviderId]);
 
   useEffect(() => {
     const isValidCount = recurrenceUnit === 'weekly'
@@ -164,8 +171,9 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
     }
     if (shouldShowSchedulePicker && scheduledAt?.includes('T')
-      && new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime()) {
-      nextErrors.scheduledAt = 'Lịch hẹn sớm nhất là từ 08:00 ngày mai.';
+      && (new Date(scheduledAt).getHours() < 8
+        || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())) {
+      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 và cách thời gian hiện tại ít nhất 2 tiếng.';
     }
     // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
     // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.

@@ -44,6 +44,8 @@ export interface BookingDraft {
   summary: string[];
   choiceGroups: AgentChoiceGroup[];
   orderId?: string;
+  /** Internal flag: true khi scheduledAt được tự động chuyển sang ngày hôm sau vì đã qua giờ */
+  _autoAdvancedDay?: boolean;
 }
 export interface DraftService {
   id: string; name: string; serviceType: string; requiresOptionSelection: boolean;
@@ -126,7 +128,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
     }));
     draft.sources.selectedOptions = "customer";
   }
-  for (const key of ["addressId", "scheduledAt", "orderType", "paymentMethod", "problemDescription"] as const) {
+  for (const key of ["addressId", "orderType", "paymentMethod", "problemDescription"] as const) {
     if (input[key] === undefined) continue;
     if (input[key] === null) { delete values[key]; delete draft.sources[key]; }
     else Object.assign(values, { [key]: input[key] });
@@ -153,9 +155,26 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
     draft.timeWindow = input.timeWindow || undefined;
     if (input.timeWindow && !input.scheduledAt) { delete values.scheduledAt; delete draft.sources.scheduledAt; values.orderType = "scheduled"; draft.sources.orderType = "customer"; }
   }
-  if (input.scheduledAt) {
+  if (input.scheduledAt === null) {
+    delete values.scheduledAt; delete draft.sources.scheduledAt;
+  } else if (input.scheduledAt) {
+    let scheduledMs = Date.parse(input.scheduledAt);
+    // Nếu giờ đã qua, tự chuyển sang ngày hôm sau cùng giờ thay vì báo lỗi
+    if (scheduledMs <= Date.now()) {
+      scheduledMs += 24 * 3600 * 1000;
+      draft._autoAdvancedDay = true;
+    } else {
+      draft._autoAdvancedDay = false;
+    }
+    // Tính giờ địa phương tại Asia/Ho_Chi_Minh (+07:00) để format ISO với offset đúng
+    const localMs = scheduledMs + 7 * 3600 * 1000; // UTC → +07:00 chỉ dùng để lấy các thành phần local
+    const d = new Date(localMs);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const adjustedIso = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}+07:00`;
+    values.scheduledAt = adjustedIso;
+    draft.sources.scheduledAt = "customer";
     values.orderType = "scheduled"; draft.sources.orderType = "customer"; draft.schedulePreference = undefined;
-    draft.scheduleDate = new Date(Date.parse(input.scheduledAt) + 7 * 3600000).toISOString().slice(0, 10);
+    draft.scheduleDate = adjustedIso.slice(0, 10);
   }
   if (input.orderType === "normal" && !input.scheduledAt) {
     delete values.scheduledAt; delete draft.sources.scheduledAt; draft.schedulePreference = undefined;
@@ -246,29 +265,37 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
     }
     draft.summary.push(`Dịch vụ: ${service.name}`);
     if (values.uniformQuantity !== undefined && uniform) {
-      draft.summary.push(`Số lượng: ${values.uniformQuantity}${draft.sources.uniformQuantity === "default" ? " (mặc định)" : ""}; đơn giá chung: ${uniform.unitPrice.toLocaleString("vi-VN")} đ. Không cần chọn loại thiết bị.`);
+      draft.summary.push(`Số lượng: ${values.uniformQuantity}; đơn giá chung: ${uniform.unitPrice.toLocaleString("vi-VN")} đ. Không cần chọn loại thiết bị.`);
     }
     for (const item of selected) {
       const option = service.options.find((candidate) => String(candidate._id) === item.optionId)!;
-      draft.summary.push(`${option.name} × ${item.quantity}${draft.sources.selectedOptions === "default" ? " (mặc định)" : ""}`);
+      draft.summary.push(`${option.name} × ${item.quantity}`);
     }
   }
-  if (values.orderType === "scheduled" && (!values.scheduledAt || Date.parse(values.scheduledAt) <= Date.now())) {
-    if (values.scheduledAt) { delete values.scheduledAt; delete draft.sources.scheduledAt; }
-    draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
-    if (draft.scheduleDate) {
-      const hours = draft.timeWindow === "morning" ? [8, 9, 10] : draft.timeWindow === "afternoon" ? [13, 14, 15]
-        : draft.timeWindow === "evening" ? [18, 19, 20] : [9, 14, 18];
-      const options = hours.map((hour) => `${draft.scheduleDate}T${String(hour).padStart(2, "0")}:00:00+07:00`)
-        .filter((time) => Date.parse(time) > Date.now())
-        .map((time) => new Date(time).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }));
-      if (options.length) draft.choiceGroups.push({ label: "Giờ hẹn mong muốn (chưa giữ chỗ)", multiple: false, options });
+  if (values.orderType === "scheduled") {
+    if (!values.scheduledAt || Date.parse(values.scheduledAt) <= Date.now()) {
+      // scheduledAt bị thiếu hoặc vẫn nằm trong quá khứ (sau khi đã thử auto-advance)
+      if (values.scheduledAt) { delete values.scheduledAt; delete draft.sources.scheduledAt; }
+      draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
+      if (draft.scheduleDate) {
+        const hours = draft.timeWindow === "morning" ? [8, 9, 10] : draft.timeWindow === "afternoon" ? [13, 14, 15]
+          : draft.timeWindow === "evening" ? [18, 19, 20] : [9, 14, 18];
+        const options = hours.map((hour) => `${draft.scheduleDate}T${String(hour).padStart(2, "0")}:00:00+07:00`)
+          .filter((time) => Date.parse(time) > Date.now())
+          .map((time) => new Date(time).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }));
+        if (options.length) draft.choiceGroups.push({ label: "Giờ hẹn mong muốn (chưa giữ chỗ)", multiple: false, options });
+      }
+    } else if (draft._autoAdvancedDay) {
+      // Đã tự chuyển sang hôm sau, thêm ghi chú vào summary
+      const displayTime = new Date(Date.parse(values.scheduledAt!)).toLocaleString("vi-VN",
+        { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
+      draft.summary.push(`⚠️ Giờ bạn chọn đã qua, đã tự chuyển lịch sang ${displayTime} (ngày mai). Bạn có thể nhắn để đổi lại.`);
     }
   }
   const address = addresses.find((item) => item.id === values.addressId);
-  if (address) draft.summary.push(`Địa chỉ: ${address.fullAddress}, ${address.ward}, ${address.province}${draft.sources.addressId === "default" ? " (mặc định)" : ""}`);
-  draft.summary.push(`Thời gian: ${values.orderType === "normal" ? "Đặt ngay" : values.scheduledAt || draft.schedulePreference || "Chưa chọn"}${draft.sources.orderType === "default" ? " (mặc định)" : ""}`);
-  draft.summary.push(`Thanh toán: ${{ bank: "Chuyển khoản", wallet: "Ví Handigo", cash: "Tiền mặt" }[values.paymentMethod]}${draft.sources.paymentMethod === "default" ? " (mặc định)" : ""}`);
+  if (address) draft.summary.push(`Địa chỉ: ${address.fullAddress}, ${address.ward}, ${address.province}`);
+  draft.summary.push(`Thời gian: ${values.orderType === "normal" ? "Đặt ngay" : values.scheduledAt || draft.schedulePreference || "Chưa chọn"}`);
+  draft.summary.push(`Thanh toán: ${{ bank: "Chuyển khoản", wallet: "Ví Handigo", cash: "Tiền mặt" }[values.paymentMethod]}`);
   draft.choiceGroups = draft.choiceGroups.slice(0, 6);
   return draft;
 }

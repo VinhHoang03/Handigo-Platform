@@ -1,6 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { earnOrderRewards } from "./reward.service";
+import { isQuotationRejectionReason } from "./refundPolicy.service";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
@@ -283,8 +284,11 @@ export const OrderService = {
     if (payload.expectedBookingAmount !== undefined && payload.expectedBookingAmount !== pricingSnapshot.bookingAmount) {
       throw new AppError("Giá vừa thay đổi. Vui lòng kiểm tra lại tổng tiền trước khi xác nhận.", 409);
     }
-    if (isAppointment && scheduledAt && scheduledAt.getTime() < getEarliestScheduledAt().getTime()) {
-      throw new AppError("Lịch hẹn sớm nhất là từ 08:00 ngày mai.", 400);
+    if (isAppointment && scheduledAt && (
+      new Date(scheduledAt.getTime() + 7 * 60 * 60 * 1000).getUTCHours() < 8
+      || scheduledAt.getTime() < getEarliestScheduledAt().getTime()
+    )) {
+      throw new AppError("Vui lòng chọn giờ từ 08:00 và cách thời gian hiện tại ít nhất 2 tiếng.", 400);
     }
     const scheduleIntervals = (isAppointment ? occurrenceDates : [new Date(Date.now() + pricingSnapshot.schedule.travelMinutes * 60000)])
       .map((date) => ({ start: date.getTime(), end: date.getTime() + pricingSnapshot.schedule.durationMinutes * 60000, ...pricingSnapshot.schedule }));

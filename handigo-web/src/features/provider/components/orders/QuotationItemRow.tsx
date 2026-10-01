@@ -109,10 +109,6 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
           </button>
         )}
       </div>
-      <textarea aria-label="Mô tả hạng mục" placeholder="Thông số, mô tả linh kiện" rows={1} maxLength={2000} value={item.description}
-        onChange={(event) => onUpdate({ description: event.target.value })} className="rounded-xl border border-outline-variant px-3 py-2 text-sm md:col-span-6" />
-      <textarea aria-label="Ghi chú hạng mục" placeholder="Ghi chú hạng mục" rows={1} maxLength={1000} value={item.note}
-        onChange={(event) => onUpdate({ note: event.target.value })} className="rounded-xl border border-outline-variant px-3 py-2 text-sm md:col-span-6" />
     </div>
   );
 }

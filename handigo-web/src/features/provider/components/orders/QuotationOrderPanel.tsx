@@ -104,6 +104,7 @@ export function QuotationOrderPanel({
       {showQuotationForm && (
         <div className="h-full lg:col-span-2">
           <RepairQuotationForm
+            depositAmount={order.depositAmount}
             appliedDepositAmount={appliedDepositAmount}
             defaultDurationMinutes={order.schedule?.durationMinutes}
             orderId={order._id}
@@ -113,6 +114,12 @@ export function QuotationOrderPanel({
             busy={busy}
           />
         </div>
+      )}
+
+      {quotation && order.status === 'accepted' && !showQuotationForm && (
+        <button type="button" disabled={busy} onClick={onCancel} className="btn-secondary text-error">
+          Hủy đơn dịch vụ
+        </button>
       )}
 
       {!isUnconfirmedAppointment && !quotation && !showQuotationForm && (
