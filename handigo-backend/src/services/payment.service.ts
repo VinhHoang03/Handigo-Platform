@@ -168,6 +168,7 @@ const assertAppointmentPaymentReady = (
 ) => {
   if (paymentType === "remaining") return;
   if (!["scheduled", "recurring"].includes(order.orderType)) return;
+  if (order.status === "created" && !order.providerId && order.bookingStatus !== "reserved") return;
   if (
     order.status !== "accepted" ||
     order.bookingStatus !== "awaiting_payment" ||
@@ -341,8 +342,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
         transactionalOrder.readyForMatching = true;
       }
       if (["scheduled", "recurring"].includes(transactionalOrder.orderType)) {
-        transactionalOrder.bookingStatus = "confirmed";
-        transactionalOrder.readyForMatching = false;
+        transactionalOrder.bookingStatus = transactionalOrder.providerId ? "confirmed" : "awaiting_provider";
       }
 
       await markOrderVoucherAsUsed(transactionalOrder, session);
@@ -465,9 +465,9 @@ const reserveExternalPayment = async (
 
       if (method === "cash") {
         order.paymentMethod = "cash";
-        order.readyForMatching = !["scheduled", "recurring"].includes(order.orderType);
+        order.readyForMatching = order.status === "created";
         if (["scheduled", "recurring"].includes(order.orderType)) {
-          order.bookingStatus = "confirmed";
+          order.bookingStatus = order.providerId ? "confirmed" : "awaiting_provider";
         }
       } else {
         order.paymentMethod = "bank";
@@ -785,8 +785,7 @@ const syncPaidPayosPaymentToOrder = async (
     order.readyForMatching = true;
   }
   if (["scheduled", "recurring"].includes(order.orderType)) {
-    order.bookingStatus = "confirmed";
-    order.readyForMatching = false;
+    order.bookingStatus = order.providerId ? "confirmed" : "awaiting_provider";
   }
   if (markVoucherUsed) {
     await markOrderVoucherAsUsed(order, session);

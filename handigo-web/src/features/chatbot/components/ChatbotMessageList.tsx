@@ -5,6 +5,7 @@ import type {
 } from "../types/chatbot.types";
 import { Bot } from "lucide-react";
 import { AgentChoiceGroups } from "./AgentChoiceGroups";
+import { AgentConfirmationCard } from "./AgentConfirmationCard";
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString("vi-VN", {
@@ -20,6 +21,9 @@ export function ChatbotMessageList({
   children,
   onSend,
   choicesDisabled = false,
+  pendingActionId,
+  confirmationsDisabled = false,
+  onDecision,
 }: {
   messages: ChatbotMessage[];
   isReplying: boolean;
@@ -28,6 +32,9 @@ export function ChatbotMessageList({
   children?: ReactNode;
   onSend?: (content: string) => Promise<void>;
   choicesDisabled?: boolean;
+  pendingActionId?: string;
+  confirmationsDisabled?: boolean;
+  onDecision?: (decision: "CONFIRM" | "REJECT") => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const followsLatest = useRef(true);
@@ -82,7 +89,12 @@ export function ChatbotMessageList({
                   : "rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest text-on-surface"
               }`}
             >
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+              {!isUser && message.confirmation && (
+                <AgentConfirmationCard action={message.confirmation}
+                  readOnly={message.confirmation.actionId !== pendingActionId}
+                  disabled={isReplying || confirmationsDisabled} onDecision={onDecision} />
+              )}
               {!isUser && message._id === messages.at(-1)?._id && Boolean(message.choiceGroups?.length) && onSend && (
                 <AgentChoiceGroups key={message._id} groups={message.choiceGroups!}
                   disabled={isReplying || choicesDisabled} onSend={onSend} />

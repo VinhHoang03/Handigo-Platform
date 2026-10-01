@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
+import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AppError } from "../utils/appError";
@@ -142,7 +143,7 @@ export const AssignmentService = {
     }
 
     const assignedOrder = await Order.findById(assignment.orderId).select(
-      "addressId customerId orderCode orderType scheduledAt status recurringGroupId occurrenceNumber",
+      "addressId customerId orderCode orderType scheduledAt status recurringGroupId occurrenceNumber paymentStatus paymentMethod",
     );
     const assignedAddress = assignedOrder
       ? await Address.findById(assignedOrder.addressId).select("ward province")
@@ -157,6 +158,13 @@ export const AssignmentService = {
     if (assignment.assignmentType === "appointment") {
       if (!assignedOrder || !assignedOrder.scheduledAt || assignedOrder.status !== "created") {
         throw new AppError("Lịch hẹn không còn khả dụng.", 409);
+      }
+      const hasInitialPayment = ["paid", "partially_paid"].includes(assignedOrder.paymentStatus)
+        || (assignedOrder.paymentMethod === "cash" && await Payment.exists({
+          orderId: assignedOrder._id, method: "cash", status: "pending", isDeleted: false,
+        }));
+      if (!hasInitialPayment) {
+        throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
       }
 
       const appointmentOrders = assignedOrder.recurringGroupId
@@ -190,7 +198,6 @@ export const AssignmentService = {
       }
 
       const respondedAt = new Date();
-      const paymentDueAt = new Date(respondedAt.getTime() + 15 * 60 * 1000);
       const claimedAssignment = await OrderAssignment.findOneAndUpdate(
         {
           _id: assignment._id,
@@ -212,8 +219,8 @@ export const AssignmentService = {
           $set: {
             providerId: provider._id,
             status: "accepted",
-            bookingStatus: "awaiting_payment",
-            paymentDueAt,
+            bookingStatus: "confirmed",
+            paymentDueAt: null,
             readyForMatching: false,
           },
         },
@@ -266,10 +273,8 @@ export const AssignmentService = {
         title: assignedOrder.recurringGroupId
           ? "Chuyên gia đã nhận chuỗi lịch"
           : "Chuyên gia đã nhận lịch",
-        content: assignedOrder.recurringGroupId
-          ? `Chuỗi lịch đã được xác nhận. Vui lòng thanh toán buổi đầu tiên trong 15 phút.`
-          : `Vui lòng thanh toán đơn ${order.orderCode} trong 15 phút để giữ lịch.`,
-        data: { orderId: order._id, paymentDueAt },
+        content: `Chuyên gia đã nhận đơn ${order.orderCode} và sẽ thực hiện theo lịch hẹn.`,
+        data: { orderId: order._id },
       });
 
       return {

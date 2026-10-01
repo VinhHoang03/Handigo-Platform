@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Service } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
+import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
 
 const ensureValidId = (id: string, field = "id") => {
   if (!Types.ObjectId.isValid(id)) {
@@ -14,6 +15,8 @@ export const getOptionsByServiceId = async (
   includeInactive = false,
 ) => {
   ensureValidId(serviceId, "service id");
+  const service = await Service.findOne({ _id: serviceId, isDeleted: false });
+  if (service && isAirConditionerCleaning(service)) return [];
   return ServiceOption.find({
     serviceId,
     isDeleted: false,
@@ -82,6 +85,9 @@ export const createOption = async (serviceId: string, data: ServiceOptionInput) 
   ensureValidId(serviceId, "service id");
   const service = await Service.findOne({ _id: serviceId, isDeleted: false });
   if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
+  if (isAirConditionerCleaning(service)) {
+    throw new AppError("Vệ sinh điều hòa chỉ áp dụng một giá cố định và số lượng, không có tùy chọn.", 400);
+  }
   await ensureConsistentSelectionGroup(serviceId, data);
   return ServiceOption.create({
     ...data,
@@ -98,8 +104,11 @@ export const updateOption = async (optionId: string, data: ServiceOptionInput) =
   const service = await Service.findOne({
     _id: option.serviceId,
     isDeleted: false,
-  }).select("serviceType");
+  }).select("serviceType slug name");
   if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
+  if (isAirConditionerCleaning(service)) {
+    throw new AppError("Vệ sinh điều hòa không sử dụng tùy chọn dịch vụ.", 400);
+  }
   const nextData = {
     ...data,
     price:

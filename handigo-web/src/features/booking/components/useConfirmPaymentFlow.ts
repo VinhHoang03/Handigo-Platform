@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { useNavigate } from 'react-router-dom';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi } from '@/features/booking/api/booking.api';
@@ -23,12 +24,14 @@ export const useConfirmPaymentFlow = () => {
     categoryId, serviceId, selectedOptionIds, selectedOptionQuantities, addressId,
     orderType, preferredProviderId, preferredProviderName, scheduledAt,
     recurrenceUnit, recurrenceCount, problemDescription, customerAttachments,
-    paymentMethod, setPaymentMethod, reset,
+    paymentMethod, setPaymentMethod, reset, uniformQuantity,
   } = useBookingStore();
 
   const bookingFingerprint = JSON.stringify({
     serviceId,
     selectedOptionIds: [...selectedOptionIds].sort(),
+    selectedOptionQuantities,
+    uniformQuantity,
     addressId,
     orderType,
     preferredProviderId,
@@ -71,14 +74,16 @@ export const useConfirmPaymentFlow = () => {
     };
   }, [serviceId, addressId, categoryId]);
 
-  const selectedOptions = options.filter((opt) =>
+  const selectedOptions = options.filter((opt) => !isAirConditionerCleaning(service) &&
     selectedOptionIds.includes(opt._id),
   );
   const orderAmount =
     service?.serviceType === 'variable_price'
       ? service.depositAmount || 0
-      : (service?.fixedPrice || 0) +
-        selectedOptions.reduce((sum, option) => sum + getOptionPrice(option), 0);
+      : isAirConditionerCleaning(service)
+        ? (service?.fixedPrice || 0) * uniformQuantity
+        : (service?.fixedPrice || 0) +
+          selectedOptions.reduce((sum, option) => sum + getOptionPrice(option) * (selectedOptionQuantities[option._id] ?? 1), 0);
   const effectivePaymentMethod =
     service?.serviceType === 'variable_price' && paymentMethod === 'cash'
       ? 'bank'
@@ -97,6 +102,7 @@ export const useConfirmPaymentFlow = () => {
       service,
       selectedOptionIds,
       selectedOptionQuantities,
+      uniformQuantity,
       preferredProviderId,
       recurrenceUnit,
       recurrenceCount,
@@ -105,7 +111,7 @@ export const useConfirmPaymentFlow = () => {
       effectivePaymentMethod,
       appliedVoucher,
       voucherCode,
-      pendingOrderId,
+      pendingOrderId: sessionStorage.getItem(PENDING_ORDER_FINGERPRINT_KEY) === bookingFingerprint ? pendingOrderId : '',
       bookingFingerprint,
       isAppointment,
       isOptionSelectionMissing: isRequiredOptionSelectionMissing(service, selectedOptionIds),
@@ -124,7 +130,7 @@ export const useConfirmPaymentFlow = () => {
     isSubmitting, paymentError,
     handleConfirm, setPaymentMethod,
     orderType, scheduledAt, preferredProviderId, preferredProviderName,
-    selectedOptionQuantities,
+    selectedOptionQuantities, uniformQuantity,
     ...voucher,
   };
 };

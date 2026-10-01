@@ -12,6 +12,7 @@ export interface ConfirmPaymentSubmitParams {
   service: Service | null;
   selectedOptionIds: string[];
   selectedOptionQuantities?: Record<string, number>;
+  uniformQuantity?: number;
   preferredProviderId?: string;
   recurrenceUnit: CreateOrderPayload['recurrenceUnit'];
   recurrenceCount?: CreateOrderPayload['recurrenceCount'];

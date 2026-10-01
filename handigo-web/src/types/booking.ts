@@ -285,6 +285,8 @@ export interface BookingState {
   serviceId?: string;
   selectedOptionIds: string[];
   selectedOptionQuantities: Record<string, number>;
+  uniformQuantity: number;
+  setUniformQuantity: (quantity: number) => void;
   addressId?: string;
   preferredProviderId?: string;
   preferredProviderName?: string;
@@ -306,6 +308,7 @@ export interface BookingState {
     serviceId: string,
     selectedOptionIds?: string[],
     selectedOptionQuantities?: Record<string, number>,
+    uniformQuantity?: number,
   ) => void;
   toggleOption: (option: ServiceOption, options: ServiceOption[]) => void;
   setOptionQuantity: (optionId: string, quantity: number) => void;

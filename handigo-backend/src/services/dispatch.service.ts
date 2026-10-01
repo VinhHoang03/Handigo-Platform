@@ -296,7 +296,7 @@ async function sendDirectProviderRequest(
   const assignment = await OrderAssignment.create({
     orderId: new Types.ObjectId(orderId),
     providerId: candidate.providerId,
-    assignmentType: "direct_request",
+    assignmentType: ctx.scheduledDates?.length ? "appointment" : "direct_request",
     status: "pending",
     assignedAt: new Date(),
     responseDeadline: deadline,
@@ -338,10 +338,9 @@ async function sendDirectProviderRequest(
 export const DispatchService = {
   /**
    * Khởi động matching đúng một lần sau khi đơn đã đủ điều kiện thanh toán
-   * và đã đến cửa sổ điều phối của lịch hẹn.
+   * cho cả đơn đặt ngay và lịch hẹn.
    */
   async dispatchReadyOrder(orderId: string): Promise<void> {
-    const { scheduledDispatchLeadMinutes } = await getMatchingConfig();
     const order = await Order.findOne({
       _id: orderId,
       status: "created",
@@ -350,16 +349,6 @@ export const DispatchService = {
       "customerId orderCode serviceId addressId preferredProviderId orderType scheduledAt matchingStartedAt",
     );
     if (!order || order.matchingStartedAt) return;
-
-    if (
-      order.orderType !== "normal" &&
-      order.scheduledAt &&
-      order.scheduledAt.getTime() -
-        scheduledDispatchLeadMinutes * 60 * 1000 >
-        Date.now()
-    ) {
-      return;
-    }
 
     const matchingStartedAt = new Date();
     const claimedOrder = await Order.findOneAndUpdate(
@@ -625,7 +614,6 @@ export const DispatchService = {
     if (timeoutMonitor) return;
 
     const scan = async (recoverStalledOrders = false) => {
-      const { scheduledDispatchLeadMinutes } = await getMatchingConfig();
       const now = new Date();
       const recurringPaymentsToOpen = await Order.find({
         orderType: "recurring",
@@ -725,17 +713,6 @@ export const DispatchService = {
         status: "created",
         readyForMatching: true,
         matchingStartedAt: null,
-        $or: [
-          { orderType: "normal" },
-          { scheduledAt: null },
-          {
-            scheduledAt: {
-              $lte: new Date(
-                now.getTime() + scheduledDispatchLeadMinutes * 60 * 1000,
-              ),
-            },
-          },
-        ],
       })
         .select("_id")
         .limit(100)

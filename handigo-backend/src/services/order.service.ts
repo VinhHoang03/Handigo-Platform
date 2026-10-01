@@ -206,8 +206,7 @@ export const OrderService = {
         400,
       );
     }
-    const requiresProviderConfirmation = ["scheduled", "recurring"].includes(orderType);
-    const isAutoAppointment = requiresProviderConfirmation && !payload.preferredProviderId;
+    const isAppointment = ["scheduled", "recurring"].includes(orderType);
     const validRecurrenceCount =
       payload.recurrenceUnit === "weekly"
         ? [1, 2, 3, 4].includes(payload.recurrenceCount || 0)
@@ -291,7 +290,7 @@ export const OrderService = {
         onlyProviderId: new Types.ObjectId(payload.preferredProviderId),
         limit: 1,
         requireOnline: false,
-        scheduledDates: requiresProviderConfirmation ? occurrenceDates : [],
+        scheduledDates: isAppointment ? occurrenceDates : [],
       });
       preferredProvider = candidates[0] ?? null;
       if (!preferredProvider) {
@@ -301,7 +300,7 @@ export const OrderService = {
         );
       }
 
-      for (const occurrenceDate of requiresProviderConfirmation ? occurrenceDates : []) {
+      for (const occurrenceDate of isAppointment ? occurrenceDates : []) {
         const conflictStart = new Date(occurrenceDate.getTime() - 60 * 60 * 1000);
         const slotEnd = new Date(occurrenceDate.getTime() + 60 * 60 * 1000);
         const hasConflict = await Order.exists({
@@ -352,7 +351,6 @@ export const OrderService = {
     // 6. Persist order
     const recurringGroupId = orderType === "recurring" ? new Types.ObjectId() : null;
     const orderDates = orderType === "normal" ? [null] : occurrenceDates;
-    const autoMatchingStartedAt = isAutoAppointment ? new Date() : null;
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
@@ -370,9 +368,7 @@ export const OrderService = {
       addressId: new Types.ObjectId(payload.addressId),
       orderType,
       scheduledAt: orderDate,
-      bookingStatus: requiresProviderConfirmation
-        ? "awaiting_provider"
-        : "not_required",
+      bookingStatus: orderType === "recurring" && index > 0 ? "reserved" : "not_required",
       paymentDueAt: null,
       recurringGroupId,
       recurrenceUnit: orderType === "recurring" ? payload.recurrenceUnit : null,
@@ -381,10 +377,8 @@ export const OrderService = {
       status: "created",
       paymentMethod: payload.paymentMethod,
       paymentStatus: "unpaid",
-      readyForMatching: isAutoAppointment && index === 0,
-      matchingStartedAt: isAutoAppointment && index === 0
-        ? autoMatchingStartedAt
-        : null,
+      readyForMatching: false,
+      matchingStartedAt: null,
       depositAmount: pricingSnapshot.depositAmount,
       inspectionRequired,
       hasAdditionalQuotation: false,
@@ -416,45 +410,6 @@ export const OrderService = {
         })
       : await Order.insertMany(orderDocuments as Array<Partial<IOrder>>);
     const order = createdOrders[0] as unknown as IOrder;
-
-    if (requiresProviderConfirmation && scheduledAt && preferredProvider) {
-      const responseMinutes = Math.max(
-        await getNumberConfigValue(
-          "APPOINTMENT_RESPONSE_MINUTES",
-          DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
-        ),
-        5,
-      );
-      const responseDeadline = new Date(
-        Math.min(
-          Date.now() + responseMinutes * 60 * 1000,
-          scheduledAt.getTime(),
-        ),
-      );
-      const assignment = await OrderAssignment.create({
-        orderId: order._id,
-        providerId: preferredProvider.providerId,
-        assignmentType: "appointment",
-        status: "pending",
-        assignedAt: new Date(),
-        responseDeadline,
-      });
-
-      emitToUser(preferredProvider.userId.toString(), "assignment:new", {
-        assignmentId: assignment._id.toString(),
-        orderId: order._id.toString(),
-        responseDeadline,
-      });
-      await createNotificationRecord({
-        userId: preferredProvider.userId,
-        type: "ORDER",
-        title: "Yêu cầu lịch hẹn mới",
-        content: `Khách hàng muốn đặt lịch ${scheduledAt.toLocaleString("vi-VN")}.`,
-        data: { orderId: order._id, assignmentId: assignment._id },
-      });
-    } else if (isAutoAppointment) {
-      await DispatchService.redispatch(order._id.toString());
-    }
 
     return order;
   },

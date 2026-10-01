@@ -12,7 +12,8 @@ import { ToolRegistry } from "../tools/tool-registry";
 import { ConfirmationService } from "./confirmation.service";
 import type { AgentSession, AgentState, PendingAction } from "./agent-state";
 import { readyBookingArguments } from "./booking-draft";
-import { agentContext } from "./agent-context";
+import { agentContext, compactAgentContext } from "./agent-context";
+import { selectToolGroup, toolGroupSchema, TOOL_ROUTING_PROMPT, type ToolIntent } from "../tools/tool-groups";
 
 export const toolError = (error: unknown) => error instanceof ZodError
   ? `Dữ liệu tool không hợp lệ: ${error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`
@@ -28,6 +29,10 @@ export class AgentLoop {
     session.state = state;
     session.activity = undefined;
     this.messages.append(session, "assistant", message);
+    if (state === "WAITING_CONFIRMATION" && session.pendingAction?.tool === "create_booking"
+      && !session.conversation.some((item) => item.confirmationActionId === session.pendingAction!.id)) {
+      session.conversation[session.conversation.length - 1].confirmationActionId = session.pendingAction.id;
+    }
     return message;
   }
 
@@ -87,7 +92,10 @@ export class AgentLoop {
   }
 
   async run(session: AgentSession, context: ToolContext, checkpoint: () => Promise<void>) {
+    await compactAgentContext(session, this.provider, AbortSignal.any([context.signal, AbortSignal.timeout(20000)]));
     const failedCalls = new Set<string>();
+    // Chọn lại theo ngữ cảnh mỗi lượt để không khóa khách vào chủ đề cũ.
+    let intent: ToolIntent | undefined;
     let consecutiveProviderErrors = 0;
     for (let iteration = 0; iteration < this.config.maxIterations; iteration += 1) {
       if (context.signal.aborted) break;
@@ -96,10 +104,11 @@ export class AgentLoop {
       await checkpoint();
       let response;
       const generationSignal = AbortSignal.any([context.signal, AbortSignal.timeout(this.config.timeoutMs)]);
+      const availableTools = this.tools.forIntent(context, intent);
       try {
         response = llmResponseSchema.parse(await withAgentTimeout(this.provider.generate({
-          system: this.config.systemPrompt, ...agentContext(session),
-          tools: this.tools.list(context), signal: generationSignal,
+          system: this.config.systemPrompt + (this.tools.routeByIntent ? TOOL_ROUTING_PROMPT : ""), ...agentContext(session),
+          tools: availableTools, signal: generationSignal,
         }), generationSignal, this.config.timeoutMs));
         consecutiveProviderErrors = 0;
       } catch (error) {
@@ -140,7 +149,24 @@ export class AgentLoop {
       if (response.type === "FINAL") return this.reply(session, "COMPLETED", response.message);
       if (response.type === "ERROR") return this.reply(session, "FAILED", response.message);
 
-      if (response.tool === "create_booking" && this.tools.list(context).some((tool) => tool.name === "update_booking_draft")) {
+      if (this.tools.routeByIntent && response.tool === selectToolGroup.name) {
+        const selection = toolGroupSchema.safeParse(response.arguments);
+        if (selection.success) {
+          intent = selection.data.intent;
+          this.messages.append(session, "tool", JSON.stringify({ intent, message: "Đã nạp nhóm công cụ. Tiếp tục xử lý yêu cầu bằng công cụ được cung cấp." }), selectToolGroup.name);
+        } else {
+          this.messages.append(session, "tool", "Nhóm công cụ không hợp lệ. Chọn booking, support, complaint, order hoặc payment.", selectToolGroup.name);
+        }
+        continue;
+      }
+
+      const requestedTool = response.tool;
+      if (this.tools.routeByIntent && !availableTools.some((tool) => tool.name === requestedTool)) {
+        this.record(session, response.tool, { error: "Công cụ chưa được nạp hoặc không được phép. Dùng select_tool_group để chọn nhóm phù hợp trước." }, false);
+        continue;
+      }
+
+      if (response.tool === "create_booking" && availableTools.some((tool) => tool.name === "update_booking_draft")) {
         const { uniformQuantity, ...argumentsWithoutUniform } = response.arguments;
         response = {
           ...response, tool: "update_booking_draft", arguments: {
@@ -220,11 +246,10 @@ export class AgentLoop {
           await checkpoint();
           session.pendingAction = await this.confirmation.prepare(create, context, argsToUse);
           session.pendingAction.taskVersion = session.taskVersion;
-          const summaryLines = draft.summary.join("\n");
           const missingNote = draft.missing.length
             ? `\n\n⚠️ Một số thông tin chưa đầy đủ: ${draft.missing.join("; ")}. Bạn có thể nhắn để bổ sung hoặc sửa trước khi xác nhận.`
             : "";
-          return this.reply(session, "WAITING_CONFIRMATION", `${summaryLines}${missingNote}\n\nVui lòng kiểm tra bản xem trước. Bạn có thể xác nhận hoặc nhắn thông tin cần sửa.`);
+          return this.reply(session, "WAITING_CONFIRMATION", missingNote.trim());
         } catch (error) {
           this.record(session, "create_booking", { error: toolError(error) }, false);
           return this.reply(session, "WAITING_USER_INPUT", toolError(error));

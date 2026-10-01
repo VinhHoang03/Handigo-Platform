@@ -36,6 +36,7 @@ export const AgentBookingService = {
     const service = await activeService(serviceId);
     const options = await getOptionsByServiceId(serviceId);
     return { id: String(service._id), name: service.name, serviceType: service.serviceType,
+      fixedPrice: service.fixedPrice,
       requiresOptionSelection: service.requiresOptionSelection, options: options.map((option) => ({
         _id: String(option._id), name: option.name, description: option.description,
         price: option.price, optionType: option.optionType, selectionGroup: option.selectionGroup,
@@ -73,16 +74,24 @@ export const AgentBookingService = {
   async preview(userId: string, args: BookingArguments) {
     const address = await ownedAddress(userId, args.addressId);
     const price = await this.price(args);
+    const paymentOnConfirmation = true;
+    const quantityPrice = price.options.length === 1 && price.options[0].optionId === null
+      ? price.options[0] : undefined;
+    const paymentNote = args.paymentMethod === "bank"
+        ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và liên kết PayOS để bạn chuyển khoản."
+        : args.paymentMethod === "wallet"
+          ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và trừ số tiền hiển thị ở trên từ ví Handigo."
+          : "Vui lòng kiểm tra thông tin của bạn và xác nhận để tạo đơn dịch vụ. Bạn thanh toán tiền mặt trực tiếp cho nhà cung cấp sau khi sử dụng dịch vụ.";
     return { title: "Tạo đơn dịch vụ", service: price.serviceName,
-      options: price.options.map((option) => `${option.name} × ${option.quantity}: ${option.subtotal.toLocaleString("vi-VN")} đ`),
+      ...(quantityPrice ? { unitPrice: quantityPrice.price, quantity: quantityPrice.quantity }
+        : { options: price.options.map((option) => `${option.name} × ${option.quantity}: ${option.subtotal.toLocaleString("vi-VN")} đ`) }),
       address: `${address.fullAddress}, ${address.ward}, ${address.province}`,
       addressVersion: address.updatedAt.toISOString(),
       schedule: args.scheduledAt ?? "Đặt ngay", orderType: args.orderType,
       paymentMethod: args.paymentMethod, amount: price.amount, currency: price.currency,
-      description: args.problemDescription ?? "", serviceType: price.serviceType,
-      note: price.serviceType === "variable_price" ? "Đây là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát."
-        : args.uniformQuantity !== undefined ? "Áp dụng giá chung; chưa xác định loại thiết bị. Đơn mới chưa thanh toán; lịch hẹn cần kỹ thuật viên chấp nhận."
-        : "Đơn mới chưa thanh toán; lịch hẹn cần kỹ thuật viên chấp nhận." };
+      description: args.problemDescription ?? "", serviceType: price.serviceType, paymentOnConfirmation,
+      note: [paymentNote, price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
+        quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ") };
   },
   async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string }) {
     const order = await OrderService.createOrder({ ...args, customerId: userId, confirmedExpectation });

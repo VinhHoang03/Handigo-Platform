@@ -8,12 +8,14 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   serviceId: undefined,
   selectedOptionIds: [],
   selectedOptionQuantities: {},
+  uniformQuantity: 1,
+  setUniformQuantity: (quantity) => set({ uniformQuantity: Math.min(99, Math.max(1, Math.trunc(quantity) || 1)) }),
   addressId: undefined,
   preferredProviderId: undefined,
   preferredProviderName: undefined,
   requestedProviderId: undefined,
   requestedProviderName: undefined,
-  orderType: 'scheduled',
+  orderType: 'normal',
   scheduledAt: undefined,
   recurrenceUnit: 'weekly',
   recurrenceCount: 1,
@@ -22,6 +24,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   paymentMethod: 'bank',
 
   setCategoryId: (id) => set({
+    uniformQuantity: 1,
     categoryId: id,
     serviceId: undefined,
     selectedOptionIds: [],
@@ -32,6 +35,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     requestedProviderName: undefined,
   }),
   setServiceId: (id) => set({
+    uniformQuantity: 1,
     serviceId: id,
     selectedOptionIds: [],
     selectedOptionQuantities: {},
@@ -40,8 +44,9 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     requestedProviderId: undefined,
     requestedProviderName: undefined,
   }),
-  selectService: (categoryId, serviceId, selectedOptionIds = [], selectedOptionQuantities = {}) =>
+  selectService: (categoryId, serviceId, selectedOptionIds = [], selectedOptionQuantities = {}, uniformQuantity = 1) =>
     set((state) => ({
+      uniformQuantity,
       categoryId,
       serviceId,
       selectedOptionIds,
@@ -93,7 +98,10 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     requestedProviderName: id ? name : undefined,
   }),
   setOrderType: (type) => set({ orderType: type }),
-  setScheduledAt: (date) => set({ scheduledAt: date }),
+  setScheduledAt: (date) => set((state) => ({
+    scheduledAt: date,
+    orderType: date ? (state.orderType === 'recurring' ? 'recurring' : 'scheduled') : 'normal',
+  })),
   setRecurrenceUnit: (unit) => set({ recurrenceUnit: unit }),
   setRecurrenceCount: (count) => set({ recurrenceCount: count }),
   setProblemDescription: (desc) => set({ problemDescription: desc }),
@@ -101,6 +109,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   setPaymentMethod: (method) => set({ paymentMethod: method }),
   reset: () =>
     set({
+      uniformQuantity: 1,
       categoryId: undefined,
       serviceId: undefined,
       selectedOptionIds: [],
@@ -110,7 +119,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
       preferredProviderName: undefined,
       requestedProviderId: undefined,
       requestedProviderName: undefined,
-      orderType: 'scheduled',
+      orderType: 'normal',
       scheduledAt: undefined,
       recurrenceUnit: 'weekly',
       recurrenceCount: 1,

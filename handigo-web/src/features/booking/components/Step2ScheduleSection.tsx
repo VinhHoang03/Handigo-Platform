@@ -62,7 +62,7 @@ export const Step2ScheduleSection = ({
               <p className="text-sm font-bold text-on-surface">Đặt trước chuyên gia theo lịch của bạn</p>
               <p className="mt-1 text-xs leading-5 text-on-surface-variant">
                 Chọn thời gian trước để Handigo chỉ hiển thị những chuyên gia còn lịch trống.
-                Bạn chưa cần thanh toán ở bước này.
+                Thông tin lịch hẹn được cập nhật trong tóm tắt đơn hàng.
               </p>
             </div>
           </div>

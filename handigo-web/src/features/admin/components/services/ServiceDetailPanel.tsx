@@ -1,4 +1,5 @@
 import { AsyncState } from '@/components/common/AsyncState';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { DataTable } from '@/components/common/dashboard/DataTable';
 import { TableSkeleton } from '@/components/common/dashboard/TableSkeleton';
 import type { Service, ServiceOption } from '../../types/categoryService.types';
@@ -105,7 +106,9 @@ export function ServiceDetailPanel({
         </div>
       </div>
 
-      <div className="p-4 sm:p-6">
+      {isAirConditionerCleaning(service) ? (
+        <p className="p-4 text-on-surface-variant sm:p-6">Dịch vụ áp dụng một đơn giá cho mỗi máy. Khách hàng chỉ chọn số lượng, không có tùy chọn dịch vụ.</p>
+      ) : <div className="p-4 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="font-headline-md text-headline-md font-bold text-on-surface">Tùy chọn dịch vụ</h3>
@@ -142,7 +145,7 @@ export function ServiceDetailPanel({
             minWidthClassName="min-w-[760px]"
           />
         </AsyncState>
-      </div>
+      </div>}
     </>
   );
 }

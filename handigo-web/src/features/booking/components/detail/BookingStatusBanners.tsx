@@ -46,7 +46,7 @@ export const BookingStatusBanners = ({
       <div className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm text-on-surface">
         <p className="font-bold">Đang chờ chuyên gia xác nhận lịch hẹn</p>
         <p className="mt-1 text-on-surface-variant">
-          Bạn chưa cần thanh toán. Handigo sẽ thông báo ngay khi chuyên gia phản hồi.
+          Handigo sẽ thông báo ngay khi chuyên gia nhận đơn.
         </p>
       </div>
     )}

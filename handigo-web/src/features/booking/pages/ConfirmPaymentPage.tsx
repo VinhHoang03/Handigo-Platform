@@ -16,8 +16,8 @@ const ConfirmPaymentPage = () => {
     voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, voucherError, setVoucherError,
     applyVoucherCode, handleConfirm,
     setPaymentMethod,
-    orderType, scheduledAt, preferredProviderId, preferredProviderName,
-    selectedOptionQuantities,
+    scheduledAt, preferredProviderId, preferredProviderName,
+    selectedOptionQuantities, uniformQuantity,
   } = useConfirmPaymentFlow();
 
   return (
@@ -35,10 +35,10 @@ const ConfirmPaymentPage = () => {
             preferredProviderName={preferredProviderName}
             selectedOptions={selectedOptions}
             selectedOptionQuantities={selectedOptionQuantities}
+            uniformQuantity={uniformQuantity}
           />
 
           <ConfirmPaymentMethodSelector
-            isAppointment={isAppointment}
             service={service}
             effectivePaymentMethod={effectivePaymentMethod}
             onChangeMethod={setPaymentMethod}
@@ -46,15 +46,11 @@ const ConfirmPaymentPage = () => {
           />
         </div>
 
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-4 lg:sticky lg:top-24">
           <OrderSummaryCard
             step={3}
             discountAmount={voucherDiscountAmount}
-            actionLabel={
-              orderType === 'scheduled' || orderType === 'recurring'
-                ? 'Gửi yêu cầu lịch hẹn'
-                : 'Xác nhận & Thanh toán'
-            }
+            actionLabel="Xác nhận & Thanh toán"
             onAction={handleConfirm}
             isLoading={isSubmitting}
             summaryContent={

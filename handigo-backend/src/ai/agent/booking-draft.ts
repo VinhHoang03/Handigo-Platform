@@ -47,6 +47,7 @@ export interface BookingDraft {
 }
 export interface DraftService {
   id: string; name: string; serviceType: string; requiresOptionSelection: boolean;
+  fixedPrice?: number | null;
   options: Array<{
     _id: unknown; name: string; price: number; optionType: string;
     allowsQuantity: boolean; selectionGroup?: string | null; selectionMode: string;
@@ -185,7 +186,11 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   if (!service && !draft.missing.some((item) => item.includes("dịch vụ"))) draft.missing.push("Chọn dịch vụ cần đặt");
   if (service) {
     const needsOptions = service.requiresOptionSelection || service.serviceType === "fixed_price";
-    const uniform = getUniformServicePrice(service.serviceType, service.options);
+    const uniform = getUniformServicePrice(service.serviceType, service.options, service.fixedPrice);
+    if (uniform && service.options.length === 0) {
+      delete values.selectedOptions; delete draft.sources.selectedOptions;
+      delete draft.optionPreference;
+    }
     if (values.uniformQuantity !== undefined && !uniform) {
       delete values.uniformQuantity; delete draft.sources.uniformQuantity;
     }

@@ -11,8 +11,11 @@ interface PricingOption {
 const normalize = (value?: string | null) => value?.trim().toLocaleLowerCase("vi") || "";
 
 // Chỉ gộp biến thể kỹ thuật tương đương; không suy ra cùng phạm vi từ giá của gói/diện tích/số phòng.
-export function getUniformServicePrice(serviceType: string, options: PricingOption[]) {
+export function getUniformServicePrice(serviceType: string, options: PricingOption[], fixedPrice?: number | null) {
   if (serviceType !== "fixed_price") return null;
+  if (options.length === 0 && typeof fixedPrice === "number" && Number.isFinite(fixedPrice) && fixedPrice > 0) {
+    return { unitPrice: fixedPrice, allowsQuantity: true };
+  }
   const base = options.filter((option) => option.optionType !== "add_on");
   if (base.length < 2) return null;
   const first = base[0];

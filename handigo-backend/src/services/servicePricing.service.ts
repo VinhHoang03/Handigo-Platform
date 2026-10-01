@@ -4,6 +4,7 @@ import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
 import { getUniformServicePrice } from "../utils/uniformServicePrice";
+import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
 
 const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
   "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
@@ -52,22 +53,27 @@ export const buildServicePricingSnapshot = async (
     throw new AppError("Danh sách tùy chọn dịch vụ bị trùng lặp.", 400);
   }
 
-  const availableOptions = await ServiceOption.find({
+  const isCleaning = isAirConditionerCleaning(service);
+  const availableOptions = isCleaning ? [] : await ServiceOption.find({
     serviceId: service._id,
     isActive: true,
     isDeleted: false,
   }).sort({ sortOrder: 1, createdAt: 1 });
-  if (uniformQuantity !== undefined) {
-    const uniform = getUniformServicePrice(service.serviceType, availableOptions);
-    if (!uniform || !Number.isInteger(uniformQuantity) || uniformQuantity < 1 || uniformQuantity > 99
-      || (!uniform.allowsQuantity && uniformQuantity !== 1) || uniqueOptionIds.length > 0) {
-      throw new AppError("Dịch vụ không còn áp dụng giá chung cho yêu cầu này. Vui lòng chọn lại tùy chọn phù hợp.", 400);
+  const uniform = getUniformServicePrice(service.serviceType, availableOptions, service.fixedPrice);
+  if (isCleaning || uniformQuantity !== undefined || (availableOptions.length === 0 && uniform)) {
+    const quantity = uniformQuantity ?? 1;
+    if (!uniform || !Number.isInteger(quantity) || quantity < 1 || quantity > 99
+      || (!uniform.allowsQuantity && quantity !== 1) || uniqueOptionIds.length > 0
+      || (isCleaning && legacySelectedOptionIds.length > 0)) {
+      throw new AppError(isCleaning
+        ? "Vệ sinh điều hòa cần đơn giá hợp lệ và số lượng nguyên từ 1 đến 99, không kèm tùy chọn."
+        : "Dịch vụ không còn áp dụng giá chung cho yêu cầu này. Vui lòng chọn lại tùy chọn phù hợp.", 400);
     }
-    const amount = uniform.unitPrice * uniformQuantity;
+    const amount = uniform.unitPrice * quantity;
     return {
       optionIds: [] as Types.ObjectId[], selectedOptionsSnapshot: [{
         optionId: null, name: service.name, optionType: "other", price: uniform.unitPrice,
-        quantity: uniformQuantity, subtotal: amount,
+        quantity, subtotal: amount,
       }], bookingAmount: amount, depositAmount: 0
     };
   }

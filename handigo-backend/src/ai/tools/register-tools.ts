@@ -26,7 +26,7 @@ import { getCancellationPreviewTool } from "./implementations/get-cancellation-p
 import { updateBookingDraftTool } from "./implementations/update-booking-draft.tool";
 
 export function registerTools(policies: Record<string, ToolPolicy>) {
-  return new ToolRegistry(policies)
+  return new ToolRegistry(policies, true)
     .register(updateBookingDraftTool)
     .register(createSupportTicketTool).register(getMySupportTicketsTool).register(getSupportTicketTool)
     .register(replySupportTicketTool).register(cancelSupportTicketTool)

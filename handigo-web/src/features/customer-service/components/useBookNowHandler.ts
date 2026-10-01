@@ -1,4 +1,5 @@
 import type { NavigateFunction } from "react-router-dom";
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import type { Address, Service } from "@/types/booking";
 import { getCategoryId } from "../utils/serviceDisplay";
 import { isRequiredOptionSelectionMissing } from "@/features/booking/utils/serviceOptionSelection";
@@ -11,6 +12,7 @@ interface UseBookNowHandlerParams {
   addresses: Address[];
   selectedOptionIds: string[];
   selectedOptionQuantities: Record<string, number>;
+  uniformQuantity: number;
   setAddressSelectionError: (message: string) => void;
   setOptionSelectionError: (message: string) => void;
   selectService: (
@@ -18,6 +20,7 @@ interface UseBookNowHandlerParams {
     serviceId: string,
     optionIds: string[],
     optionQuantities: Record<string, number>,
+    uniformQuantity?: number,
   ) => void;
 }
 
@@ -30,6 +33,7 @@ export function useBookNowHandler({
   addresses,
   selectedOptionIds,
   selectedOptionQuantities,
+  uniformQuantity,
   setAddressSelectionError,
   setOptionSelectionError,
   selectService,
@@ -49,7 +53,13 @@ export function useBookNowHandler({
       return;
     }
 
-    selectService(getCategoryId(service), service._id, selectedOptionIds, selectedOptionQuantities);
+    if (isAirConditionerCleaning(service) && !(service.fixedPrice && service.fixedPrice > 0)) {
+      setOptionSelectionError("Dịch vụ chưa có giá hợp lệ. Vui lòng thử lại sau.");
+      return;
+    }
+    selectService(getCategoryId(service), service._id,
+      isAirConditionerCleaning(service) ? [] : selectedOptionIds,
+      isAirConditionerCleaning(service) ? {} : selectedOptionQuantities, uniformQuantity);
     navigate("/customer/bookings/new/location", {
       state: { fromServiceDetail: true },
     });

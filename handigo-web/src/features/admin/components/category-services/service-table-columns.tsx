@@ -1,4 +1,5 @@
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { getPriceLabel } from '../services/service.helpers';
 import type { DataTableColumn } from '@/components/common/dashboard/DataTable';
 import type { Service } from '../../types/categoryService.types';
 import { categoryServiceMoney } from './category-service.helpers';
@@ -40,7 +41,7 @@ export function buildServiceTableColumns({ onEdit, onDelete }: ServiceTableConte
       key: 'price',
       header: 'Giá',
       className: 'tabular-nums font-medium',
-      render: (service) => (service.serviceType === 'fixed_price' ? 'Theo tùy chọn' : 'Giá linh hoạt'),
+      render: getPriceLabel,
     },
     {
       key: 'deposit',
