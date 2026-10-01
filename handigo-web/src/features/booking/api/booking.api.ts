@@ -57,7 +57,7 @@ interface ReverseGeocodedAddress {
 }
 
 export const bookingApi = {
-  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions'>) => {
+  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity'>) => {
     const response = await api.post<{ success: boolean; data: BookingPreview }>('/orders/preview', payload);
     return response.data.data;
   },

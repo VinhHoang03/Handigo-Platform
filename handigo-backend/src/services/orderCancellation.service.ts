@@ -7,6 +7,7 @@ import { OrderAssignment } from "../models/orderAssignment.model";
 import { Payment, IPayment } from "../models/payment.model";
 import { Promotion } from "../models/promotion.model";
 import { Provider } from "../models/provider.model";
+import { RepairQuotation } from "../models/repairQuotation.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { Refund, IRefund } from "../models/refund.model";
@@ -18,6 +19,8 @@ import { buildTransactionCode } from "../utils/transaction";
 import { createNotificationRecord } from "./notification.service";
 import {
   calculateRefundPolicy,
+  isQuotationRejectionReason,
+  QUOTATION_REJECTION_POLICY_VERSION,
   type RefundPolicyResult,
 } from "./refundPolicy.service";
 import { getRefundRetryDecision } from "./refundProcessing";
@@ -166,8 +169,18 @@ const getStoredRefundRate = (order: IOrder) => {
   return Number.isFinite(rate) ? Math.min(100, Math.max(0, rate)) : 100;
 };
 
-const getPaymentRefundAmount = (order: IOrder, payment: IPayment) =>
-  Math.round((getPaidPaymentAmount(payment) * getStoredRefundRate(order)) / 100);
+const isQuotationRejectionSettlement = (order: IOrder) =>
+  order.cancellation?.refundPolicy?.policyVersion === QUOTATION_REJECTION_POLICY_VERSION;
+
+const getPaymentRefundAmount = (order: IOrder, payment: IPayment) => {
+  const paid = getPaidPaymentAmount(payment);
+  if (isQuotationRejectionSettlement(order)) {
+    return payment.paymentType === "inspection_deposit"
+      ? Math.max(0, paid - order.depositAmount)
+      : paid;
+  }
+  return Math.round((paid * getStoredRefundRate(order)) / 100);
+};
 
 const buildRefundMetadata = (
   order: IOrder,
@@ -228,6 +241,7 @@ const refundWalletPayments = async (
 
   for (const payment of payments) {
     const refundAmount = getPaymentRefundAmount(order, payment);
+    if (refundAmount === 0 && isQuotationRejectionSettlement(order)) continue;
     const existingRefund = await WalletTransaction.findOne({
       relatedPaymentId: payment._id,
       type: "refund",
@@ -345,7 +359,8 @@ const compensateProviderPayments = async (
   for (const payment of payments) {
     const cancellationFee =
       getPaidPaymentAmount(payment) - getPaymentRefundAmount(order, payment);
-    const compensationAmount = Math.max(0, Math.round(cancellationFee * 0.8));
+    const compensationRate = isQuotationRejectionSettlement(order) ? 100 : 80;
+    const compensationAmount = Math.max(0, Math.round(cancellationFee * compensationRate / 100));
     if (compensationAmount === 0) continue;
 
     const claimedPayment = await Payment.findOneAndUpdate(
@@ -364,7 +379,7 @@ const compensateProviderPayments = async (
                 order.cancellation?.refundPolicy?.policyVersion ||
                 "LEGACY_FULL_REFUND",
               amount: compensationAmount,
-              rate: 80,
+              rate: compensationRate,
             },
           }),
         },
@@ -410,7 +425,9 @@ const compensateProviderPayments = async (
           balanceAfter: wallet.balance,
           status: "success",
           transactionCode: buildTransactionCode("CANCEL_COMP"),
-          description: "Bồi thường phí hủy đơn từ khách hàng",
+          description: isQuotationRejectionSettlement(order)
+            ? "Hoàn 100% tiền cọc cho thợ do khách không đồng ý báo giá"
+            : "Bồi thường phí hủy đơn từ khách hàng",
           metadata: {
             source: "cancellation_fee",
             orderCode: order.orderCode,
@@ -1011,6 +1028,7 @@ const requestPayosRefund = async (
   reason: string,
   refundAmount: number,
 ) => {
+  if (refundAmount <= 0) return;
   const queuedRefund = await ensurePayosRefundRecord(
     payment,
     order,
@@ -1132,7 +1150,7 @@ const settlePendingPayosPayment = async (
       const refundAmount = getPaymentRefundAmount(order, paidPayment);
       const cancellationFee = actualPaidAmount - refundAmount;
       const providerCompensation = order.providerId
-        ? Math.round(cancellationFee * 0.8)
+        ? Math.round(cancellationFee * (isQuotationRejectionSettlement(order) ? 1 : 0.8))
         : 0;
       const platformRetainedAmount = cancellationFee - providerCompensation;
 
@@ -1350,7 +1368,9 @@ export const cancelOrderWithSettlement = async (
         return;
       }
 
-      if (!CANCELLABLE_STATUSES.includes(order.status as any)) {
+      const quotationRejected = input.role === "provider" && isQuotationRejectionReason(reason);
+      if (!CANCELLABLE_STATUSES.includes(order.status as any) &&
+        !(quotationRejected && order.status === "in_progress")) {
         throw new AppError(
           'Không thể hủy đơn hàng ở trạng thái "' + order.status + '".',
           400,
@@ -1368,6 +1388,35 @@ export const cancelOrderWithSettlement = async (
         paidAmount,
         cancelledAt,
       );
+      if (quotationRejected) {
+        const quotation = await RepairQuotation.findOne({
+          _id: order.currentQuotationId,
+          orderId: order._id,
+          providerId: order.providerId,
+          isDeleted: false,
+        }).session(session);
+        const depositPayment = await Payment.findOne({
+          orderId: order._id,
+          paymentType: "inspection_deposit",
+          status: "paid",
+          compensatedToProviderId: null,
+          isDeleted: false,
+        }).session(session);
+        if (!order.inspectionRequired || !quotation || !depositPayment ||
+          order.depositAmount <= 0 || getPaidPaymentAmount(depositPayment) < order.depositAmount) {
+          throw new AppError("Chỉ có thể hoàn cọc cho thợ khi đơn có báo giá và tiền cọc đã thanh toán đầy đủ.", 409);
+        }
+        Object.assign(refundPolicy, {
+          policyVersion: QUOTATION_REJECTION_POLICY_VERSION,
+          canCancel: true,
+          refundRate: (paidAmount - order.depositAmount) * 100 / paidAmount,
+          refundAmount: paidAmount - order.depositAmount,
+          cancellationFee: order.depositAmount,
+          providerCompensation: order.depositAmount,
+          platformRetainedAmount: 0,
+          policyReason: "Khách hàng không đồng ý báo giá; hoàn 100% tiền cọc vào ví thợ.",
+        });
+      }
       if (!refundPolicy.canCancel) {
         throw new AppError(refundPolicy.policyReason, 409);
       }

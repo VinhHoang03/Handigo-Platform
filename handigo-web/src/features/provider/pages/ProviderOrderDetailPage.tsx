@@ -165,6 +165,7 @@ export default function ProviderOrderDetailPage() {
 
       {cancelOpen && !cancelConfirmOpen && (
         <CancellationDialog
+          canRejectQuotation={Boolean(isQuotationOrder && quotation && order.depositPaidAt)}
           reason={cancelReason}
           explanation={cancelExplanation}
           error={cancelError}

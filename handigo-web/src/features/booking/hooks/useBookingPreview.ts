@@ -28,8 +28,8 @@ const loadPreview = async (key: string, force = false) => {
 };
 
 export function useBookingPreview() {
-  const { serviceId, orderType, selectedOptionIds, selectedOptionQuantities } = useBookingStore();
-  const key = JSON.stringify({ serviceId, orderType, selectedOptions: selectedOptionIds.map((optionId) => ({ optionId, quantity: selectedOptionQuantities?.[optionId] ?? 1 })) });
+  const { serviceId, orderType, selectedOptionIds, selectedOptionQuantities, uniformQuantity } = useBookingStore();
+  const key = JSON.stringify({ serviceId, orderType, uniformQuantity: uniformQuantity > 1 ? uniformQuantity : undefined, selectedOptions: selectedOptionIds.map((optionId) => ({ optionId, quantity: selectedOptionQuantities?.[optionId] ?? 1 })) });
   const state = usePreviewState();
   useEffect(() => {
     if (serviceId) void loadPreview(key);
