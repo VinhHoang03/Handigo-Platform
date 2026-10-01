@@ -42,6 +42,7 @@ const isEmptyItem = (item: QuotationFormItem) =>
   item.unitPrice === 0;
 
 interface RepairQuotationFormProps {
+  depositAmount?: number;
   appliedDepositAmount?: number;
   defaultDurationMinutes?: number;
   orderId: string;
@@ -57,6 +58,7 @@ const isBlockedEvaluation = (evaluation: QuotationRelevanceEvaluation) =>
 
 export function RepairQuotationForm({
   appliedDepositAmount = 0,
+  depositAmount = appliedDepositAmount,
   orderId,
   serviceName,
   onSubmit,
@@ -267,6 +269,10 @@ export function RepairQuotationForm({
       )
     ) {
       setError('Có hạng mục báo giá chưa hợp lệ.');
+      return;
+    }
+    if (subtotal <= depositAmount) {
+      setError(`Tổng báo giá phải lớn hơn tiền cọc ${formatMoney(depositAmount)}.`);
       return;
     }
     const payload: CreateQuotationPayload = {

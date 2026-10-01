@@ -1,4 +1,10 @@
 export const REFUND_POLICY_VERSION = "HANDIGO_REFUND_V1";
+export const QUOTATION_REJECTION_POLICY_VERSION = "HANDIGO_QUOTATION_REJECTION_V1";
+export const QUOTATION_REJECTION_REASON = "Khách hàng không đồng ý báo giá";
+
+export const isQuotationRejectionReason = (reason: string) =>
+  reason.trim() === QUOTATION_REJECTION_REASON ||
+  reason.trim().startsWith(`${QUOTATION_REJECTION_REASON}:`);
 
 export type RefundPolicyRole = "customer" | "provider" | "admin";
 export type RefundPolicyOrderType =

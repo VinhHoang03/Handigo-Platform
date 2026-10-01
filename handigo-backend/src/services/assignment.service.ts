@@ -570,6 +570,16 @@ export const AssignmentService = {
       );
     }
 
+    const subtotalAmount = payload.items.reduce(
+      (sum, item) => sum + item.unitPrice * item.quantity,
+      0,
+    );
+    const discountAmount = payload.discountAmount ?? 0;
+    const finalAmount = Math.max(subtotalAmount - discountAmount, 0);
+    if (!Number.isFinite(finalAmount) || finalAmount <= order.depositAmount) {
+      throw new AppError("Tổng báo giá sau giảm giá phải lớn hơn tiền cọc.", 400);
+    }
+
     const relevance = await evaluateQuotationItemsForOrder(
       order,
       payload.items,
@@ -592,13 +602,6 @@ export const AssignmentService = {
       );
     }
 
-    // Calculate totals
-    const subtotalAmount = payload.items.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0,
-    );
-    const discountAmount = payload.discountAmount ?? 0;
-    const finalAmount = Math.max(subtotalAmount - discountAmount, 0);
     const quotationCode = `QUO-${randomBytes(6).toString("hex").toUpperCase()}`;
 
     // Báo giá được chấp thuận ngay khi provider gửi; khách hàng không cần xác nhận thêm.

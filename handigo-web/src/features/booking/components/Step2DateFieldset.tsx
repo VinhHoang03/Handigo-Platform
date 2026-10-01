@@ -1,3 +1,5 @@
+import { Step2TimeSlotFieldset } from './Step2TimeSlotFieldset';
+
 interface UpcomingDate {
   value: string;
   weekday: string;
@@ -11,11 +13,15 @@ interface Step2DateFieldsetProps {
   todayInputValue: string;
   upcomingDates: UpcomingDate[];
   onSelectDate: (dateValue: string) => void;
+  currentTimestamp: number;
+  error?: string;
+  onSelectSlot: (startTime: string) => void;
 }
 
 /** Chọn ngày thực hiện: nhập ngày bất kỳ hoặc chọn nhanh trong 14 ngày tới. */
 export const Step2DateFieldset = ({
   stepNumber, scheduledAt, todayInputValue, upcomingDates, onSelectDate,
+  currentTimestamp, error, onSelectSlot,
 }: Step2DateFieldsetProps) => (
   <fieldset>
     <legend className="mb-sm flex items-center gap-sm text-sm font-bold text-on-surface">
@@ -23,6 +29,7 @@ export const Step2DateFieldset = ({
       Chọn ngày thực hiện
     </legend>
     <div className="grid gap-md xl:grid-cols-[17rem_minmax(0,1fr)] xl:items-start">
+      <div className="min-w-0 space-y-sm">
       <label className="flex min-w-0 flex-col gap-xs rounded-xl bg-surface-container-low p-sm text-xs font-bold text-on-surface-variant">
         Chọn ngày bất kỳ
         <input
@@ -34,10 +41,15 @@ export const Step2DateFieldset = ({
           value={scheduledAt ? scheduledAt.split('T')[0] : ''}
           onChange={(event) => onSelectDate(event.target.value)}
         />
-        <span className="font-normal leading-5">
-          Bạn có thể chọn mọi ngày trong tương lai, không giới hạn trong danh sách gợi ý.
-        </span>
       </label>
+        <Step2TimeSlotFieldset
+          key={scheduledAt.split('T')[0]}
+          scheduledAt={scheduledAt}
+          currentTimestamp={currentTimestamp}
+          error={error}
+          onSelectSlot={onSelectSlot}
+        />
+      </div>
 
       <div>
         <p className="mb-xs text-xs font-bold uppercase tracking-wide text-on-surface-variant">

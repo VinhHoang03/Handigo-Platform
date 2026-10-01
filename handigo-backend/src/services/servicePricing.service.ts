@@ -13,10 +13,10 @@ const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
 const normalizeGroup = (value?: string | null) =>
   value?.trim().toLowerCase() || null;
 
-export const previewServiceBooking = async (payload: { serviceId: string; selectedOptionIds?: string[]; selectedOptions?: unknown; orderType?: string }) => {
+export const previewServiceBooking = async (payload: { serviceId: string; selectedOptionIds?: string[]; selectedOptions?: unknown; uniformQuantity?: number; orderType?: string }) => {
   const service = await Service.findOne({ _id: payload.serviceId, isActive: true, isDeleted: false });
   if (!service) throw new AppError("Dịch vụ không còn khả dụng.", 404);
-  return buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, undefined, payload.orderType ?? "normal");
+  return buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, payload.orderType ?? "normal");
 };
 
 export const buildServicePricingSnapshot = async (

@@ -50,7 +50,6 @@ export function ServiceQuantityPanel({ price, quantity, onChange }: {
           </button>
         </div>
       </div>
-      <p className="text-sm text-on-surface-variant">Thành tiền = đơn giá × số lượng máy.</p>
     </section>
   );
 }

@@ -114,13 +114,13 @@ export const OrderSummaryCard: React.FC<{
               <p className="text-xs text-on-surface-variant truncate max-w-[150px]">
                 {service?.description || 'Vui lòng chọn dịch vụ'}
               </p>
-              <p className="text-sm font-bold text-primary mt-1">
+              {!isCleaning && <p className="text-sm font-bold text-primary mt-1">
                 {service?.serviceType === 'fixed_price'
-                  ? isCleaning ? `${(service.fixedPrice || 0).toLocaleString('vi-VN')}đ / máy × ${uniformQuantity}` : 'Giá theo tùy chọn'
+                  ? 'Giá theo tùy chọn'
                   : service?.serviceType === 'variable_price'
                     ? `Phí cọc: ${(preview?.depositAmount ?? service.depositAmount ?? 0).toLocaleString()}đ`
                     : '0đ'}
-              </p>
+              </p>}
             </div>
           </div>
 
@@ -159,7 +159,7 @@ export const OrderSummaryCard: React.FC<{
             discountAmount={discountAmount}
             summaryContent={summaryContent}
           />
-      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn sớm nhất từ 08:00 ngày mai. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
+      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn từ 08:00, đặt trước ít nhất 2 tiếng. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
           {priceLoading && <p role="status" className="text-sm">Đang cập nhật giá…</p>}
           {priceError && <p role="alert" className="text-sm text-error">{priceError} <button type="button" onClick={retry} className="underline">Thử lại</button></p>}
         </div>

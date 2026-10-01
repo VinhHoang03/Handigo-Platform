@@ -10,6 +10,7 @@ const cancellationReasons = [
 ];
 
 interface CancellationDialogProps {
+  canRejectQuotation?: boolean;
   reason: string;
   explanation: string;
   error: string;
@@ -21,6 +22,7 @@ interface CancellationDialogProps {
 }
 
 export function CancellationDialog({
+  canRejectQuotation = false,
   reason,
   explanation,
   error,
@@ -34,7 +36,7 @@ export function CancellationDialog({
     <Modal open title="Hủy đơn dịch vụ" onClose={onClose} size="lg" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <p className="text-sm text-on-surface-variant">Lý do hủy sẽ được lưu cùng đơn hàng và thông báo cho khách hàng.</p>
       <div className="mt-md space-y-2">
-        {cancellationReasons.map((item) => (
+        {(canRejectQuotation ? ['Khách hàng không đồng ý báo giá', ...cancellationReasons] : cancellationReasons).map((item) => (
           <label key={item} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${reason === item ? 'border-error bg-error/5' : 'border-outline-variant/40 hover:bg-surface-container-low'}`}>
             <input type="radio" name="cancel-reason" value={item} checked={reason === item} onChange={() => onReasonChange(item)} className="mt-1 text-error focus:ring-error" />
             <span className="text-sm font-medium text-on-surface">{item}</span>
@@ -69,6 +71,7 @@ export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: Ca
         <TriangleAlert aria-hidden="true" size={30} />
       </div>
       <p className="mt-2 text-sm leading-6 text-on-surface-variant">Hành động này sẽ hủy đơn dịch vụ và thông báo cho khách hàng. Vui lòng kiểm tra lại trước khi xác nhận.</p>
+      {reason === 'Khách hàng không đồng ý báo giá' && <p className="mt-2 text-sm font-medium text-primary">100% tiền cọc đã thanh toán sẽ được chuyển vào ví của bạn khi hủy đơn.</p>}
       <div className="mt-4 rounded-2xl bg-error/5 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-error">Lý do đã chọn</p>
         <p className="mt-1 text-sm font-medium text-on-surface">{reason}</p>
