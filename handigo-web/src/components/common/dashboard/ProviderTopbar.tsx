@@ -6,6 +6,7 @@ import { NotificationBell } from "@/components/common/NotificationBell";
 import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { MessageCenter } from "@/features/chat/components/MessageCenter";
+import { providerProfileApi } from "@/features/provider/api/providerProfile.api";
 import { ChevronRight, House, LogOut, User, Wallet } from "lucide-react";
 
 interface ProviderTopbarProps {
@@ -28,6 +29,11 @@ export function ProviderTopbar({
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [autoAcceptScheduledBookings, setAutoAcceptScheduledBookings] =
+    useState(false);
+  const [autoAcceptHorizonDays, setAutoAcceptHorizonDays] = useState(1);
+  const [isSavingAutoAccept, setIsSavingAutoAccept] = useState(false);
+  const [autoAcceptError, setAutoAcceptError] = useState<string | null>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const avatar = userAvatar || user?.avatar;
@@ -45,6 +51,37 @@ export function ProviderTopbar({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    void providerProfileApi
+      .getProfile()
+      .then((profile) => {
+        setAutoAcceptScheduledBookings(
+          profile.provider.autoAcceptScheduledBookings,
+        );
+        setAutoAcceptHorizonDays(profile.provider.autoAcceptScheduledBookingHorizonDays ?? 1);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const updateAutoAccept = async (payload: {
+    autoAcceptScheduledBookings?: boolean;
+    autoAcceptScheduledBookingHorizonDays?: number;
+  }) => {
+    setIsSavingAutoAccept(true);
+    setAutoAcceptError(null);
+    try {
+      const profile = await providerProfileApi.updateProfile(payload);
+      setAutoAcceptScheduledBookings(
+        profile.provider.autoAcceptScheduledBookings,
+      );
+      setAutoAcceptHorizonDays(profile.provider.autoAcceptScheduledBookingHorizonDays ?? 1);
+    } catch {
+      setAutoAcceptError("Không thể lưu cài đặt tự nhận lịch. Vui lòng thử lại.");
+    } finally {
+      setIsSavingAutoAccept(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -82,6 +119,45 @@ export function ProviderTopbar({
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 rounded-full bg-surface-container px-3 py-1.5 focus-within:ring-2 focus-within:ring-primary/30 lg:flex">
+            <label className="text-xs font-semibold text-on-surface-variant">
+              Tự nhận lịch
+            </label>
+            <select
+              value={autoAcceptHorizonDays}
+              disabled={!autoAcceptScheduledBookings || isSavingAutoAccept}
+              onChange={(event) =>
+                void updateAutoAccept({
+                  autoAcceptScheduledBookingHorizonDays: Number(event.target.value),
+                })
+              }
+              className="bg-transparent text-xs font-semibold text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50"
+              aria-label="Phạm vi ngày tự nhận lịch"
+            >
+              <option value={1}>Trong 1 ngày tới</option>
+              <option value={3}>Trong 3 ngày tới</option>
+              <option value={7}>Trong 7 ngày tới</option>
+            </select>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={autoAcceptScheduledBookings}
+                disabled={isSavingAutoAccept}
+                onChange={() =>
+                  void updateAutoAccept({
+                    autoAcceptScheduledBookings: !autoAcceptScheduledBookings,
+                  })
+                }
+                className="peer sr-only"
+              />
+              <span className="h-6 w-11 rounded-full bg-outline-variant after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-outline-variant after:bg-surface-container-lowest after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-disabled:opacity-50" />
+            </label>
+          </div>
+          {autoAcceptError && (
+            <span role="status" aria-live="polite" className="hidden text-xs font-medium text-error xl:inline">
+              {autoAcceptError}
+            </span>
+          )}
           <div className="hidden items-center gap-3 rounded-full bg-surface-container px-3 py-1.5 sm:flex">
             <span
               className={`text-xs font-semibold ${

@@ -9,6 +9,7 @@ export type RepairQuotationStatus =
   | "cancelled";
 
 export interface IRepairQuotation extends Document, IBaseDocument {
+  estimatedDurationMinutes?: number;
   quotationCode: string;
   orderId: Types.ObjectId;
   customerId: Types.ObjectId;
@@ -31,6 +32,7 @@ export interface IRepairQuotation extends Document, IBaseDocument {
 
 const RepairQuotationSchema = new Schema<IRepairQuotation>(
   {
+    estimatedDurationMinutes: { type: Number, min: 1, max: 1440 },
     quotationCode: { type: String, required: true, unique: true, trim: true },
     orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },

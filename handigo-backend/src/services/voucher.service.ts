@@ -1,7 +1,8 @@
 import mongoose, { ClientSession, Types } from "mongoose";
 import { AuditLog } from "../models/auditLog.model";
 import type { RequestUser } from "../middlewares/authContext";
-import { Order } from "../models/order.model";
+import { Order, type IOrder } from "../models/order.model";
+import { calculateBookingSettlement } from "../utils/bookingPolicy";
 import { Payment } from "../models/payment.model";
 import { IPromotion, Promotion } from "../models/promotion.model";
 import { AppError } from "../utils/appError";
@@ -43,11 +44,17 @@ const isPromotionActive = (promotion: IPromotion, now = new Date()) => {
 
 const getOriginalAmount = (order: any) => Math.max(order.pricing?.bookingAmount || 0, 0);
 
+const settlementFields = (order: Pick<IOrder, "pricing" | "inspectionRequired">, amount: number) => {
+  if (order.pricing.baseAmount === undefined && !order.inspectionRequired) return {};
+  const settlement = calculateBookingSettlement(amount, order.pricing.immediateFee ?? 0, order.pricing.platformCommissionRate, order.pricing.immediateProviderPercent ?? 80, order.inspectionRequired);
+  return { "pricing.platformCommissionAmount": settlement.platformCommissionAmount, "pricing.providerEarningAmount": settlement.providerEarningAmount };
+};
+
 const getAmountBeforeVoucher = (order: any) => {
   const originalAmount = getOriginalAmount(order);
   const promotionDiscountAmount = Math.max(order.pricing?.promotionDiscountAmount || 0, 0);
 
-  return Math.max(originalAmount - promotionDiscountAmount, 0);
+  return Math.max(originalAmount - promotionDiscountAmount - (order.pricing?.immediateFee ?? 0), 0);
 };
 
 const calculateDiscountAmount = (promotion: IPromotion, amountBeforeVoucher: number) => {
@@ -280,7 +287,7 @@ const assertDiscountRule = (discountType: IPromotion["discountType"], discountVa
 const buildVoucherResponse = (order: any, promotion: IPromotion, discountAmount: number) => {
   const originalAmount = getOriginalAmount(order);
   const amountBeforeVoucher = getAmountBeforeVoucher(order);
-  const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
+  const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0) + (order.pricing?.immediateFee ?? 0);
 
   return {
     originalAmount,
@@ -354,9 +361,8 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
 
       const amountBeforeVoucher = getAmountBeforeVoucher(order);
       const { promotion, discountAmount, snapshot } =
-        await resolveVoucherForAmount(input.code, amountBeforeVoucher, session, order.customerId.toString());
-      await reservePersonalVoucher(promotion._id as Types.ObjectId, order.customerId.toString(), order._id as Types.ObjectId, order.inspectionRequired, session);
-      const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
+        await resolveVoucherForAmount(input.code, amountBeforeVoucher, session);
+      const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0) + (order.pricing.immediateFee ?? 0);
 
       const updatedOrder = await Order.findOneAndUpdate(
         {
@@ -369,6 +375,7 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
             voucherSnapshot: snapshot,
             "pricing.voucherDiscountAmount": discountAmount,
             "pricing.totalPaidAmount": finalAmount,
+            ...settlementFields(order, finalAmount),
           },
         },
         { new: true, session, runValidators: true },
@@ -427,7 +434,8 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
           $set: {
             voucherSnapshot: null,
             "pricing.voucherDiscountAmount": 0,
-            "pricing.totalPaidAmount": amountBeforeVoucher,
+            "pricing.totalPaidAmount": amountBeforeVoucher + (order.pricing.immediateFee ?? 0),
+            ...settlementFields(order, amountBeforeVoucher + (order.pricing.immediateFee ?? 0)),
           },
         },
         { new: true, session, runValidators: true },
@@ -444,7 +452,7 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
       return {
         originalAmount,
         discountAmount: 0,
-        finalAmount: amountBeforeVoucher,
+        finalAmount: amountBeforeVoucher + (order.pricing.immediateFee ?? 0),
         voucher: voucherCode ? { code: voucherCode } : null,
       };
     });
@@ -498,7 +506,7 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
       return false;
     }
 
-    if (originalAmount !== undefined && originalAmount < (promotion.minOrderAmount ?? 0)) {
+    if (amountBeforeVoucher !== undefined && amountBeforeVoucher < (promotion.minOrderAmount ?? 0)) {
       return false;
     }
 
@@ -513,7 +521,7 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
       finalAmount:
         amountBeforeVoucher === undefined || discountAmount === undefined
           ? undefined
-          : Math.max(amountBeforeVoucher - discountAmount, 0),
+          : Math.max(amountBeforeVoucher - discountAmount, 0) + (order?.pricing?.immediateFee ?? 0),
     };
   });
 };

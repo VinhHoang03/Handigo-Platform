@@ -170,6 +170,8 @@ const sumTransactions = async (
   if (direction) {
     match.direction = direction;
   }
+  // Khoản phân bổ cho hệ thống không phải tiền bị trừ từ ví thợ.
+  match["metadata.systemRevenueOnly"] = { $ne: true };
 
   const [result] = await WalletTransaction.aggregate([
     { $match: match },
@@ -301,6 +303,7 @@ export const getWalletTransactionHistory = async (
   await assertWalletAccess(user);
 
   const filter = buildTransactionFilter(user.id, query);
+  filter["metadata.systemRevenueOnly"] = { $ne: true };
   const skip = (query.page - 1) * query.limit;
 
   const [items, total] = await Promise.all([
@@ -718,10 +721,14 @@ export const recordCompletedOrderSettlement = async (
     );
   }
 
-  const balanceAfterGross = isCashOrder
+  const balanceAfterGross = order.inspectionRequired
+    ? balanceBefore + netEarning
+    : isCashOrder
     ? balanceBefore
     : balanceBefore + grossAmount;
-  const balanceAfterSettlement = balanceAfterGross - platformFee;
+  const balanceAfterSettlement = order.inspectionRequired
+    ? balanceAfterGross
+    : balanceAfterGross - platformFee;
   wallet.balance = balanceAfterSettlement;
   await wallet.save({ session });
 
@@ -742,9 +749,11 @@ export const recordCompletedOrderSettlement = async (
       relatedOrderId: order._id as Types.ObjectId,
       type: "provider_earning",
       direction: "in",
-      amount: grossAmount,
+      amount: order.inspectionRequired ? netEarning : grossAmount,
       balanceAfter: balanceAfterGross,
-      description: isCashOrder
+      description: order.inspectionRequired
+        ? "Cộng phần phụ phí đặt ngay của thợ; tiền cọc thuộc hệ thống"
+        : isCashOrder
         ? "Ghi nhận doanh thu tiền mặt khi đơn hàng hoàn tất"
         : "Cộng doanh thu dịch vụ khi đơn hàng hoàn tất",
       transactionCodePrefix: "PROVIDER_EARNING",
@@ -767,13 +776,16 @@ export const recordCompletedOrderSettlement = async (
             direction: "out",
             amount: platformFee,
             balanceAfter: balanceAfterSettlement,
-            description: isCashOrder
+            description: order.inspectionRequired
+              ? "Ghi nhận cọc và phần phụ phí của hệ thống, không trừ ví thợ"
+              : isCashOrder
               ? "Trừ phí nền tảng của đơn hàng thanh toán tiền mặt"
               : "Khấu trừ phí nền tảng từ doanh thu dịch vụ",
             transactionCodePrefix: "PLATFORM_FEE",
             metadata: {
               ...commonMetadata,
-              affectsWalletBalance: true,
+              affectsWalletBalance: !order.inspectionRequired,
+              systemRevenueOnly: order.inspectionRequired,
             },
           },
           session,

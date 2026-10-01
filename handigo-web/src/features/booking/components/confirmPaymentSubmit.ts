@@ -64,6 +64,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   let orderId = pendingOrderId;
   try {
     const payload: CreateOrderPayload = {
+      expectedBookingAmount: params.expectedBookingAmount,
       serviceId,
       selectedOptionIds: isAirConditionerCleaning(service) ? [] : selectedOptionIds,
       uniformQuantity: isAirConditionerCleaning(service) ? uniformQuantity ?? 1 : undefined,
@@ -94,6 +95,12 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         PENDING_ORDER_FINGERPRINT_KEY,
         bookingFingerprint,
       );
+    } else {
+      const existingOrder = await bookingApi.getOrderById(orderId);
+      if (existingOrder.pricing.bookingAmount !== params.expectedBookingAmount) {
+        navigate(`/customer/bookings/${orderId}`);
+        return;
+      }
     }
 
     if (effectivePaymentMethod === 'bank') {
@@ -143,7 +150,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     navigate('/customer/bookings/success', { state: { order: orderDetail } });
   } catch (error) {
     const message = getConfirmPaymentErrorMessage(error);
-    if (orderId && !isAppointment) {
+    if (orderId && (!isAppointment || service?.serviceType === 'variable_price')) {
       try {
         await bookingApi.discardUnpaidOrder(orderId);
         setPendingOrderId('');

@@ -170,6 +170,16 @@ const assertAppointmentPaymentReady = (
   if (!["scheduled", "recurring"].includes(order.orderType)) return;
   if (order.status === "created" && !order.providerId && order.bookingStatus !== "reserved") return;
   if (
+    order.inspectionRequired &&
+    order.status === "created" &&
+    order.bookingStatus === "awaiting_payment"
+  ) {
+    if (order.paymentDueAt && order.paymentDueAt <= new Date()) {
+      throw new AppError("Thời hạn thanh toán giữ lịch đã kết thúc.", 409);
+    }
+    return;
+  }
+  if (
     order.status !== "accepted" ||
     order.bookingStatus !== "awaiting_payment" ||
     !order.providerId
@@ -217,7 +227,7 @@ const getPaymentAmount = async (
   }
 
   if (paymentType === "full") {
-    return Math.max(order.pricing?.totalPaidAmount || order.pricing?.bookingAmount || 0, 0);
+    return Math.max(order.pricing?.totalPaidAmount ?? order.pricing?.bookingAmount ?? 0, 0);
   }
 
   const depositAmount = order.depositAmount || 0;
@@ -226,7 +236,7 @@ const getPaymentAmount = async (
     throw new AppError("Dịch vụ khảo sát chưa cấu hình tiền đặt cọc", 400);
   }
 
-  return depositAmount;
+  return order.pricing?.baseAmount !== undefined ? order.pricing.totalPaidAmount : depositAmount;
 };
 
 const canAccessOrder = async (order: any, user: RequestUser) => {
@@ -329,7 +339,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       );
 
       if (paymentType === "inspection_deposit") {
-        transactionalOrder.depositAmount = chargedAmount;
+        if (transactionalOrder.pricing.baseAmount === undefined) transactionalOrder.depositAmount = chargedAmount;
         transactionalOrder.depositPaidAt = createdPayment.paidAt;
         transactionalOrder.paymentStatus = "partially_paid";
       } else {
@@ -337,7 +347,11 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       }
       transactionalOrder.paymentMethod = "wallet";
 
-      shouldDispatch = paymentType !== "remaining" && transactionalOrder.status === "created";
+      shouldDispatch =
+        paymentType !== "remaining" &&
+        transactionalOrder.status === "created" &&
+        (!['scheduled', 'recurring'].includes(transactionalOrder.orderType) ||
+          transactionalOrder.inspectionRequired);
       if (shouldDispatch) {
         transactionalOrder.readyForMatching = true;
       }
@@ -475,7 +489,7 @@ const reserveExternalPayment = async (
           order.readyForMatching = false;
         }
         if (paymentType === "inspection_deposit") {
-          order.depositAmount = amount;
+          if (order.pricing.baseAmount === undefined) order.depositAmount = amount;
         }
       }
 
@@ -757,7 +771,7 @@ const syncPaidPayosPaymentToOrder = async (
   }
 
   if (payment.paymentType === "inspection_deposit") {
-    order.depositAmount = payment.amount;
+    if (order.pricing.baseAmount === undefined) order.depositAmount = payment.amount;
     order.depositPaidAt = payment.paidAt;
     order.paymentStatus = "partially_paid";
   } else {
@@ -772,7 +786,7 @@ const syncPaidPayosPaymentToOrder = async (
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]).session(session);
     const requiredAmount = Math.max(
-      order.pricing?.totalPaidAmount || order.pricing?.bookingAmount || 0,
+      order.pricing?.totalPaidAmount ?? order.pricing?.bookingAmount ?? 0,
       0,
     );
     order.paymentStatus =
@@ -780,7 +794,10 @@ const syncPaidPayosPaymentToOrder = async (
   }
 
   const shouldDispatch =
-    payment.paymentType !== "remaining" && order.status === "created";
+    payment.paymentType !== "remaining" &&
+    order.status === "created" &&
+    (!['scheduled', 'recurring'].includes(order.orderType) ||
+      order.inspectionRequired);
   if (shouldDispatch) {
     order.readyForMatching = true;
   }

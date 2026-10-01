@@ -8,6 +8,7 @@ import {
   type Step2FormErrors,
   MIN_DESCRIPTION_LENGTH,
   buildRecurringPreview,
+  getEarliestScheduledAt,
   getTodayInputValue,
   getUpcomingDates,
   getUploadErrorMessage,
@@ -162,8 +163,13 @@ export const useCreateBookingStep2Form = () => {
     } else if (scheduleDate && scheduleDate < todayInputValue) {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
     }
-    // Chỉ kiểm tra sẵn sàng khi khách chọn thợ cụ thể; tìm tự động chạy sau khi tạo đơn.
-    if (preferredProviderId && providerAvailability !== 'available') {
+    if (shouldShowSchedulePicker && scheduledAt?.includes('T')
+      && new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime()) {
+      nextErrors.scheduledAt = 'Lịch hẹn sớm nhất là từ 08:00 ngày mai.';
+    }
+    // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
+    // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.
+    if (providerAvailability !== 'available') {
       nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
         ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
         : shouldShowSchedulePicker

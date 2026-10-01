@@ -9,7 +9,7 @@ import { formatProviderOrderAmount, getCustomer } from '../utils/providerOrder.u
 import { CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
 
 const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-const orderDate = (order: Order) => new Date(order.scheduledAt || order.createdAt);
+const orderDate = (order: Order) => new Date(order.schedule?.expectedStartAt || order.scheduledAt || order.createdAt);
 
 const formatAddress = (order: Order) => {
   const address = order.addressId;
@@ -152,6 +152,7 @@ export default function ProviderSchedulePage() {
                           <span className="text-xs text-on-surface-variant">{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <h3 className="mt-3 font-bold text-on-surface">{order.serviceId?.name || 'Dịch vụ'}</h3>
+                        {order.schedule && <p className="mt-1 text-xs text-on-surface-variant">{order.schedule.durationMinutes} phút thực hiện · {order.schedule.bufferMinutes} phút dự phòng{order.schedule.expectedEndAt && ` · Kết thúc dự kiến ${new Date(order.schedule.expectedEndAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`}</p>}
                         {customer?.fullName && <p className="mt-2 text-sm text-on-surface-variant">{customer.fullName}</p>}
                         {formatAddress(order) && <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">{formatAddress(order)}</p>}
                         <div className="mt-3 flex items-center justify-between border-t border-outline-variant/20 pt-3">

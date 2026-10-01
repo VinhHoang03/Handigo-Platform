@@ -4,6 +4,8 @@ import type { Service, ServiceOption } from '../../../types/booking';
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
 interface OrderSummaryPriceDetailsProps {
+  immediateFee?: number;
+  depositAmount?: number;
   service: Service | null;
   selectedOptions: ServiceOption[];
   selectedOptionQuantities?: Record<string, number>;
@@ -22,13 +24,15 @@ export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> =
   finalTotal,
   discountAmount,
   summaryContent,
+  immediateFee = 0,
+  depositAmount,
 }) => (
   <>
     <div className="border-t border-dashed border-outline-variant pt-md space-y-sm text-sm">
       {service?.serviceType === 'variable_price' && (
         <div className="flex justify-between">
           <span className="text-on-surface-variant">Phí đặt cọc</span>
-          <span className="font-medium">{(service?.depositAmount || 0).toLocaleString()}đ</span>
+          <span className="font-medium">{(depositAmount ?? service?.depositAmount ?? 0).toLocaleString()}đ</span>
         </div>
       )}
       {selectedOptions.map(opt => (
@@ -46,6 +50,7 @@ export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> =
           )}
         </div>
       ))}
+      {immediateFee > 0 && <div className="flex justify-between"><span>Phí phục vụ ngay</span><span className="font-medium">{immediateFee.toLocaleString('vi-VN')}đ</span></div>}
     </div>
 
     <div className="pt-md border-t border-outline-variant flex justify-between items-center">

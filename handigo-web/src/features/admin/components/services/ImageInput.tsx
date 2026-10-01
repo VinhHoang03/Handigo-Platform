@@ -2,17 +2,18 @@ import { useState } from 'react';
 import { getErrorMessage } from '@/utils/apiError';
 import { categoryServiceApi } from '../../api/categoryService.api';
 import { isImageUrl } from './service.helpers';
-import { Image, Upload } from "lucide-react";
+import { Camera, Image, Upload } from "lucide-react";
 
 interface ImageInputProps {
   value: string;
   onChange: (value: string) => void;
   label?: string;
   inputName?: string;
+  compact?: boolean;
 }
 
 /** Ô nhập ảnh dịch vụ/tùy chọn — dán URL hoặc tải file lên. */
-export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', inputName = 'service-image' }: ImageInputProps) {
+export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', inputName = 'service-image', compact = false }: ImageInputProps) {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -32,6 +33,23 @@ export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', input
   };
 
   return (
+    compact ? (
+      <div className="space-y-2">
+        <span className="block text-sm font-semibold">{label}</span>
+        <label className={`group relative block h-52 w-full cursor-pointer overflow-hidden rounded-xl border border-outline-variant bg-surface-container-low ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
+          {value && isImageUrl(value) ? (
+            <img src={value} alt={`Xem trước ${label.toLowerCase()}`} className="block h-full w-full object-contain" />
+          ) : (
+            <span className="grid h-full w-full place-items-center"><Image aria-hidden="true" size={36} className="text-on-surface-variant" /></span>
+          )}
+          <span className="absolute inset-0 flex items-center justify-center bg-surface/70 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <Camera aria-hidden="true" size={28} className="text-primary" />
+          </span>
+          <input type="file" name={`${inputName}-file`} accept="image/*" className="sr-only" onChange={(event) => void upload(event.target.files?.[0])} />
+        </label>
+        {msg && <p aria-live="polite" className={`text-xs ${msg.includes('lỗi') ? 'text-error' : 'text-on-surface-variant'}`}>{msg}</p>}
+      </div>
+    ) : (
     <div className="rounded-xl border border-outline-variant bg-surface p-3">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-semibold">{label}</span>
@@ -67,5 +85,6 @@ export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', input
         </div>
       </div>
     </div>
+    )
   );
 }

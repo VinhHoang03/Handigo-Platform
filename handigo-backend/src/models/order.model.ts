@@ -18,6 +18,9 @@ export interface ISelectedOptionSnapshot {
 }
 
 export interface IOrderPricing {
+  baseAmount?: Money;
+  immediateFee?: Money;
+  immediateProviderPercent?: number;
   bookingAmount: Money;
   platformCommissionRate: number;
   platformCommissionAmount: Money;
@@ -77,6 +80,16 @@ export interface IOrderReassignment {
 }
 
 export interface IOrder extends Document, IBaseDocument {
+  overdueReview?: {
+    escalatedAt?: Date | null;
+  } | null;
+  schedule?: {
+    durationMinutes: number;
+    bufferMinutes: number;
+    travelMinutes: number;
+    expectedStartAt?: Date | null;
+    expectedEndAt?: Date | null;
+  } | null;
   orderCode: string;
   customerId: Types.ObjectId;
   providerId?: Types.ObjectId | null;
@@ -149,6 +162,9 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
 
 const OrderPricingSchema = new Schema<IOrderPricing>(
   {
+    baseAmount: { type: Number, min: 0 },
+    immediateFee: { type: Number, min: 0 },
+    immediateProviderPercent: { type: Number, min: 0, max: 100 },
     bookingAmount: { type: Number, required: true, min: 0 },
     platformCommissionRate: { type: Number, required: true, min: 0 },
     platformCommissionAmount: { type: Number, required: true, min: 0 },
@@ -179,6 +195,14 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    overdueReview: { type: new Schema({ escalatedAt: { type: Date, default: null } }, { _id: false }), default: null },
+    schedule: { type: new Schema({
+      durationMinutes: { type: Number, required: true, min: 1 },
+      bufferMinutes: { type: Number, required: true, min: 0 },
+      travelMinutes: { type: Number, required: true, min: 0 },
+      expectedStartAt: { type: Date, default: null },
+      expectedEndAt: { type: Date, default: null },
+    }, { _id: false }), default: null },
     orderCode: { type: String, required: true, unique: true, trim: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     providerId: { type: Schema.Types.ObjectId, ref: "Provider", default: null },
@@ -359,6 +383,7 @@ OrderSchema.index({
   scheduledAt: 1,
 });
 OrderSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
+OrderSchema.index({ providerId: 1, status: 1, isDeleted: 1 });
 OrderSchema.index({ bookingStatus: 1, paymentDueAt: 1 });
 OrderSchema.index({ recurringGroupId: 1, occurrenceNumber: 1 });
 OrderSchema.index({ "reassignment.status": 1, "reassignment.expiresAt": 1 });

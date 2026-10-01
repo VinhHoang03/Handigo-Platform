@@ -1,4 +1,5 @@
 import type { Order } from '@/types/booking';
+import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
 import type { CreateQuotationPayload, QuotationDetail } from '../../types/providerOrder.types';
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { FixedPriceActionForm } from '../FixedPriceActionForm';
@@ -29,6 +30,7 @@ export function QuotationOrderPanel({
   onCancel,
   onComplete,
 }: QuotationOrderPanelProps) {
+  const appliedDepositAmount = getAppliedQuotationDeposit(order);
   return (
     <>
       {isUnconfirmedAppointment ? (
@@ -71,6 +73,11 @@ export function QuotationOrderPanel({
             </span>
           </div>
 
+          <div className="space-y-2 text-sm text-on-surface-variant">
+            <p>Cọc đã thanh toán, thuộc hệ thống: −{formatMoney(appliedDepositAmount)}</p>
+            <p className="font-bold text-primary">Bạn thu trực tiếp từ khách: {formatMoney(getDirectRepairPayment(quotation.quotation.finalAmount, appliedDepositAmount))}</p>
+            <p>Tiền thu trực tiếp bằng tổng báo giá trừ cọc đã thanh toán. Cọc thuộc hệ thống; phụ phí đặt ngay được chia theo cấu hình admin và phần của bạn được cộng vào ví khi hoàn thành đơn.</p>
+          </div>
           {quotation.quotation.status === 'approved' && (
             <div className="rounded-2xl bg-success-container p-3 text-sm text-on-success-container">
               <p className="font-bold">Khách hàng đã đồng ý báo giá</p>
@@ -97,6 +104,8 @@ export function QuotationOrderPanel({
       {showQuotationForm && (
         <div className="h-full lg:col-span-2">
           <RepairQuotationForm
+            appliedDepositAmount={appliedDepositAmount}
+            defaultDurationMinutes={order.schedule?.durationMinutes}
             orderId={order._id}
             serviceName={order.serviceId.name}
             onSubmit={onCreateQuotation}

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 /**
  * Bảng dữ liệu dùng chung cho các trang admin (title → filter → bảng → phân
@@ -24,6 +24,8 @@ interface DataTableProps<T> {
   /** Hiển thị khi `rows` rỗng. Mặc định một dòng chữ trung tính. */
   emptyState?: ReactNode;
   onRowClick?: (row: T) => void;
+  expandedRowKey?: string;
+  renderExpandedRow?: (row: T) => ReactNode;
   /** Lớp `min-w-*` cho `<table>` — chỉnh khi bảng có nhiều cột hơn mức mặc định. */
   minWidthClassName?: string;
 }
@@ -38,6 +40,8 @@ export function DataTable<T>({
   rowKey,
   emptyState = defaultEmptyState,
   onRowClick,
+  expandedRowKey,
+  renderExpandedRow,
   minWidthClassName = "min-w-[720px]",
 }: DataTableProps<T>) {
   return (
@@ -59,21 +63,33 @@ export function DataTable<T>({
               <td colSpan={columns.length}>{emptyState}</td>
             </tr>
           ) : (
-            rows.map((row) => (
-              <tr
-                key={rowKey(row)}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={`border-t border-outline-variant/30 ${
-                  onRowClick ? "cursor-pointer hover:bg-surface-container-low" : ""
-                }`}
-              >
-                {columns.map((column) => (
-                  <td key={column.key} className={`p-4 ${column.className || ""}`}>
-                    {column.render(row)}
-                  </td>
-                ))}
-              </tr>
-            ))
+            rows.map((row) => {
+              const key = rowKey(row);
+              const isExpanded = expandedRowKey === key;
+              return (
+                <Fragment key={key}>
+                  <tr
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={`group border-t border-outline-variant/30 ${
+                      onRowClick ? "cursor-pointer hover:bg-surface-container-low" : ""
+                    }`}
+                  >
+                    {columns.map((column) => (
+                      <td key={column.key} className={`p-4 ${column.className || ""}`}>
+                        {column.render(row)}
+                      </td>
+                    ))}
+                  </tr>
+                  {isExpanded && renderExpandedRow && (
+                    <tr className="border-t border-outline-variant/30 bg-surface-container-high">
+                      <td colSpan={columns.length} className="p-4">
+                        {renderExpandedRow(row)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })
           )}
         </tbody>
       </table>

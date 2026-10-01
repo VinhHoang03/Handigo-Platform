@@ -1,4 +1,4 @@
-import { timeSlots } from './step2Helpers';
+import { getEarliestScheduledAt, timeSlots } from './step2Helpers';
 
 interface Step2TimeSlotFieldsetProps {
   stepNumber: number;
@@ -11,7 +11,8 @@ interface Step2TimeSlotFieldsetProps {
 /** Chọn khung giờ trong ngày đã chọn; disable các khung giờ đã qua. */
 export const Step2TimeSlotFieldset = ({
   stepNumber, scheduledAt, currentTimestamp, error, onSelectSlot,
-}: Step2TimeSlotFieldsetProps) => (
+}: Step2TimeSlotFieldsetProps) => {
+  return (
   <fieldset>
     <legend className="mb-sm flex items-center gap-sm text-sm font-bold text-on-surface">
       <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs text-on-primary">{stepNumber}</span>
@@ -23,7 +24,7 @@ export const Step2TimeSlotFieldset = ({
         const isSelected = scheduledAt?.includes(`T${startTime}`);
         const selectedDate = scheduledAt?.split('T')[0];
         const isPastSlot = selectedDate
-          ? new Date(`${selectedDate}T${startTime}:00`).getTime() <= currentTimestamp
+          ? new Date(`${selectedDate}T${startTime}:00`).getTime() < getEarliestScheduledAt(new Date(currentTimestamp)).getTime()
           : false;
         return (
           <button
@@ -39,7 +40,7 @@ export const Step2TimeSlotFieldset = ({
           >
             {slot}
             {isPastSlot && (
-              <span className="mt-1 block text-[10px] font-medium">Đã qua</span>
+              <span className="mt-1 block text-[10px] font-medium">Chưa đủ thời gian đặt trước</span>
             )}
           </button>
         );
@@ -50,3 +51,4 @@ export const Step2TimeSlotFieldset = ({
     )}
   </fieldset>
 );
+};

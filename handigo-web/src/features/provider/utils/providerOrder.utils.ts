@@ -1,4 +1,5 @@
 import type { Order, OrderCustomer } from '@/types/booking';
+import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
 import type { OrderAssignment } from '../types/providerOrder.types';
 
 export const currencyFormatter = new Intl.NumberFormat('vi-VN', {
@@ -14,7 +15,7 @@ export function formatMoney(value?: number) {
 export function formatProviderOrderAmount(order: Order) {
   if (order.inspectionRequired) {
     return typeof order.quotationFinalAmount === 'number'
-      ? formatMoney(order.quotationFinalAmount)
+      ? formatMoney(getDirectRepairPayment(order.quotationFinalAmount, getAppliedQuotationDeposit(order)))
       : 'Chưa báo giá';
   }
   return formatMoney(order.pricing?.providerEarningAmount);

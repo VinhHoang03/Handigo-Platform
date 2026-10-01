@@ -14,10 +14,17 @@ import { assertProviderWalletEligible } from "./providerWalletEligibility.servic
 import type { UserRole } from "../models/user.model";
 import { createNotificationRecord } from "./notification.service";
 import { requestDirectProviderReassignment } from "./orderReassignment.service";
+import { getBookingPolicy } from "./systemConfig.service";
+import { lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
+import { calculateDuration } from "../utils/bookingPolicy";
+import { createLogger } from "../utils/logger";
 import {
   evaluateQuotationItemsForOrder,
   getBlockedRelevanceItems,
 } from "./quotationRelevance.service";
+import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
+
+const assignmentLogger = createLogger("AssignmentService");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +43,7 @@ export interface QuotationItemInput {
 }
 
 export interface CreateQuotationPayload {
+  estimatedDurationMinutes?: number;
   orderId: string;
   inspectionNote?: string;
   recommendation?: string;
@@ -267,8 +275,15 @@ export const AssignmentService = {
         assignmentId: assignment._id.toString(),
         reason: "accepted",
       });
+    } finally {
+      await session.endSession();
+    }
+    if (!result) throw new AppError("Không thể nhận đơn.", 409);
+    try {
+      await closeCompetingAssignments(result.order._id as Types.ObjectId, result.assignment._id as Types.ObjectId);
+      emitToUser(providerUserId, "assignment:closed", { assignmentId, reason: "accepted" });
       await createNotificationRecord({
-        userId: order.customerId,
+        userId: result.order.customerId,
         type: "ORDER",
         title: assignedOrder.recurringGroupId
           ? "Chuyên gia đã nhận chuỗi lịch"
@@ -282,111 +297,7 @@ export const AssignmentService = {
         order: order as any,
       };
     }
-
-    // 4. Khóa provider trước để không thể nhận đồng thời hai đơn.
-    const claimedProvider = await Provider.findOneAndUpdate(
-      { _id: provider._id, availabilityStatus: "online" },
-      { $set: { availabilityStatus: "busy" } },
-      { returnDocument: "after", runValidators: true },
-    );
-    if (!claimedProvider) {
-      throw new AppError(
-        "Bạn đang bận hoặc không còn sẵn sàng nhận đơn mới.",
-        409,
-      );
-    }
-
-    const respondedAt = new Date();
-    const claimedAssignment = await OrderAssignment.findOneAndUpdate(
-      {
-        _id: assignment._id,
-        providerId: provider._id,
-        status: "pending",
-        responseDeadline: { $gt: respondedAt },
-        isDeleted: false,
-      },
-      { $set: { status: "accepted", respondedAt } },
-      { returnDocument: "after", runValidators: true },
-    );
-    if (!claimedAssignment) {
-      await Provider.findOneAndUpdate(
-        { _id: provider._id, availabilityStatus: "busy" },
-        { $set: { availabilityStatus: "online" } },
-      );
-      throw new AppError(
-        "Assignment không còn khả dụng hoặc đã hết thời gian phản hồi.",
-        409,
-      );
-    }
-
-    // 5. Chỉ một provider có thể chuyển đơn từ created sang accepted.
-    const order = await Order.findOneAndUpdate(
-      {
-        _id: assignment.orderId,
-        status: "created",
-        providerId: null,
-      },
-      {
-        $set: {
-          providerId: provider._id,
-          status: "accepted",
-          ...(assignment.assignmentType === "direct_request" && {
-            bookingStatus: "not_required",
-          }),
-        },
-      },
-      { returnDocument: "after", runValidators: true },
-    );
-    if (!order) {
-      await Promise.all([
-        OrderAssignment.findByIdAndUpdate(claimedAssignment._id, {
-          $set: { status: "cancelled" },
-        }),
-        Provider.findOneAndUpdate(
-          { _id: provider._id, availabilityStatus: "busy" },
-          { $set: { availabilityStatus: "online" } },
-        ),
-      ]);
-      emitToUser(providerUserId, "assignment:closed", {
-        assignmentId: assignment._id.toString(),
-        reason: "accepted_by_other",
-      });
-      throw new AppError("Đơn hàng đã được xử lý bởi provider khác.", 409);
-    }
-
-    if (order.reassignment?.status === "matching") {
-      await Order.updateOne(
-        { _id: order._id, "reassignment.status": "matching" },
-        { $set: { "reassignment.status": "matched" } },
-        { runValidators: true },
-      );
-      order.reassignment.status = "matched";
-    }
-
-    await closeCompetingAssignments(
-      assignment.orderId,
-      claimedAssignment._id as Types.ObjectId,
-    );
-
-    emitToUser(providerUserId, "assignment:closed", {
-      assignmentId: assignment._id.toString(),
-      reason: "accepted",
-    });
-
-    if (assignment.assignmentType === "direct_request") {
-      await createNotificationRecord({
-        userId: order.customerId,
-        type: "ORDER",
-        title: "Provider đã nhận yêu cầu trực tiếp",
-        content: `Provider bạn chọn đã nhận đơn ${order.orderCode}.`,
-        data: { orderId: order._id },
-      });
-    }
-
-    return {
-      assignment: claimedAssignment as any,
-      order: order as any,
-    };
+    return result;
   },
 
   /**
@@ -455,6 +366,14 @@ export const AssignmentService = {
       const appointmentOrder = await Order.findById(assignment.orderId).select(
         "recurringGroupId preferredProviderId",
       );
+      if (appointmentOrder?.preferredProviderId) {
+        await requestDirectProviderReassignment(
+          assignment.orderId.toString(),
+          provider._id as Types.ObjectId,
+          rejectReason,
+        );
+        return;
+      }
       if (appointmentOrder?.preferredProviderId && appointmentOrder.recurringGroupId) {
         await Order.updateMany(
           {
@@ -516,7 +435,7 @@ export const AssignmentService = {
     const order = await Order.findById(assignment.orderId);
     if (!order || order.status !== "created") return;
 
-    const { DispatchService } = await import("./dispatch.service.js");
+    const { DispatchService } = await import("./dispatch.service");
     await DispatchService.redispatch(order._id.toString());
   },
 
@@ -534,12 +453,15 @@ export const AssignmentService = {
   ): Promise<InstanceType<typeof RepairQuotation>> {
     const order = await Order.findById(payload.orderId);
     if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
-    if (!order.inspectionRequired) {
+    const service = await Service.findById(order.serviceId).select("serviceType").lean();
+    const requiresQuotation = order.inspectionRequired || service?.serviceType === "variable_price";
+    if (!requiresQuotation) {
       throw new AppError(
         "Đơn hàng này không yêu cầu báo giá sửa chữa.",
         400,
       );
     }
+    if (order.schedule && !payload.estimatedDurationMinutes) throw new AppError("Vui lòng nhập thời gian sửa chữa dự kiến từ 1 đến 1440 phút.", 400);
 
     const provider = await Provider.findOne({
       userId: providerUserId,
@@ -607,6 +529,7 @@ export const AssignmentService = {
 
     // Create quotation
     const quotation = await RepairQuotation.create({
+      estimatedDurationMinutes: payload.estimatedDurationMinutes,
       quotationCode,
       orderId: order._id,
       customerId: order.customerId,
@@ -636,6 +559,8 @@ export const AssignmentService = {
     await RepairQuotationItem.insertMany(itemDocs);
 
     // Link quotation to order
+    // Đơn cũ có thể chưa lưu inspectionRequired dù dịch vụ là báo giá theo khảo sát.
+    order.inspectionRequired = true;
     order.currentQuotationId = quotation._id as Types.ObjectId;
     order.hasAdditionalQuotation = true;
     await order.save();
@@ -777,8 +702,8 @@ export const AssignmentService = {
         .lean();
       hasAccess = Boolean(
         provider &&
-          order.providerId &&
-          order.providerId.toString() === provider._id.toString(),
+        order.providerId &&
+        order.providerId.toString() === provider._id.toString(),
       );
     }
     if (!hasAccess) {

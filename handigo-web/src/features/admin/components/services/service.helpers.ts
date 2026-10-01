@@ -57,7 +57,6 @@ export type OptionForm = {
   selectionGroup: string;
   selectionMode: ServiceOptionSelectionMode;
   allowsQuantity: boolean;
-  sortOrder: string;
   isActive: boolean;
 };
 
@@ -70,7 +69,6 @@ export const emptyOptionForm: OptionForm = {
   selectionGroup: '',
   selectionMode: 'multiple',
   allowsQuantity: false,
-  sortOrder: '0',
   isActive: true,
 };
 
@@ -83,7 +81,6 @@ export const toOptionPayload = (form: OptionForm, serviceType: Service['serviceT
   selectionGroup: form.selectionGroup.trim() || null,
   selectionMode: form.selectionMode,
   allowsQuantity: form.allowsQuantity,
-  sortOrder: Number(form.sortOrder) || 0,
   isActive: form.isActive,
 });
 

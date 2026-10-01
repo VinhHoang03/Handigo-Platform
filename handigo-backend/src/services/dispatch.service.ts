@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { buildMatchingSearch, getMatchingSearchStage } from "../utils/matchingSearch";
 
 import { Order } from "../models/order.model";
+import User from "../models/user.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Address } from "../models/address.model";
 import { Provider } from "../models/provider.model";
@@ -14,6 +15,9 @@ import { createLogger } from "../utils/logger";
 import { cancelSystemOrderWithSettlement } from "./orderCancellation.service";
 import { createNotificationRecord } from "./notification.service";
 import { reconcilePayosPaymentForExpiration } from "./payment.service";
+import { getOrderInterval } from "./providerSchedule.service";
+import { getBookingPolicy } from "./systemConfig.service";
+import { ScheduleInterval } from "../utils/bookingPolicy";
 
 async function createMatchingSearch(startedAt: Date) {
   const [initial, expanded, delay, duration] = await Promise.all([
@@ -32,7 +36,16 @@ const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
 const DEFAULT_MATCHING_BATCH_SIZE = 3;
 
 /** Thời gian phản hồi dành riêng cho yêu cầu customer chọn provider cụ thể. */
-export const DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS = 5 * 60 * 1000;
+export const DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS = 2 * 60 * 1000;
+
+/** Số provider tối đa được thử sau khi khách đồng ý tìm provider thay thế. */
+export const MAX_DIRECT_PROVIDER_ATTEMPTS = 3;
+
+/** Số lượt matching tối đa trước khi hủy đơn. */
+const DEFAULT_MAX_MATCHING_ATTEMPTS = 5;
+
+/** Tổng thời gian matching tối đa trước khi hủy đơn. */
+const DEFAULT_MAX_MATCHING_DURATION_SECONDS = 6 * 60;
 
 /** Bắt đầu tìm thợ trước giờ hẹn bao nhiêu phút. */
 const DEFAULT_SCHEDULED_DISPATCH_LEAD_MINUTES = 15;
@@ -44,6 +57,7 @@ let timeoutMonitor: NodeJS.Timeout | null = null;
 const dispatchLogger = createLogger("DispatchService");
 
 interface DispatchContext {
+  scheduleIntervals?: ScheduleInterval[];
   latitude?: number;
   longitude?: number;
   serviceId: string;
@@ -55,12 +69,22 @@ interface DispatchContext {
 async function getMatchingConfig() {
   const [
     matchingProviderTimeoutSecondsValue,
+    maxMatchingDurationSecondsValue,
+    maxMatchingAttemptsValue,
     scheduledDispatchLeadMinutesValue,
     matchingBatchSizeValue,
   ] = await Promise.all([
     getNumberConfigValue(
       "MATCHING_PROVIDER_TIMEOUT_SECONDS",
       DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
+    ),
+    getNumberConfigValue(
+      "MAX_MATCHING_DURATION_SECONDS",
+      DEFAULT_MAX_MATCHING_DURATION_SECONDS,
+    ),
+    getNumberConfigValue(
+      "MAX_MATCHING_ATTEMPTS",
+      DEFAULT_MAX_MATCHING_ATTEMPTS,
     ),
     getNumberConfigValue(
       "SCHEDULED_DISPATCH_LEAD_MINUTES",
@@ -73,6 +97,14 @@ async function getMatchingConfig() {
     matchingProviderTimeoutSeconds: Math.max(
       matchingProviderTimeoutSecondsValue,
       DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
+    ),
+    maxMatchingDurationSeconds: Math.max(
+      maxMatchingDurationSecondsValue,
+      DEFAULT_MAX_MATCHING_DURATION_SECONDS,
+    ),
+    maxMatchingAttempts: Math.max(
+      Math.floor(maxMatchingAttemptsValue),
+      1,
     ),
     scheduledDispatchLeadMinutes: Math.max(
       scheduledDispatchLeadMinutesValue,
@@ -101,10 +133,10 @@ async function cancelUnmatchedOrder(orderId: string, reason: string) {
   );
   const orderIds = order.recurringGroupId
     ? await Order.find({
-        recurringGroupId: order.recurringGroupId,
-        status: "created",
-        isDeleted: false,
-      }).distinct("_id")
+      recurringGroupId: order.recurringGroupId,
+      status: "created",
+      isDeleted: false,
+    }).distinct("_id")
     : [order._id];
   for (const currentOrderId of orderIds) {
     await cancelSystemOrderWithSettlement(
@@ -119,9 +151,7 @@ async function cancelUnmatchedOrder(orderId: string, reason: string) {
 async function getDispatchContext(
   orderId: string,
 ): Promise<DispatchContext | null> {
-  const order = await Order.findById(orderId).select(
-    "serviceId addressId orderType scheduledAt recurringGroupId",
-  );
+  const order = await Order.findById(orderId);
   if (!order) return null;
 
   const address = await Address.findById(order.addressId).select(
@@ -131,19 +161,23 @@ async function getDispatchContext(
 
   const scheduledDates = order.recurringGroupId
     ? (await Order.find({
-        recurringGroupId: order.recurringGroupId,
-        status: "created",
-        isDeleted: false,
-      })
-        .select("scheduledAt")
-        .sort({ occurrenceNumber: 1 })
-        .lean())
-        .map((item) => item.scheduledAt)
-        .filter((date): date is Date => date instanceof Date)
+      recurringGroupId: order.recurringGroupId,
+      status: "created",
+      isDeleted: false,
+    })
+      .select("scheduledAt")
+      .sort({ occurrenceNumber: 1 })
+      .lean())
+      .map((item) => item.scheduledAt)
+      .filter((date): date is Date => date instanceof Date)
     : order.scheduledAt
       ? [order.scheduledAt]
       : [];
 
+  const policy = await getBookingPolicy();
+  const interval = getOrderInterval(order, policy);
+  const duration = interval.end - interval.start;
+  const dates = scheduledDates.length ? scheduledDates : [new Date(Date.now() + interval.travelMinutes * 60000)];
   return {
     latitude: address.latitude,
     longitude: address.longitude,
@@ -151,6 +185,7 @@ async function getDispatchContext(
     province: address.province,
     ward: address.ward,
     scheduledDates,
+    scheduleIntervals: dates.map((date) => ({ ...interval, start: date.getTime(), end: date.getTime() + duration })),
   };
 }
 
@@ -358,9 +393,12 @@ export const DispatchService = {
         readyForMatching: true,
         matchingStartedAt: null,
       },
-      { $set: { matchingStartedAt,
-        matchingSearch: order.preferredProviderId ? null : await createMatchingSearch(matchingStartedAt),
-      } },
+      {
+        $set: {
+          matchingStartedAt,
+          matchingSearch: order.preferredProviderId ? null : await createMatchingSearch(matchingStartedAt),
+        }
+      },
       { returnDocument: "after", runValidators: true },
     );
     if (!claimedOrder) return;
@@ -378,7 +416,7 @@ export const DispatchService = {
         ...ctx,
         onlyProviderId: claimedOrder.preferredProviderId,
         limit: 1,
-        requireOnline: false,
+        requireOnline: !ctx.scheduledDates?.length,
       });
       const preferredCandidate = preferredCandidates[0];
       if (preferredCandidate) {
@@ -434,10 +472,12 @@ export const DispatchService = {
   ): Promise<void> {
     const {
       matchingProviderTimeoutSeconds,
+      maxMatchingDurationSeconds,
+      maxMatchingAttempts,
       matchingBatchSize,
     } = await getMatchingConfig();
     let order = await Order.findById(orderId).select(
-      "status readyForMatching preferredProviderId createdAt matchingStartedAt matchingSearch",
+      "status createdAt matchingStartedAt reassignment",
     );
     if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId) return;
     if (!order.matchingSearch) {
@@ -462,30 +502,76 @@ export const DispatchService = {
     });
     if (hasPendingAssignment) return;
 
-    const matchingDeadline = stage.deadline;
-    const candidateLimit = matchingBatchSize;
+    const matchingDeadline = new Date(
+      (order.matchingStartedAt || order.createdAt).getTime() +
+      maxMatchingDurationSeconds * 1000,
+    );
+    if (matchingDeadline <= new Date()) {
+      await cancelUnmatchedOrder(
+        orderId,
+        "Không có provider nhận đơn trong vòng 5 phút.",
+      );
+      return;
+    }
+
+    const isDirectReplacement = order.reassignment?.status === "matching";
+    const maxAttempts = isDirectReplacement
+      ? MAX_DIRECT_PROVIDER_ATTEMPTS
+      : maxMatchingAttempts;
+    if (triedProviderIds.length >= maxAttempts) {
+      await cancelUnmatchedOrder(
+        orderId,
+        `Không có provider nhận đơn sau ${maxMatchingAttempts} lượt matching.`,
+      );
+      dispatchLogger.warn("Không tìm được provider sau số lượt matching tối đa.", {
+        orderId,
+        maxMatchingAttempts,
+      });
+      return;
+    }
+
+    const candidateLimit = isDirectReplacement
+      ? 1
+      : Math.min(
+        matchingBatchSize,
+        maxAttempts - triedProviderIds.length,
+      );
     const batchNumber = Math.floor(triedProviderIds.length / matchingBatchSize) + 1;
 
-    const candidates: ProviderCandidate[] =
-      await MatchingService.findNearestProviders({
-        latitude: ctx.latitude,
-        longitude: ctx.longitude,
-        serviceId: ctx.serviceId,
-        province: ctx.province,
-        ward: ctx.ward,
-        excludeProviderIds: triedProviderIds,
-        limit: candidateLimit,
-        maxDistanceMeters: stage.radiusKm * 1000,
-        requireOnline: !ctx.scheduledDates?.length,
-        scheduledDates: ctx.scheduledDates,
+    const isScheduledDispatch = Boolean(ctx.scheduledDates?.length);
+    const matchingOptions = {
+      latitude: ctx.latitude,
+      longitude: ctx.longitude,
+      serviceId: ctx.serviceId,
+      province: ctx.province,
+      ward: ctx.ward,
+      excludeProviderIds: triedProviderIds,
+      limit: candidateLimit,
+      scheduledDates: ctx.scheduledDates,
+      scheduleIntervals: ctx.scheduleIntervals,
+    };
+
+    // Lịch hẹn ưu tiên provider đang online để khách không phải chờ lâu.
+    // Chỉ mở rộng sang provider offline khi hiện không có provider online phù hợp.
+    let candidates: ProviderCandidate[] = await MatchingService.findNearestProviders({
+      ...matchingOptions,
+      requireOnline: true,
+    });
+    if (isScheduledDispatch && candidates.length === 0) {
+      candidates = await MatchingService.findNearestProviders({
+        ...matchingOptions,
+        requireOnline: false,
       });
+    }
 
     // Bộ quét định kỳ tìm lại thợ vừa trực tuyến và khôi phục sau khởi động lại.
     if (candidates.length === 0 || stage.deadline.getTime() <= Date.now()) return;
 
     const deadline = new Date(
       Math.min(
-        Date.now() + matchingProviderTimeoutSeconds * 1000,
+        Date.now() + (isDirectReplacement
+          ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
+          : matchingProviderTimeoutSeconds * 1000),
         matchingDeadline.getTime(),
       ),
     );
@@ -537,6 +623,16 @@ export const DispatchService = {
 
     const order = await Order.findById(orderId);
     if (!order || order.status !== "created") return;
+
+    if (assignment.assignmentType === "appointment" && order.preferredProviderId) {
+      const { requestDirectProviderReassignment } = await import("./orderReassignment.service");
+      await requestDirectProviderReassignment(
+        orderId,
+        timedOutProviderId,
+        "Provider không phản hồi yêu cầu lịch hẹn trong 2 phút.",
+      );
+      return;
+    }
 
     if (assignment.assignmentType === "appointment") {
       const isPreferredProviderRequest = Boolean(order.preferredProviderId);
@@ -615,9 +711,31 @@ export const DispatchService = {
 
     const scan = async (recoverStalledOrders = false) => {
       const now = new Date();
+      const overdueHours = Math.max(await getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24), 1);
+      const overdueOrders = await Order.find({
+        status: "in_progress",
+        isDeleted: false,
+        "overdueReview.escalatedAt": null,
+        createdAt: { $lte: new Date(now.getTime() - overdueHours * 60 * 60 * 1000) },
+      }).select("_id orderCode customerId providerId").limit(100);
+      for (const order of overdueOrders) {
+        const claimed = await Order.findOneAndUpdate(
+          { _id: order._id, status: "in_progress", "overdueReview.escalatedAt": null },
+          { $set: { "overdueReview.escalatedAt": now } },
+          { returnDocument: "after", runValidators: true },
+        );
+        if (!claimed || !order.providerId) continue;
+        const message = `Đơn ${order.orderCode} đang thực hiện quá ${overdueHours} giờ và cần được xác nhận tình trạng.`;
+        await Promise.all([
+          createNotificationRecord({ userId: order.customerId, type: "ORDER", title: "Đơn hàng quá hạn cần xác nhận", content: message, data: { orderId: order._id, overdueReview: true } }, { emitRealtime: true }),
+          Provider.findById(order.providerId).select("userId").lean().then((provider) => provider && createNotificationRecord({ userId: provider.userId, type: "ORDER", title: "Cần cập nhật đơn đang thực hiện", content: message, data: { orderId: order._id, overdueReview: true } }, { emitRealtime: true })),
+        ]);
+        const admins = await User.find({ role: "ADMIN", isDeleted: false, status: "active" }).select("_id").lean();
+        await Promise.all(admins.map((admin) => createNotificationRecord({ userId: admin._id, type: "ORDER", title: "Đơn quá hạn cần quản trị xử lý", content: message, data: { orderId: order._id, overdueReview: true } }, { emitRealtime: true })));
+      }
       const recurringPaymentsToOpen = await Order.find({
         orderType: "recurring",
-        status: "accepted",
+        status: { $in: ["created", "accepted"] },
         bookingStatus: "reserved",
         scheduledAt: { $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
       })
@@ -648,11 +766,11 @@ export const DispatchService = {
       }
 
       const expiredPaymentOrders = await Order.find({
-        status: "accepted",
+        status: { $in: ["created", "accepted"] },
         bookingStatus: "awaiting_payment",
         paymentDueAt: { $lte: now },
       })
-        .select("_id")
+        .select("_id recurringGroupId occurrenceNumber")
         .limit(100)
         .lean();
 
@@ -687,6 +805,12 @@ export const DispatchService = {
           "Đã hết thời hạn thanh toán giữ lịch.",
           "payment_timeout",
         );
+        if (order.recurringGroupId && order.occurrenceNumber === 1) {
+          const reservations = await Order.find({ recurringGroupId: order.recurringGroupId, status: "accepted", bookingStatus: "reserved", paymentStatus: "unpaid", isDeleted: false }).select("_id");
+          for (const reservation of reservations) {
+            await cancelSystemOrderWithSettlement(reservation._id.toString(), "Giải phóng lịch định kỳ vì buổi đầu hết hạn thanh toán.", "payment_timeout");
+          }
+        }
       }
 
       const expiredAssignments = await OrderAssignment.find({

@@ -3,15 +3,15 @@ import { dateTime, typeIcons } from "./notificationBell.utils";
 
 interface NotificationItemProps {
   item: AppNotification;
-  onMarkAsRead: (item: AppNotification) => void;
+  onOpen: (item: AppNotification) => void;
 }
 
 /** Một dòng thông báo trong danh sách thả xuống. */
-export function NotificationItem({ item, onMarkAsRead }: NotificationItemProps) {
+export function NotificationItem({ item, onOpen }: NotificationItemProps) {
   return (
     <button
       type="button"
-      onClick={() => onMarkAsRead(item)}
+      onClick={() => onOpen(item)}
       className={`flex w-full gap-3 border-b border-outline-variant/10 px-4 py-3 text-left transition hover:bg-surface-container-low ${
         item.isRead ? "bg-surface-container-lowest" : "bg-primary/5"
       }`}

@@ -154,6 +154,9 @@ export interface UpdateProviderProfilePayload {
   mainServiceText?: string;
   serviceArea?: ProviderServiceArea;
   workingAreas?: string[];
+  autoAcceptScheduledBookings?: boolean;
+  autoAcceptScheduledBookingMinAdvanceMinutes?: number;
+  autoAcceptScheduledBookingHorizonDays?: number;
 }
 
 export interface ProviderProfileResponse {
@@ -174,6 +177,9 @@ export interface ProviderProfileResponse {
     mainServiceText?: string;
     experienceYears: number;
     availabilityStatus: 'online' | 'offline' | 'busy';
+    autoAcceptScheduledBookings: boolean;
+    autoAcceptScheduledBookingMinAdvanceMinutes: number;
+    autoAcceptScheduledBookingHorizonDays: number;
     verified: boolean;
     serviceIds: string[];
     services?: ProviderServiceRef[];

@@ -4,7 +4,6 @@ import {
   AdminUsersPage,
   AdminProviderApplicationsPage,
   AdminCategoriesPage,
-  AdminServicesPage,
   AdminPromotionsPage,
   AdminWithdrawalsPage,
   AdminSupportPage,
@@ -55,14 +54,6 @@ export function AdminRoutes() {
         element={
           <RouteGuard roles={["ADMIN"]}>
             <AdminCategoriesPage />
-          </RouteGuard>
-        }
-      />
-      <Route
-        path="/admin/services"
-        element={
-          <RouteGuard roles={["ADMIN"]}>
-            <AdminServicesPage />
           </RouteGuard>
         }
       />

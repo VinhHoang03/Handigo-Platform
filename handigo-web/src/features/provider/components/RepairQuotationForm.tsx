@@ -9,6 +9,7 @@ import type {
   QuotationRelevanceResult,
 } from '../types/providerOrder.types';
 import { formatMoney } from '../utils/providerOrder.utils';
+import { getDirectRepairPayment } from '@/utils/quotationPayment';
 import { QuotationItemRow } from './orders/QuotationItemRow';
 import { QuotationNotesFields } from './orders/QuotationNotesFields';
 import type { QuotationFormItem } from './orders/quotationForm.types';
@@ -41,6 +42,8 @@ const isEmptyItem = (item: QuotationFormItem) =>
   item.unitPrice === 0;
 
 interface RepairQuotationFormProps {
+  appliedDepositAmount?: number;
+  defaultDurationMinutes?: number;
   orderId: string;
   serviceName: string;
   onSubmit: (payload: CreateQuotationPayload) => Promise<void>;
@@ -53,13 +56,16 @@ const isBlockedEvaluation = (evaluation: QuotationRelevanceEvaluation) =>
   evaluation.confidence >= BLOCK_CONFIDENCE;
 
 export function RepairQuotationForm({
+  appliedDepositAmount = 0,
   orderId,
   serviceName,
   onSubmit,
   onCancel,
   busy,
+  defaultDurationMinutes,
 }: RepairQuotationFormProps) {
   const [inspectionNote, setInspectionNote] = useState('');
+  const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState(defaultDurationMinutes ?? 60);
   const [recommendation, setRecommendation] = useState('');
   const [items, setItems] = useState<QuotationFormItem[]>(() => [newItem()]);
   const revision = useRef(0);
@@ -264,6 +270,7 @@ export function RepairQuotationForm({
       return;
     }
     const payload: CreateQuotationPayload = {
+      estimatedDurationMinutes,
       inspectionNote: inspectionNote.trim() || undefined,
       recommendation: recommendation.trim() || undefined,
       items: validItems.map((item) => ({
@@ -330,6 +337,9 @@ export function RepairQuotationForm({
     >
       <div>
         <h3 className="font-headline-md text-on-surface">Tạo báo giá sửa chữa</h3>
+        <label className="mt-3 block text-sm">Thời gian sửa chữa dự kiến (phút)
+          <input className="mt-1 w-full rounded-lg border border-outline-variant bg-surface p-2" type="number" required min={1} max={1440} value={estimatedDurationMinutes} onChange={(event) => setEstimatedDurationMinutes(Number(event.target.value))} />
+        </label>
         <p className="mt-1 text-sm text-on-surface-variant">
           Ghi nhận kết quả khảo sát cho dịch vụ <strong>{serviceName}</strong>.
         </p>
@@ -470,6 +480,8 @@ export function RepairQuotationForm({
         <div className="rounded-2xl bg-primary/5 px-md py-sm text-right">
           <p className="text-xs text-on-surface-variant">Tổng báo giá (tổng thành tiền các hạng mục)</p>
           <p className="text-headline-md font-bold tabular-nums text-primary">{formatMoney(subtotal)}</p>
+          <p className="mt-2 text-sm text-on-surface-variant">Cọc đã thanh toán (thuộc hệ thống): −{formatMoney(appliedDepositAmount)}</p>
+          <p className="mt-1 font-bold text-primary">Bạn thu trực tiếp từ khách: {formatMoney(getDirectRepairPayment(subtotal, appliedDepositAmount))}</p>
         </div>
       </div>
 

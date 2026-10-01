@@ -71,6 +71,7 @@ type AuthUserResponse = {
   role: string;
   status: string;
   isEmailVerified: boolean;
+  isGoogleAccount: boolean;
   providerOnboardingStatus?: string | null;
   providerOnboardingStep?: number | null;
 };
@@ -179,6 +180,7 @@ const toAuthUserResponse = (user: IUser): AuthUserResponse => ({
   role: user.role,
   status: user.status,
   isEmailVerified: user.isEmailVerified,
+  isGoogleAccount: Boolean(user.googleId),
   providerOnboardingStatus: user.providerOnboardingStatus,
   providerOnboardingStep: user.providerOnboardingStep,
 });
@@ -730,6 +732,13 @@ export const changePassword = async (
     throw new AppError("Không tìm thấy người dùng", 404);
   }
 
+  if (user.googleId) {
+    throw new AppError(
+      "Tài khoản đăng nhập bằng Google không thể đổi mật khẩu tại đây.",
+      400,
+    );
+  }
+
   if (!user.passwordHash) {
     throw new AppError("Password login is not available for this account", 400);
   }
@@ -754,7 +763,7 @@ export const changePassword = async (
 
 export const getCurrentUser = async (
   userId: string,
-): Promise<Partial<IUser>> => {
+): Promise<Partial<IUser> & { isGoogleAccount: boolean }> => {
   const user = await User.findById(userId).select(
     "-passwordHash -registerOtp -resetPasswordOtp",
   );
@@ -763,5 +772,8 @@ export const getCurrentUser = async (
     throw new AppError("Không tìm thấy người dùng", 404);
   }
 
-  return user;
+  return {
+    ...user.toObject(),
+    isGoogleAccount: Boolean(user.googleId),
+  };
 };

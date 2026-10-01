@@ -21,6 +21,16 @@ const getCurrentCoordinates = () =>
     );
   });
 
+const getLocationErrorMessage = (error: unknown) => {
+  if (typeof error === "object" && error && "code" in error) {
+    const code = Number(error.code);
+    if (code === 1) return "Bạn chưa cho phép truy cập vị trí. Hãy cấp quyền vị trí cho trình duyệt rồi thử lại.";
+    if (code === 2) return "Không xác định được vị trí hiện tại. Vui lòng kiểm tra kết nối hoặc thử lại ở nơi có tín hiệu vị trí tốt hơn.";
+    if (code === 3) return "Lấy vị trí mất quá lâu. Vui lòng thử lại.";
+  }
+  return "Không thể cập nhật vị trí hiện tại. Vui lòng thử lại.";
+};
+
 export function useProviderAvailability(enabled = true) {
   const { showSystemAlert } = useSystemAlert();
   const providerUserId = useAuthStore(
@@ -91,19 +101,23 @@ export function useProviderAvailability(enabled = true) {
 
     const previousStatus = store.availabilityStatus;
     const nextStatus = previousStatus === "online" ? "offline" : "online";
-    store.setAvailabilityStatus(nextStatus);
     store.setIsUpdating(true);
 
     try {
       if (nextStatus === "online") {
-        void getCurrentCoordinates()
-          .then((coordinates) =>
-            providerDashboardApi.updateCurrentLocation(
-              coordinates.latitude,
-              coordinates.longitude,
-            ),
-          )
-          .catch(() => undefined);
+        try {
+          const coordinates = await getCurrentCoordinates();
+          await providerDashboardApi.updateCurrentLocation(
+            coordinates.latitude,
+            coordinates.longitude,
+          );
+        } catch (error) {
+          await providerDashboardApi.deactivateCurrentLocation();
+          showSystemAlert(
+            `${getLocationErrorMessage(error)} Hệ thống sẽ tìm đơn theo khu vực bạn đã đăng ký.`,
+            { title: "Đang nhận việc không dùng vị trí" },
+          );
+        }
       }
 
       const result = await providerDashboardApi.updateAvailability(nextStatus);
@@ -115,7 +129,9 @@ export function useProviderAvailability(enabled = true) {
         .getState()
         .setAvailabilityStatus(previousStatus);
       showSystemAlert(
-        "Không thể cập nhật trạng thái hoạt động. Vui lòng thử lại.",
+        nextStatus === "online"
+          ? "Không thể cập nhật trạng thái nhận việc. Vui lòng thử lại."
+          : "Không thể cập nhật trạng thái hoạt động. Vui lòng thử lại.",
         { title: "Cập nhật trạng thái thất bại", variant: "error" },
       );
     } finally {

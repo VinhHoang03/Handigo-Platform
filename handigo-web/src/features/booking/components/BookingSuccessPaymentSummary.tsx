@@ -13,8 +13,9 @@ export const BookingSuccessPaymentSummary = ({ order }: { order: Order }) => (
           <span className="text-on-surface-variant">
             {order.serviceId.serviceType === 'fixed_price' ? 'Phí dịch vụ' : 'Phí đặt cọc'}
           </span>
-          <span className="text-on-surface tabular-nums">{formatCurrency(order.pricing.bookingAmount)}</span>
+          <span className="text-on-surface tabular-nums">{formatCurrency(order.pricing.baseAmount ?? order.pricing.bookingAmount)}</span>
         </div>
+        {(order.pricing.immediateFee ?? 0) > 0 && <div className="flex justify-between text-label-md"><span>Phí phục vụ ngay</span><span>{formatCurrency(order.pricing.immediateFee ?? 0)}</span></div>}
         {order.pricing.promotionDiscountAmount > 0 && (
           <div className="flex justify-between text-label-md">
             <span className="text-on-surface-variant">Khuyến mãi</span>
