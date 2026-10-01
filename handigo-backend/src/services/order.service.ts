@@ -313,7 +313,7 @@ export const OrderService = {
         province: address.province,
         ward: address.ward,
         limit: 1,
-        requireOnline: false,
+        requireOnline: true,
         scheduledDates: occurrenceDates,
         scheduleIntervals,
       });
@@ -337,7 +337,7 @@ export const OrderService = {
         ward: address.ward,
         onlyProviderId: new Types.ObjectId(payload.preferredProviderId),
         limit: 1,
-        requireOnline: false,
+        requireOnline: true,
         scheduledDates: isAppointment ? occurrenceDates : [],
       });
       preferredProvider = candidates[0] ?? null;
@@ -572,7 +572,7 @@ export const OrderService = {
       latitude: address.latitude, longitude: address.longitude,
       serviceId: order.serviceId.toString(), province: address.province, ward: address.ward,
       onlyProviderId: new Types.ObjectId(providerId), limit: 1,
-      requireOnline: !isAppointment, scheduleIntervals,
+        requireOnline: true, scheduleIntervals,
     });
     const candidate = candidates[0];
     if (!candidate) throw new AppError("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.", 409);
@@ -940,7 +940,7 @@ export const OrderService = {
         if (order.inspectionRequired) {
           if (!order.depositPaidAt) throw new AppError("Tiền cọc chưa được thanh toán.", 409);
           const quotation = await RepairQuotation.findOne({ _id: order.currentQuotationId, orderId: order._id, providerId: provider._id, status: "approved", customerConfirmed: true, isDeleted: false }).session(session);
-          if (!quotation) throw new AppError("Khách hàng chưa đồng ý báo giá hiện tại.", 409);
+          if (!quotation) throw new AppError("Báo giá sửa chữa chưa được duyệt.", 409);
           if (order.schedule && !quotation.estimatedDurationMinutes) throw new AppError("Vui lòng bổ sung thời lượng sửa chữa vào báo giá.", 409);
           duration = quotation.estimatedDurationMinutes ?? duration;
         }
@@ -1064,7 +1064,7 @@ export const OrderService = {
           }).session(session);
           if (!quotation) {
             throw new AppError(
-              "Khách hàng chưa đồng ý báo giá hiện tại nên chưa thể hoàn thành đơn.",
+              "Báo giá sửa chữa chưa được duyệt nên chưa thể hoàn thành đơn.",
               409,
             );
           }

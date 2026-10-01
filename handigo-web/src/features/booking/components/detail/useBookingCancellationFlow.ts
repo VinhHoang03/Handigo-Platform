@@ -5,7 +5,7 @@ import type { CancellationPreview, Order, OrderQuotation } from "@/types/booking
 import type { PendingAction } from "./bookingDetailConstants";
 
 /**
- * ⚠️ Luồng xác nhận/từ chối báo giá và hủy đơn (kèm xem trước chính sách hoàn
+ * ⚠️ Luồng từ chối báo giá và hủy đơn (kèm xem trước chính sách hoàn
  * tiền) — đụng tiền. Giữ nguyên toàn bộ điều kiện và thứ tự gọi API gốc.
  */
 export const useBookingCancellationFlow = (
@@ -20,11 +20,6 @@ export const useBookingCancellationFlow = (
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
-
-  const handleConfirmQuotation = () => {
-    if (!quotation) return;
-    setPendingAction({ type: "confirmQuotation", reason: "" });
-  };
 
   const handleRejectQuotation = () => {
     if (!quotation) return;
@@ -115,7 +110,7 @@ export const useBookingCancellationFlow = (
     const isCancellationAction = ["cancelOrder", "cancelSeries"].includes(
       pendingAction.type,
     );
-    if (pendingAction.type !== "confirmQuotation" && !reason) {
+    if (!reason) {
       setPendingAction({
         ...pendingAction,
         error: isCancellationAction ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.",
@@ -132,10 +127,7 @@ export const useBookingCancellationFlow = (
 
     try {
       setBusy(true);
-      if (pendingAction.type === "confirmQuotation") {
-        if (!quotation) return;
-        await bookingApi.confirmQuotation(quotation.quotation._id);
-      } else if (pendingAction.type === "rejectQuotation") {
+      if (pendingAction.type === "rejectQuotation") {
         if (!quotation) return;
         await bookingApi.rejectQuotation(quotation.quotation._id, reason);
       } else if (pendingAction.type === "cancelOrder") {
@@ -169,7 +161,6 @@ export const useBookingCancellationFlow = (
   return {
     cancellationPreview,
     pendingAction,
-    handleConfirmQuotation,
     handleRejectQuotation,
     handleCancelOrder,
     handleCancelSeries,
