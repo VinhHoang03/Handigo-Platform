@@ -19,8 +19,8 @@ import { buildTransactionCode } from "../utils/transaction";
 import { createNotificationRecord } from "./notification.service";
 import {
   calculateRefundPolicy,
-  isQuotationRejectionReason,
-  QUOTATION_REJECTION_POLICY_VERSION,
+  QUOTATION_DEPOSIT_POLICY_VERSION,
+  isQuotationDeclinedReason,
   type RefundPolicyResult,
 } from "./refundPolicy.service";
 import { getRefundRetryDecision } from "./refundProcessing";
@@ -148,13 +148,23 @@ const getPaidOrderAmount = async (
   return payments.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0);
 };
 
-const calculateOrderRefundPolicy = (
+const calculateOrderRefundPolicy = async (
   order: IOrder,
   role: CancellationRole,
   paidAmount: number,
   now = new Date(),
-) =>
-  calculateRefundPolicy({
+  session?: ClientSession,
+  cancellationReason?: string,
+) => {
+  const quotationDeclined = role === "provider" && isQuotationDeclinedReason(cancellationReason);
+  const hasRepairQuotation = Boolean(order.currentQuotationId);
+  if (quotationDeclined && (!order.inspectionRequired || order.status !== "accepted")) {
+    throw new AppError("Chỉ được hủy do khách không đồng ý báo giá khi đơn sửa chữa đã được nhận và chưa bắt đầu thực hiện.", 409);
+  }
+  const deposits = role === "provider" && order.inspectionRequired && order.status === "accepted"
+    ? await Payment.find({ orderId: order._id, paymentType: "inspection_deposit", status: "paid", isDeleted: false }).session(session || null)
+    : [];
+  return calculateRefundPolicy({
     role,
     orderType: order.orderType,
     orderStatus: order.status,
@@ -162,25 +172,25 @@ const calculateOrderRefundPolicy = (
     hasAssignedProvider: Boolean(order.providerId),
     paidAmount,
     now,
+    hasRepairQuotation,
+    inspectionRequired: order.inspectionRequired,
+    cancellationReason,
+    paidInspectionDeposit: deposits.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0),
   });
+};
+
+const isQuotationDepositPolicy = (order: IOrder) =>
+  order.cancellation?.refundPolicy?.policyVersion === QUOTATION_DEPOSIT_POLICY_VERSION;
 
 const getStoredRefundRate = (order: IOrder) => {
   const rate = Number(order.cancellation?.refundPolicy?.refundRate);
   return Number.isFinite(rate) ? Math.min(100, Math.max(0, rate)) : 100;
 };
 
-const isQuotationRejectionSettlement = (order: IOrder) =>
-  order.cancellation?.refundPolicy?.policyVersion === QUOTATION_REJECTION_POLICY_VERSION;
-
-const getPaymentRefundAmount = (order: IOrder, payment: IPayment) => {
-  const paid = getPaidPaymentAmount(payment);
-  if (isQuotationRejectionSettlement(order)) {
-    return payment.paymentType === "inspection_deposit"
-      ? Math.max(0, paid - order.depositAmount)
-      : paid;
-  }
-  return Math.round((paid * getStoredRefundRate(order)) / 100);
-};
+const getPaymentRefundAmount = (order: IOrder, payment: IPayment) =>
+  isQuotationDepositPolicy(order)
+    ? payment.paymentType === "inspection_deposit" ? 0 : getPaidPaymentAmount(payment)
+    : Math.round((getPaidPaymentAmount(payment) * getStoredRefundRate(order)) / 100);
 
 const buildRefundMetadata = (
   order: IOrder,
@@ -214,7 +224,7 @@ export const getCancellationPreview = async (input: {
 
     await assertCancellationAccess(order, { ...input, reason: "Xem trước" }, session);
     const paidAmount = await getPaidOrderAmount(order._id as Types.ObjectId, session);
-    const policy = calculateOrderRefundPolicy(order, input.role, paidAmount);
+    const policy = await calculateOrderRefundPolicy(order, input.role, paidAmount, new Date(), session);
 
     return {
       orderId: order._id.toString(),
@@ -241,7 +251,7 @@ const refundWalletPayments = async (
 
   for (const payment of payments) {
     const refundAmount = getPaymentRefundAmount(order, payment);
-    if (refundAmount === 0 && isQuotationRejectionSettlement(order)) continue;
+    if (isQuotationDepositPolicy(order) && refundAmount === 0) continue;
     const existingRefund = await WalletTransaction.findOne({
       relatedPaymentId: payment._id,
       type: "refund",
@@ -340,7 +350,7 @@ const compensateProviderPayments = async (
   order: IOrder,
   session: ClientSession,
 ) => {
-  if (!order.providerId || getStoredRefundRate(order) >= 100) return;
+  if (!order.providerId || (!isQuotationDepositPolicy(order) && getStoredRefundRate(order) >= 100)) return;
 
   const provider = await Provider.findOne({
     _id: order.providerId,
@@ -359,8 +369,8 @@ const compensateProviderPayments = async (
   for (const payment of payments) {
     const cancellationFee =
       getPaidPaymentAmount(payment) - getPaymentRefundAmount(order, payment);
-    const compensationRate = isQuotationRejectionSettlement(order) ? 100 : 80;
-    const compensationAmount = Math.max(0, Math.round(cancellationFee * compensationRate / 100));
+    const compensationRate = isQuotationDepositPolicy(order) ? 1 : 0.8;
+    const compensationAmount = Math.max(0, Math.round(cancellationFee * compensationRate));
     if (compensationAmount === 0) continue;
 
     const claimedPayment = await Payment.findOneAndUpdate(
@@ -379,7 +389,7 @@ const compensateProviderPayments = async (
                 order.cancellation?.refundPolicy?.policyVersion ||
                 "LEGACY_FULL_REFUND",
               amount: compensationAmount,
-              rate: compensationRate,
+              rate: compensationRate * 100,
             },
           }),
         },
@@ -425,11 +435,11 @@ const compensateProviderPayments = async (
           balanceAfter: wallet.balance,
           status: "success",
           transactionCode: buildTransactionCode("CANCEL_COMP"),
-          description: isQuotationRejectionSettlement(order)
-            ? "Hoàn 100% tiền cọc cho thợ do khách không đồng ý báo giá"
+          description: isQuotationDepositPolicy(order)
+            ? "Nhận tiền cọc khảo sát khi hủy đơn ở bước báo giá"
             : "Bồi thường phí hủy đơn từ khách hàng",
           metadata: {
-            source: "cancellation_fee",
+            source: isQuotationDepositPolicy(order) ? "quotation_inspection_deposit" : "cancellation_fee",
             orderCode: order.orderCode,
             policyVersion:
               order.cancellation?.refundPolicy?.policyVersion ||
@@ -1150,7 +1160,7 @@ const settlePendingPayosPayment = async (
       const refundAmount = getPaymentRefundAmount(order, paidPayment);
       const cancellationFee = actualPaidAmount - refundAmount;
       const providerCompensation = order.providerId
-        ? Math.round(cancellationFee * (isQuotationRejectionSettlement(order) ? 1 : 0.8))
+        ? Math.round(cancellationFee * (isQuotationDepositPolicy(order) ? 1 : 0.8))
         : 0;
       const platformRetainedAmount = cancellationFee - providerCompensation;
 
@@ -1285,7 +1295,9 @@ const notifyCancellation = async (
     userId: order.customerId,
     type: "ORDER",
     title: customerNotification.title,
-    content: customerNotification.content,
+    content: customerNotification.content + (isQuotationDepositPolicy(order)
+      ? " Tiền cọc khảo sát được chuyển cho thợ, không hoàn lại cho khách."
+      : ""),
     data: {
       orderId: order._id,
       orderCode: order.orderCode,
@@ -1316,7 +1328,9 @@ const notifyCancellation = async (
         userId: provider.userId,
         type: "ORDER",
         title: "Đơn hàng đã được hủy",
-        content: "Đơn " + order.orderCode + " đã được hủy.",
+        content: "Đơn " + order.orderCode + " đã được hủy." + (isQuotationDepositPolicy(order)
+          ? " Tiền cọc khảo sát đã thanh toán được cộng vào ví của bạn."
+          : ""),
         data: {
           orderId: order._id,
           orderCode: order.orderCode,
@@ -1382,11 +1396,13 @@ export const cancelOrderWithSettlement = async (
         order._id as Types.ObjectId,
         session,
       );
-      const refundPolicy = calculateOrderRefundPolicy(
+      const refundPolicy = await calculateOrderRefundPolicy(
         order,
         input.role,
         paidAmount,
         cancelledAt,
+        session,
+        input.system ? undefined : reason,
       );
       if (quotationRejected) {
         const quotation = await RepairQuotation.findOne({
