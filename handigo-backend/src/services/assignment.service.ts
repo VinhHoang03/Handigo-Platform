@@ -134,6 +134,12 @@ export const AssignmentService = {
     if (assignment.providerId.toString() !== provider._id.toString()) {
       throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403);
     }
+    if (provider.availabilityStatus !== "online") {
+      throw new AppError(
+        "Bạn cần bật trạng thái trực tuyến để nhận đơn.",
+        409,
+      );
+    }
 
     // 3. Check assignment is still pending and not expired
     if (assignment.status !== "pending") {
@@ -595,21 +601,23 @@ export const AssignmentService = {
     const finalAmount = Math.max(subtotalAmount - discountAmount, 0);
     const quotationCode = `QUO-${randomBytes(6).toString("hex").toUpperCase()}`;
 
-    // Create quotation
+    // Báo giá được chấp thuận ngay khi provider gửi; khách hàng không cần xác nhận thêm.
+    const approvedAt = new Date();
     const quotation = await RepairQuotation.create({
       estimatedDurationMinutes: payload.estimatedDurationMinutes,
       quotationCode,
       orderId: order._id,
       customerId: order.customerId,
       providerId: provider._id,
-      status: "pending",
+      status: "approved",
       inspectionNote: payload.inspectionNote ?? null,
       recommendation: payload.recommendation ?? null,
       attachments: payload.attachments ?? [],
       subtotalAmount,
       discountAmount,
       finalAmount,
-      customerConfirmed: false,
+      approvedAt,
+      customerConfirmed: true,
       providerConfirmed: true,
     });
 
@@ -631,14 +639,15 @@ export const AssignmentService = {
     order.inspectionRequired = true;
     order.currentQuotationId = quotation._id as Types.ObjectId;
     order.hasAdditionalQuotation = true;
+    order.confirmation.customerConfirmedAt = approvedAt;
     await order.save();
 
     return quotation as any;
   },
 
   /**
-   * Khách hàng đồng ý báo giá sửa chữa.
-   * Sau khi xác nhận, provider có thể chủ động bắt đầu công việc.
+   * Giữ endpoint cũ để tương thích với client cũ; báo giá mới đã được duyệt
+   * ngay khi provider gửi nên client mới không cần gọi thao tác này.
    */
   async confirmRepairQuotation(
     quotationId: string,
@@ -653,7 +662,10 @@ export const AssignmentService = {
           session,
         );
         if (!quotation) throw new AppError("Báo giá không tồn tại.", 404);
-        if (quotation.status !== "pending") {
+        if (
+          quotation.status !== "pending" &&
+          !(quotation.status === "approved" && quotation.customerConfirmed)
+        ) {
           throw new AppError(
             `Báo giá đã ở trạng thái "${quotation.status}".`,
             400,
@@ -667,6 +679,10 @@ export const AssignmentService = {
         }
         if (order.currentQuotationId?.toString() !== quotation.id) {
           throw new AppError("Báo giá này không còn là báo giá hiện tại.", 409);
+        }
+        if (quotation.status === "approved" && quotation.customerConfirmed) {
+          approvedQuotation = quotation;
+          return;
         }
         if (!order.inspectionRequired || !["accepted", "in_progress"].includes(order.status)) {
           throw new AppError(

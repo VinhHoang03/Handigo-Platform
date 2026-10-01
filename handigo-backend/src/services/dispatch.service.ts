@@ -416,7 +416,7 @@ export const DispatchService = {
         ...ctx,
         onlyProviderId: claimedOrder.preferredProviderId,
         limit: 1,
-        requireOnline: !ctx.scheduledDates?.length,
+        requireOnline: true,
       });
       const preferredCandidate = preferredCandidates[0];
       if (preferredCandidate) {
@@ -538,7 +538,6 @@ export const DispatchService = {
       );
     const batchNumber = Math.floor(triedProviderIds.length / matchingBatchSize) + 1;
 
-    const isScheduledDispatch = Boolean(ctx.scheduledDates?.length);
     const matchingOptions = {
       latitude: ctx.latitude,
       longitude: ctx.longitude,
@@ -551,19 +550,11 @@ export const DispatchService = {
       scheduleIntervals: ctx.scheduleIntervals,
     };
 
-    // Lịch hẹn ưu tiên provider đang online để khách không phải chờ lâu.
-    // Chỉ mở rộng sang provider offline khi hiện không có provider online phù hợp.
+    // Mọi loại đơn đều chỉ được điều phối cho provider đang online.
     let candidates: ProviderCandidate[] = await MatchingService.findNearestProviders({
       ...matchingOptions,
       requireOnline: true,
     });
-    if (isScheduledDispatch && candidates.length === 0) {
-      candidates = await MatchingService.findNearestProviders({
-        ...matchingOptions,
-        requireOnline: false,
-      });
-    }
-
     // Bộ quét định kỳ tìm lại thợ vừa trực tuyến và khôi phục sau khởi động lại.
     if (candidates.length === 0 || stage.deadline.getTime() <= Date.now()) return;
 
@@ -952,7 +943,7 @@ export async function getMatchingMapProviders(orderId: string, customerId: strin
     maxDistanceMeters: stage.radiusKm * 1000,
     limit: Number.MAX_SAFE_INTEGER,
     excludeProviderIds: tried.triedProviderIds,
-    requireOnline: !ctx.scheduledDates?.length,
+    requireOnline: true,
   });
   return {
     radiusKm: stage.radiusKm,

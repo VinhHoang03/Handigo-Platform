@@ -10,6 +10,7 @@ interface SearchableSelectProps {
   id: string;
   label: string;
   value?: number;
+  displayValue?: string;
   options: SearchableSelectOption[];
   placeholder?: string;
   disabled?: boolean;
@@ -31,6 +32,7 @@ export function SearchableSelect({
   id,
   label,
   value,
+  displayValue,
   options,
   placeholder = "Tim kiem...",
   disabled,
@@ -79,7 +81,7 @@ export function SearchableSelect({
         ref={inputRef}
         id={id}
         type="text"
-        value={open ? query : selected?.label || ""}
+        value={open ? query : selected?.label || displayValue || ""}
         disabled={disabled}
         placeholder={loading ? "Đang tải..." : placeholder}
         className={`min-h-14 w-full rounded-lg border bg-surface-container-lowest px-4 py-3 text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60 ${

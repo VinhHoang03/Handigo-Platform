@@ -74,10 +74,16 @@ export function LocationPickerMap({
     map.on("moveend", handleMoveEnd);
     mapRef.current = map;
 
-    const frame = window.requestAnimationFrame(() => map.invalidateSize());
+    const invalidateMapSize = () => map.invalidateSize();
+    const frame = window.requestAnimationFrame(invalidateMapSize);
+    const secondFrame = window.requestAnimationFrame(invalidateMapSize);
+    const resizeObserver = new ResizeObserver(invalidateMapSize);
+    resizeObserver.observe(containerRef.current);
 
     return () => {
       window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(secondFrame);
+      resizeObserver.disconnect();
       map.off("moveend", handleMoveEnd);
       map.remove();
       mapRef.current = null;
