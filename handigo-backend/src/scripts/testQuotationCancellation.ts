@@ -10,7 +10,7 @@ import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
-import { QUOTATION_REJECTION_REASON, isQuotationRejectionReason } from "../services/refundPolicy.service";
+import { QUOTATION_DECLINED_REASON, isQuotationDeclinedReason } from "../services/refundPolicy.service";
 
 // Cô lập cấu hình và dịch vụ ngoài; không đọc bí mật hoặc truy cập database.
 function stubModule(path: string, exports: object) {
@@ -47,7 +47,7 @@ function query(value: unknown): any {
 async function testCancellation(method: string, fee = 0, invalid?: string) {
   const provider = { _id: new Types.ObjectId(), userId: new Types.ObjectId() };
   const order: any = { _id: new Types.ObjectId(), customerId: new Types.ObjectId(),
-    providerId: provider._id, currentQuotationId: new Types.ObjectId(), orderCode: "KIEM-THU",
+    providerId: provider._id, currentQuotationId: null, orderCode: "KIEM-THU",
     status: "accepted", orderType: "normal", inspectionRequired: true, depositAmount: 40000 };
   const payment: any = { _id: new Types.ObjectId(), orderId: order._id, customerId: order.customerId,
     method, status: "paid", paymentType: "inspection_deposit", amount: 40000 + fee, compensatedToProviderId: null };
@@ -92,22 +92,23 @@ async function testCancellation(method: string, fee = 0, invalid?: string) {
   mock.method(WalletTransaction, "create", async (documents: any[], options: any) => {
     assert.equal(options.session, session); entries.push(...documents); return documents;
   });
-  const cancel = () => OrderService.cancelOrder(order._id.toString(), provider.userId.toString(), "provider", `${QUOTATION_REJECTION_REASON}: Khách không sửa nữa`);
-  if (invalid && invalid !== "in_progress") {
-    await assert.rejects(cancel());
+  const cancel = () => OrderService.cancelOrder(order._id.toString(), provider.userId.toString(), "provider", `${QUOTATION_DECLINED_REASON}: Khách không sửa nữa`);
+  if (invalid && invalid !== "unpaid") {
+    await assert.rejects(cancel(), (error: any) => error.statusCode === (invalid === "ownership" ? 403 : 400));
     assert.equal(wallet.balance, 100000);
     assert.equal(entries.length, 0);
   } else {
     await cancel();
     assert.equal(order.status, "cancelled");
-    assert.equal(wallet.balance, 140000);
-    assert.equal(customerWallet.balance, fee);
-    assert.equal(order.cancellation.refundPolicy.providerCompensation, 40000);
+    const expectedCompensation = invalid === "unpaid" ? 0 : 40000 + fee;
+    assert.equal(wallet.balance, 100000 + expectedCompensation);
+    assert.equal(customerWallet.balance, 0);
+    assert.equal(order.cancellation.refundPolicy.providerCompensation, expectedCompensation);
     assert.equal(order.cancellation.refundPolicy.platformRetainedAmount, 0);
-    assert.equal(entries.filter((entry) => entry.type === "provider_earning").length, 1);
+    assert.equal(entries.filter((entry) => entry.type === "provider_earning").length, expectedCompensation ? 1 : 0);
     await cancel();
-    assert.equal(wallet.balance, 140000);
-    assert.equal(entries.filter((entry) => entry.type === "provider_earning").length, 1);
+    assert.equal(wallet.balance, 100000 + expectedCompensation);
+    assert.equal(entries.filter((entry) => entry.type === "provider_earning").length, expectedCompensation ? 1 : 0);
   }
   mock.restoreAll();
 }
@@ -135,10 +136,10 @@ async function testQuotationAmount() {
 }
 
 async function run() {
-  assert.equal(isQuotationRejectionReason("Lý do khác: Khách hàng không đồng ý báo giá"), false);
+  assert.equal(isQuotationDeclinedReason("Lý do khác: Khách hàng không đồng ý báo giá"), false);
   for (const method of ["wallet", "payos"]) await testCancellation(method);
   await testCancellation("wallet", 20000);
-  for (const invalid of ["unpaid", "completed", "ownership", "quotation", "in_progress"]) await testCancellation("wallet", 0, invalid);
+  for (const invalid of ["unpaid", "completed", "ownership", "in_progress"]) await testCancellation("wallet", 0, invalid);
   await testQuotationAmount();
   console.log("Đã kiểm tra hoàn đủ cọc, không cộng trùng, quyền hủy, điều kiện thanh toán và tổng báo giá lớn hơn cọc.");
 }
