@@ -937,7 +937,6 @@ export const OrderService = {
         if (!order) throw new AppError("Đơn không thuộc về bạn hoặc không ở trạng thái đã nhận.", 409);
         if (["scheduled", "recurring"].includes(order.orderType)) {
           if (order.bookingStatus !== "confirmed") throw new AppError("Lịch hẹn chưa được thanh toán và xác nhận.", 409);
-          if (order.scheduledAt && order.scheduledAt.getTime() - 30 * 60000 > Date.now()) throw new AppError("Chỉ có thể bắt đầu trước giờ hẹn tối đa 30 phút.", 400);
         }
         if (!order.inspectionRequired && order.paymentMethod !== "cash" && order.paymentStatus !== "paid") throw new AppError("Đơn chưa được thanh toán thành công.", 409);
         let duration = order.schedule?.durationMinutes ?? calculateDuration(order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot, policy);
