@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Handigo - Xác nhận &amp; Thanh toán</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;1,600&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "secondary-fixed": "#abedff",
+            "on-surface": "#131b2e",
+            "on-primary": "#ffffff",
+            "on-secondary-fixed-variant": "#004e5c",
+            "on-primary-container": "#b1afff",
+            "tertiary": "#592000",
+            "surface-container-low": "#f2f3ff",
+            "surface-container-high": "#e1e7ff",
+            "secondary-fixed-dim": "#86d2e6",
+            "tertiary-fixed-dim": "#ffb694",
+            "secondary": "#00687a",
+            "outline-variant": "#c7c4d8",
+            "outline": "#777587",
+            "on-secondary": "#ffffff",
+            "tertiary-container": "#7d3000",
+            "surface-bright": "#faf8ff",
+            "surface-variant": "#dae2fc",
+            "secondary-container": "#9ce8fd",
+            "on-surface-variant": "#464555",
+            "surface": "#faf8ff",
+            "surface-dim": "#d2d9f4",
+            "on-error-container": "#93000a",
+            "surface-container-lowest": "#ffffff",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "primary": "#1e00a9",
+            "on-secondary-container": "#076a7c",
+            "surface-container": "#eaedff",
+            "inverse-primary": "#c3c0ff",
+            "primary-fixed-dim": "#c3c0ff",
+            "surface-tint": "#4d44e3",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "star-gold": "#facc15",
+            "on-primary-fixed": "#0f0069",
+            "inverse-surface": "#283044",
+            "on-tertiary-fixed": "#351000",
+            "inverse-on-surface": "#eef0ff",
+            "success-green": "#4ade80",
+            "on-error": "#ffffff",
+            "on-background": "#131b2e",
+            "background": "#faf8ff",
+            "error-container": "#ffdad6",
+            "surface-container-highest": "#dae2fc",
+            "on-tertiary-container": "#ff9f72",
+            "tertiary-fixed": "#ffdbcc",
+            "on-primary-fixed-variant": "#3323cc",
+            "on-tertiary": "#ffffff",
+            "on-secondary-fixed": "#001f26",
+            "primary-container": "#3525cd",
+            "error": "#ba1a1a",
+            "primary-fixed": "#e2dfff",
+            "on-tertiary-fixed-variant": "#7b2f00"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "gutter": "24px",
+            "sm": "12px",
+            "container-max": "1280px",
+            "base": "8px",
+            "xs": "4px",
+            "xl": "80px",
+            "lg": "48px",
+            "md": "24px"
+          },
+          "fontFamily": {
+            "headline-lg-mobile": ["Hanken Grotesk"],
+            "headline-xl": ["Hanken Grotesk"],
+            "headline-md": ["Hanken Grotesk"],
+            "body-lg": ["Inter"],
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "label-md": ["Inter"],
+            "label-sm": ["Inter"]
+          },
+          "fontSize": {
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex justify-center antialiased selection:bg-primary-fixed selection:text-primary">
+<!-- Mobile Screen Container -->
+<main class="w-full max-w-md bg-surface min-h-screen flex flex-col relative pb-32 shadow-xl border-x border-outline-variant/20">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-40 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md shadow-sm">
+<div class="flex justify-between items-center w-full px-4 py-3">
+<button aria-label="Quay lại" class="p-2 rounded-full hover:bg-surface-container transition-colors duration-150 active:scale-95 text-on-surface flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-primary text-2xl">arrow_back</span>
+</button>
+<div class="flex flex-col items-center text-center">
+<h1 class="text-headline-md font-headline-md font-bold text-on-surface tracking-tight">Xác nhận &amp; Thanh toán</h1>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+<span class="w-4 h-1.5 rounded-full bg-primary-container"></span>
+<span class="text-label-sm font-label-sm text-primary font-semibold ml-1">Bước 3/3</span>
+</div>
+</div>
+<button aria-label="Trợ giúp" class="p-2 rounded-full hover:bg-surface-container transition-colors duration-150 active:scale-95 text-on-surface-variant flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-xl">help_outline</span>
+</button>
+</div>
+</header>
+<!-- Scrollable Content Canvas -->
+<div class="px-4 py-4 space-y-4">
+<!-- Section 1: Thẻ tóm tắt thông tin dịch vụ -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 relative overflow-hidden">
+<div class="absolute -right-12 -top-12 w-32 h-32 bg-primary-fixed/40 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-start justify-between pb-3 border-b border-surface-container">
+<div class="flex items-center gap-2.5">
+<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-2xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">mode_fan</span>
+</div>
+<div>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-secondary-container/60 text-on-secondary-container mb-0.5">Dịch vụ tại nhà</span>
+<h2 class="text-label-md font-label-md font-bold text-on-surface leading-tight">
+                Vệ sinh máy lạnh treo tường (x2 máy) + Bơm gas R32
+              </h2>
+</div>
+</div>
+</div>
+<div class="pt-3 space-y-2.5">
+<div class="flex items-center gap-2.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-secondary text-lg">calendar_today</span>
+<span class="text-label-md font-label-md text-on-surface font-medium">10:30 - 12:00, Hôm nay 16/10/2024</span>
+</div>
+<div class="flex items-start gap-2.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-secondary text-lg mt-0.5 shrink-0">pin_drop</span>
+<div class="text-label-md font-label-md text-on-surface leading-snug">
+              Căn hộ 12A, Tháp B, Chung cư Sunrise City, Nguyễn Hữu Thọ, P. Tân Hưng, Q.7, TP. HCM
+            </div>
+</div>
+<div class="flex items-center gap-2.5 text-on-surface-variant pt-0.5">
+<span class="material-symbols-outlined text-secondary text-lg shrink-0">person_pin</span>
+<div class="text-label-md font-label-md text-on-surface">
+<span class="font-semibold text-on-surface">Trần Anh Tuấn</span>
+<span class="text-outline mx-1">•</span>
+<span class="font-medium text-on-surface-variant">0908 123 456</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Chọn Voucher Khuyến Mãi -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">confirmation_number</span>
+<span class="text-label-md font-label-md font-bold text-on-surface">Ưu đãi &amp; Khuyến mãi</span>
+</div>
+<button class="text-label-sm font-label-sm font-semibold text-primary hover:underline transition-all" type="button">
+            Chọn voucher khác
+          </button>
+</div>
+<!-- Voucher Applied Pill / Box -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-primary/20 relative">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-white flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg" data-weight="fill" style="font-variation-settings: 'FILL' 1;">local_offer</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-label-md font-label-md font-bold text-primary tracking-wide">HANDIGO20</span>
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-label-sm font-label-sm font-medium bg-primary-fixed text-on-primary-fixed">Đã áp dụng</span>
+</div>
+<p class="text-label-sm font-label-sm text-on-surface-variant mt-0.5">Giảm 20% đơn đầu tiên (-102.000đ)</p>
+</div>
+</div>
+<button aria-label="Xóa voucher" class="text-outline hover:text-error transition-colors p-1" type="button">
+<span class="material-symbols-outlined text-lg">cancel</span>
+</button>
+</div>
+</section>
+<!-- Section 3: Bảng kê chi tiết chi phí -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 space-y-3">
+<div class="flex items-center justify-between pb-2 border-b border-surface-container">
+<span class="text-label-md font-label-md font-bold text-on-surface">Chi tiết thanh toán</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Minh bạch 100%</span>
+</div>
+<div class="space-y-2 text-label-md font-label-md">
+<div class="flex justify-between items-center text-on-surface">
+<span class="text-on-surface-variant font-medium">Phí dịch vụ cố định (2 máy lạnh)</span>
+<span class="font-semibold">360.000đ</span>
+</div>
+<div class="flex justify-between items-center text-on-surface">
+<span class="text-on-surface-variant font-medium">Phụ phí vật tư (Bơm gas R32)</span>
+<span class="font-semibold">150.000đ</span>
+</div>
+<div class="flex justify-between items-center text-on-surface">
+<div class="flex items-center gap-1.5 text-on-surface-variant">
+<span>Phí nền tảng kết nối</span>
+<span class="material-symbols-outlined text-outline text-sm cursor-pointer" title="Phí duy trì và bảo hiểm vận hành">info</span>
+</div>
+<span class="text-secondary font-semibold">0đ (Miễn phí)</span>
+</div>
+<div class="flex justify-between items-center text-on-surface">
+<span class="text-primary font-medium">Khuyến mãi voucher (HANDIGO20)</span>
+<span class="text-primary font-bold">-102.000đ</span>
+</div>
+</div>
+<div class="pt-2 border-t border-surface-container flex justify-between items-center">
+<span class="text-label-md font-label-md font-bold text-on-surface">Tổng thanh toán</span>
+<div class="text-right">
+<span class="text-headline-md font-headline-md font-bold text-primary-container leading-none">408.000đ</span>
+<span class="block text-label-sm font-label-sm text-outline font-normal">Đã bao gồm VAT</span>
+</div>
+</div>
+<!-- Hộp lưu ý minh bạch màu xanh lam nhạt -->
+<div class="mt-3 p-3 rounded-lg bg-surface-container-low border border-secondary/20 flex items-start gap-2.5">
+<span class="material-symbols-outlined text-secondary text-lg shrink-0 mt-0.5">verified_user</span>
+<p class="text-label-sm font-label-sm text-on-secondary-fixed-variant leading-relaxed">
+            Chi phí sửa chữa phát sinh (nếu có) sẽ được thợ thông báo rõ ràng tại nhà và không tính trong hóa đơn này.
+          </p>
+</div>
+</section>
+<!-- Section 4: Chọn phương thức thanh toán -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30">
+<h3 class="text-label-md font-label-md font-bold text-on-surface mb-3 flex items-center justify-between">
+<span>Phương thức thanh toán</span>
+<span class="text-label-sm font-label-sm text-secondary font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">lock</span> Bảo mật SSL
+          </span>
+</h3>
+<div class="space-y-2.5">
+<!-- Ví Handigo (Mặc định được chọn) -->
+<label class="flex items-center justify-between p-3 rounded-lg border-2 border-primary-container bg-primary-fixed/20 cursor-pointer transition-all">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm shrink-0">
+<span class="material-symbols-outlined text-xl">account_balance_wallet</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-label-md font-label-md font-bold text-on-surface">Ví Handigo</span>
+<span class="px-2 py-0.2 rounded-full text-label-sm font-label-sm bg-success-green/20 text-on-surface font-semibold">Khuyên dùng</span>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant font-medium mt-0.5">
+                  Số dư khả dụng: <span class="font-bold text-primary">850.000đ</span>
+</div>
+</div>
+</div>
+<div class="relative flex items-center justify-center">
+<input checked="" class="w-5 h-5 text-primary-container focus:ring-primary border-outline accent-primary-container" name="payment_method" type="radio"/>
+</div>
+</label>
+<!-- Cổng VNPay -->
+<label class="flex items-center justify-between p-3 rounded-lg border border-outline-variant/40 hover:border-primary/40 bg-surface-bright cursor-pointer transition-all">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/30">
+<span class="material-symbols-outlined text-primary text-xl">qr_code_scanner</span>
+</div>
+<div>
+<span class="text-label-md font-label-md font-semibold text-on-surface block">Cổng thanh toán VNPAY</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Quét mã QR Pay / ATM Nội địa</span>
+</div>
+</div>
+<input class="w-5 h-5 text-primary-container focus:ring-primary border-outline accent-primary-container" name="payment_method" type="radio"/>
+</label>
+<!-- PayOS / VietQR -->
+<label class="flex items-center justify-between p-3 rounded-lg border border-outline-variant/40 hover:border-primary/40 bg-surface-bright cursor-pointer transition-all">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/30">
+<span class="material-symbols-outlined text-secondary text-xl">sync_alt</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-label-md font-label-md font-semibold text-on-surface">PayOS / VietQR</span>
+<span class="text-label-sm font-label-sm text-secondary font-semibold">Tức thì</span>
+</div>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Chuyển khoản liên ngân hàng 24/7</span>
+</div>
+</div>
+<input class="w-5 h-5 text-primary-container focus:ring-primary border-outline accent-primary-container" name="payment_method" type="radio"/>
+</label>
+<!-- Thẻ quốc tế -->
+<label class="flex items-center justify-between p-3 rounded-lg border border-outline-variant/40 hover:border-primary/40 bg-surface-bright cursor-pointer transition-all">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/30">
+<span class="material-symbols-outlined text-on-surface text-xl">credit_card</span>
+</div>
+<div>
+<span class="text-label-md font-label-md font-semibold text-on-surface block">Thẻ tín dụng / Ghi nợ quốc tế</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Hỗ trợ Visa, MasterCard, JCB</span>
+</div>
+</div>
+<input class="w-5 h-5 text-primary-container focus:ring-primary border-outline accent-primary-container" name="payment_method" type="radio"/>
+</label>
+</div>
+</section>
+<!-- Section 5: Cam kết dịch vụ & An tâm -->
+<section class="bg-surface-container/60 rounded-xl p-3.5 border border-outline-variant/20">
+<h4 class="text-label-sm font-label-sm font-bold text-on-surface-variant uppercase tracking-wider mb-2.5">
+          Quyền lợi khách hàng Handigo
+        </h4>
+<div class="grid grid-cols-1 gap-2">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-success-green text-lg shrink-0" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-label-sm font-label-sm text-on-surface font-medium">Hoàn tiền 100% nếu không hài lòng chất lượng</span>
+</div>
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-success-green text-lg shrink-0" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-label-sm font-label-sm text-on-surface font-medium">Bảo hành dịch vụ 30 ngày cho mọi linh kiện &amp; công thợ</span>
+</div>
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-success-green text-lg shrink-0" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-label-sm font-label-sm text-on-surface font-medium">Kỹ thuật viên đã kiểm duyệt lý lịch &amp; tay nghề kỹ thuật</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Sticky Bottom Bar (Thanh toán) -->
+<div class="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none">
+<div class="w-full max-w-md bg-surface/90 dark:bg-inverse-surface/90 backdrop-blur-md shadow-lg border-t-0 p-4 pointer-events-auto flex items-center justify-between gap-4">
+<!-- Cột trái: Tổng chi phí & ghi chú -->
+<div class="flex flex-col">
+<div class="text-label-sm font-label-sm text-on-surface-variant font-medium">Tổng thanh toán</div>
+<div class="text-headline-md font-headline-md font-bold text-primary leading-none tracking-tight">408.000đ</div>
+<div class="inline-flex items-center gap-1 text-label-sm font-label-sm text-secondary font-semibold mt-1">
+<span class="material-symbols-outlined text-sm">savings</span>
+<span>Đã tiết kiệm 102.000đ</span>
+</div>
+</div>
+<!-- Nút CTA thanh toán chính -->
+<button class="flex-1 max-w-[210px] h-12 bg-primary-container text-white font-label-md font-bold rounded-xl flex items-center justify-center gap-2 shadow-md hover:bg-primary transition-all active:scale-95 duration-150" type="button">
+<span>Thanh toán ngay</span>
+<span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+</body></html>

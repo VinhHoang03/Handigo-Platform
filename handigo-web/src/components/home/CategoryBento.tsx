@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import { CategoryIcon } from "../common/CategoryIcon";
+import { ReliableImage } from "../common/ReliableImage";
 import "./home-motion.css";
 import type { CategoryShowcaseItem } from "@/features/home/hooks/useCategoryShowcase";
 
@@ -10,7 +11,20 @@ export const CategoryBento = ({ items }: { items: CategoryShowcaseItem[] }) => (
       <Link key={item.id} to={`/customer/services?categoryId=${item.id}`} className="home-category-card group flex min-w-0 flex-col overflow-hidden rounded-2xl transition-colors hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary">
         <div aria-hidden="true" className="home-category-art">
           <span className="home-category-object">
-            <CategoryIcon icon={item.icon} name={item.name} className="h-8 w-8 sm:h-11 sm:w-11" strokeWidth={1.4} />
+            {item.image ? (
+              <ReliableImage
+                src={item.image}
+                alt=""
+                className="h-full w-full rounded-[inherit] object-cover"
+              />
+            ) : (
+              <CategoryIcon
+                icon={item.icon}
+                name={item.name}
+                className="h-8 w-8 sm:h-11 sm:w-11"
+                strokeWidth={1.4}
+              />
+            )}
           </span>
           <Sparkles className="home-category-sparkle" size={20} strokeWidth={1.4} />
           <span className="home-category-dot" />
