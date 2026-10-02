@@ -8,7 +8,7 @@ const paymentReply = (result: unknown) => {
   return { message: payment.message, state: "WAITING_USER_INPUT" as const, retryable: payment.status === "blocked" };
 };
 export const createPaymentTool: AgentTool<{ orderId: string; method: "PAYOS" | "WALLET" | "CASH" }> = {
-  name: "create_payment", description: "Thanh toán đơn đã tạo. PAYOS: chuyển khoản; WALLET: trừ ví; CASH: ghi nhận tiền mặt. Luôn cần xác nhận riêng. Số tiền do backend tính. Lịch hẹn phải được chuyên gia xác nhận. Không hỗ trợ thu phần báo giá còn lại.",
+  name: "create_payment", description: "Thanh toán riêng cho đơn đã có, cần xác nhận số tiền và phương thức. PAYOS: chuyển khoản; WALLET: trừ ví; CASH: ghi nhận tiền mặt. Đơn đặt ngay vừa xác nhận được backend tự thanh toán, không gọi lại tool này. Số tiền do backend tính. Lịch hẹn phải được chuyên gia xác nhận. Không hỗ trợ thu phần báo giá còn lại.",
   inputSchema: z.object({ orderId: idSchema, method: z.enum(["PAYOS", "WALLET", "CASH"]) }).strict(),
   mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
   preview: (context, args) => AgentPaymentService.preview(context.user, args),

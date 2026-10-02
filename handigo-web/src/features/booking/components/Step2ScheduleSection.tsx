@@ -2,7 +2,6 @@ import type { ProviderAvailabilityStatus } from '@/features/customer-service/com
 import { Step2OrderTypeSelector } from './Step2OrderTypeSelector';
 import { Step2RecurrenceFieldset } from './Step2RecurrenceFieldset';
 import { Step2DateFieldset } from './Step2DateFieldset';
-import { Step2TimeSlotFieldset } from './Step2TimeSlotFieldset';
 import { Step2RecurringPreview } from './Step2RecurringPreview';
 import { Step2ProviderFieldset } from './Step2ProviderFieldset';
 import type { RecurrenceCount } from './step2Helpers';
@@ -62,7 +61,7 @@ export const Step2ScheduleSection = ({
               <p className="text-sm font-bold text-on-surface">Đặt trước chuyên gia theo lịch của bạn</p>
               <p className="mt-1 text-xs leading-5 text-on-surface-variant">
                 Chọn thời gian trước để Handigo chỉ hiển thị những chuyên gia còn lịch trống.
-                Bạn chưa cần thanh toán ở bước này.
+                Thông tin lịch hẹn được cập nhật trong tóm tắt đơn hàng.
               </p>
             </div>
           </div>
@@ -84,11 +83,6 @@ export const Step2ScheduleSection = ({
               todayInputValue={todayInputValue}
               upcomingDates={upcomingDates}
               onSelectDate={onSelectDate}
-            />
-
-            <Step2TimeSlotFieldset
-              stepNumber={2 + recurrenceStepOffset}
-              scheduledAt={scheduledAt}
               currentTimestamp={currentTimestamp}
               error={scheduledAtError}
               onSelectSlot={onSelectSlot}
@@ -97,7 +91,7 @@ export const Step2ScheduleSection = ({
             {orderType === 'recurring' && <Step2RecurringPreview dates={recurringPreviewDates} />}
 
             <Step2ProviderFieldset
-              stepNumber={3 + recurrenceStepOffset}
+              stepNumber={2 + recurrenceStepOffset}
               serviceId={serviceId}
               addressId={addressId}
               scheduledAt={scheduledAt?.includes('T') ? scheduledAt : undefined}

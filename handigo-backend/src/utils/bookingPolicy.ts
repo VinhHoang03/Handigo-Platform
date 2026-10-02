@@ -3,16 +3,13 @@ import type { BookingPolicy } from "../validations/bookingPolicy.validator";
 const VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 export const getEarliestScheduledAt = (now = new Date()) => {
-  const vietnamNow = new Date(now.getTime() + VIETNAM_OFFSET_MS);
-  return new Date(Date.UTC(
-    vietnamNow.getUTCFullYear(),
-    vietnamNow.getUTCMonth(),
-    vietnamNow.getUTCDate() + 1,
-    1,
-    0,
-    0,
-    0,
-  ));
+  const earliest = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const vietnamTime = new Date(earliest.getTime() + VIETNAM_OFFSET_MS);
+  if (vietnamTime.getUTCHours() < 8) {
+    vietnamTime.setUTCHours(8, 0, 0, 0);
+    return new Date(vietnamTime.getTime() - VIETNAM_OFFSET_MS);
+  }
+  return earliest;
 };
 
 export const calculateImmediateFee = (amount: number, inspection: boolean, orderType: string, policy: BookingPolicy) => {
@@ -36,7 +33,7 @@ export const calculateBookingSettlement = (paidAmount: number, fee: number, comm
 export const calculateDuration = (
   serviceId: string,
   inspection: boolean,
-  options: Array<{ optionId: { toString(): string }; quantity?: number }>,
+  options: Array<{ optionId: { toString(): string } | null; quantity?: number }>,
   policy: BookingPolicy,
 ) => {
   const service = policy.services[serviceId];
@@ -45,6 +42,7 @@ export const calculateDuration = (
   let extra = 0;
   const replacements: number[] = [];
   for (const option of options) {
+    if (!option.optionId) continue;
     const rule = policy.options[option.optionId.toString()];
     if (!rule) continue;
     const time = rule.minutes * (option.quantity ?? 1);

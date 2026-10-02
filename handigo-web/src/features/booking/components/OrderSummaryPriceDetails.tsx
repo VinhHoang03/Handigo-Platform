@@ -4,7 +4,6 @@ import type { Service, ServiceOption } from '../../../types/booking';
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
 interface OrderSummaryPriceDetailsProps {
-  immediateFee?: number;
   depositAmount?: number;
   service: Service | null;
   selectedOptions: ServiceOption[];
@@ -24,7 +23,6 @@ export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> =
   finalTotal,
   discountAmount,
   summaryContent,
-  immediateFee = 0,
   depositAmount,
 }) => (
   <>
@@ -50,7 +48,6 @@ export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> =
           )}
         </div>
       ))}
-      {immediateFee > 0 && <div className="flex justify-between"><span>Phí phục vụ ngay</span><span className="font-medium">{immediateFee.toLocaleString('vi-VN')}đ</span></div>}
     </div>
 
     <div className="pt-md border-t border-outline-variant flex justify-between items-center">

@@ -1,5 +1,6 @@
 import type { FormEvent, ReactNode } from 'react';
 import { CircleAlert } from 'lucide-react';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { Modal } from '@/components/common/Modal';
 import type { Category } from '../../types/categoryService.types';
 import { ImageInput } from './ImageInput';
@@ -74,7 +75,8 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
               </span>
               <select
                 name="service-price-type"
-                value={form.serviceType}
+                value={isAirConditionerCleaning(form) ? 'fixed_price' : form.serviceType}
+                disabled={isAirConditionerCleaning(form)}
                 onChange={(event) => onChange({ ...form, serviceType: event.target.value as ServiceForm['serviceType'] })}
                 className="w-full rounded-xl border border-outline-variant bg-surface p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
@@ -82,6 +84,15 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
                 <option value="variable_price">Giá linh hoạt</option>
               </select>
             </label>
+            {isAirConditionerCleaning(form) && (
+              <FormInput label="Đơn giá mỗi máy (VNĐ)" name="service-fixed-price" type="number" required
+                value={form.fixedPrice} onChange={(value) => onChange({ ...form, fixedPrice: value, serviceType: 'fixed_price' })} />
+            )}
+            {!isAirConditionerCleaning(form) && form.serviceType === 'fixed_price' && (
+              <p className="rounded-lg bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
+                Giá dịch vụ được tính từ các tùy chọn bên dưới, không sử dụng giá cơ bản.
+              </p>
+            )}
             {form.serviceType === 'variable_price' && (
               <FormInput
                 label="Tiền đặt cọc (VNĐ)"

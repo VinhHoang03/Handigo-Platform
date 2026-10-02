@@ -2,7 +2,7 @@ import axios from 'axios';
 
 /** Hằng số & hàm thuần cho CreateBookingStep2Page — tách ra để trang chính giữ dưới 200 dòng. */
 
-export const timeSlots = Array.from({ length: 10 }, (_, index) => {
+export const timeSlots = Array.from({ length: 14 }, (_, index) => {
   const startHour = 8 + index;
   return `${String(startHour).padStart(2, '0')}:00`;
 });
@@ -28,22 +28,20 @@ export const getUploadErrorMessage = (error: unknown) => {
 };
 
 export const getEarliestScheduledAt = (now = new Date()) => {
-  const earliest = new Date(now);
-  earliest.setDate(earliest.getDate() + 1);
-  earliest.setHours(8, 0, 0, 0);
+  const earliest = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  if (earliest.getHours() < 8) earliest.setHours(8, 0, 0, 0);
   return earliest;
 };
 
-export const getTodayInputValue = () => {
-  const earliest = getEarliestScheduledAt();
-  const timezoneOffset = earliest.getTimezoneOffset() * 60000;
-  return new Date(earliest.getTime() - timezoneOffset).toISOString().split('T')[0];
+export const getTodayInputValue = (now = new Date()) => {
+  const timezoneOffset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - timezoneOffset).toISOString().split('T')[0];
 };
 
-export const getUpcomingDates = () =>
+export const getUpcomingDates = (now = new Date()) =>
   Array.from({ length: 14 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() + index + 1);
+    const date = new Date(now);
+    date.setDate(date.getDate() + index);
     const timezoneOffset = date.getTimezoneOffset() * 60000;
     return {
       value: new Date(date.getTime() - timezoneOffset).toISOString().split('T')[0],

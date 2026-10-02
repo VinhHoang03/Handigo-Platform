@@ -18,7 +18,7 @@ interface QuotationOrderPanelProps {
   onComplete: (files: File[], note: string) => void | Promise<void>;
 }
 
-/** Nhánh đơn dịch vụ yêu cầu khảo sát: báo giá, chờ khách xác nhận lịch, hoặc thao tác thực hiện. */
+/** Nhánh đơn dịch vụ yêu cầu khảo sát: báo giá hoặc thao tác thực hiện. */
 export function QuotationOrderPanel({
   order,
   quotation,
@@ -80,7 +80,7 @@ export function QuotationOrderPanel({
           </div>
           {quotation.quotation.status === 'approved' && (
             <div className="rounded-2xl bg-success-container p-3 text-sm text-on-success-container">
-              <p className="font-bold">Khách hàng đã đồng ý báo giá</p>
+              <p className="font-bold">Báo giá đã được chấp thuận tự động</p>
               <p className="mt-1 text-on-success-container">
                 {order.status === 'accepted'
                   ? 'Bạn có thể bắt đầu công việc ngay, không cần chờ khách hàng thanh toán.'
@@ -104,6 +104,7 @@ export function QuotationOrderPanel({
       {showQuotationForm && (
         <div className="h-full lg:col-span-2">
           <RepairQuotationForm
+            depositAmount={order.depositAmount}
             appliedDepositAmount={appliedDepositAmount}
             defaultDurationMinutes={order.schedule?.durationMinutes}
             orderId={order._id}
@@ -113,6 +114,12 @@ export function QuotationOrderPanel({
             busy={busy}
           />
         </div>
+      )}
+
+      {quotation && order.status === 'accepted' && !showQuotationForm && (
+        <button type="button" disabled={busy} onClick={onCancel} className="btn-secondary text-error">
+          Hủy đơn dịch vụ
+        </button>
       )}
 
       {!isUnconfirmedAppointment && !quotation && !showQuotationForm && (

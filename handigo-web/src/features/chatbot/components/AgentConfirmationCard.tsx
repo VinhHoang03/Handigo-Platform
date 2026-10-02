@@ -1,8 +1,11 @@
 import type { AgentConfirmation } from "../types/agent.types";
 import { ClipboardCheck, Clock3 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 const labels: Record<string, string> = {
   service: "Dịch vụ", options: "Tùy chọn", address: "Địa chỉ", schedule: "Thời gian",
+  unitPrice: "Đơn giá", quantity: "Số lượng",
   paymentMethod: "Thanh toán", amount: "Số tiền", description: "Mô tả",
   orderCode: "Mã đơn", reason: "Lý do hủy", paidAmount: "Đã thanh toán",
   refundAmount: "Dự kiến hoàn", cancellationFee: "Phí hủy", note: "Lưu ý",
@@ -13,6 +16,7 @@ const labels: Record<string, string> = {
 const paymentLabels: Record<string, string> = { cash: "Tiền mặt", bank: "Chuyển khoản", wallet: "Ví Handigo" };
 function formatValue(key: string, value: unknown) {
   if (value == null) return "";
+  if (key === "quantity" && typeof value === "number") return value.toLocaleString("vi-VN");
   if (typeof value === "number") return `${value.toLocaleString("vi-VN")} đ`;
   if (Array.isArray(value)) return value.filter((item) => typeof item === "string").join("\n");
   if (key === "paymentMethod") return paymentLabels[String(value)] ?? String(value);
@@ -22,16 +26,35 @@ function formatValue(key: string, value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
-export function AgentConfirmationCard({ action, disabled, onDecision }: {
+export function AgentConfirmationCard({ action, disabled, onDecision, readOnly = false }: {
   action: AgentConfirmation; disabled: boolean;
-  onDecision: (decision: "CONFIRM" | "REJECT") => void;
+  readOnly?: boolean;
+  onDecision?: (decision: "CONFIRM" | "REJECT") => void;
 }) {
+  const [now, setNow] = useState(() => Date.now());
+  const expired = Date.parse(action.expiresAt) <= now;
+  useEffect(() => {
+    if (readOnly || expired) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [readOnly, expired]);
+  const statusLabels = {
+    WAITING_CONFIRMATION: "Bản xem trước đã lưu", EXECUTING: "Đang tạo đơn",
+    SUCCEEDED: "Đã tạo đơn", REJECTED: "Đã từ chối", EXPIRED: "Bản xác nhận đã hết hiệu lực",
+    UNKNOWN: "Kết quả tạo đơn cần được kiểm tra",
+  };
   return <section aria-label="Xác nhận thao tác" className="overflow-hidden rounded-2xl border border-primary/20 bg-surface-container-lowest text-sm text-on-surface shadow-sm">
     <div className="flex items-start gap-3 border-b border-outline-variant/30 bg-primary/5 p-4">
       <ClipboardCheck aria-hidden="true" size={20} className="mt-0.5 shrink-0 text-primary" />
       <div>
         <h3 className="font-semibold">{String(action.preview.title ?? "Xác nhận thao tác")}</h3>
-        <p className="mt-1 text-xs leading-5 text-on-surface-variant">Kiểm tra thông tin trước khi xác nhận.</p>
+        <p className="mt-1 text-xs leading-5 text-on-surface-variant">{!readOnly && expired
+          ? "Bản xác nhận đã hết hạn. Kiểm tra lại thông tin trước khi tiếp tục."
+          : readOnly
+          ? statusLabels[action.status ?? "WAITING_CONFIRMATION"]
+          : action.tool === "create_booking"
+            ? "Kiểm tra thông tin trước khi xác nhận. Bạn có thể nhắn thông tin cần sửa."
+            : "Kiểm tra thông tin trước khi xác nhận."}</p>
       </div>
     </div>
     <dl className="space-y-3 p-4">
@@ -43,12 +66,16 @@ export function AgentConfirmationCard({ action, disabled, onDecision }: {
         </div> : null;
       })}
     </dl>
-    <div className="border-t border-outline-variant/30 p-4">
+    {action.booking && <div className="border-t border-outline-variant/30 p-4">
+      <p className="mb-2 text-xs text-on-surface-variant">Mã đơn: {action.booking.orderCode ?? action.booking.orderId}</p>
+      <Link className="font-medium text-primary underline" to={`/customer/bookings/${action.booking.orderId}`}>Xem đơn và trạng thái hiện tại</Link>
+    </div>}
+    {!readOnly && onDecision && <div className="border-t border-outline-variant/30 p-4">
       <p className="flex items-center gap-1.5 text-xs leading-5 text-on-surface-variant"><Clock3 size={14} aria-hidden="true" />Có hiệu lực đến {new Date(action.expiresAt).toLocaleTimeString("vi-VN")}.</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button type="button" disabled={disabled} onClick={() => onDecision("REJECT")} className="min-h-11 rounded-xl border border-outline-variant px-3 py-2 font-medium hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">Từ chối</button>
-        <button type="button" disabled={disabled} onClick={() => onDecision("CONFIRM")} className="min-h-11 rounded-xl bg-primary px-3 py-2 font-medium text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">Xác nhận</button>
+        <button type="button" disabled={disabled} onClick={() => onDecision("CONFIRM")} className="min-h-11 rounded-xl bg-primary px-3 py-2 font-medium text-on-primary hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50">{expired ? "Kiểm tra lại thông tin" : "Xác nhận"}</button>
       </div>
-    </div>
+    </div>}
   </section>;
 }

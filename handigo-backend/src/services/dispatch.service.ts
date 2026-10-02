@@ -331,7 +331,7 @@ async function sendDirectProviderRequest(
   const assignment = await OrderAssignment.create({
     orderId: new Types.ObjectId(orderId),
     providerId: candidate.providerId,
-    assignmentType: "direct_request",
+    assignmentType: ctx.scheduledDates?.length ? "appointment" : "direct_request",
     status: "pending",
     assignedAt: new Date(),
     responseDeadline: deadline,
@@ -373,7 +373,7 @@ async function sendDirectProviderRequest(
 export const DispatchService = {
   /**
    * Khởi động matching đúng một lần sau khi đơn đã đủ điều kiện thanh toán
-   * để thợ có thể xác nhận lịch hẹn ngay sau khi khách thanh toán.
+   * cho cả đơn đặt ngay và lịch hẹn.
    */
   async dispatchReadyOrder(orderId: string): Promise<void> {
     const order = await Order.findOne({
@@ -416,7 +416,7 @@ export const DispatchService = {
         ...ctx,
         onlyProviderId: claimedOrder.preferredProviderId,
         limit: 1,
-        requireOnline: !ctx.scheduledDates?.length,
+        requireOnline: true,
       });
       const preferredCandidate = preferredCandidates[0];
       if (preferredCandidate) {
@@ -477,7 +477,7 @@ export const DispatchService = {
       matchingBatchSize,
     } = await getMatchingConfig();
     let order = await Order.findById(orderId).select(
-      "status createdAt matchingStartedAt reassignment",
+      "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment",
     );
     if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId) return;
     if (!order.matchingSearch) {
@@ -486,9 +486,11 @@ export const DispatchService = {
         { $set: { matchingSearch: await createMatchingSearch(order.matchingStartedAt || new Date()) } },
         { runValidators: true },
       );
-      order = await Order.findById(orderId).select("status matchingSearch");
+      order = await Order.findById(orderId).select(
+        "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment",
+      );
     }
-    if (!order || order.status !== "created" || !order.matchingSearch) return;
+    if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId || !order.matchingSearch) return;
     const stage = getMatchingSearchStage(order.matchingSearch);
     if (stage.expired) {
       await cancelUnmatchedOrder(orderId,
@@ -538,7 +540,6 @@ export const DispatchService = {
       );
     const batchNumber = Math.floor(triedProviderIds.length / matchingBatchSize) + 1;
 
-    const isScheduledDispatch = Boolean(ctx.scheduledDates?.length);
     const matchingOptions = {
       latitude: ctx.latitude,
       longitude: ctx.longitude,
@@ -551,19 +552,11 @@ export const DispatchService = {
       scheduleIntervals: ctx.scheduleIntervals,
     };
 
-    // Lịch hẹn ưu tiên provider đang online để khách không phải chờ lâu.
-    // Chỉ mở rộng sang provider offline khi hiện không có provider online phù hợp.
+    // Mọi loại đơn đều chỉ được điều phối cho provider đang online.
     let candidates: ProviderCandidate[] = await MatchingService.findNearestProviders({
       ...matchingOptions,
       requireOnline: true,
     });
-    if (isScheduledDispatch && candidates.length === 0) {
-      candidates = await MatchingService.findNearestProviders({
-        ...matchingOptions,
-        requireOnline: false,
-      });
-    }
-
     // Bộ quét định kỳ tìm lại thợ vừa trực tuyến và khôi phục sau khởi động lại.
     if (candidates.length === 0 || stage.deadline.getTime() <= Date.now()) return;
 
@@ -710,9 +703,6 @@ export const DispatchService = {
     if (timeoutMonitor) return;
 
     const scan = async (recoverStalledOrders = false) => {
-      const {
-        maxMatchingDurationSeconds,
-      } = await getMatchingConfig();
       const now = new Date();
       const overdueHours = Math.max(await getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24), 1);
       const overdueOrders = await Order.find({
@@ -955,7 +945,7 @@ export async function getMatchingMapProviders(orderId: string, customerId: strin
     maxDistanceMeters: stage.radiusKm * 1000,
     limit: Number.MAX_SAFE_INTEGER,
     excludeProviderIds: tried.triedProviderIds,
-    requireOnline: !ctx.scheduledDates?.length,
+    requireOnline: true,
   });
   return {
     radiusKm: stage.radiusKm,

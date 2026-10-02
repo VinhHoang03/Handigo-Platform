@@ -11,6 +11,7 @@ import {
   type AdministrativeUnit,
 } from "@/features/customer/api/vietnamAddress.api";
 import {
+  findAdministrativeUnitInAddress,
   findAdministrativeUnitByName,
   type AddressFormState,
 } from "@/features/profile/utils/addressBookForm.utils";
@@ -46,17 +47,18 @@ export function useAddressGeocoding({
       setProvinces(provinceSource);
     }
 
-    const matchedProvince = findAdministrativeUnitByName(
-      provinceSource,
-      currentAddress.province,
-    );
+    const matchedProvince =
+      findAdministrativeUnitByName(provinceSource, currentAddress.province) ||
+      findAdministrativeUnitInAddress(
+        provinceSource,
+        currentAddress.fullAddress,
+      );
     const wardSource = matchedProvince
       ? await getWardsByProvince(matchedProvince.code)
       : [];
-    const matchedWard = findAdministrativeUnitByName(
-      wardSource,
-      currentAddress.ward,
-    );
+    const matchedWard =
+      findAdministrativeUnitByName(wardSource, currentAddress.ward) ||
+      findAdministrativeUnitInAddress(wardSource, currentAddress.fullAddress);
 
     setAddressForm((current) => ({
       ...current,

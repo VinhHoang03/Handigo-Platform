@@ -59,7 +59,7 @@ export const Step2ExecutionInfoSection = ({
             id="problem-description"
             name="problemDescription"
             autoComplete="off"
-            className="w-full p-sm rounded-2xl border border-outline-variant focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10 outline-none min-h-[150px] text-body-md bg-surface-container-lowest"
+            className="w-full p-sm rounded-xl border border-outline-variant focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10 outline-none min-h-[128px] text-body-md bg-surface-container-lowest"
             placeholder="Ghi chú chi tiết về tình trạng hoặc yêu cầu cụ thể…"
             value={problemDescription || ''}
             onChange={(event) => onChangeProblemDescription(event.target.value)}

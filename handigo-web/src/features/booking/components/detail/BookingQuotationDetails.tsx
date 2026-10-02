@@ -11,7 +11,6 @@ type BookingQuotationDetailsProps = {
   busy: boolean;
   appliedDepositAmount: number;
   remainingQuotationAmount: number;
-  onConfirm: () => void;
   onReject: () => void;
 };
 
@@ -21,7 +20,6 @@ export const BookingQuotationDetails = ({
   busy,
   appliedDepositAmount,
   remainingQuotationAmount,
-  onConfirm,
   onReject,
 }: BookingQuotationDetailsProps) => (
   <>
@@ -139,23 +137,13 @@ export const BookingQuotationDetails = ({
           >
             Từ chối
           </button>
-          <button
-            disabled={busy}
-            onClick={onConfirm}
-            className="px-8 py-3 bg-primary text-on-primary rounded-2xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
-          >
-            {busy && (
-              <div className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
-            )}
-            Đồng ý báo giá
-          </button>
         </div>
       )}
     </div>
 
     {quotation.quotation.status === "approved" && (
       <div className="mt-md rounded-3xl border border-success/30 bg-success-container p-md text-on-success-container">
-        <p className="font-bold">Bạn đã đồng ý báo giá</p>
+        <p className="font-bold">Báo giá đã được chấp thuận</p>
         <p className="mt-1 text-sm text-on-success-container">
           Chuyên gia có thể bắt đầu thực hiện công việc ngay, không cần chờ thanh toán.
         </p>

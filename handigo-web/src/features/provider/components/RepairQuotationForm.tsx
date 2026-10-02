@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { CircleAlert, ScanLine, TriangleAlert, UploadCloud } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { getErrorMessage } from '@/utils/apiError';
@@ -13,8 +13,10 @@ import { getDirectRepairPayment } from '@/utils/quotationPayment';
 import { QuotationItemRow } from './orders/QuotationItemRow';
 import { QuotationNotesFields } from './orders/QuotationNotesFields';
 import type { QuotationFormItem } from './orders/quotationForm.types';
+import { QuotationAgentPanel } from './orders/QuotationAgentPanel';
+import type { QuotationAgentResult, QuotationHistoryItem, QuotationFields } from '../types/quotationAgent.types';
 
-const emptyItem: QuotationFormItem = {
+const emptyItem: QuotationFields = {
   title: '',
   description: '',
   itemType: 'labor',
@@ -24,6 +26,7 @@ const emptyItem: QuotationFormItem = {
 };
 
 const MAX_QUOTATION_ITEMS = 100;
+const newItem = (): QuotationFormItem => ({ ...emptyItem, rowId: crypto.randomUUID() });
 const MAX_ITEMS_PER_ADD = 20;
 const MAX_SCAN_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_GENERAL_TEXT_LENGTH = 2000;
@@ -39,6 +42,7 @@ const isEmptyItem = (item: QuotationFormItem) =>
   item.unitPrice === 0;
 
 interface RepairQuotationFormProps {
+  depositAmount?: number;
   appliedDepositAmount?: number;
   defaultDurationMinutes?: number;
   orderId: string;
@@ -54,6 +58,7 @@ const isBlockedEvaluation = (evaluation: QuotationRelevanceEvaluation) =>
 
 export function RepairQuotationForm({
   appliedDepositAmount = 0,
+  depositAmount = appliedDepositAmount,
   orderId,
   serviceName,
   onSubmit,
@@ -64,7 +69,11 @@ export function RepairQuotationForm({
   const [inspectionNote, setInspectionNote] = useState('');
   const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState(defaultDurationMinutes ?? 60);
   const [recommendation, setRecommendation] = useState('');
-  const [items, setItems] = useState([{ ...emptyItem }]);
+  const [items, setItems] = useState<QuotationFormItem[]>(() => [newItem()]);
+  const revision = useRef(0);
+  const [formRevision, setFormRevision] = useState(0);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [undo, setUndo] = useState<{ items: QuotationFormItem[]; inspectionNote: string; recommendation: string; revision: number } | null>(null);
   const [itemCountToAdd, setItemCountToAdd] = useState("1");
   const [isScanningImage, setIsScanningImage] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -77,9 +86,53 @@ export function RepairQuotationForm({
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
+  const changed = () => { revision.current++; setFormRevision(revision.current); setUndo(null); setRelevance(null); };
+
+  const applyAgent = (result: QuotationAgentResult) => {
+    if (result.revision !== revision.current || busy || isValidatingRelevance || isScanningImage) return false;
+    const previous = { items, inspectionNote, recommendation };
+    const next = [...items];
+    for (const update of result.updates) {
+      const target = update.rowId ? next.findIndex((item) => item.rowId === update.rowId) : next.findIndex(isEmptyItem);
+      const source = result.sources.find((item) => item.id === update.historyId);
+      if (target >= 0) next[target] = { ...next[target], ...update.fields,
+        historySource: update.fields.unitPrice !== undefined ? source : next[target].historySource };
+      else if (!update.rowId) next.push({ ...newItem(), ...update.fields, historySource: source });
+      else return false;
+    }
+    if (next.length > MAX_QUOTATION_ITEMS) return false;
+    changed(); setItems(next);
+    if (result.inspectionNote !== undefined) setInspectionNote(result.inspectionNote);
+    if (result.recommendation !== undefined) setRecommendation(result.recommendation);
+    setUndo({ ...previous, revision: revision.current });
+    return true;
+  };
+
+  const applyHistory = (rowId: string, expectedTitle: string, source: QuotationHistoryItem) => {
+    const item = items.find((entry) => entry.rowId === rowId);
+    if (!item || item.title !== expectedTitle || busy || isValidatingRelevance) return;
+    const manual = new Set(item.manualFields);
+    const patch: Partial<QuotationFormItem> = { title: source.title };
+    if (!manual.has('itemType')) patch.itemType = source.itemType;
+    if (!item.description && !manual.has('description')) patch.description = source.description;
+    if (!item.unitPrice && !manual.has('unitPrice')) { patch.unitPrice = source.unitPrice; patch.historySource = source; }
+    changed();
+    setItems((current) => current.map((entry) => entry.rowId === rowId ? { ...entry, ...patch } : entry));
+  };
+
   const updateItem = (index: number, patch: Partial<QuotationFormItem>) => {
-    setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
-    setRelevance(null);
+    changed();
+    setItems((current) => current.map((item, itemIndex) => {
+      if (itemIndex !== index) return item;
+      const next = { ...item, ...patch, manualFields: [...new Set([...(item.manualFields || []), ...Object.keys(patch) as Array<keyof QuotationFields>])] };
+      if (patch.title !== undefined && patch.title !== item.title && item.historySource) {
+        if (!item.manualFields?.includes('unitPrice')) next.unitPrice = 0;
+        if (!item.manualFields?.includes('description')) next.description = '';
+        next.historySource = undefined;
+      }
+      if (patch.unitPrice !== undefined) next.historySource = undefined;
+      return next;
+    }));
   };
 
   const handleAddItems = () => {
@@ -93,9 +146,10 @@ export function RepairQuotationForm({
       return;
     }
 
+    changed();
     setItems((current) => [
       ...current,
-      ...Array.from({ length: count }, () => ({ ...emptyItem })),
+      ...Array.from({ length: count }, newItem),
     ]);
     setRelevance(null);
     setError(null);
@@ -119,7 +173,12 @@ export function RepairQuotationForm({
       setIsScanningImage(true);
       setError(null);
       setScanImageError(null);
+      const scanRevision = revision.current;
       const scanResult = await providerOrderApi.scanQuotationItems(orderId, file);
+      if (scanRevision !== revision.current) {
+        setScanImageError('Form đã thay đổi trong lúc đọc tệp. Vui lòng thử lại để giữ thông tin mới.');
+        return;
+      }
       const blockedIndexes = new Set(
         scanResult.relevance.evaluations
           .filter(isBlockedEvaluation)
@@ -143,10 +202,12 @@ export function RepairQuotationForm({
         return;
       }
 
+      changed();
       setItems([
         ...currentItems,
         ...acceptedItems.map((item) => ({
           ...item,
+          rowId: crypto.randomUUID(),
           description: item.description || "",
           note: item.note || "",
         })),
@@ -177,7 +238,12 @@ export function RepairQuotationForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const validItems = items.filter((item) => item.title.trim() && item.unitPrice > 0);
+    if (agentBusy || isScanningImage || busy || isValidatingRelevance) return;
+    const validItems = items.filter((item) => !isEmptyItem(item));
+    if (validItems.some((item) => !item.title.trim() || item.unitPrice <= 0)) {
+      setError('Vui lòng hoàn tất tên và đơn giá của tất cả hạng mục, hoặc xóa dòng chưa dùng.');
+      return;
+    }
     if (!validItems.length) {
       setError('Vui lòng thêm ít nhất một hạng mục báo giá hợp lệ.');
       return;
@@ -203,6 +269,10 @@ export function RepairQuotationForm({
       )
     ) {
       setError('Có hạng mục báo giá chưa hợp lệ.');
+      return;
+    }
+    if (subtotal <= depositAmount) {
+      setError(`Tổng báo giá phải lớn hơn tiền cọc ${formatMoney(depositAmount)}.`);
       return;
     }
     const payload: CreateQuotationPayload = {
@@ -324,12 +394,20 @@ export function RepairQuotationForm({
         </div>
       )}
 
+      <QuotationAgentPanel orderId={orderId} key={orderId} disabled={busy || isScanningImage || isValidatingRelevance || isRelevanceConfirmOpen}
+        snapshot={{ revision: formRevision, inspectionNote, recommendation,
+          items: items.map(({ rowId, title, description, itemType, quantity, unitPrice, note }) => ({ rowId, title, description, itemType, quantity, unitPrice, note })) }}
+        onApply={applyAgent} onBusyChange={setAgentBusy} />
+      {undo && <button type="button" className="text-sm text-primary underline" disabled={agentBusy || busy || isValidatingRelevance}
+        onClick={() => { if (revision.current !== undo.revision) return; const previous = undo; changed(); setItems(previous.items); setInspectionNote(previous.inspectionNote); setRecommendation(previous.recommendation); }}>Hoàn tác lần điền AI vừa rồi</button>}
+
+      <fieldset disabled={busy || isValidatingRelevance || isRelevanceConfirmOpen} className="space-y-md">
       <QuotationNotesFields
         inspectionNote={inspectionNote}
         recommendation={recommendation}
         maxLength={MAX_GENERAL_TEXT_LENGTH}
-        onInspectionNoteChange={setInspectionNote}
-        onRecommendationChange={setRecommendation}
+        onInspectionNoteChange={(value) => { changed(); setInspectionNote(value); }}
+        onRecommendationChange={(value) => { changed(); setRecommendation(value); }}
       />
 
       <div className="space-y-sm">
@@ -387,12 +465,15 @@ export function RepairQuotationForm({
 
         {items.map((item, index) => (
           <QuotationItemRow
-            key={`quotation-item-${index}`}
+            key={item.rowId}
+            orderId={orderId}
             item={item}
             removable={items.length > 1}
             maxTitleLength={MAX_ITEM_TITLE_LENGTH}
             onUpdate={(patch) => updateItem(index, patch)}
+            onHistory={(source, expectedTitle) => applyHistory(item.rowId, expectedTitle, source)}
             onRemove={() => {
+              changed();
               setItems((current) => current.filter((_, i) => i !== index));
               setRelevance(null);
             }}
@@ -400,6 +481,7 @@ export function RepairQuotationForm({
         ))}
       </div>
 
+      </fieldset>
       <div className="flex justify-end">
         <div className="rounded-2xl bg-primary/5 px-md py-sm text-right">
           <p className="text-xs text-on-surface-variant">Tổng báo giá (tổng thành tiền các hạng mục)</p>
@@ -412,7 +494,7 @@ export function RepairQuotationForm({
       <div className="flex flex-col-reverse gap-sm border-t border-outline-variant/30 pt-md sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || agentBusy || isScanningImage || isValidatingRelevance}
           onClick={onCancel}
           className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm font-bold text-error transition hover:border-error/50 hover:bg-error/10 active:scale-[0.98] disabled:opacity-50"
         >
@@ -421,7 +503,7 @@ export function RepairQuotationForm({
         </button>
         <button
           type="submit"
-          disabled={busy || isValidatingRelevance}
+          disabled={busy || isValidatingRelevance || agentBusy || isScanningImage}
           className="btn-primary w-full sm:w-auto"
         >
           {isValidatingRelevance

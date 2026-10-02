@@ -1,4 +1,5 @@
 import type { Service, ServiceOption } from "@/types/booking";
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 
 export type ServiceOptionGroup = {
   key: string;
@@ -70,4 +71,4 @@ export const isRequiredOptionSelectionMissing = (
   service: Service | null | undefined,
   selectedIds: string[],
 ) =>
-  Boolean(service?.requiresOptionSelection && selectedIds.length === 0);
+  Boolean(!isAirConditionerCleaning(service) && service?.requiresOptionSelection && selectedIds.length === 0);

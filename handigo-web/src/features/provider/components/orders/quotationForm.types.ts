@@ -1,6 +1,10 @@
 import type { CreateQuotationPayload, QuotationItem } from '../../types/providerOrder.types';
+import type { QuotationHistoryItem, QuotationFields } from '../../types/quotationAgent.types';
 
 export type QuotationFormItem = CreateQuotationPayload['items'][number] & {
+  rowId: string;
+  manualFields?: Array<keyof QuotationFields>;
+  historySource?: QuotationHistoryItem;
   description: string;
   note: string;
 };

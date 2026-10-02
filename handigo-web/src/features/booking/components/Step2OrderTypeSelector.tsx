@@ -1,36 +1,33 @@
-import { CalendarDays, RefreshCcw, Zap } from "lucide-react";
-type SelectableOrderType = 'normal' | 'scheduled' | 'recurring';
-type OrderType = SelectableOrderType | 'urgent';
-
-const orderTypeOptions = [
-  { icon: Zap, type: 'normal' as const, title: 'Đặt lịch ngay', desc: 'Phục vụ sớm · có phụ phí' },
-  { icon: CalendarDays, type: 'scheduled' as const, title: 'Lên lịch hẹn', desc: 'Đặt trước · không phí ưu tiên' },
-  { icon: RefreshCcw, type: 'recurring' as const, title: 'Đặt định kỳ', desc: 'Theo tuần hoặc tháng' },
-];
+import { CalendarDays, Repeat } from "lucide-react";
+type SelectableOrderType = 'scheduled' | 'recurring';
+type OrderType = SelectableOrderType | 'normal' | 'urgent';
 
 interface Step2OrderTypeSelectorProps {
   orderType: OrderType;
   onChange: (type: SelectableOrderType) => void;
 }
 
-/** 3 lựa chọn kiểu đặt lịch: ngay / hẹn giờ / định kỳ. */
-export const Step2OrderTypeSelector = ({ orderType, onChange }: Step2OrderTypeSelectorProps) => (
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-sm">
-    {orderTypeOptions.map(({ icon: Icon, type, title, desc }) => (
-      <label key={title} className="cursor-pointer">
-        <input
-          checked={orderType === type}
-          onChange={() => onChange(type)}
-          className="peer sr-only"
-          name="booking_type"
-          type="radio"
-        />
-        <div className="p-sm rounded-2xl border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary-container/5 peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15 text-center transition-colors h-full flex flex-col items-center">
-          <Icon aria-hidden="true" size={24} className="mb-xs" />
-          <p className="font-bold text-sm">{title}</p>
-          <p className="text-xs text-on-surface-variant mt-1">{desc}</p>
-        </div>
-      </label>
-    ))}
-  </div>
-);
+export const Step2OrderTypeSelector = ({ orderType, onChange }: Step2OrderTypeSelectorProps) => {
+  return (
+    <div className="grid grid-cols-2 gap-sm">
+      {([
+        { type: 'scheduled', label: 'Đặt lịch hẹn', Icon: CalendarDays },
+        { type: 'recurring', label: 'Đặt định kỳ', Icon: Repeat },
+      ] as const).map(({ type, label, Icon }) => (
+        <button
+          key={type}
+          type="button"
+          aria-pressed={orderType === type}
+          onClick={() => onChange(type)}
+          className={`flex min-h-11 items-center justify-center gap-xs rounded-xl border px-sm py-sm text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 ${orderType === type
+            ? 'border-primary bg-primary text-on-primary'
+            : 'border-outline-variant hover:border-primary hover:text-primary'
+            }`}
+        >
+          <Icon size={20} aria-hidden="true" className="shrink-0" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+};

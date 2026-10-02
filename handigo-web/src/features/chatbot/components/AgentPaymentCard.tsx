@@ -17,6 +17,7 @@ export function AgentPaymentCard({ payment, disabled, onCheck }: {
   const url = payment.status === "pending" ? checkoutUrl(payment.checkoutUrl) : undefined;
   return <section aria-label="Thanh toán đơn hàng" className="space-y-3 rounded-2xl border border-primary/20 bg-surface-container-lowest p-4 text-sm text-on-surface">
     <h3 className="font-semibold">Thanh toán đơn {payment.orderCode}</h3>
+    <p className="text-xs text-on-surface-variant">Kết quả lần kiểm tra gần nhất. Chọn Kiểm tra thanh toán để cập nhật.</p>
     <p className="text-xs leading-5 text-on-surface-variant">{payment.message}</p>
     {payment.amount != null && <p className="font-semibold text-primary">{payment.amount.toLocaleString("vi-VN")} đ</p>}
     <div className="flex flex-col gap-2">

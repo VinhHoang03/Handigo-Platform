@@ -31,8 +31,8 @@ export const BookingQuotationPending = ({
               : "Chuyên gia đang kiểm tra thông tin và lập báo giá chi tiết cho đơn này."}
           </p>
           <p className="whitespace-normal break-words">
-            Khi có báo giá, bạn sẽ nhận được thông báo để xem chi phí và xác
-            nhận trước khi tiếp tục.
+            Khi có báo giá, bạn sẽ nhận được thông báo để xem chi phí; chuyên
+            gia có thể tiếp tục thực hiện theo báo giá đã gửi.
           </p>
         </div>
       </div>

@@ -4,12 +4,16 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 import { approvedProviderMiddleware } from "../middlewares/approvedProvider.middleware";
 import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
 import { uploadQuotationImage } from "../middlewares/quotationImageUpload.middleware";
+import { uploadQuotationAudio } from "../middlewares/quotationAudioUpload.middleware";
+import { quotationAgentAssist, quotationAgentHistory, quotationAgentTranscribe } from "../controllers/quotationAgent.controller";
+import { quotationAgentInputSchema, quotationHistoryQuerySchema } from "../validations/quotationAgent.validator";
 import { validate } from "../middlewares/validate.middleware";
 import {
   dispatchRateLimit,
   ocrRateLimit,
   routingRateLimit,
   uploadRateLimit,
+  resourceIntensiveRateLimit,
 } from "../middlewares/rateLimit.middleware";
 import {
   assignmentIdParamSchema,
@@ -71,6 +75,13 @@ const router = Router();
 router.use(authMiddleware);
 router.post("/preview", roleMiddleware("CUSTOMER"), validate(previewBookingSchema), previewBooking);
 router.patch("/:orderId/expected-end", roleMiddleware("PROVIDER"), approvedProviderMiddleware, validate(orderIdParamSchema, "params"), validate(updateExpectedEndSchema), updateOrderExpectedEnd);
+
+router.get("/:orderId/quotation-agent/history", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  resourceIntensiveRateLimit, validate(orderIdParamSchema, "params"), validate(quotationHistoryQuerySchema, "query"), quotationAgentHistory);
+router.post("/:orderId/quotation-agent/assist", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  ocrRateLimit, validate(orderIdParamSchema, "params"), validate(quotationAgentInputSchema), quotationAgentAssist);
+router.post("/:orderId/quotation-agent/transcribe", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  ocrRateLimit, validate(orderIdParamSchema, "params"), uploadQuotationAudio, quotationAgentTranscribe);
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
@@ -291,7 +302,7 @@ router.get(
   getRepairQuotation,
 );
 
-// POST   /orders/quotations/:quotationId/confirm → Customer: confirm quotation
+// POST   /orders/quotations/:quotationId/confirm → Customer: tương thích client cũ
 router.post(
   "/quotations/:quotationId/confirm",
   roleMiddleware("CUSTOMER"),

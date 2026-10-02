@@ -140,7 +140,6 @@ const BookingDetailPage = () => {
               busy={busy}
               appliedDepositAmount={appliedDepositAmount}
               remainingQuotationAmount={remainingQuotationAmount}
-              onConfirm={cancellationFlow.handleConfirmQuotation}
               onReject={cancellationFlow.handleRejectQuotation}
             />
           </BookingServiceSummary>

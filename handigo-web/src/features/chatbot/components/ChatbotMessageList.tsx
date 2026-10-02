@@ -4,6 +4,8 @@ import type {
   ChatbotMessage,
 } from "../types/chatbot.types";
 import { Bot } from "lucide-react";
+import { AgentChoiceGroups } from "./AgentChoiceGroups";
+import { AgentConfirmationCard } from "./AgentConfirmationCard";
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString("vi-VN", {
@@ -14,18 +16,34 @@ const formatTime = (value: string) =>
 export function ChatbotMessageList({
   messages,
   isReplying,
+  activity,
   audience,
   children,
+  onSend,
+  choicesDisabled = false,
+  pendingActionId,
+  confirmationsDisabled = false,
+  onDecision,
 }: {
   messages: ChatbotMessage[];
   isReplying: boolean;
+  activity?: string;
   audience: ChatbotAudience;
   children?: ReactNode;
+  onSend?: (content: string) => Promise<void>;
+  choicesDisabled?: boolean;
+  pendingActionId?: string;
+  confirmationsDisabled?: boolean;
+  onDecision?: (decision: "CONFIRM" | "REJECT") => void;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const followsLatest = useRef(true);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
+    const container = scrollRef.current;
+    if (container && followsLatest.current) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [isReplying, messages, children]);
 
   if (!messages.length && !isReplying && Children.toArray(children).length === 0) {
@@ -49,7 +67,14 @@ export function ChatbotMessageList({
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.08),transparent_38%)] px-4 py-5">
+    <div
+      ref={scrollRef}
+      onScroll={(event) => {
+        const container = event.currentTarget;
+        followsLatest.current = container.scrollHeight - container.scrollTop - container.clientHeight <= 48;
+      }}
+      className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.08),transparent_38%)] px-4 py-5"
+    >
       {messages.map((message) => {
         const isUser = message.sender === "user";
         return (
@@ -64,7 +89,16 @@ export function ChatbotMessageList({
                   : "rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest text-on-surface"
               }`}
             >
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+              {!isUser && message.confirmation && (
+                <AgentConfirmationCard action={message.confirmation}
+                  readOnly={message.confirmation.actionId !== pendingActionId}
+                  disabled={isReplying || confirmationsDisabled} onDecision={onDecision} />
+              )}
+              {!isUser && message._id === messages.at(-1)?._id && Boolean(message.choiceGroups?.length) && onSend && (
+                <AgentChoiceGroups key={message._id} groups={message.choiceGroups!}
+                  disabled={isReplying || choicesDisabled} onSend={onSend} />
+              )}
               <time
                 className={`mt-1 block text-right text-[10px] ${
                   isUser ? "text-on-primary/70" : "text-on-surface-variant"
@@ -88,12 +122,11 @@ export function ChatbotMessageList({
               />
             ))}
             <span className="ml-2 text-xs text-on-surface-variant">
-              Đang trả lời
+              {activity || "Đang trả lời"}
             </span>
           </div>
         </div>
       )}
-      <div ref={bottomRef} />
     </div>
   );
 }

@@ -20,6 +20,7 @@ export interface CreateOrderPayload {
   serviceId: string;
   selectedOptionIds?: string[];
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
+  uniformQuantity?: number;
   addressId: string;
   preferredProviderId?: string;
   orderType?: "normal" | "urgent" | "scheduled" | "recurring";
@@ -56,7 +57,7 @@ interface ReverseGeocodedAddress {
 }
 
 export const bookingApi = {
-  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions'>) => {
+  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity'>) => {
     const response = await api.post<{ success: boolean; data: BookingPreview }>('/orders/preview', payload);
     return response.data.data;
   },
@@ -240,13 +241,6 @@ export const bookingApi = {
       success: boolean;
       data: OrderQuotation | null;
     }>(`/orders/${orderId}/quotation`);
-    return response.data.data;
-  },
-
-  confirmQuotation: async (quotationId: string) => {
-    const response = await api.post<{ success: boolean; data: OrderQuotation }>(
-      `/orders/quotations/${quotationId}/confirm`,
-    );
     return response.data.data;
   },
 

@@ -223,7 +223,7 @@ const formatProviderProfile = async (provider: IProvider) => {
       mainServiceText: provider.mainServiceText,
       experienceYears: provider.experienceYears,
       availabilityStatus: provider.availabilityStatus,
-      autoAcceptScheduledBookings: provider.autoAcceptScheduledBookings,
+      autoAcceptScheduledBookings: false,
       autoAcceptScheduledBookingMinAdvanceMinutes:
         provider.autoAcceptScheduledBookingMinAdvanceMinutes,
       autoAcceptScheduledBookingHorizonDays:
@@ -392,7 +392,7 @@ export const getNearbyProvidersForCustomer = async (
   }
 
   const pricing = selectedOptions !== undefined
-    ? await buildServicePricingSnapshot(service, [], selectedOptions, scheduledAt ? "scheduled" : "normal")
+    ? await buildServicePricingSnapshot(service, [], selectedOptions, undefined, scheduledAt ? "scheduled" : "normal")
     : null;
   const scheduleIntervals = pricing ? (occurrenceDates.length ? occurrenceDates : [new Date(Date.now() + pricing.schedule.travelMinutes * 60000)])
     .map((date) => ({ ...pricing.schedule, start: date.getTime(), end: date.getTime() + pricing.schedule.durationMinutes * 60000 })) : undefined;
@@ -403,7 +403,7 @@ export const getNearbyProvidersForCustomer = async (
     province: address.province,
     ward: address.ward,
     limit: 5,
-    requireOnline: !scheduledAt,
+    requireOnline: true,
     scheduledDates: occurrenceDates,
     scheduleIntervals: savedIntervals ?? scheduleIntervals,
     excludeProviderIds,
@@ -663,18 +663,6 @@ export const updateMyProviderProfile = async (
   if (payload.workingAreas !== undefined) {
     provider.workingAreas = [...new Set(payload.workingAreas)];
   }
-  if (payload.autoAcceptScheduledBookings !== undefined) {
-    provider.autoAcceptScheduledBookings = payload.autoAcceptScheduledBookings;
-  }
-  if (payload.autoAcceptScheduledBookingMinAdvanceMinutes !== undefined) {
-    provider.autoAcceptScheduledBookingMinAdvanceMinutes =
-      payload.autoAcceptScheduledBookingMinAdvanceMinutes;
-  }
-  if (payload.autoAcceptScheduledBookingHorizonDays !== undefined) {
-    provider.autoAcceptScheduledBookingHorizonDays =
-      payload.autoAcceptScheduledBookingHorizonDays;
-  }
-
   await provider.save();
   await provider.populate(servicePopulate);
 

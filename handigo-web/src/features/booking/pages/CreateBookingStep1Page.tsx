@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import { ServiceQuantityPanel } from '../components/ServiceQuantityPanel';
 import { useNavigate } from 'react-router-dom';
 import { BookingStepper, OrderCreationShell, OrderSummaryCard } from '../components/BookingComponents';
 import { CategoryQuickSelect } from '../components/CategoryQuickSelect';
@@ -14,7 +16,7 @@ const CreateBookingStep1Page = () => {
   const {
     categoryId, setCategoryId, serviceId, setServiceId, toggleOption,
     selectedOptionIds, selectedOptionQuantities, setOptionQuantity,
-    requestedProviderId, requestedProviderName, setPreferredProviderId,
+    uniformQuantity, setUniformQuantity,
   } = useBookingStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -62,6 +64,7 @@ const CreateBookingStep1Page = () => {
   const visibleCategories = categories.slice(0, 5);
   const selectedService = services.find((service) => service._id === serviceId);
   const isVariablePrice = selectedService?.serviceType === 'variable_price';
+  const isCleaning = isAirConditionerCleaning(selectedService);
   const optionGroups = groupServiceOptions(options);
 
   const handleSelectCategory = (selectedCategoryId: string) => {
@@ -79,8 +82,9 @@ const CreateBookingStep1Page = () => {
       setSelectionError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
       return;
     }
-    if (requestedProviderId) {
-      setPreferredProviderId(requestedProviderId, requestedProviderName);
+    if (isCleaning && !(selectedService.fixedPrice && selectedService.fixedPrice > 0)) {
+      setSelectionError('Dịch vụ chưa có giá hợp lệ. Vui lòng thử lại sau.');
+      return;
     }
     setSelectionError('');
     navigate('/customer/bookings/new/location');
@@ -113,7 +117,9 @@ const CreateBookingStep1Page = () => {
             <div className="space-y-md">
               <ServiceGrid services={services} serviceId={serviceId} onSelect={setServiceId} />
 
-              {options.length > 0 && (
+              {isCleaning && <ServiceQuantityPanel price={selectedService?.fixedPrice}
+                quantity={uniformQuantity} onChange={setUniformQuantity} />}
+              {!isCleaning && options.length > 0 && (
                 <ServiceOptionsPanel
                   optionGroups={optionGroups}
                   selectedOptionIds={selectedOptionIds}
@@ -132,7 +138,7 @@ const CreateBookingStep1Page = () => {
           </section>
         </div>
 
-        <div className="col-span-12 lg:col-span-4">
+        <div className="col-span-12 lg:col-span-4 lg:sticky lg:top-24">
           <OrderSummaryCard step={1} actionLabel="Tiếp tục bước 2" onAction={continueToLocation} />
         </div>
       </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { useNavigate } from 'react-router-dom';
 import { selectedServiceImage } from '../constants/bookingImages';
 import { useBookingStore } from '../hooks/useBookingStore';
@@ -33,6 +34,7 @@ export const OrderSummaryCard: React.FC<{
     serviceId,
     selectedOptionIds,
     selectedOptionQuantities,
+    uniformQuantity,
     orderType,
     scheduledAt,
     preferredProviderName,
@@ -65,9 +67,11 @@ export const OrderSummaryCard: React.FC<{
     return () => { isMounted = false; };
   }, [serviceId, categoryId]);
 
-  const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
+  const isCleaning = isAirConditionerCleaning(service);
+  const selectedOptions = options.filter(opt => !isCleaning && selectedOptionIds.includes(opt._id));
 
   const calculateTotal = () => {
+    if (isCleaning) return (service?.fixedPrice || 0) * uniformQuantity;
     let total = 0;
     if (service?.serviceType === 'fixed_price') {
       total = 0;
@@ -94,7 +98,7 @@ export const OrderSummaryCard: React.FC<{
   };
 
   return (
-    <aside className="space-y-md lg:sticky lg:top-24">
+    <aside className="space-y-md lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto">
       <div className="bg-surface-container-lowest rounded-3xl p-md shadow-lg border border-outline-variant/30">
         <h3 className="font-headline-md text-headline-md text-primary mb-md">Tóm tắt đơn hàng</h3>
 
@@ -110,24 +114,24 @@ export const OrderSummaryCard: React.FC<{
               <p className="text-xs text-on-surface-variant truncate max-w-[150px]">
                 {service?.description || 'Vui lòng chọn dịch vụ'}
               </p>
-              <p className="text-sm font-bold text-primary mt-1">
+              {!isCleaning && <p className="text-sm font-bold text-primary mt-1">
                 {service?.serviceType === 'fixed_price'
                   ? 'Giá theo tùy chọn'
                   : service?.serviceType === 'variable_price'
                     ? `Phí cọc: ${(preview?.depositAmount ?? service.depositAmount ?? 0).toLocaleString()}đ`
                     : '0đ'}
-              </p>
+              </p>}
             </div>
           </div>
 
-          {step >= 2 && orderType !== 'normal' && (
+          {step >= 2 && (
             <div className="space-y-sm border-t border-dashed border-outline-variant pt-md text-sm">
               <div className="flex items-start gap-sm">
                 <Calendar aria-hidden="true" size={19} className="text-primary" />
                 <div>
-                  <p className="text-xs text-on-surface-variant">Lịch thực hiện</p>
+                  <p className="text-xs text-on-surface-variant">{orderType === 'normal' ? 'Đặt ngay' : orderType === 'recurring' ? 'Lịch định kỳ' : 'Lịch hẹn'}</p>
                   <p className="font-bold text-on-surface">
-                    {scheduledAt?.includes('T')
+                    {orderType === 'normal' ? 'Sớm nhất có thể' : scheduledAt?.includes('T')
                       ? new Date(scheduledAt).toLocaleString('vi-VN')
                       : 'Chưa chọn đủ ngày giờ'}
                   </p>
@@ -146,7 +150,6 @@ export const OrderSummaryCard: React.FC<{
           )}
 
           <OrderSummaryPriceDetails
-            immediateFee={preview?.immediateFee}
             depositAmount={preview?.depositAmount}
             service={service}
             selectedOptions={selectedOptions}
@@ -156,7 +159,7 @@ export const OrderSummaryCard: React.FC<{
             discountAmount={discountAmount}
             summaryContent={summaryContent}
           />
-      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn sớm nhất từ 08:00 ngày mai. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
+      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn từ 08:00, đặt trước ít nhất 2 tiếng. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
           {priceLoading && <p role="status" className="text-sm">Đang cập nhật giá…</p>}
           {priceError && <p role="alert" className="text-sm text-error">{priceError} <button type="button" onClick={retry} className="underline">Thử lại</button></p>}
         </div>

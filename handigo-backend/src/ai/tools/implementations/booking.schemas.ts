@@ -5,6 +5,7 @@ export const idSchema = createOrderSchema.shape.serviceId;
 export const priceSchema = z.object({
   serviceId: idSchema,
   selectedOptions: createOrderSchema.shape.selectedOptions,
+  uniformQuantity: z.number().int().min(1).max(99).optional(),
 }).strict();
 export const bookingSchema = priceSchema.extend({
   addressId: createOrderSchema.shape.addressId,

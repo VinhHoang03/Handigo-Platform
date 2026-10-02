@@ -168,6 +168,7 @@ const assertAppointmentPaymentReady = (
 ) => {
   if (paymentType === "remaining") return;
   if (!["scheduled", "recurring"].includes(order.orderType)) return;
+  if (order.status === "created" && !order.providerId && order.bookingStatus !== "reserved") return;
   if (
     order.inspectionRequired &&
     order.status === "created" &&
@@ -348,15 +349,12 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
 
       shouldDispatch =
         paymentType !== "remaining" &&
-        transactionalOrder.status === "created" &&
-        (!['scheduled', 'recurring'].includes(transactionalOrder.orderType) ||
-          transactionalOrder.inspectionRequired);
+        transactionalOrder.status === "created";
       if (shouldDispatch) {
         transactionalOrder.readyForMatching = true;
       }
       if (["scheduled", "recurring"].includes(transactionalOrder.orderType)) {
-        transactionalOrder.bookingStatus = "confirmed";
-        transactionalOrder.readyForMatching = shouldDispatch;
+        transactionalOrder.bookingStatus = transactionalOrder.providerId ? "confirmed" : "awaiting_provider";
       }
 
       await markOrderVoucherAsUsed(transactionalOrder, session);
@@ -479,9 +477,9 @@ const reserveExternalPayment = async (
 
       if (method === "cash") {
         order.paymentMethod = "cash";
-        order.readyForMatching = !["scheduled", "recurring"].includes(order.orderType);
+        order.readyForMatching = order.status === "created";
         if (["scheduled", "recurring"].includes(order.orderType)) {
-          order.bookingStatus = "confirmed";
+          order.bookingStatus = order.providerId ? "confirmed" : "awaiting_provider";
         }
       } else {
         order.paymentMethod = "bank";
@@ -796,14 +794,12 @@ const syncPaidPayosPaymentToOrder = async (
   const shouldDispatch =
     payment.paymentType !== "remaining" &&
     order.status === "created" &&
-    (!['scheduled', 'recurring'].includes(order.orderType) ||
-      order.inspectionRequired);
+    (payment.paymentType === "inspection_deposit" || order.paymentStatus === "paid");
   if (shouldDispatch) {
     order.readyForMatching = true;
   }
   if (["scheduled", "recurring"].includes(order.orderType)) {
-    order.bookingStatus = "confirmed";
-    order.readyForMatching = shouldDispatch;
+    order.bookingStatus = order.providerId ? "confirmed" : "awaiting_provider";
   }
   if (markVoucherUsed) {
     await markOrderVoucherAsUsed(order, session);
