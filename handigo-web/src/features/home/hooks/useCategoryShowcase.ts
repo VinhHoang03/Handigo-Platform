@@ -42,7 +42,6 @@ export function useCategoryShowcase() {
       .then(([categories, serviceList]: [Category[], { items: Service[] }]) => {
         if (!active) return;
         const services = serviceList.items ?? [];
-
         const showcase = categories
           .map<CategoryShowcaseItem>((category) => {
             const owned = services.filter(

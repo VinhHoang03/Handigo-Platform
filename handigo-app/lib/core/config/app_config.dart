@@ -5,7 +5,7 @@ abstract final class AppConfig {
     const configured = String.fromEnvironment('API_BASE_URL');
     final value = configured.isNotEmpty
         ? configured
-        : defaultTargetPlatform == TargetPlatform.android
+        : !kIsWeb && defaultTargetPlatform == TargetPlatform.android
         ? 'http://10.0.2.2:5000'
         : 'http://localhost:5000';
     return validateBaseUrl(value, release: kReleaseMode);
@@ -13,8 +13,12 @@ abstract final class AppConfig {
 
   static String validateBaseUrl(String value, {required bool release}) {
     final uri = Uri.tryParse(value);
-    if (uri == null || !uri.hasAuthority || uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment ||
+    if (uri == null ||
+        !uri.hasAuthority ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
         !['http', 'https'].contains(uri.scheme) ||
         (release && uri.scheme != 'https')) {
       throw const FormatException(

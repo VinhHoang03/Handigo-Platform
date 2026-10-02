@@ -606,7 +606,7 @@ export const forgotPassword = async (email: string): Promise<void> => {
   const user = await User.findOne({ email });
 
   if (!user) {
-    return;
+    throw new AppError("Không tìm thấy tài khoản với email này.", 404);
   }
 
   const otp = generateOtp();
@@ -615,6 +615,17 @@ export const forgotPassword = async (email: string): Promise<void> => {
   await user.save();
 
   await sendOtpEmail(user.email, "Reset your Handigo password", otp);
+};
+
+export const verifyResetPasswordOtp = async (
+  email: string,
+  otp: string,
+): Promise<void> => {
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new AppError("Mã OTP không hợp lệ hoặc đã hết hạn", 400);
+  }
+  ensureOtpValid(otp, user.resetPasswordOtp, user.resetPasswordOtpExpire);
 };
 
 export const resetPassword = async (
