@@ -7,7 +7,6 @@ import { OrderAssignment } from "../models/orderAssignment.model";
 import { Payment, IPayment } from "../models/payment.model";
 import { Promotion } from "../models/promotion.model";
 import { Provider } from "../models/provider.model";
-import { RepairQuotation } from "../models/repairQuotation.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { Refund, IRefund } from "../models/refund.model";
@@ -1382,9 +1381,7 @@ export const cancelOrderWithSettlement = async (
         return;
       }
 
-      const quotationRejected = input.role === "provider" && isQuotationRejectionReason(reason);
-      if (!CANCELLABLE_STATUSES.includes(order.status as any) &&
-        !(quotationRejected && order.status === "in_progress")) {
+      if (!CANCELLABLE_STATUSES.includes(order.status as any)) {
         throw new AppError(
           'Không thể hủy đơn hàng ở trạng thái "' + order.status + '".',
           400,
@@ -1404,35 +1401,6 @@ export const cancelOrderWithSettlement = async (
         session,
         input.system ? undefined : reason,
       );
-      if (quotationRejected) {
-        const quotation = await RepairQuotation.findOne({
-          _id: order.currentQuotationId,
-          orderId: order._id,
-          providerId: order.providerId,
-          isDeleted: false,
-        }).session(session);
-        const depositPayment = await Payment.findOne({
-          orderId: order._id,
-          paymentType: "inspection_deposit",
-          status: "paid",
-          compensatedToProviderId: null,
-          isDeleted: false,
-        }).session(session);
-        if (!order.inspectionRequired || !quotation || !depositPayment ||
-          order.depositAmount <= 0 || getPaidPaymentAmount(depositPayment) < order.depositAmount) {
-          throw new AppError("Chỉ có thể hoàn cọc cho thợ khi đơn có báo giá và tiền cọc đã thanh toán đầy đủ.", 409);
-        }
-        Object.assign(refundPolicy, {
-          policyVersion: QUOTATION_REJECTION_POLICY_VERSION,
-          canCancel: true,
-          refundRate: (paidAmount - order.depositAmount) * 100 / paidAmount,
-          refundAmount: paidAmount - order.depositAmount,
-          cancellationFee: order.depositAmount,
-          providerCompensation: order.depositAmount,
-          platformRetainedAmount: 0,
-          policyReason: "Khách hàng không đồng ý báo giá; hoàn 100% tiền cọc vào ví thợ.",
-        });
-      }
       if (!refundPolicy.canCancel) {
         throw new AppError(refundPolicy.policyReason, 409);
       }
