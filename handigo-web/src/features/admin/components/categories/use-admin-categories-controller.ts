@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useToast } from '@/components/common/Toast';
 import { getErrorMessage } from '@/utils/apiError';
+import { getAvailableCategoryIconColor, isCategoryIconColor, resolveCategoryIcon } from '@/components/common/category-icons';
 import { categoryServiceApi } from '../../api/categoryService.api';
 import type { Category, Service } from '../../types/categoryService.types';
 import {
@@ -53,6 +54,11 @@ export function useAdminCategoriesController() {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [editing, setEditing] = useState<Category | null>(null);
+  const [formError, setFormError] = useState('');
+  const [categoryIconColors, setCategoryIconColors] = useState<Array<Pick<Category, '_id' | 'name' | 'iconColor'>>>([]);
+  const [colorLoading, setColorLoading] = useState(false);
+  const [colorError, setColorError] = useState('');
+  const colorRequestId = useRef(0);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
   const load = async (overridePage = page) => {
@@ -137,26 +143,70 @@ export function useAdminCategoriesController() {
     }
   };
 
+  const loadIconColors = async (excludeId?: string) => {
+    const requestId = ++colorRequestId.current;
+    setColorLoading(true);
+    setColorError('');
+    try {
+      const colors = await categoryServiceApi.listCategoryIconColors();
+      if (requestId !== colorRequestId.current) return;
+      setCategoryIconColors(colors);
+      const usedColors = colors
+        .filter((category) => category._id !== excludeId && isCategoryIconColor(category.iconColor))
+        .map((category) => category.iconColor!);
+      setForm((current) => isCategoryIconColor(current.iconColor) ? current : {
+        ...current, iconColor: getAvailableCategoryIconColor(usedColors),
+      });
+    } catch (err) {
+      if (requestId === colorRequestId.current) {
+        setColorError(getErrorMessage(err, 'Không thể tải các màu đã dùng.'));
+      }
+    } finally {
+      if (requestId === colorRequestId.current) setColorLoading(false);
+    }
+  };
+
   const openCreate = () => {
+    setFormError('');
     setForm(emptyCategoryForm);
     setEditing(null);
     setModal('create');
+    void loadIconColors();
   };
 
   const openEdit = (category: Category) => {
+    setFormError('');
     setEditing(category);
     setForm({
       name: category.name,
       slug: category.slug,
-      icon: category.icon || '',
+      icon: resolveCategoryIcon(category.icon, category.name).id,
+      iconColor: isCategoryIconColor(category.iconColor) ? category.iconColor : '',
       description: category.description || '',
       isActive: category.isActive,
     });
     setModal('edit');
+    void loadIconColors(category._id);
   };
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    if (busy) return;
+    setFormError('');
+    if (colorLoading || colorError) {
+      setFormError('Cần tải danh sách màu đã dùng trước khi lưu.');
+      return;
+    }
+    if (!isCategoryIconColor(form.iconColor)) {
+      setFormError('Vui lòng chọn màu biểu tượng.');
+      return;
+    }
+    if (categoryIconColors.some((category) =>
+      category._id !== editing?._id && category.iconColor?.toLowerCase() === form.iconColor.toLowerCase(),
+    )) {
+      setFormError('Mã màu này đã được dùng cho danh mục khác. Vui lòng chọn màu khác.');
+      return;
+    }
     setBusy(true);
     setNotice('');
     try {
@@ -170,7 +220,10 @@ export function useAdminCategoriesController() {
       setModal(null);
       void load();
     } catch (err) {
-      setError(getErrorMessage(err, 'Có lỗi xảy ra.'));
+      setFormError(getErrorMessage(err, 'Không thể lưu danh mục.'));
+      if ((err as { response?: { status?: number } })?.response?.status === 409) {
+        void loadIconColors(editing?._id);
+      }
     } finally {
       setBusy(false);
     }
@@ -226,6 +279,13 @@ export function useAdminCategoriesController() {
     modal,
     setModal,
     form,
+    formError,
+    colorLoading,
+    colorError,
+    unavailableIconColors: Object.fromEntries(categoryIconColors
+      .filter((category) => category._id !== editing?._id && isCategoryIconColor(category.iconColor))
+      .map((category) => [category.iconColor!.toLowerCase(), category.name])),
+    reloadIconColors: () => void loadIconColors(editing?._id),
     setForm,
     deleteTarget,
     setDeleteTarget,

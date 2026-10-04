@@ -275,7 +275,7 @@ export const MatchingService = {
 /**
  * Haversine formula – returns distance in meters between two lat/lng points.
  */
-function haversineMeters(
+export function haversineMeters(
   lat1: number,
   lon1: number,
   lat2: number,

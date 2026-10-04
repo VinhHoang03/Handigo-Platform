@@ -7,6 +7,7 @@ class FeaturedProvider {
     required this.averageRating,
     required this.totalFeedbacks,
     this.avatar,
+    this.distanceMeters,
   });
 
   factory FeaturedProvider.fromJson(Map<String, dynamic> json) {
@@ -25,6 +26,7 @@ class FeaturedProvider {
       workingAreas: areas.whereType<String>().toList(),
       averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0,
       totalFeedbacks: (json['totalFeedbacks'] as num?)?.toInt() ?? 0,
+      distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
     );
   }
 
@@ -35,4 +37,5 @@ class FeaturedProvider {
   final List<String> workingAreas;
   final double averageRating;
   final int totalFeedbacks;
+  final double? distanceMeters;
 }

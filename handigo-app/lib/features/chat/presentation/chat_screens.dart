@@ -53,30 +53,10 @@ class _ConversationListScreenState
             const SizedBox(width: 9),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Đoạn chat'),
-                Text(
-                  'Trao đổi cùng Handigo',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+              children: [const Text('Đoạn chat')],
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Tìm kiếm tin nhắn',
-            onPressed: () => _searchController.clear(),
-            icon: const Icon(Icons.search),
-          ),
-          IconButton(
-            tooltip: 'Tạo cuộc trò chuyện',
-            onPressed: null,
-            icon: const Icon(Icons.edit_square),
-          ),
-        ],
       ),
       body: state.when(
         loading: () => const AppLoading(),
@@ -119,26 +99,6 @@ class _ConversationListScreenState
                       _ChatFilterChip(label: 'Tất cả', value: 'ALL', selected: _selectedFilter, onSelected: _selectFilter),
                       _ChatFilterChip(label: 'Đơn hàng', value: 'ORDER', selected: _selectedFilter, onSelected: _selectFilter),
                       _ChatFilterChip(label: 'Hỗ trợ', value: 'SUPPORT', selected: _selectedFilter, onSelected: _selectFilter),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer.withValues(alpha: .55),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.shield_outlined, color: scheme.primary),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          'Hội thoại được bảo mật & giám sát\nNhắn bảo vệ quyền lợi trong 30 ngày và minh bạch giá dịch vụ Handigo.',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -209,20 +169,44 @@ class _ConversationCard extends StatelessWidget {
     final isUnread = item.lastMessage != null && item.lastMessageSenderId != currentUserId;
     return Card(
       color: isUnread ? theme.colorScheme.surfaceContainerLow : theme.colorScheme.surfaceContainerLowest,
+      margin: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 12, 9),
+          padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 23,
-                backgroundImage: avatarUrl == null ? null : NetworkImage(avatarUrl),
-                backgroundColor: theme.colorScheme.primaryContainer,
-                foregroundColor: theme.colorScheme.onPrimaryContainer,
-                child: avatarUrl == null ? const Icon(Icons.person_outline) : null,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: avatarUrl == null
+                    ? Container(
+                        width: 44,
+                        height: 44,
+                        color: theme.colorScheme.primaryContainer,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.person_outline,
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      )
+                    : Image.network(
+                        avatarUrl,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 44,
+                          height: 44,
+                          color: theme.colorScheme.primaryContainer,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.person_outline,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -245,9 +229,12 @@ class _ConversationCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        Icon(Icons.verified, size: 14, color: theme.colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Expanded(child: Text(item.orderCode.isEmpty ? 'Hỗ trợ Handigo' : '#${item.orderCode}', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+                        if (item.orderCode.isNotEmpty) ...[
+                          Icon(Icons.verified, size: 14, color: theme.colorScheme.primary),
+                          const SizedBox(width: 4),
+                          Expanded(child: Text('#${item.orderCode}', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+                        ] else
+                          const Spacer(),
                         Text(_chatTime(item.lastMessageAt ?? item.updatedAt), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
                       ],
                     ),

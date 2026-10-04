@@ -11,6 +11,7 @@ import '../../services/domain/service_category.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/utils/media_url.dart';
 import '../domain/service_detail.dart';
+import '../domain/service_option.dart';
 import 'service_catalog_provider.dart';
 
 class ServiceCatalogScreen extends ConsumerStatefulWidget {
@@ -337,6 +338,7 @@ class ServiceDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(serviceDetailProvider(serviceId));
+    final value = detail.asData?.value;
     return Scaffold(
       appBar: AppBar(title: const Text('Chi tiết dịch vụ')),
       body: detail.when(
@@ -345,19 +347,17 @@ class ServiceDetailScreen extends ConsumerWidget {
           message: 'Không thể tải chi tiết dịch vụ.',
           onRetry: () => ref.invalidate(serviceDetailProvider(serviceId)),
         ),
-        data: (value) => Scaffold(
-          body: _ServiceDetailContent(
-            detail: value,
-          ),
-          bottomNavigationBar: _StickyBookingBar(
-            service: value.service,
-            priceLabel: value.options.isEmpty
-                ? _priceLabel(value.service)
-                : 'Từ ${_money(value.options.map((option) => option.price).reduce((a, b) => a < b ? a : b))}',
-            onPressed: () => _showBookingOptions(context, ref, value),
-          ),
-        ),
+        data: (value) => _ServiceDetailContent(detail: value),
       ),
+      bottomNavigationBar: value == null
+          ? null
+          : _StickyBookingBar(
+              service: value.service,
+              priceLabel: value.options.isEmpty
+                  ? _priceLabel(value.service)
+                  : 'Từ ${_money(value.options.map((option) => option.price).reduce((a, b) => a < b ? a : b))}',
+              onPressed: () => _showBookingOptions(context, ref, value),
+            ),
     );
   }
 }
@@ -422,31 +422,30 @@ class _ServiceDetailContent extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 service.name,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
-              Row(
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 14,
+                runSpacing: 6,
                 children: [
-                  Icon(
-                    Icons.star_rounded,
+                  _ServiceStat(
+                    icon: Icons.star_rounded,
                     color: Theme.of(context).colorScheme.tertiary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    service.totalFeedbacks > 0
+                    label: service.totalFeedbacks > 0
                         ? '${service.averageRating.toStringAsFixed(1)} (${service.totalFeedbacks} đánh giá)'
                         : 'Chưa có đánh giá',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(width: 16),
-                  Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.primary, size: 18),
-                  const SizedBox(width: 4),
-                  Text('${service.totalCompletedOrders} lượt hoàn thành', style: Theme.of(context).textTheme.labelMedium),
+                  _ServiceStat(
+                    icon: Icons.check_circle_outline,
+                    color: Theme.of(context).colorScheme.primary,
+                    label: '${service.totalCompletedOrders} lượt hoàn thành',
+                  ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               Text(
                 service.description,
                 style: Theme.of(context).textTheme.bodyMedium,
@@ -454,8 +453,13 @@ class _ServiceDetailContent extends ConsumerWidget {
             ],
           ),
         ),
+        if (detail.options.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _ServiceOptionsPreview(options: detail.options),
+          ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -489,6 +493,91 @@ class _ServiceDetailContent extends ConsumerWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _ServiceStat extends StatelessWidget {
+  const _ServiceStat({required this.icon, required this.color, required this.label});
+  final IconData icon;
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      );
+}
+
+class _ServiceOptionsPreview extends StatelessWidget {
+  const _ServiceOptionsPreview({required this.options});
+  final List<ServiceOption> options;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Các gói dịch vụ',
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 8),
+        ...options.take(10).map(
+              (option) => Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.radio_button_unchecked, size: 18, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              option.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            if (option.description?.trim().isNotEmpty == true) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                option.description!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _money(option.price),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       ],
     );
   }

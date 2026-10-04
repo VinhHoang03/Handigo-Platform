@@ -7,6 +7,7 @@
     "start": "node dist/server.js",
     "build": "tsc && tsc-alias",
     "seed:categories": "ts-node src/scripts/seedCategories.ts",
+    "migrate:category-icon-colors": "ts-node src/scripts/migrateCategoryIconColors.ts",
     "migrate:provider-service-ids": "ts-node src/scripts/migrateProviderServiceIds.ts",
     "migrate:provider-applications": "ts-node src/scripts/migrateProviderApplicationReviewHistory.ts",
     "migrate:single-user-role": "ts-node src/scripts/migrateSingleUserRole.ts",

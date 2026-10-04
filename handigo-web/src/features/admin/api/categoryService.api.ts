@@ -22,6 +22,20 @@ export const categoryServiceApi = {
   listCategories: async (query: CategoryQuery) =>
     unwrap<ListResult<Category>>(await api.get('/categories', { params: query })),
 
+  listCategoryIconColors: async () => {
+    const first = unwrap<ListResult<Category>>(
+      await api.get('/categories', { params: { page: 1, limit: 100 } }),
+    );
+    const remaining = await Promise.all(
+      Array.from({ length: Math.max(0, first.pagination.totalPages - 1) }, (_, index) =>
+        api.get('/categories', { params: { page: index + 2, limit: 100 } })
+          .then((response) => unwrap<ListResult<Category>>(response)),
+      ),
+    );
+    return [first, ...remaining].flatMap((result) => result.items)
+      .map(({ _id, name, iconColor }) => ({ _id, name, iconColor }));
+  },
+
   getCategory: async (id: string) =>
     unwrap<CategoryDetail>(await api.get(`/categories/${id}`)),
 

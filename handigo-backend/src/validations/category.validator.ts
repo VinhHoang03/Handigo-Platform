@@ -16,6 +16,9 @@ export const createCategorySchema = z.object({
   slug: slugSchema.optional(),
   description: z.string().trim().max(2000).nullable().optional(),
   icon: z.string().trim().max(500).nullable().optional(),
+  iconColor: z.string().trim()
+    .regex(/^#[0-9a-f]{6}$/i, "Màu biểu tượng phải có định dạng #RRGGBB")
+    .nullable().optional(),
   isActive: z.boolean().optional(),
 }).strict();
 

@@ -15,7 +15,9 @@ import { Service } from "../models/service.model";
 import { Address } from "../models/address.model";
 import { Feedback } from "../models/feedback.model";
 import { Category } from "../models/category.model";
+import { Location } from "../models/location.model";
 import { MatchingService } from "./matching.service";
+import { haversineMeters } from "./matching.service";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { getOrderInterval } from "../utils/providerSchedule";
@@ -242,7 +244,10 @@ const formatProviderProfile = async (provider: IProvider) => {
   };
 };
 
-export const getFeaturedProviders = async () => {
+export const getFeaturedProviders = async (origin?: {
+  latitude?: number;
+  longitude?: number;
+}) => {
   const activeUserIds = await User.distinct("_id", {
     status: "active",
     isDeleted: false,
@@ -259,7 +264,31 @@ export const getFeaturedProviders = async () => {
     .populate(servicePopulate)
     .lean();
 
-  return providers
+  const distanceByUserId = new Map<string, number>();
+  if (origin?.latitude !== undefined && origin.longitude !== undefined) {
+    const locations = await Location.find({
+      userId: { $in: providers.map((provider) => provider.userId) },
+      ownerType: "provider",
+      isActive: true,
+      isDeleted: false,
+    })
+      .select("userId coordinates lastUpdatedAt")
+      .sort({ lastUpdatedAt: -1 })
+      .lean();
+
+    for (const location of locations) {
+      const userId = location.userId.toString();
+      if (distanceByUserId.has(userId)) continue;
+      const [longitude, latitude] = location.coordinates.coordinates;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+      distanceByUserId.set(
+        userId,
+        haversineMeters(origin.latitude, origin.longitude, latitude, longitude),
+      );
+    }
+  }
+
+  const featuredProviders = providers
     .filter((provider) => provider.userId)
     .map((provider) => {
       const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string };
@@ -279,8 +308,19 @@ export const getFeaturedProviders = async () => {
         })),
         averageRating: provider.averageRating,
         totalFeedbacks: provider.totalFeedbacks,
+        distanceMeters: distanceByUserId.get(user._id.toString()) ?? null,
       };
     });
+
+  if (origin?.latitude !== undefined && origin.longitude !== undefined) {
+    featuredProviders.sort((a, b) => {
+      if (a.distanceMeters == null) return b.distanceMeters == null ? 0 : 1;
+      if (b.distanceMeters == null) return -1;
+      return a.distanceMeters - b.distanceMeters;
+    });
+  }
+
+  return featuredProviders;
 };
 
 export const getNearbyProvidersForCustomer = async (
@@ -513,7 +553,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
       isActive: true,
       isDeleted: false,
     })
-      .select("name slug icon")
+      .select("name slug icon iconColor")
       .sort({ name: 1 })
       .lean(),
   ]);
@@ -544,6 +584,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
         name: category.name,
         slug: category.slug,
         icon: category.icon,
+        iconColor: category.iconColor,
         services: services
           .filter(
             (service) =>

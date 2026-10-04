@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../providers/domain/featured_provider.dart';
 import '../../services/domain/service.dart';
 import '../../services/domain/service_category.dart';
@@ -8,11 +9,11 @@ class CustomerHomeRepository {
   const CustomerHomeRepository(this._api);
   final ApiClient _api;
 
-  Future<CustomerHomeData> load() async {
+  Future<CustomerHomeData> load({Position? currentPosition}) async {
     final results = await Future.wait<dynamic>([
       _loadCategories(),
       _loadServices(),
-      _loadProviders(),
+      _loadProviders(currentPosition),
       _loadUnreadCount(),
     ]);
     final unreadCount = results.length > 3 && results[3] is num
@@ -49,8 +50,16 @@ class CustomerHomeRepository {
         .toList();
   }
 
-  Future<List<FeaturedProvider>> _loadProviders() async {
-    final response = await _api.request('/providers/featured');
+  Future<List<FeaturedProvider>> _loadProviders(Position? currentPosition) async {
+    final response = await _api.request(
+      '/providers/featured',
+      query: {
+        if (currentPosition != null) ...{
+          'latitude': currentPosition.latitude,
+          'longitude': currentPosition.longitude,
+        },
+      },
+    );
     final items = response['data'] as List<dynamic>? ?? const [];
     return items
         .whereType<Map<String, dynamic>>()
