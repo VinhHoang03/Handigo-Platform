@@ -1,4 +1,5 @@
 import { QueryFilter, Types } from "mongoose";
+import { randomInt } from "node:crypto";
 import { Category, ICategory } from "../models/category.model";
 import { Service } from "../models/service.model";
 import { AppError } from "../utils/appError";
@@ -8,6 +9,7 @@ interface CategoryInput {
   slug?: string;
   description?: string | null;
   icon?: string | null;
+  iconColor?: string | null;
   isActive?: boolean;
 }
 
@@ -49,6 +51,33 @@ const ensureUniqueSlug = async (slug: string, excludeId?: string) => {
   if (await Category.exists(filter)) {
     throw new AppError("Category slug already exists", 409);
   }
+};
+
+const resolveUniqueIconColor = async (value?: string | null, excludeId?: string) => {
+  const filter: QueryFilter<ICategory> = { isDeleted: false };
+  if (excludeId) filter._id = { $ne: excludeId };
+  if (value) {
+    const iconColor = value.trim().toLowerCase();
+    if (await Category.exists({ ...filter, iconColor }).collation({ locale: "en", strength: 2 })) {
+      throw new AppError("Mã màu này đã được dùng cho danh mục khác. Vui lòng chọn màu khác.", 409);
+    }
+    return iconColor;
+  }
+  const categories = await Category.find(filter).select("iconColor").lean();
+  const usedColors = new Set(categories.map((category) => category.iconColor?.toLowerCase()));
+  let iconColor = "#3525cd";
+  while (usedColors.has(iconColor)) {
+    iconColor = `#${randomInt(0x100000, 0xe00000).toString(16).padStart(6, "0")}`;
+  }
+  return iconColor;
+};
+
+const rethrowCategoryWriteError = (error: unknown): never => {
+  const duplicate = error as { code?: number; keyPattern?: Record<string, unknown> } | null;
+  if (duplicate?.code === 11000 && duplicate.keyPattern?.iconColor) {
+    throw new AppError("Mã màu này vừa được dùng cho danh mục khác. Vui lòng chọn màu khác.", 409);
+  }
+  throw error;
 };
 
 export const listCategories = async (query: ListCategoriesQuery) => {
@@ -95,14 +124,21 @@ export const getCategoryById = async (id: string) => {
 };
 
 export const createCategory = async (data: CategoryInput) => {
+  await Category.init();
   const slug = data.slug || slugify(data.name || "");
   if (!slug) throw new AppError("Unable to generate a valid slug", 400);
   await ensureUniqueSlug(slug);
-  return Category.create({ ...data, slug });
+  const iconColor = await resolveUniqueIconColor(data.iconColor);
+  try {
+    return await Category.create({ ...data, slug, iconColor });
+  } catch (error) {
+    return rethrowCategoryWriteError(error);
+  }
 };
 
 export const updateCategory = async (id: string, data: CategoryInput) => {
   ensureValidId(id);
+  await Category.init();
   const category = await Category.findOne({ _id: id, isDeleted: false });
   if (!category) throw new AppError("Category not found", 404);
 
@@ -112,8 +148,16 @@ export const updateCategory = async (id: string, data: CategoryInput) => {
     data.slug = slug;
   }
 
-  Object.assign(category, data);
-  return category.save();
+  const iconColor = await resolveUniqueIconColor(
+    data.iconColor === undefined ? category.iconColor : data.iconColor,
+    id,
+  );
+  Object.assign(category, data, { iconColor });
+  try {
+    return await category.save();
+  } catch (error) {
+    return rethrowCategoryWriteError(error);
+  }
 };
 
 export const deleteCategory = async (id: string) => {
@@ -143,7 +187,7 @@ export const getActiveCategories = async () => {
     isActive: true,
     isDeleted: false,
   })
-    .select("name slug icon isActive sortOrder")
+    .select("name slug icon iconColor isActive sortOrder")
     .sort({ sortOrder: 1, name: 1 });
 };
 
@@ -152,7 +196,7 @@ export const getActiveCategoriesWithServices = async () => {
     isActive: true,
     isDeleted: false,
   })
-    .select("name slug icon isActive sortOrder")
+    .select("name slug icon iconColor isActive sortOrder")
     .sort({ sortOrder: 1, name: 1 })
     .lean();
 

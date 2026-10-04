@@ -61,6 +61,17 @@ export const providerServiceAreaSchema = z.object({
   ward: optionalText(120),
 });
 
+export const featuredProviderQuerySchema = z
+  .object({
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional(),
+  })
+  .refine(
+    (query) =>
+      (query.latitude === undefined) === (query.longitude === undefined),
+    { message: "Vĩ độ và kinh độ phải được cung cấp cùng nhau." },
+  );
+
 export const updateProviderProfileSchema = z.object({
   fullName: personNameSchema.optional(),
   phone: vietnamesePhoneSchema.optional(),

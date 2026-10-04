@@ -14,6 +14,7 @@ export interface Category {
   name: string;
   slug: string;
   icon?: string;
+  iconColor?: string | null;
   services?: Service[];
 }
 

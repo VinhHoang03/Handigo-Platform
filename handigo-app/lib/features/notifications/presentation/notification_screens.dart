@@ -4,7 +4,6 @@ import '../../../app/providers/app_providers.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../data/notification_repository.dart';
 import '../domain/notification_models.dart';
-import '../../home/presentation/customer_home_provider.dart';
 
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) => NotificationRepository(ref.watch(apiClientProvider)));
 final notificationListProvider = FutureProvider.autoDispose((ref) => ref.watch(notificationRepositoryProvider).list());
@@ -21,17 +20,30 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(notificationListProvider);
-    return Scaffold(appBar: AppBar(title: const Text('Thông báo'), actions: [TextButton(onPressed: () async { await ref.read(notificationRepositoryProvider).markAllRead(); ref.invalidate(notificationListProvider); ref.invalidate(customerHomeProvider); }, child: const Text('Đánh dấu đã đọc'))]), body: state.when(
+    return Scaffold(appBar: AppBar(title: const Text('Thông báo')), body: state.when(
       loading: () => const AppLoading(), error: (_, __) => AppMessage(message: 'Không thể tải thông báo.', onRetry: () => ref.invalidate(notificationListProvider)),
       data: (page) {
         final items = _selectedType == 'ALL' ? page.items : page.items.where((item) => item.type == _selectedType).toList();
+        final counts = <String, int>{
+          'ALL': page.items.length,
+          'ORDER': page.items.where((item) => item.type == 'ORDER').length,
+          'PAYMENT': page.items.where((item) => item.type == 'PAYMENT').length,
+          'QUOTATION': page.items.where((item) => item.type == 'QUOTATION').length,
+          'PROMOTION': page.items.where((item) => item.type == 'PROMOTION').length,
+        };
         if (page.items.isEmpty) return const AppMessage(message: 'Bạn chưa có thông báo nào.');
         return RefreshIndicator(onRefresh: () => ref.refresh(notificationListProvider.future), child: ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           itemCount: items.isEmpty ? 2 : items.length + 1,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, index) {
-            if (index == 0) return _NotificationFilters(selected: _selectedType, onSelected: (type) => setState(() => _selectedType = type));
+            if (index == 0) {
+              return _NotificationFilters(
+                selected: _selectedType,
+                counts: counts,
+                onSelected: (type) => setState(() => _selectedType = type),
+              );
+            }
             if (items.isEmpty) return const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Chưa có thông báo thuộc nhóm này.')));
             return _NotificationTile(item: items[index - 1]);
           },
@@ -42,24 +54,87 @@ class _NotificationCenterScreenState extends ConsumerState<NotificationCenterScr
 }
 
 class _NotificationFilters extends StatelessWidget {
-  const _NotificationFilters({required this.selected, required this.onSelected});
+  const _NotificationFilters({required this.selected, required this.counts, required this.onSelected});
   final String selected;
+  final Map<String, int> counts;
   final ValueChanged<String> onSelected;
   @override
-  Widget build(BuildContext context) => SizedBox(height: 42, child: ListView(scrollDirection: Axis.horizontal, children: [
-    _NotificationChip(label: 'Tất cả', value: 'ALL', selected: selected, onSelected: onSelected),
-    _NotificationChip(label: 'Đơn hàng', value: 'ORDER', selected: selected, onSelected: onSelected),
-    _NotificationChip(label: 'Thanh toán', value: 'PAYMENT', selected: selected, onSelected: onSelected),
-    _NotificationChip(label: 'Báo giá', value: 'QUOTATION', selected: selected, onSelected: onSelected),
-  ]));
+  Widget build(BuildContext context) => SizedBox(
+    height: 42,
+    child: ListView(
+      scrollDirection: Axis.horizontal,
+      children: [
+        _NotificationChip(label: 'Tất cả', value: 'ALL', count: counts['ALL'] ?? 0, selected: selected, onSelected: onSelected),
+        _NotificationChip(label: 'Đơn hàng', value: 'ORDER', count: counts['ORDER'] ?? 0, selected: selected, onSelected: onSelected),
+        _NotificationChip(label: 'Thanh toán', value: 'PAYMENT', count: counts['PAYMENT'] ?? 0, selected: selected, onSelected: onSelected),
+        _NotificationChip(label: 'Báo giá', value: 'QUOTATION', count: counts['QUOTATION'] ?? 0, selected: selected, onSelected: onSelected),
+        _NotificationChip(label: 'Ưu đãi', value: 'PROMOTION', count: counts['PROMOTION'] ?? 0, selected: selected, onSelected: onSelected),
+      ],
+    ),
+  );
 }
 
 class _NotificationChip extends StatelessWidget {
-  const _NotificationChip({required this.label, required this.value, required this.selected, required this.onSelected});
+  const _NotificationChip({required this.label, required this.value, required this.count, required this.selected, required this.onSelected});
   final String label, value, selected;
+  final int count;
   final ValueChanged<String> onSelected;
   @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(label: Text(label), selected: selected == value, onSelected: (_) => onSelected(value)));
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isSelected = selected == value;
+    final scheme = theme.colorScheme;
+    final backgroundColor = isSelected ? scheme.primary : scheme.surfaceContainerLow;
+    final foregroundColor = isSelected ? scheme.onPrimary : scheme.onSurfaceVariant;
+    final badgeColor = isSelected ? scheme.onPrimary : scheme.primary.withValues(alpha: .12);
+    final badgeTextColor = isSelected ? scheme.primary : scheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: () => onSelected(value),
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: foregroundColor,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                if (count > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: badgeTextColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _NotificationTile extends ConsumerWidget {
@@ -73,7 +148,7 @@ class _NotificationTile extends ConsumerWidget {
       child: InkWell(
         onTap: item.isRead ? null : () async { await ref.read(notificationRepositoryProvider).markRead(item.id); ref.invalidate(notificationListProvider); },
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -87,9 +162,10 @@ class _NotificationTile extends ConsumerWidget {
                       color: iconColor.withValues(alpha: .12),
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    alignment: Alignment.center,
                     child: Icon(_icon(item.type), color: iconColor),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,17 +176,19 @@ class _NotificationTile extends ConsumerWidget {
                             Expanded(
                               child: Text(
                                 item.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
                             if (!item.isRead) ...[
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
+                                  horizontal: 7,
+                                  vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
                                   color: theme.colorScheme.primaryContainer,
@@ -127,43 +205,14 @@ class _NotificationTile extends ConsumerWidget {
                             ],
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(item.content, style: theme.textTheme.bodySmall),
-                        if (!item.isRead)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () async {
-                                await ref
-                                    .read(notificationRepositoryProvider)
-                                    .markRead(item.id);
-                                ref.invalidate(notificationListProvider);
-                                ref.invalidate(customerHomeProvider);
-                              },
-                              style: TextButton.styleFrom(
-                                foregroundColor: theme.colorScheme.primary,
-                                padding: const EdgeInsets.only(top: 6),
-                                minimumSize: const Size(0, 32),
-                              ),
-                              icon: const Icon(Icons.done, size: 16),
-                              label: const Text('Đánh dấu đã đọc'),
-                            ),
-                          ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.content,
+                          style: theme.textTheme.bodySmall,
+                        ),
                       ],
                     ),
                   ),
-                  if (!item.isRead)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8, top: 5),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
                 ],
               ),
               if (item.createdAt != null) ...[
