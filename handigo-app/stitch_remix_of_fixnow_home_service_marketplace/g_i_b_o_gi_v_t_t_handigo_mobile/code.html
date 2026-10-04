@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Báo giá sửa chữa phát sinh - Handigo Đối tác</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Hanken Grotesk & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config verbatim -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "inverse-on-surface": "#eef0ff",
+            "primary": "#1e00a9",
+            "surface": "#faf8ff",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "on-tertiary-container": "#ff9f72",
+            "surface-variant": "#dae2fc",
+            "surface-container-low": "#f2f3ff",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "on-background": "#131b2e",
+            "success-green": "#4ade80",
+            "inverse-primary": "#c3c0ff",
+            "on-primary-fixed": "#0f0069",
+            "on-tertiary-fixed": "#351000",
+            "on-tertiary": "#ffffff",
+            "tertiary": "#592000",
+            "inverse-surface": "#283044",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-container": "#076a7c",
+            "outline": "#777587",
+            "secondary-fixed-dim": "#86d2e6",
+            "surface-container-highest": "#dae2fc",
+            "error": "#ba1a1a",
+            "on-primary-container": "#b1afff",
+            "secondary-container": "#9ce8fd",
+            "on-primary-fixed-variant": "#3323cc",
+            "primary-container": "#3525cd",
+            "error-container": "#ffdad6",
+            "on-secondary-fixed-variant": "#004e5c",
+            "on-secondary": "#ffffff",
+            "on-primary": "#ffffff",
+            "background": "#faf8ff",
+            "tertiary-fixed-dim": "#ffb694",
+            "outline-variant": "#c7c4d8",
+            "secondary-fixed": "#abedff",
+            "primary-fixed-dim": "#c3c0ff",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#7d3000",
+            "surface-dim": "#d2d9f4",
+            "on-surface": "#131b2e",
+            "surface-tint": "#4d44e3",
+            "on-surface-variant": "#464555",
+            "primary-fixed": "#e2dfff",
+            "tertiary-fixed": "#ffdbcc",
+            "surface-container-high": "#e1e7ff",
+            "on-error": "#ffffff",
+            "on-error-container": "#93000a",
+            "surface-bright": "#faf8ff",
+            "on-secondary-fixed": "#001f26",
+            "secondary": "#00687a",
+            "star-gold": "#facc15"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "container-max": "1280px",
+            "sm": "12px",
+            "lg": "48px",
+            "base": "8px",
+            "gutter": "24px",
+            "xl": "80px",
+            "md": "24px",
+            "xs": "4px"
+          },
+          "fontFamily": {
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "headline-xl": ["Hanken Grotesk"],
+            "headline-lg-mobile": ["Hanken Grotesk"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "label-md": ["Inter"],
+            "label-sm": ["Inter"]
+          },
+          "fontSize": {
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md text-body-md antialiased min-h-screen pb-32">
+<div class="max-w-md mx-auto relative bg-surface shadow-xl min-h-screen flex flex-col">
+<!-- Top App Bar (Task-focused contextual departure: Back button + Title + Order Code) -->
+<header class="sticky top-0 z-40 bg-surface/85 backdrop-blur-md flex items-center justify-between px-4 h-16 shadow-sm">
+<div class="flex items-center space-x-3">
+<button aria-label="Quay lại đơn hàng" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-variant active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface leading-tight">Báo giá phát sinh</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Mã đơn: <span class="font-semibold text-primary">#HDG-8924A</span></p>
+</div>
+</div>
+<div class="flex items-center space-x-1">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-fixed text-on-primary-fixed">
+          Đang làm
+        </span>
+</div>
+</header>
+<main class="p-4 space-y-4 flex-1">
+<!-- Hộp thông báo quy định minh bạch -->
+<div class="p-3.5 bg-surface-container rounded-xl border border-outline-variant/30 flex items-start space-x-3">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[20px]" data-icon="verified_user">verified_user</span>
+</div>
+<p class="font-label-md text-label-md text-on-surface leading-snug">
+          Chi phí phát sinh và vật tư thay thế cần có sự <span class="font-semibold text-primary">xác nhận đồng ý của khách hàng</span> trên ứng dụng trước khi thợ tiến hành thi công.
+        </p>
+</div>
+<!-- Tóm tắt đơn hàng -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 shadow-sm space-y-2">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Khách hàng &amp; dịch vụ</span>
+<span class="text-xs text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-success-green inline-block"></span> Có mặt tại nơi
+          </span>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div>
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface">Trần Anh Tuấn</h2>
+<p class="font-label-md text-label-md text-on-surface-variant flex items-center mt-0.5">
+<span class="material-symbols-outlined text-[16px] mr-1 text-primary" data-icon="plumbing">plumbing</span>
+              Dịch vụ Sửa rò rỉ bồn rửa
+            </p>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-variant text-primary flex items-center justify-center font-bold text-base">
+            AT
+          </div>
+</div>
+</div>
+<!-- Danh sách vật tư / Hạng mục phát sinh -->
+<section class="space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="inventory_2">inventory_2</span>
+<h3 class="font-headline-md text-headline-md text-base font-bold text-on-surface">Hạng mục &amp; Vật tư đề xuất</h3>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">2 mục</span>
+</div>
+<!-- Dòng 1 -->
+<div class="bg-surface-container-lowest p-3.5 rounded-xl border border-outline-variant/30 shadow-sm relative group hover:border-primary/40 transition-all">
+<div class="flex items-start justify-between gap-2">
+<div class="flex-1 space-y-1">
+<div class="flex items-center space-x-1.5">
+<span class="w-5 h-5 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center text-xs font-bold">1</span>
+<p class="font-label-md text-label-md font-bold text-on-surface">Bộ xi-phông &amp; ống ruột gà inox 304 chống mùi</p>
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex items-center space-x-2 text-on-surface-variant text-xs">
+<span class="bg-surface-container px-2 py-1 rounded-md font-medium text-on-surface">Số lượng: 1 cái</span>
+<span class="text-outline">×</span>
+<span class="font-semibold text-on-surface">120.000đ</span>
+</div>
+<div class="font-headline-md text-headline-md text-base font-bold text-primary">
+                  120.000đ
+                </div>
+</div>
+</div>
+<button aria-label="Xóa dòng 1" class="text-outline hover:text-error active:scale-90 p-1.5 rounded-lg hover:bg-error-container/20 transition-all ml-1" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+<!-- Dòng 2 -->
+<div class="bg-surface-container-lowest p-3.5 rounded-xl border border-outline-variant/30 shadow-sm relative group hover:border-primary/40 transition-all">
+<div class="flex items-start justify-between gap-2">
+<div class="flex-1 space-y-1">
+<div class="flex items-center space-x-1.5">
+<span class="w-5 h-5 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center text-xs font-bold">2</span>
+<p class="font-label-md text-label-md font-bold text-on-surface">Thay thế van khóa đồng ren phi 21</p>
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex items-center space-x-2 text-on-surface-variant text-xs">
+<span class="bg-surface-container px-2 py-1 rounded-md font-medium text-on-surface">Số lượng: 1 cái</span>
+<span class="text-outline">×</span>
+<span class="font-semibold text-on-surface">65.000đ</span>
+</div>
+<div class="font-headline-md text-headline-md text-base font-bold text-primary">
+                  65.000đ
+                </div>
+</div>
+</div>
+<button aria-label="Xóa dòng 2" class="text-outline hover:text-error active:scale-90 p-1.5 rounded-lg hover:bg-error-container/20 transition-all ml-1" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+<!-- Nút Thêm vật tư / công việc -->
+<button class="w-full py-3 px-4 border-2 border-dashed border-primary/40 hover:border-primary bg-surface-container-low hover:bg-surface-container rounded-xl flex items-center justify-center space-x-2 text-primary font-label-md text-label-md font-bold active:scale-[0.98] transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="add_circle">add_circle</span>
+<span>+ Thêm vật tư / công việc phát sinh</span>
+</button>
+</section>
+<!-- Khu vực tải ảnh bằng chứng hỏng hóc thực tế -->
+<section class="space-y-2">
+<div class="flex items-center justify-between">
+<label class="font-headline-md text-headline-md text-sm font-bold text-on-surface flex items-center space-x-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="photo_camera">photo_camera</span>
+<span>Hình ảnh hiện trường &amp; linh kiện hỏng</span>
+</label>
+<span class="text-xs text-outline font-medium">2/4 ảnh</span>
+</div>
+<div class="grid grid-cols-3 gap-2.5">
+<!-- Ảnh bằng chứng 1 -->
+<div class="relative aspect-square rounded-xl overflow-hidden border border-outline-variant/40 shadow-sm group">
+<img class="w-full h-full object-cover" data-alt="A detailed high-definition close-up photo of a cracked kitchen sink PVC drainage pipe showing greasy water residue and severe fracture. The lighting is crisp and documentary-style, illuminating the damaged joint inside a modern light kitchen cabinet with soft neutral background tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhpnlgW3tWJWt7tnZw-b4isTR7XBUV1i0Lr4owEbig6zfF9btRzzJJbUyRm3iKfOcNkSsTZaZ1HaipB4T9Gg3wVc2odjwmgXr5CP03JaJaFcTv20EwlZ6DqdclFPqoauVEQu8OByFofefSDIFWOUEip1MojijuLmXzwNl7YcIARTuW2tvLwemQrWV9kpdTamlD25ApSgmv-5xAIxCdWg6jyIap7ayDfWuFue9BRoCG5B1h3eZxcHPJRA"/>
+<button class="absolute top-1 right-1 w-6 h-6 rounded-full bg-inverse-surface/80 text-surface flex items-center justify-center active:scale-90" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="close">close</span>
+</button>
+<div class="absolute bottom-0 inset-x-0 bg-inverse-surface/70 text-surface text-[10px] px-1.5 py-0.5 font-medium truncate">Ống nứt vỡ</div>
+</div>
+<!-- Ảnh bằng chứng 2 -->
+<div class="relative aspect-square rounded-xl overflow-hidden border border-outline-variant/40 shadow-sm group">
+<img class="w-full h-full object-cover" data-alt="A focused close-up photo of a rusted and stripped brass water shut-off valve beneath a sink, displaying mineral calcification, stripped screw threads, and persistent droplet leaks. Natural warm interior lighting highlights the mechanical wear and authentic plumbing defect." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxIc2wjSYa0ZEezUWE_SAoZJjzdiBEG5KG73O9ziTPS_Hyjmol-lANg_VLUncjGOnnkXCG1LhnIVbDhDU7KC3ijcfS4Iwc6GJh82xa0bzlRqxhPiC3yfwnWGO1rTF2duPUL_H90b0j0MF5LwGPY4FWVkJfJaD58WNdQLuDuDFxOzDHBkhT6RG91kt_jI-xEoyPm25caqGGf2QwE8AFdiON9QtDqKL9NkicTXCjHQAW2GhhBISmR8GsNw"/>
+<button class="absolute top-1 right-1 w-6 h-6 rounded-full bg-inverse-surface/80 text-surface flex items-center justify-center active:scale-90" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="close">close</span>
+</button>
+<div class="absolute bottom-0 inset-x-0 bg-inverse-surface/70 text-surface text-[10px] px-1.5 py-0.5 font-medium truncate">Van nhờn ren</div>
+</div>
+<!-- Ô Upload ảnh mới -->
+<button class="aspect-square rounded-xl border-2 border-dashed border-outline-variant hover:border-primary bg-surface-container-low hover:bg-surface-container flex flex-col items-center justify-center text-outline hover:text-primary transition-all active:scale-95" type="button">
+<span class="material-symbols-outlined text-[28px]" data-icon="add_a_photo">add_a_photo</span>
+<span class="text-[11px] font-semibold mt-1">Chụp thêm</span>
+</button>
+</div>
+</section>
+<!-- Ghi chú giải trình cho khách hàng -->
+<section class="space-y-2">
+<label class="font-headline-md text-headline-md text-sm font-bold text-on-surface flex items-center space-x-1.5" for="technician-notes">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="description">description</span>
+<span>Giải trình nguyên nhân &amp; đề xuất kỹ thuật</span>
+</label>
+<div class="relative">
+<textarea class="w-full rounded-xl bg-surface-container-lowest border border-outline-variant/40 focus:border-primary focus:ring-1 focus:ring-primary p-3 font-body-md text-body-md text-on-surface placeholder:text-outline text-sm shadow-sm" id="technician-notes" rows="3">Ống xả cũ bị nứt mục do dầu mỡ lâu ngày và van nước bị nhờn ren cần thay để tránh rò rỉ ngầm.</textarea>
+</div>
+<p class="text-xs text-on-surface-variant flex items-center">
+<span class="material-symbols-outlined text-[14px] mr-1 text-primary" data-icon="info">info</span>
+          Giải trình rõ ràng giúp gia chủ nắm bắt và duyệt đơn nhanh hơn.
+        </p>
+</section>
+<!-- Ghi chú chính sách -->
+<div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/30 flex items-start space-x-2 text-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-primary flex-shrink-0 mt-0.5" data-icon="policy">policy</span>
+<p class="leading-relaxed">
+          Khoản tiền phát sinh này sẽ được khách hàng thanh toán trực tiếp cho thợ hoặc cộng vào ví sau khi nghiệm thu.
+        </p>
+</div>
+</main>
+<!-- Bottom Docked Summary & CTA Bar -->
+<div class="sticky bottom-0 left-0 w-full z-30 bg-surface/95 backdrop-blur-md border-t border-outline-variant/30 p-4 shadow-lg space-y-3">
+<!-- Tổng cộng -->
+<div class="flex items-baseline justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider block">Tổng chi phí phát sinh</span>
+<span class="text-xs text-on-surface-variant">2 hạng mục vật tư</span>
+</div>
+<div class="text-right">
+<span class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary leading-none">185.000đ</span>
+<span class="text-[11px] text-outline block">Đã bao gồm công lắp</span>
+</div>
+</div>
+<!-- Nút CTA -->
+<button class="w-full min-h-[48px] bg-primary-container hover:bg-primary text-on-primary font-bold text-base rounded-xl py-3.5 px-4 shadow-md flex items-center justify-center space-x-2 active:scale-95 transition-all" type="button">
+<span>Gửi báo giá cho khách duyệt ngay</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</body></html>

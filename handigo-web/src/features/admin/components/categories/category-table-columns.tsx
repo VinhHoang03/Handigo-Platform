@@ -40,9 +40,13 @@ export function buildCategoryTableColumns({
       header: "Danh mục",
       render: (category) => (
         <div className="group relative flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-fixed-dim/30 text-primary">
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary/10 bg-primary-fixed-dim/30 text-primary"
+            style={category.iconColor ? { backgroundColor: `${category.iconColor}0d`, borderColor: `${category.iconColor}30` } : undefined}
+          >
             <CategoryIcon
               icon={category.icon}
+              color={category.iconColor}
               name={category.name}
               className="h-7 w-7"
             />

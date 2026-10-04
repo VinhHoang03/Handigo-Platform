@@ -4,6 +4,7 @@ export interface Category {
   slug: string;
   description?: string;
   icon?: string;
+  iconColor?: string | null;
   image?: string;
   isActive: boolean;
 }

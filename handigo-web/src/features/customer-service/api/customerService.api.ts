@@ -56,6 +56,7 @@ export interface PublicProviderProfile {
       name: string;
       slug: string;
       icon?: string | null;
+      iconColor?: string | null;
       services: Array<{
         id: string;
         name: string;

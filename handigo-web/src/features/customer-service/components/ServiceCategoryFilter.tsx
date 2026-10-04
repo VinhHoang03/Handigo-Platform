@@ -1,4 +1,3 @@
-import { ReliableImage } from "@/components/common/ReliableImage";
 import { CategoryIcon } from "@/components/common/CategoryIcon";
 import type { Category } from "@/types/booking";
 import { LayoutGrid, SlidersHorizontal } from "lucide-react";
@@ -56,8 +55,6 @@ export function ServiceCategoryFilter({
             <span className="text-xs tabular-nums opacity-70">{totalCount}</span>
           </button>
           {visibleCategories.map((category) => {
-            const categoryImage = category.image;
-
             return (
               <button
                 key={category._id}
@@ -69,24 +66,12 @@ export function ServiceCategoryFilter({
                     : "text-on-surface hover:bg-surface-container-low"
                 }`}
               >
-                {categoryImage ? (
-                  <ReliableImage
-                    src={categoryImage.replace(
-                      /^http:\/\/res\.cloudinary\.com/i,
-                      "https://res.cloudinary.com",
-                    )}
-                    alt={category.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-5 w-5 shrink-0 rounded object-cover"
-                  />
-                ) : (
-                  <CategoryIcon
-                    icon={category.icon}
-                    name={category.name}
-                    className="h-5 w-5 shrink-0"
-                  />
-                )}
+                <CategoryIcon
+                  icon={category.icon}
+                  color={selectedCategoryId === category._id ? undefined : category.iconColor}
+                  name={category.name}
+                  className="h-5 w-5 shrink-0"
+                />
                 <span className="flex-1">{category.name}</span>
                 <span className="text-xs tabular-nums opacity-70">
                   {serviceCounts[category._id]}

@@ -228,8 +228,21 @@ export const forgotPassword = async (
   try {
     await authService.forgotPassword(req.body.email);
     res.json({
-      message: "If the email exists, a reset OTP has been sent",
+      message: "Mã OTP đặt lại đã được gửi đến email của bạn.",
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyResetPasswordOtp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    await authService.verifyResetPasswordOtp(req.body.email, req.body.otp);
+    res.json({ message: "Mã OTP đã được xác thực" });
   } catch (error) {
     next(error);
   }

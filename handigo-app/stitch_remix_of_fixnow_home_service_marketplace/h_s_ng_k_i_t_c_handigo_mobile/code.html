@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hồ sơ đăng ký Thợ - Handigo</title>
+<!-- Tailwind CSS CDN with forms and container-queries plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Hanken Grotesk & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "inverse-on-surface": "#eef0ff",
+            "primary": "#1e00a9",
+            "surface": "#faf8ff",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "on-tertiary-container": "#ff9f72",
+            "surface-variant": "#dae2fc",
+            "surface-container-low": "#f2f3ff",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "on-background": "#131b2e",
+            "success-green": "#4ade80",
+            "inverse-primary": "#c3c0ff",
+            "on-primary-fixed": "#0f0069",
+            "on-tertiary-fixed": "#351000",
+            "on-tertiary": "#ffffff",
+            "tertiary": "#592000",
+            "inverse-surface": "#283044",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-container": "#076a7c",
+            "outline": "#777587",
+            "secondary-fixed-dim": "#86d2e6",
+            "surface-container-highest": "#dae2fc",
+            "error": "#ba1a1a",
+            "on-primary-container": "#b1afff",
+            "secondary-container": "#9ce8fd",
+            "on-primary-fixed-variant": "#3323cc",
+            "primary-container": "#3525cd",
+            "error-container": "#ffdad6",
+            "on-secondary-fixed-variant": "#004e5c",
+            "on-secondary": "#ffffff",
+            "on-primary": "#ffffff",
+            "background": "#faf8ff",
+            "tertiary-fixed-dim": "#ffb694",
+            "outline-variant": "#c7c4d8",
+            "secondary-fixed": "#abedff",
+            "primary-fixed-dim": "#c3c0ff",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#7d3000",
+            "surface-dim": "#d2d9f4",
+            "on-surface": "#131b2e",
+            "surface-tint": "#4d44e3",
+            "on-surface-variant": "#464555",
+            "primary-fixed": "#e2dfff",
+            "tertiary-fixed": "#ffdbcc",
+            "surface-container-high": "#e1e7ff",
+            "on-error": "#ffffff",
+            "on-error-container": "#93000a",
+            "surface-bright": "#faf8ff",
+            "on-secondary-fixed": "#001f26",
+            "secondary": "#00687a",
+            "star-gold": "#facc15"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "container-max": "1280px",
+            "sm": "12px",
+            "lg": "48px",
+            "base": "8px",
+            "gutter": "24px",
+            "xl": "80px",
+            "md": "24px",
+            "xs": "4px"
+          },
+          "fontFamily": {
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "headline-xl": ["Hanken Grotesk"],
+            "headline-lg-mobile": ["Hanken Grotesk"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "label-md": ["Inter"],
+            "label-sm": ["Inter"]
+          },
+          "fontSize": {
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary selection:text-on-primary">
+<!-- Mobile View Wrapper (Centered Max Width Container) -->
+<div class="w-full max-w-md mx-auto flex flex-col min-h-screen bg-background relative shadow-2xl">
+<!-- Header: Focused Task Departure (Suppress standard app shell, prioritize back and title) -->
+<header class="sticky top-0 z-40 bg-surface/85 backdrop-blur-md px-4 h-16 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-3">
+<button aria-label="Quay lại" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-variant active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface tracking-tight">Hồ sơ đăng ký Thợ</h1>
+</div>
+<a aria-label="Gọi hỗ trợ khẩn cấp" class="w-10 h-10 rounded-full flex items-center justify-center text-primary bg-primary-fixed hover:bg-surface-variant active:scale-95 transition-all" href="tel:19008924">
+<span class="material-symbols-outlined text-[20px]" data-icon="support_agent">support_agent</span>
+</a>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-4 py-5 space-y-5 pb-28">
+<!-- Status Card: Hero Highlight (Pending State) -->
+<section class="relative overflow-hidden rounded-xl bg-surface-container-lowest p-5 border border-outline-variant/30 shadow-md">
+<div class="absolute -right-10 -bottom-10 w-36 h-36 bg-tertiary-fixed rounded-full blur-2xl opacity-60 pointer-events-none"></div>
+<div class="flex items-start justify-between gap-3 mb-3">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm shadow-sm">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-on-tertiary-container opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-on-tertiary-fixed-variant"></span>
+</span>
+<span>ĐANG CHỜ DUYỆT (Dự kiến trong 24h)</span>
+</div>
+<span class="material-symbols-outlined text-tertiary-container" data-icon="hourglass_top">hourglass_top</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4">
+          Ban quản trị Handigo đang tiến hành kiểm tra thông tin định danh và tay nghề chuyên môn của bạn.
+        </p>
+<!-- Progress Tracker Bar -->
+<div class="bg-surface-container-low rounded-lg p-3 border border-outline-variant/20 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="schedule">schedule</span>
+<span class="font-label-md text-label-md text-on-surface">Thời gian gửi: <strong class="text-primary font-semibold">10:45 - Hôm nay</strong></span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-variant/60 px-2 py-0.5 rounded">Mã: #HDG-8942</span>
+</div>
+</section>
+<!-- Section: 4-Step Review Timeline -->
+<section class="rounded-xl bg-surface-container-lowest p-5 border border-outline-variant/30 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="schema">schema</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Quy trình xét duyệt</h2>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-semibold">Bước 2 / 4</span>
+</div>
+<div class="relative pl-6 space-y-6 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-[2px] before:bg-surface-variant">
+<!-- Step 1 (Completed) -->
+<div class="relative group">
+<div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-success-green flex items-center justify-center text-on-surface shadow-xs">
+<span class="material-symbols-outlined text-[14px] text-on-primary" data-icon="check" data-weight="fill">check</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Bước 1: Nộp hồ sơ trực tuyến</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Đã hoàn thành - Thông tin cơ bản &amp; giấy tờ</p>
+</div>
+</div>
+<!-- Step 2 (Active/Processing) -->
+<div class="relative">
+<div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-primary-container flex items-center justify-center text-on-primary ring-4 ring-primary-fixed shadow-sm">
+<span class="material-symbols-outlined text-[13px] animate-spin" data-icon="sync">sync</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-primary font-semibold">Bước 2: Thẩm định hồ sơ &amp; đối chiếu thông tin</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Đang xử lý - Kiểm tra tính xác thực của CCCD và chứng chỉ</p>
+</div>
+</div>
+<!-- Step 3 (Next) -->
+<div class="relative opacity-60">
+<div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-surface-container-high border-2 border-outline-variant flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Bước 3: Phỏng vấn kiểm tra tay nghề / Test qua app</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Kế tiếp - Bài kiểm tra 10 câu hỏi nghiệp vụ thợ</p>
+</div>
+</div>
+<!-- Step 4 (Final) -->
+<div class="relative opacity-50">
+<div class="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-surface-container-high border-2 border-outline-variant flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Bước 4: Kích hoạt tài khoản &amp; Nhận đơn</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Nhận đồng phục và bắt đầu nhận việc gần nhà</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 1: Thông tin cá nhân & Liên hệ -->
+<section class="rounded-xl bg-surface-container-lowest p-5 border border-outline-variant/30 shadow-sm">
+<div class="flex items-center justify-between mb-4 pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="badge">badge</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">1. Thông tin cá nhân &amp; Liên hệ</h2>
+</div>
+<span class="material-symbols-outlined text-outline" data-icon="verified_user">verified_user</span>
+</div>
+<!-- Identity Header Item -->
+<div class="flex items-center gap-4 mb-4">
+<div class="relative">
+<img class="w-16 h-16 rounded-xl object-cover ring-2 ring-primary-fixed shadow-sm" data-alt="A professional studio portrait of a friendly Vietnamese male technician in his mid-30s wearing a clean dark indigo polo shirt, shot with bright even key lighting and a clean neutral minimalist backdrop. His warm and trustworthy demeanor aligns with a modern high-end service platform aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4wmP9mMBN893bJv66Gd5r591b1oMOmby9Nc665EGtY2qguy385PrjRpG2NB2x3OwGiELUmir2e6Jbdz1UcJb7otcTEUBZEszPBracpemUjqBsn75goN29TjXxas77Sx4qEczBNTwgsruLWvkjfduIE7_3q7L0-mk25xvQcBENbbzoMQpQ7e3rRDWuyoJx82vBhOILXWe7RJlQrrorzWdVWjBNR7OkbZGkht8zTUloQ955KJqMbHjXZg"/>
+<span class="absolute -bottom-1 -right-1 w-4 h-4 bg-success-green border-2 border-surface-container-lowest rounded-full"></span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface font-bold">Trần Văn Cường</h3>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="call">call</span>
+              0908 123 456
+            </p>
+</div>
+</div>
+<!-- CCCD Documents Verification -->
+<div class="space-y-2.5 pt-1">
+<p class="font-label-sm text-label-sm text-on-surface-variant font-medium">Giấy tờ tùy thân (Căn cước công dân):</p>
+<div class="grid grid-cols-2 gap-2.5">
+<!-- Front Side -->
+<div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 flex flex-col justify-between">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">CCCD Mặt trước</span>
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="check_circle" data-weight="fill">check_circle</span>
+</div>
+<div class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary-fixed px-2 py-0.5 rounded-full w-max">
+                Đã tải lên
+              </div>
+</div>
+<!-- Back Side -->
+<div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 flex flex-col justify-between">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">CCCD Mặt sau</span>
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="check_circle" data-weight="fill">check_circle</span>
+</div>
+<div class="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary-fixed px-2 py-0.5 rounded-full w-max">
+                Đã tải lên
+              </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Chuyên môn đăng ký & Chứng chỉ -->
+<section class="rounded-xl bg-surface-container-lowest p-5 border border-outline-variant/30 shadow-sm">
+<div class="flex items-center justify-between mb-4 pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="handyman">handyman</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">2. Chuyên môn đăng ký</h2>
+</div>
+<span class="font-label-sm text-label-sm px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-semibold">
+            6 năm kinh nghiệm
+          </span>
+</div>
+<div class="space-y-3">
+<!-- Skills Badges -->
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium block mb-2">Dịch vụ cung cấp chính:</span>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-primary font-label-md text-label-md font-semibold border border-surface-variant">
+<span class="material-symbols-outlined text-[16px]" data-icon="ac_unit">ac_unit</span>
+                Kỹ thuật viên Điện Lạnh &amp; Máy Lạnh
+              </span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-primary font-label-md text-label-md font-semibold border border-surface-variant">
+<span class="material-symbols-outlined text-[16px]" data-icon="water_drop">water_drop</span>
+                Điện Nước gia đình
+              </span>
+</div>
+</div>
+<!-- Certificate View Attachment -->
+<div class="pt-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium block mb-1.5">Bằng cấp &amp; Chứng chỉ nghề:</span>
+<div class="p-3 bg-surface-container-low rounded-lg border border-outline-variant/30 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="workspace_premium" data-weight="fill">workspace_premium</span>
+</div>
+<div>
+<p class="font-label-md text-label-md font-semibold text-on-surface">Chứng chỉ nghề Điện Lạnh ĐH/CĐ Kỹ thuật</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">chung_chi_nghe_dienlanh.pdf (2.4 MB)</p>
+</div>
+</div>
+<button aria-label="Xem lại chứng chỉ" class="text-primary hover:bg-surface-variant p-2 rounded-lg transition-colors flex items-center gap-1 font-label-sm text-label-sm font-semibold" type="button">
+<span class="material-symbols-outlined text-[18px]" data-icon="visibility">visibility</span>
+<span>Xem lại</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Khu vực hoạt động -->
+<section class="rounded-xl bg-surface-container-lowest p-5 border border-outline-variant/30 shadow-sm">
+<div class="flex items-center justify-between mb-4 pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="distance">distance</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">3. Khu vực hoạt động</h2>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="radar">radar</span>
+            Bán kính 10km
+          </span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-2">Các quận/khu vực đã chọn ưu tiên nhận cuốc:</p>
+<div class="flex flex-wrap gap-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="location_on" data-weight="fill">location_on</span>
+            Quận 7
+          </span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="location_on" data-weight="fill">location_on</span>
+            Quận 4
+          </span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="location_on" data-weight="fill">location_on</span>
+            TP. Thủ Đức
+          </span>
+</div>
+</section>
+<!-- Section 4: Phương tiện di chuyển & Dụng cụ -->
+<section class="rounded-xl bg-surface-container-lowest p-5 border border-outline-variant/30 shadow-sm">
+<div class="flex items-center gap-2 mb-4 pb-2 border-b border-outline-variant/20">
+<span class="material-symbols-outlined text-primary" data-icon="two_wheeler">two_wheeler</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">4. Phương tiện &amp; Dụng cụ mang theo</h2>
+</div>
+<div class="space-y-3">
+<div class="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg border border-outline-variant/20">
+<div class="w-9 h-9 rounded-lg bg-surface-container-highest flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined" data-icon="motorcycle">motorcycle</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Phương tiện di chuyển:</p>
+<p class="font-label-md text-label-md font-semibold text-on-surface">Xe máy cá nhân (Chủ động cơ động)</p>
+</div>
+</div>
+<div class="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg border border-outline-variant/20">
+<div class="w-9 h-9 rounded-lg bg-surface-container-highest flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined" data-icon="home_repair_service">home_repair_service</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Bộ trang thiết bị chuyên dụng:</p>
+<p class="font-label-md text-label-md font-semibold text-on-surface">Bộ đồng hồ đo gas &amp; bơm áp lực vệ sinh</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Support & Helpdesk Note Box -->
+<div class="rounded-xl p-4 bg-surface-container-low border border-outline-variant/40 flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-[22px]" data-icon="info">info</span>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant leading-relaxed">
+            Hồ sơ đang trong quy trình đối soát tự động. Nếu cần bổ sung ảnh chứng chỉ mờ hoặc đổi số điện thoại, bạn có thể thực hiện cập nhật ngay bên dưới.
+          </p>
+</div>
+</div>
+</main>
+<!-- Bottom Floating Action Tray (Sticky within mobile canvas) -->
+<div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-surface/90 backdrop-blur-md px-4 py-3 border-t border-outline-variant/20 z-50 flex flex-col gap-2.5 shadow-lg">
+<!-- Primary Action: Update/Add Files -->
+<button class="w-full h-12 rounded-xl bg-primary-container text-on-primary font-headline-md text-headline-md flex items-center justify-center gap-2 active:scale-95 transition-transform duration-150 shadow-md" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="edit_document">edit_document</span>
+<span>Cập nhật / Bổ sung giấy tờ</span>
+</button>
+<!-- Secondary Action: Fast Support Hotline -->
+<a class="w-full h-10 rounded-xl bg-surface-container-low text-primary hover:bg-surface-variant font-label-md text-label-md font-semibold flex items-center justify-center gap-2 transition-colors duration-150 border border-outline-variant/30" href="tel:19008924">
+<span class="material-symbols-outlined text-[18px] text-tertiary-container" data-icon="ring_volume">ring_volume</span>
+<span>Liên hệ CSKH duyệt nhanh: <strong class="underline">1900 8924</strong></span>
+</a>
+</div>
+</div>
+</body></html>

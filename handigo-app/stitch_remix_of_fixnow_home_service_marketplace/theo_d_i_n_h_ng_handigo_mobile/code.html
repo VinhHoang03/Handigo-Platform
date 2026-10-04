@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Handigo - Theo dõi đơn hàng #HDG-8924A</title>
+<!-- Material Symbols Outlined font -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS with form plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "error-container": "#ffdad6",
+            "on-primary-container": "#b1afff",
+            "on-primary": "#ffffff",
+            "on-background": "#131b2e",
+            "primary-container": "#3525cd",
+            "on-error-container": "#93000a",
+            "primary-fixed-dim": "#c3c0ff",
+            "surface-container-high": "#e1e7ff",
+            "primary-fixed": "#e2dfff",
+            "surface-variant": "#dae2fc",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "secondary-fixed": "#abedff",
+            "surface-dim": "#d2d9f4",
+            "error": "#ba1a1a",
+            "on-primary-fixed-variant": "#3323cc",
+            "outline": "#777587",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface": "#faf8ff",
+            "surface-container-lowest": "#ffffff",
+            "on-surface": "#131b2e",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "on-surface-variant": "#464555",
+            "on-secondary-fixed": "#001f26",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "on-error": "#ffffff",
+            "secondary": "#00687a",
+            "surface-bright": "#faf8ff",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#7d3000",
+            "primary": "#1e00a9",
+            "inverse-surface": "#283044",
+            "inverse-on-surface": "#eef0ff",
+            "surface-tint": "#4d44e3",
+            "background": "#faf8ff",
+            "surface-container-low": "#f2f3ff",
+            "on-primary-fixed": "#0f0069",
+            "tertiary-fixed": "#ffdbcc",
+            "star-gold": "#facc15",
+            "surface-container-highest": "#dae2fc",
+            "success-green": "#4ade80",
+            "on-tertiary": "#ffffff",
+            "tertiary": "#592000",
+            "on-secondary": "#ffffff",
+            "secondary-fixed-dim": "#86d2e6",
+            "outline-variant": "#c7c4d8",
+            "tertiary-fixed-dim": "#ffb694",
+            "secondary-container": "#9ce8fd",
+            "on-secondary-container": "#076a7c",
+            "inverse-primary": "#c3c0ff",
+            "on-tertiary-container": "#ff9f72",
+            "on-tertiary-fixed": "#351000"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "md": "24px",
+            "container-max": "1280px",
+            "xl": "80px",
+            "gutter": "24px",
+            "base": "8px",
+            "sm": "12px",
+            "xs": "4px",
+            "lg": "48px"
+          },
+          "fontFamily": {
+            "label-md": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "headline-lg": ["Hanken Grotesk"],
+            "headline-xl": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "body-lg": ["Inter"],
+            "label-sm": ["Inter"],
+            "headline-lg-mobile": ["Hanken Grotesk"]
+          },
+          "fontSize": {
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* Pulse glow effect for ongoing tracking */
+    @keyframes subtlePulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.08); opacity: 0.6; }
+    }
+    .status-pulse-ring {
+      animation: subtlePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface antialiased font-body-md min-h-screen pb-28 select-none">
+<!-- Top App Bar (Custom Contextual Sub-Page Navigation) -->
+<header class="fixed top-0 left-0 w-full z-50 bg-surface-glass/90 backdrop-blur-md shadow-sm transition-all duration-200">
+<div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+<!-- Back Navigation Button -->
+<button aria-label="Quay lại" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<!-- Center Title & Order ID -->
+<div class="text-center">
+<h1 class="text-headline-lg-mobile font-headline-lg-mobile text-on-background tracking-tight">Theo dõi đơn hàng</h1>
+<div class="flex items-center justify-center gap-1 mt-0.5">
+<span class="text-label-sm font-label-sm text-outline">Mã đơn:</span>
+<span class="text-label-sm font-label-sm text-primary font-bold">#HDG-8924A</span>
+</div>
+</div>
+<!-- SOS / Support Button -->
+<button class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-error-container text-on-error-container hover:opacity-90 active:scale-95 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="emergency">emergency</span>
+<span class="text-label-sm font-label-sm font-bold">SOS</span>
+</button>
+</div>
+</header>
+<!-- Main Container -->
+<main class="max-w-md mx-auto px-4 pt-20 space-y-4">
+<!-- Overview Status Card (Glassmorphic Hero Card) -->
+<div class="relative overflow-hidden rounded-xl bg-surface-container-lowest p-4 shadow-sm border border-outline-variant/30">
+<div class="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex items-start justify-between">
+<div>
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container text-on-primary-container">
+<span class="relative flex h-2 w-2">
+<span class="status-pulse-ring absolute inline-flex h-full w-full rounded-full bg-on-primary-container opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-inverse-primary"></span>
+</span>
+<span class="text-label-sm font-label-sm font-semibold">Thợ đang di chuyển</span>
+</div>
+<h2 class="text-headline-md font-headline-md text-on-background mt-2">Dự kiến đến trong 12 phút</h2>
+<p class="text-label-md font-label-md text-on-surface-variant">Khoảng 14:30 hôm nay</p>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary shadow-sm">
+<span class="material-symbols-outlined text-2xl" data-icon="two_wheeler">two_wheeler</span>
+</div>
+</div>
+<!-- Mini Live Progress Bar -->
+<div class="mt-4 pt-3 border-t border-surface-container">
+<div class="flex justify-between text-label-sm font-label-sm text-outline mb-1.5">
+<span>Tiến trình đến nơi</span>
+<span class="text-primary font-bold">75%</span>
+</div>
+<div class="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
+<div class="bg-primary-container h-full rounded-full w-3/4 transition-all duration-500"></div>
+</div>
+</div>
+</div>
+<!-- Mini Map Live Route Preview Card -->
+<div class="rounded-xl overflow-hidden bg-surface-container-lowest shadow-sm border border-outline-variant/30">
+<div class="relative h-44 w-full bg-surface-container-low overflow-hidden">
+<!-- Static/Simulated Map Graphic with Data Location -->
+<img class="w-full h-full object-cover opacity-85" data-alt="Modern clean aerial GPS map view of Ho Chi Minh City urban district street layout with a bright blue navigation route line between locations, high contrast minimalist vector aesthetic, soft lighting, light mode palette." data-location="Ho Chi Minh City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCB0O-gtKCjpuFqsCTJRtiIRZ8whp9M7uEZ3D7ZkPC3MTivly1jsuFLwkZ3r9hqw5aBVYUThoFQE6cFypxFynuHQSz0SD9Vf2uSYxsOCHPeVMj4D1B03k5zMN5CvWzrtRNWY7jPHrsOJD90b0kMwBbCRF2RUMo10TUecw9R80VikbDINC0_Lt-x7kjZBC6-FmqSoNfQgHjSE-IuElyTrFpmMUM7lkfR93anU6y9yzY5Czunm9wgBMF_g"/>
+<!-- Overlay Technician Marker -->
+<div class="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+<div class="relative flex items-center justify-center">
+<span class="status-pulse-ring absolute w-9 h-9 rounded-full bg-primary/30"></span>
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg border-2 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[16px]" data-icon="two_wheeler">two_wheeler</span>
+</div>
+</div>
+<span class="mt-1 px-2 py-0.5 rounded-full bg-inverse-surface text-inverse-on-surface text-label-sm font-label-sm font-semibold shadow">Thợ (cách 1.2km)</span>
+</div>
+<!-- Destination Marker -->
+<div class="absolute bottom-6 right-10 flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center shadow-lg border-2 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[18px]" data-icon="home">home</span>
+</div>
+<span class="mt-1 px-2 py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur-sm text-on-surface text-label-sm font-label-sm font-bold shadow-sm">Điểm đến</span>
+</div>
+<!-- Floating Destination Info Pill -->
+<div class="absolute bottom-2 left-2 right-2 bg-surface-glass/95 backdrop-blur-md px-3 py-2 rounded-lg border border-surface-container-highest/60 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg" data-icon="location_on">location_on</span>
+<div class="truncate text-label-sm font-label-sm">
+<span class="font-bold text-on-surface">Căn hộ 12A</span>, Chung cư Sunrise City, Nguyễn Hữu Thọ, Q.7
+          </div>
+</div>
+</div>
+</div>
+<!-- Technician Card -->
+<div class="rounded-xl bg-surface-container-lowest p-4 shadow-sm border border-outline-variant/30 space-y-3">
+<div class="flex items-center justify-between">
+<span class="text-label-sm font-label-sm text-outline uppercase tracking-wider font-semibold">Thợ phụ trách</span>
+<span class="inline-flex items-center gap-1 text-label-sm font-label-sm text-secondary font-bold">
+<span class="material-symbols-outlined text-[16px] text-secondary" data-icon="verified">verified</span>
+          Đã xác minh
+        </span>
+</div>
+<div class="flex items-center gap-3">
+<!-- Technician Avatar with Live Status -->
+<div class="relative">
+<img class="w-14 h-14 rounded-xl object-cover border-2 border-surface-container" data-alt="Friendly professional Vietnamese male handyman repairman smiling in official clean blue uniform polo shirt, holding digital multimeter, high resolution photorealistic studio portrait with bright clean modern lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJuiTdrGYZyGFgXsXl7vfAgNF9JL-lTdY2NQVOEqFegQ8ywKHO_VYbKWzF1unasfIY9aZZhCZ_OrTJ6vA1nLDQPm26S4FeUB1K-adC-DeFbQEPNvsBjx24BKJ_9QljGgG0beDacfCj0eX-G9hqO33UoT-kUy-Q9CBpaXRGzoIM6hsEBgEfzrPntXzTD1PrlbLzyqh3NcARbqTEj_NRdlb1ClBmlgZgphRu3CZWSCEBU_m3mUIE292G5Q"/>
+<span class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-success-green border-2 border-surface-container-lowest"></span>
+</div>
+<!-- Name & Reputation -->
+<div class="flex-1 min-w-0">
+<h3 class="text-headline-md font-headline-md text-on-background text-base truncate">Trần Văn Cường</h3>
+<p class="text-label-sm font-label-sm text-on-surface-variant truncate">Chuyên gia Điện nước • 6 năm kinh nghiệm</p>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="material-symbols-outlined text-star-gold text-[16px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="text-label-sm font-label-sm font-bold text-on-surface">4.9</span>
+<span class="text-label-sm font-label-sm text-outline">(128 đơn hoàn thành)</span>
+</div>
+</div>
+</div>
+<!-- Quick Action Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<a class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high active:scale-95 transition-all text-label-md font-label-md" href="tel:0901234567">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="call">call</span>
+<span>090 123 4567</span>
+</a>
+<button class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-primary-container text-on-primary-container hover:opacity-95 active:scale-95 transition-all text-label-md font-label-md font-bold shadow-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="chat">chat</span>
+<span>Nhắn tin</span>
+</button>
+</div>
+</div>
+<!-- Vertical Stepper / Service Timeline -->
+<div class="rounded-xl bg-surface-container-lowest p-4 shadow-sm border border-outline-variant/30">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-headline-md font-headline-md text-base text-on-background">Tiến trình dịch vụ</h3>
+<span class="text-label-sm font-label-sm text-outline">Cập nhật: Vừa xong</span>
+</div>
+<div class="relative pl-6 space-y-5">
+<!-- Continuous vertical tracker line -->
+<div class="absolute left-2.5 top-2 bottom-4 w-0.5 bg-surface-container-highest"></div>
+<div class="absolute left-2.5 top-2 h-36 w-0.5 bg-primary-container"></div>
+<!-- Step 1: Created -->
+<div class="relative flex items-start gap-3">
+<div class="absolute -left-6 mt-0.5 w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center ring-4 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+<div class="flex-1 flex items-baseline justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface font-semibold">Đã tạo đơn</p>
+<p class="text-label-sm font-label-sm text-outline">Yêu cầu sửa rò rỉ bồn rửa</p>
+</div>
+<span class="text-label-sm font-label-sm text-outline">14:00</span>
+</div>
+</div>
+<!-- Step 2: Paid -->
+<div class="relative flex items-start gap-3">
+<div class="absolute -left-6 mt-0.5 w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center ring-4 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+<div class="flex-1 flex items-baseline justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface font-semibold">Đã thanh toán ví VNPay</p>
+<p class="text-label-sm font-label-sm text-outline">Phí dịch vụ cơ bản đã giữ tiền</p>
+</div>
+<span class="text-label-sm font-label-sm text-outline">14:05</span>
+</div>
+</div>
+<!-- Step 3: Dispatched -->
+<div class="relative flex items-start gap-3">
+<div class="absolute -left-6 mt-0.5 w-5 h-5 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center ring-4 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+<div class="flex-1 flex items-baseline justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface font-semibold">Đã điều phối thợ</p>
+<p class="text-label-sm font-label-sm text-outline">Thợ Trần Văn Cường nhận việc</p>
+</div>
+<span class="text-label-sm font-label-sm text-outline">14:10</span>
+</div>
+</div>
+<!-- Step 4: Traveling (ACTIVE) -->
+<div class="relative flex items-start gap-3">
+<div class="absolute -left-6 mt-0.5 w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center ring-4 ring-surface-container-high status-pulse-ring">
+<span class="material-symbols-outlined text-[14px]" data-icon="two_wheeler">two_wheeler</span>
+</div>
+<div class="flex-1 flex items-baseline justify-between">
+<div>
+<p class="text-label-md font-label-md text-primary font-bold">Thợ đang di chuyển</p>
+<p class="text-label-sm font-label-sm text-on-surface-variant">Dự kiến đến nơi lúc 14:30</p>
+</div>
+<span class="text-label-sm font-label-sm font-bold text-primary">14:15</span>
+</div>
+</div>
+<!-- Step 5: Fixing (Pending) -->
+<div class="relative flex items-start gap-3 opacity-60">
+<div class="absolute -left-6 mt-0.5 w-5 h-5 rounded-full bg-surface-container-highest text-outline flex items-center justify-center ring-4 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-[14px]" data-icon="build">build</span>
+</div>
+<div class="flex-1 flex items-baseline justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface">Đang sửa chữa</p>
+<p class="text-label-sm font-label-sm text-outline">Kiểm tra &amp; báo giá vật tư</p>
+</div>
+<span class="text-label-sm font-label-sm text-outline">--:--</span>
+</div>
+</div>
+<!-- Step 6: Completion (Pending) -->
+<div class="relative flex items-start gap-3 opacity-60">
+<div class="absolute -left-6 mt-0.5 w-5 h-5 rounded-full bg-surface-container-highest text-outline flex items-center justify-center ring-4 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-[14px]" data-icon="task_alt">task_alt</span>
+</div>
+<div class="flex-1 flex items-baseline justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface">Nghiệm thu &amp; Hoàn thành</p>
+<p class="text-label-sm font-label-sm text-outline">Ký biên bản &amp; đánh giá dịch vụ</p>
+</div>
+<span class="text-label-sm font-label-sm text-outline">--:--</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Service Details & Cost Card -->
+<div class="rounded-xl bg-surface-container-lowest p-4 shadow-sm border border-outline-variant/30 space-y-3">
+<div class="flex items-center justify-between pb-2 border-b border-surface-container">
+<h3 class="text-headline-md font-headline-md text-base text-on-background">Chi tiết dịch vụ</h3>
+<span class="text-label-sm font-label-sm px-2 py-0.5 rounded bg-surface-container-high text-primary font-bold">1 dịch vụ</span>
+</div>
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-xl" data-icon="plumbing">plumbing</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-label-md font-label-md text-on-surface font-semibold">Kiểm tra &amp; Sửa rò rỉ ống nước bồn rửa</p>
+<p class="text-label-sm font-label-sm text-outline">Gói tiêu chuẩn (Đã gồm công thợ 1h đầu)</p>
+</div>
+</div>
+<!-- Pricing Breakdown -->
+<div class="space-y-1.5 pt-2 text-label-sm font-label-sm">
+<div class="flex justify-between text-on-surface-variant">
+<span>Phí dịch vụ cố định:</span>
+<span class="font-semibold text-on-surface">150.000đ</span>
+</div>
+<div class="flex justify-between text-secondary">
+<span>Trạng thái thanh toán:</span>
+<span class="font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span>
+            Đã thanh toán (VNPay)
+          </span>
+</div>
+</div>
+<!-- Disclaimer banner -->
+<div class="flex items-start gap-2 p-2.5 rounded-lg bg-surface-container-low text-label-sm font-label-sm text-on-surface-variant border border-surface-container">
+<span class="material-symbols-outlined text-outline text-[18px] shrink-0 mt-0.5" data-icon="info">info</span>
+<span>Lưu ý: Phí vật tư phát sinh (co nối, băng tan, ống ruột gà,...) sẽ được thợ báo giá trực tiếp trước khi thay thế.</span>
+</div>
+</div>
+<!-- CTA Section -->
+<div class="grid grid-cols-2 gap-3 pt-2">
+<button class="w-full py-3 px-4 rounded-xl border border-outline-variant text-on-surface hover:bg-surface-container active:scale-95 transition-all text-label-md font-label-md font-semibold text-center">
+        Hủy đơn
+      </button>
+<button class="w-full py-3 px-4 rounded-xl bg-surface-container-high text-outline cursor-not-allowed text-label-md font-label-md font-bold text-center" disabled="">
+        Xác nhận hoàn tất
+      </button>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Executed strictly from Shared Components JSON) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-2 pb-safe shadow-lg bg-surface-glass/90 backdrop-blur-md">
+<!-- Tab 1: Trang chủ (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1.5 hover:text-primary transition-colors duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="home">home</span>
+<span class="text-label-sm font-label-sm mt-0.5">Trang chủ</span>
+</a>
+<!-- Tab 2: Đơn hàng (ACTIVE MATCH FOR ORDER TRACKING) -->
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-3 py-1.5 active:scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="receipt_long" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="text-label-sm font-label-sm mt-0.5 font-bold">Đơn hàng</span>
+</a>
+<!-- Tab 3: Tin nhắn (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1.5 hover:text-primary transition-colors duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="chat">chat</span>
+<span class="text-label-sm font-label-sm mt-0.5">Tin nhắn</span>
+</a>
+<!-- Tab 4: Tài khoản (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1.5 hover:text-primary transition-colors duration-200 active:scale-95" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="person">person</span>
+<span class="text-label-sm font-label-sm mt-0.5">Tài khoản</span>
+</a>
+</nav>
+</body></html>

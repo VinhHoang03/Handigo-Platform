@@ -315,6 +315,11 @@ export default function AdminCategoriesPage() {
         mode={c.modal || "create"}
         form={c.form}
         busy={c.busy}
+        error={c.formError}
+        colorLoading={c.colorLoading}
+        colorError={c.colorError}
+        unavailableIconColors={c.unavailableIconColors}
+        onReloadColors={c.reloadIconColors}
         onChange={c.setForm}
         onClose={() => c.setModal(null)}
         onSubmit={c.save}

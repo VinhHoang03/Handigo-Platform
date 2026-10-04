@@ -11,6 +11,7 @@ export interface Category {
   slug: string;
   description?: string | null;
   icon?: string | null;
+  iconColor?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +60,7 @@ export interface CategoryPayload {
   slug?: string;
   description?: string | null;
   icon?: string | null;
+  iconColor?: string | null;
   isActive?: boolean;
 }
 

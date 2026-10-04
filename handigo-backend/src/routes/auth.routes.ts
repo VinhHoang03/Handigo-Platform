@@ -16,12 +16,13 @@ import {
   resendRegisterOtpSchema,
   resetPasswordSchema,
   verifyRegisterOtpSchema,
+  verifyResetPasswordOtpSchema,
 } from "../validations/auth.validator";
 
 const router = Router();
 
 router.use(
-  ["/verify-register-otp", "/reset-password"],
+  ["/verify-register-otp", "/verify-reset-password-otp", "/reset-password"],
   otpRateLimit,
 );
 router.use(
@@ -61,6 +62,11 @@ router.post(
   "/reset-password",
   validate(resetPasswordSchema),
   authController.resetPassword,
+);
+router.post(
+  "/verify-reset-password-otp",
+  validate(verifyResetPasswordOtpSchema),
+  authController.verifyResetPasswordOtp,
 );
 router.post(
   "/change-password",

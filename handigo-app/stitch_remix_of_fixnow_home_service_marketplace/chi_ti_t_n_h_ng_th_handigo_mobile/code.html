@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Chi tiết đơn hàng - Handigo Đối tác</title>
+<!-- Tailwind CSS CDN with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols Outlined Font -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Inter & Hanken Grotesk -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "inverse-on-surface": "#eef0ff",
+            "primary": "#1e00a9",
+            "surface": "#faf8ff",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "on-tertiary-container": "#ff9f72",
+            "surface-variant": "#dae2fc",
+            "surface-container-low": "#f2f3ff",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "on-background": "#131b2e",
+            "success-green": "#4ade80",
+            "inverse-primary": "#c3c0ff",
+            "on-primary-fixed": "#0f0069",
+            "on-tertiary-fixed": "#351000",
+            "on-tertiary": "#ffffff",
+            "tertiary": "#592000",
+            "inverse-surface": "#283044",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-container": "#076a7c",
+            "outline": "#777587",
+            "secondary-fixed-dim": "#86d2e6",
+            "surface-container-highest": "#dae2fc",
+            "error": "#ba1a1a",
+            "on-primary-container": "#b1afff",
+            "secondary-container": "#9ce8fd",
+            "on-primary-fixed-variant": "#3323cc",
+            "primary-container": "#3525cd",
+            "error-container": "#ffdad6",
+            "on-secondary-fixed-variant": "#004e5c",
+            "on-secondary": "#ffffff",
+            "on-primary": "#ffffff",
+            "background": "#faf8ff",
+            "tertiary-fixed-dim": "#ffb694",
+            "outline-variant": "#c7c4d8",
+            "secondary-fixed": "#abedff",
+            "primary-fixed-dim": "#c3c0ff",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#7d3000",
+            "surface-dim": "#d2d9f4",
+            "on-surface": "#131b2e",
+            "surface-tint": "#4d44e3",
+            "on-surface-variant": "#464555",
+            "primary-fixed": "#e2dfff",
+            "tertiary-fixed": "#ffdbcc",
+            "surface-container-high": "#e1e7ff",
+            "on-error": "#ffffff",
+            "on-error-container": "#93000a",
+            "surface-bright": "#faf8ff",
+            "on-secondary-fixed": "#001f26",
+            "secondary": "#00687a",
+            "star-gold": "#facc15"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "container-max": "1280px",
+            "sm": "12px",
+            "lg": "48px",
+            "base": "8px",
+            "gutter": "24px",
+            "xl": "80px",
+            "md": "24px",
+            "xs": "4px"
+          },
+          "fontFamily": {
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "headline-xl": ["Hanken Grotesk"],
+            "headline-lg-mobile": ["Hanken Grotesk"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "label-md": ["Inter"],
+            "label-sm": ["Inter"]
+          },
+          "fontSize": {
+            "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+            "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+            "headline-xl": ["56px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+            "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+            "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "400"}],
+            "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+            "label-md": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500"}],
+            "label-sm": ["12px", {"lineHeight": "1.3", "fontWeight": "600"}]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 20px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Hide scrollbar for smooth visual aesthetic */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary selection:text-on-primary">
+<!-- TOP APP BAR (Customized for Task Detail Screen: Back button + Title + Emergency Call) -->
+<header class="bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md text-primary dark:text-inverse-primary docked full-width top-0 sticky z-40 shadow-sm dark:shadow-none bg-surface-container-low dark:bg-inverse-surface flex justify-between items-center w-full px-4 h-16">
+<div class="flex items-center gap-2">
+<button aria-label="Quay lại" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant active:scale-95 transition-all" onclick="window.history.back()">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div>
+<span class="font-headline-md text-headline-md font-bold text-on-surface text-base tracking-tight block">Chi tiết đơn #HDG-8924A</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+          Dịch vụ sửa chữa tại chỗ
+        </span>
+</div>
+</div>
+<!-- Action: Emergency / Tech Support -->
+<a aria-label="Cứu hộ kỹ thuật" class="h-9 px-3 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm flex items-center gap-1.5 border border-error/20 active:scale-95 transition-all shadow-sm" href="tel:19001000">
+<span class="material-symbols-outlined" data-icon="support_agent" style="font-size: 18px;">support_agent</span>
+<span class="font-semibold">Hỗ trợ kỹ thuật</span>
+</a>
+</header>
+<!-- MAIN SCROLLABLE CONTENT CANVAS -->
+<main class="w-full max-w-md mx-auto px-4 pt-3 pb-32 flex flex-col gap-4">
+<!-- CURRENT PROGRESS STATUS BANNER -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="relative flex items-center justify-center w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container">
+<span class="material-symbols-outlined" data-icon="build" style="font-size: 20px;">build</span>
+<span class="absolute top-0 right-0 w-3 h-3 bg-secondary rounded-full ring-2 ring-surface-container-lowest animate-pulse"></span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline block">Trạng thái công việc</span>
+<h2 class="font-headline-md text-headline-md font-bold text-secondary text-sm">Đang sửa chữa tại nhà khách hàng</h2>
+</div>
+</div>
+<span class="font-label-sm text-label-sm font-semibold bg-secondary/10 text-secondary px-2.5 py-1 rounded-full border border-secondary/20 whitespace-nowrap">
+        Bước 2/4
+      </span>
+</section>
+<!-- CUSTOMER & LOCATION CARD -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3.5">
+<!-- Profile row -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-12 h-12 rounded-full object-cover border-2 border-surface-variant" data-alt="A portrait shot of a polite Vietnamese homeowner customer smiling in warm natural daylight inside a clean contemporary modern apartment living room, wearing relaxed smart casual attire, professional photographic depth of field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZa4bOpRGADUq_18LKLTB72F3dJsJQ2E_nBOsqIOWIvQIOledIbKJfqmb4kTJYq9iB5CMFKRDxix3GN5NtzQb1vfC8fyLOh4-IDpspq0IMABuqTmuwPDT4Wgn-1xX9TBFY9BqqQRy-CGXYx6SEhz-bSA0GNCE0y5Q5v1mwTO8kVKbaw9HfRVK2h-ke8czBO848-tQiTiNiBtf0Eoslg6SbWa_SeQMJWZlJUf5F8IC145aONu0Qo30tGA"/>
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-success-green border-2 border-surface-container-lowest"></span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface text-base">Trần Anh Tuấn</h3>
+<span class="material-symbols-outlined text-star-gold" data-icon="verified" style="font-variation-settings: 'FILL' 1; font-size: 16px;">verified</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-star-gold" data-icon="star" style="font-variation-settings: 'FILL' 1; font-size: 14px;">star</span>
+<span class="font-semibold text-on-surface">5.0</span>
+<span class="text-outline">• Khách quen Handigo</span>
+</div>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-secondary bg-surface-container-low px-2 py-1 rounded-lg">
+          Đơn thứ 8
+        </span>
+</div>
+<!-- Address info with map thumbnail -->
+<div class="bg-surface-container-low/70 rounded-xl p-3 flex flex-col gap-2 border border-outline-variant/20">
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary mt-0.5" data-icon="location_on" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<div class="flex-1">
+<p class="font-body-md text-body-md text-on-surface font-medium text-sm leading-snug">
+              Căn hộ 12A, Tòa B, Chung cư Sunrise City
+            </p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+              Nguyễn Hữu Thọ, P. Tân Hưng, Q.7, TP. HCM
+            </p>
+</div>
+</div>
+<!-- Quick actions for Contact & Navigation -->
+<div class="grid grid-cols-3 gap-2 pt-2 border-t border-outline-variant/30">
+<a class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-surface-container-lowest hover:bg-surface-variant text-on-surface border border-outline-variant/30 active:scale-95 transition-all text-center" href="https://maps.google.com" target="_blank">
+<span class="material-symbols-outlined text-primary mb-0.5" data-icon="map">map</span>
+<span class="font-label-sm text-label-sm text-xs font-semibold">Chỉ đường</span>
+</a>
+<a class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-surface-container-lowest hover:bg-surface-variant text-on-surface border border-outline-variant/30 active:scale-95 transition-all text-center" href="tel:0908123000">
+<span class="material-symbols-outlined text-secondary mb-0.5" data-icon="call">call</span>
+<span class="font-label-sm text-label-sm text-xs font-semibold">Gọi 0908123xxx</span>
+</a>
+<button class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-surface-container-lowest hover:bg-surface-variant text-on-surface border border-outline-variant/30 active:scale-95 transition-all text-center">
+<span class="material-symbols-outlined text-primary mb-0.5" data-icon="chat">chat</span>
+<span class="font-label-sm text-label-sm text-xs font-semibold">Chat trực tiếp</span>
+</button>
+</div>
+</div>
+</section>
+<!-- SERVICE SCOPE & CUSTOMER NOTES -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex items-center justify-between border-b border-outline-variant/20 pb-2.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="plumbing">plumbing</span>
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface text-base">Nội dung dịch vụ yêu cầu</h3>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-primary bg-primary-fixed px-2 py-0.5 rounded-full">
+          Cố định
+        </span>
+</div>
+<!-- Scope title -->
+<div>
+<p class="font-body-md text-body-md font-semibold text-on-surface text-sm">
+          Sửa chữa đường ống thoát nước bồn rửa chén và kiểm tra van cấp
+        </p>
+</div>
+<!-- Customer note block -->
+<div class="bg-surface-container-low rounded-lg p-3 border-l-4 border-primary flex flex-col gap-1.5">
+<span class="font-label-sm text-label-sm font-bold text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined" data-icon="description" style="font-size: 16px;">description</span>
+          Ghi chú từ khách hàng:
+        </span>
+<p class="font-body-md text-body-md text-sm text-on-surface italic">
+          “Nước rỉ tràn tủ bếp dưới, nhờ thợ mang theo gioăng cao su và ống ruột gà thay thế.”
+        </p>
+</div>
+<!-- Incident Photos provided by Customer -->
+<div class="flex flex-col gap-2 pt-1">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">
+          Ảnh hiện trường khách gửi (2 ảnh):
+        </span>
+<div class="grid grid-cols-2 gap-2.5">
+<div class="relative group rounded-lg overflow-hidden border border-outline-variant/40 bg-surface-container">
+<img class="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A realistic close-up photo of a kitchen under-sink drainage plumbing system leaking water into a wooden cupboard with noticeable moisture stains, captured under standard indoor incandescent lighting with clear technical inspection focus." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCweLvBjObYDgvKeG4mkxvqIGCAPvv3Wpp3Y4jjURjyFyY5MUISfxUOhgzmN8F5SksucHPFZY7HFgpTP7JxWvvxoqwhsycwL_7GA94Wy1Rhbc9haj-tQSl33WFSysBD2WDia4jcNDhmlNw_OsWkU1CLs2h0n9c-VJ6ZDj9lWad_342SwvNFiup1WrGUFUtKzU06oZc0vKRX_XAHiz1d6tFZEBcOykCmg-Cfg4lyB2M_J2wo6scpK-fJKg"/>
+<div class="absolute bottom-1 right-1 bg-surface-glass-dark px-1.5 py-0.5 rounded text-surface-container-lowest font-label-sm text-label-sm text-[10px] flex items-center gap-1">
+<span class="material-symbols-outlined" data-icon="zoom_in" style="font-size: 14px;">zoom_in</span> Xem
+            </div>
+</div>
+<div class="relative group rounded-lg overflow-hidden border border-outline-variant/40 bg-surface-container">
+<img class="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-200" data-alt="A focused high-angle photo of a modern stainless steel kitchen sink faucet shut-off valve dripping droplets along a flexible corrugated drain hose inside an apartment kitchen cabinet with damp reflective surfaces." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTl-OeXJ8Udwj1MGBDk2quaPeKRUot6XsXil3tJpkiNEramNLl2XgeY0VRmUo_We5WBLAsB6Oy0rARZRQHyHN06BbcrgeAnNs98cXeDHkiJch44hdGlnhY69axI-rTrQNt-Xk7IzB-Wq3F8AP5o24AYFTVvRv__x4sQP8E51a0u9csjFeeqlfA8Imk4uAFgktHevuN7F6v9gm8mY9VB2DwgX_AoeNAvE-xEq0wfnIDE3B6pD7W9Z1heQ"/>
+<div class="absolute bottom-1 right-1 bg-surface-glass-dark px-1.5 py-0.5 rounded text-surface-container-lowest font-label-sm text-label-sm text-[10px] flex items-center gap-1">
+<span class="material-symbols-outlined" data-icon="zoom_in" style="font-size: 14px;">zoom_in</span> Xem
+            </div>
+</div>
+</div>
+</div>
+<!-- Fixed Labor Fee Bar -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-high/60 mt-1 border border-outline-variant/20">
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Tiền công thợ cố định (Niêm yết)</span>
+<span class="font-label-sm text-label-sm text-secondary font-medium flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined" data-icon="check_circle" style="font-variation-settings: 'FILL' 1; font-size: 14px;">check_circle</span>
+            Đã thanh toán qua hệ thống
+          </span>
+</div>
+<span class="font-headline-md text-headline-md font-bold text-primary text-base">
+          150.000đ
+        </span>
+</div>
+</section>
+<!-- EXTRA MATERIALS & QUOTATION MODULE -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-tertiary-container" data-icon="receipt_long">receipt_long</span>
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface text-base">Vật tư &amp; Sửa chữa phát sinh</h3>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-semibold">
+          Chờ duyệt
+        </span>
+</div>
+<!-- Pending Quote Card with glass styling -->
+<div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/40 flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary-container animate-ping"></span>
+<span class="font-label-md text-label-md font-semibold text-on-surface">Đã gửi báo giá vật tư</span>
+</div>
+<span class="font-headline-md text-headline-md font-bold text-primary text-base">120.000đ</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">
+          1x Ống ruột gà bồn rửa phi 34 + 2x Gioăng cao su chịu nhiệt chống rò rỉ.
+        </p>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/30">
+<span class="font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined" data-icon="schedule" style="font-size: 14px;">schedule</span> Đang chờ khách xác nhận
+          </span>
+<button class="px-3 py-1.5 rounded-lg border border-primary text-primary hover:bg-primary/5 active:scale-95 transition-all font-label-sm text-label-sm font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined" data-icon="edit" style="font-size: 15px;">edit</span>
+            Chỉnh sửa báo giá
+          </button>
+</div>
+</div>
+</section>
+<!-- TECHNICIAN WORKFLOW CHECKLIST -->
+<section class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="checklist">checklist</span>
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface text-base">Quy trình thực hiện của thợ</h3>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface-variant">2/5 bước</span>
+</div>
+<!-- Checklist Items -->
+<div class="flex flex-col gap-2.5">
+<!-- Item 1: Done -->
+<label class="flex items-start gap-3 p-2.5 rounded-lg bg-surface-container-low/60 border border-outline-variant/20 cursor-pointer">
+<span class="w-5 h-5 rounded-md bg-primary text-surface-container-lowest flex items-center justify-center mt-0.5 flex-shrink-0 shadow-sm">
+<span class="material-symbols-outlined" data-icon="check" style="font-size: 16px;">check</span>
+</span>
+<div class="flex-1">
+<span class="font-body-md text-body-md text-sm text-on-surface-variant line-through font-medium block">
+              Có mặt tại nhà khách đúng giờ
+            </span>
+<span class="font-label-sm text-label-sm text-outline text-[11px]">Đã xác thực vị trí GPS (09:12 AM)</span>
+</div>
+</label>
+<!-- Item 2: Done -->
+<label class="flex items-start gap-3 p-2.5 rounded-lg bg-surface-container-low/60 border border-outline-variant/20 cursor-pointer">
+<span class="w-5 h-5 rounded-md bg-primary text-surface-container-lowest flex items-center justify-center mt-0.5 flex-shrink-0 shadow-sm">
+<span class="material-symbols-outlined" data-icon="check" style="font-size: 16px;">check</span>
+</span>
+<div class="flex-1">
+<span class="font-body-md text-body-md text-sm text-on-surface-variant line-through font-medium block">
+              Khảo sát hiện trạng &amp; Báo chi phí phát sinh
+            </span>
+<span class="font-label-sm text-label-sm text-outline text-[11px]">Đã gửi báo giá 120.000đ (09:20 AM)</span>
+</div>
+</label>
+<!-- Item 3: Current in progress -->
+<label class="flex items-start gap-3 p-2.5 rounded-lg bg-primary-fixed/30 border border-primary/40 cursor-pointer">
+<div class="w-5 h-5 rounded-md border-2 border-primary bg-surface flex items-center justify-center mt-0.5 flex-shrink-0"></div>
+<div class="flex-1">
+<span class="font-body-md text-body-md text-sm text-on-surface font-semibold block">
+              Tiến hành thay thế ống xả và siết van nối
+            </span>
+<span class="font-label-sm text-label-sm text-primary font-medium text-[11px]">Đang thao tác xử lý</span>
+</div>
+</label>
+<!-- Item 4: Pending -->
+<label class="flex items-start gap-3 p-2.5 rounded-lg bg-surface-container-low/30 border border-outline-variant/20 opacity-70">
+<div class="w-5 h-5 rounded-md border border-outline bg-surface-container-lowest flex items-center justify-center mt-0.5 flex-shrink-0"></div>
+<div class="flex-1">
+<span class="font-body-md text-body-md text-sm text-on-surface font-medium block">
+              Nghiệm thu, thử nước &amp; dọn dẹp sạch sẽ
+            </span>
+</div>
+</label>
+<!-- Item 5: Pending -->
+<label class="flex items-start gap-3 p-2.5 rounded-lg bg-surface-container-low/30 border border-outline-variant/20 opacity-70">
+<div class="w-5 h-5 rounded-md border border-outline bg-surface-container-lowest flex items-center justify-center mt-0.5 flex-shrink-0"></div>
+<div class="flex-1">
+<span class="font-body-md text-body-md text-sm text-on-surface font-medium block">
+              Chụp ảnh sau hoàn thành &amp; Ký biên bản điện tử
+            </span>
+</div>
+</label>
+</div>
+</section>
+</main>
+<!-- FIXED BOTTOM ACTION TOOLBAR -->
+<!-- Contextually suppresses standard bottom nav tab items in favor of task-oriented provider execution controls -->
+<footer class="fixed bottom-0 left-0 w-full z-50 bg-surface/90 dark:bg-inverse-surface/90 backdrop-blur-md shadow-lg border-t border-outline-variant/20 dark:border-outline/20 px-4 py-3">
+<div class="max-w-md mx-auto flex flex-col gap-2">
+<!-- Quick Total Preview Summary -->
+<div class="flex items-center justify-between px-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Tổng thu dự tính (Công + Vật tư):</span>
+<span class="font-headline-md text-headline-md font-bold text-primary text-base">270.000đ</span>
+</div>
+<!-- Action Button Group -->
+<div class="grid grid-cols-12 gap-2">
+<!-- Secondary Button: Add quote / Extra item -->
+<button class="col-span-5 h-12 rounded-xl bg-surface-container hover:bg-surface-variant text-on-surface border border-outline-variant/40 active:scale-95 transition-transform duration-150 flex items-center justify-center gap-1 font-label-md text-label-md font-semibold px-2 text-center">
+<span class="material-symbols-outlined text-primary" data-icon="add_circle" style="font-size: 18px;">add_circle</span>
+<span class="leading-tight">+ Báo giá vật tư</span>
+</button>
+<!-- Primary Action: Finish & Acceptance Signature -->
+<button class="col-span-7 h-12 rounded-xl bg-primary-container hover:opacity-95 text-on-primary font-headline-md text-headline-md font-bold text-sm shadow-md active:scale-95 transition-transform duration-150 flex items-center justify-center gap-2 px-3">
+<span class="material-symbols-outlined" data-icon="task_alt" style="font-variation-settings: 'FILL' 1; font-size: 20px;">task_alt</span>
+<span>Hoàn tất &amp; Nghiệm thu</span>
+</button>
+</div>
+</div>
+</footer>
+</body></html>
