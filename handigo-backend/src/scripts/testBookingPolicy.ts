@@ -62,16 +62,20 @@ for (const uniformQuantity of [0, -1, 1.5, 100]) {
 assert.equal(previewBookingSchema.parse({ serviceId }).uniformQuantity, undefined);
 
 const at = (time: string) => Date.parse(`2026-09-28T${time}:00+07:00`);
-// Cho phép đặt trong ngày từ 08:00, đủ 2 tiếng đặt trước và xử lý đúng khi qua ngày.
+// Cho phép đặt sát thời gian hiện tại từ 08:00, không cần đặt trước 2 tiếng.
 assert.equal(getEarliestScheduledAt(new Date(at('05:00'))).getTime(), at('08:00'));
 assert.equal(getEarliestScheduledAt(new Date(at('06:00'))).getTime(), at('08:00'));
-assert.equal(getEarliestScheduledAt(new Date(at('09:30'))).getTime(), at('11:30'));
-assert.equal(getEarliestScheduledAt(new Date(at('15:00'))).getTime(), at('17:00'));
-assert.equal(getEarliestScheduledAt(new Date(at('23:30'))).getTime(), Date.parse('2026-09-29T08:00:00+07:00'));
+assert.equal(getEarliestScheduledAt(new Date(at('09:30'))).getTime(), at('09:30'));
+assert.equal(getEarliestScheduledAt(new Date('2026-09-28T09:30:47+07:00')).getTime(), at('09:30'));
+assert.equal(getEarliestScheduledAt(new Date('2026-09-28T09:30:59+07:00')).getTime(), at('09:30'));
+assert.equal(getEarliestScheduledAt(new Date('2026-09-28T09:31:00+07:00')).getTime(), at('09:31'));
+assert.equal(getEarliestScheduledAt(new Date(at('15:00'))).getTime(), at('15:00'));
+assert.equal(getEarliestScheduledAt(new Date(at('23:30'))).getTime(), at('23:30'));
+assert.equal(getEarliestScheduledAt(new Date('2026-09-29T00:30:00+07:00')).getTime(), Date.parse('2026-09-29T08:00:00+07:00'));
 const earliest = getEarliestScheduledAt(new Date(at('09:30'))).getTime();
-assert.equal(at('11:00') >= earliest, false);
-assert.equal(at('11:30') >= earliest, true);
-assert.equal(at('12:00') >= earliest, true);
+assert.equal(at('09:00') >= earliest, false);
+assert.equal(at('10:00') >= earliest, true);
+assert.equal(at('11:00') >= earliest, true);
 const interval = (start: string, end: string) => ({ start: at(start), end: at(end), bufferMinutes: 15, travelMinutes: 30 });
 const first = interval('09:00', '10:30');
 assert.equal(intervalsConflict(first, interval('11:00', '12:00')), true);

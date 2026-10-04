@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createOrderSchema, cancelOrderSchema, orderIdParamSchema } from "../../../validations/order.validator";
+import { getEarliestScheduledAt } from "../../../utils/bookingPolicy";
 
 export const idSchema = createOrderSchema.shape.serviceId;
 export const priceSchema = z.object({
@@ -14,7 +15,7 @@ export const bookingSchema = priceSchema.extend({
   problemDescription: createOrderSchema.shape.problemDescription,
   paymentMethod: createOrderSchema.shape.paymentMethod,
 }).strict().superRefine((value, ctx) => {
-  if (value.orderType === "scheduled" && (!value.scheduledAt || Date.parse(value.scheduledAt) <= Date.now())) {
+  if (value.orderType === "scheduled" && (!value.scheduledAt || Date.parse(value.scheduledAt) < getEarliestScheduledAt().getTime())) {
     ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn trong tương lai." });
   }
   if (value.orderType === "normal" && value.scheduledAt) {

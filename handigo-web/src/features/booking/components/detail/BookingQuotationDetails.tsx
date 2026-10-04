@@ -12,9 +12,10 @@ type BookingQuotationDetailsProps = {
   appliedDepositAmount: number;
   remainingQuotationAmount: number;
   onReject: () => void;
+  orderStatus?: string;
 };
 
-/** Nội dung báo giá sửa chữa khi chuyên gia đã gửi báo giá. */
+/** Hiển thị bản báo giá đã lưu gần nhất của chuyên gia. */
 export const BookingQuotationDetails = ({
   quotation,
   busy,
@@ -36,7 +37,6 @@ export const BookingQuotationDetails = ({
     </div>
 
     <div className="grid gap-sm mb-lg sm:grid-cols-2">
-      {quotation.quotation.estimatedDurationMinutes && <p className="text-sm">Thời lượng sửa chữa dự kiến: {quotation.quotation.estimatedDurationMinutes} phút. Khả năng thực hiện ngay sẽ được kiểm tra theo lịch của chuyên gia.</p>}
       {quotation.quotation.quotationCode && (
         <div className="rounded-2xl bg-surface-container-low p-sm">
           <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
@@ -50,10 +50,10 @@ export const BookingQuotationDetails = ({
       {quotation.quotation.createdAt && (
         <div className="rounded-2xl bg-surface-container-low p-sm">
           <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
-            Thời gian gửi
+            Cập nhật gần nhất
           </p>
           <p className="mt-1 font-semibold text-on-surface">
-            {new Date(quotation.quotation.createdAt).toLocaleString("vi-VN")}
+            {new Date(quotation.quotation.updatedAt ?? quotation.quotation.createdAt).toLocaleString("vi-VN")}
           </p>
         </div>
       )}
@@ -140,44 +140,6 @@ export const BookingQuotationDetails = ({
         </div>
       )}
     </div>
-
-    {quotation.quotation.status === "approved" && (
-      <div className="mt-md rounded-3xl border border-success/30 bg-success-container p-md text-on-success-container">
-        <p className="font-bold">Báo giá đã được chấp thuận</p>
-        <p className="mt-1 text-sm text-on-success-container">
-          Chuyên gia có thể bắt đầu thực hiện công việc ngay, không cần chờ thanh toán.
-        </p>
-        <div className="mt-3 grid gap-2 border-t border-success/30 pt-3 sm:grid-cols-3">
-          <div>
-            <p className="text-xs font-bold uppercase text-on-success-container">
-              Tổng chi phí
-            </p>
-            <p className="mt-1 font-bold tabular-nums">
-              {formatCurrency(quotation.quotation.finalAmount)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase text-on-success-container">
-              Tiền cọc qua Handigo
-            </p>
-            <p className="mt-1 font-bold tabular-nums">
-              {formatCurrency(appliedDepositAmount)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase text-on-success-container">
-              Còn cần thanh toán
-            </p>
-            <p className="mt-1 font-bold tabular-nums">
-              {formatCurrency(remainingQuotationAmount)}
-            </p>
-          </div>
-        </div>
-        <p className="mt-3 text-sm text-on-success-container">
-          Bạn tự trao đổi phương thức và thanh toán số tiền còn lại trực tiếp với chuyên gia.
-        </p>
-      </div>
-    )}
 
     {quotation.quotation.inspectionNote && (
       <div className="mt-md p-md bg-surface-container rounded-2xl border border-outline-variant/30 italic text-on-surface-variant text-sm">

@@ -201,12 +201,19 @@ export const OrderService = {
     ) {
       throw new AppError("Thời gian thực hiện không hợp lệ.", 400);
     }
+    const scheduledHour = scheduledAt
+      ? new Date(scheduledAt.getTime() + 7 * 60 * 60 * 1000).getUTCHours()
+      : null;
     if (
       ["scheduled", "recurring"].includes(orderType) &&
-      (!scheduledAt || scheduledAt.getTime() <= Date.now())
+      (!scheduledAt
+        || scheduledAt.getTime() < getEarliestScheduledAt().getTime()
+        || scheduledHour === null
+        || scheduledHour < 8
+        || scheduledHour > 21)
     ) {
       throw new AppError(
-        "Vui lòng chọn thời gian thực hiện trong tương lai.",
+        "Vui lòng chọn giờ từ 08:00 đến 21:59 và không sớm hơn phút hiện tại.",
         400,
       );
     }
@@ -282,12 +289,6 @@ export const OrderService = {
     );
     if (payload.expectedBookingAmount !== undefined && payload.expectedBookingAmount !== pricingSnapshot.bookingAmount) {
       throw new AppError("Giá vừa thay đổi. Vui lòng kiểm tra lại tổng tiền trước khi xác nhận.", 409);
-    }
-    if (isAppointment && scheduledAt && (
-      new Date(scheduledAt.getTime() + 7 * 60 * 60 * 1000).getUTCHours() < 8
-      || scheduledAt.getTime() < getEarliestScheduledAt().getTime()
-    )) {
-      throw new AppError("Vui lòng chọn giờ từ 08:00 và cách thời gian hiện tại ít nhất 2 tiếng.", 400);
     }
     const scheduleIntervals = (isAppointment ? occurrenceDates : [new Date(Date.now() + pricingSnapshot.schedule.travelMinutes * 60000)])
       .map((date) => ({ start: date.getTime(), end: date.getTime() + pricingSnapshot.schedule.durationMinutes * 60000, ...pricingSnapshot.schedule }));
@@ -942,8 +943,8 @@ export const OrderService = {
         let duration = order.schedule?.durationMinutes ?? calculateDuration(order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot, policy);
         if (order.inspectionRequired) {
           if (!order.depositPaidAt) throw new AppError("Tiền cọc chưa được thanh toán.", 409);
-          const quotation = await RepairQuotation.findOne({ _id: order.currentQuotationId, orderId: order._id, providerId: provider._id, status: "approved", customerConfirmed: true, isDeleted: false }).session(session);
-          if (!quotation) throw new AppError("Báo giá sửa chữa chưa được duyệt.", 409);
+          const quotation = await RepairQuotation.findOne({ _id: order.currentQuotationId, orderId: order._id, providerId: provider._id, $or: [{ status: "saved" }, { status: "approved", customerConfirmed: true }], isDeleted: false }).session(session);
+          if (!quotation) throw new AppError("Vui lòng lưu báo giá sửa chữa trước khi bắt đầu.", 409);
           if (order.schedule && !quotation.estimatedDurationMinutes) throw new AppError("Vui lòng bổ sung thời lượng sửa chữa vào báo giá.", 409);
           duration = quotation.estimatedDurationMinutes ?? duration;
         }
@@ -970,6 +971,7 @@ export const OrderService = {
     providerUserId: string,
     completionEvidenceImages: string[],
     completionNote?: string,
+    expectedQuotation?: { quotationId: string; revision: number },
   ): Promise<IOrder> {
     const provider = await getProviderByUserId(providerUserId);
     const order = await Order.findById(orderId);
@@ -1061,15 +1063,17 @@ export const OrderService = {
             _id: transactionalOrder.currentQuotationId,
             orderId: transactionalOrder._id,
             providerId: transactionalProvider._id,
-            status: "approved",
-            customerConfirmed: true,
+            $or: [{ status: "saved" }, { status: "approved", customerConfirmed: true }],
             isDeleted: false,
           }).session(session);
           if (!quotation) {
             throw new AppError(
-              "Báo giá sửa chữa chưa được duyệt nên chưa thể hoàn thành đơn.",
+              "Vui lòng lưu báo giá sửa chữa trước khi hoàn thành đơn.",
               409,
             );
+          }
+          if (expectedQuotation && (quotation.id !== expectedQuotation.quotationId || (quotation.revision ?? 0) !== expectedQuotation.revision)) {
+            throw new AppError("Báo giá đã thay đổi. Vui lòng tải lại và kiểm tra số tiền trước khi hoàn thành đơn.", 409);
           }
         }
         if (

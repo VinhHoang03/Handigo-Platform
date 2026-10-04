@@ -232,6 +232,11 @@ export const createRepairQuotationSchema = z
     }
   });
 
+export const updateRepairQuotationSchema = createRepairQuotationSchema.safeExtend({
+  quotationId: objectIdSchema,
+  expectedRevision: z.number().int().nonnegative(),
+});
+
 export const rejectRepairQuotationSchema = z.object({
   rejectionReason: optionalTextSchema(
     500,
@@ -240,6 +245,8 @@ export const rejectRepairQuotationSchema = z.object({
 });
 
 export const completeOrderSchema = z.object({
+  expectedQuotationId: objectIdSchema.optional(),
+  expectedQuotationRevision: z.number().int().nonnegative().optional(),
   completionEvidenceImages: z
     .array(z.string().trim().url("Ảnh nghiệm thu phải là đường dẫn hợp lệ"))
     .min(1, "Vui lòng cung cấp ít nhất một ảnh nghiệm thu")
@@ -248,6 +255,10 @@ export const completeOrderSchema = z.object({
     1000,
     "Ghi chú hoàn thành không được vượt quá 1000 ký tự",
   ),
+}).superRefine((payload, context) => {
+  if ((payload.expectedQuotationId !== undefined) !== (payload.expectedQuotationRevision !== undefined)) {
+    context.addIssue({ code: "custom", path: ["expectedQuotationRevision"], message: "Vui lòng cung cấp cả mã và phiên bản báo giá khi kiểm tra trước khi hoàn thành." });
+  }
 });
 
 export const rejectAssignmentSchema = z.object({

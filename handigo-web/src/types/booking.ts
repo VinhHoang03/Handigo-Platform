@@ -271,7 +271,9 @@ export interface OrderQuotation {
     estimatedDurationMinutes?: number;
     _id: string;
     quotationCode?: string;
-    status: "pending" | "approved" | "rejected" | "expired" | "cancelled";
+    status: "saved" | "pending" | "approved" | "rejected" | "expired" | "cancelled";
+    revision?: number;
+    updatedAt?: string;
     subtotalAmount?: number;
     discountAmount?: number;
     finalAmount: number;

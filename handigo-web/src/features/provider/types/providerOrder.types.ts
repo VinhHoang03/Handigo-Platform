@@ -29,7 +29,9 @@ export interface RepairQuotation {
   _id: string;
   quotationCode: string;
   orderId: string;
-  status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+  status: 'saved' | 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+  revision?: number;
+  attachments?: string[];
   inspectionNote?: string | null;
   recommendation?: string | null;
   subtotalAmount: number;
@@ -40,6 +42,7 @@ export interface RepairQuotation {
   approvedAt?: string | null;
   rejectedAt?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface QuotationDetail {
@@ -52,6 +55,7 @@ export interface CreateQuotationPayload {
   inspectionNote?: string;
   recommendation?: string;
   discountAmount?: number;
+  attachments?: string[];
   items: Array<{
     title: string;
     description?: string;

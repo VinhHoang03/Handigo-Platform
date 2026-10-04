@@ -41,9 +41,11 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
     return () => { clearTimeout(timer); controller.abort(); };
   }, [query, orderId]);
   return (
-    <div className="grid min-w-0 gap-sm rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-sm md:grid-cols-12">
-      <div className="min-w-0 space-y-2 md:col-span-4">
+    <div className="grid min-w-0 grid-cols-2 items-start gap-sm rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-sm md:grid-cols-12">
+      <div className="col-span-2 min-w-0 space-y-2 md:col-span-4">
+      <label htmlFor={`quotation-title-${item.rowId}`} className="block text-xs text-on-surface-variant md:sr-only">Tên hạng mục</label>
       <input
+        id={`quotation-title-${item.rowId}`}
         value={item.title}
         maxLength={maxTitleLength}
         onChange={(event) => { onUpdate({ title: event.target.value }); setQuery(event.target.value); setHistory([]); setError(''); setLoading(false); }}
@@ -60,13 +62,15 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
         </button>)}
       </div>}
       {query && query.length >= 2 && !loading && !error && history.length === 0 && <p className="text-xs text-on-surface-variant">Chưa có gợi ý phù hợp; bạn có thể nhập tiếp.</p>}
-      {item.historySource && <p className="text-xs text-on-surface-variant">Giá lịch sử ngày {new Date(item.historySource.usedAt).toLocaleDateString('vi-VN')}. Kiểm tra trước khi gửi.</p>}
+      {item.historySource && <p className="text-xs text-on-surface-variant">Giá lịch sử ngày {new Date(item.historySource.usedAt).toLocaleDateString('vi-VN')}. Kiểm tra trước khi lưu.</p>}
       </div>
+      <label className="col-span-2 min-w-0 space-y-2 md:col-span-2">
+      <span className="block text-xs text-on-surface-variant md:sr-only">Loại hạng mục</span>
       <select
         aria-label="Loại hạng mục"
         value={item.itemType}
         onChange={(event) => onUpdate({ itemType: event.target.value as QuotationItem['itemType'] })}
-        className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-2"
+        className="w-full min-w-0 rounded-xl border border-outline-variant px-3 py-2"
       >
         {quotationItemTypes.map((type) => (
           <option key={type.value} value={type.value}>
@@ -74,6 +78,9 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
           </option>
         ))}
       </select>
+      </label>
+      <label className="min-w-0 space-y-2 md:col-span-1">
+      <span className="block text-xs text-on-surface-variant md:sr-only">Số lượng</span>
       <input
         type="number"
         min={1}
@@ -83,8 +90,11 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
         onChange={(event) => onUpdate({ quantity: Number(event.target.value) })}
         aria-label="Số lượng"
         placeholder="Số lượng"
-        className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-1"
+        className="w-full min-w-0 rounded-xl border border-outline-variant px-3 py-2"
       />
+      </label>
+      <label className="min-w-0 space-y-2 md:col-span-2">
+      <span className="block text-xs text-on-surface-variant md:sr-only">Đơn giá (VND)</span>
       <input
         type="text"
         inputMode="numeric"
@@ -96,15 +106,16 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
         }}
         aria-label="Đơn giá (VND)"
         placeholder="Đơn giá (VND)"
-        className="min-w-0 rounded-xl border border-outline-variant px-3 py-2 md:col-span-2"
+        className="w-full min-w-0 rounded-xl border border-outline-variant px-3 py-2"
       />
-      <div className="flex items-center justify-between gap-2 md:col-span-2">
+      </label>
+      <div className="col-span-2 flex items-center justify-between gap-2 md:col-span-3">
         <div>
           <span className="block text-xs text-on-surface-variant md:hidden">Thành tiền</span>
           <span className="text-sm font-semibold tabular-nums text-primary">{formatMoney(item.quantity * item.unitPrice)}</span>
         </div>
         {removable && (
-          <button type="button" onClick={onRemove} aria-label={`Xóa hạng mục ${item.title || 'trống'}`} className="text-error">
+          <button type="button" onClick={onRemove} aria-label={`Xóa hạng mục ${item.title || 'trống'}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-error hover:bg-error/5">
             <Trash2 aria-hidden="true" size={16} />
           </button>
         )}

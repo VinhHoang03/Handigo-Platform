@@ -3,6 +3,7 @@ import { AppError } from "../../utils/appError";
 import { bookingSchema, idSchema } from "../tools/implementations/booking.schemas";
 import type { AgentChoiceGroup } from "../llm/llm.interface";
 import { getUniformServicePrice } from "../../utils/uniformServicePrice";
+import { getEarliestScheduledAt } from "../../utils/bookingPolicy";
 
 const selectedOptionsSchema = z.array(z.object({
   optionId: idSchema,
@@ -273,7 +274,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
     }
   }
   if (values.orderType === "scheduled") {
-    if (!values.scheduledAt || Date.parse(values.scheduledAt) <= Date.now()) {
+    if (!values.scheduledAt || Date.parse(values.scheduledAt) < getEarliestScheduledAt().getTime()) {
       // scheduledAt bị thiếu hoặc vẫn nằm trong quá khứ (sau khi đã thử auto-advance)
       if (values.scheduledAt) { delete values.scheduledAt; delete draft.sources.scheduledAt; }
       draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
