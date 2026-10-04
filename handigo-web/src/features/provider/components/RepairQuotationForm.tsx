@@ -1,10 +1,12 @@
-import { useRef, useState, type FormEvent } from 'react';
-import { CircleAlert, ScanLine, TriangleAlert, UploadCloud } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { CircleAlert, FileSpreadsheet, ImagePlus, Mic, ScanLine, TriangleAlert, UploadCloud, X } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
+import { ReliableImage } from '@/components/common/ReliableImage';
 import { getErrorMessage } from '@/utils/apiError';
 import { providerOrderApi } from '../api/providerOrder.api';
 import type {
   CreateQuotationPayload,
+  QuotationDetail,
   QuotationRelevanceEvaluation,
   QuotationRelevanceResult,
 } from '../types/providerOrder.types';
@@ -47,7 +49,9 @@ interface RepairQuotationFormProps {
   defaultDurationMinutes?: number;
   orderId: string;
   serviceName: string;
-  onSubmit: (payload: CreateQuotationPayload) => Promise<void>;
+  initialQuotation?: QuotationDetail | null;
+  onSubmit: (payload: CreateQuotationPayload) => Promise<boolean>;
+  onDiscard?: () => void;
   onCancel: () => void;
   busy?: boolean;
 }
@@ -65,26 +69,51 @@ export function RepairQuotationForm({
   onCancel,
   busy,
   defaultDurationMinutes,
+  initialQuotation,
+  onDiscard,
 }: RepairQuotationFormProps) {
-  const [inspectionNote, setInspectionNote] = useState('');
-  const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState(defaultDurationMinutes ?? 60);
-  const [recommendation, setRecommendation] = useState('');
-  const [items, setItems] = useState<QuotationFormItem[]>(() => [newItem()]);
+  const [inspectionNote, setInspectionNote] = useState(initialQuotation?.quotation.inspectionNote ?? '');
+  const estimatedDurationMinutes = initialQuotation?.quotation.estimatedDurationMinutes ?? defaultDurationMinutes ?? 60;
+  const [recommendation, setRecommendation] = useState(initialQuotation?.quotation.recommendation ?? '');
+  const discountAmount = initialQuotation?.quotation.discountAmount ?? 0;
+  const [items, setItems] = useState<QuotationFormItem[]>(() => initialQuotation?.items.length
+    ? initialQuotation.items.map((item) => ({
+      ...newItem(), ...item, description: item.description ?? '', note: item.note ?? '',
+      manualFields: Object.keys(emptyItem) as Array<keyof QuotationFields>,
+    })) : [newItem()]);
   const revision = useRef(0);
   const [formRevision, setFormRevision] = useState(0);
   const [agentBusy, setAgentBusy] = useState(false);
   const [undo, setUndo] = useState<{ items: QuotationFormItem[]; inspectionNote: string; recommendation: string; revision: number } | null>(null);
   const [itemCountToAdd, setItemCountToAdd] = useState("1");
+  const [scanOpen, setScanOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [scanComplete, setScanComplete] = useState(false);
+  const [scanStatus, setScanStatus] = useState('');
   const [isScanningImage, setIsScanningImage] = useState(false);
-  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [scanImageError, setScanImageError] = useState<string | null>(null);
   const [relevance, setRelevance] = useState<QuotationRelevanceResult | null>(null);
   const [isValidatingRelevance, setIsValidatingRelevance] = useState(false);
-  const [pendingPayload, setPendingPayload] = useState<CreateQuotationPayload | null>(null);
-  const [isRelevanceConfirmOpen, setIsRelevanceConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const finalAmount = Math.max(subtotal - discountAmount, 0);
+  const inputBusy = Boolean(busy || agentBusy || isScanningImage || isValidatingRelevance);
+  const selectedImageUrl = useMemo(() => selectedFile?.type.startsWith('image/')
+    ? URL.createObjectURL(selectedFile) : null, [selectedFile]);
+
+  useEffect(() => () => {
+    if (selectedImageUrl) URL.revokeObjectURL(selectedImageUrl);
+  }, [selectedImageUrl]);
+
+  useEffect(() => {
+    if (!formRevision) return;
+    const preventUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener('beforeunload', preventUnload);
+    return () => window.removeEventListener('beforeunload', preventUnload);
+  }, [formRevision]);
 
   const changed = () => { revision.current++; setFormRevision(revision.current); setUndo(null); setRelevance(null); };
 
@@ -155,7 +184,11 @@ export function RepairQuotationForm({
     setError(null);
   };
 
-  const handleScanQuotationFile = async (file: File | undefined) => {
+  const handleSelectFile = (file: File | undefined) => {
+    setScanImageError(null);
+    setScanStatus('');
+    setScanComplete(false);
+    setSelectedFile(null);
     if (!file) return;
     const isSupportedFile =
       ["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
@@ -168,13 +201,17 @@ export function RepairQuotationForm({
       setScanImageError("Tệp hạng mục không được vượt quá 10 MB.");
       return;
     }
+    setSelectedFile(file);
+  };
 
+  const handleScanQuotationFile = async () => {
+    if (!selectedFile || inputBusy || scanComplete) return;
     try {
       setIsScanningImage(true);
       setError(null);
       setScanImageError(null);
       const scanRevision = revision.current;
-      const scanResult = await providerOrderApi.scanQuotationItems(orderId, file);
+      const scanResult = await providerOrderApi.scanQuotationItems(orderId, selectedFile);
       if (scanRevision !== revision.current) {
         setScanImageError('Form đã thay đổi trong lúc đọc tệp. Vui lòng thử lại để giữ thông tin mới.');
         return;
@@ -223,7 +260,8 @@ export function RepairQuotationForm({
           `Đã bỏ qua ${blockedIndexes.size} hạng mục không phù hợp với dịch vụ ${scanResult.relevance.serviceName}.`,
         );
       }
-      setIsScanModalOpen(false);
+      setScanComplete(true);
+      setScanStatus(`Đã thêm ${acceptedItems.length} hạng mục vào danh sách.`);
     } catch (scanError) {
       setScanImageError(
         getErrorMessage(
@@ -271,7 +309,15 @@ export function RepairQuotationForm({
       setError('Có hạng mục báo giá chưa hợp lệ.');
       return;
     }
-    if (subtotal <= depositAmount) {
+    if (!Number.isInteger(estimatedDurationMinutes) || estimatedDurationMinutes < 1 || estimatedDurationMinutes > 1440) {
+      setError('Thời gian sửa chữa phải là số nguyên từ 1 đến 1440 phút.');
+      return;
+    }
+    if (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > subtotal) {
+      setError('Giảm giá phải từ 0 đến tổng thành tiền các hạng mục.');
+      return;
+    }
+    if (finalAmount <= depositAmount) {
       setError(`Tổng báo giá phải lớn hơn tiền cọc ${formatMoney(depositAmount)}.`);
       return;
     }
@@ -279,6 +325,8 @@ export function RepairQuotationForm({
       estimatedDurationMinutes,
       inspectionNote: inspectionNote.trim() || undefined,
       recommendation: recommendation.trim() || undefined,
+      discountAmount,
+      attachments: initialQuotation?.quotation.attachments,
       items: validItems.map((item) => ({
         title: item.title.trim(),
         description: item.description.trim() || undefined,
@@ -301,14 +349,8 @@ export function RepairQuotationForm({
       if (result.status === 'blocked') {
         const blockedCount = result.evaluations.filter(isBlockedEvaluation).length;
         setError(
-          `Không thể gửi báo giá: có ${blockedCount} hạng mục không phù hợp với dịch vụ ${result.serviceName}.`,
+          `Không thể lưu báo giá: có ${blockedCount} hạng mục không phù hợp với dịch vụ ${result.serviceName}.`,
         );
-        return;
-      }
-
-      if (result.status === 'warning') {
-        setPendingPayload(payload);
-        setIsRelevanceConfirmOpen(true);
         return;
       }
 
@@ -325,30 +367,32 @@ export function RepairQuotationForm({
     }
   };
 
-  const confirmWarningAndSubmit = async () => {
-    if (!pendingPayload) return;
-    setIsRelevanceConfirmOpen(false);
-    setError(null);
-    await onSubmit({ ...pendingPayload, relevanceConfirmed: true });
-    setPendingPayload(null);
-  };
-
   const relevanceIssues =
     relevance?.evaluations.filter((evaluation) => evaluation.level !== 'relevant') || [];
 
   return (
+    <>
     <form
       onSubmit={handleSubmit}
       className="h-full space-y-md rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md"
     >
-      <div>
-        <h3 className="font-headline-md text-on-surface">Tạo báo giá sửa chữa</h3>
-        <label className="mt-3 block text-sm">Thời gian sửa chữa dự kiến (phút)
-          <input className="mt-1 w-full rounded-lg border border-outline-variant bg-surface p-2" type="number" required min={1} max={1440} value={estimatedDurationMinutes} onChange={(event) => setEstimatedDurationMinutes(Number(event.target.value))} />
-        </label>
+      <div className="flex flex-col gap-sm sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+        <h3 className="font-headline-md text-on-surface">{initialQuotation ? 'Chỉnh sửa báo giá' : 'Lập báo giá sửa chữa'}</h3>
         <p className="mt-1 text-sm text-on-surface-variant">
           Ghi nhận kết quả khảo sát cho dịch vụ <strong>{serviceName}</strong>.
         </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <button type="button" disabled={inputBusy} onClick={() => setScanOpen(true)}
+            className="btn-secondary flex min-h-11 items-center justify-center gap-2 px-3 text-sm">
+            <ImagePlus size={18} aria-hidden="true" />Thêm ảnh
+          </button>
+          <button type="button" disabled={inputBusy} onClick={() => setVoiceOpen(true)}
+            className="btn-secondary flex min-h-11 items-center justify-center gap-2 px-3 text-sm">
+            <Mic size={18} aria-hidden="true" />Giọng nói AI
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -394,22 +438,10 @@ export function RepairQuotationForm({
         </div>
       )}
 
-      <QuotationAgentPanel orderId={orderId} key={orderId} disabled={busy || isScanningImage || isValidatingRelevance || isRelevanceConfirmOpen}
-        snapshot={{ revision: formRevision, inspectionNote, recommendation,
-          items: items.map(({ rowId, title, description, itemType, quantity, unitPrice, note }) => ({ rowId, title, description, itemType, quantity, unitPrice, note })) }}
-        onApply={applyAgent} onBusyChange={setAgentBusy} />
       {undo && <button type="button" className="text-sm text-primary underline" disabled={agentBusy || busy || isValidatingRelevance}
         onClick={() => { if (revision.current !== undo.revision) return; const previous = undo; changed(); setItems(previous.items); setInspectionNote(previous.inspectionNote); setRecommendation(previous.recommendation); }}>Hoàn tác lần điền AI vừa rồi</button>}
 
-      <fieldset disabled={busy || isValidatingRelevance || isRelevanceConfirmOpen} className="space-y-md">
-      <QuotationNotesFields
-        inspectionNote={inspectionNote}
-        recommendation={recommendation}
-        maxLength={MAX_GENERAL_TEXT_LENGTH}
-        onInspectionNoteChange={(value) => { changed(); setInspectionNote(value); }}
-        onRecommendationChange={(value) => { changed(); setRecommendation(value); }}
-      />
-
+      <fieldset disabled={busy || isValidatingRelevance} className="space-y-md">
       <div className="space-y-sm">
         <div className="flex flex-wrap items-end justify-between gap-sm">
           <div>
@@ -433,24 +465,11 @@ export function RepairQuotationForm({
             </label>
             <button
               type="button"
-              disabled={items.length >= MAX_QUOTATION_ITEMS || isScanningImage}
+              disabled={items.length >= MAX_QUOTATION_ITEMS || isScanningImage || agentBusy}
               onClick={handleAddItems}
               className="h-10 rounded-xl border border-primary/30 px-3 text-sm font-medium text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               + Thêm hạng mục
-            </button>
-            <button
-              type="button"
-              disabled={isScanningImage || items.length >= MAX_QUOTATION_ITEMS}
-              onClick={() => {
-                setScanImageError(null);
-                setIsScanModalOpen(true);
-              }}
-              className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-white transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Nhập hạng mục từ ảnh hoặc tệp Excel"
-              title="Nhập từ ảnh hoặc Excel"
-            >
-              <ScanLine aria-hidden="true" size={20} />
             </button>
           </div>
         </div>
@@ -460,7 +479,7 @@ export function RepairQuotationForm({
           <span className="md:col-span-2">Loại</span>
           <span className="md:col-span-1">Số lượng</span>
           <span className="md:col-span-2">Đơn giá (VND)</span>
-          <span className="md:col-span-2">Thành tiền</span>
+          <span className="md:col-span-3">Thành tiền</span>
         </div>
 
         {items.map((item, index) => (
@@ -481,172 +500,91 @@ export function RepairQuotationForm({
         ))}
       </div>
 
+      <QuotationNotesFields
+        inspectionNote={inspectionNote}
+        recommendation={recommendation}
+        maxLength={MAX_GENERAL_TEXT_LENGTH}
+        onInspectionNoteChange={(value) => { changed(); setInspectionNote(value); }}
+        onRecommendationChange={(value) => { changed(); setRecommendation(value); }}
+      />
       </fieldset>
-      <div className="flex justify-end">
-        <div className="rounded-2xl bg-primary/5 px-md py-sm text-right">
-          <p className="text-xs text-on-surface-variant">Tổng báo giá (tổng thành tiền các hạng mục)</p>
-          <p className="text-headline-md font-bold tabular-nums text-primary">{formatMoney(subtotal)}</p>
-          <p className="mt-2 text-sm text-on-surface-variant">Cọc đã thanh toán (thuộc hệ thống): −{formatMoney(appliedDepositAmount)}</p>
-          <p className="mt-1 font-bold text-primary">Bạn thu trực tiếp từ khách: {formatMoney(getDirectRepairPayment(subtotal, appliedDepositAmount))}</p>
+      <dl className="space-y-3 rounded-2xl bg-primary/5 p-md">
+        <div className="flex items-baseline justify-between gap-4">
+          <dt className="text-sm text-on-surface-variant">Tổng báo giá</dt>
+          <dd className="text-right font-semibold tabular-nums text-on-surface">{formatMoney(finalAmount)}</dd>
         </div>
-      </div>
+        <div className="flex items-baseline justify-between gap-4">
+          <dt className="text-sm text-on-surface-variant">Khách đã thanh toán</dt>
+          <dd className="text-right text-sm tabular-nums text-on-surface-variant">−{formatMoney(appliedDepositAmount)}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-4 border-t border-primary/15 pt-3">
+          <dt className="font-semibold text-primary">Cần thu từ khách</dt>
+          <dd className="text-right text-headline-md font-bold tabular-nums text-primary">{formatMoney(getDirectRepairPayment(finalAmount, appliedDepositAmount))}</dd>
+        </div>
+      </dl>
 
-      <div className="flex flex-col-reverse gap-sm border-t border-outline-variant/30 pt-md sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          disabled={busy || agentBusy || isScanningImage || isValidatingRelevance}
-          onClick={onCancel}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-error/30 bg-error/5 px-4 py-3 text-sm font-bold text-error transition hover:border-error/50 hover:bg-error/10 active:scale-[0.98] disabled:opacity-50"
-        >
-          <TriangleAlert aria-hidden="true" size={20} />
-          Hủy đơn hàng
+      <div className="grid grid-cols-2 items-center gap-sm sm:flex sm:flex-wrap">
+        <button type="button" onClick={onCancel} disabled={inputBusy}
+          className="col-start-1 row-start-2 flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-error hover:bg-error/5 disabled:opacity-50 sm:mr-auto">
+          <TriangleAlert size={18} aria-hidden="true" />Hủy đơn
         </button>
+        {onDiscard && <button type="button" disabled={inputBusy}
+          onClick={() => formRevision ? setDiscardOpen(true) : onDiscard()} className="btn-secondary col-start-2 row-start-2">Đóng chỉnh sửa</button>}
         <button
           type="submit"
-          disabled={busy || isValidatingRelevance || agentBusy || isScanningImage}
-          className="btn-primary w-full sm:w-auto"
+          disabled={inputBusy}
+          className="btn-primary col-span-2 row-start-1 w-full sm:w-auto"
         >
           {isValidatingRelevance
             ? 'Đang kiểm tra hạng mục…'
             : busy
-              ? 'Đang gửi báo giá…'
-              : 'Gửi báo giá cho khách hàng'}
+              ? 'Đang lưu báo giá…'
+              : initialQuotation ? 'Lưu thay đổi' : 'Lưu báo giá'}
         </button>
       </div>
 
-      <Modal
-        open={isScanModalOpen}
-        title="Nhập hạng mục từ ảnh hoặc Excel"
-        onClose={() => {
-          if (!isScanningImage) setIsScanModalOpen(false);
-        }}
-        size="sm"
-        closeOnEsc={!isScanningImage}
-        closeOnOverlayClick={!isScanningImage}
-      >
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <p className="text-sm leading-6 text-on-surface-variant">
-              Tải lên ảnh hoặc tệp Excel có danh sách hạng mục cần báo giá. Hệ thống
-              sẽ đọc dữ liệu và đối chiếu với dịch vụ <strong>{serviceName}</strong> trước
-              khi thêm vào biểu mẫu.
-            </p>
-            <ul className="list-disc space-y-1 pl-5 text-sm text-on-surface-variant">
-              <li>Ảnh giấy viết tay, bảng Excel hoặc bảng báo giá.</li>
-              <li>Chụp thẳng, đủ sáng, rõ chữ và không bị cắt mất nội dung.</li>
-              <li>
-                Tệp Excel cần có cột “Tên hạng mục” hoặc “Hạng mục”; có thể kèm
-                “Loại”, “Số lượng”, “Đơn giá”, “Mô tả” và “Ghi chú”.
-              </li>
-              <li>Hỗ trợ JPG, JPEG, PNG, WebP, XLSX; dung lượng tối đa 10 MB.</li>
-            </ul>
-          </div>
-
-          {scanImageError && (
-            <div
-              role="alert"
-              className="rounded-xl bg-error/10 px-4 py-3 text-sm text-error"
-            >
-              {scanImageError}
-            </div>
-          )}
-
-          <label
-            className={`flex min-h-52 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 px-6 py-8 text-center transition ${
-              isScanningImage
-                ? "cursor-wait opacity-70"
-                : "cursor-pointer hover:border-primary hover:bg-primary/10"
-            }`}
-          >
-            <span className="grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
-              <UploadCloud
-                aria-hidden="true"
-                size={28}
-                className={isScanningImage ? "animate-pulse motion-reduce:animate-none" : ""}
-              />
-            </span>
-            <span className="mt-4 font-semibold text-on-surface" aria-live="polite">
-              {isScanningImage ? "Đang đọc dữ liệu…" : "Nhấp để chọn ảnh hoặc tệp Excel"}
-            </span>
-            <span className="mt-1 text-xs text-on-surface-variant">
-              {isScanningImage
-                ? "Vui lòng chờ trong giây lát."
-                : "Chọn một tệp từ thiết bị của bạn."}
-            </span>
-            <input
-              type="file"
-              name="quotationFile"
-              accept="image/jpeg,image/png,image/webp,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              disabled={isScanningImage}
-              onChange={(event) => {
-                void handleScanQuotationFile(event.target.files?.[0]);
-                event.target.value = "";
-              }}
-              className="sr-only"
-            />
-          </label>
-
-          <p className="rounded-xl bg-surface-container-low px-4 py-3 text-xs leading-5 text-on-surface-variant">
-            Sau khi quét, hãy kiểm tra lại thông tin và đơn giá trước khi gửi báo giá
-            cho khách hàng.
-          </p>
+      <Modal open={scanOpen} title="Thêm hạng mục từ ảnh" size="sm"
+        onClose={() => { if (!isScanningImage) setScanOpen(false); }}
+        closeOnEsc={!isScanningImage} closeOnOverlayClick={!isScanningImage}>
+          <section aria-label="Nhập hạng mục từ ảnh hoặc Excel" className="space-y-3 rounded-2xl border border-outline-variant/30 bg-surface-container-low p-4">
+            <label className={`flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest px-4 py-5 text-center text-primary focus-within:ring-2 focus-within:ring-primary ${inputBusy ? 'opacity-50' : 'cursor-pointer hover:border-primary'}`}>
+              <UploadCloud size={24} aria-hidden="true" />
+              <span className="text-sm font-semibold">{selectedFile ? 'Chọn ảnh hoặc tệp Excel khác' : 'Chọn ảnh hoặc tệp Excel'}</span>
+              <input type="file" name="quotationFile" aria-label="Chọn ảnh hoặc tệp Excel" className="sr-only"
+                accept="image/jpeg,image/png,image/webp,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                disabled={inputBusy} onChange={(event) => { handleSelectFile(event.target.files?.[0]); event.target.value = ''; }} />
+            </label>
+            <p className="text-xs text-on-surface-variant">JPG, PNG, WebP hoặc Excel .xlsx, tối đa 10 MB.</p>
+            {selectedFile && <div className="flex items-center gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3">
+              {selectedImageUrl ? <ReliableImage src={selectedImageUrl} alt="Ảnh hạng mục đã chọn" className="h-20 w-20 shrink-0 rounded-lg object-contain" /> : <FileSpreadsheet size={32} aria-hidden="true" className="shrink-0 text-primary" />}
+              <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium text-on-surface">{selectedFile.name}</p><p className="text-xs text-on-surface-variant">{Math.ceil(selectedFile.size / 1024)} KB</p></div>
+              <button type="button" aria-label="Bỏ tệp đã chọn" disabled={inputBusy} onClick={() => handleSelectFile(undefined)} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"><X size={18} aria-hidden="true" /></button>
+            </div>}
+            {scanImageError && <p role="alert" className="rounded-xl bg-error/10 px-3 py-2 text-sm text-error">{scanImageError}</p>}
+            {scanStatus && <p role="status" className="text-sm text-on-surface-variant">{scanStatus}</p>}
+            <button type="button" disabled={!selectedFile || inputBusy || scanComplete || items.length >= MAX_QUOTATION_ITEMS}
+              onClick={() => void handleScanQuotationFile()} className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 sm:w-auto">
+              <ScanLine size={18} aria-hidden="true" />{isScanningImage ? 'Đang đọc hạng mục…' : scanComplete ? 'Đã thêm hạng mục' : 'Đọc hạng mục'}
+            </button>
+            {isScanningImage && <p role="status" className="text-sm text-on-surface-variant">Đang đọc tệp và kiểm tra hạng mục.</p>}
+          </section>
+        <div className="mt-4 flex justify-end">
+          <button type="button" disabled={isScanningImage} onClick={() => setScanOpen(false)} className="btn-secondary">Trở về báo giá</button>
         </div>
       </Modal>
+          <QuotationAgentPanel orderId={orderId} key={orderId} open={voiceOpen} onClose={() => setVoiceOpen(false)} disabled={busy || isScanningImage || isValidatingRelevance}
+            snapshot={{ revision: formRevision, inspectionNote, recommendation,
+              items: items.map(({ rowId, title, description, itemType, quantity, unitPrice, note }) => ({ rowId, title, description, itemType, quantity, unitPrice, note })) }}
+            onApply={applyAgent} onBusyChange={setAgentBusy} />
 
-      <Modal
-        open={isRelevanceConfirmOpen}
-        title="Xác nhận hạng mục cần kiểm tra"
-        onClose={() => {
-          if (!busy) setIsRelevanceConfirmOpen(false);
-        }}
-        size="sm"
-        closeOnEsc={!busy}
-        closeOnOverlayClick={!busy}
-      >
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
-            <div className="flex items-start gap-3">
-              <CircleAlert aria-hidden="true" size={22} className="mt-0.5 shrink-0" />
-              <div>
-                <p className="font-semibold">
-                  Một số hạng mục chưa thể xác định chắc chắn có phù hợp với dịch vụ
-                  {` ${relevance?.serviceName || serviceName}`}.
-                </p>
-                <p className="mt-1 text-sm">
-                  Hãy kiểm tra kỹ trước khi xác nhận gửi cho khách hàng.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <ul className="max-h-64 list-disc space-y-2 overflow-y-auto pl-5 text-sm text-on-surface-variant">
-            {relevanceIssues.map((issue) => (
-              <li key={`confirm-${issue.index}-${issue.title}`}>
-                <strong className="text-on-surface">{issue.title}</strong>: {issue.reason}
-              </li>
-            ))}
-          </ul>
-
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setIsRelevanceConfirmOpen(false)}
-              className="h-11 rounded-xl border border-outline-variant px-4 text-sm font-semibold text-on-surface transition hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:opacity-50"
-            >
-              Quay lại chỉnh sửa
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void confirmWarningAndSubmit()}
-              className="btn-primary h-11 px-4"
-            >
-              {busy ? 'Đang gửi báo giá…' : 'Tôi đã kiểm tra, tiếp tục gửi'}
-            </button>
-          </div>
+      <Modal open={discardOpen} title="Bỏ thay đổi chưa lưu?" onClose={() => setDiscardOpen(false)}>
+        <p className="text-sm text-on-surface-variant">Bản báo giá đã lưu vẫn được giữ lại. Các thay đổi đang nhập sẽ bị bỏ.</p>
+        <div className="mt-4 flex justify-end gap-3">
+          <button type="button" onClick={() => setDiscardOpen(false)} className="btn-secondary">Tiếp tục chỉnh sửa</button>
+          <button type="button" onClick={onDiscard} className="btn-primary">Bỏ thay đổi</button>
         </div>
       </Modal>
     </form>
+    </>
   );
 }

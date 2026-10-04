@@ -7,13 +7,15 @@ import { Service } from "../models/service.model";
 import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
+import { AuditLog } from "../models/auditLog.model";
+import type { INotification } from "../models/notification.model";
 import { AppError } from "../utils/appError";
 import { Address } from "../models/address.model";
 import { emitToUser } from "../sockets/socketServer";
 import { cancelOrderWithSettlement } from "./orderCancellation.service";
 import { assertProviderWalletEligible } from "./providerWalletEligibility.service";
 import type { UserRole } from "../models/user.model";
-import { createNotificationRecord } from "./notification.service";
+import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 import { requestDirectProviderReassignment } from "./orderReassignment.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
@@ -53,6 +55,166 @@ export interface CreateQuotationPayload {
   discountAmount?: number;
   relevanceConfirmed?: boolean;
 }
+
+export interface UpdateQuotationPayload extends CreateQuotationPayload {
+  quotationId: string;
+  expectedRevision: number;
+}
+
+const assertQuotationOrder = (
+  order: InstanceType<typeof Order>,
+  providerId: Types.ObjectId,
+) => {
+  if (order.providerId?.toString() !== providerId.toString()) {
+    throw new AppError("Bạn không phải thợ được phân công cho đơn hàng này.", 403);
+  }
+  if (!["accepted", "in_progress"].includes(order.status)) {
+    throw new AppError("Chỉ được lưu báo giá khi đơn đã nhận hoặc đang thực hiện.", 409);
+  }
+  if (["scheduled", "recurring"].includes(order.orderType) && order.bookingStatus !== "confirmed") {
+    throw new AppError("Lịch hẹn chưa được thanh toán và xác nhận.", 409);
+  }
+};
+
+const saveRepairQuotation = async (
+  payload: CreateQuotationPayload | UpdateQuotationPayload,
+  providerUserId: string,
+): Promise<InstanceType<typeof RepairQuotation>> => {
+  const order = await Order.findOne({ _id: payload.orderId, isDeleted: false });
+  if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+  const provider = await Provider.findOne({ userId: providerUserId, verified: true, isDeleted: false });
+  if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ đã được duyệt.", 404);
+  assertQuotationOrder(order, provider._id as Types.ObjectId);
+  const service = await Service.findById(order.serviceId).select("serviceType").lean();
+  if (!order.inspectionRequired && service?.serviceType !== "variable_price") {
+    throw new AppError("Đơn hàng này không yêu cầu báo giá sửa chữa.", 400);
+  }
+  if (order.schedule && !payload.estimatedDurationMinutes) {
+    throw new AppError("Vui lòng nhập thời gian sửa chữa dự kiến từ 1 đến 1440 phút.", 400);
+  }
+  const subtotalAmount = payload.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const discountAmount = payload.discountAmount ?? 0;
+  const finalAmount = subtotalAmount - discountAmount;
+  if (!Number.isFinite(finalAmount) || finalAmount <= order.depositAmount) {
+    throw new AppError("Tổng báo giá sau giảm giá phải lớn hơn tiền cọc.", 400);
+  }
+  const relevance = await evaluateQuotationItemsForOrder(order, payload.items);
+  const blockedItems = getBlockedRelevanceItems(relevance);
+  if (blockedItems.length) {
+    throw new AppError(`Không thể lưu báo giá vì có hạng mục không phù hợp với dịch vụ ${relevance.serviceName}: ${blockedItems.slice(0, 3).map((item) => `"${item.title}"`).join(", ")}.`, 422);
+  }
+
+  const update = "expectedRevision" in payload ? payload : null;
+  const policy = await getBookingPolicy();
+  const session = await mongoose.startSession();
+  let notification: INotification | undefined;
+  try {
+    const quotation = await session.withTransaction(async () => {
+      notification = undefined;
+      await lockProviderSchedule(provider._id as Types.ObjectId, session);
+      const currentOrder = await Order.findOne({ _id: order._id, isDeleted: false }).session(session);
+      if (!currentOrder) throw new AppError("Đơn hàng không tồn tại.", 404);
+      assertQuotationOrder(currentOrder, provider._id as Types.ObjectId);
+      if (currentOrder.depositAmount !== order.depositAmount) {
+        throw new AppError("Tiền cọc đã thay đổi. Vui lòng tải lại đơn hàng.", 409);
+      }
+      let currentQuotation: InstanceType<typeof RepairQuotation>;
+      let oldValue: Record<string, unknown> | null = null;
+      let oldItems: InstanceType<typeof RepairQuotationItem>[] = [];
+      if (update) {
+        if (currentOrder.currentQuotationId?.toString() !== update.quotationId) {
+          throw new AppError("Báo giá không còn là bản hiện tại. Vui lòng tải lại đơn hàng.", 409);
+        }
+        const existing = await RepairQuotation.findOne({ _id: update.quotationId, orderId: currentOrder._id, providerId: provider._id, isDeleted: false }).session(session);
+        if (!existing) throw new AppError("Báo giá không tồn tại.", 404);
+        if (!["saved", "approved"].includes(existing.status)) {
+          throw new AppError("Chỉ được chỉnh sửa báo giá đã lưu hoặc đã được chấp thuận.", 409);
+        }
+        if ((existing.revision ?? 0) !== update.expectedRevision) {
+          throw new AppError("Báo giá đã được cập nhật ở phiên khác. Vui lòng tải lại trước khi sửa tiếp.", 409);
+        }
+        oldItems = await RepairQuotationItem.find({ quotationId: existing._id, isDeleted: false }).session(session);
+        oldValue = { ...existing.toObject(), items: oldItems.map((item) => item.toObject()) };
+        currentQuotation = existing;
+      } else {
+        if (currentOrder.currentQuotationId) {
+          throw new AppError("Đơn hàng đã có báo giá. Vui lòng chỉnh sửa bản hiện tại.", 409);
+        }
+        currentQuotation = new RepairQuotation({
+          quotationCode: `QUO-${randomBytes(6).toString("hex").toUpperCase()}`,
+          orderId: currentOrder._id, customerId: currentOrder.customerId, providerId: provider._id,
+        });
+      }
+
+      const duration = payload.estimatedDurationMinutes;
+      if (currentOrder.status === "in_progress" && duration && duration !== currentQuotation.estimatedDurationMinutes) {
+        const start = currentOrder.schedule?.expectedStartAt;
+        if (!start) throw new AppError("Đơn chưa có giờ bắt đầu để cập nhật thời lượng sửa chữa.", 409);
+        const expectedEndAt = new Date(start.getTime() + duration * 60_000);
+        if (expectedEndAt.getTime() <= Date.now()) {
+          throw new AppError("Thời lượng mới phải có giờ kết thúc dự kiến sau thời điểm hiện tại.", 409);
+        }
+        currentOrder.schedule = {
+          durationMinutes: duration,
+          bufferMinutes: currentOrder.schedule?.bufferMinutes ?? policy.bufferMinutes,
+          travelMinutes: currentOrder.schedule?.travelMinutes ?? policy.travelMinutes,
+          expectedStartAt: start, expectedEndAt,
+        };
+        await assertProviderSchedule(provider._id as Types.ObjectId, [currentOrder], session, policy);
+      }
+
+      currentQuotation.set({
+        status: "saved", revision: (currentQuotation.revision ?? 0) + 1,
+        estimatedDurationMinutes: duration,
+        inspectionNote: payload.inspectionNote ?? null,
+        recommendation: payload.recommendation ?? null,
+        attachments: payload.attachments ?? currentQuotation.attachments ?? [],
+        subtotalAmount, discountAmount, finalAmount,
+        approvedAt: null, customerConfirmed: false, providerConfirmed: true,
+      });
+      await currentQuotation.save({ session });
+      if (update) {
+        await RepairQuotationItem.updateMany(
+          { quotationId: currentQuotation._id, isDeleted: false },
+          { $set: { isDeleted: true, deletedAt: new Date() } },
+          { session, runValidators: true },
+        );
+      }
+      const items = await RepairQuotationItem.insertMany(payload.items.map((item) => ({
+        ...item, quotationId: currentQuotation._id, totalPrice: item.unitPrice * item.quantity,
+      })), { session });
+      currentOrder.inspectionRequired = true;
+      currentOrder.currentQuotationId = currentQuotation._id as Types.ObjectId;
+      currentOrder.hasAdditionalQuotation = true;
+      currentOrder.confirmation.customerConfirmedAt = null;
+      await currentOrder.save({ session });
+      await AuditLog.create([{
+        actorId: new Types.ObjectId(providerUserId),
+        actorRole: "provider", action: update ? "UPDATE_QUOTATION" : "SAVE_QUOTATION",
+        targetType: "RepairQuotation", targetId: currentQuotation._id,
+        oldValue, newValue: { ...currentQuotation.toObject(), items: items.map((item) => item.toObject()) },
+        description: update ? "Thợ cập nhật báo giá sửa chữa." : "Thợ lưu báo giá sửa chữa.",
+      }], { session });
+      const changedItems = oldItems.map((item) => ({ title: item.title, description: item.description ?? null, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, note: item.note ?? null }));
+      const newItems = payload.items.map((item) => ({ title: item.title, description: item.description ?? null, itemType: item.itemType, quantity: item.quantity, unitPrice: item.unitPrice, note: item.note ?? null }));
+      if (!update || oldValue?.finalAmount !== finalAmount || JSON.stringify(changedItems) !== JSON.stringify(newItems)) {
+        notification = await createNotificationRecord({
+          userId: currentOrder.customerId, type: "QUOTATION",
+          title: update ? "Báo giá đã được cập nhật" : "Báo giá đã được lưu",
+          content: `Thợ đã ${update ? "cập nhật" : "lưu"} báo giá cho đơn ${currentOrder.orderCode}. Vui lòng xem chi phí mới nhất.`,
+          data: { orderId: currentOrder.id, quotationId: currentQuotation.id, revision: currentQuotation.revision },
+        }, { session });
+      }
+      return currentQuotation;
+    });
+    if (!quotation) throw new AppError("Không thể lưu báo giá.", 409);
+    if (notification) emitRealtimeNotification(notification);
+    emitToUser(order.customerId.toString(), "quotation:updated", { orderId: order.id, revision: quotation.revision });
+    return quotation;
+  } finally {
+    await session.endSession();
+  }
+};
 
 const closeCompetingAssignments = async (
   orderId: Types.ObjectId,
@@ -517,141 +679,22 @@ export const AssignmentService = {
   // REPAIR SERVICE – Quotation Flow
   // ────────────────────────────────────────────────────────────────────────────
 
-  /**
-   * Provider creates a RepairQuotation after inspection.
-   * Only available for orders where inspectionRequired === true.
-   */
+  /** Lưu báo giá sau khảo sát, có thể chỉnh sửa tới khi kết thúc đơn. */
   async createRepairQuotation(
     payload: CreateQuotationPayload,
     providerUserId: string,
   ): Promise<InstanceType<typeof RepairQuotation>> {
-    const order = await Order.findById(payload.orderId);
-    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
-    const service = await Service.findById(order.serviceId).select("serviceType").lean();
-    const requiresQuotation = order.inspectionRequired || service?.serviceType === "variable_price";
-    if (!requiresQuotation) {
-      throw new AppError(
-        "Đơn hàng này không yêu cầu báo giá sửa chữa.",
-        400,
-      );
-    }
-    if (order.schedule && !payload.estimatedDurationMinutes) throw new AppError("Vui lòng nhập thời gian sửa chữa dự kiến từ 1 đến 1440 phút.", 400);
-
-    const provider = await Provider.findOne({
-      userId: providerUserId,
-      verified: true,
-      isDeleted: false,
-    });
-    if (!provider) throw new AppError("Provider không tồn tại.", 404);
-    if (
-      !order.providerId ||
-      order.providerId.toString() !== provider._id.toString()
-    ) {
-      throw new AppError(
-        "Bạn không phải provider được phân công cho đơn hàng này.",
-        403,
-      );
-    }
-
-    if (
-      ["scheduled", "recurring"].includes(order.orderType) &&
-      order.bookingStatus !== "confirmed"
-    ) {
-      throw new AppError(
-        "Khách hàng chưa thanh toán giữ lịch. Bạn chỉ có thể gửi báo giá sau khi lịch hẹn được xác nhận.",
-        409,
-      );
-    }
-
-    if (!["accepted", "in_progress"].includes(order.status)) {
-      throw new AppError(
-        "Chỉ có thể tạo báo giá khi đơn hàng đang ở trạng thái accepted hoặc in_progress.",
-        400,
-      );
-    }
-
-    const subtotalAmount = payload.items.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0,
-    );
-    const discountAmount = payload.discountAmount ?? 0;
-    const finalAmount = Math.max(subtotalAmount - discountAmount, 0);
-    if (!Number.isFinite(finalAmount) || finalAmount <= order.depositAmount) {
-      throw new AppError("Tổng báo giá sau giảm giá phải lớn hơn tiền cọc.", 400);
-    }
-
-    const relevance = await evaluateQuotationItemsForOrder(
-      order,
-      payload.items,
-    );
-    const blockedItems = getBlockedRelevanceItems(relevance);
-    if (blockedItems.length) {
-      const titles = blockedItems
-        .slice(0, 3)
-        .map((item) => `"${item.title}"`)
-        .join(", ");
-      throw new AppError(
-        `Không thể gửi báo giá vì có hạng mục không phù hợp với dịch vụ ${relevance.serviceName}: ${titles}.`,
-        422,
-      );
-    }
-    if (relevance.status === "warning" && !payload.relevanceConfirmed) {
-      throw new AppError(
-        "Báo giá có hạng mục cần kiểm tra thêm. Vui lòng xem cảnh báo và xác nhận trước khi gửi.",
-        409,
-      );
-    }
-
-    const quotationCode = `QUO-${randomBytes(6).toString("hex").toUpperCase()}`;
-
-    // Báo giá được chấp thuận ngay khi provider gửi; khách hàng không cần xác nhận thêm.
-    const approvedAt = new Date();
-    const quotation = await RepairQuotation.create({
-      estimatedDurationMinutes: payload.estimatedDurationMinutes,
-      quotationCode,
-      orderId: order._id,
-      customerId: order.customerId,
-      providerId: provider._id,
-      status: "approved",
-      inspectionNote: payload.inspectionNote ?? null,
-      recommendation: payload.recommendation ?? null,
-      attachments: payload.attachments ?? [],
-      subtotalAmount,
-      discountAmount,
-      finalAmount,
-      approvedAt,
-      customerConfirmed: true,
-      providerConfirmed: true,
-    });
-
-    // Create quotation items
-    const itemDocs = payload.items.map((item) => ({
-      quotationId: quotation._id,
-      title: item.title,
-      description: item.description ?? null,
-      itemType: item.itemType,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      totalPrice: item.unitPrice * item.quantity,
-      note: item.note ?? null,
-    }));
-    await RepairQuotationItem.insertMany(itemDocs);
-
-    // Link quotation to order
-    // Đơn cũ có thể chưa lưu inspectionRequired dù dịch vụ là báo giá theo khảo sát.
-    order.inspectionRequired = true;
-    order.currentQuotationId = quotation._id as Types.ObjectId;
-    order.hasAdditionalQuotation = true;
-    order.confirmation.customerConfirmedAt = approvedAt;
-    await order.save();
-
-    return quotation as any;
+    return saveRepairQuotation(payload, providerUserId);
   },
 
-  /**
-   * Giữ endpoint cũ để tương thích với client cũ; báo giá mới đã được duyệt
-   * ngay khi provider gửi nên client mới không cần gọi thao tác này.
-   */
+  async updateRepairQuotation(
+    payload: UpdateQuotationPayload,
+    providerUserId: string,
+  ): Promise<InstanceType<typeof RepairQuotation>> {
+    return saveRepairQuotation(payload, providerUserId);
+  },
+
+  /** Giữ xác nhận cho báo giá chờ duyệt cũ; báo giá đã lưu không cần khách xác nhận. */
   async confirmRepairQuotation(
     quotationId: string,
     customerUserId: string,
@@ -667,6 +710,7 @@ export const AssignmentService = {
         if (!quotation) throw new AppError("Báo giá không tồn tại.", 404);
         if (
           quotation.status !== "pending" &&
+          quotation.status !== "saved" &&
           !(quotation.status === "approved" && quotation.customerConfirmed)
         ) {
           throw new AppError(
@@ -683,7 +727,7 @@ export const AssignmentService = {
         if (order.currentQuotationId?.toString() !== quotation.id) {
           throw new AppError("Báo giá này không còn là báo giá hiện tại.", 409);
         }
-        if (quotation.status === "approved" && quotation.customerConfirmed) {
+        if (quotation.status === "saved" || (quotation.status === "approved" && quotation.customerConfirmed)) {
           approvedQuotation = quotation;
           return;
         }
@@ -847,47 +891,36 @@ export const AssignmentService = {
       .lean();
   },
 
-  /**
-   * Get current repair quotation for an order (customer/provider view).
-   */
+  /** Đọc báo giá và hạng mục trong cùng phiên bản dữ liệu. */
   async getQuotationByOrder(
     orderId: string,
     userId: string,
     role: "CUSTOMER" | "PROVIDER",
   ) {
-    const order = await Order.findById(orderId);
-    if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
-
-    if (role === "CUSTOMER") {
-      if (order.customerId.toString() !== userId) {
-        throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
-      }
-    } else {
-      const provider = await Provider.findOne({
-        userId,
-        verified: true,
-        isDeleted: false,
-      });
-      if (!provider) throw new AppError("Provider không tồn tại.", 404);
-      if (
-        !order.providerId ||
-        order.providerId.toString() !== provider._id.toString()
-      ) {
-        throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
-      }
+    const session = await mongoose.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        const order = await Order.findOne({ _id: orderId, isDeleted: false }).session(session);
+        if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+        if (role === "CUSTOMER") {
+          if (order.customerId.toString() !== userId) {
+            throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
+          }
+        } else {
+          const provider = await Provider.findOne({ userId, verified: true, isDeleted: false }).session(session);
+          if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ.", 404);
+          if (order.providerId?.toString() !== provider._id.toString()) {
+            throw new AppError("Bạn không có quyền xem báo giá của đơn hàng này.", 403);
+          }
+        }
+        if (!order.currentQuotationId) return null;
+        const quotation = await RepairQuotation.findOne({ _id: order.currentQuotationId, isDeleted: false }).session(session).lean();
+        if (!quotation) return null;
+        const items = await RepairQuotationItem.find({ quotationId: quotation._id, isDeleted: false }).session(session).lean();
+        return { quotation, items };
+      }, { readConcern: { level: "snapshot" } });
+    } finally {
+      await session.endSession();
     }
-
-    if (!order.currentQuotationId) {
-      return null;
-    }
-
-    const quotation = await RepairQuotation.findById(order.currentQuotationId).lean();
-    if (!quotation) return null;
-
-    const items = await RepairQuotationItem.find({
-      quotationId: quotation._id,
-    }).lean();
-
-    return { quotation, items };
   },
 };

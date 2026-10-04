@@ -33,7 +33,7 @@ const toNotificationResponse = (notification: INotification) => ({
   updatedAt: notification.updatedAt,
 });
 
-const emitRealtimeNotification = (notification: INotification) => {
+export const emitRealtimeNotification = (notification: INotification) => {
   emitToUser(
     notification.userId.toString(),
     "notification:new",

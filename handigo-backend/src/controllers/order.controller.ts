@@ -274,7 +274,7 @@ export const completeOrder = async (
   next: NextFunction,
 ) => {
   try {
-    const { completionEvidenceImages, completionNote } = req.body;
+    const { completionEvidenceImages, completionNote, expectedQuotationId, expectedQuotationRevision } = req.body;
     const evidenceImages = Array.isArray(completionEvidenceImages)
       ? completionEvidenceImages.filter(
           (url): url is string => typeof url === "string",
@@ -285,6 +285,9 @@ export const completeOrder = async (
       uid(req),
       evidenceImages,
       typeof completionNote === "string" ? completionNote : undefined,
+      expectedQuotationId && expectedQuotationRevision !== undefined
+        ? { quotationId: expectedQuotationId, revision: expectedQuotationRevision }
+        : undefined,
     );
     return ok(res, order);
   } catch (error) {
@@ -385,6 +388,20 @@ export const createRepairQuotation = async (
       providerUserId,
     );
     return ok(res, quotation, 201);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateRepairQuotation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    return ok(res, await AssignmentService.updateRepairQuotation(
+      { ...req.body, orderId: param(req, "orderId") }, uid(req),
+    ));
   } catch (error) {
     return next(error);
   }

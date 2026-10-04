@@ -4,6 +4,7 @@ import { quotationAgentApi } from '../../api/quotationAgent.api';
 import { quotationAudioToWav } from '../../utils/quotationAudio';
 import type { QuotationAgentResult, QuotationAgentSnapshot } from '../../types/quotationAgent.types';
 import { getErrorMessage } from '@/utils/apiError';
+import { Modal } from '@/components/common/Modal';
 
 interface Props {
   orderId: string;
@@ -11,9 +12,11 @@ interface Props {
   disabled?: boolean;
   onApply: (result: QuotationAgentResult) => boolean;
   onBusyChange: (busy: boolean) => void;
+  open?: boolean;
+  onClose?: () => void;
 }
 
-export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBusyChange }: Props) {
+export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBusyChange, open, onClose }: Props) {
   const [instruction, setInstruction] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -47,11 +50,11 @@ export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBu
       if (controller.signal.aborted) return;
       const hasChanges = reply.updates.length || reply.inspectionNote !== undefined || reply.recommendation !== undefined;
       if (hasChanges && !onApply(reply)) {
-        setError('Form đã thay đổi trong lúc AI xử lý. Chưa áp dụng kết quả cũ; bấm Điền báo giá để xử lý lại trên dữ liệu mới.');
+        setError('Form đã thay đổi trong lúc AI xử lý. Chưa áp dụng kết quả cũ; bấm Điền vào báo giá để xử lý lại trên dữ liệu mới.');
       } else {
         setResult(reply);
         if (hasChanges) setInstruction('');
-        setStatus(hasChanges ? 'Đã điền vào form. Kiểm tra các dòng trước khi gửi báo giá.' : reply.message);
+        setStatus(hasChanges ? 'Đã điền vào form. Kiểm tra các dòng trước khi lưu báo giá.' : reply.message);
       }
     } catch (failure) {
       if (!controller.signal.aborted) setError(getErrorMessage(failure, 'Không thể xử lý báo giá. Form hiện tại được giữ nguyên.'));
@@ -91,7 +94,7 @@ export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBu
           const transcript = await quotationAgentApi.transcribe(orderId, wav, controller.signal);
           if (controller.signal.aborted) return;
           setInstruction((previous) => `${previous.trim()}${previous.trim() ? '\n' : ''}${transcript}`.slice(0, 6000));
-          setStatus('Đã nhận dạng giọng nói. Kiểm tra nội dung rồi bấm Điền báo giá.');
+          setStatus('Đã nhận dạng giọng nói. Kiểm tra nội dung rồi bấm Điền vào báo giá.');
         } catch (failure) {
           if (!controller.signal.aborted && current === generation.current) setError(getErrorMessage(failure, 'Không thể nhận dạng giọng nói. Hãy ghi âm lại hoặc nhập mô tả.'));
         } finally { if (current === generation.current) setWorking(false); }
@@ -104,20 +107,21 @@ export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBu
     }
   };
 
-  return <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/5 p-4" aria-label="Điền báo giá thông minh">
-    <p className="font-semibold text-on-surface">Điền báo giá thông minh</p>
-    <p className="text-sm text-on-surface-variant">Mô tả nhiều hạng mục hoặc yêu cầu sửa một dòng. Giá lịch sử chỉ là tham khảo; bạn kiểm tra trước khi gửi.</p>
-    <textarea aria-label="Mô tả báo giá" value={instruction} maxLength={6000} rows={3}
+  const panel = <section className="space-y-3 rounded-2xl border border-primary/20 bg-primary/5 p-4" aria-label="Giọng nói AI">
+    <p className="font-semibold text-on-surface">Giọng nói AI</p>
+    <p className="text-sm text-on-surface-variant">Ghi âm tên hạng mục, số lượng và đơn giá. Kiểm tra hoặc sửa nội dung nhận dạng trước khi điền vào báo giá.</p>
+    <label className="block text-sm font-medium" htmlFor={`quotation-voice-${orderId}`}>Nội dung báo giá</label>
+    <textarea id={`quotation-voice-${orderId}`} aria-label="Mô tả báo giá" value={instruction} maxLength={6000} rows={3}
       disabled={working || recording || disabled} onChange={(event) => { setInstruction(event.target.value); setResult(null); }}
       placeholder="Ví dụ: thay 2 tụ 35 µF, mỗi cái 180 nghìn, công thay 100 nghìn…"
       className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-sm" />
     <div className="flex flex-wrap gap-2">
       <button type="button" disabled={working || disabled} onClick={() => recording ? recorder.current?.stop() : void record()}
-        className="flex items-center gap-2 rounded-xl border border-primary/30 px-3 py-2 text-sm disabled:opacity-50">
-        {recording ? <Square size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}{recording ? 'Dừng ghi âm' : 'Nhập bằng giọng nói'}
+        className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-primary/30 px-3 py-2 text-sm disabled:opacity-50">
+        {recording ? <Square size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}{recording ? 'Dừng ghi âm' : 'Bắt đầu ghi âm'}
       </button>
       <button type="button" disabled={working || recording || disabled || !instruction.trim()} onClick={() => void run()}
-        className="flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"><Sparkles size={16} aria-hidden="true" />Điền báo giá</button>
+        className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"><Sparkles size={16} aria-hidden="true" />Điền vào báo giá</button>
       {working && <button type="button" onClick={() => { generation.current++; request.current?.abort(); setWorking(false); setStatus('Đã dừng xử lý; form được giữ nguyên.'); }} className="px-3 text-sm text-error">Dừng xử lý</button>}
     </div>
     {status && <p role="status" className="text-sm">{status}</p>}
@@ -130,4 +134,14 @@ export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBu
         onClick={() => { const text = `${instruction}\n${group.label}: ${option}`; setInstruction(text); void run(text); }}>{option}</button>)}</div></div>)}
     </div>}
   </section>;
+
+  if (open === undefined) return panel;
+  const close = () => { if (!working && !recording) onClose?.(); };
+  return <Modal open={open} title="Nhập báo giá bằng giọng nói AI" size="sm" onClose={close}
+    closeOnEsc={!working && !recording} closeOnOverlayClick={!working && !recording}>
+    {panel}
+    <div className="mt-4 flex justify-end">
+      <button type="button" disabled={working || recording} onClick={close} className="btn-secondary">Trở về báo giá</button>
+    </div>
+  </Modal>;
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import type { Order, OrderQuotation, Payment } from "@/types/booking";
+import { createAuthenticatedSocket } from '@/realtime/authenticatedSocket';
 
 /** Tải dữ liệu đơn hàng, chuỗi lịch định kỳ, lịch sử thanh toán và báo giá. */
 export const useBookingDetailData = (id: string | undefined) => {
@@ -64,7 +65,8 @@ export const useBookingDetailData = (id: string | undefined) => {
         try {
           const quo = await bookingApi.getQuotation(id);
           if (quo && quo.quotation) {
-            setQuotation(quo);
+            setQuotation((previous) => previous?.quotation._id === quo.quotation._id
+              && (previous.quotation.revision ?? 0) > (quo.quotation.revision ?? 0) ? previous : quo);
           } else {
             setQuotation(null);
           }
@@ -85,6 +87,44 @@ export const useBookingDetailData = (id: string | undefined) => {
   useEffect(() => {
     void Promise.resolve().then(loadData);
   }, [loadData]);
+
+  const hasQuotationService = Boolean(order?.inspectionRequired || order?.serviceId.serviceType === 'variable_price');
+  useEffect(() => {
+    if (!id || !hasQuotationService) return;
+    let disposed = false;
+    let pending = false;
+    let queued = false;
+    const refreshQuotation = async () => {
+      if (pending) { queued = true; return; }
+      pending = true;
+      try {
+        do {
+          queued = false;
+          const latest = await bookingApi.getQuotation(id);
+          if (!disposed) setQuotation((previous) => previous && latest && previous.quotation._id === latest.quotation._id
+            && (previous.quotation.revision ?? 0) > (latest.quotation.revision ?? 0) ? previous : latest);
+        } while (queued && !disposed);
+      } catch (error) {
+        console.error('Không thể tải báo giá mới nhất:', error);
+      } finally {
+        pending = false;
+      }
+    };
+    const { socket, dispose } = createAuthenticatedSocket();
+    const onUpdated = (payload: { orderId?: string }) => {
+      if (payload.orderId === id) void refreshQuotation();
+    };
+    socket.on('quotation:updated', onUpdated);
+    socket.on('connect', refreshQuotation);
+    window.addEventListener('focus', refreshQuotation);
+    return () => {
+      disposed = true;
+      socket.off('quotation:updated', onUpdated);
+      socket.off('connect', refreshQuotation);
+      window.removeEventListener('focus', refreshQuotation);
+      dispose();
+    };
+  }, [id, hasQuotationService]);
 
   // Đồng bộ tiến trình khi khách chờ, kể cả sau tải lại trang hoặc bỏ lỡ socket.
   useEffect(() => {

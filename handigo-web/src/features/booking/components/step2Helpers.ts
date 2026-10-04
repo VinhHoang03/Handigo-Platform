@@ -28,7 +28,8 @@ export const getUploadErrorMessage = (error: unknown) => {
 };
 
 export const getEarliestScheduledAt = (now = new Date()) => {
-  const earliest = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const earliest = new Date(now);
+  earliest.setSeconds(0, 0);
   if (earliest.getHours() < 8) earliest.setHours(8, 0, 0, 0);
   return earliest;
 };
@@ -36,6 +37,34 @@ export const getEarliestScheduledAt = (now = new Date()) => {
 export const getTodayInputValue = (now = new Date()) => {
   const timezoneOffset = now.getTimezoneOffset() * 60000;
   return new Date(now.getTime() - timezoneOffset).toISOString().split('T')[0];
+};
+
+export const getDefaultScheduledAt = (now = new Date()) => {
+  const date = getTodayInputValue(now);
+  const earliest = getEarliestScheduledAt(now).getTime();
+  const currentMinute = new Date(now);
+  currentMinute.setSeconds(0, 0);
+  if (now.getHours() < 8) return `${date}T${timeSlots[0]}:00`;
+  if (now.getHours() <= 21 && currentMinute.getTime() >= earliest) {
+    return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
+  }
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return `${getTodayInputValue(tomorrow)}T${timeSlots[0]}:00`;
+};
+
+export const getInitialScheduledAt = (scheduledAt: string | undefined, now = new Date()) => {
+  if (scheduledAt) {
+    const hasSelectedTime = scheduledAt.includes('T');
+    const selected = new Date(hasSelectedTime ? scheduledAt : `${scheduledAt}T08:00:00`);
+    if (Number.isFinite(selected.getTime())
+      && selected.getTime() >= getEarliestScheduledAt(now).getTime()
+      && selected.getHours() >= 8 && selected.getHours() <= 21) {
+      if (hasSelectedTime) return scheduledAt;
+      if (selected.getTime() > getEarliestScheduledAt(now).getTime()) return `${scheduledAt}T${timeSlots[0]}:00`;
+    }
+  }
+  return getDefaultScheduledAt(now);
 };
 
 export const getUpcomingDates = (now = new Date()) =>

@@ -21,6 +21,7 @@ import {
   cancelOrderSchema,
   completeOrderSchema,
   createRepairQuotationSchema,
+  updateRepairQuotationSchema,
   createOrderSchema,
   previewBookingSchema,
   updateExpectedEndSchema,
@@ -57,6 +58,7 @@ import {
   getOrderAssignments,
   redispatchOrder,
   createRepairQuotation,
+  updateRepairQuotation,
   getRepairQuotation,
   confirmRepairQuotation,
   rejectRepairQuotation,
@@ -295,6 +297,16 @@ router.post(
 );
 
 // GET    /orders/:orderId/quotation           → Provider: get current quotation
+router.patch(
+  "/:orderId/quotation",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  ocrRateLimit,
+  validate(orderIdParamSchema, "params"),
+  validate(updateRepairQuotationSchema),
+  updateRepairQuotation,
+);
+
 router.get(
   "/:orderId/quotation",
   roleMiddleware("CUSTOMER", "PROVIDER"),
