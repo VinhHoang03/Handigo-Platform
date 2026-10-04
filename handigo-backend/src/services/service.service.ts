@@ -3,6 +3,7 @@ import { Category } from "../models/category.model";
 import { Order } from "../models/order.model";
 import { IService, Service } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
+import { Feedback } from "../models/feedback.model";
 import { AppError } from "../utils/appError";
 import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
 
@@ -175,11 +176,42 @@ export const listServices = async (query: ListServicesQuery) => {
     ]),
   );
 
+  const ratingStats = await Feedback.aggregate<{
+    _id: Types.ObjectId;
+    averageRating: number;
+    totalFeedbacks: number;
+  }>([
+    {
+      $match: {
+        serviceId: { $in: items.map((item) => item._id) },
+        isVisible: true,
+        isDeleted: false,
+      },
+    },
+    {
+      $group: {
+        _id: "$serviceId",
+        averageRating: { $avg: "$rating" },
+        totalFeedbacks: { $sum: 1 },
+      },
+    },
+  ]);
+  const ratingByServiceId = new Map(
+    ratingStats.map((item) => [item._id.toString(), item]),
+  );
+
   return {
     items: items.map((item) => ({
       ...item.toObject(),
       minOptionPrice:
-        isAirConditionerCleaning(item) ? null : minimumOptionPriceByServiceId.get(item._id.toString()) ?? null,
+        isAirConditionerCleaning(item)
+          ? null
+          : minimumOptionPriceByServiceId.get(item._id.toString()) ?? null,
+      averageRating: Number(
+        (ratingByServiceId.get(item._id.toString())?.averageRating ?? 0).toFixed(1),
+      ),
+      totalFeedbacks:
+        ratingByServiceId.get(item._id.toString())?.totalFeedbacks ?? 0,
     })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
@@ -192,6 +224,38 @@ export const getServiceById = async (id: string) => {
     "name slug isActive",
   );
   if (!service) throw new AppError("Service not found", 404);
+
+  const [ratingStats, totalCompletedOrders] = await Promise.all([
+    Feedback.aggregate<{ averageRating: number; totalFeedbacks: number }>([
+      {
+        $match: {
+          serviceId: service._id,
+          isVisible: true,
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: "$rating" },
+          totalFeedbacks: { $sum: 1 },
+        },
+      },
+    ]),
+    Order.countDocuments({
+      serviceId: service._id,
+      status: "completed",
+      isDeleted: false,
+    }),
+  ]);
+
+  const stats = ratingStats[0];
+  service.set({
+    averageRating: Number((stats?.averageRating ?? 0).toFixed(1)),
+    totalFeedbacks: stats?.totalFeedbacks ?? 0,
+    totalCompletedOrders,
+  }, undefined, { strict: false });
+
   return service;
 };
 

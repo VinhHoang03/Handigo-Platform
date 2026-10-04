@@ -6,8 +6,7 @@ export interface CategoryShowcaseItem {
   id: string;
   name: string;
   icon?: string;
-  /** Ảnh của một dịch vụ thuộc danh mục — bộ minh hoạ thật, không phải ảnh kho. */
-  image: string;
+  iconColor?: string | null;
   /** Số dịch vụ đang mở trong danh mục. Đếm từ API, không phải số ước lượng. */
   serviceCount: number;
 }
@@ -22,8 +21,7 @@ const categoryIdOf = (service: Service) => {
 };
 
 /**
- * Gộp danh mục với dịch vụ để có đủ ba thứ mà lưới bento cần: tên, ảnh thật và
- * số dịch vụ thật.
+ * Gộp danh mục với dịch vụ để hiển thị tên, biểu tượng, màu và số dịch vụ.
  *
  * Chỉ trả về danh mục **đang có dịch vụ**. Danh mục rỗng vẫn tồn tại trong DB
  * nhưng bấm vào chỉ dẫn tới trang trắng — đưa lên trang chủ là hứa suông.
@@ -42,7 +40,6 @@ export function useCategoryShowcase() {
       .then(([categories, serviceList]: [Category[], { items: Service[] }]) => {
         if (!active) return;
         const services = serviceList.items ?? [];
-
         const showcase = categories
           .map<CategoryShowcaseItem>((category) => {
             const owned = services.filter(
@@ -52,7 +49,7 @@ export function useCategoryShowcase() {
               id: category._id,
               name: category.name,
               icon: category.icon,
-              image: owned.find((service) => service.image)?.image ?? "",
+              iconColor: category.iconColor,
               serviceCount: owned.length,
             };
           })

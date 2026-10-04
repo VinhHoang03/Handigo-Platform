@@ -4,6 +4,7 @@ import * as providerProfileService from "../services/providerProfile.service";
 import { AppError } from "../utils/appError";
 import {
   createCertificateSchema,
+  featuredProviderQuerySchema,
   submitIdentitySchema,
   updateCertificateSchema,
   updateProviderProfileSchema,
@@ -29,12 +30,13 @@ export const getMyProfile = async (
 };
 
 export const getFeaturedProviders = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const data = await providerProfileService.getFeaturedProviders();
+    const query = featuredProviderQuerySchema.parse(req.query);
+    const data = await providerProfileService.getFeaturedProviders(query);
     return res.json({ success: true, data });
   } catch (error) {
     return next(error);

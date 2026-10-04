@@ -350,9 +350,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
 
       shouldDispatch =
         paymentType !== "remaining" &&
-        transactionalOrder.status === "created" &&
-        (!['scheduled', 'recurring'].includes(transactionalOrder.orderType) ||
-          transactionalOrder.inspectionRequired);
+        transactionalOrder.status === "created";
       if (shouldDispatch) {
         transactionalOrder.readyForMatching = true;
       }
@@ -797,8 +795,7 @@ const syncPaidPayosPaymentToOrder = async (
   const shouldDispatch =
     payment.paymentType !== "remaining" &&
     order.status === "created" &&
-    (!['scheduled', 'recurring'].includes(order.orderType) ||
-      order.inspectionRequired);
+    (payment.paymentType === "inspection_deposit" || order.paymentStatus === "paid");
   if (shouldDispatch) {
     order.readyForMatching = true;
   }

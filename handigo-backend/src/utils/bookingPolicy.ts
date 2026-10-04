@@ -3,7 +3,8 @@ import type { BookingPolicy } from "../validations/bookingPolicy.validator";
 const VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 export const getEarliestScheduledAt = (now = new Date()) => {
-  const earliest = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const earliest = new Date(now);
+  earliest.setSeconds(0, 0);
   const vietnamTime = new Date(earliest.getTime() + VIETNAM_OFFSET_MS);
   if (vietnamTime.getUTCHours() < 8) {
     vietnamTime.setUTCHours(8, 0, 0, 0);

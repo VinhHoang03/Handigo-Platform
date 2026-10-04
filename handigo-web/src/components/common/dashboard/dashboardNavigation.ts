@@ -75,7 +75,7 @@ export const adminNavItems: DashboardNavItem[] = [
   },
   { icon: Star, label: "Đánh giá", path: "/admin/feedbacks" },
   { icon: Grid2X2, label: "Danh mục và dịch vụ", path: "/admin/categories" },
-  {
+   {
     icon: Lightbulb,
     label: "Đề xuất dịch vụ",
     path: "/admin/service-suggestions",

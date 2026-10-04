@@ -61,7 +61,7 @@ export const providerOrderApi = {
 
   completeOrder: async (
     orderId: string,
-    payload: { completionEvidenceImages: string[]; completionNote?: string },
+    payload: { completionEvidenceImages: string[]; completionNote?: string; expectedQuotationId?: string; expectedQuotationRevision?: number },
   ) => {
     const response = await api.post<{ success: boolean; data: Order }>(
       `/orders/${orderId}/complete`,
@@ -89,6 +89,13 @@ export const providerOrderApi = {
     const response = await api.post<{ success: boolean; data: QuotationDetail['quotation'] }>(
       `/orders/${orderId}/quotations`,
       payload,
+    );
+    return response.data.data;
+  },
+
+  updateQuotation: async (orderId: string, quotationId: string, expectedRevision: number, payload: CreateQuotationPayload) => {
+    const response = await api.patch<{ success: boolean; data: QuotationDetail['quotation'] }>(
+      `/orders/${orderId}/quotation`, { ...payload, quotationId, expectedRevision },
     );
     return response.data.data;
   },

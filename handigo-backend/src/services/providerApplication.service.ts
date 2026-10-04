@@ -104,7 +104,7 @@ const servicePopulate = {
   select: "name slug categoryId serviceType fixedPrice image",
   populate: {
     path: "categoryId",
-    select: "name slug icon",
+    select: "name slug icon iconColor",
   },
 };
 

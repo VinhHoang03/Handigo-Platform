@@ -38,20 +38,13 @@ export default function CustomerServiceDetailPage() {
     useServiceDetailData(serviceId);
 
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
-  const [selectedOptionQuantities, setSelectedOptionQuantities] = useState<
-    Record<string, number>
-  >({});
+  const [selectedOptionQuantities, setSelectedOptionQuantities] = useState<Record<string, number>>({});
   const [optionSelectionError, setOptionSelectionError] = useState("");
   const [quantitySelection, setQuantitySelection] = useState({ serviceId, quantity: 1 });
   const uniformQuantity = quantitySelection.serviceId === serviceId ? quantitySelection.quantity : 1;
   const isCleaning = isAirConditionerCleaning(service);
 
-  const { estimatePrice } = useServicePricing(
-    service,
-    options,
-    selectedOptionIds,
-    selectedOptionQuantities,
-  );
+  const { estimatePrice } = useServicePricing(service, options, selectedOptionIds, selectedOptionQuantities);
 
   const {
     addresses,
@@ -82,10 +75,7 @@ export default function CustomerServiceDetailPage() {
   const handleToggleOption = (option: ServiceOption) => {
     setOptionSelectionError("");
     setSelectedOptionIds((current) => toggleServiceOption(current, option, options));
-    setSelectedOptionQuantities((current) => ({
-      ...current,
-      [option._id]: current[option._id] ?? 1,
-    }));
+    setSelectedOptionQuantities((current) => ({ ...current, [option._id]: current[option._id] ?? 1 }));
   };
 
   const handleBookNow = useBookNowHandler({
@@ -112,23 +102,16 @@ export default function CustomerServiceDetailPage() {
         ) : (
           <>
             <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
-              <Link to="/customer" className="inline-flex min-h-11 items-center hover:text-primary">
-                Trang chủ
-              </Link>
+              <Link to="/customer" className="inline-flex min-h-11 items-center hover:text-primary">Trang chủ</Link>
               <ChevronRight aria-hidden="true" size={16} />
-              <Link to="/customer/services" className="inline-flex min-h-11 items-center hover:text-primary">
-                Dịch vụ
-              </Link>
+              <Link to="/customer/services" className="inline-flex min-h-11 items-center hover:text-primary">Dịch vụ</Link>
               <ChevronRight aria-hidden="true" size={16} />
               <span className="font-semibold text-on-surface">{service.name}</span>
             </nav>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
               <div className="space-y-8 lg:col-span-8">
-                <ServiceGallery
-                  service={service}
-                  categoryName={getCategoryName(service, categories)}
-                />
+                <ServiceGallery service={service} categoryName={getCategoryName(service, categories)} />
                 <ServiceDescriptionSection service={service} />
                 {isCleaning ? <>
                   <ServiceQuantityPanel price={service.fixedPrice} quantity={uniformQuantity}
@@ -167,14 +150,10 @@ export default function CustomerServiceDetailPage() {
                   isBookDisabled={isCleaning && !(service.fixedPrice && service.fixedPrice > 0)}
                   onBookNow={handleBookNow}
                 />
-
                 <NearbyProviderSelector
                   serviceId={service._id}
                   addressId={addressId}
-                  enabled={
-                    !isLoadingAddresses &&
-                    addresses.some((address) => address._id === addressId)
-                  }
+                  enabled={!isLoadingAddresses && addresses.some((address) => address._id === addressId)}
                   allowSelection={false}
                 />
               </aside>

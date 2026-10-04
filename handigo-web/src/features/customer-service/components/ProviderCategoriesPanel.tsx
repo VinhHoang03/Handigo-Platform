@@ -26,6 +26,7 @@ export function ProviderCategoriesPanel({
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                 <CategoryIcon
                   icon={category.icon}
+                  color={category.iconColor}
                   name={category.name}
                   className="h-5 w-5"
                 />

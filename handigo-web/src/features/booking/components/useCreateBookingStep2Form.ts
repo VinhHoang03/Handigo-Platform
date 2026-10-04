@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import { useBookingStore } from '../hooks/useBookingStore';
@@ -9,6 +9,7 @@ import {
   MIN_DESCRIPTION_LENGTH,
   buildRecurringPreview,
   getEarliestScheduledAt,
+  getInitialScheduledAt,
   getTodayInputValue,
   getUpcomingDates,
   getUploadErrorMessage,
@@ -34,6 +35,7 @@ export const useCreateBookingStep2Form = () => {
   const [formErrors, setFormErrors] = useState<Step2FormErrors>({});
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [providerAvailability, setProviderAvailability] = useState<ProviderAvailabilityStatus>('idle');
+  const scheduleInitialized = useRef(false);
   const todayInputValue = getTodayInputValue(new Date(currentTimestamp));
   const upcomingDates = useMemo(() => getUpcomingDates(new Date(`${todayInputValue}T00:00:00`)), [todayInputValue]);
   const recurringPreview = useMemo(
@@ -48,8 +50,15 @@ export const useCreateBookingStep2Form = () => {
   );
 
   useEffect(() => {
-    const timer = window.setInterval(() => setCurrentTimestamp(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
+    let interval: number | undefined;
+    const timeout = window.setTimeout(() => {
+      setCurrentTimestamp(Date.now());
+      interval = window.setInterval(() => setCurrentTimestamp(Date.now()), 60_000);
+    }, 60_000 - (Date.now() % 60_000));
+    return () => {
+      window.clearTimeout(timeout);
+      if (interval !== undefined) window.clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -58,6 +67,16 @@ export const useCreateBookingStep2Form = () => {
       setPreferredProviderId(undefined);
     }
   }, [orderType, setOrderType, setPreferredProviderId]);
+
+  useEffect(() => {
+    if (scheduleInitialized.current || !['scheduled', 'recurring'].includes(orderType)) return;
+    scheduleInitialized.current = true;
+    const initialScheduledAt = getInitialScheduledAt(scheduledAt);
+    if (initialScheduledAt !== scheduledAt) {
+      setScheduledAt(initialScheduledAt);
+      setPreferredProviderId(undefined);
+    }
+  }, [orderType, scheduledAt, setScheduledAt, setPreferredProviderId]);
 
   useEffect(() => {
     const isValidCount = recurrenceUnit === 'weekly'
@@ -172,8 +191,9 @@ export const useCreateBookingStep2Form = () => {
     }
     if (shouldShowSchedulePicker && scheduledAt?.includes('T')
       && (new Date(scheduledAt).getHours() < 8
+        || new Date(scheduledAt).getHours() > 21
         || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())) {
-      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 và cách thời gian hiện tại ít nhất 2 tiếng.';
+      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 đến 21:59 và không sớm hơn phút hiện tại.';
     }
     // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
     // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.

@@ -10,18 +10,22 @@ enum UserRole {
 
 class AppUser {
   const AppUser({required this.id, required this.fullName, required this.email,
-    required this.role, this.providerOnboardingStatus});
+    required this.role, this.avatar, this.isGoogleAccount = false, this.providerOnboardingStatus});
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
     id: (json['id'] ?? json['_id']) as String,
     fullName: json['fullName'] as String,
     email: json['email'] as String,
     role: UserRole.parse(json['role'] as String),
+    avatar: json['avatar'] as String?,
+    isGoogleAccount: json['isGoogleAccount'] as bool? ?? false,
     providerOnboardingStatus: json['providerOnboardingStatus'] as String?,
   );
   final String id;
   final String fullName;
   final String email;
   final UserRole role;
+  final String? avatar;
+  final bool isGoogleAccount;
   final String? providerOnboardingStatus;
   bool get canViewOrders => role == UserRole.customer ||
       (role == UserRole.provider && providerOnboardingStatus == 'APPROVED');
