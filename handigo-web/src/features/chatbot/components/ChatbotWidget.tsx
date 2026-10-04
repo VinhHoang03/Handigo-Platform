@@ -13,6 +13,7 @@ import type { AgentRequest, AgentSession } from "../types/agent.types";
 import { AgentSessionHistory } from "./AgentSessionHistory";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { isAxiosError } from "axios";
+import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 
 export function ChatbotWidget({
   audience,
@@ -28,10 +29,12 @@ export function ChatbotWidget({
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
   const [error, setError] = useState("");
   const [agentSession, setAgentSession] = useState<AgentSession | null>(null);
+  const [paymentAnchor, setPaymentAnchor] = useState<{ key: string; messageId: string } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const userId = useAuthStore((state) => state.user?.id ?? state.user?._id);
   const storageKey = `handigo-agent-session:${userId}`;
   const sessionId = useRef<string>(crypto.randomUUID());
+  const liveOrderMessages = useRef(new Map<string, ChatbotMessage>());
   const pendingRequest = useRef<AgentRequest | null>(null);
   const sending = useRef(false);
   const usesAgent = audience === "CUSTOMER";
@@ -44,10 +47,35 @@ export function ChatbotWidget({
         ? "Trợ lý Handigo hiện hỗ trợ tài khoản Khách hàng và Nhà cung cấp."
         : "";
 
+  const anchorPayment = (session: AgentSession) => {
+    if (!session.payment) return;
+    const key = `${session.sessionId}:${session.payment.paymentId ?? session.payment.orderId}`;
+    setPaymentAnchor((previous) => {
+      if (previous?.key === key && session.messages.some((message) => message._id === previous.messageId)) return previous;
+      const related = [...session.messages].reverse().find((message) => message.confirmation?.booking?.orderId === session.payment?.orderId
+        || (message.confirmation?.tool === "create_payment" && message.confirmation.preview.orderId === session.payment?.orderId));
+      const message = related ?? [...session.messages].reverse().find((message) => message.sender === "assistant") ?? session.messages.at(-1);
+      return message ? { key, messageId: message._id } : null;
+    });
+  };
+
   const applySession = (session: AgentSession) => {
+    if (sessionId.current !== session.sessionId) liveOrderMessages.current.clear();
     sessionId.current = session.sessionId;
     setAgentSession(session);
-    setMessages(session.messages);
+    anchorPayment(session);
+    setMessages((items) => {
+      const merged = new Map(session.messages.map((message) => [message._id, message]));
+      // Giữ thông báo vừa đến qua socket khi response của lượt chat chưa chứa sự kiện đó.
+      for (const message of items) {
+        if ((message._id.startsWith("order-event:") || message._id.startsWith("booking:")) && !merged.has(message._id)
+          && agentSession?.sessionId === session.sessionId) merged.set(message._id, message);
+      }
+      for (const message of liveOrderMessages.current.values()) {
+        if (!merged.has(message._id)) merged.set(message._id, message);
+      }
+      return [...merged.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    });
     pendingRequest.current = session.interruptedRequest && !session.requiresReconciliation
       ? { ...session.interruptedRequest, sessionId: session.sessionId } : null;
     if (pendingRequest.current) setError("Lượt trước chưa hoàn tất. Chọn Thử lại để tiếp tục an toàn.");
@@ -93,6 +121,42 @@ export function ChatbotWidget({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!usesAgent || !userId) return;
+    let disposed = false;
+    const { socket, dispose } = createAuthenticatedSocket();
+    const receive = (update: { sessionId: string; message: ChatbotMessage }) => {
+      if (update.sessionId !== sessionId.current) return;
+      liveOrderMessages.current.set(update.message._id, update.message);
+      setMessages((items) => items.some((item) => item._id === update.message._id) ? items
+        : [...items, update.message].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    };
+    const refresh = async () => {
+      // Nạp lại các mốc bị lỡ khi mất socket; không thay thế lượt khách đang gửi.
+      if (sending.current) return;
+      const id = sessionId.current;
+      try {
+        const session = await agentApi.get(id);
+        if (disposed || id !== sessionId.current || sending.current) return;
+        setMessages((items) => {
+          const stored = new Map(session.messages.map((message) => [message._id, message]));
+          for (const message of items) if (!stored.has(message._id)) stored.set(message._id, message);
+          return [...stored.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        });
+        setAgentSession(session);
+        anchorPayment(session);
+      } catch { /* Lịch sử vẫn có thể được tải lại khi mở chat hoặc chọn Thử lại. */ }
+    };
+    socket.on("agent:order:message", receive);
+    socket.on("connect", refresh);
+    return () => {
+      disposed = true;
+      socket.off("agent:order:message", receive);
+      socket.off("connect", refresh);
+      dispose();
+    };
+  }, [usesAgent, userId]);
 
   const sendMessage = async (content: string) => {
     if (sending.current || isLoading) return;
@@ -210,6 +274,7 @@ export function ChatbotWidget({
     try {
       await agentApi.delete(id);
       if (sessionId.current === id) {
+        liveOrderMessages.current.clear();
         sessionId.current = crypto.randomUUID();
         pendingRequest.current = null;
         setAgentSession(null);
@@ -246,6 +311,8 @@ export function ChatbotWidget({
           onSend={sendMessage}
           pendingConfirmation={agentSession?.pendingConfirmation}
           payment={agentSession?.payment}
+          paymentMessageId={paymentAnchor?.key === `${agentSession?.sessionId}:${agentSession?.payment?.paymentId ?? agentSession?.payment?.orderId}`
+            ? paymentAnchor.messageId : undefined}
           onCheckPayment={(orderId) => {
             if (sending.current) return;
             if (agentSession?.requiresReconciliation) pendingRequest.current = null;

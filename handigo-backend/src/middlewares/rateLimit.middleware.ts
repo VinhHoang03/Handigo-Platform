@@ -112,6 +112,14 @@ export const paymentRateLimit = createRateLimit({
   keyGenerator: getAuthenticatedUserOrIp,
 });
 
+// Đối soát chỉ kiểm tra giao dịch hiện có, cần nhịp riêng để không chiếm hạn mức tạo thanh toán.
+export const paymentReconciliationRateLimit = createRateLimit({
+  windowMs: 60_000,
+  maxRequests: 20,
+  message: RESOURCE_RATE_LIMIT_MESSAGE,
+  keyGenerator: getAuthenticatedUserOrIp,
+});
+
 export const resourceIntensiveRateLimit = createRateLimit({
   windowMs: 60_000,
   maxRequests: 60,

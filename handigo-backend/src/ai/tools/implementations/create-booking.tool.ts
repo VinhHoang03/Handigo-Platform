@@ -7,5 +7,5 @@ export const createBookingTool: AgentTool<BookingArguments> = {
   inputSchema: bookingSchema, mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
   preview: (context, args) => AgentBookingService.preview(context.user.id, args),
   execute: (context, args) => AgentBookingService.create(context.user.id, args,
-    z.object({ amount: z.number().finite().nonnegative(), addressVersion: z.string() }).parse(context.confirmedPreview)),
+    z.object({ amount: z.number().finite().nonnegative(), addressVersion: z.string() }).parse(context.confirmedPreview), context.sessionId),
 };
