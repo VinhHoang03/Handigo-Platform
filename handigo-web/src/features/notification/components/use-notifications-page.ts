@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { notificationApi } from "../api/notification.api";
 import type {
@@ -34,8 +35,8 @@ export function useNotificationsPageController(role: NotificationRole) {
   const [totalPages, setTotalPages] = useState(1);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
   const [busy, setBusy] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [sendForm, setSendForm] = useState<SendFormState>(emptySendForm);

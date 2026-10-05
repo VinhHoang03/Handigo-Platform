@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { ImagePlus, Loader2, X } from "lucide-react";
 
@@ -14,7 +15,7 @@ export function MessageComposer({
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

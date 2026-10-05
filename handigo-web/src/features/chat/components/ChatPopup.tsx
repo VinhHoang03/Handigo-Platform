@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AsyncState } from '@/components/common/AsyncState';
@@ -20,11 +21,12 @@ const sortMessages = (items: ChatMessage[]) => [...items].sort((a, b) => {
 });
 
 export function ChatPopup({ orderId, conversation: initialConversation, open, onClose }: { orderId?: string; conversation?: Conversation; open: boolean; onClose: () => void }) {
+  const { addToast } = useToast();
   const currentUser = useAuthStore((state) => state.user);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const [minimized, setMinimized] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -78,7 +80,7 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
       })
       .catch(() => setError('Đơn dịch vụ chưa sẵn sàng để trò chuyện.'))
       .finally(() => setLoading(false));
-  }, [open, orderId, initialConversation, currentUser?.role]);
+  }, [open, orderId, initialConversation, currentUser?.role, setError]);
 
   const currentUserId = currentUser?.id || currentUser?._id || '';
   const partnerName = partner?.fullName || 'Đối tác dịch vụ';
@@ -129,9 +131,11 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
       await chatApi.seen(conversationId);
       setMessages((items) => items.map((item) => ({ ...item, status: 'seen' })));
       setNotice('Đã đánh dấu cuộc trò chuyện là đã đọc.');
+      addToast('Đã đánh dấu cuộc trò chuyện là đã đọc.', 'success');
       setMenuOpen(false);
     } catch {
       setNotice('Không thể đánh dấu đã đọc. Vui lòng thử lại.');
+      addToast('Không thể đánh dấu đã đọc. Vui lòng thử lại.', 'error');
     }
   };
 
@@ -140,6 +144,7 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
     await chatApi.report(conversationId, description);
     setReportOpen(false);
     setNotice('Báo cáo đã được gửi.');
+    addToast('Báo cáo đã được gửi.', 'success');
   };
 
   if (minimized) {

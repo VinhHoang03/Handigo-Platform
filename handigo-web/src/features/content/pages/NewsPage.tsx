@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { newsApi, type NewsArticleRecord } from "../api/news.api";
@@ -9,7 +10,7 @@ export default function NewsPage() {
   const [category, setCategory] = useState("Tất cả");
   const [records, setRecords] = useState<NewsArticleRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [loadError, setLoadError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     let active = true;
@@ -31,7 +32,7 @@ export default function NewsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [setLoadError]);
 
   const articles = useMemo(
     () => mergeNewsArticles(records, newsArticles),

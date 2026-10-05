@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from 'react';
 import { X } from "lucide-react";
 
@@ -8,7 +9,7 @@ interface ChatReportDialogProps {
 
 export function ChatReportDialog({ onClose, onSubmit }: ChatReportDialogProps) {
   const [description, setDescription] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const [busy, setBusy] = useState(false);
 
   const submit = async (event: FormEvent) => {

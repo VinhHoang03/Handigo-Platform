@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
@@ -36,7 +37,7 @@ export default function PublicProviderProfilePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<PublicProviderProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedServiceId = searchParams.get("serviceId") || "";
   const selectService = useBookingStore((state) => state.selectService);
@@ -71,7 +72,7 @@ export default function PublicProviderProfilePage() {
     return () => {
       isMounted = false;
     };
-  }, [providerId]);
+  }, [providerId, setError]);
 
   const areas = useMemo(() => (profile ? getAreaText(profile) : []), [profile]);
   const effectiveSelectedServiceId = profile?.provider.services.some(

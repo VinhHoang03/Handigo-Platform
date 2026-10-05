@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { tokenStorage } from "@/api/tokenStorage";
@@ -15,7 +16,8 @@ export const useBookingPaymentFlow = (
   setBusy: (busy: boolean) => void,
   loadData: () => Promise<void>,
 ) => {
-  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const { addToast } = useToast();
+  const [paymentError, setPaymentError] = useToastFeedback<string | null>(null, "error");
   const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
   const [initialPaymentMethod, setInitialPaymentMethod] =
     useState<InitialPaymentMethod>("PAYOS");
@@ -69,6 +71,7 @@ export const useBookingPaymentFlow = (
         return;
       }
       setPaymentMethodModalOpen(false);
+      addToast("Đã ghi nhận phương thức thanh toán.", "success");
       await loadData();
     } catch (error) {
       console.error("Không thể tiếp tục thanh toán đơn hàng:", error);

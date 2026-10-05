@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
@@ -46,7 +47,7 @@ export function ProviderApplicationHistory({
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const [selected, setSelected] = useState<ProviderApplication | null>(null);
 
   const load = useCallback(async () => {
@@ -61,7 +62,7 @@ export function ProviderApplicationHistory({
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, setError]);
 
   useEffect(() => {
     // Tải dữ liệu từ API khi trang danh sách thay đổi.

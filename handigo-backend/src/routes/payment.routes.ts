@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createPayment,
   getPaymentById,
+  getPaymentQr,
   getPaymentHistory,
   getPaymentsByOrder,
   payosWebhook,
@@ -11,7 +12,7 @@ import {
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import { createPaymentSchema } from "../validations/payment.validator";
-import { paymentRateLimit } from "../middlewares/rateLimit.middleware";
+import { paymentRateLimit, paymentReconciliationRateLimit } from "../middlewares/rateLimit.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { paymentIdParamSchema } from "../validations/payment.validator";
 
@@ -29,7 +30,7 @@ router.get("/history", authMiddleware, getPaymentHistory);
 router.post(
   "/order/:orderId/reconcile",
   authMiddleware,
-  paymentRateLimit,
+  paymentReconciliationRateLimit,
   reconcilePayosPaymentByOrder,
 );
 router.get("/order/:orderId", authMiddleware, getPaymentsByOrder);
@@ -41,6 +42,7 @@ router.post(
   validate(paymentIdParamSchema, "params"),
   retryPayosRefund,
 );
+router.get("/:id/qr", authMiddleware, roleMiddleware("CUSTOMER"), validate(paymentIdParamSchema, "params"), getPaymentQr);
 router.get("/:id", authMiddleware, getPaymentById);
 
 export default router;

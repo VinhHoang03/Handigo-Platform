@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -29,8 +30,8 @@ export default function AdminPromotionsPage() {
   const [items, setItems] = useState<Voucher[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
   const [busy, setBusy] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
   const [form, setForm] = useState<VoucherFormState>(emptyForm);
@@ -55,7 +56,7 @@ export default function AdminPromotionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, setError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 250);

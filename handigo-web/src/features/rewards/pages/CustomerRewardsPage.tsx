@@ -1,9 +1,9 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Gift, History, Info, LoaderCircle, Sparkles, Ticket, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Modal } from "@/components/common/Modal";
-import { useToast } from "@/components/common/Toast";
 import { getErrorMessage } from "@/utils/apiError";
 import { rewardsApi, type RewardEntry, type RewardOffer, type RewardOverview, type RewardPage, type RewardVoucher } from "../api/rewards.api";
 import { RewardVoucherCard } from "../components/RewardVoucherCard";
@@ -19,11 +19,11 @@ export default function CustomerRewardsPage() {
   const [vouchers, setVouchers] = useState<RewardPage<RewardVoucher> | null>(null);
   const [history, setHistory] = useState<RewardPage<RewardEntry> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const [rulesOpen, setRulesOpen] = useState(false);
   const [selected, setSelected] = useState<RewardOffer | null>(null);
   const [redeeming, setRedeeming] = useState(false);
-  const [redeemError, setRedeemError] = useState("");
+  const [redeemError, setRedeemError] = useToastFeedback<string>("", "error");
   const [paging, setPaging] = useState(false);
   const [onlyAffordable, setOnlyAffordable] = useState(false);
   const pending = useRef<{ offerId: string; requestId: string } | null>(null);
@@ -35,7 +35,7 @@ export default function CustomerRewardsPage() {
       setError("");
     } catch (failure) { setError(getErrorMessage(failure, "Chưa tải được điểm thưởng. Vui lòng thử lại.")); }
     finally { setLoading(false); }
-  }, []);
+  }, [setError]);
   useEffect(() => {
     let active = true;
     fetchRewardData().then(([summary, mine, entries]) => {
@@ -45,7 +45,7 @@ export default function CustomerRewardsPage() {
       if (active) setError(getErrorMessage(failure, "Chưa tải được điểm thưởng. Vui lòng thử lại."));
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [setError]);
 
   const redeem = async () => {
     if (!selected || submitting.current) return;

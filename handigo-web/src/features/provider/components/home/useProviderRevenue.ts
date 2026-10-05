@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import {
   providerDashboardApi,
@@ -16,7 +17,7 @@ export function useProviderRevenue() {
     ProviderEarningPoint[]
   >([]);
   const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
-  const [earningsError, setEarningsError] = useState<string | null>(null);
+  const [earningsError, setEarningsError] = useToastFeedback<string | null>(null, "error");
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +48,7 @@ export function useProviderRevenue() {
     return () => {
       cancelled = true;
     };
-  }, [revenuePeriod]);
+  }, [revenuePeriod, setEarningsError]);
 
   const setRevenuePeriod = (period: RevenuePeriod) => {
     setRevenuePeriodState(period);

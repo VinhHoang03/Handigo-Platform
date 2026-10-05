@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
 import { Eye, RefreshCw } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -23,7 +24,7 @@ export default function AdminCasesPage() {
   const [items, setItems] = useState<CaseRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   const load = useCallback(async () => {
     try {
@@ -41,7 +42,7 @@ export default function AdminCasesPage() {
     } finally {
       setLoading(false);
     }
-  }, [query, tab]);
+  }, [query, setError, tab]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void load(), 0);

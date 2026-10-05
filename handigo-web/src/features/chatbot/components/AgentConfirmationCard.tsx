@@ -13,7 +13,7 @@ const labels: Record<string, string> = {
   subject: "Tiêu đề yêu cầu", category: "Nhóm hỗ trợ", priority: "Độ ưu tiên",
   caseId: "Mã yêu cầu", caseStatus: "Trạng thái hiện tại",
 };
-const paymentLabels: Record<string, string> = { cash: "Tiền mặt", bank: "Chuyển khoản", wallet: "Ví Handigo" };
+const paymentLabels: Record<string, string> = { cash: "Tiền mặt", bank: "Trực tuyến", wallet: "Ví Handigo" };
 function formatValue(key: string, value: unknown) {
   if (value == null) return "";
   if (key === "quantity" && typeof value === "number") return value.toLocaleString("vi-VN");
@@ -59,7 +59,9 @@ export function AgentConfirmationCard({ action, disabled, onDecision, readOnly =
     </div>
     <dl className="space-y-3 p-4">
       {Object.entries(labels).map(([key, label]) => {
-        const value = formatValue(key, action.preview[key]);
+        const value = key === "note" && action.tool === "create_booking"
+          ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ."
+          : formatValue(key, action.preview[key]);
         return value ? <div key={key} className={key === "amount" ? "rounded-xl bg-primary/5 p-3" : ""}>
           <dt className="text-xs text-on-surface-variant">{key === "amount" && action.preview.serviceType === "variable_price" ? "Tiền đặt cọc" : label}</dt>
           <dd className={`mt-1 whitespace-pre-wrap break-words leading-5 ${key === "amount" ? "text-lg font-semibold text-primary" : "font-medium"}`}>{value}</dd>

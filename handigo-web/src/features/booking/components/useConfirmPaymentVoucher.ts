@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from 'react';
 import { bookingVoucherApi } from '@/features/booking/api/voucher.api';
 import type { AvailableVoucher } from '../types/voucher.types';
@@ -7,7 +8,7 @@ export const useConfirmPaymentVoucher = (orderAmount: number) => {
   const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<AvailableVoucher | null>(null);
-  const [voucherError, setVoucherError] = useState('');
+  const [voucherError, setVoucherError] = useToastFeedback<string>('', "error");
 
   useEffect(() => {
     let isMounted = true;

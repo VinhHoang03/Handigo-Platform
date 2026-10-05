@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import { useBookingStore } from '@/features/booking/hooks/useBookingStore';
 import {
@@ -50,7 +51,7 @@ export function useNearbyProviders({
     ? JSON.stringify(booking.selectedOptionIds.map((optionId) => ({ optionId, quantity: booking.selectedOptionQuantities?.[optionId] ?? 1 }))) : undefined;
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     let isMounted = true;
@@ -100,7 +101,7 @@ export function useNearbyProviders({
     return () => {
       isMounted = false;
     };
-  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId, selectedOptions]);
+  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId, selectedOptions, setError]);
 
   useEffect(() => {
     if (!allowSelection || !hasLoaded || !onSelectProvider || !selectedProviderId) return;

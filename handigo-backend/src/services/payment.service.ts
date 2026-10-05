@@ -16,6 +16,7 @@ import { buildTransactionCode } from "../utils/transaction";
 import { createLogger } from "../utils/logger";
 import { markOrderVoucherAsUsed } from "./voucher.service";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { publishPaymentStatus } from "./paymentStatus.service";
 
 export interface ConfirmedPaymentExpectation {
   amount: number;
@@ -920,6 +921,8 @@ const reconcilePendingPayosPayment = async (orderId: string) => {
   const reconciledPayment = await Payment.findById(payment._id);
   const reconciledOrder = await Order.findById(orderId);
 
+  if (reconciledPayment) publishPaymentStatus(reconciledPayment);
+
   if (transitionedToPaid && reconciledPayment) {
     await createNotificationRecord({
       userId: reconciledPayment.customerId,
@@ -1100,6 +1103,7 @@ export const handlePayosWebhook = async (payload: any) => {
   if (!resultPayment) {
     throw new AppError("Không thể xử lý webhook PayOS", 500);
   }
+  publishPaymentStatus(resultPayment);
   if (shouldDispatch) {
     triggerDispatch(resultPayment.orderId.toString());
   }

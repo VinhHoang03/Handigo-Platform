@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { InitialsAvatar } from '@/components/common/InitialsAvatar';
@@ -19,11 +20,12 @@ const customerOf = (feedback: Feedback) =>
   typeof feedback.customerId === 'string' ? undefined : feedback.customerId;
 
 export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
+  const { addToast } = useToast();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const [submitError, setSubmitError] = useState('');
+  const [loadError, setLoadError] = useToastFeedback<string>('', "error");
+  const [submitError, setSubmitError] = useToastFeedback<string>('', "error");
   const [content, setContent] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [previewImage, setPreviewImage] = useState('');
@@ -52,7 +54,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
       }
     });
     return () => { cancelled = true; };
-  }, [orderId]);
+  }, [orderId, setLoadError]);
 
   const handleFiles = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -85,6 +87,7 @@ export function ProviderOrderFeedbackThread({ orderId }: { orderId: string }) {
       setFeedback(updated);
       setContent('');
       setFiles([]);
+      addToast("Đã gửi phản hồi đánh giá.", "success");
     } catch (error) {
       const message = axios.isAxiosError<{ message?: string }>(error)
         ? error.response?.data?.message

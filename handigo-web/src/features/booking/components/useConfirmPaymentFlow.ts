@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useToastFeedback } from "@/components/common/Toast";
+import { useState, useEffect, useCallback } from 'react';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { useNavigate } from 'react-router-dom';
 import { useBookingStore } from '../hooks/useBookingStore';
@@ -6,7 +7,7 @@ import { bookingApi } from '@/features/booking/api/booking.api';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Address, Service, ServiceOption } from '../../../types/booking';
 import { isRequiredOptionSelectionMissing } from '../utils/serviceOptionSelection';
-import { useSystemAlert } from '@/components/common/SystemAlert';
+import { useToast } from '@/components/common/Toast';
 import { useConfirmPaymentVoucher } from './useConfirmPaymentVoucher';
 import { useBookingPreview } from '../hooks/useBookingPreview';
 import {
@@ -20,7 +21,8 @@ export const getOptionPrice = (option: ServiceOption) =>
 
 /** State + logic thanh toán PayOS/ví/tiền mặt cho ConfirmPaymentPage — không đổi hành vi, chỉ tách khỏi trang. */
 export const useConfirmPaymentFlow = () => {
-  const { showSystemAlert } = useSystemAlert();
+  const { addToast } = useToast();
+  const showSystemAlert = useCallback((message: string) => { addToast(message, "error"); }, [addToast]);
   const { preview, error: previewError, retry: retryPreview } = useBookingPreview();
   const {
     categoryId, serviceId, selectedOptionIds, selectedOptionQuantities, addressId,
@@ -46,7 +48,7 @@ export const useConfirmPaymentFlow = () => {
   const [address, setAddress] = useState<Address | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentError, setPaymentError] = useState('');
+  const [paymentError, setPaymentError] = useToastFeedback<string>('', "error");
   const [pendingOrderId, setPendingOrderId] = useState(() =>
     sessionStorage.getItem(PENDING_ORDER_FINGERPRINT_KEY) === bookingFingerprint
       ? sessionStorage.getItem(PENDING_ORDER_ID_KEY) || ''
@@ -59,9 +61,13 @@ export const useConfirmPaymentFlow = () => {
     if (serviceId) {
       serviceCatalogApi.serviceById(serviceId).then((data) => {
         if (isMounted) setService(data);
+      }).catch(() => {
+        if (isMounted) setPaymentError('Không thể tải thông tin dịch vụ.');
       });
       serviceCatalogApi.options(serviceId).then((data) => {
         if (isMounted) setOptions(data);
+      }).catch(() => {
+        if (isMounted) setPaymentError('Không thể tải tùy chọn dịch vụ.');
       });
     }
     if (addressId) {
@@ -69,12 +75,14 @@ export const useConfirmPaymentFlow = () => {
         if (!isMounted) return;
         const found = addresses.find((a) => a._id === addressId);
         if (found) setAddress(found);
+      }).catch(() => {
+        if (isMounted) setPaymentError('Không thể tải địa chỉ thực hiện dịch vụ.');
       });
     }
     return () => {
       isMounted = false;
     };
-  }, [serviceId, addressId, categoryId]);
+  }, [serviceId, addressId, categoryId, setPaymentError]);
 
   const selectedOptions = options.filter((opt) => !isAirConditionerCleaning(service) &&
     selectedOptionIds.includes(opt._id),

@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
 import type {
@@ -38,6 +39,7 @@ export function ViolationFormModal({
   onClose,
   onCreated,
 }: ViolationFormModalProps) {
+  const { addToast } = useToast();
   const [targetUserId, setTargetUserId] = useState(userId || "");
   const [violationType, setViolationType] = useState("");
   const [severity, setSeverity] = useState<ViolationSeverity>("MEDIUM");
@@ -48,7 +50,7 @@ export function ViolationFormModal({
   const [durationDays, setDurationDays] = useState("");
   const [penaltyNote, setPenaltyNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -73,6 +75,7 @@ export function ViolationFormModal({
       setBusy(true);
       setError("");
       await adminCasesApi.createViolation(payload);
+      addToast("Đã tạo bản ghi vi phạm.", "success");
       onCreated();
       onClose();
     } catch (requestError) {

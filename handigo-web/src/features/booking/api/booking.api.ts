@@ -1,4 +1,5 @@
 import api from "@/api/client";
+import { isAxiosError } from "axios";
 import type {
   Address,
   CancellationPreview,
@@ -126,6 +127,23 @@ export const bookingApi = {
       `/payments/${paymentId}`,
     );
     return response.data.data;
+  },
+
+  getPaymentQr: async (paymentId: string) => {
+    try {
+      const response = await api.get<Blob>(`/payments/${paymentId}/qr`, { responseType: "blob" });
+      if (response.data.type !== "image/png") throw new Error("Chưa nhận được ảnh QR thanh toán hợp lệ.");
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.data instanceof Blob) {
+        const details = await error.response.data.text();
+        try {
+          const body = JSON.parse(details) as { message?: unknown };
+          if (typeof body.message === "string") error.response.data = { message: body.message };
+        } catch { /* Giữ lỗi gốc nếu phản hồi không phải JSON. */ }
+      }
+      throw error;
+    }
   },
 
   getPaymentsByOrder: async (orderId: string) => {

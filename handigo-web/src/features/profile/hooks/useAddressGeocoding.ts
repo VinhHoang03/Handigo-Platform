@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import {
   useRef,
   useState,
@@ -32,8 +33,8 @@ export function useAddressGeocoding({
   setWards,
   setAddressForm,
 }: UseAddressGeocodingOptions) {
-  const [locationError, setLocationError] = useState("");
-  const [locationHint, setLocationHint] = useState("");
+  const [locationError, setLocationError] = useToastFeedback<string>("", "error");
+  const [locationHint, setLocationHint] = useToastFeedback<string>("", "success");
   const [isLocating, setIsLocating] = useState(false);
   const [isResolvingMapAddress, setIsResolvingMapAddress] = useState(false);
   const mapRequestSequenceRef = useRef(0);

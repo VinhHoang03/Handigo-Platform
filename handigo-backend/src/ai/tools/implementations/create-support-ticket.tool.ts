@@ -11,6 +11,6 @@ export const createSupportTicketTool: AgentTool<z.infer<typeof agentTicketSchema
   mutates: true,
   requiresConfirmation: true,
   preview: (context, args) => care.previewTicket(context.user.id, args),
-  execute: (context, args) => care.createTicket(context.user.id, args),
+  execute: (context, args) => care.createTicket(context.user.id, args, context.sessionId),
   reply: receipt("Đã gửi yêu cầu hỗ trợ, đang chờ bộ phận hỗ trợ xử lý."),
 };

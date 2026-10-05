@@ -117,7 +117,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       });
 
       if (!payment.checkoutUrl) {
-        throw new Error('PayOS checkoutUrl is missing');
+        throw new Error('PayOS không trả về liên kết thanh toán.');
       }
 
       sessionStorage.setItem('latestBookingOrderId', orderId);

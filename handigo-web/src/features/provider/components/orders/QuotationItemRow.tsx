@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import type { QuotationItem } from '../../types/providerOrder.types';
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { quotationItemTypes, type QuotationFormItem } from './quotationForm.types';
@@ -21,7 +22,7 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
   const [query, setQuery] = useState<string | null>(null);
   const [history, setHistory] = useState<QuotationHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const historyCallback = useRef(onHistory);
   useEffect(() => { historyCallback.current = onHistory; }, [onHistory]);
   useEffect(() => {
@@ -39,7 +40,7 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
       finally { if (!controller.signal.aborted) setLoading(false); }
     }, 450);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, orderId]);
+  }, [query, orderId, setError]);
   return (
     <div className="grid min-w-0 grid-cols-2 items-start gap-sm rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-sm md:grid-cols-12">
       <div className="col-span-2 min-w-0 space-y-2 md:col-span-4">
