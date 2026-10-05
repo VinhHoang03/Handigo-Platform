@@ -369,8 +369,9 @@ class _ServiceDetailContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final service = detail.service;
+    final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.only(bottom: 112),
       children: [
         Stack(
           children: [
@@ -407,15 +408,15 @@ class _ServiceDetailContent extends ConsumerWidget {
           ],
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (service.categoryName != null)
                 Text(
                   service.categoryName!,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.secondary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -424,7 +425,7 @@ class _ServiceDetailContent extends ConsumerWidget {
                 service.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -433,41 +434,42 @@ class _ServiceDetailContent extends ConsumerWidget {
                 children: [
                   _ServiceStat(
                     icon: Icons.star_rounded,
-                    color: Theme.of(context).colorScheme.tertiary,
+                    color: theme.colorScheme.tertiary,
                     label: service.totalFeedbacks > 0
                         ? '${service.averageRating.toStringAsFixed(1)} (${service.totalFeedbacks} đánh giá)'
                         : 'Chưa có đánh giá',
                   ),
                   _ServiceStat(
                     icon: Icons.check_circle_outline,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: theme.colorScheme.primary,
                     label: '${service.totalCompletedOrders} lượt hoàn thành',
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Text(
-                service.description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              if (service.description.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(service.description, style: theme.textTheme.bodyMedium),
+              ],
             ],
           ),
         ),
-        if (detail.options.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: _ServiceOptionsPreview(options: detail.options),
-          ),
+        const SizedBox(height: 14),
+        _ServiceHighlights(),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          child: _ServiceOptionsPreview(
+            service: service,
+            options: detail.options,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Quy trình 5 bước thực hiện chuẩn Handigo',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                'Quy trình thực hiện',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 12),
               ...[
@@ -493,7 +495,100 @@ class _ServiceDetailContent extends ConsumerWidget {
             ],
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _ServiceReviewSummary(service: service),
+        ),
       ],
+    );
+  }
+}
+
+class _ServiceHighlights extends StatelessWidget {
+  const _ServiceHighlights();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const items = [
+      (Icons.verified_user_outlined, 'Thợ đã xác thực'),
+      (Icons.schedule_outlined, 'Đặt lịch linh hoạt'),
+      (Icons.receipt_long_outlined, 'Giá minh bạch'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var index = 0; index < items.length; index++) ...[
+            if (index > 0) const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 72),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(items[index].$1, size: 20, color: theme.colorScheme.primary),
+                    const SizedBox(height: 5),
+                    Text(
+                      items[index].$2,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceReviewSummary extends StatelessWidget {
+  const _ServiceReviewSummary({required this.service});
+  final Service service;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.rate_review_outlined, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Đánh giá dịch vụ', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 3),
+                  Text(
+                    service.totalFeedbacks > 0
+                        ? '${service.averageRating.toStringAsFixed(1)}/5 từ ${service.totalFeedbacks} đánh giá'
+                        : 'Dịch vụ chưa có đánh giá',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            if (service.totalFeedbacks > 0)
+              Icon(Icons.star_rounded, color: theme.colorScheme.tertiary, size: 20),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -519,7 +614,8 @@ class _ServiceStat extends StatelessWidget {
 }
 
 class _ServiceOptionsPreview extends StatelessWidget {
-  const _ServiceOptionsPreview({required this.options});
+  const _ServiceOptionsPreview({required this.service, required this.options});
+  final Service service;
   final List<ServiceOption> options;
 
   @override
@@ -529,10 +625,29 @@ class _ServiceOptionsPreview extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Các gói dịch vụ',
+          'Chọn gói dịch vụ',
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
+        if (options.isEmpty)
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dịch vụ tính theo đơn giá cố định: ${_priceLabel(service)}',
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ...options.take(10).map(
               (option) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -628,6 +743,7 @@ class _StickyBookingBar extends StatelessWidget {
           children: [
             Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Giá từ', style: Theme.of(context).textTheme.labelSmall),
@@ -643,11 +759,15 @@ class _StickyBookingBar extends StatelessWidget {
                 ],
               ),
             ),
-            FilledButton.icon(
-              onPressed: onPressed,
-              icon: const Icon(Icons.calendar_month_outlined, size: 18),
-              label: const Text('Đặt lịch dịch vụ ngay'),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+            const SizedBox(width: 8),
+            Flexible(
+              flex: 2,
+              child: FilledButton.icon(
+                onPressed: onPressed,
+                icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                label: const Text('Đặt lịch dịch vụ ngay'),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+              ),
             ),
           ],
         ),
