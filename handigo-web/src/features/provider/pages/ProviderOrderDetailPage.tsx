@@ -15,7 +15,6 @@ import { ProviderOrderDetailSkeleton } from '../components/orders/ProviderOrderD
 import { useProviderOrderDetail } from '../hooks/useProviderOrderDetail';
 import { getPaymentStatusLabel, orderTypeLabels } from '../utils/providerOrderDetailLabels';
 import { ArrowLeft, CircleAlert } from "lucide-react";
-import { OrderScheduleCard } from '../components/orders/OrderScheduleCard';
 
 export default function ProviderOrderDetailPage() {
   const navigate = useNavigate();
@@ -44,6 +43,7 @@ export default function ProviderOrderDetailPage() {
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,
+    reload,
   } = useProviderOrderDetail(orderId, navigate);
 
   if (loading) {
@@ -97,14 +97,16 @@ export default function ProviderOrderDetailPage() {
   return (
     <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
-        {['accepted', 'in_progress'].includes(order.status) && <OrderScheduleCard key={order._id} order={order} />}
         <Link to="/provider/orders" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
           <ArrowLeft aria-hidden="true" size={16} />
           Quay lại danh sách
         </Link>
 
         {error && (
-          <div className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">{error}</div>
+          <div role="alert" className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">
+            {error}
+            <button type="button" disabled={busy} onClick={() => void reload()} className="ml-3 font-semibold underline">Tải lại dữ liệu</button>
+          </div>
         )}
 
         {assignment && (
@@ -123,7 +125,6 @@ export default function ProviderOrderDetailPage() {
             order={order}
             customer={customer}
             addressLine={addressLine}
-            addressNote={address.note}
             orderType={orderTypeLabels[order.orderType]}
           />
           <PaymentSummaryCard
@@ -139,6 +140,7 @@ export default function ProviderOrderDetailPage() {
         <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-2">
           {isQuotationOrder ? (
             <QuotationOrderPanel
+              key={order._id}
               order={order}
               quotation={quotation}
               busy={busy}

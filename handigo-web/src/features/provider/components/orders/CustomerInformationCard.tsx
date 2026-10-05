@@ -9,7 +9,6 @@ interface CustomerInformationCardProps {
   order: Order;
   customer: ReturnType<typeof getCustomer>;
   addressLine: string;
-  addressNote?: string;
   orderType: string;
 }
 
@@ -17,7 +16,6 @@ export function CustomerInformationCard({
   order,
   customer,
   addressLine,
-  addressNote,
   orderType,
 }: CustomerInformationCardProps) {
   const details = [
@@ -55,10 +53,9 @@ export function CustomerInformationCard({
           </div>
         ))}
       </div>
-      {(order.problemDescription || addressNote) && (
+      {order.problemDescription && (
         <div className="mt-md rounded-2xl bg-surface-container-low p-3 text-sm">
-          {order.problemDescription && <p className="whitespace-pre-wrap text-on-surface"><strong>Mô tả:</strong> {order.problemDescription}</p>}
-          {addressNote && <p className="mt-2 whitespace-pre-wrap text-on-surface"><strong>Ghi chú địa chỉ:</strong> {addressNote}</p>}
+          <p className="whitespace-pre-wrap text-on-surface"><strong>Mô tả:</strong> {order.problemDescription}</p>
         </div>
       )}
       {order.customerAttachments?.length ? (

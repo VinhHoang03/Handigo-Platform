@@ -119,6 +119,8 @@ export const getQuotationStatusLabel = (
   status: OrderQuotation["quotation"]["status"],
 ) => {
   switch (status) {
+    case "saved":
+      return "Đã lưu";
     case "pending":
       return "Chờ xác nhận";
     case "approved":
@@ -138,6 +140,7 @@ export const getQuotationStatusClass = (
   status: OrderQuotation["quotation"]["status"],
 ) => {
   switch (status) {
+    case "saved":
     case "approved":
       return toneChipClasses.success;
     case "rejected":

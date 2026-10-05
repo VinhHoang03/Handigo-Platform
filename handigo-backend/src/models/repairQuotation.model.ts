@@ -2,6 +2,7 @@ import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument, Money } from "./common";
 
 export type RepairQuotationStatus =
+  | "saved"
   | "pending"
   | "approved"
   | "rejected"
@@ -15,6 +16,7 @@ export interface IRepairQuotation extends Document, IBaseDocument {
   customerId: Types.ObjectId;
   providerId: Types.ObjectId;
   status: RepairQuotationStatus;
+  revision: number;
   inspectionNote?: string | null;
   recommendation?: string | null;
   attachments: string[];
@@ -43,9 +45,10 @@ const RepairQuotationSchema = new Schema<IRepairQuotation>(
     },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "expired", "cancelled"],
+      enum: ["saved", "pending", "approved", "rejected", "expired", "cancelled"],
       default: "pending",
     },
+    revision: { type: Number, min: 0, default: 0 },
     inspectionNote: { type: String, default: null, trim: true },
     recommendation: { type: String, default: null, trim: true },
     attachments: { type: [String], default: [] },

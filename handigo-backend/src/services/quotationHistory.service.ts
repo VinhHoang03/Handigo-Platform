@@ -36,7 +36,7 @@ export function matchQuotationHistory(items: QuotationHistoryItem[], query: stri
 // Dùng index providerId/createdAt và quotationId hiện có, giới hạn dữ liệu trước khi đối chiếu tên.
 export async function loadQuotationHistory(order: Pick<IOrder, "providerId" | "serviceId">): Promise<QuotationHistoryItem[]> {
   const quotations = await RepairQuotation.aggregate<{ _id: Types.ObjectId; createdAt: Date }>([
-    { $match: { providerId: order.providerId, status: "approved", isDeleted: { $ne: true } } },
+    { $match: { providerId: order.providerId, status: { $in: ["approved", "saved"] }, isDeleted: { $ne: true } } },
     { $sort: { createdAt: -1 } },
     { $limit: 200 },
     { $lookup: { from: Order.collection.name, localField: "orderId", foreignField: "_id", as: "order" } },

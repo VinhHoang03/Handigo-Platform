@@ -1,6 +1,7 @@
 import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/booking.api';
 import { tokenStorage } from '@/api/tokenStorage';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import { getEarliestScheduledAt } from './step2Helpers';
 import {
   type ConfirmPaymentSubmitParams,
   getConfirmPaymentErrorMessage,
@@ -40,7 +41,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   }
   if (
     (orderType === 'scheduled' || orderType === 'recurring') &&
-    (!scheduledAt || new Date(scheduledAt).getTime() <= Date.now())
+    (!scheduledAt || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())
   ) {
     setPaymentError('Vui lòng chọn thời gian thực hiện trong tương lai.');
     return;

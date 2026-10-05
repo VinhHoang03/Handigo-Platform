@@ -4,9 +4,11 @@ import { bookingApi } from '@/features/booking/api/booking.api';
 import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../api/providerOrder.api';
 import type { OrderAssignment, QuotationDetail } from '../types/providerOrder.types';
+import { useToast } from '@/components/common/Toast';
 
 /** State, tải dữ liệu và các thao tác của trang chi tiết đơn dịch vụ (thợ). */
 export function useProviderOrderDetail(orderId: string | undefined, navigate: NavigateFunction) {
+  const { addToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [assignment, setAssignment] = useState<OrderAssignment | null>(null);
   const [quotation, setQuotation] = useState<QuotationDetail | null>(null);
@@ -19,10 +21,10 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   const [cancelExplanation, setCancelExplanation] = useState('');
   const [cancelError, setCancelError] = useState('');
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (showLoading = true) => {
     if (!orderId) return;
 
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const [orderData, pendingAssignments] = await Promise.all([
         bookingApi.getOrderById(orderId),
@@ -41,7 +43,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
         ['scheduled', 'recurring'].includes(orderData.orderType) &&
         orderData.bookingStatus !== 'confirmed';
       if (
-        orderData.inspectionRequired &&
+        (orderData.inspectionRequired || orderData.serviceId.serviceType === 'variable_price') &&
         orderData.status !== 'created' &&
         !isUnconfirmedAppointment
       ) {
@@ -54,14 +56,15 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       setError(null);
     } catch {
       setError('Không thể tải chi tiết đơn dịch vụ.');
-      setOrder(null);
+      if (showLoading) setOrder(null);
+      else throw new Error('Không thể tải dữ liệu mới nhất. Vui lòng tải lại đơn hàng.');
     } finally {
       setLoading(false);
     }
   }, [orderId]);
 
   useEffect(() => {
-    void Promise.resolve().then(loadData);
+    void Promise.resolve().then(() => loadData());
   }, [loadData]);
 
   const runAction = async (
@@ -73,7 +76,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       setBusy(true);
       setError(null);
       await action();
-      if (reload) await loadData();
+      if (reload) await loadData(false);
       return true;
     } catch (err: unknown) {
       const message =
@@ -123,6 +126,10 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       await providerOrderApi.completeOrder(order._id, {
         completionEvidenceImages,
         completionNote,
+        ...(quotation ? {
+          expectedQuotationId: quotation.quotation._id,
+          expectedQuotationRevision: quotation.quotation.revision ?? 0,
+        } : {}),
       });
     }, 'Không thể hoàn thành đơn.');
   };
@@ -164,10 +171,16 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   };
 
   const handleCreateQuotation = async (payload: Parameters<typeof providerOrderApi.createQuotation>[1]) => {
-    if (!orderId) return;
-    await runAction(async () => {
-      await providerOrderApi.createQuotation(orderId, payload);
-    }, 'Không thể gửi báo giá.');
+    if (!orderId) return false;
+    const succeeded = await runAction(async () => {
+      if (quotation) {
+        await providerOrderApi.updateQuotation(orderId, quotation.quotation._id, quotation.quotation.revision ?? 0, payload);
+      } else {
+        await providerOrderApi.createQuotation(orderId, payload);
+      }
+    }, 'Không thể lưu báo giá.');
+    if (succeeded) addToast('Đã lưu báo giá.', 'success');
+    return succeeded;
   };
 
   return {
@@ -194,5 +207,6 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,
+    reload: loadData,
   };
 }

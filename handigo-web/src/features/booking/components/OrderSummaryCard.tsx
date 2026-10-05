@@ -159,7 +159,7 @@ export const OrderSummaryCard: React.FC<{
             discountAmount={discountAmount}
             summaryContent={summaryContent}
           />
-      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn từ 08:00, đặt trước ít nhất 2 tiếng. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
+      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn từ 08:00, chọn khung giờ sau thời gian hiện tại. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
           {priceLoading && <p role="status" className="text-sm">Đang cập nhật giá…</p>}
           {priceError && <p role="alert" className="text-sm text-error">{priceError} <button type="button" onClick={retry} className="underline">Thử lại</button></p>}
         </div>

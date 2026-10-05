@@ -35,6 +35,7 @@ export const BookingQuotationPanel = ({
       {quotation ? (
         <BookingQuotationDetails
           quotation={quotation}
+          orderStatus={order.status}
           busy={busy}
           appliedDepositAmount={appliedDepositAmount}
           remainingQuotationAmount={remainingQuotationAmount}

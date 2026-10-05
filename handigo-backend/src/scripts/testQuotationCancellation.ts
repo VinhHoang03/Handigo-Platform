@@ -7,6 +7,7 @@ import { Payment } from "../models/payment.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
+import { AuditLog } from "../models/auditLog.model";
 import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
@@ -17,13 +18,13 @@ function stubModule(path: string, exports: object) {
   require.cache[require.resolve(path)] = { exports } as NodeModule;
 }
 stubModule("../configs/payos.config", { payos: {}, payoutPayos: {} });
-stubModule("../services/notification.service", { createNotificationRecord: async () => {} });
+stubModule("../services/notification.service", { createNotificationRecord: async () => {}, emitRealtimeNotification: () => {} });
 stubModule("../sockets/socketServer", { emitToUser: () => {} });
-stubModule("../services/systemConfig.service", {});
+stubModule("../services/systemConfig.service", { getBookingPolicy: async () => ({}) });
 stubModule("../services/orderReassignment.service", {
   requestProviderReassignment: () => { throw new Error("Không được tìm thợ thay thế khi khách từ chối báo giá."); },
 });
-stubModule("../services/providerSchedule.service", {});
+stubModule("../services/providerSchedule.service", { lockProviderSchedule: async () => {} });
 stubModule("../services/providerWalletEligibility.service", {});
 stubModule("../services/quotationRelevance.service", {
   evaluateQuotationItemsForOrder: async () => ({ status: "valid" }),
@@ -116,13 +117,16 @@ async function testCancellation(method: string, fee = 0, invalid?: string) {
 async function testQuotationAmount() {
   const provider = { _id: new Types.ObjectId(), userId: new Types.ObjectId() };
   const order: any = { _id: new Types.ObjectId(), providerId: provider._id, inspectionRequired: true,
+    customerId: new Types.ObjectId(),
     depositAmount: 40000, status: "accepted", confirmation: {}, save: async () => {} };
-  mock.method(Order, "findById", () => query(order));
+  mock.method(Order, "findOne", () => query(order));
   mock.method(Provider, "findOne", () => query(provider));
   mock.method(Service, "findById", () => query({ serviceType: "variable_price" }));
   let created = 0;
-  mock.method(RepairQuotation, "create", async (value: any) => { created++; return { ...value, _id: new Types.ObjectId() }; });
+  mock.method(RepairQuotation.prototype, "save", async function (this: InstanceType<typeof RepairQuotation>) { created++; return this; });
   mock.method(RepairQuotationItem, "insertMany", async () => []);
+  mock.method(AuditLog, "create", async () => []);
+  mock.method(mongoose, "startSession", async () => ({ withTransaction: async (fn: () => Promise<unknown>) => fn(), endSession: async () => {} }) as any);
   const quote = (price: number, discountAmount = 0) => AssignmentService.createRepairQuotation({
     orderId: order._id.toString(), discountAmount,
     items: [{ title: "Công sửa chữa", itemType: "labor", quantity: 1, unitPrice: price }],

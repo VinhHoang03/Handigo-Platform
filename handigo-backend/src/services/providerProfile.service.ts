@@ -21,7 +21,7 @@ import { haversineMeters } from "./matching.service";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { getOrderInterval } from "../utils/providerSchedule";
-import type { ScheduleInterval } from "../utils/bookingPolicy";
+import { getEarliestScheduledAt, type ScheduleInterval } from "../utils/bookingPolicy";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import {
@@ -359,7 +359,7 @@ export const getNearbyProvidersForCustomer = async (
   }
 
   const scheduledAt = scheduledAtValue ? new Date(scheduledAtValue) : null;
-  if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date())) {
+  if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt < getEarliestScheduledAt())) {
     throw new AppError("Thời gian lịch hẹn không hợp lệ.", 400);
   }
   const recurrenceUnit = ["weekly", "monthly"].includes(recurrenceUnitValue || "")
