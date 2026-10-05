@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   newsApi,
@@ -22,8 +23,8 @@ export function useAdminNewsController() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -35,7 +36,7 @@ export function useAdminNewsController() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);

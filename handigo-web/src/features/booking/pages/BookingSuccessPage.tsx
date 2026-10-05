@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useToast } from '@/components/common/Toast';
+import { getErrorMessage } from '@/utils/apiError';
 import { useLocation, Navigate } from 'react-router-dom';
 import { BookingShell } from '../components/BookingComponents';
 import { BookingSuccessHero } from '../components/BookingSuccessHero';
@@ -24,6 +26,8 @@ const formatAddress = (order: Order) => {
 };
 
 const BookingSuccessPage = () => {
+  const { addToast } = useToast();
+  const notifiedOrderId = useRef<string | null>(null);
   const location = useLocation();
   const stateOrder = location.state?.order as Order | undefined;
   const fallbackOrderId = new URLSearchParams(location.search).get('orderId') || sessionStorage.getItem('latestBookingOrderId');
@@ -56,6 +60,7 @@ const BookingSuccessPage = () => {
       })
       .catch(error => {
         console.error('Failed to load paid order:', error);
+        if (isMounted) addToast(getErrorMessage(error, 'Không thể tải thông tin đơn dịch vụ.'), 'error');
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -64,7 +69,13 @@ const BookingSuccessPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [fallbackOrderId, reset, stateOrder]);
+  }, [addToast, fallbackOrderId, reset, stateOrder]);
+
+  useEffect(() => {
+    if (!order || notifiedOrderId.current === order._id) return;
+    notifiedOrderId.current = order._id;
+    addToast('Đã tạo đơn dịch vụ.', 'success');
+  }, [addToast, order]);
 
   const addressText = order ? formatAddress(order) : '';
 

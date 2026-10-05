@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -20,8 +21,8 @@ export default function AdminWithdrawalsPage() {
   const [items, setItems] = useState<AdminWithdrawal[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
   const [selected, setSelected] = useState<AdminWithdrawal | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +39,7 @@ export default function AdminWithdrawalsPage() {
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, setError]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void load(), 0);

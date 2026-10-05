@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import type { Order, OrderQuotation, Payment } from "@/types/booking";
@@ -10,7 +11,7 @@ export const useBookingDetailData = (id: string | undefined) => {
   const [quotation, setQuotation] = useState<OrderQuotation | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [apiError, setApiError] = useToastFeedback<string | null>(null, "error");
   const [reassignmentModalOpen, setReassignmentModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -82,7 +83,7 @@ export const useBookingDetailData = (id: string | undefined) => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, setApiError]);
 
   useEffect(() => {
     void Promise.resolve().then(loadData);

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import { providerOrderApi } from "../../api/providerOrder.api";
 import type { Order } from "@/types/booking";
@@ -8,10 +9,10 @@ export function useProviderOrdersSchedule() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [totalOrders, setTotalOrders] = useState(0);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
-  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [ordersError, setOrdersError] = useToastFeedback<string | null>(null, "error");
   const [todaySchedule, setTodaySchedule] = useState<Order[]>([]);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useToastFeedback<string | null>(null, "error");
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +71,7 @@ export function useProviderOrdersSchedule() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setOrdersError, setScheduleError]);
 
   return {
     recentOrders,

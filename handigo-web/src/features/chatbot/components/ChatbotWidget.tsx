@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { getErrorMessage } from "@/utils/apiError";
@@ -21,13 +22,14 @@ export function ChatbotWidget({
   audience: ChatbotAudience;
 }) {
   const location = useLocation();
+  const { addToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [activity, setActivity] = useState("");
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const [agentSession, setAgentSession] = useState<AgentSession | null>(null);
   const [paymentAnchor, setPaymentAnchor] = useState<{ key: string; messageId: string } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -240,6 +242,7 @@ export function ChatbotWidget({
     setError("");
     try {
       const session = await agentApi.reset(sessionId.current);
+      addToast("Đã tạo cuộc trò chuyện mới.", "success");
       applySession(session);
       setHasLoaded(true);
     } catch (requestError) {
@@ -273,6 +276,7 @@ export function ChatbotWidget({
     setIsLoading(true);
     try {
       await agentApi.delete(id);
+      addToast("Đã xóa cuộc trò chuyện.", "success");
       if (sessionId.current === id) {
         liveOrderMessages.current.clear();
         sessionId.current = crypto.randomUUID();

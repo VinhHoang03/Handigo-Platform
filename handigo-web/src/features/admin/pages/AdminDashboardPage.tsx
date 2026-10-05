@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -19,7 +20,7 @@ export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<AdminOrderAnalytics | null>(null);
   const [providers, setProviders] = useState<AdminProviderAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   const load = useCallback(async () => {
     try {
@@ -43,7 +44,7 @@ export default function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate]);
+  }, [fromDate, setError, toDate]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void load(), 0);

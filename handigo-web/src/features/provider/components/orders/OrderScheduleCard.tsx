@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from 'react';
 import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../../api/providerOrder.api';
@@ -6,8 +7,8 @@ import { getErrorMessage } from '@/utils/apiError';
 export function OrderScheduleCard({ order }: { order: Order }) {
   const [end, setEnd] = useState('');
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [notice, setNotice] = useToastFeedback<string>('', "success");
+  const [error, setError] = useToastFeedback<string>('', "error");
   const [expectedEnd, setExpectedEnd] = useState(order.schedule?.expectedEndAt);
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');

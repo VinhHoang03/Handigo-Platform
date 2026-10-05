@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { Pagination } from '@/components/common/Pagination';
@@ -19,6 +20,7 @@ const filters = [
 const ORDERS_PER_PAGE = 5;
 
 export default function ProviderOrdersPage() {
+  const { addToast } = useToast();
   const [assignments, setAssignments] = useState<OrderAssignment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [page, setPage] = useState(1);
@@ -34,7 +36,7 @@ export default function ProviderOrdersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useToastFeedback<string | null>(null, "error");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -76,7 +78,7 @@ export default function ProviderOrdersPage() {
     } finally {
       setLoadingOrders(false);
     }
-  }, [activeFilter, debouncedSearch, page]);
+  }, [activeFilter, debouncedSearch, page, setError]);
 
   useEffect(() => {
     void Promise.resolve().then(loadAssignments);
@@ -90,6 +92,7 @@ export default function ProviderOrdersPage() {
     try {
       setActionBusy(true);
       await providerOrderApi.acceptAssignment(assignmentId);
+      addToast("Đã nhận đơn dịch vụ.", "success");
       await Promise.all([loadAssignments(), loadOrders()]);
     } catch (err: unknown) {
       const message =
@@ -112,6 +115,7 @@ export default function ProviderOrdersPage() {
     try {
       setActionBusy(true);
       await providerOrderApi.rejectAssignment(assignmentId, reason);
+      addToast("Đã từ chối đơn dịch vụ.", "success");
       await loadAssignments();
     } catch {
       setError('Không thể từ chối đơn.');

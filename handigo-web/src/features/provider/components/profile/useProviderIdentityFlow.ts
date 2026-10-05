@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { getErrorMessage } from "@/utils/apiError";
 import { providerProfileApi } from "../../api/providerProfile.api";
@@ -26,10 +27,11 @@ export function useProviderIdentityFlow({
   setIsSaving,
   setUploadingAsset,
 }: UseProviderIdentityFlowParams) {
+  const { addToast } = useToast();
   const [identityForm, setIdentityForm] =
     useState<IdentityForm>(emptyIdentityForm);
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
-  const [identityError, setIdentityError] = useState("");
+  const [identityError, setIdentityError] = useToastFeedback<string>("", "error");
 
   function openIdentityModal() {
     setIdentityForm(toIdentityForm(profile?.provider.identityDocument));
@@ -129,6 +131,7 @@ export function useProviderIdentityFlow({
       setProfile(nextProfile);
       setIdentityForm(emptyIdentityForm);
       setIsIdentityModalOpen(false);
+      addToast("Đã gửi giấy tờ xác thực để xét duyệt.", "success");
     } catch (submitError) {
       setIdentityError(
         getErrorMessage(

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from 'react';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { ServiceQuantityPanel } from '../components/ServiceQuantityPanel';
@@ -21,7 +22,7 @@ const CreateBookingStep1Page = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
-  const [selectionError, setSelectionError] = useState('');
+  const [selectionError, setSelectionError] = useToastFeedback<string>('', "error");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const navigate = useNavigate();
 

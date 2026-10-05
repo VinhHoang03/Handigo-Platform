@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { walletApi } from '../api/wallet.api';
@@ -18,8 +19,8 @@ export function WalletPage({ role }: { role: WalletRole }) {
   const [wallet, setWallet] = useState<WalletOverview | null>(null);
   const [summary, setSummary] = useState<WalletSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
+  const [notice, setNotice] = useToastFeedback<string>('', "success");
   const transactionsRef = useRef<WalletSectionHandle>(null);
   const withdrawalsRef = useRef<WalletSectionHandle>(null);
 
@@ -38,7 +39,7 @@ export function WalletPage({ role }: { role: WalletRole }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

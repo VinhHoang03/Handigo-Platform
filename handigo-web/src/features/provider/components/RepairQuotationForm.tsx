@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { CircleAlert, FileSpreadsheet, ImagePlus, Mic, ScanLine, TriangleAlert, UploadCloud, X } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
@@ -92,10 +93,10 @@ export function RepairQuotationForm({
   const [scanComplete, setScanComplete] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [isScanningImage, setIsScanningImage] = useState(false);
-  const [scanImageError, setScanImageError] = useState<string | null>(null);
+  const [scanImageError, setScanImageError] = useToastFeedback<string | null>(null, "error");
   const [relevance, setRelevance] = useState<QuotationRelevanceResult | null>(null);
   const [isValidatingRelevance, setIsValidatingRelevance] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useToastFeedback<string | null>(null, "error");
   const [discardOpen, setDiscardOpen] = useState(false);
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);

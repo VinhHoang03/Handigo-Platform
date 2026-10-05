@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState } from 'react';
 import { Mic, Square, Sparkles } from 'lucide-react';
 import { quotationAgentApi } from '../../api/quotationAgent.api';
@@ -19,7 +20,7 @@ interface Props {
 export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBusyChange, open, onClose }: Props) {
   const [instruction, setInstruction] = useState('');
   const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const [working, setWorking] = useState(false);
   const [recording, setRecording] = useState(false);
   const [result, setResult] = useState<QuotationAgentResult | null>(null);

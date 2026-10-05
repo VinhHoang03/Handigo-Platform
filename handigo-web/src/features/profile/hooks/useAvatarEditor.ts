@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import { uploadUserAvatar } from "@/features/profile/api/userProfile.api";
 import { getErrorMessage } from "@/utils/apiError";
@@ -16,7 +17,7 @@ interface UseAvatarEditorParams {
  */
 export function useAvatarEditor({ onSave }: UseAvatarEditorParams) {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const [isUploading, setIsUploading] = useState(false);
 
   const {

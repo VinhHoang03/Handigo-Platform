@@ -55,6 +55,8 @@ function ToastItem({
 
   return (
     <div
+      role={type === "error" ? "alert" : "status"}
+      aria-atomic="true"
       className={`
         flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-md
         ${styles.bg} ${styles.border} ${styles.text}
@@ -89,7 +91,7 @@ export function ToastContainer() {
   const { toasts, removeToast } = useToast();
 
   return (
-    <div className="pointer-events-none fixed right-0 top-20 z-[300] flex flex-col gap-3 p-4 sm:gap-4 sm:p-6">
+    <div className="pointer-events-none fixed right-0 top-20 z-[300] flex max-h-[calc(100dvh-5rem)] w-full max-w-md flex-col gap-3 overflow-y-auto p-4 sm:gap-4 sm:p-6">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <ToastItem

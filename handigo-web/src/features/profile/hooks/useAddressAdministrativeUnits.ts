@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import {
   useEffect,
   useMemo,
@@ -38,7 +39,7 @@ export function useAddressAdministrativeUnits({
   const [wards, setWards] = useState<AdministrativeUnit[]>([]);
   const [isProvinceLoading, setIsProvinceLoading] = useState(false);
   const [isWardLoading, setIsWardLoading] = useState(false);
-  const [administrativeError, setAdministrativeError] = useState("");
+  const [administrativeError, setAdministrativeError] = useToastFeedback<string>("", "error");
 
   const provinceOptions = useMemo(
     () => toSelectOptions(provinces),
@@ -86,7 +87,7 @@ export function useAddressAdministrativeUnits({
     return () => {
       cancelled = true;
     };
-  }, [open, province, provinceCode, provinces.length, setAddressForm]);
+  }, [open, province, provinceCode, provinces.length, setAddressForm, setAdministrativeError]);
 
   useEffect(() => {
     if (!open || !provinceCode) return undefined;
@@ -125,7 +126,7 @@ export function useAddressAdministrativeUnits({
     return () => {
       cancelled = true;
     };
-  }, [open, provinceCode, ward, wardCode, setAddressForm]);
+  }, [open, provinceCode, ward, wardCode, setAddressForm, setAdministrativeError]);
 
   return {
     provinces,

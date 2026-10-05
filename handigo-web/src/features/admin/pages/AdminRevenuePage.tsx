@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw, TrendingUp } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -16,7 +17,7 @@ export default function AdminRevenuePage() {
   const [range, setRange] = useState<RevenueQuery>(() => createRange(30));
   const [data, setData] = useState<AdminRevenue | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   const load = useCallback(async () => {
     try {
@@ -28,7 +29,7 @@ export default function AdminRevenuePage() {
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, [range, setError]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
@@ -14,12 +15,12 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   const [quotation, setQuotation] = useState<QuotationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useToastFeedback<string | null>(null, "error");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelExplanation, setCancelExplanation] = useState('');
-  const [cancelError, setCancelError] = useState('');
+  const [cancelError, setCancelError] = useToastFeedback<string>('', "error");
 
   const loadData = useCallback(async (showLoading = true) => {
     if (!orderId) return;
@@ -61,7 +62,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, setError]);
 
   useEffect(() => {
     void Promise.resolve().then(() => loadData());
@@ -71,11 +72,13 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     action: () => Promise<void>,
     fallbackMessage: string,
     reload = true,
+    successMessage?: string,
   ) => {
     try {
       setBusy(true);
       setError(null);
       await action();
+      if (successMessage) addToast(successMessage, "success");
       if (reload) await loadData(false);
       return true;
     } catch (err: unknown) {
@@ -99,7 +102,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     if (!assignment) return;
     await runAction(async () => {
       await providerOrderApi.acceptAssignment(assignment._id);
-    }, 'Không thể nhận đơn.');
+    }, 'Không thể nhận đơn.', true, 'Đã nhận đơn dịch vụ.');
   };
 
   const handleReject = async () => {
@@ -107,14 +110,14 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     const reason = window.prompt('Lý do từ chối (tùy chọn):') ?? undefined;
     await runAction(async () => {
       await providerOrderApi.rejectAssignment(assignment._id, reason);
-    }, 'Không thể từ chối đơn.');
+    }, 'Không thể từ chối đơn.', true, 'Đã từ chối đơn dịch vụ.');
   };
 
   const handleStart = async () => {
     if (!order) return;
     await runAction(async () => {
       await providerOrderApi.startOrder(order._id);
-    }, 'Không thể bắt đầu đơn.');
+    }, 'Không thể bắt đầu đơn.', true, 'Đã bắt đầu thực hiện đơn dịch vụ.');
   };
 
   const handleComplete = async (files: File[], completionNote: string) => {
@@ -131,7 +134,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
           expectedQuotationRevision: quotation.quotation.revision ?? 0,
         } : {}),
       });
-    }, 'Không thể hoàn thành đơn.');
+    }, 'Không thể hoàn thành đơn.', true, 'Đã hoàn thành đơn dịch vụ.');
   };
 
   const requestCancelConfirmation = () => {
@@ -160,7 +163,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
     const succeeded = await runAction(async () => {
       await providerOrderApi.cancelOrder(order._id, cancellationReason);
-    }, 'Không thể hủy đơn.', false);
+    }, 'Không thể hủy đơn.', false, 'Đã hủy đơn dịch vụ.');
     if (!succeeded) return;
 
     setCancelConfirmOpen(false);

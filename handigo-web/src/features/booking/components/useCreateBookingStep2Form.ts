@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
@@ -31,7 +32,7 @@ export const useCreateBookingStep2Form = () => {
     customerAttachments, setCustomerAttachments,
   } = useBookingStore();
   const [isUploadingImages, setIsUploadingImages] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useToastFeedback<string | null>(null, "error");
   const [formErrors, setFormErrors] = useState<Step2FormErrors>({});
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [providerAvailability, setProviderAvailability] = useState<ProviderAvailabilityStatus>('idle');

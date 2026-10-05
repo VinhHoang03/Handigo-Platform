@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
 import {
   createUserAddress,
@@ -28,13 +29,14 @@ export function useAddressBookManager({
   singleAddressMode = false,
   onSelectAddress,
 }: UseAddressBookManagerParams) {
+  const { addToast } = useToast();
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserAddress | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   const loadAddresses = useCallback(async () => {
     try {
@@ -47,7 +49,7 @@ export function useAddressBookManager({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     // Chỉ tải từ API khi component được gắn; đổi lựa chọn dùng danh sách hiện có.
@@ -98,6 +100,7 @@ export function useAddressBookManager({
       const savedAddress = address
         ? await updateUserAddress(address.id, payload)
         : await createUserAddress(payload);
+      addToast(address ? "Đã cập nhật địa chỉ." : "Đã thêm địa chỉ.", "success");
       await loadAddresses();
       onSelectAddress?.(savedAddress);
     } catch (submitError) {
@@ -117,6 +120,7 @@ export function useAddressBookManager({
     try {
       setIsSaving(true);
       await deleteUserAddress(deleteTarget.id);
+      addToast("Đã xóa địa chỉ.", "success");
       const nextAddresses = addresses.filter(
         (item) => item.id !== deleteTarget.id,
       );

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import { bookingApi } from "@/features/booking/api/booking.api";
@@ -36,7 +37,7 @@ export function useCurrentLocationPicker({
   const [isLocating, setIsLocating] = useState(false);
   const [currentLocationDraft, setCurrentLocationDraft] =
     useState<CurrentLocationDraft | null>(null);
-  const [currentLocationError, setCurrentLocationError] = useState("");
+  const [currentLocationError, setCurrentLocationError] = useToastFeedback<string>("", "error");
   const [isResolvingCurrentAddress, setIsResolvingCurrentAddress] = useState(false);
   const [isSavingCurrentLocation, setIsSavingCurrentLocation] = useState(false);
 

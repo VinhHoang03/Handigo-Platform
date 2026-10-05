@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from "react";
 import type { UserAddress, UserAddressPayload } from "@/features/profile/types/profile.types";
 import { getErrorMessage } from "@/utils/apiError";
@@ -35,7 +36,7 @@ export function useAddressBookForm({
   const [addressForm, setAddressForm] = useState<AddressFormState>(() =>
     toAddressForm(address, addressCount, defaultRecipient),
   );
-  const [addressFormError, setAddressFormError] = useState("");
+  const [addressFormError, setAddressFormError] = useToastFeedback<string>("", "error");
 
   const {
     provinces,

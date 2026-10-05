@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { ServiceQuantityPanel } from '@/features/booking/components/ServiceQuantityPanel';
@@ -39,7 +40,7 @@ export default function CustomerServiceDetailPage() {
 
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [selectedOptionQuantities, setSelectedOptionQuantities] = useState<Record<string, number>>({});
-  const [optionSelectionError, setOptionSelectionError] = useState("");
+  const [optionSelectionError, setOptionSelectionError] = useToastFeedback<string>("", "error");
   const [quantitySelection, setQuantitySelection] = useState({ serviceId, quantity: 1 });
   const uniformQuantity = quantitySelection.serviceId === serviceId ? quantitySelection.quantity : 1;
   const isCleaning = isAirConditionerCleaning(service);

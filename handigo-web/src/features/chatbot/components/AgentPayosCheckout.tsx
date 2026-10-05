@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { getErrorMessage } from "@/utils/apiError";
@@ -17,7 +18,7 @@ export function AgentPayosCheckout({ payment, disabled, onCheck }: {
 }) {
   const [state, setState] = useState<CheckoutState>("loading");
   const [qrUrl, setQrUrl] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const [attempt, setAttempt] = useState(0);
   const terminal = useRef(false);
   const notified = useRef(false);
@@ -111,7 +112,7 @@ export function AgentPayosCheckout({ payment, disabled, onCheck }: {
       document.removeEventListener("visibilitychange", onVisible);
       if (imageUrl) URL.revokeObjectURL(imageUrl);
     };
-  }, [attempt, payment.orderId, payment.paymentId]);
+  }, [attempt, payment.orderId, payment.paymentId, setError]);
 
   return <div className="space-y-3" aria-busy={state === "loading"}>
     {statusMessages[state] && <p role="status" className="text-xs leading-5 text-on-surface-variant">{statusMessages[state]}</p>}

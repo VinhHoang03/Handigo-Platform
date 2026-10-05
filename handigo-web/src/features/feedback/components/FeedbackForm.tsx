@@ -1,3 +1,4 @@
+import { useToast } from "@/components/common/Toast";
 import { useEffect, useId, useMemo, useState } from 'react';
 import { ImagePlus, Send, X } from 'lucide-react';
 import { FloatingTextarea } from '@/components/common/FloatingField';
@@ -12,12 +13,14 @@ interface Props {
 }
 
 export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
+  const { addToast } = useToast();
   const fileInputId = useId();
   const [rating, setRating] = useState(feedback?.rating || 0);
   const [comment, setComment] = useState(feedback?.comment || '');
   const [existingImages, setExistingImages] = useState<string[]>(feedback?.images || []);
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState('');
+  const reportError = (message: string) => { setMessage(message); addToast(message, "error"); };
   const previews = useMemo(
     () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [files],
@@ -34,11 +37,11 @@ export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
       (file) => !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024,
     );
     if (invalidFile) {
-      setMessage('Mỗi tệp phải là hình ảnh và có dung lượng không quá 5 MB.');
+      reportError('Mỗi tệp phải là hình ảnh và có dung lượng không quá 5 MB.');
       return;
     }
     if (selectedFiles.length > remaining) {
-      setMessage(`Bạn chỉ có thể chọn thêm tối đa ${remaining} ảnh.`);
+      reportError(`Bạn chỉ có thể chọn thêm tối đa ${remaining} ảnh.`);
     } else {
       setMessage('');
     }
@@ -48,20 +51,21 @@ export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!rating) {
-      setMessage('Vui lòng chọn số sao.');
+      reportError('Vui lòng chọn số sao.');
       return;
     }
     if (existingImages.length + files.length > 5) {
-      setMessage('Chỉ được tải tối đa 5 ảnh.');
+      reportError('Chỉ được tải tối đa 5 ảnh.');
       return;
     }
 
     try {
       await save({ orderId, rating, comment: comment.trim() || null, images: existingImages }, files);
       setFiles([]);
-      setMessage(feedback ? 'Đã cập nhật đánh giá.' : 'Đã gửi đánh giá.');
+      setMessage('');
+      addToast(feedback ? 'Đã cập nhật đánh giá.' : 'Đã gửi đánh giá.', 'success');
     } catch (requestError) {
-      setMessage(requestError instanceof Error ? requestError.message : 'Không thể lưu đánh giá.');
+      reportError(requestError instanceof Error ? requestError.message : 'Không thể lưu đánh giá.');
     }
   };
 
