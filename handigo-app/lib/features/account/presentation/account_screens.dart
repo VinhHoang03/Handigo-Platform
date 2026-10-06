@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
@@ -7,12 +8,20 @@ import '../../../app/theme/app_theme.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../home/presentation/device_location_provider.dart';
 import '../data/account_repository.dart';
 import '../domain/account_models.dart';
 
-const _figmaPrimary = Color(0xFF5638E6);
-const _figmaPrimarySoft = Color(0xFFF0ECFF);
-const _accountBackground = Color(0xFFF8F7FC);
+const _figmaPrimary = Color(0xFF4F35D5);
+const _figmaPrimarySoft = Color(0xFFEFEBFF);
+const _accountBackground = Color(0xFFF6F5FA);
+const _accountSurface = Color(0xFFFFFFFF);
+const _accountInk = Color(0xFF201B36);
+const _accountMuted = Color(0xFF777286);
+const _accountDivider = Color(0xFFEDEAF3);
+const _accountGold = Color(0xFF926319);
+const _accountDanger = Color(0xFFC64050);
+const _accountIconPath = 'assets/icons/account';
 
 final accountRepositoryProvider = Provider<AccountRepository>(
   (ref) => AccountRepository(ref.watch(apiClientProvider)),
@@ -55,7 +64,6 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
-    final scheme = Theme.of(context).colorScheme;
     final user = auth.user;
     final profile = ref.watch(accountProfileProvider).asData?.value;
     final addresses = ref.watch(accountAddressesProvider).asData?.value;
@@ -69,19 +77,24 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
       backgroundColor: _accountBackground,
       appBar: AppBar(
         centerTitle: true,
-        toolbarHeight: 56,
-        backgroundColor: Colors.white,
+        toolbarHeight: 62,
+        backgroundColor: _accountSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           tooltip: 'Quay lại',
           onPressed: () => context.canPop() ? context.pop() : null,
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: SvgPicture.asset(
+            '$_accountIconPath/back.svg',
+            width: 22,
+            height: 22,
+          ),
         ),
         title: Text(
           'Tài khoản & Cài đặt',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: scheme.onSurface,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: _accountInk,
+            fontSize: 22,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -89,166 +102,181 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
           IconButton(
             tooltip: 'Trợ giúp',
             onPressed: () => context.push('/customer/support'),
-            icon: const Icon(Icons.support_agent_rounded, size: 21),
+            icon: SvgPicture.asset(
+              '$_accountIconPath/app_help.svg',
+              width: 22,
+              height: 22,
+            ),
           ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-            children: [
-              _ProfileSummaryCard(
-                name: user?.fullName ?? 'Khách hàng',
-                contact: _maskedPhone('${profile?['phone'] ?? ''}'),
-                badge: 'Thành viên Gold',
-                avatarUrl: user?.avatar,
-                isGoogleAccount: user?.isGoogleAccount ?? false,
-                onEdit: () => context.push('/customer/profile'),
-              ),
-              const SizedBox(height: 12),
-              _ProviderModeCard(
-                isApproved: isApprovedProvider,
-                onPressed: () => isApprovedProvider
-                    ? context.go('/provider')
-                    : context.push('/customer/provider-onboarding'),
-              ),
-              const SizedBox(height: 12),
-              _WalletOverviewCard(
-                balance: wallet?.balance,
-                onDeposit: () => context.push('/customer/wallet'),
-                onHistory: () => context.push('/customer/wallet'),
-              ),
-              const SizedBox(height: 16),
-              _AccountSection(
-                title: 'Quản lý cá nhân',
-                items: [
-                  _MenuItem(
-                    label: 'Thông tin cá nhân',
-                    subtitle: 'Hồ sơ, xác minh & thông tin liên hệ',
-                    icon: Icons.badge_outlined,
-                    onTap: () => context.push('/customer/profile'),
-                  ),
-                  _MenuItem(
-                    label: 'Sổ địa chỉ',
-                    subtitle: addresses == null
-                        ? 'Quản lý các địa chỉ đã lưu'
-                        : '${addresses.length} địa chỉ đã lưu',
-                    icon: Icons.location_on_outlined,
-                    onTap: () => context.push('/customer/addresses'),
-                  ),
-                  _MenuItem(
-                    label: 'Phương thức thanh toán',
-                    subtitle: 'Quản lý thẻ & tài khoản liên kết',
-                    icon: Icons.credit_card_outlined,
-                    onTap: () => context.push('/customer/wallet'),
-                  ),
-                  _MenuItem(
-                    label: 'Kho Voucher & Ưu đãi của tôi',
-                    subtitle: vouchers == null
-                        ? 'Xem các ưu đãi đang có'
-                        : '${vouchers.length} mã giảm giá sẵn sàng áp dụng',
-                    icon: Icons.confirmation_num_outlined,
-                    badge: vouchers == null ? null : '${vouchers.length} mã',
-                    onTap: () => context.push('/customer/vouchers'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _AccountSection(
-                title: 'Cài đặt ứng dụng',
-                items: [
-                  _MenuItem(
-                    label: 'Thông báo & nhắc lịch',
-                    subtitle: 'Lịch hẹn, tin nhắn & cập nhật dịch vụ',
-                    icon: Icons.notifications_none_rounded,
-                    onTap: () => context.push('/customer/notifications'),
-                  ),
-                  const _MenuItem(
-                    label: 'Ngôn ngữ',
-                    subtitle: 'Tiếng Việt',
-                    icon: Icons.translate_rounded,
-                  ),
-                  _MenuItem(
-                    label: 'Bảo mật & đăng nhập',
-                    subtitle: 'Mật khẩu, Face ID & vân tay',
-                    icon: Icons.verified_user_outlined,
-                    onTap: () => context.push('/customer/settings'),
-                  ),
-                  _MenuItem(
-                    label: 'Giao diện',
-                    subtitle: 'Sáng - Theo cài đặt thiết bị',
-                    icon: Icons.dark_mode_outlined,
-                    onTap: () => context.push('/customer/settings'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _AccountSection(
-                title: 'Hỗ trợ & thông tin',
-                items: [
-                  _MenuItem(
-                    label: 'Trung tâm trợ giúp',
-                    subtitle: 'Chat với Handigo - Hỗ trợ 24/7',
-                    icon: Icons.support_agent_rounded,
-                    onTap: () => context.push('/customer/support'),
-                  ),
-                  _MenuItem(
-                    label: 'Góp ý & báo cáo sự cố',
-                    subtitle: 'Chúng tôi luôn lắng nghe bạn',
-                    icon: Icons.rate_review_outlined,
-                    onTap: () => context.push('/customer/complaints'),
-                  ),
-                  _MenuItem(
-                    label: 'Điều khoản & quyền riêng tư',
-                    subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
-                    icon: Icons.policy_outlined,
-                    onTap: () => context.push('/customer/settings'),
-                  ),
-                  _MenuItem(
-                    label: 'Đánh giá Handigo',
-                    subtitle: 'Chia sẻ trải nghiệm của bạn',
-                    icon: Icons.star_rounded,
-                    iconColor: AppTheme.starGold,
-                    onTap: () => context.push('/customer/feedback'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => ref.read(authControllerProvider).logout(),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(44),
-                  backgroundColor: Colors.white,
-                  foregroundColor: scheme.error,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  textStyle: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              children: [
+                _ProfileSummaryCard(
+                  name: user?.fullName ?? 'Khách hàng',
+                  contact: _maskedPhone('${profile?['phone'] ?? ''}'),
+                  badge: 'Thành viên Gold',
+                  avatarUrl: user?.avatar,
+                  onEdit: () => context.push('/customer/profile'),
                 ),
-                child: const Text('Đăng xuất'),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Handigo - Phiên bản 2.4.0',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
+                const SizedBox(height: 24),
+                _ProviderModeCard(
+                  isApproved: isApprovedProvider,
+                  onPressed: () => isApprovedProvider
+                      ? context.go('/provider')
+                      : context.push('/customer/provider-onboarding'),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                'Tận tâm trong từng tay',
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: scheme.outline),
-              ),
-            ],
+                const SizedBox(height: 24),
+                _WalletOverviewCard(
+                  balance: wallet?.balance,
+                  onDeposit: () => context.push('/customer/wallet'),
+                  onHistory: () => context.push('/customer/wallet'),
+                ),
+                const SizedBox(height: 24),
+                _AccountSection(
+                  title: 'Quản lý cá nhân',
+                  items: [
+                    _MenuItem(
+                      label: 'Thông tin cá nhân',
+                      subtitle: 'Hồ sơ, xác minh & thông tin liên hệ',
+                      iconAsset: '$_accountIconPath/user.svg',
+                      onTap: () => context.push('/customer/profile'),
+                    ),
+                    _MenuItem(
+                      label: 'Sổ địa chỉ',
+                      subtitle: addresses == null
+                          ? 'Quản lý các địa chỉ đã lưu'
+                          : '${addresses.length} địa chỉ đã lưu',
+                      iconAsset: '$_accountIconPath/pin.svg',
+                      onTap: () => context.push('/customer/addresses'),
+                    ),
+                    _MenuItem(
+                      label: 'Phương thức thanh toán',
+                      subtitle: 'Quản lý thẻ & tài khoản liên kết',
+                      iconAsset: '$_accountIconPath/card.svg',
+                      onTap: () => context.push('/customer/wallet'),
+                    ),
+                    _MenuItem(
+                      label: 'Voucher & ưu đãi',
+                      subtitle: vouchers == null
+                          ? 'Xem các ưu đãi đang có'
+                          : '${vouchers.length} ưu đãi sẵn sàng sử dụng',
+                      iconAsset: '$_accountIconPath/gift.svg',
+                      onTap: () => context.push('/customer/vouchers'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _AccountSection(
+                  title: 'Cài đặt ứng dụng',
+                  items: [
+                    _MenuItem(
+                      label: 'Thông báo & nhắc lịch',
+                      subtitle: 'Lịch hẹn, tin nhắn & cập nhật dịch vụ',
+                      iconAsset: '$_accountIconPath/bell.svg',
+                      onTap: () => context.push('/customer/notifications'),
+                    ),
+                    const _MenuItem(
+                      label: 'Ngôn ngữ',
+                      subtitle: 'Tiếng Việt',
+                      iconAsset: '$_accountIconPath/globe.svg',
+                    ),
+                    _MenuItem(
+                      label: 'Bảo mật & đăng nhập',
+                      subtitle: 'Mật khẩu, Face ID & vân tay',
+                      iconAsset: '$_accountIconPath/shield.svg',
+                      onTap: () => context.push('/customer/settings'),
+                    ),
+                    _MenuItem(
+                      label: 'Giao diện',
+                      subtitle: 'Sáng · Theo cài đặt thiết bị',
+                      iconAsset: '$_accountIconPath/moon.svg',
+                      onTap: () => context.push('/customer/settings'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _AccountSection(
+                  title: 'Hỗ trợ & thông tin',
+                  items: [
+                    _MenuItem(
+                      label: 'Trung tâm trợ giúp',
+                      subtitle: 'Chat với Handigo · Hỗ trợ 24/7',
+                      iconAsset: '$_accountIconPath/help.svg',
+                      onTap: () => context.push('/customer/support'),
+                    ),
+                    _MenuItem(
+                      label: 'Góp ý & báo cáo sự cố',
+                      subtitle: 'Chúng tôi luôn lắng nghe bạn',
+                      iconAsset: '$_accountIconPath/chat.svg',
+                      onTap: () => context.push('/customer/complaints'),
+                    ),
+                    _MenuItem(
+                      label: 'Điều khoản & quyền riêng tư',
+                      subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
+                      iconAsset: '$_accountIconPath/file.svg',
+                      onTap: () => context.push('/customer/settings'),
+                    ),
+                    _MenuItem(
+                      label: 'Đánh giá Handigo',
+                      subtitle: 'Chia sẻ trải nghiệm của bạn',
+                      iconAsset: '$_accountIconPath/star.svg',
+                      onTap: () => context.push('/customer/feedback'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton(
+                  onPressed: () => ref.read(authControllerProvider).logout(),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    backgroundColor: _accountSurface,
+                    foregroundColor: _accountDanger,
+                    elevation: 0,
+                    side: const BorderSide(color: _accountDivider),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  child: const Text('Đăng xuất'),
+                ),
+                const SizedBox(height: 24),
+                Column(
+                  children: [
+                    Text(
+                      'Handigo · Phiên bản 2.4.0',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _accountMuted,
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tiện ích trong tầm tay',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _accountMuted,
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -584,80 +612,161 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
 class AddressScreen extends ConsumerWidget {
   const AddressScreen({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
+      backgroundColor: _accountBackground,
       appBar: AppBar(
+        backgroundColor: _accountSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        toolbarHeight: 62,
         leading: IconButton(
           tooltip: 'Quay lại',
           onPressed: () => context.canPop() ? context.pop() : null,
-          icon: const Icon(Icons.arrow_back),
+          icon: SvgPicture.asset(
+            '$_accountIconPath/back.svg',
+            width: 22,
+            height: 22,
+            colorFilter: const ColorFilter.mode(_accountInk, BlendMode.srcIn),
+          ),
         ),
-        title: const Text('Sổ địa chỉ của tôi'),
-        actions: [
-          IconButton(
-            onPressed: () => _addressForm(context, ref),
-            icon: const Icon(Icons.add),
+        title: const Text(
+          'Sổ địa chỉ của tôi',
+          style: TextStyle(
+            color: _accountInk,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -.2,
           ),
-        ],
+        ),
       ),
-      body: ref
-          .watch(accountAddressesProvider)
-          .when(
-            loading: () => const AppLoading(),
-            error: (_, __) => AppMessage(
-              message: 'Không thể tải địa chỉ.',
-              onRetry: () => ref.invalidate(accountAddressesProvider),
+      body: SafeArea(
+        top: false,
+        child: ref
+            .watch(accountAddressesProvider)
+            .when(
+              loading: () => const AppLoading(),
+              error: (_, _) => AppMessage(
+                message: 'Không thể tải địa chỉ.',
+                onRetry: () => ref.invalidate(accountAddressesProvider),
+              ),
+              data: (items) {
+                return RefreshIndicator(
+                  color: _figmaPrimary,
+                  onRefresh: () => ref.refresh(accountAddressesProvider.future),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        children: [
+                          _AddAddressCard(
+                            onTap: () => _addressForm(context, ref),
+                          ),
+                          const SizedBox(height: 24),
+                          const _AddressSectionLabel('Vị trí hiện tại'),
+                          const SizedBox(height: 12),
+                          _CurrentLocationSection(
+                            onDetermine: () => _determineLocation(context, ref),
+                          ),
+                          const SizedBox(height: 28),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Địa chỉ đã lưu',
+                                  style: TextStyle(
+                                    color: _accountInk,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${items.length} địa chỉ',
+                                style: const TextStyle(
+                                  color: _accountMuted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (items.isEmpty)
+                            _EmptyAddress(
+                              onAdd: () => _addressForm(context, ref),
+                            )
+                          else
+                            ...items.expand(
+                              (item) => [
+                                _AddressCard(
+                                  item: item,
+                                  onSetDefault: item.isDefault
+                                      ? null
+                                      : () async {
+                                          await ref
+                                              .read(accountRepositoryProvider)
+                                              .updateAddress(item.id, {
+                                                'isDefault': true,
+                                              });
+                                          ref.invalidate(
+                                            accountAddressesProvider,
+                                          );
+                                        },
+                                  onEdit: () =>
+                                      _addressForm(context, ref, item: item),
+                                  onDelete: () async {
+                                    await ref
+                                        .read(accountRepositoryProvider)
+                                        .deleteAddress(item.id);
+                                    ref.invalidate(accountAddressesProvider);
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                            ),
+                          const SizedBox(height: 16),
+                          const _AddressPrivacyFooter(),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-            data: (items) {
-              if (items.isEmpty)
-                return _EmptyAddress(onAdd: () => _addressForm(context, ref));
-              return RefreshIndicator(
-                onRefresh: () => ref.refresh(accountAddressesProvider.future),
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  itemCount: items.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, index) {
-                    if (index == 0) {
-                      return _AddAddressCard(
-                        onTap: () => _addressForm(context, ref),
-                      );
-                    }
-                    final item = items[index - 1];
-                    return _AddressCard(
-                      item: item,
-                      onSelected: (value) async {
-                        if (value == 'default')
-                          await ref
-                              .read(accountRepositoryProvider)
-                              .updateAddress(item.id, {'isDefault': true});
-                        if (value == 'delete')
-                          await ref
-                              .read(accountRepositoryProvider)
-                              .deleteAddress(item.id);
-                        ref.invalidate(accountAddressesProvider);
-                      },
-                    );
-                  },
-                ),
-              );
-            },
-          ),
+      ),
     );
   }
 }
 
-Future<void> _addressForm(BuildContext context, WidgetRef ref) async {
-  final name = TextEditingController(),
-      phone = TextEditingController(),
-      address = TextEditingController(),
-      province = TextEditingController(),
-      ward = TextEditingController();
+Future<void> _determineLocation(BuildContext context, WidgetRef ref) async {
+  ref.invalidate(deviceLocationProvider);
+  final location = await ref.read(deviceLocationProvider.future);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(location.label)));
+}
+
+Future<void> _addressForm(
+  BuildContext context,
+  WidgetRef ref, {
+  AddressItem? item,
+}) async {
+  final name = TextEditingController(text: item?.recipientName ?? ''),
+      phone = TextEditingController(text: item?.recipientPhone ?? ''),
+      address = TextEditingController(text: item?.fullAddress ?? ''),
+      province = TextEditingController(text: item?.province ?? ''),
+      ward = TextEditingController(text: item?.ward ?? ''),
+      note = TextEditingController(text: item?.note ?? '');
   final form = await showDialog<Map<String, String>>(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('Thêm địa chỉ'),
+      title: Text(item == null ? 'Thêm địa chỉ' : 'Chỉnh sửa địa chỉ'),
       content: SingleChildScrollView(
         child: Column(
           children: [
@@ -666,6 +775,7 @@ Future<void> _addressForm(BuildContext context, WidgetRef ref) async {
             _field(address, 'Địa chỉ đầy đủ'),
             _field(province, 'Tỉnh/thành phố'),
             _field(ward, 'Phường/xã'),
+            _field(note, 'Ghi chú cho thợ (không bắt buộc)'),
           ],
         ),
       ),
@@ -681,14 +791,29 @@ Future<void> _addressForm(BuildContext context, WidgetRef ref) async {
             'fullAddress': address.text,
             'province': province.text,
             'ward': ward.text,
+            'note': note.text,
           }),
           child: const Text('Lưu'),
         ),
       ],
     ),
   );
-  if (form != null && form.values.every((v) => v.trim().isNotEmpty)) {
-    await ref.read(accountRepositoryProvider).createAddress(form);
+  final requiredValues = form == null
+      ? const <String>[]
+      : [
+          form['recipientName'] ?? '',
+          form['recipientPhone'] ?? '',
+          form['fullAddress'] ?? '',
+          form['province'] ?? '',
+          form['ward'] ?? '',
+        ];
+  if (form != null &&
+      requiredValues.every((value) => value.trim().isNotEmpty)) {
+    if (item == null) {
+      await ref.read(accountRepositoryProvider).createAddress(form);
+    } else {
+      await ref.read(accountRepositoryProvider).updateAddress(item.id, form);
+    }
     ref.invalidate(accountAddressesProvider);
   }
 }
@@ -1357,17 +1482,13 @@ class _MenuItem {
   const _MenuItem({
     required this.label,
     required this.subtitle,
-    required this.icon,
+    required this.iconAsset,
     this.onTap,
-    this.badge,
-    this.iconColor,
   });
 
   final String label, subtitle;
-  final IconData icon;
+  final String iconAsset;
   final VoidCallback? onTap;
-  final String? badge;
-  final Color? iconColor;
 }
 
 class _ProfileSummaryCard extends StatelessWidget {
@@ -1376,84 +1497,68 @@ class _ProfileSummaryCard extends StatelessWidget {
     required this.contact,
     required this.badge,
     required this.avatarUrl,
-    required this.isGoogleAccount,
     required this.onEdit,
   });
   final String name, contact, badge;
   final String? avatarUrl;
-  final bool isGoogleAccount;
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .3)),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.onSurface.withValues(alpha: .08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            _AccountAvatar(
-              name: name,
-              email: contact,
-              avatarUrl: avatarUrl,
-              isGoogleAccount: isGoogleAccount,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
+    final borderRadius = BorderRadius.circular(20);
+    return Material(
+      color: _accountSurface,
+      borderRadius: borderRadius,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onEdit,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              _AccountAvatar(name: name, avatarUrl: avatarUrl),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: _accountInk,
+                        fontSize: 22,
+                        height: 1.45,
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    contact,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '✦ $badge',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFFB06B00),
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: 4),
+                    Text(
+                      contact,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _accountMuted,
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
                     ),
-                  ),
-                ],
+                    Text(
+                      '✦  $badge',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _accountGold,
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              tooltip: 'Chỉnh sửa hồ sơ',
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined, size: 19),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1468,21 +1573,10 @@ class _ProviderModeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF6545EF), Color(0xFF4D2FDB)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x302600B8),
-          blurRadius: 20,
-          offset: Offset(0, 8),
-        ),
-      ],
+      color: _figmaPrimary,
+      borderRadius: BorderRadius.circular(20),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1490,42 +1584,51 @@ class _ProviderModeCard extends StatelessWidget {
         Text(
           isApproved ? 'ĐỐI TÁC ĐÃ XÁC MINH' : 'MỞ RỘNG CƠ HỘI',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white.withValues(alpha: .9),
-            fontWeight: FontWeight.w700,
-            letterSpacing: .45,
+            color: _accountSurface,
+            fontSize: 12,
+            height: 1.45,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
           isApproved ? 'Sẵn sàng nhận việc mới?' : 'Trở thành Đối tác',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: Colors.white,
+            color: _accountSurface,
+            fontSize: 22,
+            height: 1.45,
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 12),
         Text(
           isApproved
-              ? 'Chuyển sang chế độ Thợ để quản lý lịch làm việc chuyên nghiệp.'
+              ? 'Chuyển sang chế độ Thợ để quản lý\nlịch làm việc và thu nhập.'
               : 'Đăng ký cung cấp dịch vụ trên Handigo.',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white.withValues(alpha: .86),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: _accountSurface,
+            fontSize: 14,
+            height: 1.45,
           ),
         ),
         const SizedBox(height: 12),
         FilledButton(
           onPressed: onPressed,
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(42),
-            backgroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(48),
+            backgroundColor: _accountSurface,
             foregroundColor: _figmaPrimary,
+            elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
           child: Text(
-            isApproved ? 'Chuyển sang chế độ Thợ →' : 'Đăng ký ngay →',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            isApproved ? 'Chuyển sang chế độ Thợ  →' : 'Đăng ký ngay  →',
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.45,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -1545,66 +1648,55 @@ class _WalletOverviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .45)),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.onSurface.withValues(alpha: .05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: _accountSurface,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.account_balance_wallet_outlined,
-                color: _figmaPrimary,
-                size: 19,
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Ví Handigo',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: _accountInk,
+                    fontSize: 14,
+                    height: 1.45,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               Text(
                 'Được bảo vệ',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: _figmaPrimary,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  height: 1.45,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Số dư khả dụng',
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+          Text(
+            'Số dư khả dụng',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: _accountMuted,
+              fontSize: 12,
+              height: 1.45,
             ),
           ),
-          const SizedBox(height: 3),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              balance == null ? 'Đang tải...' : _money(balance!),
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          const SizedBox(height: 12),
+          Text(
+            balance == null ? 'Đang tải...' : _accountMoney(balance!),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: _accountInk,
+              fontSize: 30,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 12),
@@ -1616,24 +1708,27 @@ class _WalletOverviewCard extends StatelessWidget {
                   icon: const Icon(Icons.add, size: 17),
                   label: const Text('Nạp tiền'),
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(42),
+                    minimumSize: const Size.fromHeight(48),
                     backgroundColor: _figmaPrimary,
+                    foregroundColor: _accountSurface,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
                   onPressed: onHistory,
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(42),
+                    minimumSize: const Size.fromHeight(48),
                     backgroundColor: _figmaPrimarySoft,
                     foregroundColor: _figmaPrimary,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: const Text('Lịch sử giao dịch'),
@@ -1648,31 +1743,27 @@ class _WalletOverviewCard extends StatelessWidget {
 }
 
 class _AccountAvatar extends StatelessWidget {
-  const _AccountAvatar({
-    required this.name,
-    required this.email,
-    required this.avatarUrl,
-    required this.isGoogleAccount,
-  });
-  final String name, email;
+  const _AccountAvatar({required this.name, required this.avatarUrl});
+  final String name;
   final String? avatarUrl;
-  final bool isGoogleAccount;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final fallbackColor = _avatarColor(scheme, email, isGoogleAccount);
+    final imageUrl = usableMediaUrl(avatarUrl);
     return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(color: fallbackColor, shape: BoxShape.circle),
+      width: 64,
+      height: 64,
+      decoration: const BoxDecoration(
+        color: _figmaPrimarySoft,
+        shape: BoxShape.circle,
+      ),
       clipBehavior: Clip.antiAlias,
       alignment: Alignment.center,
-      child: usableMediaUrl(avatarUrl) != null
+      child: imageUrl != null
           ? Image.network(
-              usableMediaUrl(avatarUrl)!,
-              width: 52,
-              height: 52,
+              imageUrl,
+              width: 64,
+              height: 64,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => _initial(context),
             )
@@ -1681,25 +1772,21 @@ class _AccountAvatar extends StatelessWidget {
   }
 
   Widget _initial(BuildContext context) => Text(
-    name.isEmpty ? '?' : name.substring(0, 1).toUpperCase(),
-    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-      color: Colors.white,
+    _initials(name),
+    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+      color: _figmaPrimary,
+      fontSize: 22,
+      height: 1.45,
       fontWeight: FontWeight.w800,
     ),
   );
 }
 
-Color _avatarColor(ColorScheme scheme, String email, bool isGoogleAccount) {
-  final isGmail = email.toLowerCase().endsWith('@gmail.com');
-  if (!isGmail && !isGoogleAccount) return scheme.primaryContainer;
-  const colors = [
-    AppTheme.primary,
-    AppTheme.secondary,
-    Color(0xFF7D3000),
-    Color(0xFF006A7C),
-  ];
-  final hash = email.codeUnits.fold<int>(0, (sum, value) => sum + value);
-  return colors[hash % colors.length];
+String _initials(String value) {
+  final parts = value.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty || parts.first.isEmpty) return '?';
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  return '${parts[parts.length - 2][0]}${parts.last[0]}'.toUpperCase();
 }
 
 class _AccountSection extends StatelessWidget {
@@ -1711,17 +1798,16 @@ class _AccountSection extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 2),
-        child: Text(
-          title,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
+      Text(
+        title,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: _accountMuted,
+          fontSize: 14,
+          height: 1.45,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 10),
       _MenuCard(items: items),
     ],
   );
@@ -1736,20 +1822,6 @@ class _SectionLabel extends StatelessWidget {
     style: Theme.of(
       context,
     ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-  );
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label});
-  final String label;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.secondaryContainer,
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(label, style: Theme.of(context).textTheme.labelSmall),
   );
 }
 
@@ -2229,62 +2301,335 @@ BoxDecoration _profileFieldDecoration(ColorScheme scheme) => BoxDecoration(
 class _AddAddressCard extends StatelessWidget {
   const _AddAddressCard({required this.onTap});
   final VoidCallback onTap;
+
   @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
+  Widget build(BuildContext context) => Material(
+    color: _accountSurface,
+    borderRadius: BorderRadius.circular(18),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
       onTap: onTap,
-      leading: const Icon(Icons.add_location_alt_outlined),
-      title: const Text('Thêm địa chỉ mới'),
-      subtitle: const Text('Thêm nhà riêng, văn phòng hoặc địa chỉ khác'),
-      trailing: const Icon(Icons.chevron_right),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: _figmaPrimarySoft,
+                shape: BoxShape.circle,
+              ),
+              child: SvgPicture.asset(
+                '$_accountIconPath/pin.svg',
+                width: 21,
+                height: 21,
+                colorFilter: const ColorFilter.mode(
+                  _figmaPrimary,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Thêm địa chỉ mới',
+                    style: TextStyle(
+                      color: _accountInk,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Thêm địa chỉ để đặt dịch vụ nhanh hơn',
+                    style: TextStyle(
+                      color: _accountMuted,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: _accountMuted,
+              size: 24,
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }
 
-class _AddressCard extends StatelessWidget {
-  const _AddressCard({required this.item, required this.onSelected});
-  final AddressItem item;
-  final ValueChanged<String> onSelected;
+class _AddressSectionLabel extends StatelessWidget {
+  const _AddressSectionLabel(this.label);
+
+  final String label;
+
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => Text(
+    label,
+    style: const TextStyle(
+      color: _accountMuted,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+}
+
+class _CurrentLocationSection extends StatelessWidget {
+  const _CurrentLocationSection({required this.onDetermine});
+
+  final VoidCallback onDetermine;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: SvgPicture.asset(
+          '$_accountIconPath/pin.svg',
+          width: 22,
+          height: 22,
+          colorFilter: const ColorFilter.mode(_figmaPrimary, BlendMode.srcIn),
+        ),
+      ),
+      const SizedBox(width: 12),
+      const Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Dùng vị trí hiện tại của bạn',
+              style: TextStyle(
+                color: _accountInk,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 3),
+            Text(
+              'Giúp điền địa chỉ nhanh hơn',
+              style: TextStyle(color: _accountMuted, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(width: 8),
+      TextButton(
+        onPressed: onDetermine,
+        style: TextButton.styleFrom(
+          foregroundColor: _figmaPrimary,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          minimumSize: const Size(0, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        ),
+        child: const Text('Xác định vị trí'),
+      ),
+    ],
+  );
+}
+
+class _AddressCard extends StatelessWidget {
+  const _AddressCard({
+    required this.item,
+    required this.onSetDefault,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final AddressItem item;
+  final VoidCallback? onSetDefault;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: _accountSurface,
+      borderRadius: BorderRadius.circular(18),
+    ),
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(item.isDefault ? Icons.home : Icons.location_on_outlined),
+              Icon(
+                item.isDefault
+                    ? Icons.home_outlined
+                    : Icons.location_on_outlined,
+                color: _figmaPrimary,
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   item.isDefault ? 'Nhà riêng' : 'Địa chỉ đã lưu',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: const TextStyle(
+                    color: _accountInk,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              if (item.isDefault) const _StatusBadge(label: 'Mặc định'),
-              PopupMenuButton<String>(
-                onSelected: onSelected,
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'default', child: Text('Đặt mặc định')),
-                  PopupMenuItem(value: 'delete', child: Text('Xóa')),
-                ],
-              ),
+              if (item.isDefault)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _figmaPrimarySoft,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: const Text(
+                    'Mặc định',
+                    style: TextStyle(
+                      color: _figmaPrimary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
             ],
           ),
-          const Divider(height: 18),
-          Text(
-            item.recipientName,
-            style: Theme.of(context).textTheme.bodyLarge,
+          const SizedBox(height: 14),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: item.recipientName,
+                  style: const TextStyle(
+                    color: _accountInk,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const TextSpan(
+                  text: '  •  ',
+                  style: TextStyle(color: _accountMuted),
+                ),
+                TextSpan(
+                  text: item.recipientPhone,
+                  style: const TextStyle(color: _accountMuted),
+                ),
+              ],
+            ),
+            style: const TextStyle(fontSize: 13, height: 1.4),
           ),
-          const SizedBox(height: 4),
-          Text(item.recipientPhone),
           const SizedBox(height: 8),
-          Text(item.fullAddress),
-          const SizedBox(height: 4),
           Text(
-            '${item.ward}, ${item.province}',
-            style: Theme.of(context).textTheme.bodySmall,
+            _fullAddress(item),
+            style: const TextStyle(
+              color: _accountMuted,
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+          if (item.note?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(left: 12),
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: _accountDivider, width: 2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Ghi chú cho thợ:',
+                    style: TextStyle(
+                      color: _accountMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '“${item.note!.trim()}”',
+                    style: const TextStyle(
+                      color: _accountInk,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14),
+            child: Divider(height: 1, color: _accountDivider),
+          ),
+          Row(
+            children: [
+              if (item.isDefault)
+                const Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_rounded, color: _accountMuted, size: 17),
+                      SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          'Địa chỉ mặc định',
+                          style: TextStyle(
+                            color: _accountMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Expanded(
+                  child: InkWell(
+                    onTap: onSetDefault,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 5),
+                      child: Text(
+                        'Đặt làm mặc định',
+                        style: TextStyle(
+                          color: _figmaPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              TextButton.icon(
+                onPressed: onEdit,
+                style: _addressActionStyle(_accountInk),
+                icon: const Icon(Icons.edit_outlined, size: 17),
+                label: const Text('Chỉnh sửa'),
+              ),
+              IconButton(
+                tooltip: 'Xóa địa chỉ',
+                onPressed: onDelete,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: _accountDanger,
+                  size: 20,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -2292,39 +2637,109 @@ class _AddressCard extends StatelessWidget {
   );
 }
 
+String _fullAddress(AddressItem item) {
+  final parts = [
+    item.fullAddress,
+    item.ward,
+    item.province,
+  ].map((part) => part.trim()).where((part) => part.isNotEmpty).toList();
+  return parts.join(', ');
+}
+
+ButtonStyle _addressActionStyle(Color color) => TextButton.styleFrom(
+  foregroundColor: color,
+  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+  minimumSize: const Size(0, 32),
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+);
+
 class _EmptyAddress extends StatelessWidget {
   const _EmptyAddress({required this.onAdd});
   final VoidCallback onAdd;
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.location_off_outlined,
-            size: 56,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Bạn chưa có địa chỉ',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Thêm địa chỉ để đặt dịch vụ nhanh hơn.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-            label: const Text('Thêm địa chỉ'),
-          ),
-        ],
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: _accountSurface,
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.location_off_outlined, size: 56, color: _figmaPrimary),
+            const SizedBox(height: 16),
+            Text(
+              'Bạn chưa có địa chỉ',
+              style: const TextStyle(
+                color: _accountInk,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Thêm địa chỉ để đặt dịch vụ nhanh hơn.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _accountMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onAdd,
+              style: FilledButton.styleFrom(backgroundColor: _figmaPrimary),
+              icon: const Icon(Icons.add),
+              label: const Text('Thêm địa chỉ'),
+            ),
+          ],
+        ),
       ),
+    ),
+  );
+}
+
+class _AddressPrivacyFooter extends StatelessWidget {
+  const _AddressPrivacyFooter();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SvgPicture.asset(
+          '$_accountIconPath/shield.svg',
+          width: 21,
+          height: 21,
+          colorFilter: const ColorFilter.mode(_figmaPrimary, BlendMode.srcIn),
+        ),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bảo mật thông tin địa chỉ',
+                style: TextStyle(
+                  color: _accountInk,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Địa chỉ của bạn chỉ được chia sẻ với kỹ thuật viên sau khi đơn đặt dịch vụ được xác nhận.',
+                style: TextStyle(
+                  color: _accountMuted,
+                  fontSize: 12,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -2416,29 +2831,17 @@ class _MenuCard extends StatelessWidget {
   final List<_MenuItem> items;
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.onSurface.withValues(alpha: .035),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: _accountSurface,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         children: [
           for (var index = 0; index < items.length; index++) ...[
             if (index > 0)
-              Divider(
-                height: 1,
-                indent: 60,
-                color: scheme.outlineVariant.withValues(alpha: .38),
-              ),
+              const Divider(height: 1, thickness: 1, color: _accountDivider),
             _AccountMenuTile(item: items[index]),
           ],
         ],
@@ -2454,28 +2857,23 @@ class _AccountMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: item.onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 68),
+      child: SizedBox(
+        height: 76,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
               Container(
-                width: 34,
-                height: 34,
+                width: 40,
+                height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: _figmaPrimarySoft,
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  item.icon,
-                  size: 18,
-                  color: item.iconColor ?? _figmaPrimary,
-                ),
+                child: SvgPicture.asset(item.iconAsset, width: 22, height: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -2488,47 +2886,31 @@ class _AccountMenuTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        color: _accountInk,
+                        fontSize: 14,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       item.subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 10,
+                        color: _accountMuted,
+                        fontSize: 12,
+                        height: 1.45,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (item.badge != null)
-                Container(
-                  margin: const EdgeInsets.only(left: 6),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _figmaPrimarySoft,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    item.badge!,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: _figmaPrimary,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 5),
-              Icon(
+              const SizedBox(width: 8),
+              const Icon(
                 Icons.chevron_right_rounded,
-                size: 18,
-                color: scheme.onSurfaceVariant,
+                size: 16,
+                color: _accountMuted,
               ),
             ],
           ),
@@ -2592,6 +2974,8 @@ String _providerStatusLabel(String value) => switch (value.toUpperCase()) {
 };
 
 String _money(num value) => '${NumberFormat('#,##0', 'vi_VN').format(value)}đ';
+String _accountMoney(num value) =>
+    '${NumberFormat('#,##0', 'vi_VN').format(value)} ₫';
 String _transactionLabel(String type) => switch (type) {
   'deposit' => 'Nạp tiền',
   'payment' => 'Thanh toán đơn hàng',
