@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState, type FormEvent } from "react";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { categoryServiceApi } from "@/features/admin/api/categoryService.api";
@@ -23,8 +24,8 @@ export default function ProviderServiceSuggestionPage() {
   const [description, setDescription] = useState("");
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [message, setMessage] = useToastFeedback<string>("", "success");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     const loadCategories = async () => {

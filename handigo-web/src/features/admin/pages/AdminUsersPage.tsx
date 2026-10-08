@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useToast } from "@/components/common/Toast";
+import { getErrorMessage } from "@/utils/apiError";
 import { AsyncState } from "@/components/common/AsyncState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -11,6 +13,7 @@ import { useAdminList } from "../hooks/useAdminList";
 import type { AdminQuery, AdminUser } from "../types/admin.types";
 
 export default function AdminUsersPage() {
+  const { addToast } = useToast();
   const [query, setQuery] = useState<AdminQuery>({ page: 1, limit: 10 });
   const { result, loading, error, load } = useAdminList("users", query);
   const users = (result?.items || []) as AdminUser[];
@@ -27,7 +30,10 @@ export default function AdminUsersPage() {
         target.status === "active" ? "locked" : "active",
       );
       setTarget(null);
+      addToast("Đã cập nhật trạng thái tài khoản.", "success");
       await load();
+    } catch (error) {
+      addToast(getErrorMessage(error, "Không thể cập nhật trạng thái tài khoản."), "error");
     } finally {
       setBusy(false);
     }

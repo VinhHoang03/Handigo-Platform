@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -29,8 +30,8 @@ export default function AdminServiceSuggestionsPage() {
   const [createdCategoryId, setCreatedCategoryId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   const loadData = async () => {
     setIsLoading(true);

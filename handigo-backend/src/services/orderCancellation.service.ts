@@ -1169,7 +1169,7 @@ const settlePendingPayosPayment = async (
 
       const detectedPaymentStatus =
         payment.paymentType === "inspection_deposit" ||
-        paymentLink.amountPaid < payment.amount
+          paymentLink.amountPaid < payment.amount
           ? "partially_paid"
           : "paid";
       await Order.updateOne(
@@ -1181,16 +1181,16 @@ const settlePendingPayosPayment = async (
           },
           ...(order.cancellation?.refundPolicy
             ? {
-                $inc: {
-                  "cancellation.refundPolicy.paidAmount": actualPaidAmount,
-                  "cancellation.refundPolicy.refundAmount": refundAmount,
-                  "cancellation.refundPolicy.cancellationFee": cancellationFee,
-                  "cancellation.refundPolicy.providerCompensation":
-                    providerCompensation,
-                  "cancellation.refundPolicy.platformRetainedAmount":
-                    platformRetainedAmount,
-                },
-              }
+              $inc: {
+                "cancellation.refundPolicy.paidAmount": actualPaidAmount,
+                "cancellation.refundPolicy.refundAmount": refundAmount,
+                "cancellation.refundPolicy.cancellationFee": cancellationFee,
+                "cancellation.refundPolicy.providerCompensation":
+                  providerCompensation,
+                "cancellation.refundPolicy.platformRetainedAmount":
+                  platformRetainedAmount,
+              },
+            }
             : {}),
         },
       );
@@ -1275,24 +1275,24 @@ const notifyCancellation = async (
   const customerNotification =
     systemCancellationType === "payment_timeout"
       ? {
-          title: "Đơn hàng đã hủy do quá hạn thanh toán",
-          content:
-            "Đơn " +
-            order.orderCode +
-            " đã tự động hủy vì bạn chưa thanh toán trong thời hạn giữ lịch.",
-        }
+        title: "Đơn hàng đã hủy do quá hạn thanh toán",
+        content:
+          "Đơn " +
+          order.orderCode +
+          " đã tự động hủy vì bạn chưa thanh toán trong thời hạn giữ lịch.",
+      }
       : systemCancellationType === "provider_unavailable"
         ? {
-            title: "Đơn hàng đã hủy vì chưa tìm được chuyên gia",
-            content:
-              "Handigo chưa tìm được chuyên gia nhận đơn " +
-              order.orderCode +
-              " trong thời gian quy định. Vui lòng đặt lại khi phù hợp.",
-          }
+          title: "Đơn hàng đã hủy vì chưa tìm được chuyên gia",
+          content:
+            "Handigo chưa tìm được chuyên gia nhận đơn " +
+            order.orderCode +
+            " trong thời gian quy định. Vui lòng đặt lại khi phù hợp.",
+        }
         : {
-            title: "Đơn hàng đã được hủy",
-            content: "Đơn " + order.orderCode + " đã được hủy. Lý do: " + reason,
-          };
+          title: "Đơn hàng đã được hủy",
+          content: "Đơn " + order.orderCode + " đã được hủy. Lý do: " + reason,
+        };
 
   await createNotificationRecord({
     userId: order.customerId,

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Trash2 } from "lucide-react";
 import { agentApi } from "../api/agent.api";
@@ -10,11 +11,11 @@ export function AgentSessionHistory({ currentId, disabled, onSelect, onDelete }:
 }) {
   const [page, setPage] = useState(1);
   const [history, setHistory] = useState<History | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState("");
+  const [deleteError, setDeleteError] = useToastFeedback<string>("", "error");
   const deleting = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -24,7 +25,7 @@ export function AgentSessionHistory({ currentId, disabled, onSelect, onDelete }:
       if (!controller.signal.aborted) setError(getErrorMessage(error, "Chưa tải được lịch sử trò chuyện."));
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [page, attempt]);
+  }, [page, attempt, setError]);
   const changePage = (next: number) => { setLoading(true); setError(""); setPage(next); };
   const deleteSession = async (id: string) => {
     if (disabled || deleting.current) return;

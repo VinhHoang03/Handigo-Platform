@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { getErrorMessage } from "@/utils/apiError";
 import { providerProfileApi } from "../../api/providerProfile.api";
@@ -24,10 +25,11 @@ export function useProviderCertificateFlow({
   setIsSaving,
   setUploadingAsset,
 }: UseProviderCertificateFlowParams) {
+  const { addToast } = useToast();
   const [certificateForm, setCertificateForm] =
     useState<CertificateForm>(emptyCertificateForm);
   const [isCertificateFormOpen, setIsCertificateFormOpen] = useState(false);
-  const [certificateError, setCertificateError] = useState("");
+  const [certificateError, setCertificateError] = useToastFeedback<string>("", "error");
 
   function openCreateCertificateForm() {
     setCertificateForm(emptyCertificateForm);
@@ -109,6 +111,7 @@ export function useProviderCertificateFlow({
       setProfile(nextProfile);
       setCertificateForm(emptyCertificateForm);
       setIsCertificateFormOpen(false);
+      addToast("Đã lưu chứng chỉ.", "success");
     } catch (submitError) {
       setCertificateError(
         getErrorMessage(submitError, "Không thể lưu chứng chỉ. Vui lòng thử lại."),
@@ -127,6 +130,9 @@ export function useProviderCertificateFlow({
       const nextProfile =
         await providerProfileApi.deleteCertificate(certificateId);
       setProfile(nextProfile);
+      addToast("Đã xóa chứng chỉ.", "success");
+    } catch (error) {
+      setCertificateError(getErrorMessage(error, "Không thể xóa chứng chỉ."));
     } finally {
       setIsSaving(false);
     }
@@ -140,6 +146,9 @@ export function useProviderCertificateFlow({
         { isPublic: !certificate.isPublic },
       );
       setProfile(nextProfile);
+      addToast("Đã cập nhật chế độ hiển thị chứng chỉ.", "success");
+    } catch (error) {
+      setCertificateError(getErrorMessage(error, "Không thể cập nhật chế độ hiển thị chứng chỉ."));
     } finally {
       setIsSaving(false);
     }

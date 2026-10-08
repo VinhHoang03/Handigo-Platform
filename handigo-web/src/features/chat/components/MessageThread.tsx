@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Modal } from "@/components/common/Modal";
@@ -24,13 +25,14 @@ export function MessageThread({
   onDelete,
 }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { addToast } = useToast();
   const [menuMessageId, setMenuMessageId] = useState("");
   const [editingMessageId, setEditingMessageId] = useState("");
   const [editingContent, setEditingContent] = useState("");
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [previewImageUrl, setPreviewImageUrl] = useState("");
   const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState("");
+  const [actionError, setActionError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -46,6 +48,7 @@ export function MessageThread({
       setBusy(true);
       setActionError("");
       await onEdit(editingMessageId, content);
+      addToast("Đã chỉnh sửa tin nhắn.", "success");
       setEditingMessageId("");
     } catch {
       setActionError("Không thể chỉnh sửa tin nhắn. Vui lòng thử lại.");
@@ -59,6 +62,7 @@ export function MessageThread({
       setBusy(true);
       setActionError("");
       await onDelete(deletingMessageId);
+      addToast("Đã xóa tin nhắn.", "success");
       setDeletingMessageId("");
     } catch {
       setActionError("Không thể xóa tin nhắn. Vui lòng thử lại.");

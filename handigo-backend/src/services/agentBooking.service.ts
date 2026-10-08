@@ -5,6 +5,18 @@ import { previewServiceBooking } from "./servicePricing.service";
 import { getUserAddresses } from "./address.service";
 import { MatchingService } from "./matching.service";
 import { OrderService, type CreateOrderPayload } from "./order.service";
+import { safelyTrackAgentBooking } from "./agentOrderProgress.service";
+import type { IOrder } from "../models/order.model";
+
+function bookingView(order: Pick<IOrder, "_id" | "orderCode" | "status" | "bookingStatus" | "paymentStatus"
+  | "orderType" | "paymentMethod" | "inspectionRequired" | "scheduledAt" | "depositAmount" | "pricing">) {
+  return {
+    orderId: String(order._id), orderCode: order.orderCode, status: order.status,
+    bookingStatus: order.bookingStatus, paymentStatus: order.paymentStatus,
+    orderType: order.orderType, paymentMethod: order.paymentMethod, inspectionRequired: order.inspectionRequired,
+    scheduledAt: order.scheduledAt, amount: order.inspectionRequired ? order.depositAmount : order.pricing.bookingAmount,
+  };
+}
 
 type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions" | "uniformQuantity">;
 type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "paymentMethod" | "problemDescription"> & {
@@ -136,18 +148,14 @@ export const AgentBookingService = {
         quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ")
     };
   },
-  async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string }) {
+  async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string }, sessionId?: string) {
     const order = await OrderService.createOrder({ ...args, customerId: userId, confirmedExpectation });
-    return this.getBooking(userId, String(order._id));
+    if (sessionId) void safelyTrackAgentBooking(userId, sessionId, String(order._id));
+    return bookingView(order);
   },
   async getBooking(userId: string, orderId: string) {
     const order = await OrderService.getOrderById(orderId, userId);
-    return {
-      orderId: String(order._id), orderCode: order.orderCode, status: order.status,
-      bookingStatus: order.bookingStatus, paymentStatus: order.paymentStatus,
-      orderType: order.orderType, paymentMethod: order.paymentMethod, inspectionRequired: order.inspectionRequired,
-      scheduledAt: order.scheduledAt, amount: order.inspectionRequired ? order.depositAmount : order.pricing.bookingAmount
-    };
+    return bookingView(order);
   },
   async bookings(userId: string, search?: string) {
     const result = await OrderService.getOrdersByCustomer(userId, 1, 10, { search });

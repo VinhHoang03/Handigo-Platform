@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { ToastContext } from "./toast-context";
+import { getToastMessage } from "./toast-message";
 import type { Toast, ToastContextType, ToastType } from "./toast-context";
 
 export type { ToastType, Toast, ToastContextType };
@@ -15,7 +16,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const addToast = useCallback(
     (message: string, type: ToastType, duration = 5000) => {
       const id = `${Date.now()}-${Math.random()}`;
-      const toast: Toast = { id, message, type, duration };
+      const toast: Toast = { id, message: getToastMessage(message, type), type, duration };
 
       setToasts((prev) => [...prev, toast]);
 

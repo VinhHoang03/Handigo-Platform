@@ -3,7 +3,7 @@ import {
   providerDashboardApi,
   type ProviderAvailabilityStatus,
 } from "../api/providerDashboard.api";
-import { useSystemAlert } from "@/components/common/SystemAlert";
+import { useToast } from "@/components/common/Toast";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useProviderAvailabilityStore } from "../store/providerAvailability.store";
 
@@ -32,7 +32,7 @@ const getLocationErrorMessage = (error: unknown) => {
 };
 
 export function useProviderAvailability(enabled = true) {
-  const { showSystemAlert } = useSystemAlert();
+  const { addToast } = useToast();
   const providerUserId = useAuthStore(
     (state) => state.user?.id || state.user?._id || null,
   );
@@ -113,9 +113,9 @@ export function useProviderAvailability(enabled = true) {
           );
         } catch (error) {
           await providerDashboardApi.deactivateCurrentLocation();
-          showSystemAlert(
+          addToast(
             `${getLocationErrorMessage(error)} Hệ thống sẽ tìm đơn theo khu vực bạn đã đăng ký.`,
-            { title: "Đang nhận việc không dùng vị trí" },
+            "info",
           );
         }
       }
@@ -124,20 +124,21 @@ export function useProviderAvailability(enabled = true) {
       useProviderAvailabilityStore
         .getState()
         .setAvailabilityStatus(result.availabilityStatus);
+      addToast(result.availabilityStatus === "online" ? "Đã bật trạng thái nhận việc." : "Đã tắt trạng thái nhận việc.", "success");
     } catch {
       useProviderAvailabilityStore
         .getState()
         .setAvailabilityStatus(previousStatus);
-      showSystemAlert(
+      addToast(
         nextStatus === "online"
           ? "Không thể cập nhật trạng thái nhận việc. Vui lòng thử lại."
           : "Không thể cập nhật trạng thái hoạt động. Vui lòng thử lại.",
-        { title: "Cập nhật trạng thái thất bại", variant: "error" },
+        "error",
       );
     } finally {
       useProviderAvailabilityStore.getState().setIsUpdating(false);
     }
-  }, [enabled, showSystemAlert]);
+  }, [enabled, addToast]);
 
   return {
     availabilityStatus,

@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -23,6 +24,7 @@ interface CaseManagementPageProps {
 }
 
 export default function CaseManagementPage({ role }: CaseManagementPageProps) {
+  const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
   const requestedCreateKind = searchParams.get("create");
@@ -45,8 +47,8 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [actionError, setActionError] = useToastFeedback<string>("", "error");
   const [createKind, setCreateKind] = useState<CreateCaseKind | null>(initialCreateKind);
   const [selected, setSelected] = useState<SelectedCase | null>(null);
 
@@ -66,7 +68,7 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [query, tab]);
+  }, [query, setError, tab]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -132,6 +134,7 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
       setBusy(true);
       setActionError("");
       await action();
+      addToast("Đã cập nhật yêu cầu.", "success");
       return true;
     } catch (requestError) {
       setActionError(getErrorMessage(requestError, errorMessage));

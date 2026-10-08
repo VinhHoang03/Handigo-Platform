@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import { bookingApi } from "@/features/booking/api/booking.api";
@@ -27,7 +28,7 @@ export function useAddressSelection({
 }: UseAddressSelectionParams) {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
-  const [addressSelectionError, setAddressSelectionError] = useState("");
+  const [addressSelectionError, setAddressSelectionError] = useToastFeedback<string>("", "error");
   const [requiresPhoneUpdate, setRequiresPhoneUpdate] = useState(false);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export function useAddressSelection({
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, isAuthInitializing]);
+  }, [isAuthenticated, isAuthInitializing, setAddressSelectionError]);
 
   useEffect(() => {
     if (isAuthInitializing || isLoadingAddresses) return;

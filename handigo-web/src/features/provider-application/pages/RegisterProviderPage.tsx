@@ -9,7 +9,10 @@ import { getProviderApplicationSubmissionErrors } from "../utils/providerApplica
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { initialProviderApplicationForm } from "../components/registerProviderPageHelpers";
 import { useRegisterProviderFormSync } from "../components/useRegisterProviderFormSync";
-import { clearProviderApplicationDraft, providerApplicationDraftKey } from "../utils/providerApplicationDraftStorage";
+import {
+  clearProviderApplicationDraft,
+  providerApplicationDraftKey,
+} from "../utils/providerApplicationDraftStorage";
 
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
@@ -70,7 +73,9 @@ export default function RegisterProviderPage() {
   const submissionErrors = getProviderApplicationSubmissionErrors(form);
   const canSubmit = submissionErrors.length === 0 && uploadCount === 0;
 
-  const uploadAsset = async (...args: Parameters<typeof providerApplication.uploadImage>) => {
+  const uploadAsset = async (
+    ...args: Parameters<typeof providerApplication.uploadImage>
+  ) => {
     setUploadCount((count) => count + 1);
     try {
       return await providerApplication.uploadImage(...args);
@@ -86,7 +91,12 @@ export default function RegisterProviderPage() {
       const userId = user?.id || user?._id || "";
       clearProviderApplicationDraft(providerApplicationDraftKey(userId));
       if (providerApplication.application?.status === "rejected") {
-        clearProviderApplicationDraft(providerApplicationDraftKey(userId, providerApplication.application._id));
+        clearProviderApplicationDraft(
+          providerApplicationDraftKey(
+            userId,
+            providerApplication.application._id,
+          ),
+        );
       }
       setSuccess(
         providerApplication.application?.status === "rejected"
@@ -114,7 +124,12 @@ export default function RegisterProviderPage() {
     providerApplication.application?.status === "resubmitted";
 
   if (isWaitingForReview && !success) {
-    return <Navigate to={isDirectProvider ? "/provider/profile" : "/customer/profile"} replace />;
+    return (
+      <Navigate
+        to={isDirectProvider ? "/provider/profile" : "/customer/profile"}
+        replace
+      />
+    );
   }
 
   return (
@@ -149,7 +164,10 @@ export default function RegisterProviderPage() {
         )}
 
         <AsyncState
-          loading={providerApplication.loading || (!formReady && !providerApplication.loadError)}
+          loading={
+            providerApplication.loading ||
+            (!formReady && !providerApplication.loadError)
+          }
           error={providerApplication.loadError}
           onRetry={() => void providerApplication.loadData()}
         >

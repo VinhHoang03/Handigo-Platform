@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState } from "react";
 import { customerServiceApi } from "../api/customerService.api";
 import {
@@ -48,7 +49,7 @@ export function useServiceCatalog({
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     let active = true;
@@ -75,7 +76,7 @@ export function useServiceCatalog({
     return () => {
       active = false;
     };
-  }, []);
+  }, [setError]);
 
   /** Số dịch vụ theo từng danh mục, để sidebar ẩn được danh mục rỗng. */
   const serviceCounts = useMemo(() => {

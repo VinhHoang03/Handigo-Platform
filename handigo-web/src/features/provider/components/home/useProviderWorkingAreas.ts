@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import { providerProfileApi } from "../../api/providerProfile.api";
 
@@ -10,7 +11,7 @@ export function useProviderWorkingAreas() {
   const [workingAreas, setWorkingAreas] = useState<string[]>([]);
   const [rating, setRating] = useState<{ average: number; total: number } | null>(null);
   const [isLoadingAreas, setIsLoadingAreas] = useState(true);
-  const [areasError, setAreasError] = useState<string | null>(null);
+  const [areasError, setAreasError] = useToastFeedback<string | null>(null, "error");
 
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +59,7 @@ export function useProviderWorkingAreas() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setAreasError]);
 
   return { workingAreas, rating, isLoadingAreas, areasError };
 }

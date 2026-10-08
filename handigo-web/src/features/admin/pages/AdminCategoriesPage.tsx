@@ -1,10 +1,10 @@
 import { ReliableImage } from '@/components/common/ReliableImage';
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { CircleAlert, Image as ImageIcon, ListPlus, Pencil, PlusCircle, Trash2, Wrench } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { useToast } from "@/components/common/Toast";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { DataTable } from "@/components/common/dashboard/DataTable";
@@ -96,7 +96,7 @@ export default function AdminCategoriesPage() {
   const [optionModal, setOptionModal] = useState<'create' | 'edit' | null>(null);
   const [optionForm, setOptionForm] = useState<OptionForm>(emptyOptionForm);
   const [editingOption, setEditingOption] = useState<ServiceOption | null>(null);
-  const [optionFormError, setOptionFormError] = useState('');
+  const [optionFormError, setOptionFormError] = useToastFeedback<string>('', "error");
   const [serviceDeleteTarget, setServiceDeleteTarget] = useState<Service | null>(null);
   const [serviceBusy, setServiceBusy] = useState(false);
 

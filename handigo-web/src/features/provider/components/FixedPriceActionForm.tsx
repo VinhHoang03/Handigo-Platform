@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { Order } from '@/types/booking';
 import { ReliableImage } from '@/components/common/ReliableImage';
@@ -31,7 +32,7 @@ export function FixedPriceActionForm({
 }: FixedPriceActionFormProps) {
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [validationError, setValidationError] = useState('');
+  const [validationError, setValidationError] = useToastFeedback<string>('', "error");
   const previews = useMemo(
     () => files.map((file) => URL.createObjectURL(file)),
     [files],

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { bankAccountApi } from '../api/bankAccount.api';
 import type { BankAccount } from '../types/bankAccount.types';
@@ -17,8 +18,8 @@ import {
 export function useBankAccountManager() {
   const [items, setItems] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
+  const [notice, setNotice] = useToastFeedback<string>('', "success");
   const [busy, setBusy] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<BankAccountForm>(emptyForm);
@@ -36,7 +37,7 @@ export function useBankAccountManager() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);

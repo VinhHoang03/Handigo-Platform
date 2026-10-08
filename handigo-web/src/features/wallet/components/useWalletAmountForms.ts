@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from 'react';
 import { walletApi } from '../api/wallet.api';
 import { getErrorMessage, parseAmount } from './wallet-formatters';
@@ -18,8 +19,8 @@ export function useWalletAmountForms({ isProvider, walletBalance, refreshAll, se
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [depositError, setDepositError] = useState('');
-  const [withdrawError, setWithdrawError] = useState('');
+  const [depositError, setDepositError] = useToastFeedback<string>('', "error");
+  const [withdrawError, setWithdrawError] = useToastFeedback<string>('', "error");
 
   const changeDepositAmount = (amount: string) => {
     setDepositAmount(amount);

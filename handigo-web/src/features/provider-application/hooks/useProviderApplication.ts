@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { providerApplicationService } from '../services/providerApplication.service';
 import type {
@@ -18,9 +19,9 @@ export function useProviderApplication(applicationId?: string | null) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const [submitError, setSubmitError] = useState('');
-  const [draftError, setDraftError] = useState('');
+  const [loadError, setLoadError] = useToastFeedback<string>('', "error");
+  const [submitError, setSubmitError] = useToastFeedback<string>('', "error");
+  const [draftError, setDraftError] = useToastFeedback<string>('', "error");
 
   const loadData = useCallback(async () => {
     const version = ++loadVersion.current;
@@ -44,7 +45,7 @@ export function useProviderApplication(applicationId?: string | null) {
     } finally {
       if (version === loadVersion.current) setLoading(false);
     }
-  }, [applicationId]);
+  }, [applicationId, setLoadError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadData(), 0);
@@ -103,7 +104,7 @@ export function useProviderApplication(applicationId?: string | null) {
     });
     draftQueue.current = save.catch(() => undefined);
     return save;
-  }, []);
+  }, [setDraftError]);
 
   return {
     categories,

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
@@ -15,7 +16,7 @@ export function MessageCenter() {
   const [items, setItems] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const rootRef = useRef<HTMLDivElement>(null);
   const role = user?.role.toUpperCase();
   const currentUserId = user?.id || user?._id;
@@ -50,7 +51,7 @@ export function MessageCenter() {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     let active = true;
@@ -67,7 +68,7 @@ export function MessageCenter() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     const handleOutside = (event: MouseEvent) => {

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import { newsApi } from "../api/news.api";
 import { newsArticles } from "../data/content.data";
@@ -18,7 +19,7 @@ export function useNewsArticle(articleId?: string) {
   const [article, setArticle] = useState<NewsViewArticle | null>(null);
   const [related, setRelated] = useState<NewsViewArticle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     let active = true;
@@ -61,7 +62,7 @@ export function useNewsArticle(articleId?: string) {
     return () => {
       active = false;
     };
-  }, [articleId]);
+  }, [articleId, setError]);
 
   return { article, related, isLoading, error };
 }
