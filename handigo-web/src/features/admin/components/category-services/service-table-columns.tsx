@@ -1,3 +1,4 @@
+import { ReliableImage } from '@/components/common/ReliableImage';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { getPriceLabel } from '../services/service.helpers';
 import type { DataTableColumn } from '@/components/common/dashboard/DataTable';
@@ -18,9 +19,9 @@ export function buildServiceTableColumns({ onEdit, onDelete }: ServiceTableConte
       header: 'Tên dịch vụ',
       render: (service) => (
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-variant">
-            {service.image ? (
-              <img alt={service.name} src={service.image} className="h-full w-full object-cover" />
+          <div className="aspect-video w-20 shrink-0 overflow-hidden rounded-lg bg-surface-variant">
+            {(service.coverImage === undefined ? service.image : service.coverImage) ? (
+              <ReliableImage alt={service.name} src={(service.coverImage === undefined ? service.image : service.coverImage) || undefined} className="h-full w-full object-contain" />
             ) : (
               <Wrench aria-hidden="true" size={24} className="flex h-full w-full items-center justify-center text-on-surface-variant" />
             )}

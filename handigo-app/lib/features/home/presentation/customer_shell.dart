@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../shared/widgets/service_images.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,8 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
 import '../../../shared/utils/media_url.dart';
+import '../../../shared/utils/category_color.dart';
+import '../../ai_chat/presentation/ai_chat_sheet.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/app_feedback.dart';
 import '../../providers/domain/featured_provider.dart';
@@ -42,84 +45,80 @@ class _CustomerShellState extends State<CustomerShell> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: IndexedStack(index: _index, children: _pages),
-      bottomNavigationBar: NavigationBarTheme(
-        data: NavigationBarThemeData(
-          backgroundColor: Colors.white,
-          indicatorColor: Colors.transparent,
-          indicatorShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          iconTheme: WidgetStateProperty.resolveWith(
-            (states) => IconThemeData(
-              color: states.contains(WidgetState.selected)
-                  ? scheme.primary
-                  : scheme.onSurfaceVariant,
-              size: 21,
-            ),
-          ),
-          labelTextStyle: WidgetStateProperty.resolveWith(
-            (states) => Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontSize: 10,
-              color: states.contains(WidgetState.selected)
-                  ? scheme.primary
-                  : scheme.onSurfaceVariant,
-              fontWeight: states.contains(WidgetState.selected)
-                  ? FontWeight.w700
-                  : FontWeight.w500,
-            ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'handigo-ai-chat',
+        tooltip: 'Trò chuyện với trợ lý AI Handigo',
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        shape: const CircleBorder(),
+        onPressed: () => showAiChatSheet(context),
+        child: const Icon(Icons.chat_bubble_rounded),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          color: scheme.surfaceContainerLowest,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              for (final (tabIndex, label, icon) in const [
+                (0, 'Trang chủ', Icons.home_rounded),
+                (1, 'Đơn hàng', Icons.receipt_long_outlined),
+                (2, 'Tin nhắn', Icons.chat_bubble_outline),
+                (3, 'Tài khoản', Icons.person_outline),
+              ])
+                Expanded(
+                  child: Semantics(
+                    selected: _index == tabIndex,
+                    button: true,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Material(
+                        color: _index == tabIndex
+                            ? scheme.primaryContainer
+                            : scheme.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => setState(() => _index = tabIndex),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  icon,
+                                  size: 22,
+                                  color: _index == tabIndex
+                                      ? scheme.onPrimary
+                                      : scheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  label,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: _index == tabIndex
+                                            ? scheme.onPrimary
+                                            : scheme.onSurfaceVariant,
+                                        fontWeight: _index == tabIndex
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-        child: NavigationBar(
-          height: 64,
-          elevation: 2,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          selectedIndex: _index,
-          onDestinationSelected: (index) => setState(() => _index = index),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: _ActiveNavigationIcon(icon: Icons.home),
-              label: 'Trang chủ',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: _ActiveNavigationIcon(icon: Icons.receipt_long),
-              label: 'Đơn hàng',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline),
-              selectedIcon: _ActiveNavigationIcon(icon: Icons.chat_bubble),
-              label: 'Tin nhắn',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: _ActiveNavigationIcon(icon: Icons.person),
-              label: 'Tài khoản',
-            ),
-          ],
-        ),
       ),
-    );
-  }
-}
-
-class _ActiveNavigationIcon extends StatelessWidget {
-  const _ActiveNavigationIcon({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: 30,
-      height: 26,
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, color: scheme.primary, size: 20),
     );
   }
 }
@@ -136,7 +135,8 @@ class CustomerHomeScreen extends ConsumerWidget {
       appBar: CustomerAppBar(
         userName: auth.user?.fullName ?? 'bạn',
         unreadCount: home.asData?.value.unreadNotificationCount ?? 0,
-        locationLabel: location.asData?.value.label ??
+        locationLabel:
+            location.asData?.value.label ??
             (location.hasError
                 ? 'Không tải được vị trí'
                 : 'Đang xác định vị trí...'),
@@ -220,7 +220,11 @@ class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ),
                     const SizedBox(width: 3),
-                    Icon(Icons.keyboard_arrow_down, size: 16, color: scheme.primary),
+                    Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 16,
+                      color: scheme.primary,
+                    ),
                   ],
                 ),
               ],
@@ -244,7 +248,10 @@ class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
             backgroundColor: scheme.secondary,
             textColor: scheme.onSecondary,
             label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
-            child: Icon(Icons.notifications_none, color: scheme.onSurfaceVariant),
+            child: Icon(
+              Icons.notifications_none,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -259,7 +266,8 @@ class CustomerHomeContent extends ConsumerStatefulWidget {
   final CustomerHomeData data;
 
   @override
-  ConsumerState<CustomerHomeContent> createState() => _CustomerHomeContentState();
+  ConsumerState<CustomerHomeContent> createState() =>
+      _CustomerHomeContentState();
 }
 
 class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
@@ -283,7 +291,9 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
     }
 
     try {
-      final ids = (jsonDecode(raw) as List<dynamic>).whereType<String>().toList();
+      final ids = (jsonDecode(raw) as List<dynamic>)
+          .whereType<String>()
+          .toList();
       setState(() => _selectedCategoryIds = ids);
     } catch (_) {
       setState(() => _selectedCategoryIds = null);
@@ -291,7 +301,8 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
   }
 
   Future<void> _openCategoryCustomization() async {
-    final currentIds = _selectedCategoryIds ??
+    final currentIds =
+        _selectedCategoryIds ??
         widget.data.categories.take(7).map((category) => category.id).toList();
     final result = await AppBottomSheet.show<List<String>>(
       context,
@@ -303,7 +314,9 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
     if (!mounted || result == null) return;
 
     final validIds = result
-        .where((id) => widget.data.categories.any((category) => category.id == id))
+        .where(
+          (id) => widget.data.categories.any((category) => category.id == id),
+        )
         .take(7)
         .toList();
     await _storage.write(
@@ -317,7 +330,8 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
     final categoriesById = {
       for (final category in widget.data.categories) category.id: category,
     };
-    final ids = _selectedCategoryIds ??
+    final ids =
+        _selectedCategoryIds ??
         widget.data.categories.take(7).map((category) => category.id).toList();
     return [
       for (final id in ids)
@@ -368,7 +382,8 @@ class _HomeSearchField extends StatelessWidget {
   final List<ServiceCategory> categories;
 
   @override
-  Widget build(BuildContext context) => _HomeSearchFieldBody(categories: categories);
+  Widget build(BuildContext context) =>
+      _HomeSearchFieldBody(categories: categories);
 }
 
 class _HomeSearchFieldBody extends StatefulWidget {
@@ -436,9 +451,8 @@ class _HomeSearchFieldBodyState extends State<_HomeSearchFieldBody> {
     final result = await AppModal.show<_HomeSearchFilter>(
       context,
       title: 'Bộ lọc tìm kiếm',
-      builder: (context) => _HomeSearchFilterContent(
-        categories: widget.categories,
-      ),
+      builder: (context) =>
+          _HomeSearchFilterContent(categories: widget.categories),
     );
     if (!mounted || result == null) return;
     final params = <String, String>{
@@ -456,15 +470,21 @@ class _HomeSearchFieldBodyState extends State<_HomeSearchFieldBody> {
     readOnly: true,
     onTap: () => context.push('/customer/services'),
     decoration: InputDecoration(
-      hintText: _isListening ? 'Đang nghe, hãy nói tên dịch vụ...' : 'Tìm dịch vụ sửa chữa, dọn dẹp...',
+      hintText: _isListening
+          ? 'Đang nghe, hãy nói tên dịch vụ...'
+          : 'Tìm dịch vụ sửa chữa, dọn dẹp...',
       prefixIcon: const Icon(Icons.search),
       suffixIcon: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            tooltip: _isListening ? 'Dừng tìm kiếm bằng giọng nói' : 'Tìm kiếm bằng giọng nói',
+            tooltip: _isListening
+                ? 'Dừng tìm kiếm bằng giọng nói'
+                : 'Tìm kiếm bằng giọng nói',
             onPressed: _startVoiceSearch,
-            icon: Icon(_isListening ? Icons.stop_circle_outlined : Icons.mic_none),
+            icon: Icon(
+              _isListening ? Icons.stop_circle_outlined : Icons.mic_none,
+            ),
           ),
           IconButton(
             tooltip: 'Lọc dịch vụ',
@@ -488,7 +508,8 @@ class _HomeSearchFilterContent extends StatefulWidget {
   final List<ServiceCategory> categories;
 
   @override
-  State<_HomeSearchFilterContent> createState() => _HomeSearchFilterContentState();
+  State<_HomeSearchFilterContent> createState() =>
+      _HomeSearchFilterContentState();
 }
 
 class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
@@ -518,7 +539,8 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
               (category) => FilterChip(
                 label: Text(category.name),
                 selected: _selectedCategory == category.id,
-                onSelected: (_) => setState(() => _selectedCategory = category.id),
+                onSelected: (_) =>
+                    setState(() => _selectedCategory = category.id),
               ),
             ),
           ],
@@ -560,8 +582,9 @@ class _HomeIntroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const darkPurple = Color(0xFF24108F);
-    const brightPurple = Color(0xFF4C25DD);
+    const darkPurple = AppTheme.primaryDark;
+    const brightPurple = AppTheme.primary;
+    final scheme = Theme.of(context).colorScheme;
     return Card(
       margin: EdgeInsets.zero,
       elevation: 4,
@@ -626,8 +649,8 @@ class _HomeIntroCard extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: () => context.push('/customer/services'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: darkPurple,
+                        backgroundColor: scheme.surfaceContainerLowest,
+                        foregroundColor: scheme.primary,
                         minimumSize: const Size(0, 38),
                         padding: const EdgeInsets.symmetric(horizontal: 13),
                       ),
@@ -655,7 +678,7 @@ class _HomeIntroCard extends StatelessWidget {
                     const Icon(
                       Icons.home_repair_service_rounded,
                       size: 64,
-                      color: Color(0xFFE7E0FF),
+                      color: AppTheme.primaryFixed,
                     ),
                     Positioned(
                       right: 1,
@@ -758,6 +781,8 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final selectedColor = categoryIconColor(category.iconColor);
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -772,12 +797,14 @@ class _CategoryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
+                  color:
+                      selectedColor?.withValues(alpha: .1) ??
+                      scheme.surfaceContainerLow,
                   shape: BoxShape.circle,
                 ),
                 child: _CategoryIcon(
                   category: category,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: selectedColor ?? scheme.primary,
                   size: 22,
                 ),
               ),
@@ -798,7 +825,11 @@ class _CategoryCard extends StatelessWidget {
 }
 
 class _CategoryIcon extends StatelessWidget {
-  const _CategoryIcon({required this.category, required this.color, required this.size});
+  const _CategoryIcon({
+    required this.category,
+    required this.color,
+    required this.size,
+  });
   final ServiceCategory category;
   final Color color;
   final double size;
@@ -856,9 +887,9 @@ class _AllCategoryCard extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -968,7 +999,9 @@ class _CategoryCustomizationSheetState
               Expanded(
                 child: Text(
                   'Tùy chỉnh danh mục',
-                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               Text(
@@ -1004,7 +1037,8 @@ class _CategoryCustomizationSheetState
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   value: isSelected,
-                  onChanged: (value) => _toggleCategory(category.id, value ?? false),
+                  onChanged: (value) =>
+                      _toggleCategory(category.id, value ?? false),
                   secondary: Icon(
                     Icons.drag_handle,
                     color: isSelected
@@ -1050,7 +1084,7 @@ class _ServiceHorizontalList extends StatelessWidget {
     if (services.isEmpty)
       return const _HomeEmpty(message: 'Chưa có dịch vụ nổi bật.');
     return SizedBox(
-      height: 180,
+      height: 130 + MediaQuery.textScalerOf(context).scale(100),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: services.length,
@@ -1078,29 +1112,41 @@ class _ServiceCard extends StatelessWidget {
             children: [
               Stack(
                 children: [
-                  _NetworkImage(
-                    url: service.image,
-                    height: 92,
-                    width: double.infinity,
+                  ServiceCoverImage(
+                    url: service.coverImage,
+                    name: service.name,
                   ),
                   Positioned(
                     top: 8,
                     right: 8,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .94),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerLowest
+                            .withValues(alpha: .94),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.star_rounded, size: 14, color: Theme.of(context).colorScheme.tertiary),
+                            Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: AppTheme.starGold,
+                            ),
                             const SizedBox(width: 3),
                             Text(
-                              service.totalFeedbacks > 0 ? service.averageRating.toStringAsFixed(1) : 'Mới',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w800),
+                              service.totalFeedbacks > 0
+                                  ? service.averageRating.toStringAsFixed(1)
+                                  : 'Mới',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                           ],
                         ),
@@ -1130,10 +1176,11 @@ class _ServiceCard extends StatelessWidget {
                             _servicePrice(service),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                           ),
                         ],
                       ),
@@ -1142,13 +1189,14 @@ class _ServiceCard extends StatelessWidget {
                     SizedBox(
                       height: 32,
                       child: FilledButton(
-                        onPressed: () => context.push('/customer/bookings/new/${service.id}'),
+                        onPressed: () => context.push(
+                          '/customer/bookings/new/${service.id}',
+                        ),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(0, 32),
                           padding: const EdgeInsets.symmetric(horizontal: 9),
-                          textStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                          textStyle: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         child: const Text('Đặt ngay'),
                       ),
@@ -1195,7 +1243,9 @@ class _ProviderListState extends State<_ProviderList> {
         if (hasMore)
           TextButton.icon(
             onPressed: () => setState(() => _showAll = !_showAll),
-            icon: Icon(_showAll ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down),
+            icon: Icon(
+              _showAll ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+            ),
             label: Text(_showAll ? 'Thu gọn' : 'Xem thêm'),
             style: TextButton.styleFrom(
               minimumSize: const Size(0, 44),
@@ -1227,7 +1277,9 @@ class _ProviderCard extends StatelessWidget {
                     ? Container(
                         width: 58,
                         height: 58,
-                        color: Theme.of(context).colorScheme.surfaceContainerLow,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLow,
                         alignment: Alignment.center,
                         child: const Icon(Icons.person),
                       )
@@ -1239,7 +1291,9 @@ class _ProviderCard extends StatelessWidget {
                         errorBuilder: (_, __, ___) => Container(
                           width: 58,
                           height: 58,
-                          color: Theme.of(context).colorScheme.surfaceContainerLow,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLow,
                           alignment: Alignment.center,
                           child: const Icon(Icons.person),
                         ),
@@ -1281,7 +1335,11 @@ class _ProviderCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                            const Icon(Icons.star, size: 15, color: AppTheme.starGold),
+                        const Icon(
+                          Icons.star,
+                          size: 15,
+                          color: AppTheme.starGold,
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           '${provider.averageRating.toStringAsFixed(1)} (${provider.totalFeedbacks} đánh giá)',
@@ -1302,10 +1360,11 @@ class _ProviderCard extends StatelessWidget {
                           const SizedBox(width: 3),
                           Text(
                             _formatProviderDistance(provider.distanceMeters!),
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                         ],
                       ),
@@ -1319,37 +1378,6 @@ class _ProviderCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _NetworkImage extends StatelessWidget {
-  const _NetworkImage({
-    required this.url,
-    required this.height,
-    required this.width,
-  });
-  final String? url;
-  final double height;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = usableMediaUrl(url);
-    if (imageUrl == null) return _placeholder(context);
-    return Image.network(
-      imageUrl,
-      height: height,
-      width: width,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _placeholder(context),
-    );
-  }
-
-  Widget _placeholder(BuildContext context) => Container(
-    height: height,
-    width: width,
-    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    child: const Icon(Icons.home_repair_service_outlined),
-  );
 }
 
 class _HomeEmpty extends StatelessWidget {
@@ -1402,7 +1430,10 @@ String _categoryImageUrl(String value) {
   if (value.startsWith('/')) {
     return Uri.parse(AppConfig.apiBaseUrl).resolve(value).toString();
   }
-  return value.replaceFirst(RegExp(r'^http://res\.cloudinary\.com', caseSensitive: false), 'https://res.cloudinary.com');
+  return value.replaceFirst(
+    RegExp(r'^http://res\.cloudinary\.com', caseSensitive: false),
+    'https://res.cloudinary.com',
+  );
 }
 
 IconData _categoryIcon(String? icon, String name) {
@@ -1428,32 +1459,55 @@ IconData _categoryIcon(String? icon, String name) {
       ? nameKey
       : key;
   return switch (key) {
-    'bolt' || 'electrical' || 'electrical_services' || 'electricity' || 'dien_dan_dung' || 'dien_nuoc_he_thong_ky_thuat' => Icons.electrical_services_outlined,
-    'ac_unit' || 'air_conditioning' || 'air_vent' || 'dieu_hoa_thong_gio' => Icons.ac_unit,
-    'plumbing' || 'water' || 'water_drop' || 'nuoc_va_duong_ong' => Icons.plumbing,
-    'cleaning' || 'cleaning_services' || 'spray_cleaning' || 've_sinh_nha_cua' || 've_sinh_lam_sach' || 'cham_soc_nha_cua' => Icons.cleaning_services_outlined,
-    'home_repair_service' || 'home_repair' || 'appliance_repair' || 'sua_chua_gia_dung' || 'thiet_bi_gia_dung' => Icons.home_repair_service_outlined,
+    'bolt' ||
+    'electrical' ||
+    'electrical_services' ||
+    'electricity' ||
+    'dien_dan_dung' ||
+    'dien_nuoc_he_thong_ky_thuat' => Icons.electrical_services_outlined,
+    'ac_unit' ||
+    'air_conditioning' ||
+    'air_vent' ||
+    'dieu_hoa_thong_gio' => Icons.ac_unit,
+    'plumbing' ||
+    'water' ||
+    'water_drop' ||
+    'nuoc_va_duong_ong' => Icons.plumbing,
+    'cleaning' ||
+    'cleaning_services' ||
+    'spray_cleaning' ||
+    've_sinh_nha_cua' ||
+    've_sinh_lam_sach' ||
+    'cham_soc_nha_cua' => Icons.cleaning_services_outlined,
+    'home_repair_service' ||
+    'home_repair' ||
+    'appliance_repair' ||
+    'sua_chua_gia_dung' ||
+    'thiet_bi_gia_dung' => Icons.home_repair_service_outlined,
     'water_damage' => Icons.water_damage_outlined,
     'handyman' => Icons.handyman_outlined,
     'local_laundry_service' || 'laundry' => Icons.local_laundry_service,
-    'format_paint' || 'painting' || 'son_hoan_thien_nha_cua' => Icons.format_paint_outlined,
-    'grid2_x2' => nameKey == 'dien_nuoc_he_thong_ky_thuat'
-        ? Icons.plumbing
-        : Icons.grid_view_rounded,
+    'format_paint' ||
+    'painting' ||
+    'son_hoan_thien_nha_cua' => Icons.format_paint_outlined,
+    'grid2_x2' =>
+      nameKey == 'dien_nuoc_he_thong_ky_thuat'
+          ? Icons.plumbing
+          : Icons.grid_view_rounded,
     'armchair' || 'noi_that_do_go' => Icons.chair_alt_outlined,
     'chuyen_nha_van_chuyen' => Icons.local_shipping_outlined,
     'dien_tu_nha_thong_minh' => Icons.devices_other_outlined,
     _ => switch (resolvedKey) {
-        'chuyen_nha_van_chuyen' => Icons.local_shipping_outlined,
-        'noi_that_do_go' => Icons.chair_alt_outlined,
-        'son_hoan_thien_nha_cua' => Icons.format_paint_outlined,
-        'thiet_bi_gia_dung' => Icons.home_repair_service_outlined,
-        've_sinh_lam_sach' => Icons.cleaning_services_outlined,
-        'dieu_hoa_thong_gio' => Icons.ac_unit,
-        'dien_nuoc_he_thong_ky_thuat' => Icons.plumbing,
-        'dien_tu_nha_thong_minh' => Icons.devices_other_outlined,
-        _ => Icons.category_outlined,
-      },
+      'chuyen_nha_van_chuyen' => Icons.local_shipping_outlined,
+      'noi_that_do_go' => Icons.chair_alt_outlined,
+      'son_hoan_thien_nha_cua' => Icons.format_paint_outlined,
+      'thiet_bi_gia_dung' => Icons.home_repair_service_outlined,
+      've_sinh_lam_sach' => Icons.cleaning_services_outlined,
+      'dieu_hoa_thong_gio' => Icons.ac_unit,
+      'dien_nuoc_he_thong_ky_thuat' => Icons.plumbing,
+      'dien_tu_nha_thong_minh' => Icons.devices_other_outlined,
+      _ => Icons.category_outlined,
+    },
   };
 }
 

@@ -27,9 +27,9 @@ const loadPreview = async (key: string, force = false) => {
   }
 };
 
-export function useBookingPreview() {
+export function useBookingPreview(voucherCode?: string) {
   const { serviceId, orderType, selectedOptionIds, selectedOptionQuantities, uniformQuantity } = useBookingStore();
-  const key = JSON.stringify({ serviceId, orderType, uniformQuantity: uniformQuantity > 1 ? uniformQuantity : undefined, selectedOptions: selectedOptionIds.map((optionId) => ({ optionId, quantity: selectedOptionQuantities?.[optionId] ?? 1 })) });
+  const key = JSON.stringify({ serviceId, orderType, voucherCode, uniformQuantity: uniformQuantity > 1 ? uniformQuantity : undefined, selectedOptions: selectedOptionIds.map((optionId) => ({ optionId, quantity: selectedOptionQuantities?.[optionId] ?? 1 })) });
   const state = usePreviewState();
   useEffect(() => {
     if (serviceId) void loadPreview(key);

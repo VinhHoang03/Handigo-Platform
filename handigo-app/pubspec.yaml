@@ -31,3 +31,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/handigo-logo.png
+    - assets/payments/payos-logo.png
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-variable.ttf
+    - family: Hanken Grotesk
+      fonts:
+        - asset: assets/fonts/HankenGrotesk-variable.ttf

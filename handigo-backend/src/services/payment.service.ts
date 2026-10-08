@@ -520,14 +520,14 @@ export const previewOrderPayment = async (user: RequestUser, orderId: string, me
     throw new AppError("Tiền đặt cọc khảo sát chỉ thanh toán bằng chuyển khoản hoặc ví Handigo.", 400);
   }
   const amount = await getPaymentAmount(order, paymentType);
-  if (amount <= 0) throw new AppError("Số tiền thanh toán không hợp lệ.", 400);
+  if (amount < 0) throw new AppError("Số tiền thanh toán không hợp lệ.", 400);
   const existing = await Payment.findOne({ orderId, paymentType, isDeleted: false, status: { $in: ["pending", "paid"] } });
   if (existing) {
     throw new AppError(existing.status === "paid" ? "Khoản này đã được thanh toán. Hãy kiểm tra trạng thái đơn."
       : existing.method === "payos" ? "Đang có giao dịch PayOS. Hãy kiểm tra thanh toán để tiếp tục liên kết cũ; hủy trên PayOS và kiểm tra lại trước khi đổi phương thức."
       : "Đơn đã có giao dịch đang chờ. Hãy kiểm tra thanh toán, không tạo giao dịch mới.", 409);
   }
-  if (method === "WALLET") {
+  if (method === "WALLET" && amount > 0) {
     const wallet = await Wallet.findOne({ userId: user.id, isDeleted: false }).select("balance");
     if (!wallet || wallet.balance < amount) {
       const missing = amount - (wallet?.balance ?? 0);
@@ -564,7 +564,32 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   const amount = await getPaymentAmount(order, paymentType);
   assertConfirmedPayment(order, amount, paymentType, expected);
 
-  if (amount <= 0) {
+  if (amount === 0) {
+    const result = await mongoose.connection.transaction(async session => {
+      const current = await Order.findById(order._id).session(session);
+      if (!current || current.isDeleted || (current.customerId.toString() !== user.id && user.role !== "ADMIN")) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+      assertAppointmentPaymentReady(current, paymentType);
+      const currentAmount = await getPaymentAmount(current, paymentType);
+      assertConfirmedPayment(current, currentAmount, paymentType, expected);
+      if (currentAmount !== 0) throw new AppError("Giá vừa thay đổi. Vui lòng kiểm tra lại tổng tiền.", 409);
+      const existing = await Payment.findOne({ orderId: current._id, paymentType, isDeleted: false, status: { $in: ["pending", "paid"] } }).session(session);
+      if (existing?.status === "paid") return { payment: existing, shouldDispatch: false };
+      if (existing) throw new AppError("Đơn đã có giao dịch đang chờ. Vui lòng kiểm tra thanh toán.", 409);
+      if (!["created", "accepted"].includes(current.status) || current.paymentStatus !== "unpaid") throw new AppError("Đơn không còn chờ thanh toán.", 409);
+      const [payment] = await Payment.create([{
+        orderId: current._id, customerId: current.customerId, amount: 0,
+        method: input.method === "PAYOS" ? "payos" : input.method === "WALLET" ? "wallet" : "cash", paymentType, status: "paid", paidAt: new Date(),
+        transactionCode: buildTransactionCode("DISCOUNT"), gatewayResponse: { fullyDiscounted: true },
+      }], { session });
+      current.paymentMethod = input.method === "PAYOS" ? "bank" : input.method === "WALLET" ? "wallet" : "cash";
+      await current.save({ session });
+      const shouldDispatch = await syncPaidPayosPaymentToOrder(payment, session, true);
+      return { payment, shouldDispatch };
+    });
+    if (result.shouldDispatch) triggerDispatch(order._id.toString());
+    return { payment: result.payment, amount: 0, paymentType };
+  }
+  if (amount < 0) {
     throw new AppError("Số tiền thanh toán không hợp lệ", 400);
   }
 

@@ -24,8 +24,8 @@ export const BookingSuccessOrderCard = ({ order, addressText }: BookingSuccessOr
     <div className="space-y-md">
       <div className="flex gap-md">
         <ReliableImage
-          className="w-24 h-24 rounded-2xl object-cover shadow-sm"
-          src={order.serviceId.image}
+          className="w-32 aspect-video shrink-0 rounded-2xl object-contain shadow-sm"
+          src={order.serviceId.coverImage === undefined ? order.serviceId.image : order.serviceId.coverImage}
           alt={order.serviceId.name}
         />
         <div className="flex flex-col justify-center">

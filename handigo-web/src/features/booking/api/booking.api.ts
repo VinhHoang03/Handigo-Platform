@@ -57,7 +57,7 @@ interface ReverseGeocodedAddress {
 }
 
 export const bookingApi = {
-  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity'>) => {
+  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity' | 'voucherCode'>) => {
     const response = await api.post<{ success: boolean; data: BookingPreview }>('/orders/preview', payload);
     return response.data.data;
   },
@@ -254,6 +254,10 @@ export const bookingApi = {
 };
 
 export interface BookingPreview {
+  promotionDiscountAmount: number;
+  voucherDiscountAmount: number;
+  discountedAmount: number;
+  promotionSnapshot?: { name: string } | null;
   baseAmount: number;
   bookingAmount: number;
   immediateFee: number;

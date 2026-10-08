@@ -4,6 +4,7 @@ class ServiceCategory {
     required this.name,
     required this.slug,
     this.icon,
+    this.iconColor,
   });
 
   factory ServiceCategory.fromJson(Map<String, dynamic> json) {
@@ -12,6 +13,7 @@ class ServiceCategory {
       name: json['name'] as String,
       slug: json['slug'] as String,
       icon: json['icon'] as String?,
+      iconColor: json['iconColor'] as String?,
     );
   }
 
@@ -19,4 +21,5 @@ class ServiceCategory {
   final String name;
   final String slug;
   final String? icon;
+  final String? iconColor;
 }

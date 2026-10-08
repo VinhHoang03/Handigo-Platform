@@ -1,3 +1,4 @@
+import { ReliableImage } from '@/components/common/ReliableImage';
 import type { Service } from '../../../types/booking';
 import { CheckCircle2, Wrench } from "lucide-react";
 
@@ -19,12 +20,12 @@ export const ServiceGrid = ({ services, serviceId, onSelect }: ServiceGridProps)
         {serviceId === service._id ? (
           <CheckCircle2 aria-hidden="true" size={24} className="absolute top-3 right-3 z-10 text-primary" fill="currentColor" />
         ) : null}
-        <div className="aspect-[5/3] w-full overflow-hidden bg-surface-container-low">
-          {service.image ? (
-            <img
-              src={service.image}
+        <div className="aspect-video w-full overflow-hidden bg-surface-container-low">
+          {(service.coverImage === undefined ? service.image : service.coverImage) ? (
+            <ReliableImage
+              src={(service.coverImage === undefined ? service.image : service.coverImage) || undefined}
               alt={service.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="h-full w-full object-contain"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-primary">

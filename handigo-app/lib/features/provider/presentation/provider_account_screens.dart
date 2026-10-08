@@ -90,6 +90,7 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
               _ProfileHero(
                 name: '${user['fullName'] ?? 'Đối tác Handigo'}',
                 bio: '${provider['bio'] ?? provider['description'] ?? ''}',
+                avatar: user['avatar'] as String?,
               ),
               const SizedBox(height: 16),
               _ProfileSection(
@@ -155,9 +156,11 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Chứng chỉ',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Expanded(
+                    child: Text(
+                      'Chứng chỉ',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
                   TextButton.icon(
                     onPressed: () => _addCertificate(context),
@@ -170,7 +173,14 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
                 (item) => Card(
                   child: ListTile(
                     title: Text('${item['title'] ?? 'Chứng chỉ'}'),
-                    subtitle: Text('${item['status'] ?? 'pending'}'),
+                    subtitle: Text(
+                      {
+                            'pending': 'Chờ duyệt',
+                            'approved': 'Đã duyệt',
+                            'rejected': 'Chưa được duyệt',
+                          }[item['status']] ??
+                          'Chờ duyệt',
+                    ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () async {
@@ -199,15 +209,17 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
         'mainServiceText': service.text.trim(),
       });
       ref.invalidate(providerProfileProvider);
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Đã cập nhật hồ sơ.')));
+      }
     } catch (error) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(_message(error))));
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -255,10 +267,11 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
         });
         ref.invalidate(providerProfileProvider);
       } catch (error) {
-        if (context.mounted)
+        if (context.mounted) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(_message(error))));
+        }
       }
     }
     title.dispose();
@@ -267,24 +280,17 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
 }
 
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({required this.name, required this.bio});
+  const _ProfileHero({required this.name, required this.bio, this.avatar});
   final String name, bio;
+  final String? avatar;
   @override
   Widget build(BuildContext context) => Card(
-    color: Theme.of(context).colorScheme.surfaceContainerLow,
+    margin: EdgeInsets.zero,
     child: Padding(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            child: Icon(
-              Icons.handyman_rounded,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-              size: 30,
-            ),
-          ),
+          ProviderAvatar(url: avatar),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -292,9 +298,9 @@ class _ProfileHero extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -333,11 +339,13 @@ class _ProfileSection extends StatelessWidget {
             children: [
               Icon(icon, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -353,7 +361,7 @@ class ProviderWalletScreen extends ConsumerWidget {
   const ProviderWalletScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Ví và thu nhập')),
+    appBar: AppBar(title: const Text('Ví Handigo')),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -365,20 +373,7 @@ class ProviderWalletScreen extends ConsumerWidget {
                 message: _message(error),
                 onRetry: () => ref.invalidate(providerWalletProvider),
               ),
-              data: (wallet) => Card(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                child: ListTile(
-                  title: const Text('Số dư khả dụng'),
-                  subtitle: Text(
-                    _money(wallet.balance),
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  trailing: IconButton(
-                    onPressed: () => context.push('/provider/banks'),
-                    icon: const Icon(Icons.account_balance),
-                  ),
-                ),
-              ),
+              data: (wallet) => _WalletBalanceCard(wallet: wallet),
             ),
         const SizedBox(height: 12),
         Text(
@@ -399,11 +394,20 @@ class ProviderWalletScreen extends ConsumerWidget {
                   : Column(
                       children: page.items
                           .map(
-                            (item) => ListTile(
-                              title: Text(item.description ?? item.type),
-                              subtitle: Text(item.status ?? ''),
-                              trailing: Text(
-                                '${item.direction == 'in' ? '+' : '-'}${_money(item.amount)}',
+                            (item) => Card(
+                              margin: const EdgeInsets.only(top: 8),
+                              child: ListTile(
+                                leading: Icon(
+                                  item.direction == 'in'
+                                      ? Icons.south_west
+                                      : Icons.north_east,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                title: Text(item.description ?? item.type),
+                                subtitle: Text(_transactionStatus(item.status)),
+                                trailing: Text(
+                                  '${item.direction == 'in' ? '+' : '-'}${_money(item.amount)}',
+                                ),
                               ),
                             ),
                           )
@@ -428,10 +432,17 @@ class ProviderWalletScreen extends ConsumerWidget {
                   : Column(
                       children: page.items
                           .map(
-                            (item) => ListTile(
-                              title: Text(_money(_number(item['amount']))),
-                              subtitle: Text(
-                                '${item['status'] ?? ''} • ${_date(item['createdAt'])}',
+                            (item) => Card(
+                              margin: const EdgeInsets.only(top: 8),
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.payments_outlined,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                title: Text(_money(_number(item['amount']))),
+                                subtitle: Text(
+                                  '${_transactionStatus(item['status'] as String?)} • ${_date(item['createdAt'])}',
+                                ),
                               ),
                             ),
                           )
@@ -441,6 +452,70 @@ class ProviderWalletScreen extends ConsumerWidget {
       ],
     ),
   );
+}
+
+class _WalletBalanceCard extends StatelessWidget {
+  const _WalletBalanceCard({required this.wallet});
+  final WalletInfo wallet;
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [scheme.primary, scheme.primaryContainer],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                color: scheme.onPrimary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Số dư khả dụng',
+                  style: TextStyle(color: scheme.onPrimary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            _money(wallet.balance),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: scheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Chờ xử lý: ${_money(wallet.pendingBalance)}',
+            style: TextStyle(color: scheme.onPrimary),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: scheme.onPrimary,
+              side: BorderSide(color: scheme.onPrimary.withValues(alpha: .4)),
+            ),
+            onPressed: () => context.push('/provider/banks'),
+            icon: const Icon(Icons.account_balance_outlined, size: 20),
+            label: const Text('Tài khoản ngân hàng'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class ProviderBankAccountsScreen extends ConsumerWidget {
@@ -469,7 +544,7 @@ class ProviderBankAccountsScreen extends ConsumerWidget {
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, index) {
                     final item = items[index];
                     final id = '${item['id'] ?? item['_id']}';
@@ -564,10 +639,11 @@ class ProviderBankAccountsScreen extends ConsumerWidget {
         });
         ref.invalidate(providerBanksProvider);
       } catch (error) {
-        if (context.mounted)
+        if (context.mounted) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text(_message(error))));
+        }
       }
     }
     bank.dispose();
@@ -595,7 +671,7 @@ class ProviderFeedbackScreen extends ConsumerWidget {
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: page.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, index) {
                     final item = page.items[index];
                     return Card(
@@ -653,6 +729,18 @@ class _ProviderSettingsScreenState
 String _serviceNames(dynamic value) => value is List
     ? value.map((item) => item is Map ? '${item['name']}' : '$item').join(', ')
     : 'Chưa cập nhật dịch vụ';
+String _transactionStatus(String? value) =>
+    {
+      'pending': 'Đang xử lý',
+      'completed': 'Hoàn tất',
+      'success': 'Thành công',
+      'approved': 'Đã duyệt',
+      'rejected': 'Đã từ chối',
+      'failed': 'Thất bại',
+      'cancelled': 'Đã hủy',
+    }[value] ??
+    value ??
+    '';
 String _areas(dynamic areas, dynamic serviceArea) =>
     'Khu vực: ${areas is List
         ? areas.join(', ')

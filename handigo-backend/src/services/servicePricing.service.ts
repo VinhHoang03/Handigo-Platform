@@ -6,6 +6,9 @@ import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
 import { calculateDuration } from "../utils/bookingPolicy";
 import { getUniformServicePrice } from "../utils/uniformServicePrice";
 import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
+import { validateOptionSelection } from "../utils/serviceOptionGroups";
+import { resolveAutomaticPromotion } from "./promotion.service";
+import { resolveVoucherForAmount } from "./voucher.service";
 
 const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
   "QUOTATION_SERVICE_DEPOSIT_AMOUNT";
@@ -13,10 +16,15 @@ const QUOTATION_SERVICE_DEPOSIT_AMOUNT_CONFIG_KEY =
 const normalizeGroup = (value?: string | null) =>
   value?.trim().toLowerCase() || null;
 
-export const previewServiceBooking = async (payload: { serviceId: string; selectedOptionIds?: string[]; selectedOptions?: unknown; uniformQuantity?: number; orderType?: string }) => {
+export const previewServiceBooking = async (payload: { serviceId: string; selectedOptionIds?: string[]; selectedOptions?: unknown; uniformQuantity?: number; orderType?: string; voucherCode?: string }, customerId?: string) => {
   const service = await Service.findOne({ _id: payload.serviceId, isActive: true, isDeleted: false });
   if (!service) throw new AppError("Dịch vụ không còn khả dụng.", 404);
-  return buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, payload.orderType ?? "normal");
+  const pricing = await buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, payload.orderType ?? "normal");
+  const promotion = await resolveAutomaticPromotion(service._id, pricing.baseAmount, Boolean(payload.voucherCode));
+  const voucher = payload.voucherCode ? await resolveVoucherForAmount(payload.voucherCode, pricing.baseAmount - (promotion?.discountAmount ?? 0), undefined, customerId) : null;
+  return { ...pricing, promotionDiscountAmount: promotion?.discountAmount ?? 0, promotionSnapshot: promotion?.snapshot ?? null,
+    voucherDiscountAmount: voucher?.discountAmount ?? 0,
+    discountedAmount: Math.max(pricing.bookingAmount - (promotion?.discountAmount ?? 0) - (voucher?.discountAmount ?? 0), 0) };
 };
 
 export const buildServicePricingSnapshot = async (
@@ -62,12 +70,13 @@ export const buildServicePricingSnapshot = async (
     throw new AppError("Danh sách tùy chọn dịch vụ bị trùng lặp.", 400);
   }
 
-  const isCleaning = isAirConditionerCleaning(service);
-  const availableOptions = isCleaning ? [] : await ServiceOption.find({
+  const availableOptions = await ServiceOption.find({
     serviceId: service._id,
     isActive: true,
     isDeleted: false,
   }).sort({ sortOrder: 1, createdAt: 1 });
+  const isCleaning = isAirConditionerCleaning(service) && availableOptions.length === 0;
+  validateOptionSelection(service, availableOptions, new Set(uniqueOptionIds));
   const uniform = getUniformServicePrice(service.serviceType, availableOptions, service.fixedPrice);
   if (isCleaning || uniformQuantity !== undefined || (availableOptions.length === 0 && uniform)) {
     const quantity = uniformQuantity ?? 1;
@@ -103,7 +112,7 @@ export const buildServicePricingSnapshot = async (
   const quantityByOptionId = new Map(
     selectedOptionsPayload.map((item) => [item.optionId, item.quantity]),
   );
-  let selectedOptions = availableOptions.filter((option) =>
+  const selectedOptions = availableOptions.filter((option) =>
     selectedIdSet.has(option._id.toString()),
   );
 
@@ -126,15 +135,9 @@ export const buildServicePricingSnapshot = async (
     );
   }
 
-  if (selectedOptions.length === 0 && availableOptions.length > 0) {
-    const defaultOpt = availableOptions.find((opt) => opt.price > 0) || availableOptions[0];
-    selectedOptions = [defaultOpt];
-    selectedIdSet.add(defaultOpt._id.toString());
-    quantityByOptionId.set(defaultOpt._id.toString(), 1);
-  }
-
   const groups = new Map<string, typeof availableOptions>();
   for (const option of availableOptions) {
+    if (option.groupId) continue;
     const group = normalizeGroup(option.selectionGroup);
     if (!group) continue;
     groups.set(group, [...(groups.get(group) ?? []), option]);

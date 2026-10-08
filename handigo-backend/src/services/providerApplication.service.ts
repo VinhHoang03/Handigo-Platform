@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import mongoose, { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import User from "../models/user.model";
@@ -5,7 +6,7 @@ import { Provider, type IIdentityDocument, type IProviderCertificate } from "../
 import { ProviderApplication } from "../models/providerApplication.model";
 import { Session } from "../models/session.model";
 import { Service } from "../models/service.model";
-import { createNotificationRecord } from "./notification.service";
+import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 
 const notifyInitialApplicationSubmitted = async (
   userId: string,
@@ -101,7 +102,8 @@ const getPagination = (query: ApplicationQuery) => {
 
 const servicePopulate = {
   path: "serviceIds",
-  select: "name slug categoryId serviceType fixedPrice image",
+  select: "name slug categoryId serviceType fixedPrice image coverImage",
+  transform: serviceImageResponse,
   populate: {
     path: "categoryId",
     select: "name slug icon iconColor",
@@ -788,6 +790,7 @@ export const reviewApplication = async (
   assertObjectId(applicationId, "application id");
 
   const session = await mongoose.startSession();
+  let reviewNotification: Awaited<ReturnType<typeof createNotificationRecord>> | undefined;
 
   try {
     await session.withTransaction(async () => {
@@ -809,6 +812,27 @@ export const reviewApplication = async (
       application.reviewedBy = new Types.ObjectId(adminId);
       application.reviewedAt = reviewedAt;
 
+      const isServiceAddition = application.applicationType === "service_addition";
+      const approved = payload.status === "approved";
+      reviewNotification = await createNotificationRecord({
+        userId: application.userId,
+        type: "SYSTEM",
+        title: approved ? "Hồ sơ Provider đã được phê duyệt" : "Hồ sơ Provider cần chỉnh sửa",
+        content: approved
+          ? isServiceAddition
+            ? "Đơn bổ sung dịch vụ đã được phê duyệt. Dịch vụ và chứng chỉ mới đã được thêm vào hồ sơ của bạn."
+            : "Hồ sơ của bạn đã được phê duyệt. Vui lòng đăng nhập lại để cập nhật quyền Provider và bắt đầu nhận việc."
+          : `Hồ sơ bị từ chối: ${payload.rejectionReason}. ${payload.rejectionNotes} Vui lòng chỉnh sửa và gửi lại.`,
+        data: {
+          providerApplicationId: application._id,
+          applicationType: application.applicationType || "initial",
+          status: payload.status,
+          actionUrl: isServiceAddition
+            ? "/provider/profile"
+            : approved ? "/login" : `/register-provider?applicationId=${applicationId}`,
+        },
+      }, { session, deferRealtime: true });
+
       if (payload.status === "rejected") {
         application.rejectionReason = payload.rejectionReason || null;
         application.rejectionNotes = payload.rejectionNotes || null;
@@ -822,16 +846,18 @@ export const reviewApplication = async (
           notes: payload.rejectionNotes || null,
         });
         await application.save({ session });
-        await User.updateOne(
-          { _id: application.userId, role: "PROVIDER", isDeleted: false },
-          {
-            $set: {
-              providerOnboardingStatus: "REJECTED",
-              providerOnboardingStep: 3,
+        if (!isServiceAddition) {
+          await User.updateOne(
+            { _id: application.userId, role: "PROVIDER", isDeleted: false },
+            {
+              $set: {
+                providerOnboardingStatus: "REJECTED",
+                providerOnboardingStep: 3,
+              },
             },
-          },
-          { runValidators: true, session },
-        );
+            { runValidators: true, session },
+          );
+        }
         return;
       }
 
@@ -927,5 +953,6 @@ export const reviewApplication = async (
     await session.endSession();
   }
 
+  if (reviewNotification) emitRealtimeNotification(reviewNotification);
   return getApplicationById(applicationId);
 };

@@ -154,7 +154,7 @@ async function getDispatchContext(
   const order = await Order.findById(orderId);
   if (!order) return null;
 
-  const address = await Address.findById(order.addressId).select(
+  const address = order.addressSnapshot ?? await Address.findById(order.addressId).select(
     "latitude longitude province ward",
   );
   if (!address) return null;

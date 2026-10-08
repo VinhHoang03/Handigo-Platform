@@ -64,12 +64,16 @@ class BookingDraftController extends Notifier<BookingDraft> {
   @override
   BookingDraft build() => const BookingDraft();
 
-  void startService(String id) => state = state.copyWith(serviceId: id);
-  void toggleOption(String id) {
+  void startService(String id) {
+    if (state.serviceId == id) return;
+    state = state.copyWith(serviceId: id, selectedOptionIds: [], quantities: {}, clearVoucherCode: true);
+  }
+  void toggleOption(String id, {Iterable<String> siblings = const [], bool multiple = true}) {
     final ids = [...state.selectedOptionIds];
     if (ids.contains(id)) {
       ids.remove(id);
     } else {
+      if (!multiple) ids.removeWhere(siblings.contains);
       ids.add(id);
     }
     state = state.copyWith(selectedOptionIds: ids);

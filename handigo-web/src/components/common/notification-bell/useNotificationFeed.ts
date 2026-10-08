@@ -8,6 +8,9 @@ import type { AppRole } from "../Navbar";
 import { getErrorMessage, getNotificationPath } from "./notificationBell.utils";
 import { useNotificationReadActions } from "./useNotificationReadActions";
 import { useNotificationSocket } from "./useNotificationSocket";
+import { useToast } from "../Toast";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { getMeApi } from "@/features/auth/api/auth.api";
 
 interface UseNotificationFeedOptions {
   /** Gọi khi có thông báo yêu cầu chọn kỹ thuật viên khác (chỉ áp dụng cho CUSTOMER). */
@@ -20,6 +23,7 @@ export function useNotificationFeed(
   { onReassignmentRequired }: UseNotificationFeedOptions,
 ) {
   const [open, setOpen] = useState(false);
+  const { addToast } = useToast();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [query, setQuery] = useState<NotificationQuery>({
     page: 1,
@@ -89,6 +93,25 @@ export function useNotificationFeed(
     (notification: AppNotification) => {
       setUnreadCount((current) => current + 1);
 
+      if (notification.type === "SYSTEM" && notification.data?.providerApplicationId &&
+        (notification.data.status === "approved" || notification.data.status === "rejected")) {
+        const approved = notification.data.status === "approved";
+        addToast(notification.content, approved ? "success" : "info", approved ? 0 : 10000);
+        if (notification.data.applicationType === "initial") {
+          if (approved) {
+            // Phiên đã bị thu hồi khi duyệt; hiển thị lý do trước khi yêu cầu đăng nhập lại.
+            useAuthStore.getState().logout();
+          } else {
+            void getMeApi().then((user) => {
+              const store = useAuthStore.getState();
+              if (store.user?.id === user.id) store.setUser(user);
+            }).catch(() => {
+              // Thông báo vẫn hiển thị; lần khôi phục phiên tiếp theo sẽ đồng bộ trạng thái.
+            });
+          }
+        }
+      }
+
       const currentQuery = queryRef.current;
       if (currentQuery.isRead === true) return;
 
@@ -110,7 +133,7 @@ export function useNotificationFeed(
         );
       }
     },
-    [role, onReassignmentRequired],
+    [role, onReassignmentRequired, addToast],
   );
 
   useNotificationSocket(canUseUserNotifications, handleIncomingNotification);

@@ -29,14 +29,14 @@ export function ServiceCard({ service, index, categories }: ServiceCardProps) {
       to={`/customer/services/${service._id}`}
       className="group overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
     >
-      <div className="relative aspect-[16/10] overflow-hidden">
+      <div className="relative aspect-video overflow-hidden">
         <ReliableImage
           src={getServiceImage(service)}
           alt={service.name}
           loading={index < 3 ? "eager" : "lazy"}
           decoding="async"
           fetchPriority={index < 3 ? "high" : "auto"}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="h-full w-full object-contain"
         />
       </div>
       <div className="p-4">

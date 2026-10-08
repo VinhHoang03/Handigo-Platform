@@ -1,5 +1,6 @@
 import type { CategoryPayload, Service, ServicePayload } from '../../types/categoryService.types';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import type { ServiceProcessStep } from '@/types/serviceProcess';
 
 export const categoryServiceMoney = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
@@ -31,8 +32,10 @@ export const toCategoryPayload = (form: CategoryFormState): CategoryPayload => (
 export interface ServiceFormState {
   name: string;
   slug: string;
-  image: string;
+  coverImage: string;
+  galleryImages: string[];
   description: string;
+  processSteps: ServiceProcessStep[];
   serviceType: 'fixed_price' | 'variable_price';
   fixedPrice: string;
   depositAmount: string;
@@ -42,8 +45,10 @@ export interface ServiceFormState {
 export const emptyServiceForm: ServiceFormState = {
   name: '',
   slug: '',
-  image: '',
+  coverImage: '',
+  galleryImages: [],
   description: '',
+  processSteps: [],
   serviceType: 'fixed_price',
   fixedPrice: '',
   depositAmount: '',
@@ -54,8 +59,10 @@ export const toServicePayload = (form: ServiceFormState, categoryId: string): Se
   categoryId,
   name: form.name.trim(),
   slug: form.slug.trim() || undefined,
-  image: form.image.trim() || undefined,
+  coverImage: form.coverImage.trim() || null,
+  galleryImages: form.galleryImages,
   description: form.description.trim() || undefined,
+  processSteps: form.processSteps.map((step) => ({ title: step.title.trim(), description: step.description.trim() })),
   serviceType: isAirConditionerCleaning(form) ? 'fixed_price' : form.serviceType,
   fixedPrice: isAirConditionerCleaning(form) ? Number(form.fixedPrice) : null,
   depositAmount: form.serviceType === 'variable_price' && form.depositAmount ? Number(form.depositAmount) : null,

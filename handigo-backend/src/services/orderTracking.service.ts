@@ -128,7 +128,7 @@ export const getOrderTrackingState = async (
     })
       .sort({ lastUpdatedAt: -1 })
       .lean(),
-    Address.findById(order.addressId).select("latitude longitude").lean(),
+    order.addressSnapshot ?? Address.findById(order.addressId).select("latitude longitude").lean(),
   ]);
 
   const customerCoordinate =
@@ -171,7 +171,7 @@ export const getOrderTrackingRoute = async (
     })
       .sort({ lastUpdatedAt: -1 })
       .lean(),
-    Address.findById(order.addressId).select("latitude longitude").lean(),
+    order.addressSnapshot ?? Address.findById(order.addressId).select("latitude longitude").lean(),
   ]);
 
   const providerCoordinate =

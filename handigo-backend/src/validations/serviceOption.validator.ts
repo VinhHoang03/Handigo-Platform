@@ -9,6 +9,7 @@ const optionTypeEnum = z.enum([
 ]);
 
 const serviceOptionFields = {
+  groupId: z.string().regex(/^[a-fA-F0-9]{24}$/, "Mã nhóm không hợp lệ").nullable().optional(),
   name: z.string().trim().min(1, "Tên tùy chọn là bắt buộc").max(200),
   description: z.string().trim().max(1000).nullable().optional(),
   image: z.string().trim().url("Ảnh tùy chọn phải là một đường dẫn hợp lệ").max(2000).nullable().optional(),

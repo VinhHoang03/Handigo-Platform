@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ReliableImage } from "@/components/common/ReliableImage";
+import { ServiceImageCarousel } from "@/components/common/ServiceImageCarousel";
 import type { Service } from "@/types/booking";
-import { getServiceImage } from "../utils/serviceDisplay";
+import { getServiceImage, normalizeServiceImageUrl } from "../utils/serviceDisplay";
 import { Share2 } from "lucide-react";
 
 interface ServiceGalleryProps {
@@ -33,11 +33,7 @@ export function ServiceGallery({ service, categoryName }: ServiceGalleryProps) {
 
   return (
     <section className="overflow-hidden rounded-xl bg-surface-container-lowest p-5 shadow-sm">
-      <ReliableImage
-        src={getServiceImage(service)}
-        alt={`Thợ Handigo làm dịch vụ ${service.name}`}
-        className="mb-5 aspect-[16/9] w-full rounded-lg bg-surface-container object-cover"
-      />
+      <div className="mb-5"><ServiceImageCarousel images={service.galleryImages?.map(url => normalizeServiceImageUrl(url) || url)} coverImage={getServiceImage(service)} name={service.name} /></div>
 
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div className="min-w-0">

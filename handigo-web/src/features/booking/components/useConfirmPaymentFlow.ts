@@ -21,7 +21,6 @@ export const getOptionPrice = (option: ServiceOption) =>
 /** State + logic thanh toán PayOS/ví/tiền mặt cho ConfirmPaymentPage — không đổi hành vi, chỉ tách khỏi trang. */
 export const useConfirmPaymentFlow = () => {
   const { showSystemAlert } = useSystemAlert();
-  const { preview, error: previewError, retry: retryPreview } = useBookingPreview();
   const {
     categoryId, serviceId, selectedOptionIds, selectedOptionQuantities, addressId,
     orderType, preferredProviderId, preferredProviderName, scheduledAt,
@@ -76,13 +75,14 @@ export const useConfirmPaymentFlow = () => {
     };
   }, [serviceId, addressId, categoryId]);
 
-  const selectedOptions = options.filter((opt) => !isAirConditionerCleaning(service) &&
+  const isCleaning = isAirConditionerCleaning(service) && options.length === 0;
+  const selectedOptions = options.filter((opt) =>
     selectedOptionIds.includes(opt._id),
   );
   const orderAmount =
     service?.serviceType === 'variable_price'
       ? service.depositAmount || 0
-      : isAirConditionerCleaning(service)
+      : isCleaning
         ? (service?.fixedPrice || 0) * uniformQuantity
         : (service?.fixedPrice || 0) +
           selectedOptions.reduce((sum, option) => sum + getOptionPrice(option) * (selectedOptionQuantities[option._id] ?? 1), 0);
@@ -94,11 +94,14 @@ export const useConfirmPaymentFlow = () => {
 
   const voucher = useConfirmPaymentVoucher(orderAmount);
   const { voucherCode, appliedVoucher, setVoucherError } = voucher;
+  const previewVoucherCode = appliedVoucher ? voucherCode : undefined;
+  const { preview, error: previewError, retry: retryPreview } = useBookingPreview(previewVoucherCode);
 
   const handleConfirm = () => {
     if (!preview) { setPaymentError(previewError ?? 'Vui lòng chờ cập nhật giá.'); retryPreview(); return; }
     return runConfirmPaymentSubmit({
       expectedBookingAmount: preview.bookingAmount,
+      hasServiceOptions: options.length > 0,
       serviceId,
       addressId,
       orderType,
@@ -118,7 +121,7 @@ export const useConfirmPaymentFlow = () => {
       pendingOrderId: sessionStorage.getItem(PENDING_ORDER_FINGERPRINT_KEY) === bookingFingerprint ? pendingOrderId : '',
       bookingFingerprint,
       isAppointment,
-      isOptionSelectionMissing: isRequiredOptionSelectionMissing(service, selectedOptionIds),
+      isOptionSelectionMissing: isRequiredOptionSelectionMissing(service, selectedOptionIds, options),
       showSystemAlert,
       setPaymentError,
       setVoucherError,
@@ -137,5 +140,9 @@ export const useConfirmPaymentFlow = () => {
     orderType, scheduledAt, preferredProviderId, preferredProviderName,
     selectedOptionQuantities, uniformQuantity,
     ...voucher,
+    previewVoucherCode,
+    voucherDiscountAmount: preview?.voucherDiscountAmount ?? 0,
+    previewError,
+    promotionName: preview?.promotionSnapshot?.name,
   };
 };

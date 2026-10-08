@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { providerApplicationService } from '../services/providerApplication.service';
 import type {
   Category,
@@ -10,6 +10,11 @@ import type {
 export function useProviderApplication(applicationId?: string | null) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [application, setApplication] = useState<ProviderApplication | null>(null);
+  const [loadedApplication, setLoadedApplication] = useState<ProviderApplication | null>(null);
+  const loadVersion = useRef(0);
+  const draftQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const submitLocked = useRef(false);
+  const submitted = useRef(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -17,91 +22,100 @@ export function useProviderApplication(applicationId?: string | null) {
   const [submitError, setSubmitError] = useState('');
   const [draftError, setDraftError] = useState('');
 
-  const loadCategories = () => {
+  const loadData = useCallback(async () => {
+    const version = ++loadVersion.current;
     setLoading(true);
     setLoadError('');
-    providerApplicationService
-      .loadCategories()
-      .then(setCategories)
-      .catch(() =>
-        setLoadError('Không thể tải lĩnh vực dịch vụ. Vui lòng thử lại.'),
-      )
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      providerApplicationService.loadCategories(),
-      applicationId
-        ? providerApplicationService.loadDetail(applicationId)
-        : providerApplicationService.loadMine(),
-    ])
-      .then(([categoryValue, applicationValue]) => {
-        if (!active) return;
-        setCategories(categoryValue);
-        setApplication(applicationValue);
-      })
-      .catch(() => {
-        if (active) {
-          setLoadError('Không thể tải lĩnh vực dịch vụ. Vui lòng thử lại.');
-        }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
+    try {
+      const [categoryValue, applicationValue] = await Promise.all([
+        providerApplicationService.loadCategories(),
+        applicationId
+          ? providerApplicationService.loadDetail(applicationId)
+          : providerApplicationService.loadMine(),
+      ]);
+      if (version !== loadVersion.current) return;
+      setCategories(categoryValue);
+      setApplication(applicationValue);
+      setLoadedApplication(applicationValue);
+    } catch {
+      if (version === loadVersion.current) {
+        setLoadError('Không thể tải dịch vụ hoặc hồ sơ. Vui lòng thử lại.');
+      }
+    } finally {
+      if (version === loadVersion.current) setLoading(false);
+    }
   }, [applicationId]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadData(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      loadVersion.current += 1;
+    };
+  }, [loadData]);
+
   const submit = async (payload: ProviderApplicationPayload) => {
+    if (submitLocked.current || submitted.current ||
+      application?.status === 'pending' || application?.status === 'resubmitted') {
+      throw new Error('Hồ sơ đang được gửi hoặc đang chờ xét duyệt.');
+    }
+    submitLocked.current = true;
     try {
       setSubmitting(true);
       setSubmitError('');
+      await draftQueue.current;
       const resubmitId =
-        applicationId || (application?.status === 'rejected' ? application._id : null);
-      return await (resubmitId
+        application?.status === 'rejected' ? application._id : null;
+      const result = await (resubmitId
         ? providerApplicationService.resubmit(resubmitId, payload)
         : providerApplicationService.submit(payload));
+      submitted.current = true;
+      setApplication(result);
+      return result;
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : 'Không thể gửi hồ sơ.',
       );
       throw error;
     } finally {
+      submitLocked.current = false;
       setSubmitting(false);
     }
   };
 
-  const saveDraft = useCallback(async (payload: ProviderApplicationDraftPayload) => {
-    try {
-      setSavingDraft(true);
-      setDraftError('');
-      const draft = await providerApplicationService.saveDraft(payload);
-      setApplication(draft);
-      return draft;
-    } catch (error) {
-      setDraftError(
-        error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ lÆ°u nhÃ¡p há»“ sÆ¡.',
-      );
-      throw error;
-    } finally {
-      setSavingDraft(false);
-    }
+  const saveDraft = useCallback((payload: ProviderApplicationDraftPayload) => {
+    const save = draftQueue.current.then(async () => {
+      if (submitLocked.current || submitted.current) return;
+      try {
+        setSavingDraft(true);
+        setDraftError('');
+        const draft = await providerApplicationService.saveDraft(payload);
+        setApplication(draft);
+        return draft;
+      } catch (error) {
+        setDraftError(
+          error instanceof Error ? error.message : 'Không thể lưu nháp hồ sơ.',
+        );
+        throw error;
+      } finally {
+        setSavingDraft(false);
+      }
+    });
+    draftQueue.current = save.catch(() => undefined);
+    return save;
   }, []);
 
   return {
     categories,
     application,
+    loadedApplication,
     loading,
     submitting,
     savingDraft,
     loadError,
     submitError,
     draftError,
-    loadCategories,
+    loadData,
     submit,
     saveDraft,
     uploadImage: providerApplicationService.uploadImage,

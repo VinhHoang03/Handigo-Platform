@@ -1,5 +1,6 @@
 import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument, Money } from "./common";
+import { installOrderHistory } from "../utils/orderHistory";
 
 export type OrderStatusValue =
   | "created"
@@ -80,6 +81,13 @@ export interface IOrderReassignment {
 }
 
 export interface IOrder extends Document, IBaseDocument {
+  promotionUsedAt?: Date | null;
+  promotionReleasedAt?: Date | null;
+  statusVersion: number;
+  addressSnapshot?: {
+    recipientName?: string; recipientPhone?: string; fullAddress: string;
+    province: string; ward: string; latitude?: number; longitude?: number;
+  } | null;
   overdueReview?: {
     escalatedAt?: Date | null;
   } | null;
@@ -195,6 +203,7 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    statusVersion: { type: Number, default: 0, min: 0 },
     overdueReview: { type: new Schema({ escalatedAt: { type: Date, default: null } }, { _id: false }), default: null },
     schedule: { type: new Schema({
       durationMinutes: { type: Number, required: true, min: 1 },
@@ -223,6 +232,11 @@ const OrderSchema = new Schema<IOrder>(
       default: [],
     },
     addressId: { type: Schema.Types.ObjectId, ref: "Address", required: true },
+    addressSnapshot: { type: new Schema({
+      recipientName: String, recipientPhone: String, fullAddress: { type: String, required: true },
+      province: { type: String, required: true }, ward: { type: String, required: true },
+      latitude: Number, longitude: Number,
+    }, { _id: false }), default: null },
     orderType: {
       type: String,
       enum: ["normal", "urgent", "scheduled", "recurring"],
@@ -293,6 +307,8 @@ const OrderSchema = new Schema<IOrder>(
     completionNote: { type: String, default: null, trim: true },
     pricing: { type: OrderPricingSchema, required: true },
     promotionSnapshot: { type: DiscountSnapshotSchema, default: null },
+    promotionUsedAt: { type: Date, default: null },
+    promotionReleasedAt: { type: Date, default: null },
     voucherSnapshot: { type: DiscountSnapshotSchema, default: null },
     voucherUsedAt: { type: Date, default: null },
     cancellation: {
@@ -388,4 +404,5 @@ OrderSchema.index({ bookingStatus: 1, paymentDueAt: 1 });
 OrderSchema.index({ recurringGroupId: 1, occurrenceNumber: 1 });
 OrderSchema.index({ "reassignment.status": 1, "reassignment.expiresAt": 1 });
 
+installOrderHistory(OrderSchema);
 export const Order = model<IOrder>("Order", OrderSchema, "orders");

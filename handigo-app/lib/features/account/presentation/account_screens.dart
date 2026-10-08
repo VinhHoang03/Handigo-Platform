@@ -10,9 +10,6 @@ import '../../../shared/widgets/app_states.dart';
 import '../data/account_repository.dart';
 import '../domain/account_models.dart';
 
-const _figmaPrimary = Color(0xFF5638E6);
-const _figmaPrimarySoft = Color(0xFFF0ECFF);
-const _accountBackground = Color(0xFFF8F7FC);
 
 final accountRepositoryProvider = Provider<AccountRepository>(
   (ref) => AccountRepository(ref.watch(apiClientProvider)),
@@ -66,11 +63,11 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
         user?.providerOnboardingStatus == 'APPROVED';
 
     return Scaffold(
-      backgroundColor: _accountBackground,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         centerTitle: true,
         toolbarHeight: 56,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -220,7 +217,7 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
                 onPressed: () => ref.read(authControllerProvider).logout(),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(44),
-                  backgroundColor: Colors.white,
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
                   foregroundColor: scheme.error,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -370,11 +367,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: _accountBackground,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         centerTitle: true,
         toolbarHeight: 56,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -520,10 +517,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.verified_user_outlined,
                           size: 17,
-                          color: _figmaPrimary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -557,7 +554,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         onPressed: _saving ? null : () => _saveProfile(profile),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size.fromHeight(48),
-                          backgroundColor: _figmaPrimary,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -729,7 +726,7 @@ class WalletScreen extends ConsumerWidget {
                   onRetry: () => ref.invalidate(accountWalletProvider),
                 ),
                 data: (wallet) => Card(
-                  color: Theme.of(context).colorScheme.primaryContainer,
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
                     child: Column(
@@ -741,7 +738,7 @@ class WalletScreen extends ConsumerWidget {
                               Icons.account_balance_wallet_outlined,
                               color: Theme.of(
                                 context,
-                              ).colorScheme.onPrimaryContainer,
+                              ).colorScheme.primary,
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -964,8 +961,8 @@ class VoucherScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.secondary,
+                          AppTheme.primaryDark,
+                          AppTheme.secondary,
                         ],
                       ),
                       borderRadius: BorderRadius.circular(18),
@@ -1031,7 +1028,7 @@ class _VoucherCard extends StatelessWidget {
               width: 58,
               height: 58,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
+                color: theme.colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
@@ -1441,7 +1438,7 @@ class _ProfileSummaryCard extends StatelessWidget {
                   Text(
                     '✦ $badge',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFFB06B00),
+                      color: AppTheme.tertiaryContainer,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1471,14 +1468,14 @@ class _ProviderModeCard extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       gradient: const LinearGradient(
-        colors: [Color(0xFF6545EF), Color(0xFF4D2FDB)],
+        colors: [AppTheme.primary, AppTheme.primaryDark],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
       borderRadius: BorderRadius.circular(12),
       boxShadow: const [
         BoxShadow(
-          color: Color(0x302600B8),
+          color: Color(0x303525CD),
           blurRadius: 20,
           offset: Offset(0, 8),
         ),
@@ -1517,8 +1514,8 @@ class _ProviderModeCard extends StatelessWidget {
           onPressed: onPressed,
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(42),
-            backgroundColor: Colors.white,
-            foregroundColor: _figmaPrimary,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+            foregroundColor: Theme.of(context).colorScheme.primary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -1564,9 +1561,9 @@ class _WalletOverviewCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.account_balance_wallet_outlined,
-                color: _figmaPrimary,
+                color: Theme.of(context).colorScheme.primary,
                 size: 19,
               ),
               const SizedBox(width: 8),
@@ -1581,7 +1578,7 @@ class _WalletOverviewCard extends StatelessWidget {
               Text(
                 'Được bảo vệ',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: _figmaPrimary,
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -1617,7 +1614,7 @@ class _WalletOverviewCard extends StatelessWidget {
                   label: const Text('Nạp tiền'),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(42),
-                    backgroundColor: _figmaPrimary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -1630,8 +1627,8 @@ class _WalletOverviewCard extends StatelessWidget {
                   onPressed: onHistory,
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(42),
-                    backgroundColor: _figmaPrimarySoft,
-                    foregroundColor: _figmaPrimary,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                    foregroundColor: Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -1691,12 +1688,12 @@ class _AccountAvatar extends StatelessWidget {
 
 Color _avatarColor(ColorScheme scheme, String email, bool isGoogleAccount) {
   final isGmail = email.toLowerCase().endsWith('@gmail.com');
-  if (!isGmail && !isGoogleAccount) return scheme.primaryContainer;
+  if (!isGmail && !isGoogleAccount) return AppTheme.primary;
   const colors = [
     AppTheme.primary,
     AppTheme.secondary,
-    Color(0xFF7D3000),
-    Color(0xFF006A7C),
+    AppTheme.tertiaryContainer,
+    AppTheme.secondary,
   ];
   final hash = email.codeUnits.fold<int>(0, (sum, value) => sum + value);
   return colors[hash % colors.length];
@@ -1769,20 +1766,20 @@ class _ProfileHero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         children: [
           CircleAvatar(
             radius: 34,
-            backgroundColor: _figmaPrimarySoft,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
             foregroundImage: imageUrl == null ? null : NetworkImage(imageUrl),
             child: imageUrl == null
                 ? Text(
                     name.isEmpty ? '?' : name.substring(0, 1).toUpperCase(),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: _figmaPrimary,
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w800,
                     ),
                   )
@@ -1808,8 +1805,8 @@ class _ProfileHero extends StatelessWidget {
             onPressed: () {},
             style: FilledButton.styleFrom(
               minimumSize: const Size(132, 38),
-              backgroundColor: _figmaPrimarySoft,
-              foregroundColor: _figmaPrimary,
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+              foregroundColor: Theme.of(context).colorScheme.primary,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1832,7 +1829,7 @@ class _ProfileFormGroup extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(14),
     ),
     child: Column(
@@ -1902,7 +1899,7 @@ class _ProfileField extends StatelessWidget {
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   contentPadding: const EdgeInsets.only(top: 5, bottom: 1),
-                  prefixIcon: Icon(icon, color: _figmaPrimary, size: 17),
+                  prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 17),
                   prefixIconConstraints: const BoxConstraints(
                     minWidth: 27,
                     minHeight: 20,
@@ -1931,7 +1928,7 @@ class _ProfileField extends StatelessWidget {
                       child: Text(
                         actionLabel!,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: _figmaPrimary,
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1988,7 +1985,7 @@ class _ProfileReadOnlyField extends StatelessWidget {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      Icon(icon, color: _figmaPrimary, size: 17),
+                      Icon(icon, color: Theme.of(context).colorScheme.primary, size: 17),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -2034,13 +2031,13 @@ class _VerifiedBadge extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.check, size: 12, color: _figmaPrimary),
+        Icon(Icons.check, size: 12, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: 3),
         Text(
           label,
           style: Theme.of(
             context,
-          ).textTheme.labelSmall?.copyWith(color: _figmaPrimary, fontSize: 10),
+          ).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.primary, fontSize: 10),
         ),
       ],
     );
@@ -2090,11 +2087,11 @@ class _MembershipCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final accent = highlighted ? const Color(0xFF6750C9) : _figmaPrimary;
+    final accent = highlighted ? scheme.primary : Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -2111,7 +2108,7 @@ class _MembershipCard extends StatelessWidget {
             height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: _figmaPrimarySoft,
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(icon, color: accent, size: 19),
@@ -2141,7 +2138,7 @@ class _MembershipCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: _figmaPrimarySoft,
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -2167,7 +2164,7 @@ class _ProviderDocumentsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: _figmaPrimarySoft,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: onTap,
@@ -2181,12 +2178,12 @@ class _ProviderDocumentsCard extends StatelessWidget {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.description_outlined,
-                  color: _figmaPrimary,
+                  color: Theme.of(context).colorScheme.primary,
                   size: 19,
                 ),
               ),
@@ -2221,7 +2218,7 @@ class _ProviderDocumentsCard extends StatelessWidget {
 }
 
 BoxDecoration _profileFieldDecoration(ColorScheme scheme) => BoxDecoration(
-  color: Colors.white,
+  color: scheme.surfaceContainerLowest,
   borderRadius: BorderRadius.circular(8),
   border: Border.all(color: scheme.outlineVariant.withValues(alpha: .65)),
 );
@@ -2468,13 +2465,13 @@ class _AccountMenuTile extends StatelessWidget {
                 height: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _figmaPrimarySoft,
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
                   item.icon,
                   size: 18,
-                  color: item.iconColor ?? _figmaPrimary,
+                  color: item.iconColor ?? Theme.of(context).colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -2512,13 +2509,13 @@ class _AccountMenuTile extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: _figmaPrimarySoft,
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     item.badge!,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: _figmaPrimary,
+                      color: Theme.of(context).colorScheme.primary,
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                     ),

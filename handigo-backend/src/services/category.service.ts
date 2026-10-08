@@ -205,7 +205,7 @@ export const getActiveCategoriesWithServices = async () => {
     isActive: true,
     isDeleted: false,
   })
-    .select("categoryId name slug serviceType fixedPrice depositAmount image")
+    .select("categoryId name slug serviceType fixedPrice depositAmount image coverImage galleryImages")
     .sort({ name: 1 })
     .lean();
 
@@ -213,6 +213,8 @@ export const getActiveCategoriesWithServices = async () => {
     (groups, service) => {
       const key = service.categoryId.toString();
       groups[key] = groups[key] || [];
+      service.coverImage = service.coverImage === undefined ? service.image : service.coverImage;
+      service.image = service.coverImage;
       groups[key].push(service);
       return groups;
     },

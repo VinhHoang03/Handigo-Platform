@@ -6,12 +6,26 @@ import '../../services/domain/service.dart';
 import '../../services/domain/service_category.dart';
 import '../domain/service_detail.dart';
 import '../domain/service_option.dart';
+import '../domain/service_review.dart';
 
 class ServiceCatalogRepository {
   const ServiceCatalogRepository(this._api);
   final ApiClient _api;
 
   Future<String> uploadAttachment(XFile file) => _api.uploadOrderAttachment(file);
+
+  Future<PagedResult<ServiceReview>> reviews(ServiceReviewQuery query) async {
+    final response = await _api.request('/services/${query.serviceId}/feedback', query: {
+      'page': query.page, 'limit': query.positiveOnly ? 4 : 10,
+      'sort': query.positiveOnly ? 'rating' : 'newest',
+      if (query.positiveOnly) 'positiveOnly': 'true',
+      if (query.rating != null) 'rating': query.rating,
+      if (query.hasImages) 'hasImages': 'true',
+      if (query.keyword.isNotEmpty) 'keyword': query.keyword,
+      'optionId': ?query.optionId,
+    });
+    return PagedResult.fromJson(response['data'] as Map<String, dynamic>, ServiceReview.fromJson);
+  }
 
   Future<List<ServiceCategory>> categories() async {
     final response = await _api.request('/categories/active');
@@ -68,11 +82,13 @@ class ServiceCatalogRepository {
     required String serviceId,
     required BookingType type,
     required List<Map<String, dynamic>> selectedOptions,
+    String? voucherCode,
   }) async {
     final response = await _api.request('/orders/preview', method: 'POST', authenticated: true, data: {
       'serviceId': serviceId,
       'orderType': bookingTypeValue(type),
       'selectedOptions': selectedOptions,
+      if (voucherCode != null && voucherCode.isNotEmpty) 'voucherCode': voucherCode,
     });
     return BookingPreview.fromJson(response['data'] as Map<String, dynamic>);
   }

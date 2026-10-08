@@ -1,3 +1,5 @@
+import type { ServiceProcessStep } from './serviceProcess';
+
 export interface Category {
   _id: string;
   name: string;
@@ -10,21 +12,27 @@ export interface Category {
 }
 
 export interface Service {
+  optionGroups?: OptionGroupDefinition[];
   _id: string;
   categoryId: string;
   name: string;
   slug: string;
   description?: string;
+  processSteps?: ServiceProcessStep[];
   serviceType: "fixed_price" | "variable_price";
   fixedPrice?: number;
   minOptionPrice?: number | null;
   depositAmount?: number;
+  coverImage?: string | null;
+  galleryImages?: string[];
   image?: string;
   requiresOptionSelection: boolean;
   isActive: boolean;
 }
 
 export interface ServiceOption {
+  groupId?: string | null;
+  isRequired?: boolean;
   _id: string;
   serviceId: string;
   name: string;
@@ -48,6 +56,14 @@ export interface ServiceOption {
   allowsQuantity?: boolean;
   sortOrder?: number;
   isActive: boolean;
+}
+
+export interface OptionGroupDefinition {
+  _id: string;
+  name: string;
+  selectionMode: "single" | "multiple";
+  isRequired: boolean;
+  sortOrder: number;
 }
 
 export interface Payment {
@@ -132,6 +148,7 @@ export interface OrderReassignment {
 }
 
 export interface Order {
+  statusHistory?: Array<{ _id: string; status: string; previousStatus?: string | null; changedByRole: string; note?: string | null; createdAt: string }>;
   schedule?: { durationMinutes: number; bufferMinutes: number; travelMinutes: number; expectedStartAt?: string | null; expectedEndAt?: string | null } | null;
   _id: string;
   orderCode: string;

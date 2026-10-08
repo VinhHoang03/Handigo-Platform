@@ -29,8 +29,8 @@ export const BookingServiceSummary = ({
     <div className="flex flex-col md:flex-row md:justify-between items-start gap-md mb-lg">
       <div className="flex gap-md items-center">
         <ReliableImage
-          className="w-20 h-20 rounded-2xl object-cover shadow-sm bg-surface-container"
-          src={order.serviceId?.image}
+          className="w-28 aspect-video shrink-0 rounded-2xl object-contain shadow-sm bg-surface-container"
+          src={(order.serviceId?.coverImage === undefined ? order.serviceId?.image : order.serviceId.coverImage)}
           alt={order.serviceId?.name}
         />
         <div>
@@ -126,7 +126,7 @@ export const BookingServiceSummary = ({
               >
                 <ReliableImage
                   src={url}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                   alt={`Attachment ${idx + 1}`}
                 />
               </div>

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model";
 import type { AuthenticatedUser } from "./authContext";
+import { orderActorContext } from "../utils/orderActorContext";
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -49,7 +50,7 @@ export const authMiddleware = (
           email: user.email,
           role: user.role,
         };
-        next();
+        orderActorContext.run({ id: user._id.toString(), role: user.role.toLowerCase() as "customer" | "provider" | "admin" }, next);
       })
       .catch((error) => next(error));
   } catch (error) {

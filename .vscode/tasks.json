@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Handigo App: Android có hot reload",
+      "type": "shell",
+      "command": "node",
+      "args": ["scripts/dev-app.mjs"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "Handigo App: Lấy dependencies",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["pub", "get"],
+      "options": { "cwd": "${workspaceFolder}/handigo-app" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Handigo App: Phân tích Dart",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["analyze", "--no-pub"],
+      "options": { "cwd": "${workspaceFolder}/handigo-app" },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Handigo App: Chạy kiểm thử",
+      "type": "shell",
+      "command": "flutter",
+      "args": ["test", "--no-pub"],
+      "options": { "cwd": "${workspaceFolder}/handigo-app" },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Handigo Backend: Chạy development",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "options": { "cwd": "${workspaceFolder}/handigo-backend" },
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    }
+  ]
+}
