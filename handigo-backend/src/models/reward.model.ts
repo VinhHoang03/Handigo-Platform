@@ -16,6 +16,7 @@ const RewardTransactionSchema = new Schema({
   description: { type: String, required: true },
   orderId: { type: Schema.Types.ObjectId, ref: "Order", default: null },
   promotionId: { type: Schema.Types.ObjectId, ref: "Promotion", default: null },
+  voucherId: { type: Schema.Types.ObjectId, ref: "Voucher", default: null },
   offerId: { type: String, default: null },
 }, { timestamps: true });
 RewardTransactionSchema.index({ userId: 1, createdAt: -1 });

@@ -34,6 +34,7 @@ const adminVoucherBaseSchema = z.object({
   maxDiscountAmount: positiveNumberSchema.nullable().optional(),
   minOrderAmount: positiveNumberSchema.nullable().optional(),
   usageLimit: z.coerce.number().int().min(0).nullable().optional(),
+  perUserLimit: z.coerce.number().int().min(1, "Giới hạn mỗi khách phải ít nhất một lượt.").optional(),
   startAt: dateStringSchema,
   endAt: dateStringSchema,
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),

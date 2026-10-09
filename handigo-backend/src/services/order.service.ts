@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { earnOrderRewards } from "./reward.service";
@@ -7,6 +8,10 @@ import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
 import { Address } from "../models/address.model";
+import { recordOrderStatus } from "../utils/orderHistory";
+import { resolveAutomaticPromotion, claimPromotion, releaseOrderPromotion } from "./promotion.service";
+import { withOrderAddress } from "../utils/orderAddress";
+import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates } from "./address.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
@@ -35,6 +40,7 @@ import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
   reservePersonalVoucher,
+  releaseVoucherReservation,
 } from "./voucher.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -92,7 +98,10 @@ function getPopulatedId(value: unknown): string | null {
 
 async function attachQuotationFinalAmounts<T extends {
   currentQuotationId?: unknown;
+  addressId?: unknown;
+  addressSnapshot?: IOrder["addressSnapshot"];
 }>(orders: T[]): Promise<Array<T & { quotationFinalAmount?: number }>> {
+  orders = orders.map(withOrderAddress);
   const quotationIds = orders
     .map((order) => getPopulatedId(order.currentQuotationId))
     .filter((id): id is string => Boolean(id));
@@ -124,11 +133,11 @@ async function attachQuotationFinalAmounts<T extends {
 
 export async function dispatchOrderForMatching(orderId: string) {
   const order = await Order.findById(orderId).select(
-    "addressId serviceId status readyForMatching",
+    "addressId addressSnapshot serviceId status readyForMatching",
   );
   if (!order || order.status !== "created" || !order.readyForMatching) return;
 
-  const address = await Address.findById(order.addressId).select(
+  const address = order.addressSnapshot ?? await Address.findById(order.addressId).select(
     "latitude longitude province ward",
   );
   if (!address) {
@@ -277,6 +286,7 @@ export const OrderService = {
     const selectedAddress = await Address.findOne({
       _id: payload.addressId,
       userId: payload.customerId,
+      isDeleted: { $ne: true },
     });
     if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
@@ -380,12 +390,13 @@ export const OrderService = {
       : Math.max(platformCommissionPercent, 0) / 100;
     // Tiền đặt dịch vụ gồm giá gốc/cọc và phụ phí phục vụ ngay nếu có.
     const totalAmount = pricingSnapshot.bookingAmount;
-    if (payload.confirmedExpectation && totalAmount !== payload.confirmedExpectation.amount) {
+    const automaticPromotion = await resolveAutomaticPromotion(service._id, pricingSnapshot.baseAmount, Boolean(payload.voucherCode));
+    const voucherResult = payload.voucherCode
+      ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount - (automaticPromotion?.discountAmount ?? 0), undefined, payload.customerId)
+      : null;
+    if (payload.confirmedExpectation && Math.max(totalAmount - (automaticPromotion?.discountAmount ?? 0) - (voucherResult?.discountAmount ?? 0), 0) !== payload.confirmedExpectation.amount) {
       throw new ActionPreconditionError();
     }
-    const voucherResult = payload.voucherCode
-      ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount)
-      : null;
 
 
     // 6. Persist order
@@ -394,8 +405,9 @@ export const OrderService = {
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
+      const promotionDiscountAmount = automaticPromotion?.discountAmount ?? 0;
       const { platformCommissionAmount, providerEarningAmount } = calculateBookingSettlement(
-        Math.max(totalAmount - voucherDiscountAmount, 0),
+        Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
         platformCommissionRate,
         inspectionRequired,
       );
@@ -411,6 +423,11 @@ export const OrderService = {
       selectedOptionIds: pricingSnapshot.optionIds,
       selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
       addressId: new Types.ObjectId(payload.addressId),
+      addressSnapshot: {
+        recipientName: address.recipientName, recipientPhone: address.recipientPhone,
+        fullAddress: address.fullAddress, province: address.province, ward: address.ward,
+        latitude: address.latitude, longitude: address.longitude,
+      },
       orderType,
       scheduledAt: orderDate,
       schedule: pricingSnapshot.schedule,
@@ -421,6 +438,7 @@ export const OrderService = {
       occurrenceNumber: orderType === "recurring" ? index + 1 : null,
       totalOccurrences: orderType === "recurring" ? orderDates.length : null,
       status: "created",
+      statusVersion: 1,
       paymentMethod: payload.paymentMethod,
       paymentStatus: "unpaid",
       readyForMatching: false,
@@ -436,20 +454,26 @@ export const OrderService = {
         platformCommissionRate,
         platformCommissionAmount,
         providerEarningAmount,
-        promotionDiscountAmount: 0,
+        promotionDiscountAmount,
         voucherDiscountAmount,
-        totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
+        totalPaidAmount: Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
       },
       voucherSnapshot: orderVoucher?.snapshot ?? null,
+      promotionSnapshot: automaticPromotion?.snapshot ?? null,
+      promotionUsedAt: automaticPromotion ? new Date() : null,
       confirmation: {
         customerConfirmedAt: null,
         providerConfirmedAt: null,
       },
       };
     });
-    const createdOrders = (await Order.insertMany(
-      orderDocuments as Array<Partial<IOrder>>,
-    )) as Array<IOrder>;
+    const createdOrders = await mongoose.connection.transaction(async session => {
+      if (automaticPromotion) await claimPromotion(automaticPromotion.promotion, orderDocuments.length, session);
+      const documents = await Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
+      if (voucherResult) await reservePersonalVoucher(voucherResult.snapshot.voucherId, payload.customerId, documents[0]._id, service.serviceType === "variable_price", session);
+      for (const document of documents) await recordOrderStatus({ _id: document._id, status: document.status, statusVersion: 1 }, null, session);
+      return documents;
+    });
     const order = createdOrders[0] as unknown as IOrder;
 
     return order;
@@ -501,6 +525,8 @@ export const OrderService = {
 
         order.isDeleted = true;
         order.readyForMatching = false;
+        await releaseVoucherReservation(order._id, session);
+        await releaseOrderPromotion(order._id, session);
         await order.save({ session });
         return { orderId: order._id.toString() };
       });
@@ -552,7 +578,7 @@ export const OrderService = {
       );
     }
 
-    const address = await Address.findOne({
+    const address = order.addressSnapshot ?? await Address.findOne({
       _id: order.addressId,
       userId: customerId,
     });
@@ -713,7 +739,7 @@ export const OrderService = {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("serviceId", "name image serviceType")
+        .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
         .lean(),
       Order.countDocuments(query),
     ]);
@@ -753,7 +779,7 @@ export const OrderService = {
       .sort({ createdAt: -1 })
       .limit(safeLimit)
       .populate("customerId", "fullName avatar phone")
-      .populate("serviceId", "name image serviceType")
+      .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
       .populate("addressId")
       .lean();
 
@@ -815,7 +841,7 @@ export const OrderService = {
         .skip(skip)
         .limit(limit)
         .populate("customerId", "fullName avatar phone")
-        .populate("serviceId", "name image serviceType")
+        .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
         .populate("addressId")
         .lean(),
       Order.countDocuments(query),
@@ -844,8 +870,7 @@ export const OrderService = {
     const order = await Order.findOne({ _id: orderId, isDeleted: false })
       .populate("customerId", "fullName avatar phone email")
       .populate(
-        "serviceId",
-        "name image serviceType categoryId depositAmount fixedPrice",
+        { path: "serviceId", select: "name image coverImage serviceType categoryId depositAmount fixedPrice", transform: serviceImageResponse },
       )
       .populate("addressId")
       .populate({
@@ -876,7 +901,10 @@ export const OrderService = {
           : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
-    return { ...order, matchingSearch, matchingExpiresAt };
+    const statusHistory = await OrderStatus.find({ orderId: order._id, isDeleted: false })
+      .select("status previousStatus statusVersion changedByRole note createdAt")
+      .sort({ createdAt: 1, statusVersion: 1 }).lean();
+    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {

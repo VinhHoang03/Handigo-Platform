@@ -1,9 +1,10 @@
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { Modal } from '@/components/common/Modal';
-import { ImageInput } from '../services/ImageInput';
+import { ServiceImagesEditor } from '../services/ServiceImagesEditor';
 import { FormActions, FormInput, FormTextArea, ToggleRow } from '../services/service-form-fields';
 import type { ServiceFormState } from './category-service.helpers';
+import { ServiceProcessEditor } from '../services/ServiceProcessEditor';
 
 interface ServiceFormModalProps {
   open: boolean;
@@ -17,12 +18,13 @@ interface ServiceFormModalProps {
 
 /** Modal thêm/sửa dịch vụ thuộc danh mục đang chọn. */
 export function ServiceFormModal({ open, mode, form, busy, onChange, onClose, onSubmit }: ServiceFormModalProps) {
+  const [mediaBusy, setMediaBusy] = useState(false);
   return (
-    <Modal open={open} title={mode === 'edit' ? 'Sửa dịch vụ' : 'Thêm dịch vụ'} onClose={onClose}>
-      <form onSubmit={onSubmit} className="space-y-4">
+    <Modal open={open} title={mode === 'edit' ? 'Sửa dịch vụ' : 'Thêm dịch vụ'} onClose={() => { if (!mediaBusy) onClose(); }} closeOnEsc={!mediaBusy} closeOnOverlayClick={!mediaBusy}>
+      <form onSubmit={event => { if (mediaBusy) event.preventDefault(); else onSubmit(event); }} className="space-y-4">
         <FormInput label="Tên dịch vụ" name="service-name" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} />
         <FormInput label="Slug" name="service-slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" />
-        <ImageInput label="Ảnh dịch vụ" value={form.image} onChange={(value) => onChange({ ...form, image: value })} />
+        <ServiceImagesEditor coverImage={form.coverImage} galleryImages={form.galleryImages} disabled={busy} onBusyChange={setMediaBusy} onChange={(coverImage, galleryImages) => onChange({ ...form, coverImage, galleryImages })} />
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Loại giá</span>
           <select
@@ -45,7 +47,8 @@ export function ServiceFormModal({ open, mode, form, busy, onChange, onClose, on
         )}
         <FormTextArea label="Mô tả" name="service-description" value={form.description} onChange={(value) => onChange({ ...form, description: value })} />
         <ToggleRow checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị dịch vụ" name="service-active" />
-        <FormActions busy={busy} onCancel={onClose} />
+        <ServiceProcessEditor steps={form.processSteps} disabled={busy} onChange={(processSteps) => onChange({ ...form, processSteps })} />
+        <FormActions busy={busy || mediaBusy} onCancel={onClose} />
       </form>
     </Modal>
   );

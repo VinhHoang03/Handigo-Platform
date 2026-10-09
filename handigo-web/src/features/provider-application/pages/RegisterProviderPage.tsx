@@ -1,4 +1,3 @@
-import { useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -6,13 +5,14 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { ProviderApplicationStepper } from "../components/ProviderApplicationStepper";
 import { RegisterProviderStepPanel } from "../components/RegisterProviderStepPanel";
 import { useProviderApplication } from "../hooks/useProviderApplication";
-import { hasProviderApplicationDateErrors } from "../utils/providerApplicationValidation";
+import { getProviderApplicationSubmissionErrors } from "../utils/providerApplicationValidation";
 import { useAuthStore } from "@/features/auth/store/auth.store";
-import {
-  hasRequiredIdentityImage,
-  initialProviderApplicationForm,
-} from "../components/registerProviderPageHelpers";
+import { initialProviderApplicationForm } from "../components/registerProviderPageHelpers";
 import { useRegisterProviderFormSync } from "../components/useRegisterProviderFormSync";
+import {
+  clearProviderApplicationDraft,
+  providerApplicationDraftKey,
+} from "../utils/providerApplicationDraftStorage";
 
 export default function RegisterProviderPage() {
   const navigate = useNavigate();
@@ -26,17 +26,17 @@ export default function RegisterProviderPage() {
     isDirectProvider ? user?.providerOnboardingStep || 1 : 1,
   );
   const [form, setForm] = useState(initialProviderApplicationForm);
-  const [success, setSuccess] = useToastFeedback<string>("", "success");
+  const [success, setSuccess] = useState("");
+  const [uploadCount, setUploadCount] = useState(0);
 
-  useRegisterProviderFormSync({
+  const { localDraftError, formReady } = useRegisterProviderFormSync({
     user,
     navigate,
     providerApplication,
-    applicationId,
-    isDirectProvider,
     step,
     form,
     setForm,
+    setStep,
   });
 
   const toggleService = (id: string) =>
@@ -70,18 +70,36 @@ export default function RegisterProviderPage() {
         ) && form.serviceIds.length > 0
       : form.workingAreas.length > 0;
 
-  const canSubmit =
-    Boolean(form.description.trim()) &&
-    Boolean(form.identityDocument.documentNumber.trim()) &&
-    Boolean(form.identityDocument.fullName.trim()) &&
-    hasRequiredIdentityImage(form) &&
-    !hasProviderApplicationDateErrors(form);
+  const submissionErrors = getProviderApplicationSubmissionErrors(form);
+  const canSubmit = submissionErrors.length === 0 && uploadCount === 0;
+
+  const uploadAsset = async (
+    ...args: Parameters<typeof providerApplication.uploadImage>
+  ) => {
+    setUploadCount((count) => count + 1);
+    try {
+      return await providerApplication.uploadImage(...args);
+    } finally {
+      setUploadCount((count) => count - 1);
+    }
+  };
 
   const send = async () => {
+    if (!canSubmit || providerApplication.submitting || success) return;
     try {
       await providerApplication.submit(form);
+      const userId = user?.id || user?._id || "";
+      clearProviderApplicationDraft(providerApplicationDraftKey(userId));
+      if (providerApplication.application?.status === "rejected") {
+        clearProviderApplicationDraft(
+          providerApplicationDraftKey(
+            userId,
+            providerApplication.application._id,
+          ),
+        );
+      }
       setSuccess(
-        applicationId
+        providerApplication.application?.status === "rejected"
           ? "Hồ sơ đã được gửi lại và đang chờ quản trị viên xét duyệt."
           : "Hồ sơ đã được gửi và đang chờ quản trị viên xét duyệt.",
       );
@@ -96,7 +114,7 @@ export default function RegisterProviderPage() {
         window.setTimeout(() => navigate("/customer/profile"), 1500);
       }
     } catch {
-      // The hook exposes the request error for rendering.
+      // Hook hiển thị lỗi gửi hồ sơ.
     }
   };
 
@@ -105,8 +123,13 @@ export default function RegisterProviderPage() {
     providerApplication.application?.status === "pending" ||
     providerApplication.application?.status === "resubmitted";
 
-  if (isDirectProvider && isWaitingForReview) {
-    return <Navigate to="/provider/profile" replace />;
+  if (isWaitingForReview && !success) {
+    return (
+      <Navigate
+        to={isDirectProvider ? "/provider/profile" : "/customer/profile"}
+        replace
+      />
+    );
   }
 
   return (
@@ -141,9 +164,12 @@ export default function RegisterProviderPage() {
         )}
 
         <AsyncState
-          loading={providerApplication.loading}
+          loading={
+            providerApplication.loading ||
+            (!formReady && !providerApplication.loadError)
+          }
           error={providerApplication.loadError}
-          onRetry={providerApplication.loadCategories}
+          onRetry={() => void providerApplication.loadData()}
         >
           <RegisterProviderStepPanel
             step={step}
@@ -156,10 +182,13 @@ export default function RegisterProviderPage() {
             }
             onAddArea={addArea}
             onRemoveArea={removeArea}
-            onUploadAsset={providerApplication.uploadImage}
+            onUploadAsset={uploadAsset}
             savingDraft={providerApplication.savingDraft}
             submitError={providerApplication.submitError}
-            draftError={providerApplication.draftError}
+            draftError={providerApplication.draftError || localDraftError}
+            submissionErrors={submissionErrors}
+            uploading={uploadCount > 0}
+            isRejected={providerApplication.application?.status === "rejected"}
             success={success}
             canContinue={canContinue}
             canSubmit={canSubmit}

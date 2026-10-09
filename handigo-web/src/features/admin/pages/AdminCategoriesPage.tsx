@@ -1,3 +1,4 @@
+import { ReliableImage } from '@/components/common/ReliableImage';
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { CircleAlert, Image as ImageIcon, ListPlus, Pencil, PlusCircle, Trash2, Wrench } from "lucide-react";
@@ -12,6 +13,7 @@ import { CategoryFilterBar } from "../components/categories/CategoryFilterBar";
 import { CategoryFormModal } from "../components/categories/CategoryFormModal";
 import { ServiceFormModal } from "../components/services/ServiceFormModal";
 import { OptionFormModal } from "../components/services/OptionFormModal";
+import { OptionGroupsEditor } from "../components/services/OptionGroupsEditor";
 import { emptyServiceForm, emptyOptionForm, getCategoryId, toOptionPayload, toServicePayload, type OptionForm, type ServiceForm } from "../components/services/service.helpers";
 import { categoryServiceApi } from "../api/categoryService.api";
 import { buildCategoryTableColumns } from "../components/categories/category-table-columns";
@@ -44,8 +46,8 @@ function CategoryServicesDropdown({
             const price = service.fixedPrice ?? service.minOptionPrice ?? service.depositAmount;
             return (
               <div key={service._id} onClick={() => onEditService(service)} className="group relative mx-3 flex w-full min-w-[62rem] cursor-pointer items-center gap-5 rounded-xl border border-outline-variant bg-surface-container-lowest px-5 py-3 shadow-sm transition-colors hover:border-primary/50 hover:bg-surface-container-high sm:mx-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-variant text-on-surface-variant">
-                  {service.image && isImageUrl(service.image) ? <img src={service.image} alt="" aria-hidden="true" className="h-full w-full object-cover" /> : <Wrench aria-hidden="true" size={22} />}
+                <div className="flex aspect-video w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-variant text-on-surface-variant">
+                  {(service.coverImage === undefined ? service.image : service.coverImage) && isImageUrl((service.coverImage === undefined ? service.image : service.coverImage)) ? <ReliableImage src={(service.coverImage === undefined ? service.image : service.coverImage) || undefined} alt="" aria-hidden="true" className="h-full w-full object-contain" /> : <Wrench aria-hidden="true" size={22} />}
                 </div>
                 <div className="w-64 min-w-0 shrink-0">
                   <span className="group/description relative inline-flex min-w-0 items-center gap-1">
@@ -103,8 +105,10 @@ export default function AdminCategoriesPage() {
       categoryId: getCategoryId(service),
       name: service.name,
       slug: service.slug,
-      image: service.image || '',
+      coverImage: (service.coverImage === undefined ? service.image : service.coverImage) || '',
+      galleryImages: [...(service.galleryImages ?? [])],
       description: service.description || '',
+      processSteps: (service.processSteps ?? []).map((step) => ({ ...step })),
       serviceType: service.serviceType,
       fixedPrice: service.fixedPrice == null ? '' : String(service.fixedPrice),
       depositAmount: service.depositAmount == null ? '' : String(service.depositAmount),
@@ -153,6 +157,7 @@ export default function AdminCategoriesPage() {
   const openEditOption = (option: ServiceOption) => {
     setEditingOption(option);
     setOptionForm({
+      groupId: option.groupId ?? '',
       name: option.name,
       description: option.description || '',
       image: option.image || '',
@@ -172,8 +177,8 @@ export default function AdminCategoriesPage() {
     if (!editingService) return;
     setServiceBusy(true);
     try {
-      if (editingOption) await categoryServiceApi.updateServiceOption(editingOption._id, toOptionPayload(optionForm, editingService.serviceType));
-      else await categoryServiceApi.createServiceOption(editingService._id, toOptionPayload(optionForm, editingService.serviceType));
+      if (editingOption) await categoryServiceApi.updateServiceOption(editingOption._id, toOptionPayload(optionForm));
+      else await categoryServiceApi.createServiceOption(editingService._id, toOptionPayload(optionForm));
       setOptionModal(null);
       setOptionFormError('');
       setServiceOptions(await categoryServiceApi.listServiceOptions(editingService._id));
@@ -336,6 +341,7 @@ export default function AdminCategoriesPage() {
       >
         {editingService && (
           <section className="space-y-3 rounded-xl border border-outline-variant/40 p-4">
+            <OptionGroupsEditor service={editingService} onSaved={updated => { setEditingService(updated); void categoryServiceApi.listServiceOptions(updated._id).then(setServiceOptions); }} />
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-on-surface">Tùy chọn dịch vụ</h3>
@@ -361,7 +367,7 @@ export default function AdminCategoriesPage() {
                     {options.map((option) => (
                       <div key={option._id} className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-outline-variant/60 px-4 py-3 text-sm">
                         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low text-on-surface-variant">
-                          {option.image && isImageUrl(option.image) ? <img src={option.image} alt="" aria-hidden="true" className="h-full w-full object-cover" /> : <ImageIcon aria-hidden="true" size={20} />}
+                          {option.image && isImageUrl(option.image) ? <ReliableImage src={option.image} alt="" aria-hidden="true" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" size={20} />}
                         </div>
                         <div className="group/option relative min-w-0">
                           <div className="flex min-w-0 items-center gap-1"><p className="truncate font-semibold">{option.name}</p><span className="rounded-full p-0.5 text-on-surface-variant" aria-label={`Mô tả tùy chọn ${option.name}`}><CircleAlert aria-hidden="true" size={15} /></span></div>

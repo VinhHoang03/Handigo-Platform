@@ -1,21 +1,27 @@
 import { QueryFilter, Types } from "mongoose";
 import { Category } from "../models/category.model";
 import { Order } from "../models/order.model";
-import { IService, Service } from "../models/service.model";
+import { IService, IServiceProcessStep, IServiceOptionGroup, Service } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { Feedback } from "../models/feedback.model";
 import { AppError } from "../utils/appError";
 import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
+
+import { validateNewServiceImages } from "./serviceImage.service";
 
 interface ServiceInput {
   categoryId?: string;
   name?: string;
   slug?: string;
   description?: string | null;
+  processSteps?: IServiceProcessStep[];
+  optionGroups?: Array<Omit<IServiceOptionGroup, "_id"> & { _id?: string | Types.ObjectId }>;
   serviceType?: "fixed_price" | "variable_price";
   fixedPrice?: number | null;
   depositAmount?: number | null;
   image?: string | null;
+  coverImage?: string | null;
+  galleryImages?: string[];
   requiresOptionSelection?: boolean;
   isActive?: boolean;
 }
@@ -260,13 +266,20 @@ export const getServiceById = async (id: string) => {
 };
 
 export const createService = async (data: ServiceInput) => {
+  const names = (data.optionGroups ?? []).map(group => group.name.trim().toLocaleLowerCase("vi"));
+  if (new Set(names).size !== names.length) throw new AppError("Tên nhóm tùy chọn không được trùng nhau.", 400);
+  if ((data.isActive ?? true) && data.optionGroups?.some(group => group.isRequired)) {
+    throw new AppError("Hãy tạo dịch vụ tạm ngừng, gán tùy chọn cho nhóm bắt buộc rồi kích hoạt.", 400);
+  }
   normalizeAndValidatePricing(data);
   await ensureCategoryExists(data.categoryId!, data.isActive ?? true);
   const slug = data.slug || slugify(data.name || "");
   if (!slug) throw new AppError("Không thể tạo đường dẫn hợp lệ", 400);
   await ensureUniqueSlug(data.categoryId!, slug);
 
-  return Service.create({ ...data, slug, image: normalizeImageUrl(data.image) });
+  const coverImage = normalizeImageUrl(data.coverImage !== undefined ? data.coverImage : data.image) ?? null;
+  await validateNewServiceImages([...(coverImage ? [coverImage] : []), ...(data.galleryImages ?? [])]);
+  return Service.create({ ...data, slug, coverImage, image: undefined });
 };
 
 export const updateService = async (id: string, data: ServiceInput) => {
@@ -274,22 +287,51 @@ export const updateService = async (id: string, data: ServiceInput) => {
   const service = await Service.findOne({ _id: id, isDeleted: false });
   if (!service) throw new AppError("Không tìm thấy dịch vụ", 404);
 
+  if (data.optionGroups !== undefined || data.isActive === true) {
+    const groups = data.optionGroups ?? service.optionGroups ?? [];
+    const names = groups.map(group => group.name.trim().toLocaleLowerCase("vi"));
+    const ids = groups.flatMap(group => group._id ? [group._id.toString()] : []);
+    if (new Set(names).size !== names.length || new Set(ids).size !== ids.length) {
+      throw new AppError("Tên hoặc mã nhóm tùy chọn không được trùng nhau.", 400);
+    }
+    const options = await ServiceOption.find({ serviceId: service._id, isDeleted: false });
+    if (options.some(option => option.groupId && !ids.includes(option.groupId.toString()))) {
+      throw new AppError("Vui lòng chuyển các tùy chọn sang nhóm khác trước khi xóa nhóm.", 400);
+    }
+    if ((data.isActive ?? service.isActive) && groups.some(group => group.isRequired
+      && !options.some(option => option.isActive && option.groupId?.toString() === group._id?.toString()))) {
+      throw new AppError("Nhóm bắt buộc phải có ít nhất một tùy chọn đang hoạt động.", 400);
+    }
+  }
+
+  const oldCover = service.coverImage === undefined ? service.image : service.coverImage;
+  const coverImage = normalizeImageUrl(data.coverImage !== undefined ? data.coverImage : data.image !== undefined ? data.image : oldCover);
+  const galleryImages = data.galleryImages ?? service.galleryImages ?? [];
+  await validateNewServiceImages([...(coverImage ? [coverImage] : []), ...galleryImages], [...(oldCover ? [normalizeImageUrl(oldCover)!] : []), ...(service.galleryImages ?? [])]);
   const categoryId = data.categoryId || service.categoryId.toString();
   const nextData: ServiceInput = {
     categoryId,
     name: data.name ?? service.name,
     slug: data.slug ?? service.slug,
     description: data.description === undefined ? service.description : data.description,
+    processSteps: data.processSteps === undefined ? service.processSteps : data.processSteps,
+    optionGroups: data.optionGroups ?? service.optionGroups,
     serviceType: data.serviceType ?? service.serviceType,
     fixedPrice: data.fixedPrice === undefined ? service.fixedPrice : data.fixedPrice,
     depositAmount:
       data.depositAmount === undefined ? service.depositAmount : data.depositAmount,
-    image: data.image === undefined ? service.image : data.image,
+    image: undefined,
+    coverImage,
+    galleryImages,
     requiresOptionSelection:
       data.requiresOptionSelection ?? service.requiresOptionSelection,
     isActive: data.isActive ?? service.isActive,
   };
-  normalizeAndValidatePricing(nextData, service.isActive);
+  if (data.serviceType !== undefined && data.serviceType !== service.serviceType
+    || data.fixedPrice !== undefined && data.fixedPrice !== service.fixedPrice
+    || data.depositAmount !== undefined && data.depositAmount !== service.depositAmount) {
+    normalizeAndValidatePricing(nextData, service.isActive);
+  }
   await ensureCategoryExists(categoryId, nextData.isActive);
 
   const slug = data.slug || (data.name ? slugify(data.name) : service.slug);
@@ -299,7 +341,7 @@ export const updateService = async (id: string, data: ServiceInput) => {
     ...nextData,
     categoryId,
     slug,
-    ...(data.image !== undefined ? { image: normalizeImageUrl(data.image) } : {}),
+
   });
   return service.save();
 };

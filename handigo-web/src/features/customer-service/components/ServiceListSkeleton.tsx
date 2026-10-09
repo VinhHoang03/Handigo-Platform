@@ -9,7 +9,7 @@ export function ServiceListSkeleton() {
           key={index}
           className="overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm"
         >
-          <Skeleton className="aspect-[16/10] w-full" rounded="rounded-none" />
+          <Skeleton className="aspect-video w-full" rounded="rounded-none" />
           <div className="space-y-3 p-4">
             <Skeleton className="h-4 w-2/5" />
             <Skeleton className="h-5 w-4/5" />

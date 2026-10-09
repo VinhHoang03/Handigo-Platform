@@ -25,6 +25,8 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     reset, navigate,
   } = params;
 
+  const isCleaning = isAirConditionerCleaning(service) && !params.hasServiceOptions;
+
   if (!serviceId) {
     showSystemAlert('Vui lòng chọn dịch vụ trước khi thanh toán.', {
       title: 'Chưa chọn dịch vụ',
@@ -50,7 +52,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     setPaymentError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
     return;
   }
-  if (isAirConditionerCleaning(service) && !(service?.fixedPrice && service.fixedPrice > 0)) {
+  if (isCleaning && !(service?.fixedPrice && service.fixedPrice > 0)) {
     setPaymentError('Dịch vụ chưa có giá hợp lệ. Vui lòng chọn lại dịch vụ.');
     return;
   }
@@ -67,9 +69,9 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     const payload: CreateOrderPayload = {
       expectedBookingAmount: params.expectedBookingAmount,
       serviceId,
-      selectedOptionIds: isAirConditionerCleaning(service) ? [] : selectedOptionIds,
-      uniformQuantity: isAirConditionerCleaning(service) ? uniformQuantity ?? 1 : undefined,
-      selectedOptions: (isAirConditionerCleaning(service) ? [] : selectedOptionIds).map((optionId) => ({
+      selectedOptionIds: isCleaning ? [] : selectedOptionIds,
+      uniformQuantity: isCleaning ? uniformQuantity ?? 1 : undefined,
+      selectedOptions: (isCleaning ? [] : selectedOptionIds).map((optionId) => ({
         optionId,
         quantity: selectedOptionQuantities?.[optionId] ?? 1,
       })),
@@ -116,6 +118,14 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
       });
 
+      if (payment.payment.status === 'paid') {
+        const orderDetail = await bookingApi.getOrderById(orderId);
+        sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
+        sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
+        reset();
+        navigate('/customer/bookings/success', { state: { order: orderDetail } });
+        return;
+      }
       if (!payment.checkoutUrl) {
         throw new Error('PayOS không trả về liên kết thanh toán.');
       }

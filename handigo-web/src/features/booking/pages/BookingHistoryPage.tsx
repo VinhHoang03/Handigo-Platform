@@ -82,7 +82,7 @@ const BookingHistoryPage = () => {
     schedule: order?.scheduledAt ? new Date(order.scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất',
     meta: order?.providerId ? `Chuyên gia: ${order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
     price: `${order?.pricing?.totalPaidAmount?.toLocaleString() || '0'}đ`,
-    imageUrl: order?.serviceId?.image,
+    imageUrl: (order?.serviceId?.coverImage === undefined ? order?.serviceId?.image : order.serviceId.coverImage) || undefined,
     primaryAction: order?.status === 'completed' ? 'Đánh giá' : 'Xem chi tiết',
   }));
 

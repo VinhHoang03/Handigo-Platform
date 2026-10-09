@@ -16,7 +16,7 @@ const uid = (req: Request): string => requireRequestUser(req).id;
 
 export const previewBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    return ok(res, await previewServiceBooking(req.body));
+    return ok(res, await previewServiceBooking(req.body, uid(req)));
   } catch (error) { return next(error); }
 };
 

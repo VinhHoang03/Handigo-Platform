@@ -64,3 +64,27 @@ export const hasProviderApplicationDateErrors = (
       errors.certificates.some((item) => item.issuedAt || item.expiresAt),
   );
 };
+
+export const getProviderApplicationSubmissionErrors = (form: ProviderApplicationPayload) => {
+  const errors: string[] = [];
+  if (!form.serviceIds.length) errors.push('Chọn ít nhất một dịch vụ ở bước 1.');
+  if (!form.workingAreas.length) errors.push('Thêm ít nhất một khu vực hoạt động ở bước 2.');
+  if (!form.description.trim()) errors.push('Nhập mô tả kinh nghiệm.');
+  if (!form.identityDocument.documentNumber.trim()) errors.push('Nhập số giấy tờ định danh.');
+  if (!form.identityDocument.fullName.trim()) errors.push('Nhập họ tên trên giấy tờ.');
+  if (form.identityDocument.type === 'cccd' && !form.identityDocument.frontImageUrl) {
+    errors.push('Tải ảnh mặt trước CCCD (bắt buộc).');
+  }
+  if (form.identityDocument.type === 'passport' && !form.identityDocument.passportImageUrl) {
+    errors.push('Tải ảnh hộ chiếu (bắt buộc).');
+  }
+  form.certificates.forEach((certificate, index) => {
+    const filled = certificate.title.trim() || certificate.certificateNumber?.trim() ||
+      certificate.issuer?.trim() || certificate.issuedAt || certificate.expiresAt || certificate.imageUrls.length;
+    if (!filled) return;
+    if (!certificate.title.trim()) errors.push(`Nhập tên chứng chỉ ${index + 1} hoặc xóa mục này.`);
+    if (!certificate.imageUrls.length) errors.push(`Tải tệp chứng chỉ ${index + 1} hoặc xóa mục này.`);
+  });
+  if (hasProviderApplicationDateErrors(form)) errors.push('Sửa các ngày không hợp lệ được đánh dấu trong hồ sơ.');
+  return errors;
+};

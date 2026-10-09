@@ -58,7 +58,15 @@ export function OptionFormModal({
           </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormInput
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-sm font-semibold">Nhóm tùy chọn</span>
+            <select value={form.groupId} onChange={event => onChange({ ...form, groupId: event.target.value })}
+              className="w-full rounded-xl border border-outline-variant bg-surface p-3">
+              <option value="">Chưa gán nhóm / nhóm cũ</option>
+              {(selectedService?.optionGroups ?? []).map(group => <option key={group._id} value={group._id}>{group.name} · {group.selectionMode === 'single' ? 'Chọn một' : 'Chọn nhiều'}{group.isRequired ? ' · Bắt buộc' : ''}</option>)}
+            </select>
+          </label>
+          {!form.groupId && <><FormInput
             label="Nhóm lựa chọn"
             name="option-selection-group"
             value={form.selectionGroup}
@@ -83,7 +91,7 @@ export function OptionFormModal({
               <option value="multiple">Được chọn nhiều</option>
               <option value="single">Chỉ chọn một</option>
             </select>
-          </label>
+          </label></>}
         </div>
         {selectedService?.serviceType === 'fixed_price' ? (
           <FormInput label="Giá (VNĐ)" name="option-price" type="number" required value={form.price} onChange={(value) => onChange({ ...form, price: value })} />

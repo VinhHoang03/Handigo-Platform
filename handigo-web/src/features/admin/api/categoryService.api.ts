@@ -78,6 +78,11 @@ export const categoryServiceApi = {
     unwrap<null>(await api.delete(`/services/options/${optionId}`)),
 
   // ── Assets ──────────────────────────────────────────────────────────────────
+  uploadServiceImage: async (file: File) => {
+    const form = new FormData();
+    form.append('image', file);
+    return unwrap<UploadedImage>(await api.post('/admin/assets/service-images', form));
+  },
   uploadImage: async (file: File) => {
     const form = new FormData();
     form.append('image', file);

@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { Order } from "../models/order.model";
@@ -965,7 +966,7 @@ export const AssignmentService = {
           "createdAt",
         ].join(" "),
         populate: [
-          { path: "serviceId", select: "name image serviceType depositAmount fixedPrice" },
+          { path: "serviceId", select: "name image coverImage serviceType depositAmount fixedPrice", transform: serviceImageResponse },
           { path: "addressId", select: "ward province" },
         ],
       })

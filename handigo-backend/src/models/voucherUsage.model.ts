@@ -6,7 +6,7 @@ export interface IVoucherUsage extends Document, IBaseDocument {
   userId: Types.ObjectId;
   orderId: Types.ObjectId;
   discountAmount: Money;
-  status: "used" | "restored" | "cancelled_not_restored";
+  status: "reserved" | "used" | "restored" | "cancelled_not_restored";
   usedAt: Date;
   restoredAt?: Date | null;
 }
@@ -19,7 +19,7 @@ const VoucherUsageSchema = new Schema<IVoucherUsage>(
     discountAmount: { type: Number, required: true, min: 0 },
     status: {
       type: String,
-      enum: ["used", "restored", "cancelled_not_restored"],
+      enum: ["reserved", "used", "restored", "cancelled_not_restored"],
       default: "used",
     },
     usedAt: { type: Date, default: Date.now },
@@ -29,6 +29,7 @@ const VoucherUsageSchema = new Schema<IVoucherUsage>(
   { timestamps: true },
 );
 
-VoucherUsageSchema.index({ voucherId: 1, userId: 1 }, { unique: true });
+VoucherUsageSchema.index({ voucherId: 1, userId: 1, status: 1 });
+VoucherUsageSchema.index({ voucherId: 1, orderId: 1 }, { unique: true });
 
 export const VoucherUsage = model<IVoucherUsage>("VoucherUsage", VoucherUsageSchema, "voucherusages");

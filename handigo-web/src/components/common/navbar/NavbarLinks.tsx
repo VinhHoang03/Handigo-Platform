@@ -54,7 +54,7 @@ export function NavbarLinks({ navItems, isActive, services }: NavbarLinksProps) 
                           <ReliableImage
                             src={getServiceImage(service)}
                             alt={service.name}
-                            className="h-20 w-full bg-surface-container object-cover transition duration-300 group-hover/card:scale-105"
+                            className="aspect-video w-full bg-surface-container object-contain"
                           />
                           <div className="px-3 py-2">
                             <p className="line-clamp-2 min-h-10 text-xs font-semibold leading-5 text-on-surface group-hover/card:text-primary">

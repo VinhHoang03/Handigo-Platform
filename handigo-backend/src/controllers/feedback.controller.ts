@@ -5,6 +5,15 @@ import { sendControllerError } from "../utils/controllerError";
 
 const getUserId = (req: Request) => requireAuthenticatedUser(req).id;
 
+export const getServiceFeedbacks = async (req: Request, res: Response) => {
+  try {
+    const data = await feedbackService.getServiceFeedbacks(req.params.id as string, req.query);
+    return res.json({ success: true, data });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
 export const createFeedback = async (req: Request, res: Response) => {
   try {
     const feedback = await feedbackService.createFeedback(getUserId(req), req.body);

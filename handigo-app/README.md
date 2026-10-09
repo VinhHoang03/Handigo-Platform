@@ -14,6 +14,45 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000
 
 Đổi `API_BASE_URL` theo thiết bị đang chạy. Không đưa secret backend vào app.
 
+### Hot reload khi Codex sửa code
+
+Chạy từ thư mục gốc repository, sau khi mở emulator và chạy backend:
+
+```powershell
+node scripts/dev-app.mjs
+```
+
+Script theo dõi file Dart trong `lib`, tự gửi hot reload sau khi lưu và giữ
+trạng thái app. Nhập `r`, `R` hoặc `q` rồi Enter để reload, restart hoặc dừng.
+Nếu đang chạy app bằng IDE/terminal khác, dừng phiên đó trước khi dùng script
+để tránh hai phiên debug trên cùng thiết bị. Lệnh không tự chạy backend.
+
+```powershell
+node scripts/dev-app.mjs --device emulator-5554 --api http://10.0.2.2:5000
+node --test scripts/dev-app.test.mjs
+```
+
+Hai lệnh trên đều chạy từ root. Node.js và Flutter phải có trên PATH.
+Script chỉ theo dõi `lib/**/*.dart`; chỉnh sửa cấu hình native hoặc
+dependencies cần dừng app, chạy `flutter pub get` khi cần, rồi chạy lại.
+Nếu chỉ muốn reload thủ công, thêm `--no-watch`.
+
+### Debug bằng VS Code hoặc Cursor
+
+Mở thư mục gốc repository và cài hai extension được đề xuất: Dart và Flutter.
+Chọn emulator ở thanh trạng thái, vào **Run and Debug**, chọn
+**Handigo App: Debug trên thiết bị đã chọn**, rồi nhấn `F5`.
+Địa chỉ API mặc định là `http://10.0.2.2:5000`, có thể đổi trong hộp nhập khi chạy.
+
+`.vscode/settings.json` bật hot reload khi lưu và theo dõi thay đổi từ công cụ
+bên ngoài như Codex. Tính năng theo dõi này là tùy chọn preview của Dart Code;
+nếu extension không hỗ trợ, dùng script terminal ở trên. Các task có sẵn:
+lấy dependencies, phân tích Dart, chạy kiểm thử và chạy backend development.
+
+Nếu dùng Android Studio, mở `handigo-app`, chọn emulator và chạy `lib/main.dart`
+ở chế độ debug. Dùng nút **Hot Reload** hoặc **Hot Restart** của Flutter plugin;
+cấu hình `.vscode` chỉ áp dụng cho VS Code/Cursor.
+
 ### OTP và khôi phục mật khẩu
 
 OTP được gửi qua email, có hạn 10 phút theo backend; bộ đếm trên app bắt đầu từ lúc gửi yêu cầu. Nút gửi lại có thời gian chờ 60 giây. Backend vẫn quyết định mã còn hợp lệ hay không.

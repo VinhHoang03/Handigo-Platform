@@ -5,7 +5,7 @@ export function ServiceDetailSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
       <div className="space-y-8 lg:col-span-8">
-        <Skeleton className="h-[360px] w-full" rounded="rounded-xl" />
+        <Skeleton className="aspect-video w-full" rounded="rounded-xl" />
         <div className="space-y-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-5">
           <Skeleton className="h-6 w-1/3" />
           <Skeleton className="h-4 w-full" />
