@@ -39,7 +39,6 @@ export function ProviderDescriptionStep({
 }: ProviderDescriptionStepProps) {
   const {
     uploadingKey,
-    uploadError,
     ocrMessages,
     uploadIdentity,
     uploadCertificate,
@@ -94,11 +93,6 @@ export function ProviderDescriptionStep({
         </p>
       </div>
 
-      {uploadError && (
-        <p className="rounded-2xl bg-error/10 p-3 text-sm text-error">
-          {uploadError}
-        </p>
-      )}
 
       <ProviderIdentityDocumentSection
         identity={identity}

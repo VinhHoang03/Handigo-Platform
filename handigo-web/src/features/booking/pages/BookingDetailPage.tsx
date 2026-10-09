@@ -144,9 +144,6 @@ const BookingDetailPage = () => {
             />
           </BookingServiceSummary>
 
-          {order.status === "completed" && (
-            <OrderFeedbackSection orderId={order._id} />
-          )}
         </div>
 
         <aside className="lg:col-span-4 flex flex-col gap-lg">
@@ -155,6 +152,7 @@ const BookingDetailPage = () => {
             orderId={order._id}
             orderStatus={order.status}
             hasSuccessfulPayment={hasSuccessfulPayment}
+            providerUnavailable={order.status === "cancelled" && /^Không (?:tìm thấy thợ nhận đơn|có provider nhận đơn)/u.test(order.cancellation?.reason || "")}
           />
 
           <BookingStatusTimeline
@@ -162,6 +160,10 @@ const BookingDetailPage = () => {
             statusLabel={getStatusLabel(order.status)}
             timeline={timeline}
           />
+
+          {order.status === "completed" && (
+            <OrderFeedbackSection orderId={order._id} />
+          )}
 
           <BookingRefundPanel
             order={order}

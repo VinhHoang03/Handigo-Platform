@@ -7,8 +7,8 @@ import { getErrorMessage } from '@/utils/apiError';
 export function OrderScheduleCard({ order }: { order: Order }) {
   const [end, setEnd] = useState('');
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useToastFeedback<string>('', "success");
-  const [error, setError] = useToastFeedback<string>('', "error");
+  const [, setNotice] = useToastFeedback<string>('', "success");
+  const [, setError] = useToastFeedback<string>('', "error");
   const [expectedEnd, setExpectedEnd] = useState(order.schedule?.expectedEndAt);
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError(''); setNotice('');
@@ -28,6 +28,6 @@ export function OrderScheduleCard({ order }: { order: Order }) {
       <label className="block text-sm">Cập nhật giờ hoàn thành khi công việc thay đổi<input className="mt-1 block rounded-lg border border-outline-variant bg-surface p-2" type="datetime-local" required value={end} onChange={(event) => setEnd(event.target.value)} /></label>
       <button className="rounded-lg bg-primary px-4 py-2 text-on-primary disabled:opacity-50" disabled={busy}>{busy ? 'Đang cập nhật…' : 'Cập nhật thời gian'}</button>
     </form>}
-    {notice && <p role="status" className="text-sm">{notice}</p>}{error && <p role="alert" className="text-sm text-error">{error}</p>}
+
   </section>;
 }

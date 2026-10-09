@@ -29,8 +29,6 @@ export function ProviderServiceSuggestionForm({
   description,
   isLoadingCategories,
   isSubmitting,
-  message,
-  error,
   onServiceNameChange,
   onCategoryIdChange,
   onCategoryNameChange,
@@ -43,17 +41,6 @@ export function ProviderServiceSuggestionForm({
       onSubmit={onSubmit}
       className="grid grid-cols-1 gap-5 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm lg:grid-cols-3"
     >
-      {(message || error) && (
-        <div
-          className={`lg:col-span-3 rounded-lg px-4 py-3 text-sm font-medium ${
-            error
-              ? "bg-error/10 text-error"
-              : "bg-success-container text-on-success-container"
-          }`}
-        >
-          {error || message}
-        </div>
-      )}
 
       <label className="block lg:col-span-2">
         <span className="mb-2 block text-sm font-bold text-on-surface">

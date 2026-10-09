@@ -31,11 +31,6 @@ export default function AdminNewsPage() {
           </button>
         </header>
 
-        {(news.error || news.notice) && (
-          <p aria-live="polite" className={`rounded-xl px-4 py-3 ${news.error ? "bg-error/10 text-error" : "bg-success-container text-on-success-container"}`}>
-            {news.error || news.notice}
-          </p>
-        )}
 
         <NewsStatsBar {...news.stats} />
 

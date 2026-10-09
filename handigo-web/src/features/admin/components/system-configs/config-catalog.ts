@@ -19,7 +19,7 @@ export const configDefinitions: ConfigDefinition[] = [
   {
     key: 'BOOKING_POLICY', label: 'Giá và thời lượng đặt dịch vụ', group: 'booking', type: 'JSON',
     defaultValue: defaultBookingPolicy, isPublic: false, isEffective: true,
-    description: 'Phụ phí đặt ngay, thời gian đặt trước, thời lượng dịch vụ, dự phòng, di chuyển và ca làm việc.',
+    description: 'Thời gian đặt trước, thời lượng dịch vụ, dự phòng, di chuyển và ca làm việc.',
     effect: 'Giá và thời lượng được lưu theo đơn mới. Lịch làm việc được kiểm tra lại lúc nhận đơn. Voucher không giảm phụ phí.',
   },
   {
@@ -68,13 +68,13 @@ export const configDefinitions: ConfigDefinition[] = [
     label: "Thời gian chờ provider nhận đơn",
     group: "booking",
     type: "NUMBER",
-    defaultValue: 60,
+    defaultValue: 90,
     unit: "giây",
     isPublic: false,
     description:
       "Số giây hệ thống chờ nhóm provider hiện tại phản hồi trước khi mở nhóm tiếp theo.",
-    effect: "Có hiệu lực với các nhóm phân phối mới sau khi lưu.",
-    isEffective: true,
+    effect: "Thời gian phản hồi được cố định 90 giây cho đơn thường và lịch hẹn; giá trị cấu hình này không thay đổi thời hạn nhận đơn.",
+    isEffective: false,
   },
   {
     key: "MATCHING_BATCH_SIZE",

@@ -59,7 +59,7 @@ const BookingSuccessPage = () => {
         reset();
       })
       .catch(error => {
-        console.error('Failed to load paid order:', error);
+        console.error("Không thể tải đơn hàng đã thanh toán:", error);
         if (isMounted) addToast(getErrorMessage(error, 'Không thể tải thông tin đơn dịch vụ.'), 'error');
       })
       .finally(() => {

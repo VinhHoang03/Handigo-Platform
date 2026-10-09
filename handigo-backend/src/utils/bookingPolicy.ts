@@ -13,21 +13,13 @@ export const getEarliestScheduledAt = (now = new Date()) => {
   return earliest;
 };
 
-export const calculateImmediateFee = (amount: number, inspection: boolean, orderType: string, policy: BookingPolicy) => {
-  if (!["normal", "urgent"].includes(orderType)) return 0;
-  return inspection ? policy.immediateMin
-    : Math.min(policy.immediateMax, Math.max(policy.immediateMin, Math.round(amount * policy.immediatePercent / 100)));
-};
-
-export const calculateBookingSettlement = (paidAmount: number, fee: number, commissionRate: number, providerFeePercent: number, inspectionRequired = false) => {
+export const calculateBookingSettlement = (paidAmount: number, commissionRate: number, inspectionRequired = false) => {
   if (inspectionRequired) {
-    // Cọc thực thu thuộc hệ thống; thợ chỉ nhận phần phụ phí phục vụ ngay.
+    // Cọc thực thu thuộc hệ thống.
     // Tiền sửa chữa theo báo giá được khách thanh toán trực tiếp cho thợ.
-    const providerEarningAmount = Math.min(paidAmount, Math.round(fee * providerFeePercent / 100));
-    return { platformCommissionAmount: Math.max(paidAmount - providerEarningAmount, 0), providerEarningAmount };
+    return { platformCommissionAmount: paidAmount, providerEarningAmount: 0 };
   }
-  const platformCommissionAmount = Math.min(paidAmount,
-    Math.round(Math.max(paidAmount - fee, 0) * commissionRate) + fee - Math.round(fee * providerFeePercent / 100));
+  const platformCommissionAmount = Math.min(paidAmount, Math.round(paidAmount * commissionRate));
   return { platformCommissionAmount, providerEarningAmount: paidAmount - platformCommissionAmount };
 };
 

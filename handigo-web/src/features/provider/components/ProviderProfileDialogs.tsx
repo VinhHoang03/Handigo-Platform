@@ -15,7 +15,6 @@ interface ProfessionalDialogProps {
 export function ProfessionalProfileDialog({
   open,
   bio,
-  error,
   saving,
   onBioChange,
   onClose,
@@ -29,11 +28,6 @@ export function ProfessionalProfileDialog({
       size="lg"
     >
       <form className="space-y-6" onSubmit={onSubmit}>
-          {error && (
-            <p className="rounded-xl bg-error/10 p-3 text-sm font-medium text-error">
-              {error}
-            </p>
-          )}
 
           <label className="block">
             <span className="mb-2 block text-xs font-bold uppercase text-on-surface-variant">
@@ -82,7 +76,6 @@ export function ServiceAreaDialog({
   open,
   areas,
   saving,
-  error,
   onChange,
   onClose,
   onSave,
@@ -98,11 +91,6 @@ export function ServiceAreaDialog({
   return (
     <Modal open={open} title="Chỉnh sửa khu vực phục vụ" onClose={onClose} size="lg">
       <div className="space-y-6">
-        {error && (
-          <p className="rounded-xl bg-error/10 p-3 text-sm font-medium text-error">
-            {error}
-          </p>
-        )}
         <WorkingAreasStep
           areas={areas}
           onAdd={(value) => !areas.includes(value) && onChange([...areas, value])}

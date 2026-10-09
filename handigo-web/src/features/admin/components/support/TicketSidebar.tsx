@@ -14,7 +14,7 @@ interface TicketSidebarProps {
   onCreateViolation: () => void;
 }
 
-export function TicketSidebar({ ticket, admins, busy, actionError, onAssign, onStatusChange, onCreateViolation }: TicketSidebarProps) {
+export function TicketSidebar({ ticket, admins, busy, onAssign, onStatusChange, onCreateViolation }: TicketSidebarProps) {
   const [assignedAdminId, setAssignedAdminId] = useState(ticket.assignedAdminId?._id ?? "");
   const [nextStatus, setNextStatus] = useState<SupportTicketStatus | "">("");
   const [resolutionNote, setResolutionNote] = useState("");
@@ -31,7 +31,6 @@ export function TicketSidebar({ ticket, admins, busy, actionError, onAssign, onS
 
   return (
     <aside className="space-y-5">
-      {actionError && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{actionError}</p>}
 
       {!ticket.createdViolationId && ticket.status !== "cancelled" && (
         <button type="button" onClick={onCreateViolation} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-on-error">

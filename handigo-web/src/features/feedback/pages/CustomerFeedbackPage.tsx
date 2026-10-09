@@ -50,16 +50,7 @@ export default function CustomerFeedbackPage() {
                   />
                 )}
                 {context.canReview && (!feedback || isEditing) && (
-                  <>
-                    {feedback && (
-                      <div className="mb-4 flex justify-end">
-                        <button type="button" disabled={saving} onClick={() => setEditingOrderId(null)} className="btn-secondary">
-                          Hủy chỉnh sửa
-                        </button>
-                      </div>
-                    )}
-                    <FeedbackForm key={feedback?._id || orderId} orderId={orderId} feedback={feedback} saving={saving} save={saveFeedback} />
-                  </>
+                  <FeedbackForm key={feedback?._id || orderId} orderId={orderId} feedback={feedback} saving={saving} save={saveFeedback} onCancel={feedback ? () => setEditingOrderId(null) : undefined} />
                 )}
                 {!context.canReview && (
                   <div className="flex gap-3 rounded-lg border border-warning/30 bg-warning-container p-4 text-on-warning-container"><AlertCircle className="shrink-0" size={20} /><p>{context.reason}</p></div>

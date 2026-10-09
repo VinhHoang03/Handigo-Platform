@@ -24,7 +24,7 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number) => {
   let timeoutId: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(
-      () => reject(new Error("AI provider timeout")),
+      () => reject(new Error("Dịch vụ AI phản hồi quá thời gian chờ")),
       timeoutMs,
     );
   });
@@ -68,7 +68,7 @@ class GeminiChatProvider implements AiChatProvider {
     try {
       const result = await withTimeout(model.generateContent(prompt), timeoutMs);
       const reply = result.response.text().trim();
-      if (!reply) throw new Error("Empty AI response");
+      if (!reply) throw new Error("Dịch vụ AI trả về phản hồi rỗng");
       return reply;
     } catch (error) {
       if (error instanceof AppError) throw error;

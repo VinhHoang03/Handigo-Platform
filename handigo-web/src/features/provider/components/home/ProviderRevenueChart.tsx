@@ -4,6 +4,7 @@ import type { RevenuePeriod } from "./providerHome.utils";
 interface RevenueChartItem {
   key: string;
   label: string;
+  fullLabel: string;
   amount: number;
 }
 
@@ -53,17 +54,19 @@ export function ProviderRevenueChart({
             aria-label="Lọc biểu đồ doanh thu"
             className="rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
           >
-            <option value="week">Tuần này</option>
-            <option value="month">Tháng này</option>
+            <option value="week">Tuần</option>
+            <option value="month">Tháng</option>
           </select>
         </div>
       }
     >
       <BarChart
-        data={revenueChart.map((item) => ({ label: item.label, value: item.amount }))}
+        data={revenueChart.map((item) => ({ label: item.label, fullLabel: item.fullLabel, value: item.amount }))}
         ariaLabel={`Doanh thu ${revenueLabel}`}
         height={256}
         singleColor
+        barCategoryGap="28%"
+        connectTops
         formatValue={(value) => chartMoney.format(value)}
         formatAxisValue={(value) => chartCompactMoney.format(value)}
       />

@@ -14,6 +14,12 @@ export const useBookingDetailData = (id: string | undefined) => {
   const [apiError, setApiError] = useToastFeedback<string | null>(null, "error");
   const [reassignmentModalOpen, setReassignmentModalOpen] = useState(false);
 
+  const updateOrder = useCallback((latest: Order) => {
+    setOrder((previous) => previous?._id === latest._id
+      && new Date(previous.updatedAt).getTime() > new Date(latest.updatedAt).getTime()
+      ? previous : latest);
+  }, []);
+
   const loadData = useCallback(async () => {
     if (!id) {
       setApiError("Mã đơn hàng không hợp lệ.");
@@ -39,7 +45,7 @@ export const useBookingDetailData = (id: string | undefined) => {
       if (!data) {
         setApiError("Không tìm thấy thông tin đơn hàng.");
       } else {
-        setOrder(data);
+        updateOrder(data);
         if (data.reassignment?.status === "awaiting_customer") {
           setReassignmentModalOpen(true);
         }
@@ -72,60 +78,83 @@ export const useBookingDetailData = (id: string | undefined) => {
             setQuotation(null);
           }
         } catch (e) {
-          console.error("No quotation found yet or error:", e);
+          console.error("Chưa tìm thấy báo giá hoặc có lỗi:", e);
           setQuotation(null);
         }
         setApiError(null);
       }
     } catch (err: unknown) {
-      console.error("Error fetching order:", err);
+      console.error("Lỗi khi tải đơn hàng:", err);
       setApiError("Đã có lỗi xảy ra khi tải thông tin đơn hàng.");
     } finally {
       setLoading(false);
     }
-  }, [id, setApiError]);
+  }, [id, setApiError, updateOrder]);
 
   useEffect(() => {
     void Promise.resolve().then(loadData);
   }, [loadData]);
 
-  const hasQuotationService = Boolean(order?.inspectionRequired || order?.serviceId.serviceType === 'variable_price');
+  const recurringGroupId = order?.recurringGroupId;
   useEffect(() => {
-    if (!id || !hasQuotationService) return;
+    if (!id) return;
     let disposed = false;
     let pending = false;
     let queued = false;
-    const refreshQuotation = async () => {
+    const refreshOrder = async () => {
       if (pending) { queued = true; return; }
       pending = true;
       try {
         do {
           queued = false;
-          const latest = await bookingApi.getQuotation(id);
-          if (!disposed) setQuotation((previous) => previous && latest && previous.quotation._id === latest.quotation._id
-            && (previous.quotation.revision ?? 0) > (latest.quotation.revision ?? 0) ? previous : latest);
+          const latestOrder = await bookingApi.getOrderById(id);
+          if (disposed || !latestOrder) return;
+          updateOrder(latestOrder);
+          if (latestOrder.reassignment?.status === 'awaiting_customer') {
+            setReassignmentModalOpen(true);
+          }
+          const [latest, latestSeries] = await Promise.all([
+            latestOrder.inspectionRequired || latestOrder.serviceId.serviceType === 'variable_price'
+              ? bookingApi.getQuotation(id)
+              : Promise.resolve(null),
+            latestOrder.orderType === 'recurring'
+              ? bookingApi.getRecurringSeries(id)
+              : Promise.resolve([]),
+          ]);
+          if (!disposed) {
+            setQuotation((previous) => previous && latest && previous.quotation._id === latest.quotation._id
+              && (previous.quotation.revision ?? 0) > (latest.quotation.revision ?? 0) ? previous : latest);
+            setRecurringOrders(latestSeries);
+          }
         } while (queued && !disposed);
       } catch (error) {
-        console.error('Không thể tải báo giá mới nhất:', error);
+        console.error('Không thể cập nhật thông tin đơn hàng:', error);
       } finally {
         pending = false;
       }
     };
     const { socket, dispose } = createAuthenticatedSocket();
     const onUpdated = (payload: { orderId?: string }) => {
-      if (payload.orderId === id) void refreshQuotation();
+      if (payload.orderId === id) void refreshOrder();
+    };
+    const onOrderUpdated = (payload: { orderId?: string; recurringGroupId?: string }) => {
+      if (payload.orderId === id || (recurringGroupId && payload.recurringGroupId === recurringGroupId)) {
+        void refreshOrder();
+      }
     };
     socket.on('quotation:updated', onUpdated);
-    socket.on('connect', refreshQuotation);
-    window.addEventListener('focus', refreshQuotation);
+    socket.on('order:updated', onOrderUpdated);
+    socket.on('connect', refreshOrder);
+    window.addEventListener('focus', refreshOrder);
     return () => {
       disposed = true;
       socket.off('quotation:updated', onUpdated);
-      socket.off('connect', refreshQuotation);
-      window.removeEventListener('focus', refreshQuotation);
+      socket.off('order:updated', onOrderUpdated);
+      socket.off('connect', refreshOrder);
+      window.removeEventListener('focus', refreshOrder);
       dispose();
     };
-  }, [id, hasQuotationService]);
+  }, [id, recurringGroupId, updateOrder]);
 
   // Đồng bộ tiến trình khi khách chờ, kể cả sau tải lại trang hoặc bỏ lỡ socket.
   useEffect(() => {
@@ -137,7 +166,7 @@ export const useBookingDetailData = (id: string | undefined) => {
       pending = true;
       try {
         const updated = await bookingApi.getOrderById(id);
-        if (!disposed && updated) setOrder(updated);
+        if (!disposed && updated) updateOrder(updated);
       } catch (error) {
         console.error("Không thể cập nhật tiến trình tìm thợ:", error);
       } finally {
@@ -145,7 +174,7 @@ export const useBookingDetailData = (id: string | undefined) => {
       }
     }, 5000);
     return () => { disposed = true; window.clearInterval(timer); };
-  }, [id, order?.status]);
+  }, [id, order?.status, updateOrder]);
 
   return {
     order,

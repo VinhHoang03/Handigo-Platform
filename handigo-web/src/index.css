@@ -207,6 +207,27 @@
 }
 
 @layer components {
+  @keyframes handigo-toast-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .handigo-toast {
+    animation: handigo-toast-enter 180ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .handigo-toast {
+      animation: none;
+    }
+  }
+
   @keyframes provider-status-marquee {
     from {
       transform: translateX(100%);

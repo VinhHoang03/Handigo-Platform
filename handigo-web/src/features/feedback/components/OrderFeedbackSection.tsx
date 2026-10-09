@@ -28,12 +28,7 @@ export function OrderFeedbackSection({ orderId }: { orderId: string }) {
             Chia sẻ trải nghiệm thực tế để Handigo cải thiện chất lượng dịch vụ.
           </p>
         </div>
-        {feedback && context?.canReview && !loading && !error && (
-          isEditing ? (
-            <button type="button" disabled={saving} onClick={() => setEditingOrderId(null)} className="btn-secondary">
-              Hủy chỉnh sửa
-            </button>
-          ) : (
+        {feedback && context?.canReview && !loading && !error && !isEditing && (
             <button
               type="button"
               aria-label="Chỉnh sửa đánh giá"
@@ -43,7 +38,6 @@ export function OrderFeedbackSection({ orderId }: { orderId: string }) {
             >
               <Pencil size={18} aria-hidden="true" />
             </button>
-          )
         )}
       </div>
 
@@ -57,6 +51,7 @@ export function OrderFeedbackSection({ orderId }: { orderId: string }) {
             feedback={feedback}
             saving={saving}
             save={saveFeedback}
+            onCancel={feedback ? () => setEditingOrderId(null) : undefined}
           />
         ) : (
           <p className="rounded-2xl bg-surface-container-low p-4 text-sm text-on-surface-variant">

@@ -17,6 +17,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   requestedProviderName: undefined,
   orderType: 'normal',
   scheduledAt: undefined,
+  isScheduleAutomatic: false,
   recurrenceUnit: 'weekly',
   recurrenceCount: 1,
   problemDescription: undefined,
@@ -98,8 +99,9 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
     requestedProviderName: id ? name : undefined,
   }),
   setOrderType: (type) => set({ orderType: type }),
-  setScheduledAt: (date) => set((state) => ({
+  setScheduledAt: (date, automatic = false) => set((state) => ({
     scheduledAt: date,
+    isScheduleAutomatic: Boolean(date) && automatic,
     orderType: date ? (state.orderType === 'recurring' ? 'recurring' : 'scheduled') : 'normal',
   })),
   setRecurrenceUnit: (unit) => set({ recurrenceUnit: unit }),
@@ -121,6 +123,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
       requestedProviderName: undefined,
       orderType: 'normal',
       scheduledAt: undefined,
+      isScheduleAutomatic: false,
       recurrenceUnit: 'weekly',
       recurrenceCount: 1,
       problemDescription: undefined,

@@ -5,7 +5,7 @@ const getTransporter = () => {
   const pass = process.env.EMAIL_PASSWORD;
 
   if (!user || !pass) {
-    throw new Error("EMAIL_USER and EMAIL_PASSWORD must be defined");
+    throw new Error("Phải cấu hình EMAIL_USER và EMAIL_PASSWORD");
   }
 
   return nodemailer.createTransport({

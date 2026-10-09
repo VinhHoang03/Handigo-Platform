@@ -2,6 +2,10 @@ import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { Order } from '@/types/booking';
 import { ReliableImage } from '@/components/common/ReliableImage';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
+import type { QuotationDetail } from '../types/providerOrder.types';
+import { formatMoney } from '../utils/providerOrder.utils';
 import { CircleCheckBig, ImagePlus, X } from "lucide-react";
 
 interface FixedPriceActionFormProps {
@@ -10,6 +14,8 @@ interface FixedPriceActionFormProps {
   onComplete: (files: File[], note: string) => void | Promise<void>;
   onCancel: () => void;
   busy?: boolean;
+  quotation?: QuotationDetail | null;
+  onConfirmPayment?: (quotationId: string, expectedRevision: number) => Promise<boolean>;
 }
 
 const MAX_EVIDENCE_IMAGES = 5;
@@ -29,10 +35,13 @@ export function FixedPriceActionForm({
   onComplete,
   onCancel,
   busy,
+  quotation,
+  onConfirmPayment,
 }: FixedPriceActionFormProps) {
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [validationError, setValidationError] = useToastFeedback<string>('', "error");
+  const [paymentConfirmation, setPaymentConfirmation] = useState<{ quotationId: string; revision: number; amount: number } | null>(null);
+  const [, setValidationError] = useToastFeedback<string>('', "error");
   const previews = useMemo(
     () => files.map((file) => URL.createObjectURL(file)),
     [files],
@@ -45,6 +54,10 @@ export function FixedPriceActionForm({
   const showStart = order.status === 'accepted' && !order.inspectionRequired;
   const showComplete = order.status === 'in_progress';
   const showCancel = ['accepted', 'in_progress'].includes(order.status);
+  const repairQuotation = quotation?.quotation;
+  const showPaymentConfirmation = order.inspectionRequired && onConfirmPayment && repairQuotation
+    && order.status === 'completed'
+    && (repairQuotation.status === 'saved' || (repairQuotation.status === 'approved' && repairQuotation.customerConfirmed));
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -140,7 +153,6 @@ export function FixedPriceActionForm({
                 ))}
               </div>
             )}
-            {validationError && <p className="mt-2 text-sm text-error">{validationError}</p>}
           </div>
 
           <label className="block space-y-2">
@@ -172,6 +184,25 @@ export function FixedPriceActionForm({
       ) : null}
 
       <div className="space-y-sm pt-md">
+        {showPaymentConfirmation && (repairQuotation.directPaymentConfirmedAt && order.paymentStatus === 'paid' ? (
+          <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
+            <CircleCheckBig aria-hidden="true" size={20} />
+            Đã xác nhận thanh toán báo giá
+          </p>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setPaymentConfirmation({
+              quotationId: repairQuotation._id,
+              revision: repairQuotation.revision ?? 0,
+              amount: getDirectRepairPayment(repairQuotation.finalAmount, getAppliedQuotationDeposit(order)),
+            })}
+            className="btn-secondary w-full py-3 text-base font-bold"
+          >
+            Xác nhận đã thanh toán
+          </button>
+        ))}
         {showStart && (
           <button type="button" disabled={busy} onClick={onStart} className="btn-primary w-full py-3 text-base font-bold">
             {busy ? 'Đang xử lý...' : 'Bắt đầu thực hiện'}
@@ -193,6 +224,19 @@ export function FixedPriceActionForm({
           </button>
         )}
       </div>
+      <ConfirmDialog
+        open={paymentConfirmation !== null}
+        title="Xác nhận đã thanh toán báo giá"
+        message={`Bạn xác nhận đã nhận đủ ${formatMoney(paymentConfirmation?.amount)} tiền sửa chữa trực tiếp từ khách theo báo giá này?`}
+        busy={busy}
+        onCancel={() => { if (!busy) setPaymentConfirmation(null); }}
+        onConfirm={() => {
+          if (!paymentConfirmation || !onConfirmPayment || busy) return;
+          void onConfirmPayment(paymentConfirmation.quotationId, paymentConfirmation.revision).then((succeeded) => {
+            if (succeeded) setPaymentConfirmation(null);
+          });
+        }}
+      />
     </div>
   );
 }

@@ -7,7 +7,7 @@ const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
 
   if (!secret) {
-    throw new Error("ACCESS_TOKEN_SECRET or JWT_SECRET is not defined.");
+    throw new Error("Chưa cấu hình ACCESS_TOKEN_SECRET hoặc JWT_SECRET.");
   }
 
   return secret;
@@ -28,7 +28,7 @@ export const authMiddleware = (
   }
 
   if (!token) {
-    return res.status(401).json({ message: "Unauthorized, missing token" });
+    return res.status(401).json({ message: "Chưa xác thực, thiếu mã truy cập" });
   }
 
   try {
@@ -40,7 +40,7 @@ export const authMiddleware = (
         }
 
         if (user.status === "locked") {
-          return res.status(403).json({ message: "Account is locked" });
+          return res.status(403).json({ message: "Tài khoản đã bị khóa" });
         }
 
         req.user = {
@@ -53,6 +53,6 @@ export const authMiddleware = (
       })
       .catch((error) => next(error));
   } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return res.status(401).json({ message: "Mã truy cập không hợp lệ hoặc đã hết hạn" });
   }
 };
