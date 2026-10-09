@@ -25,5 +25,22 @@ export const getAllowedOrigins = () => {
 
 export const isAllowedOrigin = (origin?: string) => {
   if (!origin) return true;
-  return getAllowedOrigins().includes(normalizeOrigin(origin));
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (getAllowedOrigins().includes(normalizedOrigin)) return true;
+
+  // Flutter web dùng cổng ngẫu nhiên; chỉ cho phép loopback khi phát triển.
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const url = new URL(normalizedOrigin);
+      return (
+        ["http:", "https:"].includes(url.protocol) &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
+        url.origin === normalizedOrigin
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 };
