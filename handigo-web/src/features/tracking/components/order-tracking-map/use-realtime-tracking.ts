@@ -43,7 +43,7 @@ export function useRealtimeTracking({
   useEffect(() => {
     if (!trackingEnabled) return;
 
-    console.log(`[Socket-Client] Connecting for order ${orderId} as ${viewerRole}...`);
+    console.log(`[Socket-Client] Đang kết nối cho đơn hàng ${orderId} với vai trò ${viewerRole}...`);
     const { socket, dispose } = createAuthenticatedSocket({
       reconnection: true,
       reconnectionAttempts: 5,
@@ -52,12 +52,12 @@ export function useRealtimeTracking({
     socketRef.current = socket;
 
     const joinOrderRoom = () => {
-      console.log(`[Socket-Client] Connected! Socket ID: ${socket.id}`);
+      console.log(`[Socket-Client] Đã kết nối! Định danh socket: ${socket.id}`);
       socket.emit(
         "order:tracking:join",
         { orderId },
         (response: { success: boolean; data?: TrackingState; message?: string }) => {
-          console.log("[Socket-Client] order:tracking:join response:", response);
+          console.log("[Socket-Client] Phản hồi tham gia theo dõi đơn hàng:", response);
           if (response.success) {
             setTracking((cur) => ({
               customer: cur.customer,
@@ -73,7 +73,7 @@ export function useRealtimeTracking({
     };
 
     const handleConnectError = (err: Error) => {
-      console.error("[Socket-Client] Connection error:", err.message);
+      console.error("[Socket-Client] Lỗi kết nối:", err.message);
       setLocationMessage(`Lỗi kết nối định vị: ${err.message}`);
     };
 
@@ -81,7 +81,7 @@ export function useRealtimeTracking({
     socket.on("connect_error", handleConnectError);
 
     const handleLocation = (location: LocationEvent) => {
-      console.log("[Socket-Client] order:location received:", location);
+      console.log("[Socket-Client] Đã nhận vị trí đơn hàng:", location);
       if (location.ownerType === "provider") {
         setTracking((cur) => ({ ...cur, provider: location }));
       } else if (location.ownerType === "customer") {
@@ -91,7 +91,7 @@ export function useRealtimeTracking({
     socket.on("order:location", handleLocation);
 
     return () => {
-      console.log("[Socket-Client] Cleaning up socket connection...");
+      console.log("[Socket-Client] Đang đóng kết nối socket...");
       socket.off("connect", joinOrderRoom);
       socket.off("connect_error", handleConnectError);
       socket.off("order:location", handleLocation);
@@ -126,15 +126,15 @@ export function useRealtimeTracking({
           { orderId, ...nextCoordinate },
           (res: { success: boolean; message?: string } | undefined) => {
             if (res && !res.success) {
-              console.warn("[Socket-Client] order:location:update failed:", res.message);
+              console.warn("[Socket-Client] Cập nhật vị trí đơn hàng thất bại:", res.message);
             } else {
-              console.log("[Socket-Client] order:location:update ack:", res);
+              console.log("[Socket-Client] Phản hồi xác nhận cập nhật vị trí đơn hàng:", res);
             }
           },
         );
       },
       (err) => {
-        console.error("[Socket-Client] GPS watchPosition error:", err.message);
+        console.error("[Socket-Client] Lỗi theo dõi vị trí GPS:", err.message);
         setLocationMessage(mapText.locationPermission);
       },
       { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 },

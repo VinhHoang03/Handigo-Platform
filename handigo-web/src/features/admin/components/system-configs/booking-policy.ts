@@ -12,11 +12,6 @@ export const defaultBookingPolicy = {
 };
 
 export const bookingPolicyFields = [
-  ['immediatePercent', 'Phụ phí đặt ngay (%)', 0, 100],
-  ['immediateMin', 'Phụ phí tối thiểu (đ)', 0, 10000000],
-  ['immediateMax', 'Phụ phí tối đa (đ)', 0, 10000000],
-  ['inspectionImmediateFee', 'Phụ phí khảo sát ngay (đ)', 0, 10000000],
-  ['providerFeePercent', 'Phần phụ phí dành cho thợ (%)', 0, 100],
   ['minAdvanceMinutes', 'Đặt lịch trước tối thiểu (phút)', 1, 43200],
   ['defaultDurationMinutes', 'Thời lượng mặc định (phút)', 1, 1440],
   ['inspectionDurationMinutes', 'Thời lượng khảo sát mặc định (phút)', 1, 1440],

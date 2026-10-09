@@ -30,6 +30,8 @@ export interface IRepairQuotation extends Document, IBaseDocument {
   cancelledAt?: Date | null;
   customerConfirmed: boolean;
   providerConfirmed: boolean;
+  directPaymentConfirmedAt?: Date | null;
+  directPaymentConfirmedAmount?: Money | null;
 }
 
 const RepairQuotationSchema = new Schema<IRepairQuotation>(
@@ -62,6 +64,8 @@ const RepairQuotationSchema = new Schema<IRepairQuotation>(
     cancelledAt: { type: Date, default: null },
     customerConfirmed: { type: Boolean, default: false },
     providerConfirmed: { type: Boolean, default: true },
+    directPaymentConfirmedAt: { type: Date, default: null },
+    directPaymentConfirmedAmount: { type: Number, min: 0, default: null },
     ...baseFields,
   },
   { timestamps: true },

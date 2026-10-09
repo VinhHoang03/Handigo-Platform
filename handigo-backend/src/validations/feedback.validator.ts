@@ -3,7 +3,7 @@ import { z } from "zod";
 const objectIdSchema = z
   .string()
   .trim()
-  .regex(/^[0-9a-fA-F]{24}$/, "Invalid Mongo object id");
+  .regex(/^[0-9a-fA-F]{24}$/, "Định danh MongoDB không hợp lệ");
 
 const imageUrlSchema = z.string().trim().url("Image must be a valid URL");
 
@@ -36,7 +36,7 @@ export const updateFeedbackSchema = z
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
-    "At least one field is required",
+    "Vui lòng cung cấp ít nhất một trường dữ liệu",
   );
 
 export const visibilitySchema = z.object({

@@ -93,10 +93,10 @@ export function RepairQuotationForm({
   const [scanComplete, setScanComplete] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [isScanningImage, setIsScanningImage] = useState(false);
-  const [scanImageError, setScanImageError] = useToastFeedback<string | null>(null, "error");
+  const [, setScanImageError] = useToastFeedback<string | null>(null, "error");
   const [relevance, setRelevance] = useState<QuotationRelevanceResult | null>(null);
   const [isValidatingRelevance, setIsValidatingRelevance] = useState(false);
-  const [error, setError] = useToastFeedback<string | null>(null, "error");
+  const [, setError] = useToastFeedback<string | null>(null, "error");
   const [discardOpen, setDiscardOpen] = useState(false);
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
@@ -396,11 +396,6 @@ export function RepairQuotationForm({
         </div>
       </div>
 
-      {error && (
-        <div role="alert" className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">
-          {error}
-        </div>
-      )}
 
       {relevance && relevanceIssues.length > 0 && (
         <div
@@ -561,7 +556,6 @@ export function RepairQuotationForm({
               <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium text-on-surface">{selectedFile.name}</p><p className="text-xs text-on-surface-variant">{Math.ceil(selectedFile.size / 1024)} KB</p></div>
               <button type="button" aria-label="Bỏ tệp đã chọn" disabled={inputBusy} onClick={() => handleSelectFile(undefined)} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"><X size={18} aria-hidden="true" /></button>
             </div>}
-            {scanImageError && <p role="alert" className="rounded-xl bg-error/10 px-3 py-2 text-sm text-error">{scanImageError}</p>}
             {scanStatus && <p role="status" className="text-sm text-on-surface-variant">{scanStatus}</p>}
             <button type="button" disabled={!selectedFile || inputBusy || scanComplete || items.length >= MAX_QUOTATION_ITEMS}
               onClick={() => void handleScanQuotationFile()} className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 sm:w-auto">

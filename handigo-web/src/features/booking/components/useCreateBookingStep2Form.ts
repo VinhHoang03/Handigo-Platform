@@ -10,6 +10,7 @@ import {
   MIN_DESCRIPTION_LENGTH,
   buildRecurringPreview,
   getEarliestScheduledAt,
+  getDefaultScheduledAt,
   getInitialScheduledAt,
   getTodayInputValue,
   getUpcomingDates,
@@ -26,7 +27,7 @@ export const useCreateBookingStep2Form = () => {
     preferredProviderId, setPreferredProviderId,
     requestedProviderId,
     orderType, setOrderType,
-    scheduledAt, setScheduledAt, problemDescription, setProblemDescription,
+    scheduledAt, setScheduledAt, isScheduleAutomatic, problemDescription, setProblemDescription,
     recurrenceUnit = 'weekly', setRecurrenceUnit,
     recurrenceCount = 1, setRecurrenceCount,
     customerAttachments, setCustomerAttachments,
@@ -52,13 +53,31 @@ export const useCreateBookingStep2Form = () => {
 
   useEffect(() => {
     let interval: number | undefined;
+    const updateCurrentTime = () => {
+      const now = new Date();
+      const booking = useBookingStore.getState();
+      if (booking.isScheduleAutomatic && ['scheduled', 'recurring'].includes(booking.orderType)) {
+        const nextScheduledAt = getDefaultScheduledAt(now);
+        if (nextScheduledAt !== booking.scheduledAt) {
+          booking.setScheduledAt(nextScheduledAt, true);
+        }
+      }
+      setCurrentTimestamp(now.getTime());
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') updateCurrentTime();
+    };
     const timeout = window.setTimeout(() => {
-      setCurrentTimestamp(Date.now());
-      interval = window.setInterval(() => setCurrentTimestamp(Date.now()), 60_000);
+      updateCurrentTime();
+      interval = window.setInterval(updateCurrentTime, 60_000);
     }, 60_000 - (Date.now() % 60_000));
+    window.addEventListener('focus', updateCurrentTime);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       window.clearTimeout(timeout);
       if (interval !== undefined) window.clearInterval(interval);
+      window.removeEventListener('focus', updateCurrentTime);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -72,12 +91,13 @@ export const useCreateBookingStep2Form = () => {
   useEffect(() => {
     if (scheduleInitialized.current || !['scheduled', 'recurring'].includes(orderType)) return;
     scheduleInitialized.current = true;
+    if (scheduledAt && !isScheduleAutomatic) return;
     const initialScheduledAt = getInitialScheduledAt(scheduledAt);
     if (initialScheduledAt !== scheduledAt) {
-      setScheduledAt(initialScheduledAt);
+      setScheduledAt(initialScheduledAt, true);
       setPreferredProviderId(undefined);
     }
-  }, [orderType, scheduledAt, setScheduledAt, setPreferredProviderId]);
+  }, [orderType, scheduledAt, isScheduleAutomatic, setScheduledAt, setPreferredProviderId]);
 
   useEffect(() => {
     const isValidCount = recurrenceUnit === 'weekly'

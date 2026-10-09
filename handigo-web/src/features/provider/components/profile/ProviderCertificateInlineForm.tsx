@@ -10,7 +10,6 @@ import { Upload } from "lucide-react";
 
 export function CertificateInlineForm({
   form,
-  error,
   isSaving,
   uploading,
   showVisibility = true,
@@ -36,11 +35,6 @@ export function CertificateInlineForm({
       className="grid grid-cols-1 gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4 md:grid-cols-2"
       onSubmit={onSubmit}
     >
-      {error && (
-        <div className="rounded-lg bg-error/10 p-3 text-sm text-error md:col-span-2">
-          {error}
-        </div>
-      )}
       {showVisibility && (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-outline-variant/30 bg-surface-container-lowest/80 p-4 md:col-span-2">
           <div>

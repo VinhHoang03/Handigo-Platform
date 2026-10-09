@@ -10,7 +10,7 @@ import { useProviderAvailabilityStore } from "../store/providerAvailability.stor
 const getCurrentCoordinates = () =>
   new Promise<GeolocationCoordinates>((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("GEOLOCATION_NOT_SUPPORTED"));
+      reject(new Error("Trình duyệt không hỗ trợ xác định vị trí"));
       return;
     }
 

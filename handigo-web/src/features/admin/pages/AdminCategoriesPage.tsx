@@ -8,7 +8,6 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { DataTable } from "@/components/common/dashboard/DataTable";
 import { TableSkeleton } from "@/components/common/dashboard/TableSkeleton";
-import { NotificationBanner } from "@/features/notification/components/NotificationBanner";
 import { CategoryFilterBar } from "../components/categories/CategoryFilterBar";
 import { CategoryFormModal } from "../components/categories/CategoryFormModal";
 import { ServiceFormModal } from "../components/services/ServiceFormModal";
@@ -255,7 +254,6 @@ export default function AdminCategoriesPage() {
           </div>
         </header>
 
-        <NotificationBanner error={c.error} notice={c.notice} />
 
         <CategoryFilterBar
           search={c.search}

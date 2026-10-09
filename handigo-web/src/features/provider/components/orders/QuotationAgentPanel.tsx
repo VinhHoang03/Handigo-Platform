@@ -20,7 +20,7 @@ interface Props {
 export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBusyChange, open, onClose }: Props) {
   const [instruction, setInstruction] = useState('');
   const [status, setStatus] = useState('');
-  const [error, setError] = useToastFeedback<string>('', "error");
+  const [, setError] = useToastFeedback<string>('', "error");
   const [working, setWorking] = useState(false);
   const [recording, setRecording] = useState(false);
   const [result, setResult] = useState<QuotationAgentResult | null>(null);
@@ -126,7 +126,6 @@ export function QuotationAgentPanel({ orderId, snapshot, disabled, onApply, onBu
       {working && <button type="button" onClick={() => { generation.current++; request.current?.abort(); setWorking(false); setStatus('Đã dừng xử lý; form được giữ nguyên.'); }} className="px-3 text-sm text-error">Dừng xử lý</button>}
     </div>
     {status && <p role="status" className="text-sm">{status}</p>}
-    {error && <p role="alert" className="text-sm text-error">{error}</p>}
     {result && <div className="space-y-2 text-sm">
       <p>{result.message}</p>
       {result.warnings.map((warning) => <p key={warning} className="text-amber-800">{warning}</p>)}

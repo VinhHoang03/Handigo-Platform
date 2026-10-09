@@ -8,7 +8,12 @@ export const feedbackApi = {
   getProviderFeedbackByOrder: async (orderId: string) => data<Feedback | null>(await api.get(`/feedback/provider/orders/${orderId}`)),
   create: async (payload: FeedbackPayload) => data<Feedback>(await api.post('/feedback', payload)),
   update: async (id: string, payload: Omit<FeedbackPayload, 'orderId'>) => data<Feedback>(await api.put(`/feedback/${id}`, payload)),
-  providerList: async (query: FeedbackQuery) => data<FeedbackList>(await api.get('/feedback/provider/me', { params: query })),
+  providerList: async (query: FeedbackQuery) => {
+    const params = Object.fromEntries(
+      Object.entries(query).filter(([, value]) => value !== '' && value !== undefined),
+    );
+    return data<FeedbackList>(await api.get('/feedback/provider/me', { params }));
+  },
   adminList: async (query: FeedbackQuery) => data<FeedbackList>(await api.get('/admin/feedbacks', { params: query })),
   reply: async (id: string, content: string, images?: string[]) => data<Feedback>(await api.put(`/feedback/${id}/reply`, { content, images })),
   setVisibility: async (id: string, isVisible: boolean) => data<Feedback>(await api.patch(`/feedback/${id}/visibility`, { isVisible })),

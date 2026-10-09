@@ -772,7 +772,7 @@ const syncPaidPayosPaymentToOrder = async (
   if (payment.paymentType === "inspection_deposit") {
     if (order.pricing.baseAmount === undefined) order.depositAmount = payment.amount;
     order.depositPaidAt = payment.paidAt;
-    order.paymentStatus = "partially_paid";
+    if (order.paymentStatus !== "paid") order.paymentStatus = "partially_paid";
   } else {
     const [summary] = await Payment.aggregate<{ total: number }>([
       {

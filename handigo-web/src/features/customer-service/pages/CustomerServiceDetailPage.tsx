@@ -117,7 +117,6 @@ export default function CustomerServiceDetailPage() {
                 {isCleaning ? <>
                   <ServiceQuantityPanel price={service.fixedPrice} quantity={uniformQuantity}
                     onChange={(quantity) => setQuantitySelection({ serviceId, quantity })} />
-                  {optionSelectionError && <p className="text-error">{optionSelectionError}</p>}
                 </> : <ServiceOptionsSection
                   service={service}
                   options={options}

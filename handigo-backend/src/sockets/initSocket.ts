@@ -22,7 +22,7 @@ const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
 
   if (!secret) {
-    throw new Error("ACCESS_TOKEN_SECRET or JWT_SECRET is not defined.");
+    throw new Error("Chưa cấu hình ACCESS_TOKEN_SECRET hoặc JWT_SECRET.");
   }
 
   return secret;
@@ -58,14 +58,14 @@ export const initSocket = (server: HttpServer) => {
       const token = socket.handshake.auth?.token;
 
       if (!token || typeof token !== "string") {
-        return next(new Error("Missing socket token"));
+        return next(new Error("Thiếu mã xác thực kết nối socket"));
       }
 
       const decoded = jwt.verify(token, getAccessSecret()) as SocketUser;
       const user = await User.findOne({ _id: decoded.id, isDeleted: false });
 
       if (!user || user.status === "locked") {
-        return next(new Error("Socket user is not allowed"));
+        return next(new Error("Người dùng không được phép kết nối socket"));
       }
 
       socket.user = {
@@ -75,7 +75,7 @@ export const initSocket = (server: HttpServer) => {
       };
       next();
     } catch (error) {
-      next(new Error("Invalid socket token"));
+      next(new Error("Mã xác thực kết nối socket không hợp lệ"));
     }
   });
 

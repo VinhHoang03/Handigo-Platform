@@ -2,8 +2,6 @@ import { StatCard } from "../shared/StatCard";
 import { PauseCircle, Plus, Tag, Ticket } from "lucide-react";
 export function PromotionHeader({
   stats,
-  notice,
-  error,
   onCreate,
 }: {
   stats: { active: number; inactive: number; used: number };
@@ -32,11 +30,6 @@ export function PromotionHeader({
         <StatCard icon={Ticket} label="Lượt đã dùng" value={stats.used} />
       </div>
 
-      {(notice || error) && (
-        <div className={`rounded-xl px-4 py-3 ${error ? "bg-error/10 text-error" : "bg-success-container text-on-success-container"}`}>
-          {error || notice}
-        </div>
-      )}
     </>
   );
 }

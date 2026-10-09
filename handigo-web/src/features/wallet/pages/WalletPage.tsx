@@ -20,7 +20,7 @@ export function WalletPage({ role }: { role: WalletRole }) {
   const [summary, setSummary] = useState<WalletSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>('', "error");
-  const [notice, setNotice] = useToastFeedback<string>('', "success");
+  const [, setNotice] = useToastFeedback<string>('', "success");
   const transactionsRef = useRef<WalletSectionHandle>(null);
   const withdrawalsRef = useRef<WalletSectionHandle>(null);
 
@@ -87,13 +87,10 @@ export function WalletPage({ role }: { role: WalletRole }) {
           <WalletHeaderActions isProvider={isProvider} onOpenDeposit={forms.openDeposit} onOpenWithdraw={forms.openWithdraw} />
         </div>
 
-        {(notice || error) && (
-          <div className={`rounded-xl px-4 py-3 ${error ? 'bg-error/10 text-error' : 'bg-success/10 text-success'}`}>{error || notice}</div>
-        )}
 
         <WalletStatsCards stats={stats} loading={loading} error={error && !wallet ? error : ''} onRetry={refreshAll} />
 
-        <WalletTransactionsSection key={role} ref={transactionsRef} onError={setError} pageSize={isProvider ? 5 : 8} />
+        <WalletTransactionsSection key={role} ref={transactionsRef} onError={setError} pageSize={5} groupSettlements={isProvider} />
 
         <WalletWithdrawalsSection ref={withdrawalsRef} onError={setError} />
       </div>

@@ -274,7 +274,6 @@ export const bookingApi = {
 export interface BookingPreview {
   baseAmount: number;
   bookingAmount: number;
-  immediateFee: number;
   depositAmount: number;
   minAdvanceMinutes: number;
   schedule: { durationMinutes: number; bufferMinutes: number; travelMinutes: number };

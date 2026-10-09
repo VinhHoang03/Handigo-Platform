@@ -7,7 +7,7 @@ export const createAddress = async (req: Request, res: Response) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: "Vui lòng đăng nhập để tiếp tục",
       });
     }
 
@@ -32,7 +32,7 @@ export const updateAddress = async (req: Request, res: Response) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: "Vui lòng đăng nhập để tiếp tục",
       });
     }
 
@@ -59,7 +59,7 @@ export const deleteAddress = async (req: Request, res: Response) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: "Vui lòng đăng nhập để tiếp tục",
       });
     }
 
@@ -86,7 +86,7 @@ export const getUserAddresses = async (req: Request, res: Response) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: "Vui lòng đăng nhập để tiếp tục",
       });
     }
 
@@ -111,7 +111,7 @@ export const setDefaultAddress = async (req: Request, res: Response) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: "Vui lòng đăng nhập để tiếp tục",
       });
     }
 
