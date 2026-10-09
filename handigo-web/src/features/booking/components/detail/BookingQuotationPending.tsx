@@ -15,7 +15,7 @@ export const BookingQuotationPending = ({
 
       <div className="min-w-0 flex-1 text-center sm:text-left">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="min-w-0 whitespace-normal break-words text-base font-bold leading-snug text-on-surface sm:text-lg">
+          <h3 className="min-w-0 whitespace-normal break-words text-base font-bold leading-snug text-on-surface">
             Đang chờ chuyên gia báo giá
           </h3>
           <span className="mx-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-warning-container px-3 py-1 text-xs font-bold text-on-warning-container sm:mx-0">

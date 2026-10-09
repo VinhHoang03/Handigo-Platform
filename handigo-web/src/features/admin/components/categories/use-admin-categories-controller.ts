@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useToast } from '@/components/common/Toast';
 import { getErrorMessage } from '@/utils/apiError';
@@ -48,16 +49,16 @@ export function useAdminCategoriesController() {
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
+  const [notice, setNotice] = useToastFeedback<string>('', "success");
 
   const [modal, setModal] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [editing, setEditing] = useState<Category | null>(null);
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useToastFeedback<string>('', "error");
   const [categoryIconColors, setCategoryIconColors] = useState<Array<Pick<Category, '_id' | 'name' | 'iconColor'>>>([]);
   const [colorLoading, setColorLoading] = useState(false);
-  const [colorError, setColorError] = useState('');
+  const [colorError, setColorError] = useToastFeedback<string>('', "error");
   const colorRequestId = useRef(0);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 

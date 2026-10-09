@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "@/components/common/Toast";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { getErrorMessage } from "@/utils/apiError";
 import type { CancellationPreview, Order, OrderQuotation } from "@/types/booking";
@@ -15,6 +16,7 @@ export const useBookingCancellationFlow = (
   setBusy: (busy: boolean) => void,
   loadData: () => Promise<void>,
 ) => {
+  const { addToast } = useToast();
   const [cancellationPreview, setCancellationPreview] =
     useState<CancellationPreview | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
@@ -39,6 +41,7 @@ export const useBookingCancellationFlow = (
         error: preview.canCancel ? undefined : preview.items[0]?.policyReason,
       });
     } catch {
+      addToast("Không thể tải chính sách hoàn tiền. Vui lòng đóng và thử lại.", "error");
       setCancellationPreview(null);
       setPendingAction({
         type: "cancelOrder",
@@ -70,6 +73,7 @@ export const useBookingCancellationFlow = (
           : "Có buổi đã đến giờ thực hiện và không thể tự hủy.",
       });
     } catch {
+      addToast("Không thể tải chính sách hoàn tiền cho chuỗi lịch. Vui lòng đóng và thử lại.", "error");
       setCancellationPreview(null);
       setPendingAction({
         type: "cancelSeries",
@@ -111,6 +115,7 @@ export const useBookingCancellationFlow = (
       pendingAction.type,
     );
     if (!reason) {
+      addToast(isCancellationAction ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.", "error");
       setPendingAction({
         ...pendingAction,
         error: isCancellationAction ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.",
@@ -118,6 +123,7 @@ export const useBookingCancellationFlow = (
       return;
     }
     if (isCancellationAction && reason === "Lý do khác" && !additionalInfo) {
+      addToast("Vui lòng nhập thông tin cho lý do khác.", "error");
       setPendingAction({ ...pendingAction, error: "Vui lòng nhập thông tin cho lý do khác." });
       return;
     }
@@ -138,10 +144,12 @@ export const useBookingCancellationFlow = (
         await bookingApi.cancelRecurringSeries(order._id, reason);
       }
 
+      addToast(pendingAction.type === "rejectQuotation" ? "Đã từ chối báo giá." : "Đã hủy lịch dịch vụ.", "success");
       setPendingAction(null);
       setCancellationPreview(null);
       await loadData();
     } catch (error) {
+      addToast(getErrorMessage(error, "Không thể thực hiện thao tác. Vui lòng thử lại."), "error");
       setPendingAction((current) =>
         current
           ? {

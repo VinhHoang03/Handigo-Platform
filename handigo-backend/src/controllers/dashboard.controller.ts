@@ -37,7 +37,7 @@ export const getDashboardOverview = async (
       return res.json({ success: true, data, message: "Get provider dashboard overview successfully" });
     }
 
-    throw new AppError("Access denied: insufficient permissions", 403);
+    throw new AppError("Bạn không có quyền truy cập chức năng này", 403);
   } catch (error) {
     return next(error);
   }

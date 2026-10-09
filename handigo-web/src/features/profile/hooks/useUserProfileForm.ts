@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from "react";
 import type {
   UserAddress,
@@ -36,7 +37,7 @@ export function useUserProfileForm({
   const [profileForm, setProfileForm] = useState<UserProfileFormValue>(() =>
     toProfileForm(user),
   );
-  const [localProfileError, setLocalProfileError] = useState("");
+  const [localProfileError, setLocalProfileError] = useToastFeedback<string>("", "error");
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
 
   const startEditing = () => {

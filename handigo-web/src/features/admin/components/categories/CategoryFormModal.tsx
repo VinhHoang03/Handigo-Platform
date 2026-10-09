@@ -20,14 +20,13 @@ interface CategoryFormModalProps {
 
 /** Modal thêm/sửa danh mục — tách khỏi trang chính để giữ trang dưới 200 dòng. */
 export function CategoryFormModal({
-  open, mode, form, busy, error, colorLoading = false, colorError,
+  open, mode, form, busy, colorLoading = false, colorError,
   unavailableIconColors = {}, onReloadColors, onChange, onClose, onSubmit,
 }: CategoryFormModalProps) {
   const colorConflict = unavailableIconColors[form.iconColor.toLowerCase()];
   return (
     <Modal open={open} title={mode === 'edit' ? 'Sửa danh mục' : 'Thêm danh mục'} onClose={() => { if (!busy) onClose(); }} closeOnEsc={!busy} closeOnOverlayClick={!busy}>
       <form onSubmit={onSubmit} className="space-y-4">
-        {error && <p role="alert" className="rounded-xl bg-error/10 p-3 text-sm text-error">{error}</p>}
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Tên danh mục</span>
           <input

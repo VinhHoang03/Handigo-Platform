@@ -40,7 +40,7 @@ const slugify = (value: string) =>
 
 const ensureValidId = (id: string) => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError("Invalid category id", 400);
+    throw new AppError("Định danh danh mục không hợp lệ", 400);
   }
 };
 
@@ -49,7 +49,7 @@ const ensureUniqueSlug = async (slug: string, excludeId?: string) => {
   if (excludeId) filter._id = { $ne: excludeId };
 
   if (await Category.exists(filter)) {
-    throw new AppError("Category slug already exists", 409);
+    throw new AppError("Đường dẫn danh mục đã tồn tại", 409);
   }
 };
 
@@ -113,7 +113,7 @@ export const listCategories = async (query: ListCategoriesQuery) => {
 export const getCategoryById = async (id: string) => {
   ensureValidId(id);
   const category = await Category.findOne({ _id: id, isDeleted: false });
-  if (!category) throw new AppError("Category not found", 404);
+  if (!category) throw new AppError("Không tìm thấy danh mục", 404);
 
   const services = await Service.find({
     categoryId: category._id,
@@ -126,7 +126,7 @@ export const getCategoryById = async (id: string) => {
 export const createCategory = async (data: CategoryInput) => {
   await Category.init();
   const slug = data.slug || slugify(data.name || "");
-  if (!slug) throw new AppError("Unable to generate a valid slug", 400);
+  if (!slug) throw new AppError("Không thể tạo đường dẫn hợp lệ", 400);
   await ensureUniqueSlug(slug);
   const iconColor = await resolveUniqueIconColor(data.iconColor);
   try {
@@ -140,7 +140,7 @@ export const updateCategory = async (id: string, data: CategoryInput) => {
   ensureValidId(id);
   await Category.init();
   const category = await Category.findOne({ _id: id, isDeleted: false });
-  if (!category) throw new AppError("Category not found", 404);
+  if (!category) throw new AppError("Không tìm thấy danh mục", 404);
 
   const slug = data.slug || (data.name ? slugify(data.name) : undefined);
   if (slug) {
@@ -163,7 +163,7 @@ export const updateCategory = async (id: string, data: CategoryInput) => {
 export const deleteCategory = async (id: string) => {
   ensureValidId(id);
   const category = await Category.findOne({ _id: id, isDeleted: false });
-  if (!category) throw new AppError("Category not found", 404);
+  if (!category) throw new AppError("Không tìm thấy danh mục", 404);
 
   const hasServices = await Service.exists({
     categoryId: id,
@@ -171,7 +171,7 @@ export const deleteCategory = async (id: string) => {
   });
   if (hasServices) {
     throw new AppError(
-      "Cannot delete a category that still contains services",
+      "Không thể xóa danh mục vẫn còn dịch vụ",
       409,
     );
   }

@@ -22,6 +22,7 @@ import {
   completeOrderSchema,
   createRepairQuotationSchema,
   updateRepairQuotationSchema,
+  confirmQuotationPaymentSchema,
   createOrderSchema,
   previewBookingSchema,
   updateExpectedEndSchema,
@@ -51,6 +52,7 @@ import {
   cancelRecurringSeries,
   startOrder,
   completeOrder,
+  confirmQuotationPayment,
   uploadOrderAttachment,
   acceptAssignment,
   rejectAssignment,
@@ -223,6 +225,15 @@ router.post(
   approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
   startOrder,
+);
+
+router.post(
+  "/:orderId/quotation/payment/confirm",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  validate(orderIdParamSchema, "params"),
+  validate(confirmQuotationPaymentSchema),
+  confirmQuotationPayment,
 );
 
 // POST   /orders/:orderId/complete → Provider: complete order

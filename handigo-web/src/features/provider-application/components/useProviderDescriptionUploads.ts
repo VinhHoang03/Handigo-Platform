@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { getErrorMessage } from "@/utils/apiError";
 import type {
@@ -26,7 +27,7 @@ export function useProviderDescriptionUploads(
   ) => Promise<ProviderApplicationAssetUpload>,
 ) {
   const [uploadingKey, setUploadingKey] = useState("");
-  const [uploadError, setUploadError] = useState("");
+  const [uploadError, setUploadError] = useToastFeedback<string>("", "error");
   const [ocrMessages, setOcrMessages] = useState<Record<string, string>>({});
 
   const uploadIdentity = async (

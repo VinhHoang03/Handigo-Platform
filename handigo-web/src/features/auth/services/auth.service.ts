@@ -150,7 +150,7 @@ export const authService = {
     try {
       await logoutApi();
     } catch (error) {
-      console.warn('Logout API failed, continuing with local cleanup:', error);
+      console.warn("API đăng xuất thất bại, tiếp tục xóa phiên đăng nhập trên thiết bị:", error);
     } finally {
       useAuthStore.getState().logout();
     }

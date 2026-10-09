@@ -31,6 +31,7 @@ export function ChatbotPanel({
   onNewSession,
   taskBlocked = false,
   payment,
+  paymentMessageId,
   onCheckPayment,
   onContinue,
   history,
@@ -51,6 +52,7 @@ export function ChatbotPanel({
   onNewSession?: () => void;
   taskBlocked?: boolean;
   payment?: AgentPayment | null;
+  paymentMessageId?: string;
   onCheckPayment?: (orderId: string) => void;
   onContinue?: () => void;
   history?: ReactNode;
@@ -116,11 +118,14 @@ export function ChatbotPanel({
           pendingActionId={pendingConfirmation?.actionId}
           confirmationsDisabled={isLoading || taskBlocked || Boolean(error) || Boolean(availabilityMessage)}
           onDecision={onDecision}
+          renderAfterMessage={(message) => payment && onCheckPayment && message._id === paymentMessageId
+            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} />
+            : null}
         >
           {pendingConfirmation && onDecision && !messages.some((message) => message.confirmation?.actionId === pendingConfirmation.actionId) && (
             <AgentConfirmationCard action={pendingConfirmation} disabled={isReplying || isLoading || taskBlocked} onDecision={onDecision} />
           )}
-          {payment && onCheckPayment && (
+          {payment && onCheckPayment && !messages.some((message) => message._id === paymentMessageId) && (
             <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} />
           )}
         </ChatbotMessageList>

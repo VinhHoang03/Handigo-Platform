@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from 'react';
 import { feedbackService } from '../services/feedback.service';
 import type { FeedbackList, FeedbackPayload, FeedbackQuery, OrderFeedbackContext } from '../types/feedback.types';
@@ -63,7 +64,7 @@ export function useOrderFeedback(orderId: string) {
 export function useFeedbackList(mode: 'provider' | 'admin', query: FeedbackQuery) {
   const [result, setResult] = useState<FeedbackList | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const load = useCallback(async () => {
     try {
       setLoading(true);
@@ -74,7 +75,7 @@ export function useFeedbackList(mode: 'provider' | 'admin', query: FeedbackQuery
     } finally {
       setLoading(false);
     }
-  }, [mode, query]);
+  }, [mode, query, setError]);
   useEffect(() => {
     let active = true;
     const request = mode === 'provider'
@@ -87,6 +88,6 @@ export function useFeedbackList(mode: 'provider' | 'admin', query: FeedbackQuery
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [mode, query]);
+  }, [mode, query, setError]);
   return { result, loading, error, load };
 }

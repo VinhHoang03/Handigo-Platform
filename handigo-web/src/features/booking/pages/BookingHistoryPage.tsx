@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BookingHistoryCard, BookingPageHeader, BookingShell } from '../components/BookingComponents';
@@ -20,7 +21,7 @@ const filters = [
 const BookingHistoryPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -51,7 +52,7 @@ const BookingHistoryPage = () => {
     } finally {
       setTimeout(() => setLoading(false), 0);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

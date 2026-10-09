@@ -52,7 +52,6 @@ export function CancellationDialog({
         <textarea value={explanation} onChange={(event) => onExplanationChange(event.target.value)} maxLength={500} rows={5} aria-invalid={Boolean(error)} className="mt-2 w-full resize-none rounded-2xl border border-outline-variant px-4 py-3 outline-none focus:border-error focus:ring-4 focus:ring-error/10" placeholder={reason === 'Lý do khác' ? 'Mô tả cụ thể lý do hủy (ít nhất 10 ký tự)...' : 'Bổ sung thông tin để khách hàng hiểu rõ hơn (không bắt buộc)...'} />
         <span className="mt-1 block text-right text-xs text-on-surface-variant">{explanation.length}/500</span>
       </label>
-      {error && <p className="mt-2 text-sm text-error">{error}</p>}
       <div className="mt-md flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
         <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50"><TriangleAlert aria-hidden="true" size={24} />Tiếp tục hủy đơn</button>

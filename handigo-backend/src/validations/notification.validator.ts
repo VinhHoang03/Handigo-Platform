@@ -34,8 +34,8 @@ export const adminNotificationListQuerySchema = notificationListQuerySchema.exte
 
 export const sendSystemNotificationSchema = z.object({
   targetRole: targetRoleSchema,
-  title: z.string().trim().min(1, "Title is required").max(200),
-  content: z.string().trim().min(1, "Content is required").max(2000),
+  title: z.string().trim().min(1, "Vui lòng nhập tiêu đề").max(200),
+  content: z.string().trim().min(1, "Vui lòng nhập nội dung").max(2000),
   type: z.literal("SYSTEM").default("SYSTEM"),
   data: z.record(z.string(), z.unknown()).nullable().optional(),
 });

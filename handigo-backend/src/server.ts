@@ -27,6 +27,7 @@ const startServer = async () => {
         stopRefundReconciliationMonitor,
       },
       { startReassignmentMonitor, stopReassignmentMonitor },
+      { startAgentOrderProgressMonitor, stopAgentOrderProgressMonitor },
     ] = await Promise.all([
       import("./app"),
       import("./configs/db"),
@@ -34,6 +35,7 @@ const startServer = async () => {
       import("./services/dispatch.service"),
       import("./services/orderCancellation.service"),
       import("./services/orderReassignment.service"),
+      import("./services/agentOrderProgress.service"),
     ]);
 
     await connectDB();
@@ -48,6 +50,7 @@ const startServer = async () => {
     DispatchService.startTimeoutMonitor();
     startRefundReconciliationMonitor();
     startReassignmentMonitor();
+    startAgentOrderProgressMonitor();
 
     server.listen(PORT, "0.0.0.0", () => {
       serverLogger.info("Máy chủ đang chạy.", { port: PORT });
@@ -73,6 +76,7 @@ const startServer = async () => {
       forceShutdownTimer.unref();
 
       try {
+        await stopAgentOrderProgressMonitor();
         server.closeIdleConnections();
         await new Promise<void>((resolve, reject) => {
           server.close((error) => {

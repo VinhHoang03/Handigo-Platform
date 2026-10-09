@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
 import type { Order } from "@/types/booking";
@@ -43,6 +44,7 @@ export function CreateCaseModal({
   onClose,
   onCreated,
 }: CreateCaseModalProps) {
+  const { addToast } = useToast();
   const [orderId, setOrderId] = useState(initialOrderId ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -54,7 +56,7 @@ export function CreateCaseModal({
   );
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useToastFeedback<string>("", "error");
 
   const availableOrders = useMemo(
     () => (kind === "complaint" ? orders.filter((order) => order.status === "completed") : orders),
@@ -118,6 +120,7 @@ export function CreateCaseModal({
       }
 
       onCreated();
+      addToast("Đã gửi yêu cầu.", "success");
       onClose();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể gửi yêu cầu. Vui lòng thử lại."));
@@ -180,7 +183,6 @@ export function CreateCaseModal({
           <EvidenceImagePicker files={files} onChange={setFiles} disabled={busy} />
         </div>
 
-        {error && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{error}</p>}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
           <button type="submit" disabled={busy} className="btn-primary">

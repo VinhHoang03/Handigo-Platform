@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import type { QuotationItem } from '../../types/providerOrder.types';
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { quotationItemTypes, type QuotationFormItem } from './quotationForm.types';
@@ -21,7 +22,7 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
   const [query, setQuery] = useState<string | null>(null);
   const [history, setHistory] = useState<QuotationHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const historyCallback = useRef(onHistory);
   useEffect(() => { historyCallback.current = onHistory; }, [onHistory]);
   useEffect(() => {
@@ -39,7 +40,7 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
       finally { if (!controller.signal.aborted) setLoading(false); }
     }, 450);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, orderId]);
+  }, [query, orderId, setError]);
   return (
     <div className="grid min-w-0 grid-cols-2 items-start gap-sm rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-sm md:grid-cols-12">
       <div className="col-span-2 min-w-0 space-y-2 md:col-span-4">
@@ -54,7 +55,6 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
         className="w-full min-w-0 rounded-xl border border-outline-variant px-3 py-2"
       />
       {query && loading && <p role="status" className="text-xs">Đang tìm hạng mục đã báo giá…</p>}
-      {error && <p role="alert" className="text-xs text-error">{error}</p>}
       {query && !loading && history.length > 0 && <div className="space-y-1 rounded-xl border p-2" aria-label="Gợi ý từ lịch sử báo giá">
         {history.map((entry) => <button key={entry.id} type="button" className="block w-full rounded-lg p-2 text-left text-xs hover:bg-primary/5"
           onClick={() => { onHistory(entry, query); setQuery(null); }}>

@@ -169,7 +169,7 @@ app.use(
     res: Response,
     _next: NextFunction,
   ) => {
-    appLogger.error("Lỗi xử lý request", err, {
+    appLogger.error("Lỗi xử lý yêu cầu", err, {
       method: req.method,
       path: req.path,
     });

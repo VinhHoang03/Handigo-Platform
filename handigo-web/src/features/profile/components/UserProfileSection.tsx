@@ -39,7 +39,6 @@ export function UserProfileSection({
   isSaving,
   isAddressLoading,
   isAddressSaving,
-  error,
   addressError,
   defaultAvatar = DEFAULT_AVATAR,
   showAvatar = true,
@@ -58,7 +57,6 @@ export function UserProfileSection({
     isEmailVisible,
     setIsEmailVisible,
     profileForm,
-    localProfileError,
     fieldErrors,
     startEditing,
     cancelEditing,
@@ -90,11 +88,6 @@ export function UserProfileSection({
         )}
       </div>
 
-      {(error || localProfileError) && (
-        <div className="mb-5 rounded-lg bg-error/10 p-3 text-sm font-medium text-error">
-          {localProfileError || error}
-        </div>
-      )}
 
       <div
         className={

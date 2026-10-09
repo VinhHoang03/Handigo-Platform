@@ -24,8 +24,6 @@ export const BookingServiceSummary = ({
   children,
 }: BookingServiceSummaryProps) => (
   <section className="rounded-3xl bg-surface-container-lowest p-lg shadow-sm border border-outline-variant/30">
-    {(order.pricing.immediateFee ?? 0) > 0 && <p className="mb-3 text-sm">Phí phục vụ ngay: {order.pricing.immediateFee?.toLocaleString('vi-VN')}đ (đã gồm trong tổng tiền).</p>}
-    {order.schedule && <p className="mb-3 text-sm">Thời lượng dự kiến: {order.schedule.durationMinutes} phút.{order.schedule.expectedEndAt && ` Hoàn thành dự kiến: ${new Date(order.schedule.expectedEndAt).toLocaleString('vi-VN')}.`}</p>}
     <div className="flex flex-col md:flex-row md:justify-between items-start gap-md mb-lg">
       <div className="flex gap-md items-center">
         <ReliableImage

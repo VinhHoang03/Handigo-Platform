@@ -1,3 +1,4 @@
+import { useToast } from "@/components/common/Toast";
 import { useState } from 'react';
 import { getErrorMessage } from '@/utils/apiError';
 import { categoryServiceApi } from '../../api/categoryService.api';
@@ -14,6 +15,7 @@ interface ImageInputProps {
 
 /** Ô nhập ảnh dịch vụ/tùy chọn — dán URL hoặc tải file lên. */
 export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', inputName = 'service-image', compact = false }: ImageInputProps) {
+  const { addToast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -24,9 +26,11 @@ export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', input
     try {
       const uploaded = await categoryServiceApi.uploadImage(file);
       onChange(uploaded.url);
-      setMsg('Đã tải ảnh lên.');
+      addToast('Đã tải ảnh lên.', 'success');
     } catch (err) {
-      setMsg(getErrorMessage(err, 'Có lỗi xảy ra.'));
+      const message = getErrorMessage(err, 'Không thể tải ảnh lên.');
+      setMsg(message);
+      addToast(message, 'error');
     } finally {
       setUploading(false);
     }

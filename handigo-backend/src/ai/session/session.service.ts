@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { Schema, model } from "mongoose";
 import { AppError } from "../../utils/appError";
 import { newSession, type AgentSession } from "../agent/agent-state";
+import { AgentCaseSubscription, AgentOrderMessage, AgentOrderSubscription } from "../../models/agentOrderProgress.model";
+import { mergeAgentOrderMessages } from "../../services/agentOrderProgress.service";
 
 interface SessionDocument {
   updatedAt: Date;
@@ -44,7 +46,7 @@ export class SessionService implements SessionStore {
   async get(id: string, userId: string) {
     const doc = await SessionModel.findOne({ _id: id, userId }).lean();
     if (!doc) throw new AppError("Không tìm thấy cuộc trò chuyện.", 404);
-    return doc.data;
+    return mergeAgentOrderMessages(doc.data);
   }
 
   async progress(id: string, userId: string) {
@@ -61,7 +63,12 @@ export class SessionService implements SessionStore {
       "data.requiresReconciliation": { $ne: true },
       "data.actions.status": { $nin: ["UNKNOWN", "EXECUTING"] },
     }).lean();
-    if (deleted) return;
+    if (deleted) {
+      await AgentOrderSubscription.deleteMany({ sessionId: id, userId });
+      await AgentCaseSubscription.deleteMany({ sessionId: id, userId });
+      await AgentOrderMessage.deleteMany({ sessionId: id, userId });
+      return;
+    }
     await this.get(id, userId);
     throw new AppError("Vui lòng hoàn tất lượt xử lý, xác nhận hoặc đối soát trước khi xóa cuộc trò chuyện.", 409);
   }
@@ -83,7 +90,7 @@ export class SessionService implements SessionStore {
 
   async latest(userId: string) {
     const doc = await SessionModel.findOne({ userId }).sort({ updatedAt: -1 }).lean();
-    return doc?.data ?? null;
+    return doc ? mergeAgentOrderMessages(doc.data) : null;
   }
 
   async acquire(id: string, userId: string) {
@@ -101,7 +108,12 @@ export class SessionService implements SessionStore {
       $set: { lockId, lockedUntil: new Date(Date.now() + 120_000) },
     }, { new: true, runValidators: true }).lean();
     if (!doc) throw new AppError("Phiên không khả dụng hoặc đang xử lý. Vui lòng tải lại sau.", 409);
-    return { session: doc.data, lockId };
+    try {
+      return { session: await mergeAgentOrderMessages(doc.data), lockId };
+    } catch (error) {
+      await this.release(id, lockId);
+      throw error;
+    }
   }
 
   async save(session: AgentSession, lockId: string) {
@@ -110,6 +122,7 @@ export class SessionService implements SessionStore {
       data: session, lockedUntil: new Date(Date.now() + 120_000),
     } }, { runValidators: true });
     if (result.matchedCount !== 1) throw new AppError("Phiên đã mất quyền xử lý. Vui lòng tải lại.", 409);
+    await mergeAgentOrderMessages(session);
   }
 
   async release(id: string, lockId: string) {

@@ -46,7 +46,7 @@ const getOriginalAmount = (order: any) => Math.max(order.pricing?.bookingAmount 
 
 const settlementFields = (order: Pick<IOrder, "pricing" | "inspectionRequired">, amount: number) => {
   if (order.pricing.baseAmount === undefined && !order.inspectionRequired) return {};
-  const settlement = calculateBookingSettlement(amount, order.pricing.immediateFee ?? 0, order.pricing.platformCommissionRate, order.pricing.immediateProviderPercent ?? 80, order.inspectionRequired);
+  const settlement = calculateBookingSettlement(amount, order.pricing.platformCommissionRate, order.inspectionRequired);
   return { "pricing.platformCommissionAmount": settlement.platformCommissionAmount, "pricing.providerEarningAmount": settlement.providerEarningAmount };
 };
 
@@ -54,7 +54,7 @@ const getAmountBeforeVoucher = (order: any) => {
   const originalAmount = getOriginalAmount(order);
   const promotionDiscountAmount = Math.max(order.pricing?.promotionDiscountAmount || 0, 0);
 
-  return Math.max(originalAmount - promotionDiscountAmount - (order.pricing?.immediateFee ?? 0), 0);
+  return Math.max(originalAmount - promotionDiscountAmount, 0);
 };
 
 const calculateDiscountAmount = (promotion: IPromotion, amountBeforeVoucher: number) => {
@@ -206,7 +206,7 @@ const toAdminVoucherResponse = (promotion: IPromotion) => ({
 
 const ensureAdmin = (user: RequestUser) => {
   if (user.role !== "ADMIN") {
-    throw new AppError("Chi admin moi co quyen quan ly voucher", 403);
+    throw new AppError("Chỉ quản trị viên mới có quyền quản lý mã giảm giá", 403);
   }
 };
 
@@ -249,7 +249,7 @@ const getVoucherOrFail = async (id: string) => {
 
 const mapDuplicateKeyError = (error: any) => {
   if (error?.code === 11000) {
-    throw new AppError("Ma voucher da ton tai", 409);
+    throw new AppError("Mã giảm giá đã tồn tại", 409);
   }
 
   throw error;
@@ -268,26 +268,26 @@ const assertUniqueVoucherCode = async (code: string, excludeId?: string) => {
   const existing = await Promotion.exists(query);
 
   if (existing) {
-    throw new AppError("Ma voucher da ton tai", 409);
+    throw new AppError("Mã giảm giá đã tồn tại", 409);
   }
 };
 
 const assertVoucherDateRange = (startAt: Date, endAt: Date) => {
   if (startAt >= endAt) {
-    throw new AppError("startAt phai truoc endAt", 400);
+    throw new AppError("Thời gian bắt đầu phải trước thời gian kết thúc", 400);
   }
 };
 
 const assertDiscountRule = (discountType: IPromotion["discountType"], discountValue: number) => {
   if (toResponseDiscountType(discountType) === "PERCENT" && (discountValue < 1 || discountValue > 100)) {
-    throw new AppError("Gia tri phan tram phai tu 1 den 100", 400);
+    throw new AppError("Giá trị phần trăm phải từ 1 đến 100", 400);
   }
 };
 
 const buildVoucherResponse = (order: any, promotion: IPromotion, discountAmount: number) => {
   const originalAmount = getOriginalAmount(order);
   const amountBeforeVoucher = getAmountBeforeVoucher(order);
-  const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0) + (order.pricing?.immediateFee ?? 0);
+  const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
 
   return {
     originalAmount,
@@ -362,7 +362,7 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
       const amountBeforeVoucher = getAmountBeforeVoucher(order);
       const { promotion, discountAmount, snapshot } =
         await resolveVoucherForAmount(input.code, amountBeforeVoucher, session);
-      const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0) + (order.pricing.immediateFee ?? 0);
+      const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
 
       const updatedOrder = await Order.findOneAndUpdate(
         {
@@ -434,8 +434,8 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
           $set: {
             voucherSnapshot: null,
             "pricing.voucherDiscountAmount": 0,
-            "pricing.totalPaidAmount": amountBeforeVoucher + (order.pricing.immediateFee ?? 0),
-            ...settlementFields(order, amountBeforeVoucher + (order.pricing.immediateFee ?? 0)),
+            "pricing.totalPaidAmount": amountBeforeVoucher,
+            ...settlementFields(order, amountBeforeVoucher),
           },
         },
         { new: true, session, runValidators: true },
@@ -452,7 +452,7 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
       return {
         originalAmount,
         discountAmount: 0,
-        finalAmount: amountBeforeVoucher + (order.pricing.immediateFee ?? 0),
+        finalAmount: amountBeforeVoucher,
         voucher: voucherCode ? { code: voucherCode } : null,
       };
     });
@@ -521,7 +521,7 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
       finalAmount:
         amountBeforeVoucher === undefined || discountAmount === undefined
           ? undefined
-          : Math.max(amountBeforeVoucher - discountAmount, 0) + (order?.pricing?.immediateFee ?? 0),
+          : Math.max(amountBeforeVoucher - discountAmount, 0),
     };
   });
 };

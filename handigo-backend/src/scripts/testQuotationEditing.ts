@@ -8,7 +8,7 @@ import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AuditLog } from "../models/auditLog.model";
 import { DEFAULT_BOOKING_POLICY } from "../validations/bookingPolicy.validator";
-import { completeOrderSchema, updateRepairQuotationSchema } from "../validations/order.validator";
+import { completeOrderSchema, confirmQuotationPaymentSchema, updateRepairQuotationSchema } from "../validations/order.validator";
 
 // Cô lập database và dịch vụ ngoài, không nạp cấu hình bí mật.
 const stubModule = (path: string, exports: object) => {
@@ -93,6 +93,10 @@ async function run() {
   mock.method(Order, "findOne", () => query(cloneOrder()));
   mock.method(Order, "findById", () => query(cloneOrder()));
   mock.method(Order, "exists", () => query(null));
+  mock.method(Order, "updateOne", async (_filter: unknown, update: any) => {
+    if (update.$set?.paymentStatus) order.paymentStatus = update.$set.paymentStatus;
+    return { matchedCount: 1 };
+  });
   mock.method(Provider, "findOne", () => query(provider));
   mock.method(Provider, "findById", () => query(provider));
   mock.method(Service, "findById", () => query({ serviceType: "variable_price" }));
@@ -241,7 +245,57 @@ async function run() {
   assert.equal(updateRepairQuotationSchema.safeParse({ ...payload(), quotationId: new Types.ObjectId().toString(), expectedRevision: -1 }).success, false);
   assert.equal(updateRepairQuotationSchema.safeParse({ ...payload(), quotationId: new Types.ObjectId().toString() }).success, false);
   assert.equal(completeOrderSchema.safeParse({ completionEvidenceImages: ["https://example.com/anh.jpg"], expectedQuotationId: new Types.ObjectId().toString() }).success, false);
-  console.log("Đạt: lưu/sửa báo giá, tổng tiền, lịch sử, phiên bản, quyền sở hữu, khóa khi kết thúc, tương thích bản cũ, lịch làm việc và kiểm tra trước hoàn thành.");
+  reset();
+  await save();
+  const confirmPayment = (expectedRevision = quotation!.revision, quotationId = quotation!.id) =>
+    AssignmentService.confirmQuotationPayment(order.id, provider.userId.toString(), quotationId, expectedRevision);
+  await assert.rejects(confirmPayment(), /trạng thái hiện tại/);
+  order.status = "in_progress";
+  await assert.rejects(confirmPayment(), /trạng thái hiện tại/);
+  order.status = "completed";
+  order.providerId = new Types.ObjectId();
+  await assert.rejects(confirmPayment(), /không phải thợ/);
+  order.providerId = provider._id as Types.ObjectId;
+  await assert.rejects(confirmPayment(quotation!.revision - 1), /Báo giá đã thay đổi/);
+  await assert.rejects(confirmPayment(quotation!.revision, new Types.ObjectId().toString()), /bản hiện tại/);
+  for (const status of ["pending", "rejected", "expired", "cancelled"] as const) {
+    quotation!.status = status;
+    await assert.rejects(confirmPayment(), /chưa đủ điều kiện/);
+  }
+  quotation!.status = "saved";
+  const confirmed = await confirmPayment();
+  assert.ok(confirmed.directPaymentConfirmedAt);
+  assert.equal(confirmed.directPaymentConfirmedAmount, 60000);
+  assert.equal(order.paymentStatus, "paid");
+  assert.equal(order.status, "completed");
+  assert.equal(settlementCalls, 0);
+  const auditCount = auditLogs.length;
+  const confirmedAt = confirmed.directPaymentConfirmedAt!.getTime();
+  assert.equal((await confirmPayment()).directPaymentConfirmedAt!.getTime(), confirmedAt);
+  assert.equal(auditLogs.length, auditCount);
+  order.paymentStatus = "partially_paid";
+  await confirmPayment();
+  assert.equal(order.paymentStatus, "paid");
+  assert.equal(auditLogs.length, auditCount);
+  assert.ok(events.some((event: any) => event[0] === customerId.toString() && event[1] === "quotation:updated" && event[2].orderId === order.id));
+  // Bản ghi cũ đã xác nhận lúc đang làm vẫn phải mất xác nhận khi sửa báo giá.
+  order.status = "in_progress";
+  await update();
+  assert.equal(order.paymentStatus, "partially_paid");
+  assert.equal(quotation!.directPaymentConfirmedAt, null);
+  assert.equal(quotation!.directPaymentConfirmedAmount, null);
+  order.pricing.baseAmount = 40000;
+  order.pricing.totalPaidAmount = 40000;
+  order.status = "completed";
+  assert.equal((await confirmPayment()).directPaymentConfirmedAmount, 60000);
+  order.status = "cancelled";
+  await assert.rejects(confirmPayment(), /trạng thái hiện tại/);
+  order.status = "in_progress";
+  order.depositPaidAt = null;
+  await assert.rejects(confirmPayment(), /trạng thái hiện tại/);
+  assert.equal(confirmQuotationPaymentSchema.safeParse({ quotationId: quotation!.id, expectedRevision: -1 }).success, false);
+  assert.equal(confirmQuotationPaymentSchema.safeParse({ quotationId: quotation!.id }).success, false);
+  console.log("Đạt: lưu/sửa báo giá, quyền sở hữu, phiên bản, lịch làm việc, hoàn thành và xác nhận thanh toán trực tiếp không ghi nhận trùng.");
 }
 
 run().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => mock.restoreAll());

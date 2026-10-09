@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -25,8 +26,8 @@ import { Globe, Settings, Zap } from "lucide-react";
 export default function AdminSystemConfigsPage() {
   const [items, setItems] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
   const [busy, setBusy] = useState(false);
   const [activeGroup, setActiveGroup] = useState<ConfigGroupKey | "all">("all");
   const [editing, setEditing] = useState<ConfigItem | null>(null);
@@ -48,7 +49,7 @@ export default function AdminSystemConfigsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);

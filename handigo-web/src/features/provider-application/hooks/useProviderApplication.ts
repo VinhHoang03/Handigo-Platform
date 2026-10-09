@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from 'react';
 import { providerApplicationService } from '../services/providerApplication.service';
 import type {
@@ -13,9 +14,9 @@ export function useProviderApplication(applicationId?: string | null) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const [submitError, setSubmitError] = useState('');
-  const [draftError, setDraftError] = useState('');
+  const [loadError, setLoadError] = useToastFeedback<string>('', "error");
+  const [submitError, setSubmitError] = useToastFeedback<string>('', "error");
+  const [draftError, setDraftError] = useToastFeedback<string>('', "error");
 
   const loadCategories = () => {
     setLoading(true);
@@ -54,7 +55,7 @@ export function useProviderApplication(applicationId?: string | null) {
     return () => {
       active = false;
     };
-  }, [applicationId]);
+  }, [applicationId, setLoadError]);
 
   const submit = async (payload: ProviderApplicationPayload) => {
     try {
@@ -84,13 +85,13 @@ export function useProviderApplication(applicationId?: string | null) {
       return draft;
     } catch (error) {
       setDraftError(
-        error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ lÆ°u nhÃ¡p há»“ sÆ¡.',
+        error instanceof Error ? error.message : 'Không thể lưu nháp hồ sơ.',
       );
       throw error;
     } finally {
       setSavingDraft(false);
     }
-  }, []);
+  }, [setDraftError]);
 
   return {
     categories,

@@ -53,7 +53,7 @@ export function getPaymentMethodLabel(method: string) {
     case 'wallet':
       return 'Ví HandiGo';
     case 'bank':
-      return 'Chuyển khoản QR';
+      return 'Thanh toán trực tuyến';
     case 'cash':
       return 'Tiền mặt';
     default:

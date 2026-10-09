@@ -48,14 +48,14 @@ const normalizeImageUrl = (value?: string | null) => {
     .replace(/^http:\/\/res\.cloudinary\.com/i, "https://res.cloudinary.com");
 };
 
-const ensureValidId = (id: string, field = "service") => {
+const ensureValidId = (id: string, field = "dịch vụ") => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${field} id`, 400);
+    throw new AppError(`Định danh ${field} không hợp lệ`, 400);
   }
 };
 
 const ensureCategoryExists = async (categoryId: string, requireActive = false) => {
-  ensureValidId(categoryId, "category");
+  ensureValidId(categoryId, "danh mục");
   const category = await Category.findOne({
     _id: categoryId,
     isDeleted: false,
@@ -105,7 +105,7 @@ const ensureUniqueSlug = async (
   if (excludeId) filter._id = { $ne: excludeId };
 
   if (await Service.exists(filter)) {
-    throw new AppError("Service slug already exists in this category", 409);
+    throw new AppError("Đường dẫn dịch vụ đã tồn tại trong danh mục này", 409);
   }
 };
 
@@ -122,7 +122,7 @@ export const listServices = async (query: ListServicesQuery) => {
     ];
   }
   if (query.categoryId) {
-    ensureValidId(query.categoryId, "category");
+    ensureValidId(query.categoryId, "danh mục");
     filter.categoryId = query.categoryId;
   }
   if (
@@ -223,7 +223,7 @@ export const getServiceById = async (id: string) => {
     "categoryId",
     "name slug isActive",
   );
-  if (!service) throw new AppError("Service not found", 404);
+  if (!service) throw new AppError("Không tìm thấy dịch vụ", 404);
 
   const [ratingStats, totalCompletedOrders] = await Promise.all([
     Feedback.aggregate<{ averageRating: number; totalFeedbacks: number }>([
@@ -263,7 +263,7 @@ export const createService = async (data: ServiceInput) => {
   normalizeAndValidatePricing(data);
   await ensureCategoryExists(data.categoryId!, data.isActive ?? true);
   const slug = data.slug || slugify(data.name || "");
-  if (!slug) throw new AppError("Unable to generate a valid slug", 400);
+  if (!slug) throw new AppError("Không thể tạo đường dẫn hợp lệ", 400);
   await ensureUniqueSlug(data.categoryId!, slug);
 
   return Service.create({ ...data, slug, image: normalizeImageUrl(data.image) });
@@ -272,7 +272,7 @@ export const createService = async (data: ServiceInput) => {
 export const updateService = async (id: string, data: ServiceInput) => {
   ensureValidId(id);
   const service = await Service.findOne({ _id: id, isDeleted: false });
-  if (!service) throw new AppError("Service not found", 404);
+  if (!service) throw new AppError("Không tìm thấy dịch vụ", 404);
 
   const categoryId = data.categoryId || service.categoryId.toString();
   const nextData: ServiceInput = {
@@ -307,7 +307,7 @@ export const updateService = async (id: string, data: ServiceInput) => {
 export const deleteService = async (id: string) => {
   ensureValidId(id);
   const service = await Service.findOne({ _id: id, isDeleted: false });
-  if (!service) throw new AppError("Service not found", 404);
+  if (!service) throw new AppError("Không tìm thấy dịch vụ", 404);
 
   service.isDeleted = true;
   service.deletedAt = new Date();

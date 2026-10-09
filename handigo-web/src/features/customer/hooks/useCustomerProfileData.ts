@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
@@ -21,6 +22,7 @@ import {
 
 /** Tải hồ sơ khách hàng + đơn đăng ký provider, và các thao tác lưu hồ sơ/avatar. */
 export function useCustomerProfileData() {
+  const { addToast } = useToast();
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [providerApplication, setProviderApplication] =
     useState<ProviderApplication | null>(null);
@@ -28,7 +30,7 @@ export function useCustomerProfileData() {
     useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useToastFeedback<string>("", "error");
   const [dismissedProviderBanner, setDismissedProviderBanner] =
     useState<ProviderBannerMode | null>(null);
 
@@ -78,7 +80,7 @@ export function useCustomerProfileData() {
     } finally {
       setIsLoading(false);
     }
-  }, [syncAuthUser]);
+  }, [setErrorMsg, syncAuthUser]);
 
   const loadProviderApplication = useCallback(async () => {
     try {
@@ -105,6 +107,7 @@ export function useCustomerProfileData() {
       const nextProfile = await updateUserProfile(payload);
       setProfile(nextProfile);
       syncAuthUser(nextProfile);
+      addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (error) {
       setErrorMsg(
         getErrorMessage(error, "Cập nhật hồ sơ thất bại. Vui lòng thử lại."),
@@ -123,6 +126,7 @@ export function useCustomerProfileData() {
       const nextProfile = await updateUserAvatar(url);
       setProfile(nextProfile);
       syncAuthUser(nextProfile);
+      addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (error) {
       setErrorMsg(
         getErrorMessage(

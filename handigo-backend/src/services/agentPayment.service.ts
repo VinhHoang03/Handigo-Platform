@@ -12,6 +12,7 @@ export const agentPaymentResultSchema = z.object({
   message: z.string(), amount: z.number().nonnegative().optional(),
   method: z.string().optional(), paymentType: z.string().optional(),
   checkoutUrl: z.string().url().optional(),
+  paymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
 });
 export type AgentPaymentResult = z.infer<typeof agentPaymentResultSchema>;
 export type AgentPaymentArguments = { orderId: string; method: CreatePaymentInput["method"] };
@@ -55,7 +56,7 @@ export function createAgentPaymentService(deps = dependencies) {
     }
     const payment = payments.find((item) => ["paid", "pending"].includes(item.status)) ?? payments[0];
     const base = { orderId, orderCode: order.orderCode, amount: payment?.amount,
-      method: payment?.method, paymentType: payment?.paymentType };
+      method: payment?.method, paymentType: payment?.paymentType, paymentId: payment ? String(payment._id) : undefined };
     if (payment?.status === "paid") return { ...base,
       status: payment.paymentType === "inspection_deposit" ? "deposit_paid" : "paid",
       message: payment.paymentType === "inspection_deposit"
@@ -68,7 +69,7 @@ export function createAgentPaymentService(deps = dependencies) {
       if (payment.method === "cash") return { ...base, status: "cash_pending", message: "Đã ghi nhận thanh toán tiền mặt. Bạn thanh toán trực tiếp cho nhà cung cấp; đơn chưa được đánh dấu đã thanh toán." };
       const link = payment.gatewayResponse?.paymentLink as { checkoutUrl?: unknown } | undefined;
       return { ...base, status: "pending", checkoutUrl: safePayosUrl(link?.checkoutUrl),
-        message: "Giao dịch đang chờ thanh toán. Mở PayOS để thanh toán hoặc hủy giao dịch trước khi đổi phương thức, sau đó chọn Kiểm tra thanh toán. Không tạo đơn mới." };
+        message: "Giao dịch đang chờ thanh toán. Quét mã QR trong khung thanh toán ngay tại đây. Hệ thống sẽ xác minh kết quả thanh toán cho bạn." };
     }
     if (["scheduled", "recurring"].includes(order.orderType)
       && !(order.status === "created" && !order.providerId && order.bookingStatus !== "reserved")

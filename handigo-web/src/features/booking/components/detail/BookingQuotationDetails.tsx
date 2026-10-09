@@ -25,8 +25,8 @@ export const BookingQuotationDetails = ({
 }: BookingQuotationDetailsProps) => (
   <>
     <div className="flex flex-col gap-3 mb-lg sm:flex-row sm:items-center sm:justify-between">
-      <h3 className="font-headline-md text-headline-md text-primary flex min-w-0 items-center gap-2">
-        <FileSpreadsheet aria-hidden="true" size={24} />
+      <h3 className="font-headline-sm text-headline-sm text-primary flex min-w-0 items-center gap-2">
+        <FileSpreadsheet aria-hidden="true" size={20} />
         Báo giá sửa chữa
       </h3>
       <span
@@ -76,7 +76,7 @@ export const BookingQuotationDetails = ({
               </p>
             )}
           </div>
-          <p className="font-headline-sm text-primary shrink-0 tabular-nums">
+          <p className="text-sm font-semibold text-primary shrink-0 tabular-nums">
             {formatCurrency(item.totalPrice)}
           </p>
         </div>
@@ -115,14 +115,14 @@ export const BookingQuotationDetails = ({
           </div>
           <div className="flex items-end justify-between gap-4 border-t border-primary/10 pt-3">
             <div>
-              <p className="text-label-sm font-bold uppercase text-on-surface-variant">
+              <p className="text-xs font-bold uppercase text-on-surface-variant">
                 Còn cần thanh toán
               </p>
               <p className="mt-1 text-xs text-on-surface-variant">
                 Thanh toán trực tiếp theo thỏa thuận với chuyên gia
               </p>
             </div>
-            <p className="shrink-0 text-headline-lg font-black leading-none text-primary tabular-nums">
+            <p className="shrink-0 text-headline-sm font-bold leading-tight text-primary tabular-nums">
               {formatCurrency(remainingQuotationAmount)}
             </p>
           </div>

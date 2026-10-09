@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Types } from 'mongoose';
 import { bookingPolicySchema, DEFAULT_BOOKING_POLICY } from '../validations/bookingPolicy.validator';
-import { calculateBookingSettlement, calculateDuration, calculateImmediateFee, getEarliestScheduledAt, intervalsConflict } from '../utils/bookingPolicy';
+import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, intervalsConflict } from '../utils/bookingPolicy';
 import { getOrderInterval, isWithinWorkingCalendar } from '../utils/providerSchedule';
 import { createOrderSchema, previewBookingSchema } from '../validations/order.validator';
 
@@ -11,30 +11,16 @@ const optionId = '100000000000000000000002';
 const extraId = '100000000000000000000003';
 const providerId = '100000000000000000000004';
 
-assert.equal(calculateImmediateFee(200000, false, 'normal', policy), 30000);
-assert.equal(calculateImmediateFee(50000, false, 'urgent', policy), 20000);
-assert.equal(calculateImmediateFee(1000000, false, 'normal', policy), 60000);
-assert.equal(calculateImmediateFee(200000, false, 'scheduled', policy), 0);
-assert.equal(calculateImmediateFee(200000, false, 'recurring', policy), 0);
-assert.equal(calculateImmediateFee(50000, true, 'normal', policy), 20000);
-assert.equal(calculateImmediateFee(1000000, true, 'normal', policy), 20000);
-assert.deepEqual(calculateBookingSettlement(230000, 30000, 0.15, 80), { platformCommissionAmount: 36000, providerEarningAmount: 194000 });
-assert.deepEqual(calculateBookingSettlement(210000, 30000, 0.15, 80), { platformCommissionAmount: 33000, providerEarningAmount: 177000 });
-assert.deepEqual(calculateBookingSettlement(80000, 30000, 0, 80), { platformCommissionAmount: 6000, providerEarningAmount: 74000 });
-assert.deepEqual(calculateBookingSettlement(30000, 30000, 0.15, 80), { platformCommissionAmount: 6000, providerEarningAmount: 24000 });
+assert.deepEqual(calculateBookingSettlement(200000, 0.15), { platformCommissionAmount: 30000, providerEarningAmount: 170000 });
+assert.deepEqual(calculateBookingSettlement(180000, 0.15), { platformCommissionAmount: 27000, providerEarningAmount: 153000 });
+assert.deepEqual(calculateBookingSettlement(80000, 0), { platformCommissionAmount: 0, providerEarningAmount: 80000 });
+assert.deepEqual(calculateBookingSettlement(0, 0.15), { platformCommissionAmount: 0, providerEarningAmount: 0 });
 
 // Đơn báo giá: cọc thuộc hệ thống, không cộng tiền sửa chữa vào ví thợ.
-assert.deepEqual(calculateBookingSettlement(40000, 0, 0, 80, true), { platformCommissionAmount: 40000, providerEarningAmount: 0 });
-// Cọc 40.000đ + phụ phí 20.000đ; thợ nhận 80% phụ phí.
-assert.deepEqual(calculateBookingSettlement(60000, 20000, 0, 80, true), { platformCommissionAmount: 44000, providerEarningAmount: 16000 });
-// Voucher giảm cọc 10.000đ, không giảm phần phụ phí của thợ.
-assert.deepEqual(calculateBookingSettlement(50000, 20000, 0, 80, true), { platformCommissionAmount: 34000, providerEarningAmount: 16000 });
-assert.deepEqual(calculateBookingSettlement(20000, 20000, 0, 80, true), { platformCommissionAmount: 4000, providerEarningAmount: 16000 });
-assert.deepEqual(calculateBookingSettlement(0, 0, 0, 80, true), { platformCommissionAmount: 0, providerEarningAmount: 0 });
-// Tỷ lệ lấy từ cấu hình của đơn, không cố định ở mức 80%.
-assert.deepEqual(calculateBookingSettlement(60000, 20000, 0, 65, true), { platformCommissionAmount: 47000, providerEarningAmount: 13000 });
-assert.deepEqual(calculateBookingSettlement(60000, 20000, 0, 0, true), { platformCommissionAmount: 60000, providerEarningAmount: 0 });
-assert.deepEqual(calculateBookingSettlement(60000, 20000, 0, 100, true), { platformCommissionAmount: 40000, providerEarningAmount: 20000 });
+assert.deepEqual(calculateBookingSettlement(40000, 0, true), { platformCommissionAmount: 40000, providerEarningAmount: 0 });
+// Voucher giảm tiền cọc thực thu của hệ thống.
+assert.deepEqual(calculateBookingSettlement(30000, 0, true), { platformCommissionAmount: 30000, providerEarningAmount: 0 });
+assert.deepEqual(calculateBookingSettlement(0, 0, true), { platformCommissionAmount: 0, providerEarningAmount: 0 });
 
 const custom = bookingPolicySchema.parse({
   services: { [serviceId]: { durationMinutes: 90, inspectionMinutes: 45 } },

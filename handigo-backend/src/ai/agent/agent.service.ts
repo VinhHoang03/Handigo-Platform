@@ -17,12 +17,16 @@ export function sessionView(session: AgentSession) {
     || session.pendingAction?.status === "EXECUTING" || session.pendingAction?.status === "UNKNOWN";
   const recentMessages = [...session.conversation].reverse();
   const latestUserIndex = recentMessages.findIndex((item) => item.role === "user");
-  // Chỉ gắn thẻ thanh toán với lượt hiện tại; giữ dữ liệu cũ khi cần đối soát.
+  // Ưu tiên thanh toán của lượt hiện tại; giữ dữ liệu khi cần đối soát hoặc giao dịch vẫn đang chờ.
   const paymentMessages = requiresReconciliation || latestUserIndex < 0
     ? recentMessages : recentMessages.slice(0, latestUserIndex);
-  const paymentResult = paymentMessages.find((item) => item.role === "tool"
+  const validPaymentMessage = (item: typeof recentMessages[number]) => item.role === "tool"
     && ["create_payment", "get_payment_status"].includes(item.tool ?? "")
-    && (() => { try { return agentPaymentResultSchema.safeParse(JSON.parse(item.content)).success; } catch { return false; } })());
+    && (() => { try { return agentPaymentResultSchema.safeParse(JSON.parse(item.content)).success; } catch { return false; } })();
+  const latestPayment = recentMessages.find(validPaymentMessage);
+  // Giao dịch đang chờ vẫn phải hiển thị khi khách gửi thêm tin nhắn trong cùng phiên.
+  const paymentResult = paymentMessages.find(validPaymentMessage)
+    ?? (latestPayment && JSON.parse(latestPayment.content).status === "pending" ? latestPayment : undefined);
   let payment = paymentResult ? agentPaymentResultSchema.parse(JSON.parse(paymentResult.content)) : null;
   const unknown = session.pendingAction?.tool === "create_payment" && session.pendingAction.status === "EXECUTING"
     ? session.pendingAction : [...session.actions].reverse().find((action) => action.tool === "create_payment" && action.status === "UNKNOWN");

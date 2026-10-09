@@ -1,4 +1,4 @@
-import { Children, useEffect, useRef, type ReactNode } from "react";
+import { Children, Fragment, useEffect, useRef, type ReactNode } from "react";
 import type {
   ChatbotAudience,
   ChatbotMessage,
@@ -24,6 +24,7 @@ export function ChatbotMessageList({
   pendingActionId,
   confirmationsDisabled = false,
   onDecision,
+  renderAfterMessage,
 }: {
   messages: ChatbotMessage[];
   isReplying: boolean;
@@ -35,12 +36,17 @@ export function ChatbotMessageList({
   pendingActionId?: string;
   confirmationsDisabled?: boolean;
   onDecision?: (decision: "CONFIRM" | "REJECT") => void;
+  renderAfterMessage?: (message: ChatbotMessage) => ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const followsLatest = useRef(true);
+  const lastUserMessageId = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const container = scrollRef.current;
+    const userMessageId = messages.findLast((message) => message.sender === "user")?._id;
+    if (userMessageId && userMessageId !== lastUserMessageId.current) followsLatest.current = true;
+    lastUserMessageId.current = userMessageId;
     if (container && followsLatest.current) {
       container.scrollTop = container.scrollHeight;
     }
@@ -78,8 +84,8 @@ export function ChatbotMessageList({
       {messages.map((message) => {
         const isUser = message.sender === "user";
         return (
+          <Fragment key={message._id}>
           <div
-            key={message._id}
             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
@@ -108,6 +114,8 @@ export function ChatbotMessageList({
               </time>
             </div>
           </div>
+          {renderAfterMessage?.(message)}
+          </Fragment>
         );
       })}
       {children}

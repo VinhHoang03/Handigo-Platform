@@ -4,11 +4,11 @@ const requiredString = z.string().trim().min(1);
 const slugSchema = z
   .string()
   .trim()
-  .min(1, "Slug is required")
-  .max(120, "Slug must be at most 120 characters")
+  .min(1, "Vui lòng nhập đường dẫn")
+  .max(120, "Đường dẫn không được vượt quá 120 ký tự")
   .regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    "Slug must contain only lowercase letters, numbers, and hyphens",
+    "Đường dẫn chỉ được chứa chữ thường, chữ số và dấu gạch nối",
   );
 
 export const createCategorySchema = z.object({
@@ -24,11 +24,11 @@ export const createCategorySchema = z.object({
 
 export const updateCategorySchema = createCategorySchema.partial().refine(
   (payload) => Object.keys(payload).length > 0,
-  { message: "At least one field is required" },
+  { message: "Vui lòng cung cấp ít nhất một trường dữ liệu" },
 );
 
 export const categoryIdSchema = z.object({
-  id: z.string().regex(/^[a-f\d]{24}$/i, "Invalid category id"),
+  id: z.string().regex(/^[a-f\d]{24}$/i, "Định danh danh mục không hợp lệ"),
 });
 
 export const categoryQuerySchema = z.object({

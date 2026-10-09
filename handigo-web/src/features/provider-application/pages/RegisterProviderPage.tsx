@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -25,7 +26,7 @@ export default function RegisterProviderPage() {
     isDirectProvider ? user?.providerOnboardingStep || 1 : 1,
   );
   const [form, setForm] = useState(initialProviderApplicationForm);
-  const [success, setSuccess] = useState("");
+  const [success, setSuccess] = useToastFeedback<string>("", "success");
 
   useRegisterProviderFormSync({
     user,

@@ -39,6 +39,8 @@ export interface RepairQuotation {
   finalAmount: number;
   customerConfirmed: boolean;
   providerConfirmed: boolean;
+  directPaymentConfirmedAt?: string | null;
+  directPaymentConfirmedAmount?: number | null;
   approvedAt?: string | null;
   rejectedAt?: string | null;
   createdAt: string;

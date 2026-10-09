@@ -64,14 +64,14 @@ async function testPricing() {
   const immediate = await buildServicePricingSnapshot(service, [], selectedOptions);
   assert.equal(immediate.baseAmount, 200000);
   assert.equal(immediate.bookingAmount, 200000);
-  assert.equal(immediate.immediateFee, 0);
+  assert.equal('immediateFee' in immediate, false);
   assert.equal(immediate.selectedOptionsSnapshot[0].quantity, 2);
   for (const orderType of ["normal", "urgent", "scheduled", "recurring"]) {
     const booked = await buildServicePricingSnapshot(service, [], selectedOptions, undefined, orderType);
     const preview = await previewServiceBooking({ serviceId: service._id.toString(), selectedOptions, orderType });
     assert.equal(booked.bookingAmount, 200000);
     assert.equal(preview.bookingAmount, booked.bookingAmount);
-    assert.equal(booked.immediateFee, 0);
+    assert.equal('immediateFee' in booked, false);
     assert.equal(booked.schedule.durationMinutes, DEFAULT_BOOKING_POLICY.defaultDurationMinutes);
   }
   await assert.rejects(buildServicePricingSnapshot(service, [], [selectedOptions[0], selectedOptions[0]]));
@@ -86,7 +86,7 @@ async function testPricing() {
   assert.equal(calculateDuration(cleaning._id.toString(), false, uniform.selectedOptionsSnapshot, DEFAULT_BOOKING_POLICY), 60);
   const uniformNow = await buildServicePricingSnapshot(cleaning, [], [], 3, "normal");
   assert.equal(uniformNow.bookingAmount, 300000);
-  assert.equal(uniformNow.immediateFee, 0);
+  assert.equal('immediateFee' in uniformNow, false);
   await assert.rejects(buildServicePricingSnapshot(cleaning, [], [], 0));
 
   const repair = new Service({ name: "Sửa chữa", serviceType: "variable_price", depositAmount: 40000 });
@@ -94,12 +94,13 @@ async function testPricing() {
   assert.equal(deposit.depositAmount, 40000);
   assert.equal(deposit.baseAmount, 40000);
   assert.equal(deposit.bookingAmount, 40000);
-  assert.equal(deposit.immediateFee, 0);
+  assert.equal('immediateFee' in deposit, false);
   assert.equal(deposit.selectedOptionsSnapshot[0].price, 0);
   mock.restoreAll();
 }
 
 async function testAssignments() {
+  provider.availabilityStatus = "online";
   const order = new Order({
     _id: new Types.ObjectId(), customerId: new Types.ObjectId(), serviceId: service._id,
     orderCode: "KIEM-THU", status: "created", paymentStatus: "paid", paymentMethod: "wallet",
@@ -142,6 +143,7 @@ async function testAssignments() {
   assert.equal(saved, 1);
   assert.equal(ended, 1);
   assert.equal(notifications.length, 1);
+  provider.availabilityStatus = "online";
 
   assignment.providerId = new Types.ObjectId();
   await assert.rejects(AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString()), /quyền/);
@@ -159,6 +161,7 @@ async function testAssignments() {
   mock.method(Payment, "exists", () => ({ session: async () => ({ _id: new Types.ObjectId() }) }));
   await AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString());
   assert.equal(saved, 2);
+  provider.availabilityStatus = "online";
   const claimsBeforeConflict = claimed;
   scheduleCheck.mock.mockImplementation(async () => { throw new Error("Trùng lịch kiểm thử"); });
   await assert.rejects(AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString()), /Trùng lịch/);
@@ -212,13 +215,13 @@ async function testOrderCreation() {
   assert.equal(immediate.pricing.bookingAmount, 200000);
   assert.equal(immediate.pricing.platformCommissionAmount, 30000);
   assert.equal(immediate.pricing.providerEarningAmount, 170000);
-  assert.equal(immediate.pricing.immediateFee, 0);
+  assert.equal(immediate.pricing.immediateFee, undefined);
   assert.equal(immediate.schedule?.durationMinutes, 60);
   await assert.rejects(OrderService.createOrder({ ...payload, expectedBookingAmount: 1 }), /Giá vừa thay đổi/);
   await assert.rejects(OrderService.createOrder({ ...payload, expectedBookingAmount: 230000 }), /Giá vừa thay đổi/);
   const discounted = await OrderService.createOrder({ ...payload, voucherCode: "KIEM-THU" });
   assert.equal(discounted.pricing.totalPaidAmount, 190000);
-  assert.equal(discounted.pricing.immediateFee, 0);
+  assert.equal(discounted.pricing.immediateFee, undefined);
   assert.equal(discounted.pricing.platformCommissionAmount + discounted.pricing.providerEarningAmount, 190000);
 
   const scheduledAt = new Date(Date.now() + 2 * 86400000);
@@ -232,7 +235,7 @@ async function testOrderCreation() {
   assert.equal(created[1].pricing.totalPaidAmount, 200000);
   assert.equal(created[1].bookingStatus, "reserved");
   assert.equal(created[2].recurringGroupId?.toString(), created[0].recurringGroupId?.toString());
-  assert.equal(created[0].pricing.immediateFee, 0);
+  assert.equal(created[0].pricing.immediateFee, undefined);
   assert.equal(created[0].pricing.platformCommissionAmount + created[0].pricing.providerEarningAmount, 190000);
 
   provider.autoAcceptScheduledBookings = true;

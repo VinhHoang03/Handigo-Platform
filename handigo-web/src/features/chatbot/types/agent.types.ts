@@ -36,7 +36,9 @@ export interface AgentPayment {
   status: "unpaid" | "pending" | "paid" | "deposit_paid" | "cash_pending" | "blocked" | "failed" | "refunded";
   message: string;
   amount?: number;
+  method?: string;
   checkoutUrl?: string;
+  paymentId?: string;
 }
 
 export interface AgentProgress {

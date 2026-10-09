@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DashboardShell } from '@/components/common/DashboardShell';
@@ -29,7 +30,7 @@ export default function ProviderSchedulePage() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +45,7 @@ export default function ProviderSchedulePage() {
       }
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [setError]);
 
   const ordersByDate = useMemo(() => orders.reduce<Record<string, Order[]>>((result, order) => {
     const key = dateKey(orderDate(order));

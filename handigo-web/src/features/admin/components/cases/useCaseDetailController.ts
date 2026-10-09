@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState } from "react";
 import type {
   Complaint,
@@ -26,11 +27,12 @@ export function useCaseDetailController(
   /** Lỗi tải chi tiết dùng chung banner lỗi của bảng (giữ nguyên hành vi cũ). */
   reportError: (message: string) => void,
 ) {
+  const { addToast } = useToast();
   const [selected, setSelected] = useState<SelectedAdminCase | null>(null);
   const [violationSource, setViolationSource] = useState<SourceForViolation | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState("");
+  const [actionError, setActionError] = useToastFeedback<string>("", "error");
   const [evidenceNote, setEvidenceNote] = useState("");
   const [nextStatus, setNextStatus] = useState("");
   const [reviewNote, setReviewNote] = useState("");
@@ -75,6 +77,7 @@ export function useCaseDetailController(
       setSelected({ kind: "complaint", item });
       resetForm();
       await reload();
+      addToast("Đã cập nhật hồ sơ xử lý.", "success");
     } catch (requestError) {
       setActionError(getErrorMessage(requestError, "Không thể cập nhật khiếu nại."));
     } finally {
@@ -96,6 +99,7 @@ export function useCaseDetailController(
       setSelected({ kind: "report", item });
       resetForm();
       await reload();
+      addToast("Đã cập nhật hồ sơ xử lý.", "success");
     } catch (requestError) {
       setActionError(getErrorMessage(requestError, "Không thể cập nhật báo cáo."));
     } finally {

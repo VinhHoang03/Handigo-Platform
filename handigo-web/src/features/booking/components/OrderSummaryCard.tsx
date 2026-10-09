@@ -129,7 +129,7 @@ export const OrderSummaryCard: React.FC<{
               <div className="flex items-start gap-sm">
                 <Calendar aria-hidden="true" size={19} className="text-primary" />
                 <div>
-                  <p className="text-xs text-on-surface-variant">{orderType === 'normal' ? 'Đặt ngay' : orderType === 'recurring' ? 'Lịch định kỳ' : 'Lịch hẹn'}</p>
+                  <p className="text-xs text-on-surface-variant">{orderType === 'normal' ? 'Đặt ngay' : orderType === 'recurring' ? 'Lịch định kỳ' : 'Thời gian thực hiện'}</p>
                   <p className="font-bold text-on-surface">
                     {orderType === 'normal' ? 'Sớm nhất có thể' : scheduledAt?.includes('T')
                       ? new Date(scheduledAt).toLocaleString('vi-VN')
@@ -150,7 +150,6 @@ export const OrderSummaryCard: React.FC<{
           )}
 
           <OrderSummaryPriceDetails
-            depositAmount={preview?.depositAmount}
             service={service}
             selectedOptions={selectedOptions}
             selectedOptionQuantities={selectedOptionQuantities}

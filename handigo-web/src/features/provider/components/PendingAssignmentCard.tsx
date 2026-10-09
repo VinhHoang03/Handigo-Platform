@@ -73,15 +73,15 @@ export function PendingAssignmentCard({
           </p>
         </div>
 
-        <div className="grid gap-sm sm:grid-cols-2">
-          <div className="rounded-2xl bg-surface-container-low p-sm">
+        <div className={`grid gap-sm ${isAppointment ? 'sm:grid-cols-2' : ''}`}>
+          {isAppointment && <div className="rounded-2xl bg-surface-container-low p-sm">
             <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
-              Thời gian hẹn
+              Thời gian thực hiện
             </p>
             <p className="mt-1 text-sm font-medium text-on-surface">
-              {formatDateTime(order.scheduledAt || order.createdAt)}
+              {formatDateTime(order.scheduledAt)}
             </p>
-          </div>
+          </div>}
           <div className="rounded-2xl bg-surface-container-low p-sm">
             <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
               Thu nhập dự kiến

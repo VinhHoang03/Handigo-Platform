@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import {
   getProvinces,
@@ -12,7 +13,7 @@ import {
 export function useProvinces() {
   const [provinces, setProvinces] = useState<AdministrativeUnit[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +25,7 @@ export function useProvinces() {
         const data = await getProvinces();
         if (!cancelled) setProvinces(data);
       } catch {
-        if (!cancelled) setError("Khong tai duoc danh sach tinh/thanh.");
+        if (!cancelled) setError("Không tải được danh sách tỉnh/thành.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -34,7 +35,7 @@ export function useProvinces() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setError]);
 
   return { provinces, loading, error };
 }
@@ -43,7 +44,7 @@ export function useProvinces() {
 export function useWardsByProvince(provinceCode: number | undefined) {
   const [wards, setWards] = useState<AdministrativeUnit[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     if (!provinceCode) {
@@ -59,7 +60,7 @@ export function useWardsByProvince(provinceCode: number | undefined) {
         const data = await getWardsByProvince(provinceCode);
         if (!cancelled) setWards(data);
       } catch {
-        if (!cancelled) setError("Khong tai duoc danh sach phuong/xa.");
+        if (!cancelled) setError("Không tải được danh sách phường/xã.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -69,7 +70,7 @@ export function useWardsByProvince(provinceCode: number | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [provinceCode]);
+  }, [provinceCode, setError]);
 
   return { wards, setWards, loading, error };
 }

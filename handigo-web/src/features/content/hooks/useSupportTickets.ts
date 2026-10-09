@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { caseManagementApi } from "@/features/case-management/api/caseManagement.api";
@@ -17,6 +18,7 @@ export type SupportRole = "CUSTOMER" | "PROVIDER";
  * tiết, huỷ, phản hồi. Tách khỏi phần hiển thị để component chỉ còn lo bố cục.
  */
 export function useSupportTickets(role: SupportRole) {
+  const { addToast } = useToast();
   const [ticketQuery, setTicketQuery] = useState<CaseListQuery>({
     page: 1,
     limit: 10,
@@ -27,8 +29,8 @@ export function useSupportTickets(role: SupportRole) {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [actionError, setActionError] = useToastFeedback<string>("", "error");
   const [selected, setSelected] = useState<SelectedCase | null>(null);
 
   const loadTickets = useCallback(async () => {
@@ -43,7 +45,7 @@ export function useSupportTickets(role: SupportRole) {
     } finally {
       setLoading(false);
     }
-  }, [ticketQuery]);
+  }, [setError, ticketQuery]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -84,6 +86,7 @@ export function useSupportTickets(role: SupportRole) {
       setBusy(true);
       setActionError("");
       const ticket = await action();
+      addToast("Đã cập nhật yêu cầu hỗ trợ.", "success");
       setSelected({ kind: "ticket", item: ticket });
       await loadTickets();
       return true;

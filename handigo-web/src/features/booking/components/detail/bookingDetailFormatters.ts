@@ -70,16 +70,16 @@ export const getPaymentStatusDisplay = (
     };
   }
 
-  if (currentOrder.inspectionRequired && hasPaidInitialPayment) {
+  if (currentOrder.paymentStatus === "paid") {
     return {
-      label: "Đã thanh toán tiền cọc",
+      label: "Đã thanh toán",
       className: toneTextClasses.success,
     };
   }
 
-  if (currentOrder.paymentStatus === "paid") {
+  if (currentOrder.inspectionRequired && hasPaidInitialPayment) {
     return {
-      label: "Đã thanh toán",
+      label: "Đã thanh toán tiền cọc",
       className: toneTextClasses.success,
     };
   }

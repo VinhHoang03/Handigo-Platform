@@ -27,5 +27,5 @@ export const updateServiceOptionSchema = z
   .object(serviceOptionFields)
   .partial()
   .refine((data) => Object.keys(data).length > 0, {
-    message: "At least one field is required",
+    message: "Vui lòng cung cấp ít nhất một trường dữ liệu",
   });

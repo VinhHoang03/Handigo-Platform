@@ -23,7 +23,7 @@ export const uploadImage = multer({
   // validate chỉ cho phép image
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only images are allowed"));
+      return cb(new Error("Chỉ cho phép tải lên tệp ảnh"));
     }
     cb(null, true);
   },

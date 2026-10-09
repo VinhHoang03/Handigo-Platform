@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import {
   providerDashboardApi,
@@ -5,6 +6,7 @@ import {
 } from "../../api/providerDashboard.api";
 import {
   dateKey,
+  getRevenueChart,
   getRevenueRange,
   type RevenuePeriod,
 } from "./providerHome.utils";
@@ -16,7 +18,7 @@ export function useProviderRevenue() {
     ProviderEarningPoint[]
   >([]);
   const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
-  const [earningsError, setEarningsError] = useState<string | null>(null);
+  const [earningsError, setEarningsError] = useToastFeedback<string | null>(null, "error");
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +49,7 @@ export function useProviderRevenue() {
     return () => {
       cancelled = true;
     };
-  }, [revenuePeriod]);
+  }, [revenuePeriod, setEarningsError]);
 
   const setRevenuePeriod = (period: RevenuePeriod) => {
     setRevenuePeriodState(period);
@@ -59,14 +61,7 @@ export function useProviderRevenue() {
   const earningsByDay = new Map(
     revenueEarnings.map((item) => [item.day, item.amount]),
   );
-  const revenueChart = revenueRange.dates.map((date) => ({
-    key: dateKey(date),
-    label:
-      revenuePeriod === "week"
-        ? date.toLocaleDateString("vi-VN", { weekday: "short" })
-        : String(date.getDate()),
-    amount: earningsByDay.get(dateKey(date)) ?? 0,
-  }));
+  const revenueChart = getRevenueChart(revenuePeriod, revenueRange.dates, earningsByDay);
   const revenueTotal = revenueChart.reduce(
     (total, item) => total + item.amount,
     0,
