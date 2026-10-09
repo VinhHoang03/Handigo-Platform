@@ -12,7 +12,7 @@ import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
 import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
-import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt } from "../utils/bookingPolicy";
+import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, isWithinAppointmentHours } from "../utils/bookingPolicy";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import {
   DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
@@ -201,19 +201,14 @@ export const OrderService = {
     ) {
       throw new AppError("Thời gian thực hiện không hợp lệ.", 400);
     }
-    const scheduledHour = scheduledAt
-      ? new Date(scheduledAt.getTime() + 7 * 60 * 60 * 1000).getUTCHours()
-      : null;
     if (
       ["scheduled", "recurring"].includes(orderType) &&
       (!scheduledAt
         || scheduledAt.getTime() < getEarliestScheduledAt().getTime()
-        || scheduledHour === null
-        || scheduledHour < 8
-        || scheduledHour > 21)
+        || !isWithinAppointmentHours(scheduledAt))
     ) {
       throw new AppError(
-        "Vui lòng chọn giờ từ 08:00 đến 21:59 và không sớm hơn phút hiện tại.",
+        "Vui lòng chọn giờ từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.",
         400,
       );
     }

@@ -45,7 +45,8 @@ export const getDefaultScheduledAt = (now = new Date()) => {
   const currentMinute = new Date(now);
   currentMinute.setSeconds(0, 0);
   if (now.getHours() < 8) return `${date}T${timeSlots[0]}:00`;
-  if (now.getHours() <= 21 && currentMinute.getTime() >= earliest) {
+  if ((now.getHours() < 21 || (now.getHours() === 21 && now.getMinutes() === 0))
+    && currentMinute.getTime() >= earliest) {
     return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
   }
   const tomorrow = new Date(now);
@@ -59,7 +60,13 @@ export const getInitialScheduledAt = (scheduledAt: string | undefined, now = new
     const selected = new Date(hasSelectedTime ? scheduledAt : `${scheduledAt}T08:00:00`);
     if (Number.isFinite(selected.getTime())
       && selected.getTime() >= getEarliestScheduledAt(now).getTime()
-      && selected.getHours() >= 8 && selected.getHours() <= 21) {
+      && selected.getHours() >= 8
+      && (selected.getHours() < 21 || (
+        selected.getHours() === 21
+        && selected.getMinutes() === 0
+        && selected.getSeconds() === 0
+        && selected.getMilliseconds() === 0
+      ))) {
       if (hasSelectedTime) return scheduledAt;
       if (selected.getTime() > getEarliestScheduledAt(now).getTime()) return `${scheduledAt}T${timeSlots[0]}:00`;
     }

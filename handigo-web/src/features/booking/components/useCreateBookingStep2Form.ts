@@ -192,8 +192,13 @@ export const useCreateBookingStep2Form = () => {
     if (shouldShowSchedulePicker && scheduledAt?.includes('T')
       && (new Date(scheduledAt).getHours() < 8
         || new Date(scheduledAt).getHours() > 21
+        || (new Date(scheduledAt).getHours() === 21 && (
+          new Date(scheduledAt).getMinutes() > 0
+          || new Date(scheduledAt).getSeconds() > 0
+          || new Date(scheduledAt).getMilliseconds() > 0
+        ))
         || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())) {
-      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 đến 21:59 và không sớm hơn phút hiện tại.';
+      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.';
     }
     // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
     // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.

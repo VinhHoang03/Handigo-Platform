@@ -41,7 +41,15 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   }
   if (
     (orderType === 'scheduled' || orderType === 'recurring') &&
-    (!scheduledAt || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())
+    (!scheduledAt
+      || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime()
+      || new Date(scheduledAt).getHours() < 8
+      || new Date(scheduledAt).getHours() > 21
+      || (new Date(scheduledAt).getHours() === 21 && (
+        new Date(scheduledAt).getMinutes() > 0
+        || new Date(scheduledAt).getSeconds() > 0
+        || new Date(scheduledAt).getMilliseconds() > 0
+      )))
   ) {
     setPaymentError('Vui lòng chọn thời gian thực hiện trong tương lai.');
     return;
