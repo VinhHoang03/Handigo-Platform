@@ -30,13 +30,13 @@ async function createMatchingSearch(startedAt: Date) {
     Math.max(expanded, initial, 0.1), Math.max(delay, 0.1), Math.max(duration, 0.1));
 }
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
-const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
+const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 90;
 
 /** Số provider nhận cùng một lượt đề nghị để cạnh tranh nhận đơn. */
 const DEFAULT_MATCHING_BATCH_SIZE = 3;
 
-/** Thời gian phản hồi dành riêng cho yêu cầu customer chọn provider cụ thể. */
-export const DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS = 2 * 60 * 1000;
+/** Thời gian nhận đơn dùng chung cho đơn thường, lịch hẹn và yêu cầu chọn thợ. */
+export const DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS = DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS * 1000;
 
 /** Số provider tối đa được thử sau khi khách đồng ý tìm provider thay thế. */
 export const MAX_DIRECT_PROVIDER_ATTEMPTS = 3;
@@ -68,16 +68,11 @@ interface DispatchContext {
 
 async function getMatchingConfig() {
   const [
-    matchingProviderTimeoutSecondsValue,
     maxMatchingDurationSecondsValue,
     maxMatchingAttemptsValue,
     scheduledDispatchLeadMinutesValue,
     matchingBatchSizeValue,
   ] = await Promise.all([
-    getNumberConfigValue(
-      "MATCHING_PROVIDER_TIMEOUT_SECONDS",
-      DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
-    ),
     getNumberConfigValue(
       "MAX_MATCHING_DURATION_SECONDS",
       DEFAULT_MAX_MATCHING_DURATION_SECONDS,
@@ -94,10 +89,7 @@ async function getMatchingConfig() {
   ]);
 
   return {
-    matchingProviderTimeoutSeconds: Math.max(
-      matchingProviderTimeoutSecondsValue,
-      DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
-    ),
+    matchingProviderTimeoutSeconds: DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
     maxMatchingDurationSeconds: Math.max(
       maxMatchingDurationSecondsValue,
       DEFAULT_MAX_MATCHING_DURATION_SECONDS,

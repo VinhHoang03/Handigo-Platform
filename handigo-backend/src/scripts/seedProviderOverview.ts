@@ -108,7 +108,7 @@ async function main() {
       for (const plan of plans) {
         if (await Order.exists({ orderCode: plan.orderCode }).session(session)) continue;
         const completed = plan.status === "completed";
-        const settlement = calculateBookingSettlement(plan.pricing.bookingAmount, 0, commissionRate, 80);
+        const settlement = calculateBookingSettlement(plan.pricing.bookingAmount, commissionRate, false);
         const [order] = await Order.create([{
           orderCode: plan.orderCode, customerId: customer._id, providerId: provider._id,
           preferredProviderId: provider._id, serviceId: plan.service._id, addressId: address._id,

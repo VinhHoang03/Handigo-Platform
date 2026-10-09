@@ -172,6 +172,7 @@ const saveRepairQuotation = async (
         attachments: payload.attachments ?? currentQuotation.attachments ?? [],
         subtotalAmount, discountAmount, finalAmount,
         approvedAt: null, customerConfirmed: false, providerConfirmed: true,
+        directPaymentConfirmedAt: null, directPaymentConfirmedAmount: null,
       });
       await currentQuotation.save({ session });
       if (update) {
@@ -188,6 +189,9 @@ const saveRepairQuotation = async (
       currentOrder.currentQuotationId = currentQuotation._id as Types.ObjectId;
       currentOrder.hasAdditionalQuotation = true;
       currentOrder.confirmation.customerConfirmedAt = null;
+      if (oldValue?.directPaymentConfirmedAt && currentOrder.paymentStatus === "paid") {
+        currentOrder.paymentStatus = "partially_paid";
+      }
       await currentOrder.save({ session });
       await AuditLog.create([{
         actorId: new Types.ObjectId(providerUserId),
@@ -436,6 +440,11 @@ export const AssignmentService = {
         );
       }
 
+      emitToUser(order.customerId.toString(), "order:updated", {
+        orderId: order._id.toString(),
+        recurringGroupId: order.recurringGroupId?.toString(),
+      });
+
       await closeCompetingAssignments(
         assignment.orderId,
         claimedAssignment._id as Types.ObjectId,
@@ -521,6 +530,10 @@ export const AssignmentService = {
       await session.endSession();
     }
     if (!result) throw new AppError("Không thể nhận đơn.", 409);
+    emitToUser(result.order.customerId.toString(), "order:updated", {
+      orderId: result.order._id.toString(),
+      recurringGroupId: result.order.recurringGroupId?.toString(),
+    });
     try {
       await closeCompetingAssignments(result.order._id as Types.ObjectId, result.assignment._id as Types.ObjectId);
       emitToUser(providerUserId, "assignment:closed", { assignmentId, reason: "accepted" });
@@ -693,6 +706,75 @@ export const AssignmentService = {
     providerUserId: string,
   ): Promise<InstanceType<typeof RepairQuotation>> {
     return saveRepairQuotation(payload, providerUserId);
+  },
+
+  /** Thợ xác nhận khoản sửa chữa đã nhận trực tiếp từ khách theo báo giá hiện tại. */
+  async confirmQuotationPayment(
+    orderId: string,
+    providerUserId: string,
+    quotationId: string,
+    expectedRevision: number,
+  ): Promise<InstanceType<typeof RepairQuotation>> {
+    const session = await mongoose.startSession();
+    try {
+      const result = await session.withTransaction(async () => {
+        const provider = await Provider.findOne({ userId: providerUserId, verified: true, isDeleted: false }).session(session);
+        if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ đã được duyệt.", 403);
+        await lockProviderSchedule(provider._id as Types.ObjectId, session);
+        const order = await Order.findOne({ _id: orderId, isDeleted: false }).session(session);
+        if (!order) throw new AppError("Đơn hàng không tồn tại.", 404);
+        if (order.providerId?.toString() !== provider.id) {
+          throw new AppError("Bạn không phải thợ được phân công cho đơn hàng này.", 403);
+        }
+        if (!order.inspectionRequired || order.status !== "completed" || !order.depositPaidAt) {
+          throw new AppError("Không thể xác nhận thanh toán báo giá ở trạng thái hiện tại của đơn hàng.", 409);
+        }
+        if (order.currentQuotationId?.toString() !== quotationId) {
+          throw new AppError("Báo giá không còn là bản hiện tại. Vui lòng tải lại đơn hàng.", 409);
+        }
+        const quotation = await RepairQuotation.findOne({ _id: quotationId, orderId: order._id, providerId: provider._id, isDeleted: false }).session(session);
+        if (!quotation) throw new AppError("Báo giá không tồn tại.", 404);
+        if (quotation.status !== "saved" && !(quotation.status === "approved" && quotation.customerConfirmed)) {
+          throw new AppError("Báo giá chưa đủ điều kiện xác nhận thanh toán.", 409);
+        }
+        if ((quotation.revision ?? 0) !== expectedRevision) {
+          throw new AppError("Báo giá đã thay đổi. Vui lòng tải lại và kiểm tra số tiền trước khi xác nhận.", 409);
+        }
+        const appliedDeposit = order.pricing.baseAmount !== undefined
+          ? Math.max(order.pricing.totalPaidAmount, 0)
+          : Math.max(order.depositAmount, 0);
+        const amount = Math.max(quotation.finalAmount - appliedDeposit, 0);
+        if (!Number.isFinite(amount)) throw new AppError("Số tiền thanh toán báo giá không hợp lệ.", 409);
+        // Cùng ghi vào đơn để phát hiện xung đột với thao tác hủy hoặc hoàn thành.
+        const claimedOrder = await Order.updateOne(
+          { _id: order._id, providerId: provider._id, status: order.status, currentQuotationId: quotation._id, isDeleted: false },
+          { $set: { paymentStatus: "paid" }, $inc: { __v: 1 } },
+          { session, runValidators: true },
+        );
+        if (claimedOrder.matchedCount !== 1) throw new AppError("Đơn hàng đã thay đổi. Vui lòng tải lại trước khi xác nhận.", 409);
+        if (quotation.directPaymentConfirmedAt) return quotation;
+        const oldValue = { ...quotation.toObject() };
+        quotation.directPaymentConfirmedAt = new Date();
+        quotation.directPaymentConfirmedAmount = amount;
+        await quotation.save({ session });
+        await AuditLog.create([{
+          actorId: new Types.ObjectId(providerUserId), actorRole: "provider",
+          action: "CONFIRM_QUOTATION_PAYMENT", targetType: "RepairQuotation", targetId: quotation._id,
+          oldValue, newValue: { ...quotation.toObject() },
+          description: "Thợ xác nhận đã nhận tiền sửa chữa trực tiếp từ khách.",
+        }], { session });
+        return quotation;
+      });
+      if (!result) throw new AppError("Không thể xác nhận thanh toán báo giá.", 500);
+      try {
+        emitToUser(result.customerId.toString(), "quotation:updated", { orderId, revision: result.revision });
+      } catch {
+        assignmentLogger.warn("Đã xác nhận thanh toán báo giá; chưa gửi được tín hiệu cập nhật cho khách.", { orderId });
+      }
+      return result;
+    } finally {
+      await session.endSession();
+    }
   },
 
   /** Giữ xác nhận cho báo giá chờ duyệt cũ; báo giá đã lưu không cần khách xác nhận. */

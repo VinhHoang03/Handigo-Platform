@@ -56,7 +56,7 @@ export function CreateCaseModal({
   );
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useToastFeedback<string>("", "error");
+  const [, setError] = useToastFeedback<string>("", "error");
 
   const availableOrders = useMemo(
     () => (kind === "complaint" ? orders.filter((order) => order.status === "completed") : orders),
@@ -183,7 +183,6 @@ export function CreateCaseModal({
           <EvidenceImagePicker files={files} onChange={setFiles} disabled={busy} />
         </div>
 
-        {error && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{error}</p>}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
           <button type="submit" disabled={busy} className="btn-primary">

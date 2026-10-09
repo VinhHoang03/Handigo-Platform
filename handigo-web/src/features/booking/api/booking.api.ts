@@ -278,7 +278,6 @@ export interface BookingPreview {
   promotionSnapshot?: { name: string } | null;
   baseAmount: number;
   bookingAmount: number;
-  immediateFee: number;
   depositAmount: number;
   minAdvanceMinutes: number;
   schedule: { durationMinutes: number; bufferMinutes: number; travelMinutes: number };

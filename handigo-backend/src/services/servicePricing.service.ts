@@ -96,8 +96,6 @@ export const buildServicePricingSnapshot = async (
       }],
       bookingAmount: amount,
       baseAmount: amount,
-      immediateFee: 0,
-      immediateProviderPercent: policy.providerFeePercent,
       minAdvanceMinutes: policy.minAdvanceMinutes,
       paymentHoldMinutes: policy.paymentHoldMinutes,
       schedule: {
@@ -201,8 +199,6 @@ export const buildServicePricingSnapshot = async (
     selectedOptionsSnapshot,
     bookingAmount,
     baseAmount: bookingAmount,
-    immediateFee: 0,
-    immediateProviderPercent: policy.providerFeePercent,
     minAdvanceMinutes: policy.minAdvanceMinutes,
     paymentHoldMinutes: policy.paymentHoldMinutes,
     schedule: {

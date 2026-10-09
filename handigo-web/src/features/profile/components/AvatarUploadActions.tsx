@@ -16,7 +16,6 @@ export function AvatarUploadActions({
   inputRef,
   file,
   isUploading,
-  error,
   onSelectFile,
   onClose,
   onSave,
@@ -39,11 +38,6 @@ export function AvatarUploadActions({
       <p className="text-center text-sm text-on-surface-variant">
         Hỗ trợ JPG/JPEG, PNG, WebP, GIF và AVIF, tối đa 5 MB.
       </p>
-      {error && (
-        <p className="rounded-lg bg-error/10 px-4 py-3 text-sm font-medium text-error">
-          {error}
-        </p>
-      )}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button

@@ -268,6 +268,15 @@ export const startOrder = async (
   }
 };
 
+export const confirmQuotationPayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { quotationId, expectedRevision } = req.body;
+    return ok(res, await AssignmentService.confirmQuotationPayment(param(req, "orderId"), uid(req), quotationId, expectedRevision));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const completeOrder = async (
   req: Request,
   res: Response,

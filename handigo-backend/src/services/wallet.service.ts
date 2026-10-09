@@ -7,6 +7,7 @@ import type { IOrder } from "../models/order.model";
 import User from "../models/user.model";
 import { toObjectId } from "../utils/mongo";
 import { buildTransactionCode } from "../utils/transaction";
+import { getGroupedWalletTransactionHistory } from "./walletHistory.service";
 import { Wallet } from "../models/wallet.model";
 import {
   WalletTransaction,
@@ -241,7 +242,7 @@ const buildTransactionFilter = (
   query: WalletTransactionQuery,
 ) => {
   const filter: Record<string, unknown> = {
-    userId,
+    userId: toObjectId(userId),
     isDeleted: false,
   };
 
@@ -304,6 +305,9 @@ export const getWalletTransactionHistory = async (
 
   const filter = buildTransactionFilter(user.id, query);
   filter["metadata.systemRevenueOnly"] = { $ne: true };
+  if (user.role === "PROVIDER" && query.groupSettlements && (!query.type || query.type === "provider_earning")) {
+    return getGroupedWalletTransactionHistory(filter, query);
+  }
   const skip = (query.page - 1) * query.limit;
 
   const [items, total] = await Promise.all([
@@ -752,7 +756,7 @@ export const recordCompletedOrderSettlement = async (
       amount: order.inspectionRequired ? netEarning : grossAmount,
       balanceAfter: balanceAfterGross,
       description: order.inspectionRequired
-        ? "Cộng phần phụ phí đặt ngay của thợ; tiền cọc thuộc hệ thống"
+        ? undefined
         : isCashOrder
         ? "Ghi nhận doanh thu tiền mặt khi đơn hàng hoàn tất"
         : "Cộng doanh thu dịch vụ khi đơn hàng hoàn tất",
@@ -777,7 +781,7 @@ export const recordCompletedOrderSettlement = async (
             amount: platformFee,
             balanceAfter: balanceAfterSettlement,
             description: order.inspectionRequired
-              ? "Ghi nhận cọc và phần phụ phí của hệ thống, không trừ ví thợ"
+              ? undefined
               : isCashOrder
               ? "Trừ phí nền tảng của đơn hàng thanh toán tiền mặt"
               : "Khấu trừ phí nền tảng từ doanh thu dịch vụ",

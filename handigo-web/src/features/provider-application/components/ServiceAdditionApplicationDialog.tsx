@@ -37,7 +37,7 @@ export function ServiceAdditionApplicationDialog({
   );
   const [description, setDescription] = useState(application?.description || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useToastFeedback<string>("", "error");
+  const [, setError] = useToastFeedback<string>("", "error");
   const {
     certificates,
     certificateForm,
@@ -118,11 +118,6 @@ export function ServiceAdditionApplicationDialog({
           </p>
         </div>
 
-        {error && (
-          <p className="rounded-xl bg-error/10 p-3 text-sm font-medium text-error">
-            {error}
-          </p>
-        )}
 
         {isLoading ? (
           <div className="h-48 animate-pulse rounded-2xl bg-surface-container-low" />

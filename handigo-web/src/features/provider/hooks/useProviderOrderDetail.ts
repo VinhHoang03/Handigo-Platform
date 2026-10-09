@@ -137,6 +137,13 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     }, 'Không thể hoàn thành đơn.', true, 'Đã hoàn thành đơn dịch vụ.');
   };
 
+  const handleConfirmQuotationPayment = async (quotationId: string, expectedRevision: number) => {
+    if (!order || busy) return false;
+    return runAction(async () => {
+      await providerOrderApi.confirmQuotationPayment(order._id, quotationId, expectedRevision);
+    }, 'Không thể xác nhận thanh toán báo giá.', true, 'Đã xác nhận nhận đủ tiền sửa chữa theo báo giá.');
+  };
+
   const requestCancelConfirmation = () => {
     const reason = cancelReason.trim();
     const explanation = cancelExplanation.trim();
@@ -207,6 +214,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     handleReject,
     handleStart,
     handleComplete,
+    handleConfirmQuotationPayment,
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,

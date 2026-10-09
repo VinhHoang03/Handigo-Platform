@@ -238,6 +238,13 @@ export const updateRepairQuotationSchema = createRepairQuotationSchema.safeExten
   expectedRevision: z.number().int().nonnegative(),
 });
 
+export const confirmQuotationPaymentSchema = z.object({
+  quotationId: objectIdSchema,
+  expectedRevision: z.number({ error: "Phiên bản báo giá phải là số." })
+    .int("Phiên bản báo giá phải là số nguyên.")
+    .nonnegative("Phiên bản báo giá không được âm."),
+});
+
 export const rejectRepairQuotationSchema = z.object({
   rejectionReason: optionalTextSchema(
     500,

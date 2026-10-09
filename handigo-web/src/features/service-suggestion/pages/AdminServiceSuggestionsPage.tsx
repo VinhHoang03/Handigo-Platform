@@ -30,8 +30,8 @@ export default function AdminServiceSuggestionsPage() {
   const [createdCategoryId, setCreatedCategoryId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [notice, setNotice] = useToastFeedback<string>("", "success");
-  const [error, setError] = useToastFeedback<string>("", "error");
+  const [, setNotice] = useToastFeedback<string>("", "success");
+  const [, setError] = useToastFeedback<string>("", "error");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -150,15 +150,6 @@ export default function AdminServiceSuggestionsPage() {
           onRefresh={() => void loadData()}
         />
 
-        {(notice || error) && (
-          <div
-            className={`rounded-lg px-4 py-3 text-sm font-medium ${
-              error ? "bg-error/10 text-error" : "bg-success-container text-on-success-container"
-            }`}
-          >
-            {error || notice}
-          </div>
-        )}
 
         <AsyncState
           loading={isLoading}

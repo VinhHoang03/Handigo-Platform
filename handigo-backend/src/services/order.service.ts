@@ -47,7 +47,6 @@ import {
 
 const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
 const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
-const DEFAULT_APPOINTMENT_RESPONSE_MINUTES = 2;
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -153,7 +152,7 @@ export async function dispatchOrderForMatching(orderId: string) {
     ward: address.ward,
   }).catch((err: unknown) =>
     console.error(
-      `[OrderService] Dispatch failed for order ${order._id}:`,
+      `[OrderService] Điều phối đơn hàng ${order._id} thất bại:`,
       err,
     ),
   );
@@ -409,9 +408,7 @@ export const OrderService = {
       const promotionDiscountAmount = automaticPromotion?.discountAmount ?? 0;
       const { platformCommissionAmount, providerEarningAmount } = calculateBookingSettlement(
         Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
-        pricingSnapshot.immediateFee,
         platformCommissionRate,
-        pricingSnapshot.immediateProviderPercent,
         inspectionRequired,
       );
       return {
@@ -453,8 +450,6 @@ export const OrderService = {
       customerAttachments: payload.customerAttachments ?? [],
       pricing: {
         baseAmount: pricingSnapshot.baseAmount,
-        immediateFee: pricingSnapshot.immediateFee,
-        immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
         bookingAmount: totalAmount, // The amount including options for the current payment phase
         platformCommissionRate,
         platformCommissionAmount,
@@ -608,28 +603,9 @@ export const OrderService = {
     const candidate = candidates[0];
     if (!candidate) throw new AppError("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.", 409);
 
-    let responseDeadline: Date;
-    if (isAppointment) {
-      const responseMinutes = Math.max(
-        await getNumberConfigValue(
-          "APPOINTMENT_RESPONSE_MINUTES",
-          DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
-        ),
-        2,
-      );
-      responseDeadline = new Date(
-        order.scheduledAt
-          ? Math.min(
-            Date.now() + responseMinutes * 60 * 1000,
-            order.scheduledAt.getTime(),
-          )
-          : Date.now() + responseMinutes * 60 * 1000,
-      );
-    } else {
-      responseDeadline = new Date(
-        Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
-      );
-    }
+    const responseDeadline = new Date(
+      Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+    );
     const claimedOrder = await Order.findOneAndUpdate(
       { _id: order._id, status: "created", bookingStatus: "rejected" },
       {
@@ -1121,8 +1097,7 @@ export const OrderService = {
         const commissionRate = transactionalOrder.inspectionRequired
           ? 0
           : Math.max(transactionalOrder.pricing.platformCommissionRate, 0);
-        const immediateFee = transactionalOrder.pricing.immediateFee ?? 0;
-        const { platformCommissionAmount } = calculateBookingSettlement(totalAmount, immediateFee, commissionRate, transactionalOrder.pricing.immediateProviderPercent ?? 80, transactionalOrder.inspectionRequired);
+        const { platformCommissionAmount } = calculateBookingSettlement(totalAmount, commissionRate, transactionalOrder.inspectionRequired);
         transactionalOrder.pricing.platformCommissionAmount =
           platformCommissionAmount;
         transactionalOrder.pricing.totalPaidAmount = totalAmount;

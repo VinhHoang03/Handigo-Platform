@@ -3,7 +3,7 @@ import * as vietnamAddressService from "../services/vietnamAddress.service";
 
 const parseCodeParam = (value: string | string[] | undefined, name: string): number => {
   if (Array.isArray(value)) {
-    const error = new Error(`${name} must be a single value`) as Error & {
+    const error = new Error(`${name} chỉ được chứa một giá trị`) as Error & {
       statusCode?: number;
     };
     error.statusCode = 400;
@@ -12,7 +12,7 @@ const parseCodeParam = (value: string | string[] | undefined, name: string): num
 
   const code = Number(value);
   if (!Number.isInteger(code) || code <= 0) {
-    const error = new Error(`${name} must be a positive integer`) as Error & {
+    const error = new Error(`${name} phải là số nguyên dương`) as Error & {
       statusCode?: number;
     };
     error.statusCode = 400;

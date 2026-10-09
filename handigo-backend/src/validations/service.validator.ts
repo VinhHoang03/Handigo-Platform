@@ -3,11 +3,11 @@ import { z } from "zod";
 const slugSchema = z
   .string()
   .trim()
-  .min(1, "Slug is required")
-  .max(120, "Slug must be at most 120 characters")
+  .min(1, "Vui lòng nhập đường dẫn")
+  .max(120, "Đường dẫn không được vượt quá 120 ký tự")
   .regex(
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-    "Slug must contain only lowercase letters, numbers, and hyphens",
+    "Đường dẫn chỉ được chứa chữ thường, chữ số và dấu gạch nối",
   );
 
 const serviceImageUrl = z.string().trim().url().max(2000).refine(value => /^https?:\/\//i.test(value), "Ảnh phải dùng đường dẫn HTTP hoặc HTTPS");

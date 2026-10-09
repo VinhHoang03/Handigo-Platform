@@ -28,10 +28,10 @@ export const BookingQuotationPanel = ({
     order.inspectionRequired ||
     order.hasAdditionalQuotation;
 
-  if (!shouldShow) return null;
+  if (!shouldShow || (order.status === "cancelled" && !quotation)) return null;
 
   return (
-    <div className="mt-lg pt-lg border-t-4 border-primary/20 w-full overflow-hidden">
+    <div className="mt-lg pt-lg border-t-4 border-primary/20 w-full overflow-hidden text-sm leading-6">
       {quotation ? (
         <BookingQuotationDetails
           quotation={quotation}

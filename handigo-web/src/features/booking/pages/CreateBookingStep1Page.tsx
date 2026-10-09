@@ -22,7 +22,7 @@ const CreateBookingStep1Page = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
-  const [selectionError, setSelectionError] = useToastFeedback<string>('', "error");
+  const [, setSelectionError] = useToastFeedback<string>('', "error");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -134,7 +134,6 @@ const CreateBookingStep1Page = () => {
                   onQuantityChange={setOptionQuantity}
                 />
               )}
-              {selectionError && <p className="mt-sm text-sm font-semibold text-error">{selectionError}</p>}
             </div>
           </section>
         </div>

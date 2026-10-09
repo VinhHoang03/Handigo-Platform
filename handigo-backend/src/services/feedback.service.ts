@@ -32,7 +32,7 @@ interface PaginationQuery {
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${fieldName}`, 400);
+    throw new AppError(`Định danh ${fieldName} không hợp lệ`, 400);
   }
 };
 
@@ -82,8 +82,8 @@ export const recalculateProviderRating = async (providerId: Types.ObjectId | str
 };
 
 export const createFeedback = async (userId: string, payload: FeedbackPayload) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(payload.orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(payload.orderId, "đơn hàng");
 
   const order = await Order.findOne({
     _id: payload.orderId,
@@ -135,8 +135,8 @@ export const updateMyFeedback = async (
   feedbackId: string,
   payload: UpdateFeedbackPayload,
 ) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(feedbackId, "feedback id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(feedbackId, "đánh giá");
 
   const feedback = await Feedback.findOne({
     _id: feedbackId,
@@ -167,7 +167,7 @@ export const updateMyFeedback = async (
 };
 
 export const getMyFeedbacks = async (userId: string) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
 
   return Feedback.find({
     customerId: userId,
@@ -197,8 +197,8 @@ export const getLatestPublicFeedbacks = async () => {
 };
 
 export const getFeedbackByOrder = async (userId: string, orderId: string) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(orderId, "đơn hàng");
 
   const order = await Order.findOne({
     _id: orderId,
@@ -226,8 +226,8 @@ export const getFeedbackByOrder = async (userId: string, orderId: string) => {
 };
 
 export const getProviderFeedbackByOrder = async (userId: string, orderId: string) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(orderId, "đơn hàng");
 
   const provider = await Provider.findOne({ userId, isDeleted: false }).select("_id");
   if (!provider) {
@@ -254,8 +254,8 @@ export const getProviderFeedbackByOrder = async (userId: string, orderId: string
 };
 
 export const getOrderFeedbackContext = async (userId: string, orderId: string) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(orderId, "đơn hàng");
 
   const order = await Order.findOne({
     _id: orderId,
@@ -414,7 +414,7 @@ export const getProviderFeedbacks = async (
   providerId: string,
   query: PaginationQuery = {},
 ) => {
-  assertObjectId(providerId, "provider id");
+  assertObjectId(providerId, "nhà cung cấp");
 
   const provider = await Provider.findOne({
     _id: providerId,
@@ -494,7 +494,7 @@ export const getMyProviderFeedbacks = async (
   userId: string,
   query: PaginationQuery = {},
 ) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
 
   const provider = await Provider.findOne({
     userId,
@@ -512,7 +512,7 @@ export const setFeedbackVisibility = async (
   feedbackId: string,
   isVisible: boolean,
 ) => {
-  assertObjectId(feedbackId, "feedback id");
+  assertObjectId(feedbackId, "đánh giá");
 
   const feedback = await Feedback.findOneAndUpdate(
     {
@@ -538,8 +538,8 @@ export const upsertProviderReply = async (
   content: string,
   images?: string[],
 ) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(feedbackId, "feedback id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(feedbackId, "đánh giá");
 
   const provider = await Provider.findOne({ userId, isDeleted: false });
   if (!provider) {

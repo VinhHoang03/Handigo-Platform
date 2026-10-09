@@ -112,8 +112,6 @@ export interface OrderCustomer {
 
 export interface OrderPricing {
   baseAmount?: number;
-  immediateFee?: number;
-  immediateProviderPercent?: number;
   bookingAmount: number;
   platformCommissionRate: number;
   platformCommissionAmount: number;
@@ -319,6 +317,8 @@ export interface BookingState {
   requestedProviderName?: string;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
+  /** Thời gian do form tự điền, chưa được khách chủ động chọn. */
+  isScheduleAutomatic: boolean;
   recurrenceUnit?: "weekly" | "monthly";
   recurrenceCount?: 1 | 2 | 3 | 4 | 8 | 12;
   problemDescription?: string;
@@ -341,7 +341,7 @@ export interface BookingState {
   setPreferredProviderId: (id?: string, name?: string) => void;
   setRequestedProvider: (id?: string, name?: string) => void;
   setOrderType: (type: BookingState["orderType"]) => void;
-  setScheduledAt: (date: string) => void;
+  setScheduledAt: (date: string, automatic?: boolean) => void;
   setRecurrenceUnit: (unit: "weekly" | "monthly") => void;
   setRecurrenceCount: (count: 1 | 2 | 3 | 4 | 8 | 12) => void;
   setProblemDescription: (desc: string) => void;

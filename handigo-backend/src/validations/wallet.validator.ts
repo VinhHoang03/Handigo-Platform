@@ -23,6 +23,10 @@ export const paginationQuerySchema = z.object({
 export const walletTransactionQuerySchema = paginationQuerySchema
   .extend({
     type: walletTransactionTypeSchema.optional(),
+    groupSettlements: z.preprocess(
+      (value) => value === "true" ? true : value === "false" ? false : value,
+      z.boolean({ error: "Tùy chọn gộp quyết toán phải là giá trị đúng hoặc sai." }).optional(),
+    ),
     fromDate: z.coerce.date().optional(),
     toDate: z.coerce.date().optional(),
   })

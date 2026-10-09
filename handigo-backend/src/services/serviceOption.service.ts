@@ -4,9 +4,9 @@ import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
 import { optionWithGroup } from "../utils/serviceOptionGroups";
 
-const ensureValidId = (id: string, field = "id") => {
+const ensureValidId = (id: string, field = "được yêu cầu") => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${field}`, 400);
+    throw new AppError(`Định danh ${field} không hợp lệ`, 400);
   }
 };
 
@@ -14,7 +14,7 @@ export const getOptionsByServiceId = async (
   serviceId: string,
   includeInactive = false,
 ) => {
-  ensureValidId(serviceId, "service id");
+  ensureValidId(serviceId, "dịch vụ");
   const service = await Service.findOne({ _id: serviceId, isDeleted: false });
   if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
   const options = await ServiceOption.find({
@@ -85,7 +85,7 @@ const normalizeGroup = (value?: string | null) =>
   value?.trim().toLowerCase() || null;
 
 export const createOption = async (serviceId: string, data: ServiceOptionInput) => {
-  ensureValidId(serviceId, "service id");
+  ensureValidId(serviceId, "dịch vụ");
   const service = await Service.findOne({ _id: serviceId, isDeleted: false });
   if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
   const group = data.groupId ? service.optionGroups?.find(item => item._id.toString() === data.groupId) : null;
@@ -101,7 +101,7 @@ export const createOption = async (serviceId: string, data: ServiceOptionInput) 
 };
 
 export const updateOption = async (optionId: string, data: ServiceOptionInput) => {
-  ensureValidId(optionId, "option id");
+  ensureValidId(optionId, "tùy chọn");
   const option = await ServiceOption.findOne({ _id: optionId, isDeleted: false });
   if (!option) throw new AppError("Không tìm thấy tùy chọn dịch vụ.", 404);
   const service = await Service.findOne({
@@ -157,9 +157,9 @@ export const updateOption = async (optionId: string, data: ServiceOptionInput) =
 };
 
 export const deleteOption = async (optionId: string) => {
-  ensureValidId(optionId, "option id");
+  ensureValidId(optionId, "tùy chọn");
   const option = await ServiceOption.findOne({ _id: optionId, isDeleted: false });
-  if (!option) throw new AppError("Service option not found", 404);
+  if (!option) throw new AppError("Không tìm thấy tùy chọn dịch vụ", 404);
   const service = await Service.findById(option.serviceId);
   const group = service?.optionGroups?.find(item => item._id.toString() === option.groupId?.toString());
   if (service?.isActive && group?.isRequired && !await ServiceOption.exists({
