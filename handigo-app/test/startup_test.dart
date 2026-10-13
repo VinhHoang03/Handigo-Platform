@@ -40,6 +40,39 @@ class _RestoreRepository extends AuthRepository {
 }
 
 void main() {
+  testWidgets('Đăng nhập dùng giao diện sáng khi hệ thống ở chế độ tối', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.platformBrightnessTestValue =
+        Brightness.dark;
+    addTearDown(
+      tester.binding.platformDispatcher.clearPlatformBrightnessTestValue,
+    );
+    final api = ApiClient(Dio(), CookieJar());
+    final repository = _RestoreRepository(api, Future<AppUser?>.value(null));
+    final container = ProviderContainer(
+      overrides: [
+        apiClientProvider.overrideWithValue(api),
+        authRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(api.close);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const HandigoApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(
+      Theme.of(tester.element(find.byType(LoginScreen))).brightness,
+      Brightness.light,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scenario in <String, ApiException?>{
     'không có phiên đăng nhập': null,
     'cookie hết hạn': const ApiException('Phiên hết hạn.', statusCode: 401),

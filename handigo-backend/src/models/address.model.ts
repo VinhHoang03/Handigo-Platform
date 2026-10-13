@@ -7,6 +7,9 @@ import {
 } from "../utils/profileValidation";
 
 export interface IAddress extends Document {
+  isDeleted: boolean;
+  deletedAt?: Date | null;
+  identityKey?: string;
   userId: Types.ObjectId;
   recipientName?: string;
   recipientPhone?: string;
@@ -26,6 +29,9 @@ export interface IAddress extends Document {
 
 const addressSchema = new Schema<IAddress>(
   {
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
+    identityKey: { type: String, select: false },
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -91,5 +97,8 @@ const addressSchema = new Schema<IAddress>(
 );
 
 addressSchema.index({ userId: 1 });
+addressSchema.index({ userId: 1, identityKey: 1 }, {
+  unique: true, partialFilterExpression: { identityKey: { $type: "string" } },
+});
 
 export const Address = model<IAddress>("Address", addressSchema, "addresses");

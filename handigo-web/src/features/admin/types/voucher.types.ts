@@ -12,6 +12,8 @@ export interface Voucher {
   minOrderAmount?: number | null;
   usageLimit?: number | null;
   usedCount: number;
+  reservedCount?: number;
+  perUserLimit?: number;
   startAt: string;
   endAt: string;
   status: VoucherStatus;
@@ -29,6 +31,7 @@ export interface VoucherQuery {
 }
 
 export interface VoucherPayload {
+  perUserLimit?: number;
   code: string;
   name?: string;
   description?: string | null;

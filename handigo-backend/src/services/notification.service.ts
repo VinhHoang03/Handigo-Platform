@@ -77,22 +77,23 @@ export const createNotificationRecord = async (
   options?: {
     session?: ClientSession;
     emitRealtime?: boolean;
+    deferRealtime?: boolean;
   },
 ) => {
+  const document = new Notification({
+    userId: toObjectId(input.userId),
+    type: input.type,
+    title: input.title.trim(),
+    content: input.content.trim(),
+    data: input.data ?? null,
+  });
+  document.$locals.deferRealtime = options?.deferRealtime === true;
   const [notification] = await Notification.create(
-    [
-      {
-        userId: toObjectId(input.userId),
-        type: input.type,
-        title: input.title.trim(),
-        content: input.content.trim(),
-        data: input.data ?? null,
-      },
-    ],
+    [document],
     { session: options?.session },
   );
 
-  if (options?.emitRealtime) {
+  if (options?.emitRealtime && !options.deferRealtime) {
     emitRealtimeNotification(notification);
   }
 

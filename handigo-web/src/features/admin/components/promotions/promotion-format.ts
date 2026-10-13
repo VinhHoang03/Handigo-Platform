@@ -14,6 +14,7 @@ export type VoucherFormState = {
   maxDiscountAmount: string;
   minOrderAmount: string;
   usageLimit: string;
+  perUserLimit: string;
   startAt: string;
   endAt: string;
   status: Exclude<VoucherStatus, "EXPIRED">;
@@ -28,6 +29,7 @@ export const emptyForm: VoucherFormState = {
   maxDiscountAmount: "",
   minOrderAmount: "",
   usageLimit: "",
+  perUserLimit: "1",
   startAt: "",
   endAt: "",
   status: "ACTIVE",
@@ -85,6 +87,7 @@ export const buildPayload = (form: VoucherFormState): VoucherPayload => ({
   maxDiscountAmount: optionalNumber(form.maxDiscountAmount),
   minOrderAmount: optionalNumber(form.minOrderAmount),
   usageLimit: optionalNumber(form.usageLimit),
+  ...(form.perUserLimit.trim() ? { perUserLimit: Number(form.perUserLimit) } : {}),
   startAt: toIsoString(form.startAt),
   endAt: toIsoString(form.endAt),
   status: form.status,

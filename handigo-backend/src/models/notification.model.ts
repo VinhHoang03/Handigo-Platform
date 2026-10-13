@@ -54,7 +54,7 @@ NotificationSchema.pre("save", function () {
 });
 
 NotificationSchema.post("save", (notification: INotification) => {
-  if (notification.$locals.wasNew) {
+  if (notification.$locals.wasNew && !notification.$locals.deferRealtime) {
     emitRealtimeNotification(notification);
   }
 });

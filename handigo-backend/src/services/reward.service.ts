@@ -2,6 +2,8 @@ import mongoose, { ClientSession, Types } from "mongoose";
 import { randomUUID } from "crypto";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
 import { Promotion } from "../models/promotion.model";
+import { Voucher } from "../models/voucher.model";
+import { findStoredVoucher, listStoredVouchers } from "./voucherStore.service";
 import { IOrder, Order } from "../models/order.model";
 import { REWARD_POLICY, calculateRewardPoints } from "../configs/rewards";
 import { AppError } from "../utils/appError";
@@ -42,11 +44,9 @@ export const getRewardHistory = async (userId: string, page: number) => {
 
 export const getMyRewardVouchers = async (userId: string, page: number) => {
   const filter = { ownerId: new Types.ObjectId(userId), isDeleted: false };
-  const [items, total] = await Promise.all([
-    Promotion.find(filter).select("code name discountValue minOrderAmount startAt endAt usedCount isActive status reservedOrderId")
-      .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * 12).limit(12).lean(),
-    Promotion.countDocuments(filter),
-  ]);
+  const all = await listStoredVouchers(filter);
+  const total = all.length;
+  const items = all.slice((page - 1) * 12, page * 12).map(item => item.toObject());
   const reservations = await Order.find({
     _id: { $in: items.flatMap((item) => item.reservedOrderId ? [item.reservedOrderId] : []) },
     customerId: userId, isDeleted: false, status: { $ne: "cancelled" },
@@ -67,7 +67,7 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
     const previous = await RewardTransaction.findById(key).session(session);
     if (previous) {
       if (previous.offerId !== offerId) throw new AppError("Yêu cầu này đã được dùng cho ưu đãi khác.", 409);
-      return Promotion.findById(previous.promotionId).session(session);
+      return findStoredVoucher({ _id: previous.voucherId ?? previous.promotionId }, session);
     }
     const account = await RewardAccount.findOneAndUpdate(
       { _id: userId, balance: { $gte: offer.points } },
@@ -76,7 +76,7 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
     );
     if (!account) throw new AppError("Bạn chưa đủ điểm để đổi ưu đãi này.", 409);
     const now = new Date();
-    const [voucher] = await Promotion.create([{
+    const [voucher] = await Voucher.create([{
       ownerId: userId, code: `HD${randomUUID().replace(/-/g, "").toUpperCase()}`,
       name: offer.name, description: "Ưu đãi dành riêng cho khách hàng đổi điểm Handigo",
       discountType: "AMOUNT", discountValue: offer.discountValue, minOrderAmount: offer.minOrderAmount,
@@ -84,7 +84,7 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
     }], { session });
     await RewardTransaction.create([{
       _id: key, userId, kind: "REDEEM", points: -offer.points, balanceAfter: account.balance,
-      promotionId: voucher._id, offerId, description: `Đổi ưu đãi ${offer.name}`,
+      voucherId: voucher._id, offerId, description: `Đổi ưu đãi ${offer.name}`,
     }], { session });
     return voucher;
   });

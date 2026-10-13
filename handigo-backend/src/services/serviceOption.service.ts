@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { Service } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { AppError } from "../utils/appError";
-import { isAirConditionerCleaning } from "../utils/airConditionerCleaning";
+import { optionWithGroup } from "../utils/serviceOptionGroups";
 
 const ensureValidId = (id: string, field = "được yêu cầu") => {
   if (!Types.ObjectId.isValid(id)) {
@@ -16,8 +16,8 @@ export const getOptionsByServiceId = async (
 ) => {
   ensureValidId(serviceId, "dịch vụ");
   const service = await Service.findOne({ _id: serviceId, isDeleted: false });
-  if (service && isAirConditionerCleaning(service)) return [];
-  return ServiceOption.find({
+  if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
+  const options = await ServiceOption.find({
     serviceId,
     isDeleted: false,
     ...(includeInactive ? {} : { isActive: true }),
@@ -25,9 +25,12 @@ export const getOptionsByServiceId = async (
     sortOrder: 1,
     createdAt: 1,
   });
+  return options.map(option => ({ ...option.toObject(), ...optionWithGroup(service, option) }));
 };
 
 interface ServiceOptionInput {
+  groupId?: string | null;
+  allowsQuantity?: boolean;
   name?: string;
   description?: string | null;
   image?: string | null;
@@ -85,14 +88,14 @@ export const createOption = async (serviceId: string, data: ServiceOptionInput) 
   ensureValidId(serviceId, "dịch vụ");
   const service = await Service.findOne({ _id: serviceId, isDeleted: false });
   if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
-  if (isAirConditionerCleaning(service)) {
-    throw new AppError("Vệ sinh điều hòa chỉ áp dụng một giá cố định và số lượng, không có tùy chọn.", 400);
-  }
-  await ensureConsistentSelectionGroup(serviceId, data);
+  const group = data.groupId ? service.optionGroups?.find(item => item._id.toString() === data.groupId) : null;
+  if (data.groupId && !group) throw new AppError("Nhóm tùy chọn không thuộc dịch vụ này.", 400);
+  if (!group) await ensureConsistentSelectionGroup(serviceId, data);
   return ServiceOption.create({
     ...data,
+    ...(group ? { selectionGroup: group.name, selectionMode: group.selectionMode } : {}),
     price: service.serviceType === "variable_price" ? 0 : data.price,
-    selectionGroup: data.selectionGroup?.trim() || null,
+    selectionGroup: group?.name ?? data.selectionGroup?.trim() ?? null,
     serviceId,
   });
 };
@@ -104,32 +107,36 @@ export const updateOption = async (optionId: string, data: ServiceOptionInput) =
   const service = await Service.findOne({
     _id: option.serviceId,
     isDeleted: false,
-  }).select("serviceType slug name");
+  });
   if (!service) throw new AppError("Không tìm thấy dịch vụ.", 404);
-  if (isAirConditionerCleaning(service)) {
-    throw new AppError("Vệ sinh điều hòa không sử dụng tùy chọn dịch vụ.", 400);
+  const groupId = data.groupId === undefined ? option.groupId?.toString() : data.groupId;
+  const group = groupId ? service.optionGroups?.find(item => item._id.toString() === groupId) : null;
+  if (groupId && !group) throw new AppError("Nhóm tùy chọn không thuộc dịch vụ này.", 400);
+  if (option.groupId && (data.isActive === false || groupId !== option.groupId.toString())) {
+    const oldGroup = service.optionGroups?.find(item => item._id.equals(option.groupId!));
+    if (service.isActive && oldGroup?.isRequired && !await ServiceOption.exists({
+      serviceId: service._id, groupId: option.groupId, _id: { $ne: option._id }, isActive: true, isDeleted: false,
+    })) throw new AppError("Không thể bỏ tùy chọn cuối cùng của nhóm bắt buộc đang hoạt động.", 400);
   }
   const nextData = {
     ...data,
-    price:
-      service.serviceType === "variable_price"
-        ? 0
-        : data.price ?? option.price,
+    price: data.price ?? option.price,
     selectionGroup:
       data.selectionGroup === undefined
         ? option.selectionGroup
         : data.selectionGroup?.trim() || null,
-    selectionMode: data.selectionMode ?? option.selectionMode,
+    selectionMode: group?.selectionMode ?? data.selectionMode ?? option.selectionMode,
   };
+  if (group) nextData.selectionGroup = group.name;
   const staysInCurrentGroup =
     normalizeGroup(nextData.selectionGroup) === normalizeGroup(option.selectionGroup);
-  if (!staysInCurrentGroup) {
+  if (!group && !staysInCurrentGroup) {
     await ensureConsistentSelectionGroup(option.serviceId, nextData, optionId);
   }
   Object.assign(option, nextData);
   await option.save();
 
-  if (staysInCurrentGroup && nextData.selectionGroup) {
+  if (!group && staysInCurrentGroup && nextData.selectionGroup) {
     await ServiceOption.updateMany(
       {
         serviceId: option.serviceId,
@@ -153,6 +160,11 @@ export const deleteOption = async (optionId: string) => {
   ensureValidId(optionId, "tùy chọn");
   const option = await ServiceOption.findOne({ _id: optionId, isDeleted: false });
   if (!option) throw new AppError("Không tìm thấy tùy chọn dịch vụ", 404);
+  const service = await Service.findById(option.serviceId);
+  const group = service?.optionGroups?.find(item => item._id.toString() === option.groupId?.toString());
+  if (service?.isActive && group?.isRequired && !await ServiceOption.exists({
+    serviceId: option.serviceId, groupId: option.groupId, _id: { $ne: option._id }, isActive: true, isDeleted: false,
+  })) throw new AppError("Không thể xóa tùy chọn cuối cùng của nhóm bắt buộc đang hoạt động.", 400);
   option.isDeleted = true;
   option.deletedAt = new Date();
   option.isActive = false;

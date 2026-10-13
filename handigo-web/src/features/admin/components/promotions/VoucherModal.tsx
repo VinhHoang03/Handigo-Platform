@@ -87,6 +87,7 @@ export function VoucherModal({
             value={form.usageLimit}
             onChange={(value) => onChange({ ...form, usageLimit: value })}
           />
+          <FormInput label="Giới hạn mỗi khách" type="number" value={form.perUserLimit} onChange={value => onChange({ ...form, perUserLimit: value })} />
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <FormInput

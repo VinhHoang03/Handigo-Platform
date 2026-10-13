@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { useNavigate } from 'react-router-dom';
-import { selectedServiceImage } from '../constants/bookingImages';
+import { ReliableImage } from '@/components/common/ReliableImage';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Service, ServiceOption } from '../../../types/booking';
@@ -20,6 +20,7 @@ export const OrderSummaryCard: React.FC<{
   isLoading?: boolean;
   summaryContent?: React.ReactNode;
   discountAmount?: number;
+  voucherCode?: string;
 }> = ({
   step,
   actionLabel,
@@ -28,6 +29,7 @@ export const OrderSummaryCard: React.FC<{
   isLoading,
   summaryContent,
   discountAmount = 0,
+  voucherCode,
 }) => {
   const {
     categoryId,
@@ -42,7 +44,7 @@ export const OrderSummaryCard: React.FC<{
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const navigate = useNavigate();
-  const { preview, loading: priceLoading, error: priceError, retry } = useBookingPreview();
+  const { preview, loading: priceLoading, error: priceError, retry } = useBookingPreview(voucherCode);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,7 +69,7 @@ export const OrderSummaryCard: React.FC<{
     return () => { isMounted = false; };
   }, [serviceId, categoryId]);
 
-  const isCleaning = isAirConditionerCleaning(service);
+  const isCleaning = isAirConditionerCleaning(service) && options.length === 0;
   const selectedOptions = options.filter(opt => !isCleaning && selectedOptionIds.includes(opt._id));
 
   const calculateTotal = () => {
@@ -87,7 +89,8 @@ export const OrderSummaryCard: React.FC<{
   };
 
   const total = preview?.bookingAmount ?? calculateTotal();
-  const finalTotal = Math.max(total - Math.min(discountAmount, preview?.baseAmount ?? total), 0);
+  const effectiveDiscount = preview ? preview.promotionDiscountAmount + preview.voucherDiscountAmount : discountAmount;
+  const finalTotal = preview?.discountedAmount ?? Math.max(total - Math.min(discountAmount, total), 0);
 
   const handleAction = () => {
     if (onAction) {
@@ -104,9 +107,9 @@ export const OrderSummaryCard: React.FC<{
 
         <div className="space-y-md">
           <div className="flex gap-sm p-sm bg-surface-container-low rounded-2xl">
-            <img
-              className="w-16 h-16 rounded-xl object-cover"
-              src={service?.image || selectedServiceImage}
+            <ReliableImage
+              className="w-24 aspect-video shrink-0 rounded-xl object-contain"
+              src={service?.coverImage === undefined ? service?.image : service.coverImage}
               alt={service?.name || 'Dịch vụ'}
             />
             <div>
@@ -155,7 +158,7 @@ export const OrderSummaryCard: React.FC<{
             selectedOptionQuantities={selectedOptionQuantities}
             total={total}
             finalTotal={finalTotal}
-            discountAmount={discountAmount}
+            discountAmount={effectiveDiscount}
             summaryContent={summaryContent}
           />
       {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn từ 08:00, chọn khung giờ sau thời gian hiện tại. Thời gian đến là dự kiến, chưa phải cam kết.</p>}

@@ -43,6 +43,7 @@ export const buildVoucherColumns = ({
               {voucher.usedCount}
               {voucher.usageLimit == null ? "" : `/${voucher.usageLimit}`}
             </b>
+            {(voucher.reservedCount ?? 0) > 0 && <span> · Đang giữ: {voucher.reservedCount}</span>}
           </span>
           <span>
             Hạn:{" "}

@@ -7,6 +7,7 @@ import { ServiceListToolbar } from "../components/ServiceListToolbar";
 import { ServiceListEmpty } from "../components/ServiceListEmpty";
 import { ServiceCard } from "../components/ServiceCard";
 import { ServiceListSkeleton } from "../components/ServiceListSkeleton";
+import { PromotionBanner } from "../components/PromotionBanner";
 import {
   useServiceCatalog,
   type ServiceSortKey,
@@ -51,6 +52,7 @@ export default function CustomerServiceListPage() {
         </div>
 
         <section className="md:col-span-3">
+          <PromotionBanner />
           <ServiceListToolbar
             title={selectedCategory?.name || "Danh sách dịch vụ"}
             resultCount={visibleServices.length}

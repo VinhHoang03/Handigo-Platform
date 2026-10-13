@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import { OrderAssignment } from "../models/orderAssignment.model";
 
 export const getAssignmentRealtimePayload = async (assignmentId: string) => {
@@ -21,7 +22,7 @@ export const getAssignmentRealtimePayload = async (assignmentId: string) => {
       populate: [
         {
           path: "serviceId",
-          select: "name image serviceType depositAmount fixedPrice",
+          select: "name image coverImage serviceType depositAmount fixedPrice", transform: serviceImageResponse,
         },
         { path: "addressId", select: "ward province" },
       ],

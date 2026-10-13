@@ -1,4 +1,6 @@
 import { Address, IAddress } from "../models/address.model";
+import { createHash } from "node:crypto";
+import mongoose, { ClientSession } from "mongoose";
 import { geocodeSavedAddress } from "./reverseGeocoding.service";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
@@ -72,6 +74,24 @@ const pickAddressPayload = (data: AddressPayload): AddressPayload => {
 const normalizeAddressPart = (value?: string) =>
   value?.trim().toLocaleLowerCase("vi-VN").replace(/\s+/g, " ") || "";
 
+const addressIdentity = (payload: AddressPayload) => createHash("sha256").update(JSON.stringify([
+  normalizeAddressPart(payload.fullAddress), normalizeAddressPart(payload.province), normalizeAddressPart(payload.ward),
+])).digest("hex");
+
+// Khóa theo chủ sở hữu để không tạo nhiều địa chỉ mặc định khi ghi đồng thời.
+const changeAddresses = async <T>(userId: string, work: (session: ClientSession) => Promise<T>) => {
+  try {
+    return await mongoose.connection.transaction(async session => {
+      const owner = await User.updateOne({ _id: userId }, { $inc: { __v: 1 } }, { session, runValidators: true });
+      if (!owner.matchedCount) throw new AppError("Không tìm thấy chủ sở hữu địa chỉ.", 404);
+      return work(session);
+    });
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) throw new AppError("Địa chỉ này đã tồn tại trong sổ địa chỉ.", 409);
+    throw error;
+  }
+};
+
 // Lấy tọa độ trước khi ghi để không lưu địa chỉ mới với vị trí cũ.
 const resolveAddressPayload = async (payload: AddressPayload, current?: IAddress) => {
   const hasCoordinates = (value: AddressPayload) =>
@@ -112,15 +132,18 @@ const hasSameAdministrativeUnit = (
   return normalizeAddressPart(currentName) === normalizeAddressPart(candidateName);
 };
 
-const findDuplicateAddress = async (userId: string, payload: AddressPayload) => {
+const findDuplicateAddress = async (userId: string, payload: AddressPayload, session: ClientSession, excludeId?: string) => {
   const addresses = await Address.find({ userId })
-    .select("fullAddress province provinceCode ward wardCode placeId")
+    .select("fullAddress province provinceCode ward wardCode placeId isDeleted updatedAt")
+    .sort({ isDeleted: 1, createdAt: -1 }).session(session)
     .lean();
 
   return addresses.find((address) => {
+    if (address._id.toString() === excludeId) return false;
     if (
       payload.placeId &&
       address.placeId &&
+      normalizeAddressPart(address.fullAddress) === normalizeAddressPart(payload.fullAddress) &&
       normalizeAddressPart(address.placeId) === normalizeAddressPart(payload.placeId)
     ) {
       return true;
@@ -145,94 +168,57 @@ const findDuplicateAddress = async (userId: string, payload: AddressPayload) => 
 };
 
 export const createAddress = async (userId: string, data: AddressPayload) => {
-  let payload = pickAddressPayload(data);
-
-  if (payload.note === CURRENT_LOCATION_NOTE) {
-    const locationConditions: Record<string, unknown>[] = [];
-    if (payload.placeId) {
-      locationConditions.push({ placeId: payload.placeId });
+  const payload = await resolveAddressPayload(pickAddressPayload(data));
+  return changeAddresses(userId, async session => {
+    const duplicate = await findDuplicateAddress(userId, payload, session);
+    if (duplicate && !duplicate.isDeleted) {
+      if (payload.note === CURRENT_LOCATION_NOTE) return Address.findById(duplicate._id).session(session);
+      throw new AppError("Địa chỉ này đã tồn tại trong sổ địa chỉ.", 409);
     }
-    if (payload.fullAddress && payload.province && payload.ward) {
-      locationConditions.push({
-        fullAddress: payload.fullAddress,
-        province: payload.province,
-        ward: payload.ward,
-      });
+    if (payload.isDefault) await Address.updateMany({ userId, isDeleted: { $ne: true } }, { $set: { isDefault: false } }, { session, runValidators: true });
+    const fields = { ...payload, identityKey: addressIdentity(payload), isDeleted: false, deletedAt: null };
+    if (duplicate) {
+      const restored = await Address.findOneAndUpdate(
+        { _id: duplicate._id, userId, isDeleted: true, updatedAt: duplicate.updatedAt },
+        { $set: fields }, { new: true, session, runValidators: true },
+      );
+      if (!restored) throw new AppError("Địa chỉ vừa thay đổi. Vui lòng thử lại.", 409);
+      return restored;
     }
-
-    if (locationConditions.length > 0) {
-      const existingAddress = await Address.findOne({
-        userId,
-        note: CURRENT_LOCATION_NOTE,
-        $or: locationConditions,
-      });
-      if (existingAddress) return existingAddress;
-    }
-  }
-
-  const duplicateAddress = await findDuplicateAddress(userId, payload);
-  if (duplicateAddress) {
-    if (payload.note === CURRENT_LOCATION_NOTE) return duplicateAddress;
-    throw new AppError("Địa chỉ này đã tồn tại trong sổ địa chỉ.", 409);
-  }
-
-  payload = await resolveAddressPayload(payload);
-
-  if (payload.isDefault) {
-    await Address.updateMany(
-      { userId },
-      { isDefault: false }
-    );
-  }
-
-  const address = await Address.create({
-    ...payload,
-    userId,
+    const [created] = await Address.create([{ ...fields, userId }], { session });
+    return created;
   });
-
-  return address;
 };
 
-export const updateAddress = async (
-  addressId: string,
-  userId: string,
-  data: AddressPayload
-) => {
-  const current = await Address.findOne({ _id: addressId, userId });
-  if (!current) throw new AppError("Không tìm thấy địa chỉ", 404);
+export const updateAddress = async (addressId: string, userId: string, data: AddressPayload) => {
+  const current = await Address.findOne({ _id: addressId, userId, isDeleted: { $ne: true } });
+  if (!current) throw new AppError("Không tìm thấy địa chỉ.", 404);
   const payload = await resolveAddressPayload(pickAddressPayload(data), current);
-
-  if (payload.isDefault) {
-    await Address.updateMany(
-      { userId },
-      { isDefault: false }
+  return changeAddresses(userId, async session => {
+    const merged = { ...current.toObject(), ...payload };
+    if (await findDuplicateAddress(userId, merged, session, addressId)) throw new AppError("Địa chỉ này đã tồn tại. Hãy chọn hoặc khôi phục địa chỉ đã lưu.", 409);
+    if (payload.isDefault) await Address.updateMany({ userId, _id: { $ne: addressId } }, { $set: { isDefault: false } }, { session, runValidators: true });
+    const address = await Address.findOneAndUpdate(
+      { _id: addressId, userId, isDeleted: { $ne: true }, updatedAt: current.updatedAt },
+      { $set: { ...payload, identityKey: addressIdentity(merged) },
+        ...(payload.latitude !== undefined && !payload.placeId ? { $unset: { placeId: 1 } } : {}) },
+      { new: true, session, runValidators: true },
     );
-  }
-
-  const address = await Address.findOneAndUpdate(
-    { _id: addressId, userId, updatedAt: current.updatedAt },
-    {
-      $set: payload,
-      ...(payload.latitude !== undefined && !payload.placeId ? { $unset: { placeId: 1 } } : {}),
-    },
-    { new: true, runValidators: true }
-  );
-  if (!address) throw new AppError("Địa chỉ vừa được thay đổi. Vui lòng tải lại và thử lại.", 409);
-  return address;
-};
-
-export const deleteAddress = async (addressId: string, userId: string) => {
-  const result = await Address.findOneAndDelete({
-    _id: addressId,
-    userId,
+    if (!address) throw new AppError("Địa chỉ vừa thay đổi. Vui lòng tải lại và thử lại.", 409);
+    return address;
   });
-
-  return result;
 };
+
+export const deleteAddress = async (addressId: string, userId: string) => changeAddresses(userId, async session => {
+  const address = await Address.findOneAndUpdate({ _id: addressId, userId, isDeleted: { $ne: true } },
+    { $set: { isDeleted: true, deletedAt: new Date(), isDefault: false } }, { new: true, session, runValidators: true });
+  if (!address) throw new AppError("Không tìm thấy địa chỉ.", 404);
+  return address;
+});
 
 export const getUserAddresses = async (userId: string) => {
   const [addresses, user] = await Promise.all([
-    Address.find({ userId }).sort({ createdAt: -1 }).lean(),
+    Address.find({ userId, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
     User.findById(userId).select("fullName phone").lean(),
   ]);
 
@@ -243,20 +229,13 @@ export const getUserAddresses = async (userId: string) => {
   }));
 };
 
-export const setDefaultAddress = async (userId: string, addressId: string) => {
-  await Address.updateMany(
-    { userId },
-    { isDefault: false }
-  );
-
-  const address = await Address.findOneAndUpdate(
-    { _id: addressId, userId },
-    { isDefault: true },
-    { new: true }
-  );
-
-  return address;
-};
+export const setDefaultAddress = async (userId: string, addressId: string) => changeAddresses(userId, async session => {
+  const exists = await Address.exists({ _id: addressId, userId, isDeleted: { $ne: true } }).session(session);
+  if (!exists) throw new AppError("Không tìm thấy địa chỉ.", 404);
+  await Address.updateMany({ userId, _id: { $ne: addressId } }, { $set: { isDefault: false } }, { session, runValidators: true });
+  return Address.findOneAndUpdate({ _id: addressId, userId, isDeleted: { $ne: true } },
+    { $set: { isDefault: true } }, { new: true, session, runValidators: true });
+});
 
 export const getServiceHistory = async (_userId: string) => {
   return [];
@@ -267,7 +246,7 @@ export const checkAddressUpdate = async (
   userId: string,
   candidate: AddressPayload,
 ) => {
-  const current = await Address.findOne({ _id: addressId, userId }).lean();
+  const current = await Address.findOne({ _id: addressId, userId, isDeleted: { $ne: true } }).lean();
   if (!current) {
     throw new AppError("Không tìm thấy địa chỉ", 404);
   }

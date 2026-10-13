@@ -18,6 +18,7 @@ const ConfirmPaymentPage = () => {
     setPaymentMethod,
     scheduledAt, preferredProviderId, preferredProviderName,
     selectedOptionQuantities, uniformQuantity,
+    previewVoucherCode, promotionName, previewError,
   } = useConfirmPaymentFlow();
 
   return (
@@ -50,10 +51,14 @@ const ConfirmPaymentPage = () => {
           <OrderSummaryCard
             step={3}
             discountAmount={voucherDiscountAmount}
+            voucherCode={previewVoucherCode}
             actionLabel="Xác nhận & Thanh toán"
             onAction={handleConfirm}
             isLoading={isSubmitting}
             summaryContent={
+              <>
+              {promotionName && <p className="mb-3 rounded-xl bg-primary/10 p-3 text-primary">Ưu đãi tự động: {promotionName}</p>}
+              {previewError && <p role="alert" className="mb-3 text-error">{previewError}</p>}
               <ConfirmPaymentVoucherPanel
                 voucherCode={voucherCode}
                 onSelectVoucher={(code) => {
@@ -76,6 +81,7 @@ const ConfirmPaymentPage = () => {
                 voucherError={voucherError}
                 isSubmitting={isSubmitting}
               />
+              </>
             }
           />
         </div>

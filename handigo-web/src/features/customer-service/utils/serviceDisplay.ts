@@ -22,16 +22,7 @@ export const getCategoryName = (service: Service, categories: Category[]) => {
   return categories.find((item) => item._id === getCategoryId(service))?.name || "Dịch vụ";
 };
 
-/**
- * Cloudinary chọn định dạng và mức nén theo trình duyệt khi có `f_auto,q_auto`
- * trong đường dẫn. Không có hai tham số này, mọi ảnh dịch vụ được trả về nguyên
- * bản JPEG: Lighthouse đo được 683 KB ảnh cho một lần mở trang danh sách, và
- * nêu đích danh "serve images in next-gen formats" là cơ hội lớn nhất còn lại.
- *
- * Chỉ đổi định dạng và chất lượng, **không** đổi kích thước: ảnh gốc vốn đã
- * khoảng 600px, thêm `w_` chỉ khiến Cloudinary phóng to hoặc làm mềm ảnh trên
- * màn hình mật độ cao.
- */
+/** Tối ưu định dạng/nén khi phân phối, giữ nguyên kích thước và tỉ lệ ảnh. */
 const CLOUDINARY_DELIVERY = "f_auto,q_auto";
 
 const withCloudinaryDelivery = (url: string) => {
@@ -51,19 +42,9 @@ export const normalizeServiceImageUrl = (value?: string | null) => {
   );
 };
 
-/**
- * Ảnh của dịch vụ, hoặc `null` khi chưa có.
- *
- * Trước đây hàm này nhận thêm `index` và rơi về một trong bốn ảnh Unsplash
- * hotlink khi thiếu ảnh. Hai vấn đề: ảnh chụp thật lệch hẳn tông với bộ minh hoạ
- * 3D của sản phẩm, và tham số `index` khiến người đọc tưởng gọi với index khác
- * sẽ ra ảnh khác. Thực ra dịch vụ có ảnh thì index bị bỏ qua hoàn toàn, nên
- * thư viện ảnh ở trang chi tiết hiện đúng một tấm ba lần.
- *
- * Trả `null` để `ReliableImage` dựng ô giữ chỗ theo token màu của hệ thống.
- */
+/** Cover chuẩn; dữ liệu cũ dùng image, thiếu ảnh trả null cho placeholder. */
 export const getServiceImage = (service?: Service | null) =>
-  normalizeServiceImageUrl(service?.image);
+  normalizeServiceImageUrl(service?.coverImage === undefined ? service?.image : service.coverImage);
 
 export const getOptionPrice = (option: ServiceOption) =>
   option.price ?? option.fixedPrice ?? 0;

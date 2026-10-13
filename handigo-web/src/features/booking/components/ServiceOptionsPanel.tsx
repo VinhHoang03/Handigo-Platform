@@ -32,7 +32,7 @@ export const ServiceOptionsPanel = ({
     <div className="space-y-md">
       {optionGroups.map((group) => (
         <fieldset key={group.key}>
-          <legend className="font-label-md mb-sm">{group.label}</legend>
+          <legend className="font-label-md mb-sm">{group.label}{group.isRequired ? ' — Bắt buộc' : ' — Không bắt buộc'}</legend>
           <div className="flex flex-wrap gap-sm">
             {group.options.map((option) => (
               <label

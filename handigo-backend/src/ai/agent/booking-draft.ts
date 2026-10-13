@@ -51,8 +51,9 @@ export interface BookingDraft {
 export interface DraftService {
   id: string; name: string; serviceType: string; requiresOptionSelection: boolean;
   fixedPrice?: number | null;
+  optionGroups?: Array<{ _id: unknown; name: string; selectionMode: string; isRequired: boolean }>;
   options: Array<{
-    _id: unknown; name: string; price: number; optionType: string;
+    _id: unknown; groupId?: unknown; name: string; price: number; optionType: string;
     allowsQuantity: boolean; selectionGroup?: string | null; selectionMode: string;
     description?: string | null; isRequired?: boolean
   }>;
@@ -220,14 +221,6 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       values.uniformQuantity = quantity;
       draft.sources.uniformQuantity = draft.requestedQuantity !== undefined ? "customer" : "default";
     }
-    if (values.selectedOptions === undefined && values.uniformQuantity === undefined && needsOptions && !draft.optionPreference) {
-      const candidates = service.options.filter((option) => option.optionType !== "add_on"
-        && (service.serviceType !== "fixed_price" || option.price > 0));
-      if (candidates.length >= 1) {
-        values.selectedOptions = [{ optionId: String(candidates[0]._id), quantity: draft.requestedQuantity ?? 1 }];
-        draft.sources.selectedOptions = "default";
-      }
-    }
     const selected = values.selectedOptions ?? [];
     if (input.quantity !== undefined && selected.length === 1) selected[0].quantity = input.quantity;
     if (input.quantity !== undefined && selected.length > 1) throw new AppError("Vui lòng nêu số lượng cho từng tùy chọn đã chọn.", 400);
@@ -240,7 +233,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
     }
     const groups = new Map<string, DraftService["options"]>();
     for (const option of service.options) {
-      const group = option.selectionGroup?.trim().toLowerCase() || "";
+      const group = option.groupId ? String(option.groupId) : option.selectionGroup?.trim().toLowerCase() || "";
       groups.set(group, [...(groups.get(group) ?? []), option]);
     }
     for (const [group, options] of groups) {
@@ -249,7 +242,18 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
         throw new AppError(`Nhóm “${options[0].selectionGroup}” chỉ được chọn một tùy chọn.`, 400);
       }
     }
-    if (draft.optionPreference || (values.uniformQuantity === undefined && needsOptions && (!selected.length || (service.serviceType === "fixed_price"
+    const requiredGroups = service.optionGroups ?? [];
+    for (const group of requiredGroups) {
+      const members = service.options.filter(option => String(option.groupId ?? "") === String(group._id));
+      const count = members.filter(option => ids.has(String(option._id))).length;
+      if (group.selectionMode === "single" && count > 1) throw new AppError(`Nhóm “${group.name}” chỉ được chọn một tùy chọn.`, 400);
+      if (group.isRequired && count === 0) {
+        draft.missing.push(`Chọn tùy chọn trong nhóm “${group.name}”`);
+        draft.choiceGroups.push({ label: `${group.name} · Bắt buộc`, multiple: group.selectionMode === "multiple",
+          options: members.slice(0, 12).map(option => option.name) });
+      }
+    }
+    if (draft.optionPreference || (requiredGroups.length === 0 && values.uniformQuantity === undefined && needsOptions && (!selected.length || (service.serviceType === "fixed_price"
       && !service.options.some((option) => ids.has(String(option._id)) && option.price > 0))))) {
       draft.missing.push(`Chọn gói hoặc loại dịch vụ${draft.optionPreference ? ` (${draft.optionPreference})` : ""}`);
       for (const [group, options] of groups) {

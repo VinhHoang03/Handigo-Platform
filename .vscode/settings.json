@@ -1,0 +1,8 @@
+{
+  "dart.flutterHotReloadOnSave": "all",
+  "dart.previewHotReloadOnSaveWatcher": true,
+  "[dart]": {
+    "editor.defaultFormatter": "Dart-Code.dart-code",
+    "editor.formatOnSave": true
+  }
+}

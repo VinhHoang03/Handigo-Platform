@@ -18,7 +18,7 @@ class HandigoApp extends ConsumerWidget {
       title: 'Handigo',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
       routerConfig: ref.watch(appRouterProvider),
       locale: const Locale('vi', 'VN'),
       supportedLocales: const [Locale('vi', 'VN'), Locale('en', 'US')],

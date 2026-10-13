@@ -1,7 +1,7 @@
 import { AppError } from "../utils/appError";
 import { getServiceById, listServices } from "./service.service";
 import { getOptionsByServiceId } from "./serviceOption.service";
-import { buildServicePricingSnapshot } from "./servicePricing.service";
+import { previewServiceBooking } from "./servicePricing.service";
 import { getUserAddresses } from "./address.service";
 import { MatchingService } from "./matching.service";
 import { OrderService, type CreateOrderPayload } from "./order.service";
@@ -84,8 +84,10 @@ export const AgentBookingService = {
     return {
       id: String(service._id), name: service.name, serviceType: service.serviceType,
       fixedPrice: service.fixedPrice,
+      optionGroups: service.optionGroups,
       requiresOptionSelection: service.requiresOptionSelection, options: options.map((option) => ({
         _id: String(option._id), name: option.name, description: option.description,
+        groupId: option.groupId,
         price: option.price, optionType: option.optionType, selectionGroup: option.selectionGroup,
         selectionMode: option.selectionMode, allowsQuantity: option.allowsQuantity, isRequired: option.isRequired,
       }))
@@ -98,9 +100,10 @@ export const AgentBookingService = {
   },
   async price(args: PriceArguments) {
     const service = await activeService(args.serviceId);
-    const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions, args.uniformQuantity);
+    const snapshot = await previewServiceBooking(args);
     return {
-      serviceName: service.name, serviceType: service.serviceType, amount: snapshot.bookingAmount,
+      serviceName: service.name, serviceType: service.serviceType, amount: snapshot.discountedAmount,
+      promotionName: snapshot.promotionSnapshot?.name,
       depositAmount: snapshot.depositAmount, currency: "VND", options: snapshot.selectedOptionsSnapshot
     };
   },
@@ -141,7 +144,7 @@ export const AgentBookingService = {
       schedule: args.scheduledAt ?? "Đặt ngay", orderType: args.orderType,
       paymentMethod: args.paymentMethod, amount: price.amount, currency: price.currency,
       description: args.problemDescription ?? "", serviceType: price.serviceType, paymentOnConfirmation,
-      note: [paymentNote, price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
+      note: [paymentNote, price.promotionName ? `Đã áp dụng ưu đãi tự động: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
         quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ")
     };
   },
