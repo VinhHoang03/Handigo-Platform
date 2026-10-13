@@ -11,6 +11,8 @@ interface ModalProps {
   closeOnEsc?: boolean;
   danger?: boolean;
   contentRef?: Ref<HTMLDivElement>;
+  placement?: 'center' | 'side';
+  footer?: ReactNode;
 }
 
 const sizeClass: Record<NonNullable<ModalProps['size']>, string> = {
@@ -39,6 +41,8 @@ export function Modal({
   closeOnEsc = true,
   danger = false,
   contentRef,
+  placement = 'center',
+  footer,
 }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -121,7 +125,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex min-h-0 min-w-0 items-end justify-center overflow-hidden bg-on-surface/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      className={`fixed inset-0 z-[200] flex min-h-0 min-w-0 items-end justify-center overflow-hidden p-0 sm:items-center sm:p-6 ${placement === 'side' ? 'bg-on-surface/20 sm:justify-end' : 'bg-on-surface/50 backdrop-blur-sm'}`}
       onMouseDown={handleOverlayClick}
     >
       <div
@@ -130,7 +134,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`flex max-h-[calc(100dvh-8px)] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-t-3xl border border-outline-variant/30 bg-surface shadow-2xl sm:max-h-[calc(100dvh-48px)] sm:w-[calc(100vw-48px)] sm:rounded-3xl ${sizeClass[size]}`}
+        className={`flex max-h-[calc(100dvh-8px)] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-t-3xl border border-outline-variant/30 bg-surface shadow-2xl sm:max-h-[calc(100dvh-48px)] sm:w-[calc(100vw-48px)] sm:rounded-3xl ${sizeClass[size]} ${placement === 'side' ? 'sm:h-full' : ''}`}
       >
         <div className={`flex shrink-0 items-center justify-between gap-4 border-b px-4 py-4 sm:px-8 ${danger ? 'border-error/20 bg-error/5' : 'border-outline-variant/40'}`}>
           <h2 id={titleId} className={`min-w-0 text-xl font-bold sm:text-headline-md ${danger ? 'text-error' : 'text-on-surface'}`}>
@@ -148,6 +152,7 @@ export function Modal({
         <div ref={contentRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 sm:px-8 sm:py-6">
           {children}
         </div>
+        {footer && <div className="shrink-0 border-t border-outline-variant/40 px-4 py-4 sm:px-8">{footer}</div>}
       </div>
     </div>,
     document.body,

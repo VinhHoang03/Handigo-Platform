@@ -1,9 +1,9 @@
-import { NearbyProviderSelector } from '@/features/customer-service/components/NearbyProviderSelector';
-import type { ProviderAvailabilityStatus } from '@/features/customer-service/components/NearbyProviderSelector';
+import { useRef, useState } from 'react';
+import { ChevronDown, UserRound } from 'lucide-react';
+import { useNearbyProviders, type ProviderAvailabilityStatus } from '@/features/customer-service/components/useNearbyProviders';
+import { BookingProviderPicker } from './BookingProviderPicker';
 
 interface Step2ProviderFieldsetProps {
-  /** Khi có giá trị: hiển thị dạng fieldset đánh số (luồng hẹn lịch). Bỏ trống: hiển thị trần (luồng đặt ngay). */
-  stepNumber?: number;
   serviceId?: string;
   addressId?: string;
   scheduledAt?: string;
@@ -11,51 +11,62 @@ interface Step2ProviderFieldsetProps {
   recurrenceCount?: number;
   requireSelection?: boolean;
   preferredProviderId?: string;
+  preferredProviderName?: string;
   requestedProviderId?: string;
   error?: string;
   onSelectProvider: (providerId?: string, providerName?: string) => void;
   onAvailabilityChange: (status: ProviderAvailabilityStatus) => void;
 }
 
-/** "Phân phối chuyên gia": bọc NearbyProviderSelector, có/không đánh số bước tùy luồng đặt lịch. */
+/** Kiểm tra thợ phù hợp và mở danh sách chuyên gia từ tóm tắt đơn hàng. */
 export const Step2ProviderFieldset = ({
-  stepNumber, serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount,
-  requireSelection, preferredProviderId, requestedProviderId, error,
+  serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount,
+  requireSelection = false, preferredProviderId, preferredProviderName, requestedProviderId, error,
   onSelectProvider, onAvailabilityChange,
 }: Step2ProviderFieldsetProps) => {
-  const selector = (
-    <>
-      <NearbyProviderSelector
-        serviceId={serviceId}
-        addressId={addressId}
-        scheduledAt={scheduledAt}
-        recurrenceUnit={recurrenceUnit}
-        recurrenceCount={recurrenceCount}
-        requireSelection={requireSelection}
-        selectedProviderId={preferredProviderId}
-        requestedProviderId={requestedProviderId}
-        onSelectProvider={onSelectProvider}
-        onAvailabilityChange={onAvailabilityChange}
-      />
-      {error && (
-        <p role="alert" className="mt-xs text-xs font-medium text-error">
-          {error}
-        </p>
-      )}
-    </>
-  );
-
-  if (stepNumber === undefined) {
-    return <div className="mt-md">{selector}</div>;
-  }
+  const [isExpanded, setIsExpanded] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const { providers, isLoading, error: loadError } = useNearbyProviders({
+    serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount, requireSelection,
+    enabled: true, allowSelection: true, selectedProviderId: preferredProviderId,
+    requestedProviderId, onSelectProvider, onAvailabilityChange,
+  });
+  const canSearch = Boolean(serviceId && addressId && (!requireSelection || scheduledAt));
 
   return (
-    <fieldset>
-      <legend className="mb-sm flex items-center gap-sm text-sm font-bold text-on-surface">
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs text-on-primary">{stepNumber}</span>
-        Phân phối chuyên gia
-      </legend>
-      {selector}
-    </fieldset>
+    <section className="border-t border-dashed border-outline-variant pt-md">
+      <div ref={anchorRef}>
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        aria-haspopup="dialog"
+        aria-controls={isExpanded ? 'booking-provider-picker' : undefined}
+        onClick={() => setIsExpanded((expanded) => !expanded)}
+        className="flex min-h-12 w-full items-center gap-sm rounded-xl px-sm py-xs text-left hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
+      >
+        <UserRound aria-hidden="true" size={19} className="shrink-0 text-primary" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs text-on-surface-variant">Phân phối chuyên gia</span>
+          <span className="block truncate text-sm font-bold text-on-surface">
+            {preferredProviderName || 'Handigo tự điều phối thợ'}
+          </span>
+        </span>
+        <ChevronDown aria-hidden="true" size={18} className={`shrink-0 text-on-surface-variant transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+      </div>
+      {error && !isExpanded && <p role="alert" className="mt-xs text-xs text-error">{error}</p>}
+      {isExpanded && (
+        <BookingProviderPicker
+          anchorRef={anchorRef} providers={providers} preferredProviderId={preferredProviderId}
+          requestedProviderId={requestedProviderId} canSearch={canSearch} requireSelection={requireSelection}
+          isLoading={isLoading} loadError={loadError} error={error}
+          onClose={() => setIsExpanded(false)}
+          onConfirm={(providerId, providerName) => {
+            onSelectProvider(providerId, providerName);
+            setIsExpanded(false);
+          }}
+        />
+      )}
+    </section>
   );
 };

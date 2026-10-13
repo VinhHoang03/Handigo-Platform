@@ -42,7 +42,7 @@ export interface IDiscountSnapshot {
 }
 
 export interface IOrderCancellation {
-  cancelledBy: Types.ObjectId;
+  cancelledBy?: Types.ObjectId;
   cancelledByRole: "customer" | "provider" | "admin";
   reason: string;
   cancelledAt: Date;
@@ -317,7 +317,10 @@ const OrderSchema = new Schema<IOrder>(
           cancelledBy: {
             type: Schema.Types.ObjectId,
             ref: "User",
-            required: true,
+            // Hủy tự động dùng vai trò admin và không có người thao tác.
+            required: function (this: IOrderCancellation) {
+              return this.cancelledByRole !== "admin";
+            },
           },
           cancelledByRole: {
             type: String,
