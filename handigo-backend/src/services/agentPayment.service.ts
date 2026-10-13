@@ -16,7 +16,7 @@ export const agentPaymentResultSchema = z.object({
 });
 export type AgentPaymentResult = z.infer<typeof agentPaymentResultSchema>;
 export type AgentPaymentArguments = { orderId: string; method: CreatePaymentInput["method"] };
-export const paymentExpectationSchema = z.object({ amount: z.number().positive(), paymentType: z.enum(["full", "inspection_deposit"]),
+export const paymentExpectationSchema = z.object({ amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]),
   previousPaymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   previousPaymentMethod: z.enum(["cash", "payos"]).optional() });
 

@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import { Conversation } from "../models/conversation.model";
 import { Message } from "../models/message.model";
-import { Order } from "../models/order.model";
+import { Order, type IOrder } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { Report } from "../models/report.model";
 
@@ -20,7 +20,7 @@ interface SendMessagePayload {
   imageUrl?: string;
 }
 
-const chatEnabledStatuses = ["accepted", "in_progress", "completed"];
+const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress", "completed"];
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -54,7 +54,7 @@ const resolveParticipant = async (userId: string, role: UserRole, conversation: 
   throw new AppError("Bạn không thuộc cuộc trò chuyện này", 403);
 };
 
-const assertOrderCanChat = async (userId: string, role: UserRole, orderId: string) => {
+const assertOrderCanChat = async (userId: string, role: UserRole, orderId: string, requireChatEnabled = true) => {
   assertObjectId(orderId, "order id");
 
   const order = await Order.findOne({ _id: orderId, isDeleted: false });
@@ -63,11 +63,13 @@ const assertOrderCanChat = async (userId: string, role: UserRole, orderId: strin
     throw new AppError("Không tìm thấy đơn hàng", 404);
   }
 
+  if (!requireChatEnabled && role === "CUSTOMER" && order.customerId.toString() === userId) return order;
+
   if (!order.providerId) {
     throw new AppError("Đơn hàng chưa có nhà cung cấp", 400);
   }
 
-  if (!chatEnabledStatuses.includes(order.status)) {
+  if (requireChatEnabled && !chatEnabledStatuses.includes(order.status)) {
     throw new AppError("Đơn hàng chưa sẵn sàng để trò chuyện", 400);
   }
 
@@ -101,6 +103,12 @@ const getConversationForParticipant = async (
     throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
   }
 
+  const order = await assertOrderCanChat(userId, role, conversation.orderId.toString(), false);
+  if (order.providerId && conversation.providerId.toString() !== order.providerId.toString()) {
+    conversation.providerId = order.providerId!;
+    conversation.providerLastSeenAt = null;
+    await conversation.save();
+  }
   const participant = await resolveParticipant(userId, role, conversation);
 
   return { conversation, participant };
@@ -118,7 +126,11 @@ export const getMyConversations = async (userId: string, role: UserRole, query: 
     if (!provider) {
       throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
     }
+    const orderIds = await Order.find({ providerId: provider._id, isDeleted: false }).distinct("_id");
+    await Conversation.updateMany({ orderId: { $in: orderIds }, providerId: { $ne: provider._id }, isDeleted: false },
+      { $set: { providerId: provider._id, providerLastSeenAt: null } }, { runValidators: true });
     filter.providerId = provider._id;
+    filter.orderId = { $in: orderIds };
   } else {
     throw new AppError("Chỉ khách hàng và nhà cung cấp có thể truy cập trò chuyện", 403);
   }
@@ -155,17 +167,19 @@ export const getOrCreateConversationByOrder = async (
   orderId: string,
 ) => {
   const order = await assertOrderCanChat(userId, role, orderId);
+  const previous = await Conversation.findOne({ orderId: order._id, isDeleted: false }).select("providerId");
 
   const conversation = await Conversation.findOneAndUpdate(
     { orderId: order._id },
     {
-      $setOnInsert: {
-        orderId: order._id,
+      $set: {
         customerId: order.customerId,
         providerId: order.providerId,
+        ...(previous && previous.providerId.toString() !== order.providerId!.toString() ? { providerLastSeenAt: null } : {}),
       },
+      $setOnInsert: { orderId: order._id },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
   )
     .populate("orderId", "orderCode status")
     .populate("customerId", "fullName avatar")

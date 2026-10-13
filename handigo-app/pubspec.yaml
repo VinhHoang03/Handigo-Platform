@@ -1,6 +1,6 @@
 name: handigo_app
 description: "Ứng dụng di động Handigo"
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0+1
 
 environment:
@@ -33,4 +33,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/icons/account/
+    - assets/brand/handigo-logo.png
+    - assets/payments/payos-logo.png
+      - assets/icons/account/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-variable.ttf
+    - family: Hanken Grotesk
+      fonts:
+        - asset: assets/fonts/HankenGrotesk-variable.ttf

@@ -6,6 +6,10 @@ import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Payment, IPayment } from "../models/payment.model";
 import { Promotion } from "../models/promotion.model";
+import { updateStoredVoucher } from "./voucherStore.service";
+import { releaseVoucherReservation } from "./voucher.service";
+import { releaseOrderPromotion } from "./promotion.service";
+import { VoucherUsage } from "../models/voucherUsage.model";
 import { Provider } from "../models/provider.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
@@ -1457,6 +1461,7 @@ export const cancelOrderWithSettlement = async (
 
       newlyCancelled = true;
       cancelledOrder = claimedOrder;
+      await releaseVoucherReservation(claimedOrder._id, session);
 
       await OrderAssignment.updateMany(
         { orderId: claimedOrder._id, status: "pending" },
@@ -1473,15 +1478,18 @@ export const cancelOrderWithSettlement = async (
         claimedOrder.voucherSnapshot?.voucherId &&
         claimedOrder.voucherUsedAt
       ) {
-        await Promotion.updateOne(
+        await updateStoredVoucher(claimedOrder.voucherSnapshot.voucherId,
           {
             _id: claimedOrder.voucherSnapshot.voucherId,
             usedCount: { $gt: 0 },
           },
           { $inc: { usedCount: -1 } },
-          { session },
+          session,
         );
+        await VoucherUsage.updateOne({ voucherId: claimedOrder.voucherSnapshot.voucherId, orderId: claimedOrder._id, status: "used" },
+          { $set: { status: "restored", restoredAt: new Date() } }, { session, runValidators: true });
       }
+      await releaseOrderPromotion(claimedOrder._id, session);
 
       await Payment.updateMany(
         {

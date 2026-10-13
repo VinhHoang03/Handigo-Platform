@@ -12,6 +12,15 @@ export const formatTimelineTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString("vi-VN") : "";
 
 export const buildOrderTimeline = (order: Order): TimelineStep[] => {
+  if (order.statusHistory?.length) {
+    const names: Record<string, string> = { created: 'Đã tạo đơn', accepted: 'Chuyên gia đã nhận', in_progress: 'Đang thực hiện', completed: 'Đã hoàn tất', cancelled: 'Đã hủy', paid: 'Đã thanh toán', assigned: 'Đã điều phối' };
+    return order.statusHistory.map((event, index, events) => ({
+      icon: event.status === 'cancelled' ? X : event.status === 'in_progress' ? HardHat : Check,
+      title: `${names[event.status] ?? event.status} · ${index + 1}`,
+      description: event.note ?? '', time: formatTimelineTime(event.createdAt),
+      state: event.status === 'cancelled' ? 'cancelled' : index === events.length - 1 && order.status !== 'completed' ? 'active' : 'done',
+    }));
+  }
   if (order.status === "cancelled") {
     return [
       {

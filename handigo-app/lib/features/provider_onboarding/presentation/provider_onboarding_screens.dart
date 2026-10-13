@@ -559,7 +559,7 @@ class _OnboardingStepper extends StatelessWidget {
                       '${index + 1}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: active ? Colors.white : null,
+                        color: active ? Theme.of(context).colorScheme.onPrimary : null,
                       ),
                     ),
                   ),

@@ -7,6 +7,7 @@ import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { ServiceOption } from "@/types/booking";
 import { AsyncState } from "@/components/common/AsyncState";
+import { ServiceProcessSection } from '@/components/common/ServiceProcessSection';
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import { NearbyProviderSelector } from "../components/NearbyProviderSelector";
 import { ServiceDetailSkeleton } from "../components/ServiceDetailSkeleton";
@@ -27,6 +28,7 @@ import {
   toggleServiceOption,
 } from "@/features/booking/utils/serviceOptionSelection";
 import { ChevronRight } from "lucide-react";
+import { PromotionBanner } from "../components/PromotionBanner";
 
 export default function CustomerServiceDetailPage() {
   const { serviceId } = useParams();
@@ -43,7 +45,7 @@ export default function CustomerServiceDetailPage() {
   const [optionSelectionError, setOptionSelectionError] = useToastFeedback<string>("", "error");
   const [quantitySelection, setQuantitySelection] = useState({ serviceId, quantity: 1 });
   const uniformQuantity = quantitySelection.serviceId === serviceId ? quantitySelection.quantity : 1;
-  const isCleaning = isAirConditionerCleaning(service);
+  const isCleaning = isAirConditionerCleaning(service) && options.length === 0;
 
   const { estimatePrice } = useServicePricing(service, options, selectedOptionIds, selectedOptionQuantities);
 
@@ -80,6 +82,7 @@ export default function CustomerServiceDetailPage() {
   };
 
   const handleBookNow = useBookNowHandler({
+    options,
     service,
     isAuthenticated,
     navigate,
@@ -102,6 +105,7 @@ export default function CustomerServiceDetailPage() {
           </div>
         ) : (
           <>
+            <PromotionBanner serviceId={service._id} />
             <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
               <Link to="/customer" className="inline-flex min-h-11 items-center hover:text-primary">Trang chủ</Link>
               <ChevronRight aria-hidden="true" size={16} />
@@ -114,6 +118,7 @@ export default function CustomerServiceDetailPage() {
               <div className="space-y-8 lg:col-span-8">
                 <ServiceGallery service={service} categoryName={getCategoryName(service, categories)} />
                 <ServiceDescriptionSection service={service} />
+                <ServiceProcessSection steps={service.processSteps} />
                 {isCleaning ? <>
                   <ServiceQuantityPanel price={service.fixedPrice} quantity={uniformQuantity}
                     onChange={(quantity) => setQuantitySelection({ serviceId, quantity })} />

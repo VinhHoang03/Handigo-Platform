@@ -275,9 +275,9 @@ export class AgentService {
           method: { bank: "PAYOS", wallet: "WALLET", cash: "CASH" }[order.paymentMethod] });
         paymentAction = await this.loop.confirmation.prepare(paymentTool, context, paymentArgs);
         paymentAction.taskVersion = action.taskVersion;
-        const confirmed = z.object({ paymentOnConfirmation: z.literal(true), amount: z.number().positive(),
+        const confirmed = z.object({ paymentOnConfirmation: z.literal(true), amount: z.number().nonnegative(),
           paymentMethod: z.enum(["bank", "wallet", "cash"]), serviceType: z.enum(["fixed_price", "variable_price"]) }).safeParse(action.preview);
-        const current = z.object({ amount: z.number().positive(), paymentType: z.enum(["full", "inspection_deposit"]),
+        const current = z.object({ amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]),
           paymentMethod: z.enum(["bank", "wallet", "cash"]) }).safeParse(paymentAction.preview);
         // Form cũ hoặc chi phí/phương thức thay đổi không cấp quyền tự trừ tiền.
         const authorized = confirmed.success && current.success && confirmed.data.amount === current.data.amount

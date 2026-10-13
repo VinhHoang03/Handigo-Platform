@@ -1,5 +1,7 @@
 import { Router } from "express";
 import * as serviceController from "../controllers/service.controller";
+import { getServiceFeedbacks } from "../controllers/feedback.controller";
+import { serviceFeedbackQuerySchema } from "../validations/feedback.validator";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { validate } from "../middlewares/validate.middleware";
@@ -18,6 +20,7 @@ const router = Router();
 router.get("/", serviceController.listServices);
 router.get("/:id", serviceController.getServiceById);
 router.get("/:id/options", serviceController.getServiceOptions);
+router.get("/:id/feedback", validate(serviceFeedbackQuerySchema, "query"), getServiceFeedbacks);
 
 // Admin-only write routes
 router.use(authMiddleware, roleMiddleware("ADMIN"));

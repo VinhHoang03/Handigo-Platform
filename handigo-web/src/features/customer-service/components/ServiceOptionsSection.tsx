@@ -39,7 +39,7 @@ export function ServiceOptionsSection({
         <div className="space-y-6">
           {optionGroups.map((group) => (
             <fieldset key={group.key}>
-              <legend className="mb-3 font-bold text-on-surface">{group.label}</legend>
+              <legend className="mb-3 font-bold text-on-surface">{group.label}{group.isRequired ? ' — Bắt buộc' : ' — Không bắt buộc'}{group.selectionMode === 'single' ? ' · Chọn một' : ' · Chọn nhiều'}</legend>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {group.options.map((option) => {
                   const checked = selectedOptionIds.includes(option._id);

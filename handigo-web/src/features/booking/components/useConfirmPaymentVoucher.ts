@@ -12,6 +12,11 @@ export const useConfirmPaymentVoucher = (orderAmount: number, inspectionRequired
 
   useEffect(() => {
     let isMounted = true;
+    const resetTimer = window.setTimeout(() => {
+      setAppliedVoucher(null);
+      setVoucherCode('');
+      setVoucherError('');
+    }, 0);
     bookingVoucherApi
       .available()
       .then((vouchers) => {
@@ -23,10 +28,9 @@ export const useConfirmPaymentVoucher = (orderAmount: number, inspectionRequired
       });
     return () => {
       isMounted = false;
+      window.clearTimeout(resetTimer);
     };
-    setAppliedVoucher(null);
-    setVoucherCode('');
-  }, [inspectionRequired]);
+  }, [inspectionRequired, setVoucherError]);
 
   const voucherDiscountAmount = appliedVoucher
     ? Math.min(

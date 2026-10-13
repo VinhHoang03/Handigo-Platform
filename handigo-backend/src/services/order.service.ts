@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { earnOrderRewards } from "./reward.service";
@@ -7,6 +8,10 @@ import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
 import { Address } from "../models/address.model";
+import { recordOrderStatus } from "../utils/orderHistory";
+import { resolveAutomaticPromotion, claimPromotion, releaseOrderPromotion } from "./promotion.service";
+import { withOrderAddress } from "../utils/orderAddress";
+import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates } from "./address.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
@@ -35,6 +40,7 @@ import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
   reservePersonalVoucher,
+  releaseVoucherReservation,
 } from "./voucher.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -92,7 +98,10 @@ function getPopulatedId(value: unknown): string | null {
 
 async function attachQuotationFinalAmounts<T extends {
   currentQuotationId?: unknown;
+  addressId?: unknown;
+  addressSnapshot?: IOrder["addressSnapshot"];
 }>(orders: T[]): Promise<Array<T & { quotationFinalAmount?: number }>> {
+  orders = orders.map(withOrderAddress);
   const quotationIds = orders
     .map((order) => getPopulatedId(order.currentQuotationId))
     .filter((id): id is string => Boolean(id));
@@ -124,11 +133,11 @@ async function attachQuotationFinalAmounts<T extends {
 
 export async function dispatchOrderForMatching(orderId: string) {
   const order = await Order.findById(orderId).select(
-    "addressId serviceId status readyForMatching",
+    "addressId addressSnapshot serviceId status readyForMatching",
   );
   if (!order || order.status !== "created" || !order.readyForMatching) return;
 
-  const address = await Address.findById(order.addressId).select(
+  const address = order.addressSnapshot ?? await Address.findById(order.addressId).select(
     "latitude longitude province ward",
   );
   if (!address) {
@@ -153,6 +162,7 @@ export async function dispatchOrderForMatching(orderId: string) {
 
 export interface CreateOrderPayload {
   expectedBookingAmount?: number;
+  expectedFinalAmount?: number;
   uniformQuantity?: number;
   confirmedExpectation?: { amount: number; addressVersion: string; discountAmount?: number };
   customerId: string;
@@ -277,6 +287,7 @@ export const OrderService = {
     const selectedAddress = await Address.findOne({
       _id: payload.addressId,
       userId: payload.customerId,
+      isDeleted: { $ne: true },
     });
     if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
@@ -385,8 +396,10 @@ export const OrderService = {
       : Math.max(platformCommissionPercent, 0) / 100;
     // Tiền đặt dịch vụ gồm giá gốc/cọc và phụ phí phục vụ ngay nếu có.
     const totalAmount = pricingSnapshot.bookingAmount;
+    const automaticPromotion = await resolveAutomaticPromotion(service._id, pricingSnapshot.baseAmount, Boolean(payload.voucherCode));
+    const amountBeforeVoucher = Math.max(pricingSnapshot.baseAmount - (automaticPromotion?.discountAmount ?? 0), 0);
     const voucherResult = payload.voucherCode
-      ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount, undefined, payload.customerId, inspectionRequired)
+      ? await resolveVoucherForAmount(payload.voucherCode, amountBeforeVoucher, undefined, payload.customerId, inspectionRequired)
         .catch((error: unknown) => {
           if (payload.confirmedExpectation && error instanceof AppError && error.statusCode < 500) {
             throw new ActionPreconditionError(error.message);
@@ -394,8 +407,12 @@ export const OrderService = {
           throw error;
         })
       : null;
+    if (payload.expectedFinalAmount !== undefined &&
+      Math.max(totalAmount - (automaticPromotion?.discountAmount ?? 0) - (voucherResult?.discountAmount ?? 0), 0) !== payload.expectedFinalAmount) {
+      throw new AppError("Tổng tiền sau giảm giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại giá mới.", 409);
+    }
     if (payload.confirmedExpectation && (
-      Math.max(totalAmount - (voucherResult?.discountAmount ?? 0), 0) !== payload.confirmedExpectation.amount
+      Math.max(totalAmount - (automaticPromotion?.discountAmount ?? 0) - (voucherResult?.discountAmount ?? 0), 0) !== payload.confirmedExpectation.amount
       || (payload.confirmedExpectation.discountAmount !== undefined
         && (voucherResult?.discountAmount ?? 0) !== payload.confirmedExpectation.discountAmount)
     )) throw new ActionPreconditionError();
@@ -407,8 +424,9 @@ export const OrderService = {
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
+      const promotionDiscountAmount = automaticPromotion?.discountAmount ?? 0;
       const { platformCommissionAmount, providerEarningAmount } = calculateBookingSettlement(
-        Math.max(totalAmount - voucherDiscountAmount, 0),
+        Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
         platformCommissionRate,
         inspectionRequired,
       );
@@ -424,6 +442,11 @@ export const OrderService = {
       selectedOptionIds: pricingSnapshot.optionIds,
       selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
       addressId: new Types.ObjectId(payload.addressId),
+      addressSnapshot: {
+        recipientName: address.recipientName, recipientPhone: address.recipientPhone,
+        fullAddress: address.fullAddress, province: address.province, ward: address.ward,
+        latitude: address.latitude, longitude: address.longitude,
+      },
       orderType,
       scheduledAt: orderDate,
       schedule: pricingSnapshot.schedule,
@@ -434,6 +457,7 @@ export const OrderService = {
       occurrenceNumber: orderType === "recurring" ? index + 1 : null,
       totalOccurrences: orderType === "recurring" ? orderDates.length : null,
       status: "created",
+      statusVersion: 1,
       paymentMethod: payload.paymentMethod,
       paymentStatus: "unpaid",
       readyForMatching: false,
@@ -449,46 +473,46 @@ export const OrderService = {
         platformCommissionRate,
         platformCommissionAmount,
         providerEarningAmount,
-        promotionDiscountAmount: 0,
+        promotionDiscountAmount,
         voucherDiscountAmount,
-        totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
+        totalPaidAmount: Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
       },
       voucherSnapshot: orderVoucher?.snapshot ?? null,
+      promotionSnapshot: automaticPromotion?.snapshot ?? null,
+      promotionUsedAt: automaticPromotion ? new Date() : null,
       confirmation: {
         customerConfirmedAt: null,
         providerConfirmedAt: null,
       },
       };
     });
-    // Mã cá nhân phải được giữ cùng giao dịch tạo đơn để tránh dùng cho nhiều đơn.
-    const saveOrders = async (session?: mongoose.ClientSession) => {
-      if (voucherResult?.promotion.ownerId && session) {
-        const currentVoucher = await resolveVoucherForAmount(payload.voucherCode!, pricingSnapshot.baseAmount, session, payload.customerId, inspectionRequired);
+    // Giữ lượt ưu đãi và ghi lịch sử cùng giao dịch tạo đơn.
+    const saveOrders = async (session: mongoose.ClientSession) => {
+      if (voucherResult) {
+        const currentVoucher = await resolveVoucherForAmount(payload.voucherCode!, amountBeforeVoucher, session, payload.customerId, inspectionRequired);
         if (currentVoucher.discountAmount !== voucherResult.discountAmount
           || String(currentVoucher.snapshot.voucherId) !== String(voucherResult.snapshot.voucherId)) throw new ActionPreconditionError();
       }
+      if (automaticPromotion) await claimPromotion(automaticPromotion.promotion, orderDocuments.length, session);
       const documents = await Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
-      if (voucherResult?.promotion.ownerId && session) {
+      if (voucherResult) {
         await reservePersonalVoucher(voucherResult.snapshot.voucherId, payload.customerId,
           documents[0]._id as Types.ObjectId, inspectionRequired, session);
       }
+      for (const document of documents) await recordOrderStatus({ _id: document._id, status: document.status, statusVersion: 1 }, null, session);
       return documents;
     };
     let createdOrders: IOrder[];
-    if (voucherResult?.promotion.ownerId) {
-      const session = await mongoose.startSession();
-      try { createdOrders = (await session.withTransaction(() => saveOrders(session))) as IOrder[]; }
-      catch (error) {
-        // Lỗi điều kiện nghiệp vụ đã rollback: có thể lập bản xác nhận mới, không cần đối soát đơn chưa tạo.
-        if (payload.confirmedExpectation && error instanceof AppError && error.statusCode < 500) {
-          throw new ActionPreconditionError(error.message);
-        }
-        throw error;
+    const session = await mongoose.startSession();
+    try { createdOrders = (await session.withTransaction(() => saveOrders(session))) as IOrder[]; }
+    catch (error) {
+      // Lỗi nghiệp vụ đã rollback: trợ lý có thể lập bản xác nhận mới.
+      if (payload.confirmedExpectation && error instanceof AppError && error.statusCode < 500) {
+        throw new ActionPreconditionError(error.message);
       }
-      finally { await session.endSession(); }
-    } else {
-      createdOrders = await saveOrders() as IOrder[];
+      throw error;
     }
+    finally { await session.endSession(); }
     const order = createdOrders[0] as unknown as IOrder;
 
     return order;
@@ -540,6 +564,8 @@ export const OrderService = {
 
         order.isDeleted = true;
         order.readyForMatching = false;
+        await releaseVoucherReservation(order._id, session);
+        await releaseOrderPromotion(order._id, session);
         await order.save({ session });
         return { orderId: order._id.toString() };
       });
@@ -598,7 +624,7 @@ export const OrderService = {
       throw unavailable("Chuyên gia này đã từ chối hoặc không phản hồi yêu cầu trước đó. Vui lòng chọn người khác.");
     }
 
-    const address = await Address.findOne({
+    const address = order.addressSnapshot ?? await Address.findOne({
       _id: order.addressId,
       userId: customerId,
     });
@@ -764,7 +790,7 @@ export const OrderService = {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("serviceId", "name image serviceType")
+        .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
         .lean(),
       Order.countDocuments(query),
     ]);
@@ -804,7 +830,7 @@ export const OrderService = {
       .sort({ createdAt: -1 })
       .limit(safeLimit)
       .populate("customerId", "fullName avatar phone")
-      .populate("serviceId", "name image serviceType")
+      .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
       .populate("addressId")
       .lean();
 
@@ -866,7 +892,7 @@ export const OrderService = {
         .skip(skip)
         .limit(limit)
         .populate("customerId", "fullName avatar phone")
-        .populate("serviceId", "name image serviceType")
+        .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
         .populate("addressId")
         .lean(),
       Order.countDocuments(query),
@@ -895,8 +921,7 @@ export const OrderService = {
     const order = await Order.findOne({ _id: orderId, isDeleted: false })
       .populate("customerId", "fullName avatar phone email")
       .populate(
-        "serviceId",
-        "name image serviceType categoryId depositAmount fixedPrice",
+        { path: "serviceId", select: "name image coverImage serviceType categoryId depositAmount fixedPrice", transform: serviceImageResponse },
       )
       .populate("addressId")
       .populate({
@@ -927,7 +952,10 @@ export const OrderService = {
           : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
-    return { ...order, matchingSearch, matchingExpiresAt };
+    const statusHistory = await OrderStatus.find({ orderId: order._id, isDeleted: false })
+      .select("status previousStatus statusVersion changedByRole note createdAt")
+      .sort({ createdAt: 1, statusVersion: 1 }).lean();
+    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {

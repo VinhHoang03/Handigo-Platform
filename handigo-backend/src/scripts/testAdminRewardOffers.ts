@@ -3,10 +3,11 @@ import { mock } from "node:test";
 import mongoose, { Types } from "mongoose";
 import { AuditLog } from "../models/auditLog.model";
 import { Promotion } from "../models/promotion.model";
+import { Voucher } from "../models/voucher.model";
 import { Order } from "../models/order.model";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
 import { getRewardOffers, updateConfig } from "../services/systemConfig.service";
-import { getAdminRewardOffers, saveAdminRewardOffer, getRewardOverview, redeemReward } from "../services/reward.service";
+import { getAdminRewardOffers, saveAdminRewardOffer, getRewardOverview, getMyRewardVouchers, redeemReward } from "../services/reward.service";
 import { getAdminVouchers, updateAdminVoucher, disableAdminVoucher, enableAdminVoucher, deleteAdminVoucher } from "../services/voucher.service";
 import { rewardOfferSchema } from "../validations/reward.validator";
 import { adminVoucherQuerySchema } from "../validations/voucher.validator";
@@ -17,7 +18,11 @@ async function run() {
   const customer = { id: new Types.ObjectId().toString(), role: "CUSTOMER" as const };
   const configs = new Map<string, any>();
   const transactions = new Map<string, any>();
-  const promotions = new Map<string, InstanceType<typeof Promotion>>();
+  const promotions = new Map<string, InstanceType<typeof Voucher>>();
+  const legacy = new Promotion({ ownerId: customer.id, code: "MA-CU", name: "Mã đổi điểm cũ",
+    discountType: "AMOUNT", discountValue: 10000, usedCount: 0, status: "ACTIVE", isActive: true,
+    startAt: new Date(Date.now() - 100000), endAt: new Date(Date.now() + 100000),
+    createdAt: new Date(Date.now() - 10000), updatedAt: new Date() });
   const audits: any[] = [];
   let balance = 2000;
   let lastFilter: any;
@@ -46,14 +51,15 @@ async function run() {
   });
   mock.method(RewardTransaction, "findById", (id: string) => query(transactions.get(id)));
   mock.method(RewardTransaction, "create", async (rows: any) => { transactions.set(rows[0]._id, rows[0]); return rows; });
-  mock.method(Promotion, "create", async (rows: any) => {
-    const voucher = new Promotion(rows[0]); promotions.set(voucher.id, voucher); return [voucher] as never;
+  mock.method(Voucher, "create", async (rows: any) => {
+    const voucher = new Voucher({ ...rows[0], createdAt: new Date(), updatedAt: new Date() }); promotions.set(voucher.id, voucher); return [voucher] as never;
   });
-  mock.method(Promotion, "findById", (id: any) => query(promotions.get(String(id))));
-  mock.method(Promotion, "findOne", ({ _id }: any) => query(promotions.get(String(_id))));
-  mock.method(Promotion.prototype, "save", async function (this: InstanceType<typeof Promotion>) { return this; });
-  mock.method(Promotion, "find", (filter: any) => { lastFilter = filter; return query([...promotions.values()]); });
-  mock.method(Promotion, "countDocuments", () => query(promotions.size));
+  mock.method(Voucher, "findOne", ({ _id }: any) => query(promotions.get(String(_id))));
+  mock.method(Voucher.prototype, "save", async function (this: InstanceType<typeof Voucher>) { return this; });
+  mock.method(Voucher, "find", (filter: any) => { lastFilter = filter; return query([...promotions.values()]); });
+  mock.method(Promotion, "find", () => query([legacy]));
+  mock.method(Promotion, "findOne", () => query(null));
+  mock.method(Order, "find", () => ({ select: () => query([]) }));
   mock.method(Order, "exists", () => query(reserved ? { _id: new Types.ObjectId() } : null));
   try {
     await assert.rejects(getAdminRewardOffers(customer), /quản trị viên/);
@@ -75,6 +81,10 @@ async function run() {
     assert.equal(voucher.maxDiscountAmount, 30000);
     assert.equal(voucher.applicableOrderType, "variable_price");
     assert.equal(voucher.endAt.getTime() - voucher.startAt.getTime(), 30 * 86400000);
+    const mine = await getMyRewardVouchers(customer.id, 1);
+    assert.equal(mine.total, 2);
+    assert.deepEqual(mine.items.map((item) => String(item._id)), [voucher.id, legacy.id], "Khách thấy cả mã vừa đổi và mã cũ, mới nhất trước.");
+    assert.equal("ownerId" in mine.items[0], false, "Danh sách của khách giữ nguyên các trường trả về.");
     await saveAdminRewardOffer(admin, { ...offer, points: 500, maxDiscountAmount: 20000, isActive: false });
     assert.equal(voucher.maxDiscountAmount, 30000, "Chỉnh sửa gói không đổi quyền lợi mã đã cấp.");
     assert.equal((await getRewardOverview(customer.id)).policy.offers.some((item) => item.id === offer.id), false);
@@ -91,6 +101,15 @@ async function run() {
     assert.equal(lastFilter.$or, undefined, "Lọc trạng thái không tạo điều kiện OR rỗng.");
     assert.equal(String(list.items[0].ownerId), customer.id);
     assert.equal(list.items[0].applicableOrderType, "variable_price");
+    const originalEndAt = voucher.endAt;
+    voucher.endAt = new Date(Date.now() - 1000);
+    const expired = await getAdminVouchers(admin, adminVoucherQuerySchema.parse({ source: "reward", status: "EXPIRED" }));
+    assert.equal(expired.items.length, 1);
+    assert.equal(expired.items[0].status, "EXPIRED", "Mã ACTIVE đã quá hạn phải hiển thị hết hạn.");
+    const active = await getAdminVouchers(admin, adminVoucherQuerySchema.parse({ source: "reward", status: "ACTIVE" }));
+    assert.equal(active.items.some((item) => String(item.id) === voucher.id), false);
+    assert.equal(active.pagination.total, 1);
+    voucher.endAt = originalEndAt;
     await getAdminVouchers(admin, adminVoucherQuerySchema.parse({ source: "all" }));
     assert.equal(lastFilter.ownerId, undefined);
     await getAdminVouchers(admin, adminVoucherQuerySchema.parse({}));

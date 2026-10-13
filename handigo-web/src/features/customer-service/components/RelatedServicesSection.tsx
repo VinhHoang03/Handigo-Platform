@@ -24,7 +24,7 @@ export function RelatedServicesSection({ relatedServices }: RelatedServicesSecti
             <ReliableImage
               src={getServiceImage(item)}
               alt={item.name}
-              className="h-32 w-full object-cover"
+              className="aspect-video w-full object-contain"
             />
             <div className="p-4">
               <h3 className="font-bold text-on-surface group-hover:text-primary">

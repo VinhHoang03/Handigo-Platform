@@ -21,6 +21,12 @@ export const feedbackListQuerySchema = z.object({
   isVisible: booleanQuerySchema.optional(),
 });
 
+export const serviceFeedbackQuerySchema = feedbackListQuerySchema.extend({
+  optionId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Mã gói dịch vụ không hợp lệ").optional(),
+  sort: z.enum(["newest", "rating"]).default("newest"),
+  positiveOnly: booleanQuerySchema.optional(),
+});
+
 export const createFeedbackSchema = z.object({
   orderId: objectIdSchema,
   rating: z.number().int().min(1).max(5),

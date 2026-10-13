@@ -560,9 +560,7 @@ export const previewOrderPayment = async (user: RequestUser, orderId: string, me
     throw new AppError("Tiền đặt cọc khảo sát chỉ thanh toán bằng chuyển khoản hoặc ví Handigo.", 400);
   }
   const amount = await getPaymentAmount(order, paymentType);
-  if (amount < 0 || (amount === 0 && !(order.inspectionRequired && order.voucherSnapshot))) {
-    throw new AppError("Số tiền thanh toán không hợp lệ.", 400);
-  }
+  if (amount < 0) throw new AppError("Số tiền thanh toán không hợp lệ.", 400);
   const existing = await Payment.findOne({ orderId, paymentType, isDeleted: false, status: { $in: ["pending", "paid"] } });
   const switching = allowMethodSwitch && existing?.status === "pending"
     && ((existing.method === "payos" && method !== "PAYOS") || (existing.method === "cash" && method !== "CASH"));
@@ -685,19 +683,44 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
   }
 
   const paymentType = getPaymentType(order, input.paymentType);
-  assertAppointmentPaymentReady(order, paymentType);
-
+  if (!expected && input.expectedAmount !== undefined) {
+    expected = { amount: input.expectedAmount, paymentType };
+  }
   if (order.inspectionRequired && input.method === "CASH") {
     throw new AppError("Đơn khảo sát phải thanh toán tiền đặt cọc qua PayOS", 400);
   }
 
   const amount = await getPaymentAmount(order, paymentType);
-  assertConfirmedPayment(order, amount, paymentType, expected);
-
-  if (amount === 0 && paymentType === "inspection_deposit" && order.inspectionRequired) {
-    return createWalletPayment(order, paymentType, amount, expected, previousCashPaymentId);
+  if (amount === 0) {
+    const result = await mongoose.connection.transaction(async session => {
+      const current = await Order.findById(order._id).session(session);
+      if (!current || current.isDeleted || (current.customerId.toString() !== user.id && user.role !== "ADMIN")) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+      const currentAmount = await getPaymentAmount(current, paymentType);
+      if (currentAmount !== 0) throw new AppError("Giá vừa thay đổi. Vui lòng kiểm tra lại tổng tiền.", 409);
+      if (getPaymentType(current, input.paymentType) !== paymentType || (expected &&
+        (expected.amount !== currentAmount || expected.paymentType !== paymentType))) throw new ActionPreconditionError();
+      const existing = await Payment.findOne({ orderId: current._id, paymentType, isDeleted: false, status: { $in: ["pending", "paid"] } }).session(session);
+      if (existing?.status === "paid" && existing.amount === 0 && current.status !== "cancelled") return { payment: existing, shouldDispatch: false };
+      if (existing) throw new AppError("Đơn đã có giao dịch đang chờ. Vui lòng kiểm tra thanh toán.", 409);
+      assertAppointmentPaymentReady(current, paymentType);
+      assertConfirmedPayment(current, currentAmount, paymentType, expected);
+      if (!["created", "accepted"].includes(current.status) || current.paymentStatus !== "unpaid") throw new AppError("Đơn không còn chờ thanh toán.", 409);
+      const [payment] = await Payment.create([{
+        orderId: current._id, customerId: current.customerId, amount: 0,
+        method: input.method === "PAYOS" ? "payos" : input.method === "WALLET" ? "wallet" : "cash", paymentType, status: "paid", paidAt: new Date(),
+        transactionCode: buildTransactionCode("DISCOUNT"), gatewayResponse: { fullyDiscounted: true },
+      }], { session });
+      current.paymentMethod = input.method === "PAYOS" ? "bank" : input.method === "WALLET" ? "wallet" : "cash";
+      await current.save({ session });
+      const shouldDispatch = await syncPaidPayosPaymentToOrder(payment, session, true);
+      return { payment, shouldDispatch };
+    });
+    if (result.shouldDispatch) triggerDispatch(order._id.toString());
+    return { payment: result.payment, amount: 0, paymentType };
   }
-  if (amount <= 0) {
+  assertAppointmentPaymentReady(order, paymentType);
+  assertConfirmedPayment(order, amount, paymentType, expected);
+  if (amount < 0) {
     throw new AppError("Số tiền thanh toán không hợp lệ", 400);
   }
 

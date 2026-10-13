@@ -72,6 +72,7 @@ class VoucherItem {
     this.discountType,
     this.discountValue = 0,
     this.minOrderAmount = 0,
+    this.startAt,
     this.endAt,
   });
   factory VoucherItem.fromJson(Map<String, dynamic> json) => VoucherItem(
@@ -81,10 +82,11 @@ class VoucherItem {
     discountType: json['discountType'] as String?,
     discountValue: _num(json['discountValue']),
     minOrderAmount: _num(json['minOrderAmount']),
+    startAt: json['startAt'] as String?,
     endAt: json['endAt'] as String?,
   );
   final String code, name;
-  final String? description, discountType, endAt;
+  final String? description, discountType, startAt, endAt;
   final double discountValue, minOrderAmount;
 }
 

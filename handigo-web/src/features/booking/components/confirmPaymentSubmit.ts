@@ -25,6 +25,8 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     reset, navigate,
   } = params;
 
+  const isCleaning = isAirConditionerCleaning(service) && !params.hasServiceOptions;
+
   if (!serviceId) {
     showSystemAlert('Vui lòng chọn dịch vụ trước khi thanh toán.', {
       title: 'Chưa chọn dịch vụ',
@@ -50,7 +52,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     setPaymentError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
     return;
   }
-  if (isAirConditionerCleaning(service) && !(service?.fixedPrice && service.fixedPrice > 0)) {
+  if (isCleaning && !(service?.fixedPrice && service.fixedPrice > 0)) {
     setPaymentError('Dịch vụ chưa có giá hợp lệ. Vui lòng chọn lại dịch vụ.');
     return;
   }
@@ -66,10 +68,11 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   try {
     const payload: CreateOrderPayload = {
       expectedBookingAmount: params.expectedBookingAmount,
+      expectedFinalAmount: params.expectedFinalAmount,
       serviceId,
-      selectedOptionIds: isAirConditionerCleaning(service) ? [] : selectedOptionIds,
-      uniformQuantity: isAirConditionerCleaning(service) ? uniformQuantity ?? 1 : undefined,
-      selectedOptions: (isAirConditionerCleaning(service) ? [] : selectedOptionIds).map((optionId) => ({
+      selectedOptionIds: isCleaning ? [] : selectedOptionIds,
+      uniformQuantity: isCleaning ? uniformQuantity ?? 1 : undefined,
+      selectedOptions: (isCleaning ? [] : selectedOptionIds).map((optionId) => ({
         optionId,
         quantity: selectedOptionQuantities?.[optionId] ?? 1,
       })),
@@ -98,8 +101,17 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       );
     } else {
       const existingOrder = await bookingApi.getOrderById(orderId);
+      const expectedVoucherCode = params.expectedVoucherCode !== undefined ? params.expectedVoucherCode : appliedVoucher?.code ?? null;
+      if ((existingOrder.voucherSnapshot?.code ?? null) !== expectedVoucherCode) {
+        setPaymentError('Voucher của đơn đang chờ đã thay đổi. Vui lòng kiểm tra lại đơn trước khi thanh toán.');
+        return;
+      }
       if (existingOrder.pricing.bookingAmount !== params.expectedBookingAmount) {
         navigate(`/customer/bookings/${orderId}`);
+        return;
+      }
+      if (existingOrder.pricing.totalPaidAmount !== params.expectedFinalAmount) {
+        setPaymentError('Tổng tiền sau giảm giá của đơn đang chờ khác với giá đang hiển thị. Vui lòng kiểm tra lại đơn trước khi thanh toán.');
         return;
       }
     }
@@ -107,6 +119,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     if (effectivePaymentMethod === 'bank') {
       const payment = await bookingApi.createPayment({
         orderId,
+        expectedAmount: params.expectedFinalAmount,
         method: 'PAYOS',
         paymentType:
           service?.serviceType === 'variable_price'
@@ -116,7 +129,15 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
       });
 
-      if (!payment.checkoutUrl && payment.payment.status !== 'paid') {
+      if (payment.payment.status === 'paid') {
+        const orderDetail = await bookingApi.getOrderById(orderId);
+        sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
+        sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
+        reset();
+        navigate('/customer/bookings/success', { state: { order: orderDetail } });
+        return;
+      }
+      if (!payment.checkoutUrl) {
         throw new Error('PayOS không trả về liên kết thanh toán.');
       }
 
@@ -132,6 +153,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       effectivePaymentMethod === 'wallet'
         ? {
             orderId,
+            expectedAmount: params.expectedFinalAmount,
             method: 'WALLET',
             paymentType:
               service?.serviceType === 'variable_price'
@@ -140,6 +162,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
           }
         : {
             orderId,
+            expectedAmount: params.expectedFinalAmount,
             method: 'CASH',
             paymentType: 'FULL',
           },

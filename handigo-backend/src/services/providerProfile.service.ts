@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import { Types } from "mongoose";
 import User from "../models/user.model";
 import {
@@ -40,7 +41,8 @@ const safeUserSelect =
 
 const servicePopulate = {
   path: "serviceIds",
-  select: "name slug categoryId serviceType fixedPrice image",
+  select: "name slug categoryId serviceType fixedPrice image coverImage",
+  transform: serviceImageResponse,
 };
 
 const assertObjectId = (id: string, fieldName: string) => {
@@ -546,7 +548,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
       .sort({ createdAt: -1 })
       .limit(5)
       .populate("customerId", "fullName avatar")
-      .populate("serviceId", "name image")
+      .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
       .lean(),
     Category.find({
       _id: { $in: categoryIds },
@@ -617,6 +619,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
       };
       const service = feedback.serviceId as unknown as {
         name?: string;
+        coverImage?: string | null;
         image?: string | null;
       };
 
@@ -632,7 +635,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
         },
         service: {
           name: service?.name || "Dịch vụ",
-          image: service?.image || null,
+          image: (service?.coverImage === undefined ? service?.image : service.coverImage) || null,
         },
         providerReply: feedback.providerReply
           ? {

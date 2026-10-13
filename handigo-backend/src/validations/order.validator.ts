@@ -17,6 +17,7 @@ const objectIdSchema = z
 
 export const createOrderSchema = z.object({
   expectedBookingAmount: z.number().int().min(0).optional(),
+  expectedFinalAmount: z.number().int().min(0).optional(),
   serviceId: objectIdSchema,
   uniformQuantity: z.coerce.number()
     .int("Số lượng máy phải là số nguyên")
@@ -91,6 +92,7 @@ export const cancelOrderSchema = z.object({
 });
 
 export const previewBookingSchema = z.object({
+  voucherCode: createOrderSchema.shape.voucherCode,
   serviceId: createOrderSchema.shape.serviceId,
   uniformQuantity: createOrderSchema.shape.uniformQuantity,
   selectedOptionIds: createOrderSchema.shape.selectedOptionIds,

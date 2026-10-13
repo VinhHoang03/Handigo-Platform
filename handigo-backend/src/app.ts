@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.routes";
 import voucherRoutes from "./routes/voucher.routes";
+import promotionRoutes from "./routes/promotion.routes";
 import rewardRoutes from "./routes/reward.routes";
 import walletRoutes from "./routes/wallet.routes";
 import withdrawalRoutes from "./routes/withdrawal.routes";
@@ -118,6 +119,7 @@ app.use((req, res, next) => {
 app.use("/auth", authRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/vouchers", voucherRoutes);
+app.use("/promotions", promotionRoutes);
 app.use("/rewards", rewardRoutes);
 app.use("/withdrawals", withdrawalRoutes);
 app.use("/wallets", walletRoutes);

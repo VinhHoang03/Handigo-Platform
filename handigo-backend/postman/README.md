@@ -33,6 +33,14 @@ running an entire collection repeatedly.
 
 ## Quản lý gói đổi điểm và mã đã phát hành
 
+### Kiểm tra số tiền đã xác nhận khi đặt đơn
+
+`POST /orders` nhận thêm `expectedFinalAmount` (số nguyên không âm): tổng tiền sau ưu đãi/voucher khách đã xem. Nếu tổng hiện tại khác, trả lỗi 409 trước khi lưu đơn hoặc giữ lượt mã.
+
+`POST /payments/create` nhận thêm `expectedAmount` (số nguyên không âm): khoản thanh toán khách đã xác nhận. Backend kiểm tra lại trước khi thanh toán và bên trong transaction, trước khi trừ ví hoặc tạo giao dịch. Cả hai trường đều tùy chọn để tương thích với client cũ; luồng đặt đơn trên web gửi chúng cho ví, PayOS và tiền mặt, kể cả khi số tiền bằng 0đ.
+
+### API quản lý mã
+
 Các API sau yêu cầu đăng nhập với quyền ADMIN:
 
 - `GET /rewards/admin/offers`: lấy tất cả gói đổi điểm, gồm cả gói tạm dừng.

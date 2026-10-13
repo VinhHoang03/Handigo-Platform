@@ -1,13 +1,14 @@
 import { AppError } from "../utils/appError";
 import { getServiceById, listServices } from "./service.service";
 import { getOptionsByServiceId } from "./serviceOption.service";
-import { buildServicePricingSnapshot } from "./servicePricing.service";
+import { buildServicePricingSnapshot, previewServiceBooking } from "./servicePricing.service";
 import { getUserAddresses, ensureAddressCoordinates } from "./address.service";
 import { Address } from "../models/address.model";
 import { Provider } from "../models/provider.model";
 import User from "../models/user.model";
 import { Types } from "mongoose";
-import { getAvailableVouchers, resolveVoucherForAmount } from "./voucher.service";
+import { getAvailableVouchers } from "./voucher.service";
+import { resolveAutomaticPromotion } from "./promotion.service";
 import { MatchingService } from "./matching.service";
 import { OrderService, type CreateOrderPayload } from "./order.service";
 import { safelyTrackAgentBooking } from "./agentOrderProgress.service";
@@ -90,8 +91,10 @@ export const AgentBookingService = {
     return {
       id: String(service._id), name: service.name, serviceType: service.serviceType,
       fixedPrice: service.fixedPrice,
+      optionGroups: service.optionGroups,
       requiresOptionSelection: service.requiresOptionSelection, options: options.map((option) => ({
         _id: String(option._id), name: option.name, description: option.description,
+        groupId: option.groupId,
         price: option.price, optionType: option.optionType, selectionGroup: option.selectionGroup,
         selectionMode: option.selectionMode, allowsQuantity: option.allowsQuantity, isRequired: option.isRequired,
       }))
@@ -106,23 +109,27 @@ export const AgentBookingService = {
   },
   async price(args: PriceArguments) {
     const service = await activeService(args.serviceId);
-    const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions, args.uniformQuantity);
+    const snapshot = await previewServiceBooking({ serviceId: args.serviceId,
+      selectedOptions: args.selectedOptions, uniformQuantity: args.uniformQuantity });
     return {
-      serviceName: service.name, serviceType: service.serviceType, amount: snapshot.bookingAmount,
+      serviceName: service.name, serviceType: service.serviceType, amount: snapshot.discountedAmount,
+      promotionName: snapshot.promotionSnapshot?.name,
       depositAmount: snapshot.depositAmount, currency: "VND", options: snapshot.selectedOptionsSnapshot
     };
   },
   async vouchers(userId: string, args: PriceArguments) {
     const service = await activeService(args.serviceId);
     const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions, args.uniformQuantity);
+    const promotion = await resolveAutomaticPromotion(service._id, snapshot.baseAmount, true);
+    const promotionDiscountAmount = promotion?.discountAmount ?? 0;
     const vouchers = await getAvailableVouchers({ id: userId, role: "CUSTOMER" }, {}, {
-      amountBeforeVoucher: snapshot.baseAmount, inspectionRequired: service.serviceType === "variable_price",
+      amountBeforeVoucher: Math.max(snapshot.baseAmount - promotionDiscountAmount, 0), inspectionRequired: service.serviceType === "variable_price",
     });
     return vouchers.map((voucher) => ({ code: voucher.code!, name: voucher.name,
       discountAmount: voucher.discountAmount ?? 0,
-      finalAmount: Math.max(snapshot.bookingAmount - (voucher.discountAmount ?? 0), 0),
+      finalAmount: Math.max(snapshot.bookingAmount - promotionDiscountAmount - (voucher.discountAmount ?? 0), 0),
       minOrderAmount: voucher.minOrderAmount, endAt: voucher.endAt.toISOString(),
-    })).filter((voucher) => voucher.discountAmount > 0 && voucher.finalAmount > 0)
+    })).filter((voucher) => voucher.discountAmount > 0 && voucher.finalAmount >= 0)
       .sort((a, b) => b.discountAmount - a.discountAmount);
   },
   async providers(userId: string, args: BookingArguments & { providerQuery?: string }) {
@@ -185,17 +192,12 @@ export const AgentBookingService = {
   },
   async preview(userId: string, args: BookingArguments) {
     const address = await ownedAddress(userId, args.addressId);
-    const price = await this.price(args);
-    let discountAmount = 0;
-    if (args.voucherCode) {
-      const usable = await this.vouchers(userId, args);
-      if (!usable.some((voucher) => voucher.code === args.voucherCode!.trim().toUpperCase())) {
-        throw new AppError("Voucher không còn áp dụng được cho đơn này. Vui lòng chọn lại hoặc bỏ voucher.", 409);
-      }
-      const service = await activeService(args.serviceId);
-      const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions, args.uniformQuantity);
-      discountAmount = (await resolveVoucherForAmount(args.voucherCode, snapshot.baseAmount, undefined, userId, service.serviceType === "variable_price")).discountAmount;
-    }
+    const service = await activeService(args.serviceId);
+    const snapshot = await previewServiceBooking(args, userId);
+    const discountAmount = snapshot.voucherDiscountAmount;
+    const price = { serviceName: service.name, serviceType: service.serviceType,
+      amount: snapshot.discountedAmount + discountAmount,
+      options: snapshot.selectedOptionsSnapshot, currency: "VND", promotionName: snapshot.promotionSnapshot?.name };
     let providerName: string | undefined;
     if (args.preferredProviderId) {
       const result = await this.providers(userId, args);
@@ -206,7 +208,9 @@ export const AgentBookingService = {
     const paymentOnConfirmation = true;
     const quantityPrice = price.options.length === 1 && price.options[0].optionId === null
       ? price.options[0] : undefined;
-    const paymentNote = args.paymentMethod === "bank"
+    const paymentNote = snapshot.discountedAmount === 0
+      ? "Sau xác nhận, hệ thống ghi nhận khoản thanh toán 0đ; không cần chuyển khoản hoặc trừ tiền ví."
+      : args.paymentMethod === "bank"
       ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và liên kết PayOS để bạn chuyển khoản."
       : args.paymentMethod === "wallet"
         ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và trừ số tiền hiển thị ở trên từ ví Handigo."
@@ -222,7 +226,7 @@ export const AgentBookingService = {
       voucherCode: args.voucherCode, providerName,
       amount: Math.max(price.amount - discountAmount, 0), currency: price.currency,
       description: args.problemDescription ?? "", serviceType: price.serviceType, paymentOnConfirmation,
-      note: [paymentNote, price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
+      note: [paymentNote, price.promotionName ? `Đã áp dụng ưu đãi tự động: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
         quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ")
     };
   },

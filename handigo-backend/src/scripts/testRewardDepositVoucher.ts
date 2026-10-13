@@ -4,6 +4,8 @@ import mongoose, { Types } from "mongoose";
 import { Order } from "../models/order.model";
 import { Payment } from "../models/payment.model";
 import { Promotion } from "../models/promotion.model";
+import { Voucher } from "../models/voucher.model";
+import { VoucherUsage } from "../models/voucherUsage.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
@@ -19,7 +21,7 @@ stubModule("../services/systemConfig.service", { getRewardOffers: async () => RE
 stubModule("../services/notification.service", { createNotificationRecord: async () => ({}) });
 stubModule("../services/dispatch.service", { DispatchService: { dispatchReadyOrder: async () => { dispatches++; } } });
 const { createPayment } = require("../services/payment.service") as typeof import("../services/payment.service");
-const { resolveVoucherForAmount, reservePersonalVoucher, getAvailableVouchers } = require("../services/voucher.service") as typeof import("../services/voucher.service");
+const { resolveVoucherForAmount, reservePersonalVoucher, releaseVoucherReservation, getAvailableVouchers } = require("../services/voucher.service") as typeof import("../services/voucher.service");
 const { redeemReward } = require("../services/reward.service") as typeof import("../services/reward.service");
 
 async function run() {
@@ -29,7 +31,7 @@ async function run() {
     paymentStatus: "unpaid", inspectionRequired: true, depositAmount: 20000,
     pricing: { baseAmount: 20000, bookingAmount: 20000, totalPaidAmount: 0, voucherDiscountAmount: 20000,
       platformCommissionRate: 0, platformCommissionAmount: 0, providerEarningAmount: 0 } });
-  const voucher = new Promotion({ ownerId: user.id, code: "MIENCOC", name: "Miễn phí cọc",
+  const voucher = new Voucher({ ownerId: user.id, code: "MIENCOC", name: "Miễn phí cọc",
     applicableOrderType: "variable_price", discountType: "PERCENT", discountValue: 50,
     usageLimit: 1, startAt: new Date(Date.now() - 1000), endAt: new Date(Date.now() + 100000) });
   const session = { withTransaction: async (fn: () => Promise<unknown>) => fn(), endSession: async () => {} };
@@ -37,7 +39,8 @@ async function run() {
   let payment: InstanceType<typeof Payment> | null = null;
   let balance = 800;
   const redeemed = new Map<string, any>();
-  const promotions = new Map<string, InstanceType<typeof Promotion>>();
+  const promotions = new Map<string, InstanceType<typeof Voucher>>();
+  const usages = new Map<string, InstanceType<typeof VoucherUsage>>();
   mock.method(mongoose.connection, "transaction", async (fn: any) => fn(session));
   mock.method(RewardAccount, "findOneAndUpdate", (filter: any, update: any) => {
     if (balance < filter.balance.$gte) return query(null);
@@ -46,17 +49,40 @@ async function run() {
   });
   mock.method(RewardTransaction, "findById", (key: string) => query(redeemed.get(key)));
   mock.method(RewardTransaction, "create", async (rows: any) => { redeemed.set(rows[0]._id, rows[0]); return rows; });
-  mock.method(Promotion, "create", async (rows: any) => {
-    const created = new Promotion(rows[0]); promotions.set(created.id, created); return [created] as never;
+  mock.method(Voucher, "create", async (rows: any) => {
+    const created = new Voucher(rows[0]); promotions.set(created.id, created); return [created] as never;
   });
   mock.method(mongoose, "startSession", async () => session as never);
-  mock.method(Promotion, "findOne", () => query(voucher));
-  mock.method(Promotion, "findById", (id: any) => query(promotions.get(String(id)) ?? voucher));
-  mock.method(Promotion, "find", () => ({ sort: async () => [voucher] }));
+  mock.method(Voucher, "findOne", (filter: any) => query(filter._id && promotions.has(String(filter._id)) ? promotions.get(String(filter._id)) : voucher));
+  mock.method(Voucher, "find", () => query([voucher]));
+  mock.method(Promotion, "find", () => query([]));
+  mock.method(Promotion, "findOne", () => query(null));
   mock.method(Order, "find", () => ({ select: () => ({ lean: async () => [] }) }));
   mock.method(Promotion, "exists", () => query(voucher.applicableOrderType === "variable_price" && voucher.discountValue === 100));
-  mock.method(Promotion.prototype, "save", async function (this: InstanceType<typeof Promotion>) { return this; });
-  mock.method(Promotion, "updateOne", async () => { voucher.usedCount++; return {} as never; });
+  mock.method(Voucher.prototype, "save", async function (this: InstanceType<typeof Voucher>) { return this; });
+  mock.method(Voucher.prototype, "updateOne", (update: any) => ({ where: () => {
+    for (const [field, increment] of Object.entries(update.$inc ?? {})) voucher.set(field, (voucher.get(field) ?? 0) + Number(increment));
+    for (const [field, value] of Object.entries(update.$set ?? {})) voucher.set(field, value);
+    return query({ modifiedCount: 1 });
+  } }) as never);
+  const findUsage = (filter: any) => [...usages.values()].find((item) =>
+    (!filter.orderId || String(item.orderId) === String(filter.orderId)) &&
+    (!filter.voucherId || String(item.voucherId) === String(filter.voucherId)) &&
+    (!filter.status || item.status === filter.status));
+  mock.method(VoucherUsage, "exists", (filter: any) => query(findUsage(filter) ?? null));
+  mock.method(VoucherUsage, "countDocuments", () => query([...usages.values()].filter((item) => item.status !== "restored").length));
+  mock.method(VoucherUsage, "aggregate", () => query([]));
+  mock.method(VoucherUsage, "findOneAndUpdate", (filter: any, update: any) => {
+    const usage = findUsage(filter);
+    if (usage) usage.set(update.$set);
+    return query(usage ?? null);
+  });
+  mock.method(VoucherUsage, "create", async (rows: any) => {
+    const usage = new VoucherUsage(rows[0]);
+    const key = `${usage.voucherId}:${usage.orderId}`;
+    if (usages.has(key)) throw Object.assign(new Error("Trùng lịch sử giữ mã."), { code: 11000 });
+    usages.set(key, usage); return [usage] as never;
+  });
   mock.method(Order, "findById", () => query(order));
   mock.method(Order, "findOneAndUpdate", () => query(order));
   mock.method(Order.prototype, "save", async function (this: InstanceType<typeof Order>) { return this; });
@@ -92,21 +118,51 @@ async function run() {
     assert.equal((await resolveVoucherForAmount(voucher.code!, 30000, undefined, user.id, true)).discountAmount, 30000);
     assert.equal((await resolveVoucherForAmount(voucher.code!, 20000, undefined, user.id, true)).discountAmount, 20000);
     assert.equal((await getAvailableVouchers(user, {}, { amountBeforeVoucher: 40000, inspectionRequired: true }))[0].finalAmount, 10000);
-    await reservePersonalVoucher(voucher._id as Types.ObjectId, user.id, order._id as Types.ObjectId, true, session as never);
     order.voucherSnapshot = (await resolveVoucherForAmount(voucher.code!, 20000, undefined, user.id, true)).snapshot;
-    const result = await createPayment(user, { orderId: order.id, method: "PAYOS", paymentType: "INSPECTION_DEPOSIT" });
+    await reservePersonalVoucher(voucher._id as Types.ObjectId, user.id, order._id as Types.ObjectId, true, session as never);
+    assert.equal(voucher.reservedCount, 1);
+    await releaseVoucherReservation(order._id as Types.ObjectId, session as never);
+    assert.equal(voucher.reservedCount, 0);
+    assert.equal([...usages.values()][0].status, "restored");
+    await reservePersonalVoucher(voucher._id as Types.ObjectId, user.id, order._id as Types.ObjectId, true, session as never);
+    assert.equal(usages.size, 1, "Gỡ rồi giữ lại phải tái sử dụng lịch sử cùng mã/cùng đơn.");
+    assert.equal([...usages.values()][0].status, "reserved");
+    assert.equal(voucher.reservedCount, 1);
+    await reservePersonalVoucher(voucher._id as Types.ObjectId, user.id, order._id as Types.ObjectId, true, session as never);
+    assert.equal(voucher.reservedCount, 1, "Thử lại thao tác giữ không tăng lượt thêm.");
+    await assert.rejects(() => createPayment(user, { orderId: order.id, method: "PAYOS", expectedAmount: 1 }), /Thông tin hoặc chi phí đã thay đổi/);
+    assert.equal(payment, null, "Không tạo thanh toán khi giá xác nhận khác số tiền thực tế.");
+    order.pricing.totalPaidAmount = 10000;
+    let paymentOrderReads = 0;
+    const changedRead = mock.method(Order, "findById", () => {
+      if (++paymentOrderReads === 2) order.pricing.totalPaidAmount = 20000;
+      return query(order);
+    });
+    await assert.rejects(() => createPayment(user, { orderId: order.id, method: "WALLET", expectedAmount: 10000 }), /Thông tin hoặc chi phí đã thay đổi/);
+    assert.equal(payment, null, "Giá đổi trong transaction phải bị chặn trước khi tạo payment hoặc trừ ví.");
+    changedRead.mock.restore();
+    order.pricing.totalPaidAmount = 0;
+    const result = await createPayment(user, { orderId: order.id, method: "PAYOS", paymentType: "INSPECTION_DEPOSIT", expectedAmount: 0 });
     assert.equal(result.payment.amount, 0);
     assert.equal(result.payment.status, "paid");
     assert.equal(order.paymentStatus, "partially_paid");
     assert.ok(order.depositPaidAt);
     assert.equal(order.readyForMatching, true);
     assert.equal(voucher.usedCount, 1);
+    assert.equal(voucher.reservedCount, 0);
+    assert.equal([...usages.values()][0].status, "used");
     await Promise.resolve();
     assert.equal(dispatches, 1);
-    await assert.rejects(() => createPayment(user, { orderId: order.id, method: "PAYOS" }), /đã có giao dịch/);
+    order.orderType = "scheduled";
+    order.bookingStatus = "awaiting_provider";
+    assert.equal((await createPayment(user, { orderId: order.id, method: "PAYOS", expectedAmount: 0 })).payment.id, result.payment.id, "Thử lại thanh toán 0đ có giá xác nhận trên đơn đặt lịch trả giao dịch cũ.");
+    await assert.rejects(() => createPayment(user, { orderId: order.id, method: "PAYOS", expectedAmount: 1 }), /Thông tin hoặc chi phí đã thay đổi/);
+    assert.equal(voucher.usedCount, 1);
+    assert.equal(dispatches, 1, "Thử lại không tìm thợ lần nữa.");
+    order.orderType = "normal";
     payment = null;
     voucher.applicableOrderType = "fixed_price";
-    await assert.rejects(() => createPayment(user, { orderId: order.id, method: "PAYOS" }), /không hợp lệ/);
+    await assert.rejects(() => createPayment(user, { orderId: order.id, method: "PAYOS" }), /không còn chờ/);
     console.log("Đã kiểm tra giảm cọc 50%/100%, loại đơn, quyền sở hữu, miễn cọc, tìm thợ và chặn thanh toán trùng.");
   } finally { mock.restoreAll(); }
 }
