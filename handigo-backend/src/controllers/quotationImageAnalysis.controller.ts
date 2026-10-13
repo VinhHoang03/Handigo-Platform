@@ -1,11 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import { analyzeQuotationImage } from "../services/quotationImageAnalysis.service";
-import {
-  evaluateQuotationItemsForOrder,
-  evaluateQuotationItemsForProvider,
-  getQuotationOrderForProvider,
-} from "../services/quotationRelevance.service";
+import { getQuotationOrderForProvider } from "../services/quotationAccess.service";
 import { analyzeQuotationSpreadsheet } from "../services/quotationSpreadsheetAnalysis.service";
 
 const SPREADSHEET_MIME_TYPE =
@@ -25,7 +21,7 @@ export const scanQuotationItems = async (
       });
     }
 
-    const order = await getQuotationOrderForProvider(
+    await getQuotationOrderForProvider(
       String(req.body.orderId || ""),
       requireRequestUser(req).id,
     );
@@ -36,28 +32,7 @@ export const scanQuotationItems = async (
       isSpreadsheet
         ? await analyzeQuotationSpreadsheet(file.buffer)
         : await analyzeQuotationImage(file.buffer, file.mimetype);
-    const relevance = await evaluateQuotationItemsForOrder(order, items);
-    return res.json({ success: true, data: { items, relevance } });
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const validateQuotationItemsRelevance = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const orderId = Array.isArray(req.params.orderId)
-      ? req.params.orderId[0]
-      : String(req.params.orderId || "");
-    const relevance = await evaluateQuotationItemsForProvider(
-      orderId,
-      requireRequestUser(req).id,
-      req.body.items,
-    );
-    return res.json({ success: true, data: { relevance } });
+    return res.json({ success: true, data: { items } });
   } catch (error) {
     return next(error);
   }

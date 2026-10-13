@@ -18,8 +18,19 @@ export function PromotionToolbar({
         onChange: (value) => onQueryChange({ ...query, search: value, page: 1 }),
         placeholder: "Tìm theo mã, tên hoặc mô tả...",
       }}
-      filters={
+      filters={<>
         <select
+          aria-label="Nguồn mã giảm giá"
+          value={query.source || "all"}
+          onChange={(event) => onQueryChange({ ...query, source: event.target.value as VoucherQuery["source"], page: 1 })}
+          className="min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3"
+        >
+          <option value="all">Tất cả mã</option>
+          <option value="public">Mã thông thường</option>
+          <option value="reward">Mã đổi điểm</option>
+        </select>
+        <select
+          aria-label="Trạng thái mã giảm giá"
           value={query.status || ""}
           onChange={(event) => onQueryChange({ ...query, status: event.target.value as VoucherQuery["status"], page: 1 })}
           className="min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3"
@@ -29,6 +40,7 @@ export function PromotionToolbar({
           <option value="INACTIVE">Tạm dừng</option>
           <option value="EXPIRED">Hết hạn</option>
         </select>
+        </>
       }
       actions={
         <button

@@ -76,6 +76,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   try {
     const payload: CreateOrderPayload = {
       expectedBookingAmount: params.expectedBookingAmount,
+      expectedFinalAmount: params.expectedFinalAmount,
       serviceId,
       selectedOptionIds: isCleaning ? [] : selectedOptionIds,
       uniformQuantity: isCleaning ? uniformQuantity ?? 1 : undefined,
@@ -108,8 +109,17 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       );
     } else {
       const existingOrder = await bookingApi.getOrderById(orderId);
+      const expectedVoucherCode = params.expectedVoucherCode !== undefined ? params.expectedVoucherCode : appliedVoucher?.code ?? null;
+      if ((existingOrder.voucherSnapshot?.code ?? null) !== expectedVoucherCode) {
+        setPaymentError('Voucher của đơn đang chờ đã thay đổi. Vui lòng kiểm tra lại đơn trước khi thanh toán.');
+        return;
+      }
       if (existingOrder.pricing.bookingAmount !== params.expectedBookingAmount) {
         navigate(`/customer/bookings/${orderId}`);
+        return;
+      }
+      if (existingOrder.pricing.totalPaidAmount !== params.expectedFinalAmount) {
+        setPaymentError('Tổng tiền sau giảm giá của đơn đang chờ khác với giá đang hiển thị. Vui lòng kiểm tra lại đơn trước khi thanh toán.');
         return;
       }
     }
@@ -117,6 +127,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     if (effectivePaymentMethod === 'bank') {
       const payment = await bookingApi.createPayment({
         orderId,
+        expectedAmount: params.expectedFinalAmount,
         method: 'PAYOS',
         paymentType:
           service?.serviceType === 'variable_price'
@@ -138,16 +149,19 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         throw new Error('PayOS không trả về liên kết thanh toán.');
       }
 
-      sessionStorage.setItem('latestBookingOrderId', orderId);
-      tokenStorage.prepareExternalRedirect();
-      window.location.href = payment.checkoutUrl;
-      return;
+      if (payment.checkoutUrl) {
+        sessionStorage.setItem('latestBookingOrderId', orderId);
+        tokenStorage.prepareExternalRedirect();
+        window.location.href = payment.checkoutUrl;
+        return;
+      }
     }
 
-    await bookingApi.createPayment(
+    if (effectivePaymentMethod !== 'bank') await bookingApi.createPayment(
       effectivePaymentMethod === 'wallet'
         ? {
             orderId,
+            expectedAmount: params.expectedFinalAmount,
             method: 'WALLET',
             paymentType:
               service?.serviceType === 'variable_price'
@@ -156,6 +170,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
           }
         : {
             orderId,
+            expectedAmount: params.expectedFinalAmount,
             method: 'CASH',
             paymentType: 'FULL',
           },

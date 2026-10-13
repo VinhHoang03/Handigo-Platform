@@ -3,6 +3,9 @@ import { unwrap } from "@/api/response";
 
 export interface RewardOffer {
   id: string; name: string; points: number; discountValue: number; minOrderAmount: number;
+  discountType?: "AMOUNT" | "PERCENT";
+  applicableOrderType?: "fixed_price" | "variable_price";
+  maxDiscountAmount?: number | null;
 }
 export interface RewardOverview {
   balance: number; totalEarned: number; totalRedeemed: number;
@@ -12,6 +15,9 @@ export interface RewardVoucher {
   _id: string; code: string; name: string; discountValue: number; minOrderAmount: number;
   startAt: string; endAt: string; usedCount: number; isActive: boolean; status: string;
   reservedOrderId: string | null;
+  discountType?: "AMOUNT" | "PERCENT";
+  applicableOrderType?: "fixed_price" | "variable_price" | null;
+  maxDiscountAmount?: number | null;
 }
 export interface RewardEntry {
   _id: string; kind: "EARN" | "REDEEM"; points: number; balanceAfter: number; description: string; createdAt: string;

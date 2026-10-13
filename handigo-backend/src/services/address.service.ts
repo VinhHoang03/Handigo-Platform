@@ -4,6 +4,7 @@ import mongoose, { ClientSession } from "mongoose";
 import { geocodeSavedAddress } from "./reverseGeocoding.service";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
 // import ServiceRequest from "../models/request.model";
 
 type AddressPayload = {
@@ -190,9 +191,10 @@ export const createAddress = async (userId: string, data: AddressPayload) => {
   });
 };
 
-export const updateAddress = async (addressId: string, userId: string, data: AddressPayload) => {
+export const updateAddress = async (addressId: string, userId: string, data: AddressPayload, expectedVersion?: string) => {
   const current = await Address.findOne({ _id: addressId, userId, isDeleted: { $ne: true } });
   if (!current) throw new AppError("Không tìm thấy địa chỉ.", 404);
+  if (expectedVersion && current.updatedAt.toISOString() !== expectedVersion) throw new ActionPreconditionError();
   const payload = await resolveAddressPayload(pickAddressPayload(data), current);
   return changeAddresses(userId, async session => {
     const merged = { ...current.toObject(), ...payload };
@@ -204,7 +206,10 @@ export const updateAddress = async (addressId: string, userId: string, data: Add
         ...(payload.latitude !== undefined && !payload.placeId ? { $unset: { placeId: 1 } } : {}) },
       { new: true, session, runValidators: true },
     );
-    if (!address) throw new AppError("Địa chỉ vừa thay đổi. Vui lòng tải lại và thử lại.", 409);
+    if (!address) {
+      if (expectedVersion) throw new ActionPreconditionError();
+      throw new AppError("Địa chỉ vừa thay đổi. Vui lòng tải lại và thử lại.", 409);
+    }
     return address;
   });
 };

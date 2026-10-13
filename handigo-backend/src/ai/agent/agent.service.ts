@@ -230,7 +230,20 @@ export class AgentService {
       await this.loop.run(session, context, checkpoint);
       return;
     }
-    const finished = await this.loop.execute(session, context, tool, args, checkpoint, action);
+    let finished = await this.loop.execute(session, context, tool, args, checkpoint, action);
+    if (!finished && action.tool === "save_booking_address" && action.status === "SUCCEEDED"
+      && (args as { useForBooking: boolean }).useForBooking && session.bookingDraft?.status === "active") {
+      try {
+        const update = this.loop.tools.get("update_booking_draft", context);
+        finished = await this.loop.execute(session, context, update, { mode: "resume" }, checkpoint);
+        if (!finished && session.progress[session.progress.length - 1]?.status === "SUCCEEDED") {
+          if (await this.loop.prepareBookingDraft(session, context, checkpoint) !== null) return;
+        }
+      } catch (error) {
+        this.loop.reply(session, "WAITING_USER_INPUT", `Địa chỉ đã lưu. ${toolError(error)}`);
+        return;
+      }
+    }
     if (!finished && action.tool === "create_booking" && action.status === "SUCCEEDED") {
       if (await this.continueBooking(session, context, action, checkpoint)) return;
     }
@@ -262,9 +275,9 @@ export class AgentService {
           method: { bank: "PAYOS", wallet: "WALLET", cash: "CASH" }[order.paymentMethod] });
         paymentAction = await this.loop.confirmation.prepare(paymentTool, context, paymentArgs);
         paymentAction.taskVersion = action.taskVersion;
-        const confirmed = z.object({ paymentOnConfirmation: z.literal(true), amount: z.number().positive(),
+        const confirmed = z.object({ paymentOnConfirmation: z.literal(true), amount: z.number().nonnegative(),
           paymentMethod: z.enum(["bank", "wallet", "cash"]), serviceType: z.enum(["fixed_price", "variable_price"]) }).safeParse(action.preview);
-        const current = z.object({ amount: z.number().positive(), paymentType: z.enum(["full", "inspection_deposit"]),
+        const current = z.object({ amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]),
           paymentMethod: z.enum(["bank", "wallet", "cash"]) }).safeParse(paymentAction.preview);
         // Form cũ hoặc chi phí/phương thức thay đổi không cấp quyền tự trừ tiền.
         const authorized = confirmed.success && current.success && confirmed.data.amount === current.data.amount

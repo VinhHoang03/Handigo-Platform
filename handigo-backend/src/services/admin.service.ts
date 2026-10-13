@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import User from "../models/user.model";
 import { Session } from "../models/session.model";
+import { disconnectUserSockets } from "../sockets/socketServer";
 import * as providerApplicationService from "./providerApplication.service";
 import { getAdminFeedbacks as listFeedbacks } from "./feedback.service";
 import { SAFE_USER_PROJECTION } from "./user.service";
@@ -107,6 +108,7 @@ export const updateUserStatus = async (
   await user.save();
 
   if (status === "locked") {
+    disconnectUserSockets(userId);
     await Session.updateMany(
       { userId: user._id, revokedAt: null },
       { revokedAt: new Date() },

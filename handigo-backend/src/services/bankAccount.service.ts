@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { Types, type ClientSession } from "mongoose";
 import { BankAccount } from "../models/bankAccount.model";
 import type { RequestUser } from "../middlewares/authContext";
 import { Provider } from "../models/provider.model";
@@ -40,7 +40,7 @@ const pickPayload = (input: UpdateBankAccountInput) => {
   return payload;
 };
 
-const unsetOtherDefaults = async (userId: string | Types.ObjectId, exceptId?: string) => {
+const unsetOtherDefaults = async (userId: string | Types.ObjectId, exceptId?: string, session?: ClientSession) => {
   const filter: Record<string, unknown> = {
     userId,
     isDeleted: false,
@@ -50,15 +50,15 @@ const unsetOtherDefaults = async (userId: string | Types.ObjectId, exceptId?: st
     filter._id = { $ne: exceptId };
   }
 
-  await BankAccount.updateMany(filter, { isDefault: false });
+  await BankAccount.updateMany(filter, { $set: { isDefault: false } }, { session, runValidators: true });
 };
 
-const getOwnedBankAccount = async (userId: string, bankAccountId: string) => {
+const getOwnedBankAccount = async (userId: string, bankAccountId: string, session?: ClientSession) => {
   const bankAccount = await BankAccount.findOne({
     _id: bankAccountId,
     userId,
     isDeleted: false,
-  });
+  }).session(session ?? null);
 
   if (!bankAccount) {
     throw new AppError("Không tìm thấy tài khoản ngân hàng", 404);
@@ -82,22 +82,15 @@ export const createMyBankAccount = async (
 ) => {
   await assertBankAccountAccess(user);
 
-  const activeCount = await BankAccount.countDocuments({
-    userId: user.id,
-    isDeleted: false,
-  });
-  const shouldBeDefault = input.isDefault === true || activeCount === 0;
-
-  if (shouldBeDefault) {
-    await unsetOtherDefaults(user.id);
-  }
-
   try {
-    return await BankAccount.create({
-      ...input,
-      userId: user.id,
-      isDefault: shouldBeDefault,
-      status: "active",
+    return await mongoose.connection.transaction(async (session) => {
+      const activeCount = await BankAccount.countDocuments({ userId: user.id, isDeleted: false }).session(session);
+      const shouldBeDefault = input.isDefault === true || activeCount === 0;
+      if (shouldBeDefault) await unsetOtherDefaults(user.id, undefined, session);
+      const [account] = await BankAccount.create([{
+        ...input, userId: user.id, isDefault: shouldBeDefault, status: "active",
+      }], { session });
+      return account;
     });
   } catch (error: any) {
     if (error.code === 11000) {
@@ -114,31 +107,22 @@ export const updateMyBankAccount = async (
   input: UpdateBankAccountInput,
 ) => {
   await assertBankAccountAccess(user);
-  await getOwnedBankAccount(user.id, bankAccountId);
-
   const payload = pickPayload(input);
-
-  if (payload.isDefault === true) {
-    payload.status = "active";
-    await unsetOtherDefaults(user.id, bankAccountId);
-  }
-
   try {
-    const bankAccount = await BankAccount.findOneAndUpdate(
-      {
-        _id: bankAccountId,
-        userId: user.id,
-        isDeleted: false,
-      },
-      payload,
-      { new: true },
-    );
-
-    if (!bankAccount) {
-      throw new AppError("Không tìm thấy tài khoản ngân hàng", 404);
-    }
-
-    return bankAccount;
+    return await mongoose.connection.transaction(async (session) => {
+      await getOwnedBankAccount(user.id, bankAccountId, session);
+      if (payload.isDefault === true) {
+        payload.status = "active";
+        await unsetOtherDefaults(user.id, bankAccountId, session);
+      }
+      const bankAccount = await BankAccount.findOneAndUpdate(
+        { _id: bankAccountId, userId: user.id, isDeleted: false },
+        payload,
+        { new: true, session, runValidators: true },
+      );
+      if (!bankAccount) throw new AppError("Không tìm thấy tài khoản ngân hàng", 404);
+      return bankAccount;
+    });
   } catch (error: any) {
     if (error.code === 11000) {
       throw new AppError("Tài khoản ngân hàng này đã tồn tại", 409);
@@ -152,25 +136,7 @@ export const setDefaultMyBankAccount = async (
   user: RequestUser,
   bankAccountId: string,
 ) => {
-  await assertBankAccountAccess(user);
-  await getOwnedBankAccount(user.id, bankAccountId);
-  await unsetOtherDefaults(user.id, bankAccountId);
-
-  const bankAccount = await BankAccount.findOneAndUpdate(
-    {
-      _id: bankAccountId,
-      userId: user.id,
-      isDeleted: false,
-    },
-    { isDefault: true, status: "active" },
-    { new: true },
-  );
-
-  if (!bankAccount) {
-    throw new AppError("Không tìm thấy tài khoản ngân hàng", 404);
-  }
-
-  return bankAccount;
+  return updateMyBankAccount(user, bankAccountId, { isDefault: true });
 };
 
 export const deleteMyBankAccount = async (user: RequestUser, bankAccountId: string) => {

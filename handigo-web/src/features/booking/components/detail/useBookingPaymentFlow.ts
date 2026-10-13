@@ -62,7 +62,7 @@ export const useBookingPaymentFlow = (
         cancelUrl: detailUrl,
       });
 
-      if (initialPaymentMethod === "PAYOS") {
+      if (initialPaymentMethod === "PAYOS" && result.payment.status !== "paid") {
         if (!result.checkoutUrl) {
           throw new Error("PayOS không trả về liên kết thanh toán.");
         }

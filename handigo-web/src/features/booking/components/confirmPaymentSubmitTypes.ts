@@ -6,6 +6,8 @@ import type { AvailableVoucher } from '../types/voucher.types';
 /** Tham số đầu vào cho `runConfirmPaymentSubmit` — tách riêng để giữ file logic dưới 200 dòng. */
 export interface ConfirmPaymentSubmitParams {
   expectedBookingAmount: number;
+  expectedFinalAmount: number;
+  expectedVoucherCode?: string | null;
   hasServiceOptions?: boolean;
   serviceId?: string;
   addressId?: string;

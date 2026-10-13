@@ -5,7 +5,6 @@ import type {
   OrderAssignment,
   ProviderOrdersResult,
   QuotationDetail,
-  QuotationRelevanceResult,
   ScannedQuotationResult,
 } from '../types/providerOrder.types';
 
@@ -119,14 +118,5 @@ export const providerOrderApi = {
     return response.data.data;
   },
 
-  validateQuotationItems: async (
-    orderId: string,
-    items: CreateQuotationPayload['items'],
-  ) => {
-    const response = await api.post<{
-      success: boolean;
-      data: { relevance: QuotationRelevanceResult };
-    }>(`/orders/${orderId}/quotation-items/validate`, { items });
-    return response.data.data.relevance;
-  },
+
 };

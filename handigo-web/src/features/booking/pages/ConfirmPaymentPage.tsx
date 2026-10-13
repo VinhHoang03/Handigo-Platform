@@ -19,6 +19,7 @@ const ConfirmPaymentPage = () => {
     scheduledAt, preferredProviderId, preferredProviderName,
     selectedOptionQuantities, uniformQuantity,
     previewVoucherCode, promotionName, previewError,
+    voucherLocked, pendingOrder, pendingError, retryPendingOrder,
   } = useConfirmPaymentFlow();
 
   return (
@@ -52,6 +53,12 @@ const ConfirmPaymentPage = () => {
             step={3}
             discountAmount={voucherDiscountAmount}
             voucherCode={previewVoucherCode}
+            skipPricePreview={voucherLocked}
+            priceSnapshot={pendingOrder ? {
+              bookingAmount: pendingOrder.pricing.bookingAmount, discountedAmount: pendingOrder.pricing.totalPaidAmount,
+              promotionDiscountAmount: pendingOrder.pricing.promotionDiscountAmount,
+              voucherDiscountAmount: pendingOrder.pricing.voucherDiscountAmount, depositAmount: pendingOrder.depositAmount ?? 0,
+            } : undefined}
             actionLabel="Xác nhận & Thanh toán"
             onAction={handleConfirm}
             isLoading={isSubmitting}
@@ -59,7 +66,11 @@ const ConfirmPaymentPage = () => {
               <>
               {promotionName && <p className="mb-3 rounded-xl bg-primary/10 p-3 text-primary">Ưu đãi tự động: {promotionName}</p>}
               {previewError && <p role="alert" className="mb-3 text-error">{previewError}</p>}
-              <ConfirmPaymentVoucherPanel
+              {voucherLocked ? <div className="border-t border-dashed border-outline-variant pt-3 text-sm">
+                {pendingError ? <p role="alert" className="text-error">{pendingError} <button type="button" onClick={retryPendingOrder} className="underline">Thử lại</button></p>
+                  : pendingOrder ? <><p className="font-semibold">Voucher đã chốt: {pendingOrder.voucherSnapshot?.code ?? 'Không áp dụng'}</p><p className="mt-2 leading-6 text-on-surface-variant">Bạn đang tiếp tục thanh toán đơn đã tạo. Muốn đổi voucher, hãy hủy đơn cũ rồi đặt lại.</p></>
+                    : <p role="status">Đang tải voucher và giá của đơn đã tạo…</p>}
+              </div> : <ConfirmPaymentVoucherPanel
                 voucherCode={voucherCode}
                 onSelectVoucher={(code) => {
                   setVoucherCode(code);
@@ -80,7 +91,7 @@ const ConfirmPaymentPage = () => {
                 }}
                 voucherError={voucherError}
                 isSubmitting={isSubmitting}
-              />
+              />}
               </>
             }
           />

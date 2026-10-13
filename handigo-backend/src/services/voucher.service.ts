@@ -54,7 +54,7 @@ const settlementFields = (order: Pick<IOrder, "pricing" | "inspectionRequired">,
 };
 
 const getAmountBeforeVoucher = (order: any) => {
-  const originalAmount = getOriginalAmount(order);
+  const originalAmount = order.pricing?.baseAmount ?? getOriginalAmount(order);
   const promotionDiscountAmount = Math.max(order.pricing?.promotionDiscountAmount || 0, 0);
 
   return Math.max(originalAmount - promotionDiscountAmount, 0);
@@ -77,6 +77,7 @@ export const resolveVoucherForAmount = async (
   amountBeforeVoucher: number,
   session?: ClientSession,
   customerId?: string,
+  inspectionRequired?: boolean,
 ) => {
   const normalizedCode = normalizeCode(code);
   const promotion = await findStoredVoucher({ code: normalizedCode }, session);
@@ -87,6 +88,7 @@ export const resolveVoucherForAmount = async (
   if (promotion.ownerId && promotion.ownerId.toString() !== customerId) {
     throw new AppError("Mã giảm giá không thuộc tài khoản của bạn.", 403);
   }
+  assertVoucherOrderType(promotion, inspectionRequired);
   if (!isPromotionActive(promotion)) {
     throw new AppError("Voucher không hoạt động hoặc đã hết hạn", 400);
   }
@@ -119,6 +121,16 @@ export const resolveVoucherForAmount = async (
   };
 };
 
+const assertVoucherOrderType = (promotion: IPromotion, inspectionRequired?: boolean) => {
+  const applicableOrderType = promotion.applicableOrderType ?? (promotion.ownerId ? "fixed_price" : null);
+  if (applicableOrderType && (inspectionRequired === undefined ||
+    (applicableOrderType === "variable_price") !== inspectionRequired)) {
+    throw new AppError(applicableOrderType === "variable_price"
+      ? "Mã giảm phí cọc chỉ áp dụng cho đơn báo giá."
+      : "Mã đổi điểm này chỉ áp dụng cho đơn giá cố định.", 400);
+  }
+};
+
 export const markOrderVoucherAsUsed = async (
   order: InstanceType<typeof Order>,
   session: ClientSession,
@@ -140,7 +152,7 @@ export const markOrderVoucherAsUsed = async (
       "voucherSnapshot.voucherId": voucherId,
     },
     { $set: { voucherUsedAt: usedAt } },
-    { new: true, session },
+    { new: true, session, runValidators: true },
   );
   if (!claimedOrder) return false;
 
@@ -170,7 +182,7 @@ export const reservePersonalVoucher = async (
   const voucher = await findStoredVoucher({ _id: voucherId }, session);
   if (!voucher) throw new AppError("Không tìm thấy mã giảm giá.", 404);
   if (voucher.ownerId && voucher.ownerId.toString() !== customerId) throw new AppError("Mã giảm giá không thuộc tài khoản của bạn.", 403);
-  if (voucher.ownerId && inspectionRequired) throw new AppError("Mã đổi điểm chỉ áp dụng cho dịch vụ có giá cố định.", 400);
+  assertVoucherOrderType(voucher, inspectionRequired);
   if (!isPromotionActive(voucher)) throw new AppError("Mã giảm giá đã ngừng hoạt động hoặc hết hạn.", 409);
   if (await VoucherUsage.exists({ voucherId, orderId, status: "reserved" }).session(session)) return;
   const limit = voucher.usageLimit ?? ("totalUsageLimit" in voucher ? voucher.totalUsageLimit : null);
@@ -188,6 +200,12 @@ export const reservePersonalVoucher = async (
   if (voucher.ownerId) voucher.reservedOrderId = orderId;
   voucher.reservedCount = (voucher.reservedCount ?? 0) + 1;
   await voucher.save({ session });
+  const restored = await VoucherUsage.findOneAndUpdate(
+    { voucherId, orderId, userId: customerId, status: "restored", isDeleted: false },
+    { $set: { status: "reserved", discountAmount: 0, usedAt: new Date(), restoredAt: null } },
+    { new: true, session, runValidators: true },
+  );
+  if (restored) return;
   try {
     await VoucherUsage.create([{ voucherId, userId: customerId, orderId, discountAmount: 0, status: "reserved" }], { session });
   } catch (error) {
@@ -216,10 +234,20 @@ const buildVoucherInfo = (promotion: IPromotion, discountAmount?: number) => ({
   minOrderAmount: promotion.minOrderAmount,
   startAt: promotion.startAt,
   endAt: promotion.endAt,
+  applicableOrderType: promotion.applicableOrderType ?? (promotion.ownerId ? "fixed_price" : null),
 });
+
+const getAdminVoucherStatus = (promotion: IPromotion, now = new Date()) => {
+  const status = promotion.status?.toUpperCase();
+  if (promotion.endAt < now || status === "EXPIRED") return "EXPIRED";
+  return !promotion.isActive || status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+};
 
 const toAdminVoucherResponse = (promotion: IPromotion) => ({
   id: promotion._id,
+  ownerId: promotion.ownerId ?? null,
+  reservedOrderId: promotion.reservedOrderId ?? null,
+  applicableOrderType: promotion.applicableOrderType ?? (promotion.ownerId ? "fixed_price" : null),
   code: promotion.code,
   name: promotion.name,
   description: promotion.description,
@@ -233,7 +261,7 @@ const toAdminVoucherResponse = (promotion: IPromotion) => ({
   usedCount: promotion.usedCount,
   startAt: promotion.startAt,
   endAt: promotion.endAt,
-  status: promotion.status?.toUpperCase() || (promotion.isActive ? "ACTIVE" : "INACTIVE"),
+  status: getAdminVoucherStatus(promotion),
   isActive: promotion.isActive,
   isDeleted: promotion.isDeleted,
   createdAt: promotion.createdAt,
@@ -274,13 +302,22 @@ const createVoucherAuditLog = async (
 };
 
 const getVoucherOrFail = async (id: string) => {
-  const voucher = await findStoredVoucher({ _id: id, isDeleted: false, ownerId: null });
+  const voucher = await findStoredVoucher({ _id: id, isDeleted: false });
 
   if (!voucher) {
     throw new AppError("Không tìm thấy voucher", 404);
   }
 
   return voucher;
+};
+
+const assertPersonalVoucherNotReserved = async (voucher: IPromotion) => {
+  if (!voucher.ownerId || !voucher.reservedOrderId || voucher.usedCount > 0) return;
+  const activeOrder = await Order.exists({
+    _id: voucher.reservedOrderId, customerId: voucher.ownerId, isDeleted: false,
+    status: { $ne: "cancelled" }, "voucherSnapshot.voucherId": voucher._id,
+  });
+  if (activeOrder) throw new AppError("Mã đổi điểm đang được giữ cho một đơn hàng, không thể tạm dừng hoặc xóa.", 409);
 };
 
 const mapDuplicateKeyError = (error: any) => {
@@ -323,7 +360,7 @@ const assertDiscountRule = (discountType: IPromotion["discountType"], discountVa
 const buildVoucherResponse = (order: any, promotion: IPromotion, discountAmount: number) => {
   const originalAmount = getOriginalAmount(order);
   const amountBeforeVoucher = getAmountBeforeVoucher(order);
-  const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
+  const finalAmount = Math.max(originalAmount - (order.pricing?.promotionDiscountAmount || 0) - discountAmount, 0);
 
   return {
     originalAmount,
@@ -401,8 +438,8 @@ export const applyVoucher = async (user: RequestUser, input: ApplyVoucherInput) 
 
       const amountBeforeVoucher = getAmountBeforeVoucher(order);
       const { promotion, discountAmount, snapshot } =
-        await resolveVoucherForAmount(input.code, amountBeforeVoucher, session, order.customerId.toString());
-      const finalAmount = Math.max(amountBeforeVoucher - discountAmount, 0);
+        await resolveVoucherForAmount(input.code, amountBeforeVoucher, session, order.customerId.toString(), order.inspectionRequired);
+      const finalAmount = Math.max(getOriginalAmount(order) - (order.pricing.promotionDiscountAmount || 0) - discountAmount, 0);
 
       const updatedOrder = await Order.findOneAndUpdate(
         {
@@ -477,8 +514,8 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
           $set: {
             voucherSnapshot: null,
             "pricing.voucherDiscountAmount": 0,
-            "pricing.totalPaidAmount": amountBeforeVoucher,
-            ...settlementFields(order, amountBeforeVoucher),
+            "pricing.totalPaidAmount": Math.max(originalAmount - (order.pricing.promotionDiscountAmount || 0), 0),
+            ...settlementFields(order, Math.max(originalAmount - (order.pricing.promotionDiscountAmount || 0), 0)),
           },
         },
         { new: true, session, runValidators: true },
@@ -495,7 +532,7 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
       return {
         originalAmount,
         discountAmount: 0,
-        finalAmount: amountBeforeVoucher,
+        finalAmount: Math.max(originalAmount - (order.pricing.promotionDiscountAmount || 0), 0),
         voucher: voucherCode ? { code: voucherCode } : null,
       };
     });
@@ -510,11 +547,12 @@ export const removeVoucher = async (user: RequestUser, input: RemoveVoucherInput
   return result;
 };
 
-export const getAvailableVouchers = async (user: RequestUser, query: AvailableVoucherQuery) => {
+export const getAvailableVouchers = async (user: RequestUser, query: AvailableVoucherQuery,
+  bookingPreview?: { amountBeforeVoucher: number; inspectionRequired: boolean }) => {
   const now = new Date();
   let order: any = null;
   let originalAmount: number | undefined;
-  let amountBeforeVoucher: number | undefined;
+  let amountBeforeVoucher: number | undefined = bookingPreview?.amountBeforeVoucher;
 
   if (query.orderId) {
     order = await getOrderForVoucher(query.orderId, user);
@@ -543,9 +581,13 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
   const usedByCustomer = new Map(userUsages.map(item => [item._id.toString(), item.count]));
   const available = promotions.filter((promotion) => {
     if (promotion.ownerId && (
-      order?.inspectionRequired || (promotion.reservedOrderId?.toString() !== query.orderId &&
+      promotion.usedCount >= 1 || (promotion.reservedOrderId?.toString() !== query.orderId &&
         reservations.has(`${promotion.reservedOrderId}:${promotion._id}`))
     )) return false;
+    const inspectionRequired = order?.inspectionRequired ?? bookingPreview?.inspectionRequired;
+    if (inspectionRequired !== undefined) {
+      try { assertVoucherOrderType(promotion, inspectionRequired); } catch { return false; }
+    }
     if (!promotion.code || !isPromotionActive(promotion, now)) {
       return false;
     }
@@ -617,24 +659,19 @@ export const createAdminVoucher = async (user: RequestUser, input: CreateAdminVo
 export const getAdminVouchers = async (user: RequestUser, query: AdminVoucherQuery) => {
   ensureAdmin(user);
 
-  const filter: Record<string, unknown> = { isDeleted: false, ownerId: null };
+  const filter: Record<string, unknown> = { isDeleted: false };
+  if (query.source === "reward") filter.ownerId = { $ne: null };
+  else if (query.source !== "all") filter.ownerId = null;
 
   if (query.search) {
     const regex = new RegExp(query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     filter.$or = [{ code: regex }, { name: regex }, { description: regex }];
   }
 
-  if (query.status) {
-    const status = query.status.toUpperCase();
-    filter.$or = [
-      ...((filter.$or as Record<string, unknown>[] | undefined) || []),
-    ];
-
-    filter.status = { $in: [status, status.toLowerCase()] };
-  }
-
   const skip = (query.page - 1) * query.limit;
-  const all = await listStoredVouchers(filter);
+  const now = new Date();
+  const stored = await listStoredVouchers(filter);
+  const all = query.status ? stored.filter((voucher) => getAdminVoucherStatus(voucher, now) === query.status!.toUpperCase()) : stored;
   const total = all.length;
   const items = all.slice(skip, skip + query.limit);
 
@@ -664,6 +701,7 @@ export const updateAdminVoucher = async (
   ensureAdmin(user);
 
   const voucher = await getVoucherOrFail(id);
+  if (voucher.ownerId) throw new AppError("Mã đổi điểm đã cấp giữ nguyên điều kiện khi đổi. Hãy chỉnh sửa gói cho các lần đổi sau.", 409);
   const oldValue = serializePromotion(voucher);
 
   if (input.code) {
@@ -713,6 +751,7 @@ export const updateAdminVoucher = async (
 export const disableAdminVoucher = async (user: RequestUser, id: string) => {
   ensureAdmin(user);
   const voucher = await getVoucherOrFail(id);
+  await assertPersonalVoucherNotReserved(voucher);
   const oldValue = serializePromotion(voucher);
 
   voucher.status = "INACTIVE";
@@ -755,6 +794,8 @@ export const enableAdminVoucher = async (user: RequestUser, id: string) => {
 export const deleteAdminVoucher = async (user: RequestUser, id: string) => {
   ensureAdmin(user);
   const voucher = await getVoucherOrFail(id);
+  await assertPersonalVoucherNotReserved(voucher);
+  if (voucher.ownerId && voucher.usedCount > 0) throw new AppError("Không thể xóa mã đổi điểm đã sử dụng.", 409);
   const oldValue = serializePromotion(voucher);
 
   voucher.isDeleted = true;

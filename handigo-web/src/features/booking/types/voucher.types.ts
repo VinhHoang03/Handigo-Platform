@@ -11,6 +11,7 @@ export interface AvailableVoucher {
   startAt: string;
   endAt: string;
   finalAmount?: number;
+  applicableOrderType?: "fixed_price" | "variable_price" | null;
 }
 
 export interface AppliedVoucherResult {

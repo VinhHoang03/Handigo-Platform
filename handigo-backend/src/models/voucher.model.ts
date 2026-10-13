@@ -5,6 +5,7 @@ export interface IVoucher extends Document, IBaseDocument {
   name: string;
   ownerId?: Types.ObjectId | null;
   reservedOrderId?: Types.ObjectId | null;
+  applicableOrderType?: "fixed_price" | "variable_price" | null;
   usageLimit?: number | null;
   isActive: boolean;
   code: string;
@@ -27,6 +28,7 @@ const VoucherSchema = new Schema<IVoucher>(
     name: { type: String, trim: true, default: function () { return this.code; } },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reservedOrderId: { type: Schema.Types.ObjectId, ref: "Order", default: null },
+    applicableOrderType: { type: String, enum: ["fixed_price", "variable_price"], default: null },
     usageLimit: { type: Number, min: 0 },
     isActive: { type: Boolean, default: true },
     code: { type: String, required: true, unique: true, uppercase: true, trim: true },
