@@ -1349,6 +1349,9 @@ export const cancelOrderWithSettlement = async (
   input: CancelOrderInput,
 ): Promise<IOrder> => {
   assertObjectId(input.orderId, "ID đơn hàng");
+  if (!input.actorId && (!input.system || input.role !== "admin")) {
+    throw new AppError("Không xác định được người thực hiện hủy đơn", 401);
+  }
   if (input.actorId) {
     assertObjectId(input.actorId, "ID người thực hiện");
   }
@@ -1449,9 +1452,9 @@ export const cancelOrderWithSettlement = async (
           },
         },
         {
-          new: true,
+          returnDocument: "after",
           session,
-          runValidators: Boolean(input.actorId),
+          runValidators: true,
         },
       );
 
