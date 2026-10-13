@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FloatingInput } from '@/components/common/FloatingField';
 import { useAuth } from '../hooks/useAuth';
-import { getRoleHomePath } from '../utils/roleNavigation';
+import { getPostLoginPath } from '../utils/roleNavigation';
 
 interface LoginFormProps {
   rememberMe: boolean;
@@ -14,11 +14,12 @@ export function LoginForm({ rememberMe, onRememberMeChange }: LoginFormProps) {
   const [password, setPassword] = useState('');
   const { login, isLoading, error } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const user = await login({ email: email.trim().toLowerCase(), password }, rememberMe);
-    if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
+    if (user) navigate(getPostLoginPath(user.role, user.providerOnboardingStatus, location.state?.from), { replace: true });
   };
 
   return (

@@ -33,3 +33,15 @@ export const getRoleProfilePath = (role?: User['role'] | string | null) => {
       return '/login';
   }
 };
+
+export const getPostLoginPath = (role: User['role'], providerOnboardingStatus: User['providerOnboardingStatus'], from: unknown) => {
+  if (role.toUpperCase() === 'CUSTOMER' && typeof from === 'string') {
+    try {
+      const url = new URL(from, 'https://handigo.invalid');
+      if (url.origin === 'https://handigo.invalid' && ['/payment/success', '/payment/cancel', '/customer/bookings/result', '/customer/bookings/success'].includes(url.pathname)) {
+        return url.pathname + url.search + url.hash;
+      }
+    } catch { /* Đường dẫn không hợp lệ quay về trang theo vai trò. */ }
+  }
+  return getRoleHomePath(role, providerOnboardingStatus);
+};

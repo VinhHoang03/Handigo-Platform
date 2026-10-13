@@ -133,8 +133,8 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
           service?.serviceType === 'variable_price'
             ? 'INSPECTION_DEPOSIT'
             : 'FULL',
-        returnUrl: `${window.location.origin}/customer/bookings/success?orderId=${orderId}`,
-        cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
+        returnUrl: `${window.location.origin}/customer/bookings/result?orderId=${orderId}&payos=success`,
+        cancelUrl: `${window.location.origin}/customer/bookings/result?orderId=${orderId}&payos=cancel`,
       });
 
       if (payment.payment.status === 'paid') {
@@ -142,7 +142,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
         sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
         reset();
-        navigate('/customer/bookings/success', { state: { order: orderDetail } });
+        navigate('/customer/bookings/result', { state: { order: orderDetail } });
         return;
       }
       if (!payment.checkoutUrl) {
@@ -181,7 +181,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
     sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
     reset();
-    navigate('/customer/bookings/success', { state: { order: orderDetail } });
+    navigate('/customer/bookings/result', { state: { order: orderDetail } });
   } catch (error) {
     const message = getConfirmPaymentErrorMessage(error);
     if (orderId && (!isAppointment || service?.serviceType === 'variable_price')) {

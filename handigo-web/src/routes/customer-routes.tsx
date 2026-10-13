@@ -3,6 +3,7 @@ import { Route } from "react-router-dom";
 import { RouteGuard } from "@/components/common/RouteGuard";
 import { HomeRoute, WalletPage, CaseManagementPage } from "./shared-lazy-pages";
 const CustomerRewardsPage = lazy(() => import("@/features/rewards/pages/CustomerRewardsPage"));
+const PaymentReturnPage = lazy(() => import("@/features/booking/pages/PaymentReturnPage"));
 
 const BookingDetailPage = lazy(
   () => import("@/features/booking/pages/BookingDetailPage"),
@@ -19,8 +20,8 @@ const CreateBookingStep1Page = lazy(
 const CreateBookingStep2Page = lazy(
   () => import("@/features/booking/pages/CreateBookingStep2Page"),
 );
-const BookingSuccessPage = lazy(
-  () => import("@/features/booking/pages/BookingSuccessPage"),
+const BookingResultPage = lazy(
+  () => import("@/features/booking/pages/BookingResultPage"),
 );
 const CustomerProfilePage = lazy(
   () => import("@/features/customer/pages/CustomerProfilePage"),
@@ -47,6 +48,9 @@ const CustomerBankAccountsPage = lazy(
 export function CustomerRoutes() {
   return (
     <>
+      <Route path="/customer/bookings/success" element={<RouteGuard roles={["CUSTOMER"]}><PaymentReturnPage /></RouteGuard>} />
+      <Route path="/payment/success" element={<RouteGuard roles={["CUSTOMER"]}><PaymentReturnPage /></RouteGuard>} />
+      <Route path="/payment/cancel" element={<RouteGuard roles={["CUSTOMER"]}><PaymentReturnPage /></RouteGuard>} />
       <Route path="/customer/rewards" element={<RouteGuard roles={["CUSTOMER"]}><CustomerRewardsPage /></RouteGuard>} />
       <Route
         path="/customer/bookings"
@@ -81,10 +85,10 @@ export function CustomerRoutes() {
         }
       />
       <Route
-        path="/customer/bookings/success"
+        path="/customer/bookings/result"
         element={
           <RouteGuard roles={["CUSTOMER"]}>
-            <BookingSuccessPage />
+            <BookingResultPage />
           </RouteGuard>
         }
       />

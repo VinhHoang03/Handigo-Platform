@@ -28,7 +28,7 @@ export function RouteGuard({
   }
 
   if (!token || !user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
   }
 
   const normalizedRole = user.role.toUpperCase() as AppRole;
