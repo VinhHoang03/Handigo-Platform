@@ -34,6 +34,19 @@ export const getEarliestScheduledAt = (now = new Date()) => {
   return earliest;
 };
 
+export const isWithinImmediateBookingHours = (now = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value);
+
+  return hour >= 8 && (hour < 21 || (hour === 21 && minute === 0));
+};
+
 export const getTodayInputValue = (now = new Date()) => {
   const timezoneOffset = now.getTimezoneOffset() * 60000;
   return new Date(now.getTime() - timezoneOffset).toISOString().split('T')[0];
@@ -75,7 +88,7 @@ export const getInitialScheduledAt = (scheduledAt: string | undefined, now = new
 };
 
 export const getUpcomingDates = (now = new Date()) =>
-  Array.from({ length: 14 }, (_, index) => {
+  Array.from({ length: 7 }, (_, index) => {
     const date = new Date(now);
     date.setDate(date.getDate() + index);
     const timezoneOffset = date.getTimezoneOffset() * 60000;

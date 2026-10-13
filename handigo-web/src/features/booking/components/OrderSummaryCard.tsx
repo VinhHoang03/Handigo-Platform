@@ -7,7 +7,6 @@ import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalo
 import type { Service, ServiceOption } from '../../../types/booking';
 import { OrderSummaryPriceDetails } from './OrderSummaryPriceDetails';
 import { OrderSummaryActions } from './OrderSummaryActions';
-import { Calendar, User } from "lucide-react";
 import { useBookingPreview } from '../hooks/useBookingPreview';
 import type { BookingPreview } from '../api/booking.api';
 
@@ -20,6 +19,8 @@ export const OrderSummaryCard: React.FC<{
   onAction?: () => void;
   isLoading?: boolean;
   summaryContent?: React.ReactNode;
+  scheduleContent?: React.ReactNode;
+  providerContent?: React.ReactNode;
   discountAmount?: number;
   voucherCode?: string;
   priceSnapshot?: Pick<BookingPreview, 'bookingAmount' | 'discountedAmount' | 'promotionDiscountAmount' | 'voucherDiscountAmount' | 'depositAmount'>;
@@ -31,6 +32,8 @@ export const OrderSummaryCard: React.FC<{
   onAction,
   isLoading,
   summaryContent,
+  scheduleContent,
+  providerContent,
   discountAmount = 0,
   voucherCode,
   priceSnapshot,
@@ -43,8 +46,6 @@ export const OrderSummaryCard: React.FC<{
     selectedOptionQuantities,
     uniformQuantity,
     orderType,
-    scheduledAt,
-    preferredProviderName,
   } = useBookingStore();
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
@@ -133,30 +134,8 @@ export const OrderSummaryCard: React.FC<{
             </div>
           </div>
 
-          {step >= 2 && (
-            <div className="space-y-sm border-t border-dashed border-outline-variant pt-md text-sm">
-              <div className="flex items-start gap-sm">
-                <Calendar aria-hidden="true" size={19} className="text-primary" />
-                <div>
-                  <p className="text-xs text-on-surface-variant">{orderType === 'normal' ? 'Đặt ngay' : orderType === 'recurring' ? 'Lịch định kỳ' : 'Thời gian thực hiện'}</p>
-                  <p className="font-bold text-on-surface">
-                    {orderType === 'normal' ? 'Sớm nhất có thể' : scheduledAt?.includes('T')
-                      ? new Date(scheduledAt).toLocaleString('vi-VN')
-                      : 'Chưa chọn đủ ngày giờ'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-sm">
-                <User aria-hidden="true" size={19} className="text-primary" />
-                <div>
-                  <p className="text-xs text-on-surface-variant">Chuyên gia</p>
-                  <p className="font-bold text-on-surface">
-                    {preferredProviderName || 'Handigo tự điều phối'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {step === 2 && scheduleContent}
+          {step === 2 && providerContent}
 
           <OrderSummaryPriceDetails
             service={service}
@@ -167,7 +146,6 @@ export const OrderSummaryCard: React.FC<{
             discountAmount={effectiveDiscount}
             summaryContent={summaryContent}
           />
-      {preview && <p className="text-xs text-on-surface-variant">Thời lượng dự kiến: {preview.schedule.durationMinutes} phút. Lịch hẹn từ 08:00, chọn khung giờ sau thời gian hiện tại. Thời gian đến là dự kiến, chưa phải cam kết.</p>}
           {priceLoading && <p role="status" className="text-sm">Đang cập nhật giá…</p>}
           {priceError && <p role="alert" className="text-sm text-error">{priceError} <button type="button" onClick={retry} className="underline">Thử lại</button></p>}
         </div>

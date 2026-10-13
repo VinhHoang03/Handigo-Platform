@@ -8,13 +8,13 @@ import type { ProviderAvailabilityStatus } from '@/features/customer-service/com
 import {
   type Step2FormErrors,
   MIN_DESCRIPTION_LENGTH,
-  buildRecurringPreview,
   getEarliestScheduledAt,
   getDefaultScheduledAt,
   getInitialScheduledAt,
   getTodayInputValue,
   getUpcomingDates,
   getUploadErrorMessage,
+  isWithinImmediateBookingHours,
   validateImageFile,
 } from './step2Helpers';
 
@@ -24,12 +24,10 @@ export const useCreateBookingStep2Form = () => {
   const location = useLocation();
   const {
     serviceId, addressId, setAddressId,
-    preferredProviderId, setPreferredProviderId,
+    preferredProviderId, preferredProviderName, setPreferredProviderId,
     requestedProviderId,
     orderType, setOrderType,
     scheduledAt, setScheduledAt, isScheduleAutomatic, problemDescription, setProblemDescription,
-    recurrenceUnit = 'weekly', setRecurrenceUnit,
-    recurrenceCount = 1, setRecurrenceCount,
     customerAttachments, setCustomerAttachments,
   } = useBookingStore();
   const [isUploadingImages, setIsUploadingImages] = useState(false);
@@ -40,13 +38,7 @@ export const useCreateBookingStep2Form = () => {
   const scheduleInitialized = useRef(false);
   const todayInputValue = getTodayInputValue(new Date(currentTimestamp));
   const upcomingDates = useMemo(() => getUpcomingDates(new Date(`${todayInputValue}T00:00:00`)), [todayInputValue]);
-  const recurringPreview = useMemo(
-    () => buildRecurringPreview(scheduledAt, recurrenceUnit, recurrenceCount),
-    [recurrenceCount, recurrenceUnit, scheduledAt],
-  );
-  const recurrenceCountOptions = recurrenceUnit === 'weekly'
-    ? ([1, 2, 3, 4] as const)
-    : ([4, 8, 12] as const);
+  const isImmediateBookingAvailable = isWithinImmediateBookingHours(new Date(currentTimestamp));
   const isFromServiceDetail = Boolean(
     (location.state as { fromServiceDetail?: boolean } | null)?.fromServiceDetail,
   );
@@ -56,7 +48,7 @@ export const useCreateBookingStep2Form = () => {
     const updateCurrentTime = () => {
       const now = new Date();
       const booking = useBookingStore.getState();
-      if (booking.isScheduleAutomatic && ['scheduled', 'recurring'].includes(booking.orderType)) {
+      if (booking.isScheduleAutomatic && booking.orderType === 'scheduled') {
         const nextScheduledAt = getDefaultScheduledAt(now);
         if (nextScheduledAt !== booking.scheduledAt) {
           booking.setScheduledAt(nextScheduledAt, true);
@@ -82,14 +74,14 @@ export const useCreateBookingStep2Form = () => {
   }, []);
 
   useEffect(() => {
-    if (orderType === 'normal' || orderType === 'urgent') {
-      setOrderType('scheduled');
+    if (orderType === 'urgent' || orderType === 'recurring') {
+      setOrderType(orderType === 'urgent' ? 'normal' : 'scheduled');
       setPreferredProviderId(undefined);
     }
   }, [orderType, setOrderType, setPreferredProviderId]);
 
   useEffect(() => {
-    if (scheduleInitialized.current || !['scheduled', 'recurring'].includes(orderType)) return;
+    if (scheduleInitialized.current || orderType !== 'scheduled') return;
     scheduleInitialized.current = true;
     if (scheduledAt && !isScheduleAutomatic) return;
     const initialScheduledAt = getInitialScheduledAt(scheduledAt);
@@ -98,16 +90,6 @@ export const useCreateBookingStep2Form = () => {
       setPreferredProviderId(undefined);
     }
   }, [orderType, scheduledAt, isScheduleAutomatic, setScheduledAt, setPreferredProviderId]);
-
-  useEffect(() => {
-    const isValidCount = recurrenceUnit === 'weekly'
-      ? [1, 2, 3, 4].some((count) => count === recurrenceCount)
-      : [4, 8, 12].some((count) => count === recurrenceCount);
-    if (!isValidCount) {
-      setRecurrenceCount(recurrenceUnit === 'weekly' ? 1 : 4);
-      setPreferredProviderId(undefined);
-    }
-  }, [recurrenceCount, recurrenceUnit, setPreferredProviderId, setRecurrenceCount]);
 
   const handleUploadImages = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -163,14 +145,16 @@ export const useCreateBookingStep2Form = () => {
     setCustomerAttachments(customerAttachments.filter((item) => item !== url));
   };
 
-  const handleOrderTypeChange = (type: 'normal' | 'scheduled' | 'recurring') => {
+  const handleOrderTypeChange = (type: 'normal' | 'scheduled') => {
+    setCurrentTimestamp(Date.now());
+    if (type === orderType) return;
     setOrderType(type);
     setPreferredProviderId(undefined);
     setProviderAvailability('idle');
     if (type === 'normal') setScheduledAt('');
   };
 
-  const shouldShowSchedulePicker = orderType !== 'normal';
+  const shouldShowSchedulePicker = orderType === 'scheduled';
 
   const clearFormError = useCallback((field: keyof Step2FormErrors) => {
     setFormErrors((currentErrors) => {
@@ -201,6 +185,10 @@ export const useCreateBookingStep2Form = () => {
 
     if (description.length < MIN_DESCRIPTION_LENGTH) {
       nextErrors.problemDescription = 'Vui lòng mô tả tình trạng tối thiểu ' + MIN_DESCRIPTION_LENGTH + ' ký tự.';
+    }
+
+    if (orderType === 'normal' && !isWithinImmediateBookingHours(new Date())) {
+      nextErrors.scheduledAt = 'Đặt ngay chỉ khả dụng từ 08:00 đến 21:00. Vui lòng chọn Hẹn giờ.';
     }
 
     if (shouldShowSchedulePicker && !scheduleDate) {
@@ -241,12 +229,11 @@ export const useCreateBookingStep2Form = () => {
   };
 
   return {
-    serviceId, addressId, preferredProviderId, requestedProviderId, orderType,
+    serviceId, addressId, preferredProviderId, preferredProviderName, requestedProviderId, orderType,
     scheduledAt, setScheduledAt, problemDescription, setProblemDescription,
-    recurrenceUnit, setRecurrenceUnit, recurrenceCount, setRecurrenceCount,
     customerAttachments, setPreferredProviderId,
     isUploadingImages, uploadError, formErrors, currentTimestamp, providerAvailability,
-    todayInputValue, upcomingDates, recurringPreview, recurrenceCountOptions, isFromServiceDetail,
+    todayInputValue, upcomingDates, isFromServiceDetail, isImmediateBookingAvailable,
     shouldShowSchedulePicker,
     handleUploadImages, handleRemoveAttachment, handleOrderTypeChange, clearFormError,
     handleSelectAddress, handleContinue, setProviderAvailability,
