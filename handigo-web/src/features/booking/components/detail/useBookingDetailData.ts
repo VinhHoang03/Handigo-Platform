@@ -36,8 +36,8 @@ export const useBookingDetailData = (id: string | undefined) => {
           ["awaiting_payment", "expired"].includes(data.bookingStatus || ""));
       if (shouldReconcilePayos) {
         try {
-          const reconciliation = await bookingApi.reconcilePayosPayment(id);
-          if (reconciliation.order) data = reconciliation.order;
+          await bookingApi.reconcilePayosPayment(id);
+          data = await bookingApi.getOrderById(id);
         } catch (error) {
           console.error("Không thể đối soát thanh toán PayOS:", error);
         }

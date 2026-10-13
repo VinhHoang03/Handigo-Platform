@@ -43,6 +43,7 @@ import { isAllowedOrigin } from "./configs/cors";
 import { createLogger } from "./utils/logger";
 import { AppError } from "./utils/appError";
 import { securityHeaders } from "./middlewares/securityHeaders.middleware";
+import { paymentReturn } from "./controllers/payment.controller";
 
 const app: Application = express();
 const appLogger = createLogger("App");
@@ -68,6 +69,7 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.get(["/payment/success", "/payment/cancel"], paymentReturn);
 
 app.get("/health", (_req, res) => {
   res.status(200).json({

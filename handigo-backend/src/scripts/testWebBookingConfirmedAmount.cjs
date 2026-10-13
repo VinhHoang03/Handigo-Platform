@@ -25,6 +25,10 @@ const api = {
   createPayment: async (payload) => {
     paymentCalls++;
     assert.equal(payload.expectedAmount, 170000);
+    if (payload.method === "PAYOS") {
+      assert.equal(payload.returnUrl, `${window.location.origin}/customer/bookings/result?orderId=${payload.orderId}&payos=success`);
+      assert.equal(payload.cancelUrl, `${window.location.origin}/customer/bookings/result?orderId=${payload.orderId}&payos=cancel`);
+    }
     return { payment: { status: "paid" } };
   },
 };
