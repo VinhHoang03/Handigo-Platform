@@ -60,7 +60,7 @@ const getTrackingParticipants = async (
   options: { requireActiveTracking?: boolean } = {},
 ) => {
   const order = await Order.findById(orderId)
-    .select("customerId providerId addressId status createdAt")
+    .select("customerId providerId addressId addressSnapshot status createdAt")
     .lean();
   if (!order) {
     throw new AppError(trackingText.orderNotFound, 404);

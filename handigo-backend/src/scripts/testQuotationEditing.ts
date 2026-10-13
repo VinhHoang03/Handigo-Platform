@@ -19,7 +19,7 @@ const events: unknown[] = [];
 let scheduleChecks = 0;
 let scheduleConflict = false;
 let settlementCalls = 0;
-let relevanceStatus: "valid" | "warning" | "blocked" = "valid";
+const rewardOrders: InstanceType<typeof Order>[] = [];
 stubModule("../configs/payos.config", { payos: {}, payoutPayos: {} });
 stubModule("../sockets/socketServer", { emitToUser: (...args: unknown[]) => events.push(args) });
 stubModule("../services/notification.service", {
@@ -34,12 +34,9 @@ stubModule("../services/providerSchedule.service", {
     if (scheduleConflict) throw new Error("Lịch làm việc không đủ thời gian.");
   },
 });
-stubModule("../services/quotationRelevance.service", {
-  evaluateQuotationItemsForOrder: async () => ({ status: relevanceStatus, serviceName: "Sửa chữa" }),
-  getBlockedRelevanceItems: () => relevanceStatus === "blocked" ? [{ title: "Hạng mục không phù hợp" }] : [],
-});
+
 stubModule("../services/wallet.service", { recordCompletedOrderSettlement: async () => { settlementCalls++; } });
-stubModule("../services/reward.service", { earnOrderRewards: async () => {} });
+stubModule("../services/reward.service", { earnOrderRewards: async (value: InstanceType<typeof Order>) => { rewardOrders.push(new Order(value.toObject())); } });
 for (const name of ["orderReassignment", "providerWalletEligibility", "dispatch", "address", "matching", "voucher"]) {
   stubModule(`../services/${name}.service`, {});
 }
@@ -77,7 +74,6 @@ const reset = () => {
   quotation = null; items = []; auditLogs = [];
   notifications.length = 0; events.length = 0;
   scheduleChecks = 0; scheduleConflict = false; failInsert = false; settlementCalls = 0;
-  relevanceStatus = "valid";
 };
 
 const payload = () => ({
@@ -139,17 +135,14 @@ async function run() {
   } as any));
 
   reset();
-  relevanceStatus = "blocked";
-  await assert.rejects(save(), /không phù hợp/);
-  assert.equal(quotation, null);
-  relevanceStatus = "warning";
-  const warningQuotation = await save();
-  assert.equal(warningQuotation.status, "saved");
-  const warningUpdate = await update({ inspectionNote: "Đã bổ sung thông tin" });
-  assert.equal(warningUpdate.revision, 2);
-  relevanceStatus = "blocked";
-  await assert.rejects(update(), /không phù hợp/);
-  assert.equal(quotation!.revision, 2);
+  const unchecked = await AssignmentService.createRepairQuotation({ ...payload(), items: [{
+    title: "Hạng mục do thợ nhập", description: "Mô tả tự do không cần AI đối chiếu dịch vụ",
+    itemType: "other", quantity: 1, unitPrice: 100000,
+  }] }, provider.userId.toString());
+  assert.equal(unchecked.status, "saved");
+  const uncheckedUpdate = await update({ items: [{ title: "Nội dung hạng mục mới",
+    description: "Lưu trực tiếp sau kiểm tra dữ liệu và quyền sở hữu", itemType: "other", quantity: 1, unitPrice: 120000 }] });
+  assert.equal(uncheckedUpdate.revision, 2);
 
   reset();
   const first = await save();
@@ -263,16 +256,22 @@ async function run() {
     await assert.rejects(confirmPayment(), /chưa đủ điều kiện/);
   }
   quotation!.status = "saved";
+  rewardOrders.length = 0;
   const confirmed = await confirmPayment();
   assert.ok(confirmed.directPaymentConfirmedAt);
   assert.equal(confirmed.directPaymentConfirmedAmount, 60000);
   assert.equal(order.paymentStatus, "paid");
   assert.equal(order.status, "completed");
+  assert.equal(rewardOrders.length, 1);
+  assert.equal(rewardOrders[0].paymentStatus, "paid");
+  assert.equal(rewardOrders[0].status, "completed");
+  assert.equal(rewardOrders[0].currentQuotationId?.toString(), quotation!.id);
   assert.equal(settlementCalls, 0);
   const auditCount = auditLogs.length;
   const confirmedAt = confirmed.directPaymentConfirmedAt!.getTime();
   assert.equal((await confirmPayment()).directPaymentConfirmedAt!.getTime(), confirmedAt);
   assert.equal(auditLogs.length, auditCount);
+  assert.equal(rewardOrders.length, 1, "Xác nhận lại không cộng điểm lần nữa.");
   order.paymentStatus = "partially_paid";
   await confirmPayment();
   assert.equal(order.paymentStatus, "paid");

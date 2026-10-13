@@ -14,6 +14,8 @@ export const bookingSchema = priceSchema.extend({
   scheduledAt: createOrderSchema.shape.scheduledAt,
   problemDescription: createOrderSchema.shape.problemDescription,
   paymentMethod: createOrderSchema.shape.paymentMethod,
+  voucherCode: createOrderSchema.shape.voucherCode,
+  preferredProviderId: createOrderSchema.shape.preferredProviderId,
 }).strict().superRefine((value, ctx) => {
   if (value.orderType === "scheduled" && (!value.scheduledAt || Date.parse(value.scheduledAt) < getEarliestScheduledAt().getTime())) {
     ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn trong tương lai." });

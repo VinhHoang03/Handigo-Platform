@@ -9,6 +9,7 @@ import { OrderSummaryPriceDetails } from './OrderSummaryPriceDetails';
 import { OrderSummaryActions } from './OrderSummaryActions';
 import { Calendar, User } from "lucide-react";
 import { useBookingPreview } from '../hooks/useBookingPreview';
+import type { BookingPreview } from '../api/booking.api';
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
@@ -21,6 +22,8 @@ export const OrderSummaryCard: React.FC<{
   summaryContent?: React.ReactNode;
   discountAmount?: number;
   voucherCode?: string;
+  priceSnapshot?: Pick<BookingPreview, 'bookingAmount' | 'discountedAmount' | 'promotionDiscountAmount' | 'voucherDiscountAmount' | 'depositAmount'>;
+  skipPricePreview?: boolean;
 }> = ({
   step,
   actionLabel,
@@ -30,6 +33,8 @@ export const OrderSummaryCard: React.FC<{
   summaryContent,
   discountAmount = 0,
   voucherCode,
+  priceSnapshot,
+  skipPricePreview = false,
 }) => {
   const {
     categoryId,
@@ -44,7 +49,8 @@ export const OrderSummaryCard: React.FC<{
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const navigate = useNavigate();
-  const { preview, loading: priceLoading, error: priceError, retry } = useBookingPreview(voucherCode);
+  const { preview, loading: priceLoading, error: priceError, retry } = useBookingPreview(voucherCode, !skipPricePreview);
+  const effectivePreview = priceSnapshot ?? preview;
 
   useEffect(() => {
     let isMounted = true;
@@ -88,9 +94,9 @@ export const OrderSummaryCard: React.FC<{
     return total;
   };
 
-  const total = preview?.bookingAmount ?? calculateTotal();
-  const effectiveDiscount = preview ? preview.promotionDiscountAmount + preview.voucherDiscountAmount : discountAmount;
-  const finalTotal = preview?.discountedAmount ?? Math.max(total - Math.min(discountAmount, total), 0);
+  const total = effectivePreview?.bookingAmount ?? calculateTotal();
+  const effectiveDiscount = effectivePreview ? effectivePreview.promotionDiscountAmount + effectivePreview.voucherDiscountAmount : discountAmount;
+  const finalTotal = effectivePreview?.discountedAmount ?? Math.max(total - Math.min(discountAmount, total), 0);
 
   const handleAction = () => {
     if (onAction) {
@@ -121,7 +127,7 @@ export const OrderSummaryCard: React.FC<{
                 {service?.serviceType === 'fixed_price'
                   ? 'Giá theo tùy chọn'
                   : service?.serviceType === 'variable_price'
-                    ? `Phí cọc: ${(preview?.depositAmount ?? service.depositAmount ?? 0).toLocaleString()}đ`
+                    ? `Phí cọc: ${(effectivePreview?.depositAmount ?? service.depositAmount ?? 0).toLocaleString()}đ`
                     : '0đ'}
               </p>}
             </div>
@@ -171,7 +177,7 @@ export const OrderSummaryCard: React.FC<{
           orderType={orderType}
           actionLabel={actionLabel}
           isLoading={isLoading}
-          disableAction={Boolean(isLoading || priceLoading || priceError || !preview || (step === 1 && !serviceId))}
+          disableAction={Boolean(isLoading || priceLoading || priceError || !effectivePreview || (step === 1 && !serviceId))}
           onBack={() => navigate(-1)}
           onAction={handleAction}
         />

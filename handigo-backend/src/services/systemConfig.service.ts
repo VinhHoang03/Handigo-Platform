@@ -3,6 +3,8 @@ import { AuditLog } from "../models/auditLog.model";
 import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
 import { bookingPolicySchema, DEFAULT_BOOKING_POLICY } from "../validations/bookingPolicy.validator";
+import { rewardOfferSchema } from "../validations/reward.validator";
+import { REWARD_POLICY } from "../configs/rewards";
 import type {
   CreateSystemConfigInput,
   SystemConfigListQuery,
@@ -185,6 +187,7 @@ export const getConfigByKey = async (admin: RequestUser, key: string) => {
 
 export const createConfig = async (admin: RequestUser, input: CreateSystemConfigInput) => {
   assertAdmin(admin);
+  validateRewardOffer(input.key, input.value, input.type, input.isPublic);
   validateBookingPolicy(input.key, input.value, input.type, input.isPublic);
   assertConfigValueMatchesType(input.value, input.type);
   await assertMatchingConfig(input.key, input.value, input.type);
@@ -237,6 +240,7 @@ export const updateConfig = async (
   }
 
   const nextType = input.type ?? existing.type;
+  validateRewardOffer(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   validateBookingPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   assertConfigValueMatchesType(input.value, nextType);
   await assertMatchingConfig(key, input.value, nextType);
@@ -290,4 +294,25 @@ export const getBookingPolicy = async () => {
   const parsed = bookingPolicySchema.safeParse(config.value);
   if (!parsed.success) throw new AppError("Chính sách đặt dịch vụ không hợp lệ. Vui lòng liên hệ quản trị viên.", 503);
   return parsed.data;
+};
+
+const validateRewardOffer = (key: string, value: unknown, type: SystemConfigType, isPublic: boolean) => {
+  if (!key.startsWith("REWARD_OFFER_")) return;
+  const result = rewardOfferSchema.safeParse(value);
+  if (type !== "JSON" || isPublic || !result.success || key !== `REWARD_OFFER_${result.data.id}`) {
+    throw new AppError("Cấu hình gói đổi điểm phải là JSON nội bộ hợp lệ và khớp mã gói.", 400);
+  }
+};
+
+export const getRewardOffers = async (session?: mongoose.ClientSession) => {
+  const offers = new Map(REWARD_POLICY.offers.map((offer) => [offer.id, rewardOfferSchema.parse(offer)]));
+  const configs = await collection().find({ key: { $regex: "^REWARD_OFFER_" } }, { session }).toArray();
+  for (const config of configs) {
+    const parsed = rewardOfferSchema.safeParse(config.value);
+    if (config.type !== "JSON" || !parsed.success || config.key !== `REWARD_OFFER_${parsed.data.id}`) {
+      throw new AppError("Cấu hình gói đổi điểm không hợp lệ. Vui lòng liên hệ quản trị viên.", 503);
+    }
+    offers.set(parsed.data.id, parsed.data);
+  }
+  return [...offers.values()].sort((a, b) => a.points - b.points || a.id.localeCompare(b.id));
 };

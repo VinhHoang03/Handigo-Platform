@@ -29,7 +29,7 @@ export class AgentLoop {
     session.state = state;
     session.activity = undefined;
     this.messages.append(session, "assistant", message);
-    if (state === "WAITING_CONFIRMATION" && session.pendingAction?.tool === "create_booking"
+    if (state === "WAITING_CONFIRMATION" && session.pendingAction
       && !session.conversation.some((item) => item.confirmationActionId === session.pendingAction!.id)) {
       session.conversation[session.conversation.length - 1].confirmationActionId = session.pendingAction.id;
     }
@@ -61,6 +61,7 @@ export class AgentLoop {
       signal.throwIfAborted();
       const operation = tool.execute({ ...context, session, signal, confirmedPreview: action?.preview }, args);
       const result = await withAgentTimeout(operation, signal, this.config.timeoutMs);
+      if (tool.name === "save_booking_address" && context.bookingAddressLookup) context.bookingAddressLookup.value = undefined;
       this.record(session, tool.name, result, true);
       if (action) { action.status = "SUCCEEDED"; action.result = result; }
       if (tool.name === "create_booking" && session.bookingDraft) {
@@ -92,6 +93,7 @@ export class AgentLoop {
   }
 
   async run(session: AgentSession, context: ToolContext, checkpoint: () => Promise<void>) {
+    context.bookingAddressLookup = {};
     await compactAgentContext(session, this.provider, AbortSignal.any([context.signal, AbortSignal.timeout(20000)]));
     const failedCalls = new Set<string>();
     // Chọn lại theo ngữ cảnh mỗi lượt để không khóa khách vào chủ đề cũ.
@@ -182,7 +184,8 @@ export class AgentLoop {
         tool = this.tools.get(response.tool, context);
         args = tool.inputSchema.parse(response.arguments);
         if (session.bookingDraft?.status === "active" && !["update_booking_draft", "create_booking", "get_service",
-          "search_services", "get_addresses", "get_price", "get_available_times"].includes(tool.name)) {
+          "search_services", "get_addresses", "get_price", "get_available_times", "get_booking_vouchers",
+          "search_booking_providers", "save_booking_address"].includes(tool.name)) {
           session.bookingDraft.status = "paused";
         }
         if (this.tools.needsConfirmation(tool)) {
@@ -219,47 +222,63 @@ export class AgentLoop {
         failedCalls.add(failureKey);
       }
       if (tool.name === "update_booking_draft" && session.progress[session.progress.length - 1]?.status === "SUCCEEDED") {
-        const draft = session.bookingDraft!;
-        if (draft.status === "paused" || draft.status === "discarded") continue;
-        const bookingArgs = readyBookingArguments(draft);
-        // Chỉ hỏi lại khi thiếu thông tin cơ bản không thể điền mặc định (dịch vụ chưa tìm thấy, hoặc địa chỉ chưa có)
-        const hasCore = Boolean(draft.values.serviceId && draft.values.addressId);
-        if (!bookingArgs && !hasCore) {
-          const message = this.reply(session, "WAITING_USER_INPUT", `${draft.summary.join("\n")}${draft.summary.length ? "\n\n" : ""}Cần bổ sung: ${draft.missing.join("; ")}. Bạn có thể chọn hoặc nhập nhiều thông tin cùng lúc.`);
-          session.conversation[session.conversation.length - 1].choiceGroups = draft.choiceGroups;
-          return message;
-        }
-        // Có đủ thông tin cơ bản → luôn show form xác nhận ngay, kể cả khi còn missing về gói/loại
-        try {
-          const create = this.tools.get("create_booking", context);
-          const argsToUse = bookingArgs ?? create.inputSchema.parse(draft.values);
-          const previous = [...session.actions].reverse().find((action) => action.tool === "create_booking"
-            && action.taskVersion === session.taskVersion && isDeepStrictEqual(action.arguments, argsToUse)
-            && ["SUCCEEDED", "REJECTED", "UNKNOWN"].includes(action.status));
-          if (previous) {
-            return this.reply(session, "WAITING_USER_INPUT", previous.status === "SUCCEEDED"
-              ? "Yêu cầu này đã tạo đơn. Bạn có thể xem đơn hoặc kiểm tra thanh toán; không cần đặt lại."
-              : previous.status === "REJECTED" ? "Bạn đã từ chối bản đặt lịch này. Hãy cho biết thông tin cần thay đổi."
-                : "Kết quả tạo đơn trước chưa xác định. Cần kiểm tra đơn trước khi thực hiện lại.");
-          }
-          this.activity(session, "Đang kiểm tra giá và chuẩn bị bản xác nhận");
-          await checkpoint();
-          session.pendingAction = await this.confirmation.prepare(create, context, argsToUse);
-          session.pendingAction.taskVersion = session.taskVersion;
-          const missingNote = draft.missing.length
-            ? `\n\n⚠️ Một số thông tin chưa đầy đủ: ${draft.missing.join("; ")}. Bạn có thể nhắn để bổ sung hoặc sửa trước khi xác nhận.`
-            : "";
-          return this.reply(session, "WAITING_CONFIRMATION", missingNote.trim());
-        } catch (error) {
-          this.record(session, "create_booking", { error: toolError(error) }, false);
-          return this.reply(session, "WAITING_USER_INPUT", toolError(error));
-        }
+        const reply = await this.prepareBookingDraft(session, context, checkpoint);
+        if (reply !== null) return reply;
       }
 
     }
     return this.reply(session, "FAILED", context.signal.aborted
       ? "Lượt xử lý đã hết thời gian chờ. Chọn Tiếp tục yêu cầu để tiếp tục từ kết quả đã lưu."
       : "Đã đạt giới hạn số bước của lượt này. Chọn Tiếp tục yêu cầu hoặc gửi thêm thông tin để tiếp tục ngay. Nếu có nhu cầu khác, chọn Bắt đầu tác vụ mới.");
+  }
+
+  async prepareBookingDraft(session: AgentSession, context: ToolContext, checkpoint: () => Promise<void>): Promise<string | null> {
+    const draft = session.bookingDraft;
+    if (!draft || draft.status !== "active") return null;
+    const bookingArgs = readyBookingArguments(draft);
+    if (!bookingArgs) {
+      // Tiếp tục lập bản xác nhận lưu địa chỉ khách vừa nêu trong cùng lượt.
+      if (draft.addressPreference && !draft.values.addressId) return null;
+      let previousSummary: string[] = [];
+      for (const item of [...session.conversation].reverse()) {
+        if (item.role !== "tool" || item.tool !== "update_booking_draft") continue;
+        try {
+          const previous = JSON.parse(item.content);
+          if (!previous.revision || previous.revision >= draft.revision || previous.status !== "active") continue;
+          previousSummary = Array.isArray(previous.summary) ? previous.summary : [];
+          break;
+        } catch { /* Bỏ qua kết quả công cụ không phải bản nháp. */ }
+      }
+      const changed = draft.summary.filter((line) => !previousSummary.includes(line));
+      const represented = draft.choiceGroups.map((group) => group.label);
+      const missing = draft.missing.filter((item) => !represented.some((label) => item.toLocaleLowerCase("vi-VN").includes(label.toLocaleLowerCase("vi-VN"))));
+      const message = this.reply(session, "WAITING_USER_INPUT", [
+        ...changed,
+        missing.length ? `Cần bổ sung: ${missing.join("; ")}.` : "Chọn thông tin còn thiếu bên dưới để tiếp tục.",
+      ].join("\n"));
+      session.conversation[session.conversation.length - 1].choiceGroups = draft.choiceGroups;
+      return message;
+    }
+    try {
+      const create = this.tools.get("create_booking", context);
+      const previous = [...session.actions].reverse().find((action) => action.tool === "create_booking"
+        && action.taskVersion === session.taskVersion && isDeepStrictEqual(action.arguments, bookingArgs)
+        && ["SUCCEEDED", "REJECTED", "UNKNOWN"].includes(action.status));
+      if (previous) {
+        return this.reply(session, "WAITING_USER_INPUT", previous.status === "SUCCEEDED"
+          ? "Yêu cầu này đã tạo đơn. Bạn có thể xem đơn hoặc kiểm tra thanh toán; không cần đặt lại."
+          : previous.status === "REJECTED" ? "Bạn đã từ chối bản đặt lịch này. Hãy cho biết thông tin cần thay đổi."
+            : "Kết quả tạo đơn trước chưa xác định. Cần kiểm tra đơn trước khi thực hiện lại.");
+      }
+      this.activity(session, "Đang kiểm tra giá và chuẩn bị bản xác nhận");
+      await checkpoint();
+      session.pendingAction = await this.confirmation.prepare(create, context, bookingArgs);
+      session.pendingAction.taskVersion = session.taskVersion;
+      return this.reply(session, "WAITING_CONFIRMATION", "");
+    } catch (error) {
+      this.record(session, "create_booking", { error: toolError(error) }, false);
+      return this.reply(session, "WAITING_USER_INPUT", toolError(error));
+    }
   }
 
   private activity(session: AgentSession, message: string) {

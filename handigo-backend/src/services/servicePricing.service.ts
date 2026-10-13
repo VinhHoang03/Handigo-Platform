@@ -21,7 +21,7 @@ export const previewServiceBooking = async (payload: { serviceId: string; select
   if (!service) throw new AppError("Dịch vụ không còn khả dụng.", 404);
   const pricing = await buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, payload.orderType ?? "normal");
   const promotion = await resolveAutomaticPromotion(service._id, pricing.baseAmount, Boolean(payload.voucherCode));
-  const voucher = payload.voucherCode ? await resolveVoucherForAmount(payload.voucherCode, pricing.baseAmount - (promotion?.discountAmount ?? 0), undefined, customerId) : null;
+  const voucher = payload.voucherCode ? await resolveVoucherForAmount(payload.voucherCode, pricing.baseAmount - (promotion?.discountAmount ?? 0), undefined, customerId, service.serviceType === "variable_price") : null;
   return { ...pricing, promotionDiscountAmount: promotion?.discountAmount ?? 0, promotionSnapshot: promotion?.snapshot ?? null,
     voucherDiscountAmount: voucher?.discountAmount ?? 0,
     discountedAmount: Math.max(pricing.bookingAmount - (promotion?.discountAmount ?? 0) - (voucher?.discountAmount ?? 0), 0) };

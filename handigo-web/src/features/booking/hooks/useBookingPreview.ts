@@ -27,18 +27,18 @@ const loadPreview = async (key: string, force = false) => {
   }
 };
 
-export function useBookingPreview(voucherCode?: string) {
+export function useBookingPreview(voucherCode?: string, enabled = true) {
   const { serviceId, orderType, selectedOptionIds, selectedOptionQuantities, uniformQuantity } = useBookingStore();
   const key = JSON.stringify({ serviceId, orderType, voucherCode, uniformQuantity: uniformQuantity > 1 ? uniformQuantity : undefined, selectedOptions: selectedOptionIds.map((optionId) => ({ optionId, quantity: selectedOptionQuantities?.[optionId] ?? 1 })) });
   const state = usePreviewState();
   useEffect(() => {
-    if (serviceId) void loadPreview(key);
-  }, [key, serviceId]);
+    if (serviceId && enabled) void loadPreview(key);
+  }, [key, serviceId, enabled]);
   const current = state.key === key;
   return {
-    preview: current ? state.data : undefined,
-    error: current ? state.error : undefined,
-    loading: Boolean(serviceId && (!current || state.loading)),
-    retry: () => { if (serviceId) void loadPreview(key, true); },
+    preview: enabled && current ? state.data : undefined,
+    error: enabled && current ? state.error : undefined,
+    loading: Boolean(enabled && serviceId && (!current || state.loading)),
+    retry: () => { if (serviceId && enabled) void loadPreview(key, true); },
   };
 }

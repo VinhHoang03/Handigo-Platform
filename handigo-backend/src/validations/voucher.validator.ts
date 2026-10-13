@@ -87,6 +87,7 @@ export const updateAdminVoucherSchema = adminVoucherBaseSchema
   });
 
 export const adminVoucherQuerySchema = z.object({
+  source: z.enum(["all", "public", "reward"]).default("public"),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   search: z.string().trim().optional(),

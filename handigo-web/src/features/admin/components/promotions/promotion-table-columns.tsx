@@ -22,6 +22,10 @@ export const buildVoucherColumns = ({
     render: (voucher) => (
       <div className="min-w-0">
         <p className="font-semibold text-on-surface">{voucher.name}</p>
+        <p className="mt-1 text-xs font-medium text-primary">{voucher.ownerId ? "Mã đổi điểm · Dùng riêng cho khách" : "Mã thông thường"}</p>
+        {voucher.ownerId && <p className="mt-1 break-all text-xs text-on-surface-variant">Khách hàng: {voucher.ownerId}</p>}
+        {voucher.applicableOrderType && <p className="mt-1 text-xs text-on-surface-variant">{voucher.applicableOrderType === "variable_price" ? "Chỉ giảm phí cọc đơn báo giá" : "Áp dụng cho đơn giá cố định"}</p>}
+        {voucher.reservedOrderId && <p className="mt-1 break-all text-xs text-on-surface-variant">Đơn giữ mã: {voucher.reservedOrderId}</p>}
         <p className="mt-1 inline-flex rounded-lg bg-primary/10 px-2 py-1 font-mono text-sm font-semibold text-primary">
           {voucher.code}
         </p>
@@ -72,13 +76,13 @@ export const buildVoucherColumns = ({
     className: "text-right",
     render: (voucher) => (
       <div className="flex justify-end gap-1">
-        <button
+        {!voucher.ownerId && <button
           onClick={() => onEdit(voucher)}
           className="rounded-lg p-2 text-primary hover:bg-primary/10"
           aria-label="Sửa voucher"
         >
           <Pencil aria-hidden="true" size={20} />
-        </button>
+        </button>}
         <button
           onClick={() => onToggle(voucher)}
           className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high"
@@ -88,7 +92,9 @@ export const buildVoucherColumns = ({
         </button>
         <button
           onClick={() => onDelete(voucher)}
-          className="rounded-lg p-2 text-error hover:bg-error/10"
+          disabled={Boolean(voucher.ownerId && voucher.usedCount > 0)}
+          title={voucher.ownerId && voucher.usedCount > 0 ? "Không thể xóa mã đổi điểm đã sử dụng" : "Xóa voucher"}
+          className="rounded-lg p-2 text-error hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Xóa voucher"
         >
           <Trash2 aria-hidden="true" size={20} />

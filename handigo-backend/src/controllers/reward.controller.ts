@@ -26,3 +26,12 @@ export const redeem = async (req: Request, res: Response) => {
     return res.json({ success: true, data, message: "Đổi mã giảm giá thành công." });
   } catch (error) { return sendControllerError(res, error); }
 };
+
+export const getAdminOffers = async (req: Request, res: Response) => {
+  try { return res.json({ success: true, data: await rewards.getAdminRewardOffers(requireRequestUser(req)) }); }
+  catch (error) { return sendControllerError(res, error); }
+};
+export const saveAdminOffer = async (req: Request, res: Response) => {
+  try { return res.json({ success: true, data: await rewards.saveAdminRewardOffer(requireRequestUser(req), req.body), message: "Đã lưu gói đổi điểm." }); }
+  catch (error) { return sendControllerError(res, error); }
+};

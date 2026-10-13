@@ -20,6 +20,7 @@ interface OrderMessage {
   userId: string;
   orderId?: Types.ObjectId;
   content: string;
+  choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>;
   createdAt: Date;
 }
 
@@ -29,6 +30,8 @@ const messageSchema = new Schema<OrderMessage>({
   userId: { type: String, required: true },
   orderId: { type: Schema.Types.ObjectId, ref: "Order" },
   content: { type: String, required: true, maxlength: 6000 },
+  choiceGroups: { type: [{ _id: false, label: { type: String, required: true },
+    multiple: { type: Boolean, default: false }, options: [String] }], default: undefined },
   createdAt: { type: Date, required: true },
 }, { collection: "ai_agent_order_messages" });
 messageSchema.index({ sessionId: 1, userId: 1, createdAt: 1 });

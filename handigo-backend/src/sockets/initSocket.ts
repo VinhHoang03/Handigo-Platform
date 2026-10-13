@@ -4,7 +4,7 @@ import { Server, Socket } from "socket.io";
 import User from "../models/user.model";
 import * as chatService from "../services/chat.service";
 import * as orderTrackingService from "../services/orderTracking.service";
-import { setSocketServer } from "./socketServer";
+import { setSocketServer, emitToConversation } from "./socketServer";
 import { isAllowedOrigin } from "../configs/cors";
 import {
   conversationIdParamSchema,
@@ -81,6 +81,22 @@ export const initSocket = (server: HttpServer) => {
 
   io.on("connection", (socket: AuthedSocket) => {
     const socketUser = socket.user!;
+    socket.on("error", (error: Error) => {
+      socketLogger.warn("Sự kiện socket bị từ chối.", { userId: socketUser.id, message: error.message });
+    });
+    socket.use(async (_packet, next) => {
+      try {
+        const current = await User.findOne({ _id: socketUser.id, isDeleted: false }).select("status role").lean();
+        if (!current || current.status === "locked" || current.role !== socketUser.role) {
+          next(new Error("Tài khoản không còn quyền sử dụng kết nối này."));
+          socket.disconnect(true);
+          return;
+        }
+        next();
+      } catch {
+        next(new Error("Chưa thể kiểm tra quyền sử dụng kết nối. Vui lòng thử lại."));
+      }
+    });
     const userRoom = `user:${socketUser.id}`;
     socket.join(userRoom);
 
@@ -143,7 +159,7 @@ export const initSocket = (server: HttpServer) => {
           conversationId,
           messagePayload,
         );
-        io.to(`conversation:${conversationId}`).emit("message:new", message);
+        emitToConversation(conversationId, "message:new", message);
         callback?.({ success: true, data: message });
       } catch (error: any) {
         callback?.({ success: false, message: error.message });
@@ -158,7 +174,7 @@ export const initSocket = (server: HttpServer) => {
           socket.user!.role,
           conversationId,
         );
-        io.to(`conversation:${conversationId}`).emit("message:seen", result);
+        emitToConversation(conversationId, "message:seen", result);
         callback?.({ success: true, data: result });
       } catch (error: any) {
         callback?.({ success: false, message: error.message });

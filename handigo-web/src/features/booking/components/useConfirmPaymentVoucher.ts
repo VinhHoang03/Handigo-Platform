@@ -4,7 +4,7 @@ import { bookingVoucherApi } from '@/features/booking/api/voucher.api';
 import type { AvailableVoucher } from '../types/voucher.types';
 
 /** State + validation của mã voucher ở bước xác nhận thanh toán — tách khỏi hook chính cho gọn. */
-export const useConfirmPaymentVoucher = (orderAmount: number) => {
+export const useConfirmPaymentVoucher = (orderAmount: number, inspectionRequired: boolean) => {
   const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<AvailableVoucher | null>(null);
@@ -12,18 +12,25 @@ export const useConfirmPaymentVoucher = (orderAmount: number) => {
 
   useEffect(() => {
     let isMounted = true;
+    const resetTimer = window.setTimeout(() => {
+      setAppliedVoucher(null);
+      setVoucherCode('');
+      setVoucherError('');
+    }, 0);
     bookingVoucherApi
       .available()
       .then((vouchers) => {
-        if (isMounted) setAvailableVouchers(vouchers);
+        if (isMounted) setAvailableVouchers(vouchers.filter((voucher) => !voucher.applicableOrderType ||
+          (voucher.applicableOrderType === 'variable_price') === inspectionRequired));
       })
       .catch(() => {
         if (isMounted) setAvailableVouchers([]);
       });
     return () => {
       isMounted = false;
+      window.clearTimeout(resetTimer);
     };
-  }, []);
+  }, [inspectionRequired, setVoucherError]);
 
   const voucherDiscountAmount = appliedVoucher
     ? Math.min(

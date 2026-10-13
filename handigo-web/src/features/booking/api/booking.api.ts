@@ -18,6 +18,7 @@ export interface OrderPaymentsResult {
 
 export interface CreateOrderPayload {
   expectedBookingAmount?: number;
+  expectedFinalAmount?: number;
   serviceId: string;
   selectedOptionIds?: string[];
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
@@ -110,6 +111,7 @@ export const bookingApi = {
 
   createPayment: async (payload: {
     orderId: string;
+    expectedAmount?: number;
     method: "PAYOS" | "CASH" | "WALLET";
     paymentType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING";
     returnUrl?: string;

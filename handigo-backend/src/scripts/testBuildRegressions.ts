@@ -33,7 +33,7 @@ stubModule("../services/notification.service", {
 });
 stubModule("../services/orderCancellation.service", {});
 stubModule("../services/orderReassignment.service", {});
-stubModule("../services/quotationRelevance.service", {});
+
 stubModule("../services/providerWalletEligibility.service", { assertProviderWalletEligible: async () => {} });
 stubModule("../services/providerSchedule.service", schedule);
 stubModule("../services/reward.service", {});
@@ -44,7 +44,7 @@ stubModule("../services/matching.service", {
   MatchingService: { findNearestProviders: async () => [{ providerId: provider._id, userId: provider.userId }] },
 });
 stubModule("../services/voucher.service", {
-  resolveVoucherForAmount: async () => ({ discountAmount: 10000, snapshot: null }),
+  resolveVoucherForAmount: async () => ({ discountAmount: 10000, snapshot: null, promotion: { ownerId: null } }),
 });
 
 const { buildServicePricingSnapshot, previewServiceBooking } = require("../services/servicePricing.service") as typeof import("../services/servicePricing.service");

@@ -6,12 +6,16 @@ import { Link } from "react-router-dom";
 const labels: Record<string, string> = {
   service: "Dịch vụ", options: "Tùy chọn", address: "Địa chỉ", schedule: "Thời gian",
   unitPrice: "Đơn giá", quantity: "Số lượng",
+  originalAmount: "Giá trước giảm", voucherCode: "Voucher", discountAmount: "Giảm giá", providerName: "Chuyên gia ưu tiên",
+  previousAddress: "Địa chỉ trước khi sửa", recipientName: "Người nhận", recipientPhone: "Số điện thoại người nhận",
+  defaultAddress: "Địa chỉ mặc định", addressNote: "Ghi chú địa chỉ",
   paymentMethod: "Thanh toán", amount: "Số tiền", description: "Mô tả",
   orderCode: "Mã đơn", reason: "Lý do hủy", paidAmount: "Đã thanh toán",
   refundAmount: "Dự kiến hoàn", cancellationFee: "Phí hủy", note: "Lưu ý",
   paymentLabel: "Khoản thanh toán",
   subject: "Tiêu đề yêu cầu", category: "Nhóm hỗ trợ", priority: "Độ ưu tiên",
   caseId: "Mã yêu cầu", caseStatus: "Trạng thái hiện tại",
+  responseDeadline: "Hạn phản hồi",
 };
 const paymentLabels: Record<string, string> = { cash: "Tiền mặt", bank: "Trực tuyến", wallet: "Ví Handigo" };
 function formatValue(key: string, value: unknown) {
@@ -20,7 +24,7 @@ function formatValue(key: string, value: unknown) {
   if (typeof value === "number") return `${value.toLocaleString("vi-VN")} đ`;
   if (Array.isArray(value)) return value.filter((item) => typeof item === "string").join("\n");
   if (key === "paymentMethod") return paymentLabels[String(value)] ?? String(value);
-  if (key === "schedule" && typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+  if (["schedule", "responseDeadline"].includes(key) && typeof value === "string" && !Number.isNaN(Date.parse(value))) {
     return new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   }
   return typeof value === "string" ? value : "";
@@ -39,9 +43,9 @@ export function AgentConfirmationCard({ action, disabled, onDecision, readOnly =
     return () => window.clearInterval(timer);
   }, [readOnly, expired]);
   const statusLabels = {
-    WAITING_CONFIRMATION: "Bản xem trước đã lưu", EXECUTING: "Đang tạo đơn",
-    SUCCEEDED: "Đã tạo đơn", REJECTED: "Đã từ chối", EXPIRED: "Bản xác nhận đã hết hiệu lực",
-    UNKNOWN: "Kết quả tạo đơn cần được kiểm tra",
+    WAITING_CONFIRMATION: "Bản xem trước đã lưu", EXECUTING: action.tool === "create_booking" ? "Đang tạo đơn" : "Đang thực hiện",
+    SUCCEEDED: action.tool === "create_booking" ? "Đã tạo đơn" : "Đã thực hiện", REJECTED: "Đã từ chối", EXPIRED: "Bản xác nhận đã hết hiệu lực",
+    UNKNOWN: "Kết quả thao tác cần được kiểm tra",
   };
   return <section aria-label="Xác nhận thao tác" className="overflow-hidden rounded-2xl border border-primary/20 bg-surface-container-lowest text-sm text-on-surface shadow-sm">
     <div className="flex items-start gap-3 border-b border-outline-variant/30 bg-primary/5 p-4">
@@ -59,9 +63,7 @@ export function AgentConfirmationCard({ action, disabled, onDecision, readOnly =
     </div>
     <dl className="space-y-3 p-4">
       {Object.entries(labels).map(([key, label]) => {
-        const value = key === "note" && action.tool === "create_booking"
-          ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ."
-          : formatValue(key, action.preview[key]);
+        const value = formatValue(key, action.preview[key]);
         return value ? <div key={key} className={key === "amount" ? "rounded-xl bg-primary/5 p-3" : ""}>
           <dt className="text-xs text-on-surface-variant">{key === "amount" && action.preview.serviceType === "variable_price" ? "Tiền đặt cọc" : label}</dt>
           <dd className={`mt-1 whitespace-pre-wrap break-words leading-5 ${key === "amount" ? "text-lg font-semibold text-primary" : "font-medium"}`}>{value}</dd>
