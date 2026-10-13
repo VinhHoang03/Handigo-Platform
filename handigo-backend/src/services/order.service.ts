@@ -154,7 +154,7 @@ export async function dispatchOrderForMatching(orderId: string) {
 export interface CreateOrderPayload {
   expectedBookingAmount?: number;
   uniformQuantity?: number;
-  confirmedExpectation?: { amount: number; addressVersion: string };
+  confirmedExpectation?: { amount: number; addressVersion: string; discountAmount?: number };
   customerId: string;
   serviceId: string;
   servicePackageId?: string;
@@ -282,6 +282,9 @@ export const OrderService = {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
     const address = await ensureAddressCoordinates(selectedAddress);
+    if (payload.confirmedExpectation && address.updatedAt.toISOString() !== payload.confirmedExpectation.addressVersion) {
+      throw new ActionPreconditionError();
+    }
 
     const pricingSnapshot = await buildServicePricingSnapshot(
       service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, orderType,
@@ -343,9 +346,11 @@ export const OrderService = {
         limit: 1,
         requireOnline: true,
         scheduledDates: isAppointment ? occurrenceDates : [],
+        scheduleIntervals,
       });
       preferredProvider = candidates[0] ?? null;
       if (!preferredProvider) {
+        if (payload.confirmedExpectation) throw new ActionPreconditionError("Chuyên gia không còn trực tuyến hoặc phù hợp. Vui lòng chọn lại chuyên gia.");
         throw new AppError(
           "Chuyên gia không còn phù hợp với dịch vụ hoặc khu vực đã chọn.",
           409,
@@ -380,12 +385,20 @@ export const OrderService = {
       : Math.max(platformCommissionPercent, 0) / 100;
     // Tiền đặt dịch vụ gồm giá gốc/cọc và phụ phí phục vụ ngay nếu có.
     const totalAmount = pricingSnapshot.bookingAmount;
-    if (payload.confirmedExpectation && totalAmount !== payload.confirmedExpectation.amount) {
-      throw new ActionPreconditionError();
-    }
     const voucherResult = payload.voucherCode
-      ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount)
+      ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount, undefined, payload.customerId, inspectionRequired)
+        .catch((error: unknown) => {
+          if (payload.confirmedExpectation && error instanceof AppError && error.statusCode < 500) {
+            throw new ActionPreconditionError(error.message);
+          }
+          throw error;
+        })
       : null;
+    if (payload.confirmedExpectation && (
+      Math.max(totalAmount - (voucherResult?.discountAmount ?? 0), 0) !== payload.confirmedExpectation.amount
+      || (payload.confirmedExpectation.discountAmount !== undefined
+        && (voucherResult?.discountAmount ?? 0) !== payload.confirmedExpectation.discountAmount)
+    )) throw new ActionPreconditionError();
 
 
     // 6. Persist order
@@ -447,9 +460,35 @@ export const OrderService = {
       },
       };
     });
-    const createdOrders = (await Order.insertMany(
-      orderDocuments as Array<Partial<IOrder>>,
-    )) as Array<IOrder>;
+    // Mã cá nhân phải được giữ cùng giao dịch tạo đơn để tránh dùng cho nhiều đơn.
+    const saveOrders = async (session?: mongoose.ClientSession) => {
+      if (voucherResult?.promotion.ownerId && session) {
+        const currentVoucher = await resolveVoucherForAmount(payload.voucherCode!, pricingSnapshot.baseAmount, session, payload.customerId, inspectionRequired);
+        if (currentVoucher.discountAmount !== voucherResult.discountAmount
+          || String(currentVoucher.snapshot.voucherId) !== String(voucherResult.snapshot.voucherId)) throw new ActionPreconditionError();
+      }
+      const documents = await Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
+      if (voucherResult?.promotion.ownerId && session) {
+        await reservePersonalVoucher(voucherResult.snapshot.voucherId, payload.customerId,
+          documents[0]._id as Types.ObjectId, inspectionRequired, session);
+      }
+      return documents;
+    };
+    let createdOrders: IOrder[];
+    if (voucherResult?.promotion.ownerId) {
+      const session = await mongoose.startSession();
+      try { createdOrders = (await session.withTransaction(() => saveOrders(session))) as IOrder[]; }
+      catch (error) {
+        // Lỗi điều kiện nghiệp vụ đã rollback: có thể lập bản xác nhận mới, không cần đối soát đơn chưa tạo.
+        if (payload.confirmedExpectation && error instanceof AppError && error.statusCode < 500) {
+          throw new ActionPreconditionError(error.message);
+        }
+        throw error;
+      }
+      finally { await session.endSession(); }
+    } else {
+      createdOrders = await saveOrders() as IOrder[];
+    }
     const order = createdOrders[0] as unknown as IOrder;
 
     return order;
@@ -513,7 +552,9 @@ export const OrderService = {
     orderId: string,
     customerId: string,
     providerId: string,
+    expectedVersion?: string,
   ): Promise<IOrder> {
+    const unavailable = (message: string) => expectedVersion ? new ActionPreconditionError(message) : new AppError(message, 409);
     if (!Types.ObjectId.isValid(orderId) || !Types.ObjectId.isValid(providerId)) {
       throw new AppError("Đơn hàng hoặc chuyên gia không hợp lệ.", 400);
     }
@@ -522,14 +563,22 @@ export const OrderService = {
       _id: orderId,
       customerId,
       status: "created",
-      bookingStatus: "rejected",
+      $or: [{ bookingStatus: "rejected" }, { "reassignment.status": "awaiting_customer" }],
       isDeleted: false,
     });
     const isAppointment = Boolean(
       order && ["scheduled", "recurring"].includes(order.orderType),
     );
     if (!order || (isAppointment && !order.scheduledAt)) {
-      throw new AppError("Đơn hàng không ở trạng thái có thể chọn lại provider.", 409);
+      throw unavailable("Đơn hàng không ở trạng thái có thể chọn lại provider.");
+    }
+    if (expectedVersion && order.updatedAt.toISOString() !== expectedVersion) throw new ActionPreconditionError();
+    const replacing = order.reassignment?.status === "awaiting_customer";
+    if (replacing && order.reassignment!.expiresAt <= new Date()) {
+      throw unavailable("Yêu cầu đổi thợ đã hết hạn. Vui lòng kiểm tra trạng thái đơn.");
+    }
+    if (order.providerId || order.reassignment?.previousProviderIds.some((id) => String(id) === providerId)) {
+      throw unavailable("Không thể chọn lại thợ đã yêu cầu rời đơn hoặc đơn đã có người nhận.");
     }
 
     const relatedOrderIds = order.recurringGroupId
@@ -546,17 +595,14 @@ export const OrderService = {
       isDeleted: false,
     });
     if (hasDeclinedAssignment) {
-      throw new AppError(
-        "Chuyên gia này đã từ chối hoặc không phản hồi yêu cầu trước đó. Vui lòng chọn người khác.",
-        409,
-      );
+      throw unavailable("Chuyên gia này đã từ chối hoặc không phản hồi yêu cầu trước đó. Vui lòng chọn người khác.");
     }
 
     const address = await Address.findOne({
       _id: order.addressId,
       userId: customerId,
     });
-    if (!address) throw new AppError("Địa chỉ không hợp lệ.", 404);
+    if (!address) throw expectedVersion ? new ActionPreconditionError("Địa chỉ không còn khả dụng. Vui lòng kiểm tra lại đơn.") : new AppError("Địa chỉ không hợp lệ.", 404);
 
     const appointmentOrders = order.recurringGroupId
       ? await Order.find({ recurringGroupId: order.recurringGroupId, status: "created", isDeleted: false })
@@ -575,24 +621,29 @@ export const OrderService = {
         requireOnline: true, scheduleIntervals,
     });
     const candidate = candidates[0];
-    if (!candidate) throw new AppError("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.", 409);
+    if (!candidate) throw unavailable("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.");
 
     const responseDeadline = new Date(
       Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
     );
     const claimedOrder = await Order.findOneAndUpdate(
-      { _id: order._id, status: "created", bookingStatus: "rejected" },
+      { _id: order._id, customerId, status: "created", providerId: null, isDeleted: false,
+        updatedAt: order.updatedAt,
+        ...(replacing ? { "reassignment.status": "awaiting_customer", "reassignment.expiresAt": { $gt: new Date() } }
+          : { bookingStatus: "rejected" }) },
       {
         $set: {
           preferredProviderId: candidate.providerId,
           bookingStatus: "awaiting_provider",
           paymentDueAt: null,
+          readyForMatching: !isAppointment,
+          ...(replacing ? { "reassignment.status": "matching", "reassignment.respondedAt": new Date() } : {}),
         },
       },
       { returnDocument: "after", runValidators: true },
     );
     if (!claimedOrder) {
-      throw new AppError("Lịch hẹn vừa được cập nhật bởi yêu cầu khác.", 409);
+      throw unavailable("Lịch hẹn vừa được cập nhật bởi yêu cầu khác.");
     }
     if (order.recurringGroupId) {
       await Order.updateMany(

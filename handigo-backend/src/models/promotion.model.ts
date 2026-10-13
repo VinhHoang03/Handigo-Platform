@@ -17,6 +17,7 @@ export interface IPromotion extends Document, IBaseDocument {
   isActive: boolean;
   ownerId?: Types.ObjectId | null;
   reservedOrderId?: Types.ObjectId | null;
+  applicableOrderType?: "fixed_price" | "variable_price" | null;
 }
 
 const PromotionSchema = new Schema<IPromotion>(
@@ -24,6 +25,7 @@ const PromotionSchema = new Schema<IPromotion>(
     name: { type: String, required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reservedOrderId: { type: Schema.Types.ObjectId, ref: "Order", default: null },
+    applicableOrderType: { type: String, enum: ["fixed_price", "variable_price"], default: null },
     code: { type: String, default: null, uppercase: true, trim: true },
     description: { type: String, default: null },
     discountType: { type: String, enum: ["fixed", "percentage", "AMOUNT", "PERCENT"], required: true },

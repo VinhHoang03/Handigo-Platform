@@ -33,6 +33,7 @@ export function ChatbotPanel({
   payment,
   paymentMessageId,
   onCheckPayment,
+  onChangePaymentMethod,
   onContinue,
   history,
   onToggleHistory,
@@ -54,6 +55,7 @@ export function ChatbotPanel({
   payment?: AgentPayment | null;
   paymentMessageId?: string;
   onCheckPayment?: (orderId: string) => void;
+  onChangePaymentMethod?: (orderId: string) => void;
   onContinue?: () => void;
   history?: ReactNode;
   onToggleHistory?: () => void;
@@ -119,14 +121,14 @@ export function ChatbotPanel({
           confirmationsDisabled={isLoading || taskBlocked || Boolean(error) || Boolean(availabilityMessage)}
           onDecision={onDecision}
           renderAfterMessage={(message) => payment && onCheckPayment && message._id === paymentMessageId
-            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} />
+            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
             : null}
         >
           {pendingConfirmation && onDecision && !messages.some((message) => message.confirmation?.actionId === pendingConfirmation.actionId) && (
             <AgentConfirmationCard action={pendingConfirmation} disabled={isReplying || isLoading || taskBlocked} onDecision={onDecision} />
           )}
           {payment && onCheckPayment && !messages.some((message) => message._id === paymentMessageId) && (
-            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} />
+            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
           )}
         </ChatbotMessageList>
       ))}

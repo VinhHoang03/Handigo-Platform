@@ -30,3 +30,31 @@ The create-feedback and create-provider-application requests require fresh
 business data. Approval, user locking, password changes, and feedback
 visibility requests mutate database state, so review those requests before
 running an entire collection repeatedly.
+
+## Quản lý gói đổi điểm và mã đã phát hành
+
+Các API sau yêu cầu đăng nhập với quyền ADMIN:
+
+- `GET /rewards/admin/offers`: lấy tất cả gói đổi điểm, gồm cả gói tạm dừng.
+- `PUT /rewards/admin/offers`: thêm hoặc cập nhật gói theo `id`. Body gồm `id`, `name`, `points`, `discountType`, `discountValue`, `minOrderAmount`, `applicableOrderType`, `isActive` và `maxDiscountAmount` nếu có giới hạn.
+- `GET /vouchers?source=all|public|reward`: lọc tất cả mã, mã thông thường hoặc mã đổi điểm. Vẫn hỗ trợ `page`, `limit`, `search`, `status`; mặc định không truyền `source` chỉ lấy mã thông thường để tương thích API cũ.
+
+Ví dụ gói giảm phí cọc:
+
+```json
+{
+  "id": "DEPOSIT100",
+  "name": "Giảm 100% phí cọc",
+  "points": 500,
+  "discountType": "PERCENT",
+  "discountValue": 100,
+  "maxDiscountAmount": 30000,
+  "minOrderAmount": 0,
+  "applicableOrderType": "variable_price",
+  "isActive": true
+}
+```
+
+Cấu hình gói được lưu trong `system_configs`, dùng các gói mặc định khi chưa có cấu hình. Gói tạm dừng không xuất hiện trong danh sách đổi của khách. Thử lại yêu cầu đổi đã thành công vẫn trả mã cũ và không trừ điểm thêm, kể cả khi gói đã tạm dừng.
+
+Response mã quản lý bổ sung `ownerId`, `reservedOrderId`, `applicableOrderType`. Mã đổi điểm đã cấp giữ nguyên quyền lợi; không sửa trực tiếp qua `PATCH /vouchers/:id`. ADMIN có thể bật/tắt hoặc xóa bằng API hiện có, nhưng không được tạm dừng/xóa mã đang giữ cho đơn còn hiệu lực, hoặc xóa mã đã sử dụng. Thay đổi trạng thái và cấu hình được ghi nhật ký quản trị.

@@ -7,6 +7,7 @@ export interface ToolContext {
   sessionId: string;
   signal: AbortSignal;
   confirmedPreview?: unknown;
+  bookingAddressLookup?: { value?: Promise<import("../agent/booking-draft").DraftAddress[]> };
 }
 
 export interface AgentTool<T = unknown> {

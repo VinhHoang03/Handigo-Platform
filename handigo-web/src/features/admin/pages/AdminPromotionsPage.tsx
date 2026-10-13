@@ -11,6 +11,7 @@ import { PromotionHeader } from "../components/promotions/PromotionHeader";
 import { PromotionToolbar } from "../components/promotions/PromotionToolbar";
 import { buildVoucherColumns } from "../components/promotions/promotion-table-columns";
 import { VoucherModal } from "../components/promotions/VoucherModal";
+import { RewardOffersPanel } from "../components/promotions/RewardOffersPanel";
 import {
   buildPayload,
   emptyForm,
@@ -26,6 +27,7 @@ export default function AdminPromotionsPage() {
     limit: 10,
     search: "",
     status: "",
+    source: "all",
   });
   const [items, setItems] = useState<Voucher[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -155,6 +157,10 @@ export default function AdminPromotionsPage() {
     <DashboardShell role="ADMIN">
       <div className="space-y-6">
         <PromotionHeader stats={stats} notice={notice} error={error} onCreate={openCreate} />
+
+        <RewardOffersPanel />
+
+        <h2 className="text-lg font-bold text-on-surface">Mã giảm giá đã phát hành</h2>
 
         <PromotionToolbar query={query} onQueryChange={setQuery} onRefresh={() => void load()} />
 

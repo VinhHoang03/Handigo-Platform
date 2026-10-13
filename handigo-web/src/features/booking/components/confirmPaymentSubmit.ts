@@ -116,17 +116,19 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
       });
 
-      if (!payment.checkoutUrl) {
+      if (!payment.checkoutUrl && payment.payment.status !== 'paid') {
         throw new Error('PayOS không trả về liên kết thanh toán.');
       }
 
-      sessionStorage.setItem('latestBookingOrderId', orderId);
-      tokenStorage.prepareExternalRedirect();
-      window.location.href = payment.checkoutUrl;
-      return;
+      if (payment.checkoutUrl) {
+        sessionStorage.setItem('latestBookingOrderId', orderId);
+        tokenStorage.prepareExternalRedirect();
+        window.location.href = payment.checkoutUrl;
+        return;
+      }
     }
 
-    await bookingApi.createPayment(
+    if (effectivePaymentMethod !== 'bank') await bookingApi.createPayment(
       effectivePaymentMethod === 'wallet'
         ? {
             orderId,

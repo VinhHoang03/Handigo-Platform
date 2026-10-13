@@ -5,7 +5,7 @@ import { quotationAIConfig } from "../ai/quotation/quotation.config";
 import { runQuotationAgent } from "../ai/quotation/quotation-agent";
 import { AppError } from "../utils/appError";
 import { Service } from "../models/service.model";
-import { getQuotationOrderForProvider } from "./quotationRelevance.service";
+import { getQuotationOrderForProvider } from "./quotationAccess.service";
 import { loadQuotationHistory, matchQuotationHistory } from "./quotationHistory.service";
 import type { QuotationAgentInput } from "../validations/quotationAgent.validator";
 

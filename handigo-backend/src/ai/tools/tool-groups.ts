@@ -4,11 +4,11 @@ import { z } from "zod";
 const orders = ["get_my_bookings", "get_booking"];
 export const TOOL_GROUPS = {
   booking: ["search_services", "get_service", "get_service_catalog", "get_price", "get_available_times",
-    "get_addresses", "update_booking_draft", "create_booking"],
+    "get_addresses", "get_booking_vouchers", "search_booking_providers", "save_booking_address", "update_booking_draft", "create_booking"],
   support: [...orders, "create_support_ticket", "get_my_support_tickets", "get_support_ticket",
     "reply_support_ticket", "cancel_support_ticket"],
   complaint: [...orders, "create_complaint", "get_my_complaints", "get_complaint", "cancel_complaint"],
-  order: [...orders, "get_cancellation_preview", "cancel_booking"],
+  order: [...orders, "get_order_provider_options", "select_order_provider", "respond_provider_reassignment", "get_cancellation_preview", "cancel_booking"],
   payment: [...orders, "create_payment", "get_payment_status"],
 } as const;
 
@@ -20,7 +20,7 @@ export type ToolIntent = z.infer<typeof toolGroupSchema>["intent"];
 
 export const selectToolGroup = {
   name: "select_tool_group",
-  description: "Chọn nhóm công cụ theo yêu cầu mới nhất và ngữ cảnh: booking = tìm dịch vụ, giá, đặt/sửa/tiếp tục bản nháp; support = yêu cầu hỗ trợ; complaint = khiếu nại; order = tra cứu/hủy đơn, phí hủy; payment = thanh toán hoặc kiểm tra giao dịch. Chọn một nhóm mỗi lần; có thể chuyển nhóm khi cần bước khác. Không làm thay đổi dữ liệu khách hàng.",
+  description: "Chọn nhóm công cụ theo yêu cầu mới nhất và ngữ cảnh: booking = tìm dịch vụ, giá, đặt/sửa/tiếp tục bản nháp; support = yêu cầu hỗ trợ; complaint = khiếu nại; order = tra cứu/hủy đơn, phí hủy, chọn lại thợ hoặc phản hồi yêu cầu đổi thợ cho đơn đã tạo; payment = thanh toán hoặc kiểm tra giao dịch. Chọn một nhóm mỗi lần; có thể chuyển nhóm khi cần bước khác. Không làm thay đổi dữ liệu khách hàng.",
   requiresConfirmation: false,
   inputSchema: z.toJSONSchema(toolGroupSchema, { io: "input" }),
 };

@@ -2,6 +2,7 @@ import { Address, IAddress } from "../models/address.model";
 import { geocodeSavedAddress } from "./reverseGeocoding.service";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
 // import ServiceRequest from "../models/request.model";
 
 type AddressPayload = {
@@ -196,10 +197,14 @@ export const createAddress = async (userId: string, data: AddressPayload) => {
 export const updateAddress = async (
   addressId: string,
   userId: string,
-  data: AddressPayload
+  data: AddressPayload,
+  expectedVersion?: string,
 ) => {
   const current = await Address.findOne({ _id: addressId, userId });
   if (!current) throw new AppError("Không tìm thấy địa chỉ", 404);
+  if (expectedVersion && current.updatedAt.toISOString() !== expectedVersion) {
+    throw new ActionPreconditionError("Địa chỉ vừa được thay đổi. Vui lòng kiểm tra và xác nhận lại.");
+  }
   const payload = await resolveAddressPayload(pickAddressPayload(data), current);
 
   if (payload.isDefault) {

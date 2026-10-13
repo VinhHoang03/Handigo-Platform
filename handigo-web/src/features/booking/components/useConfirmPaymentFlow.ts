@@ -100,7 +100,7 @@ export const useConfirmPaymentFlow = () => {
       : paymentMethod;
   const isAppointment = orderType === 'scheduled' || orderType === 'recurring';
 
-  const voucher = useConfirmPaymentVoucher(orderAmount);
+  const voucher = useConfirmPaymentVoucher(orderAmount, service?.serviceType === 'variable_price');
   const { voucherCode, appliedVoucher, setVoucherError } = voucher;
 
   const handleConfirm = () => {

@@ -1,8 +1,19 @@
+import type { RewardOffer } from '@/features/rewards/api/rewards.api';
+
+export type AdminRewardOffer = RewardOffer & {
+  isActive: boolean;
+  discountType: 'AMOUNT' | 'PERCENT';
+  applicableOrderType: 'fixed_price' | 'variable_price';
+};
+
 export type VoucherDiscountType = 'PERCENT' | 'AMOUNT';
 export type VoucherStatus = 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
 
 export interface Voucher {
   id: string;
+  ownerId?: string | null;
+  reservedOrderId?: string | null;
+  applicableOrderType?: 'fixed_price' | 'variable_price' | null;
   code: string;
   name: string;
   description?: string | null;
@@ -22,6 +33,7 @@ export interface Voucher {
 }
 
 export interface VoucherQuery {
+  source?: 'all' | 'public' | 'reward';
   page?: number;
   limit?: number;
   search?: string;

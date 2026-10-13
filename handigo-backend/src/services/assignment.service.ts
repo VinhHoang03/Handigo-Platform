@@ -21,10 +21,8 @@ import { getBookingPolicy } from "./systemConfig.service";
 import { lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
 import { calculateDuration } from "../utils/bookingPolicy";
 import { createLogger } from "../utils/logger";
-import {
-  evaluateQuotationItemsForOrder,
-  getBlockedRelevanceItems,
-} from "./quotationRelevance.service";
+import { earnOrderRewards } from "./reward.service";
+
 import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 
 const assignmentLogger = createLogger("AssignmentService");
@@ -53,7 +51,6 @@ export interface CreateQuotationPayload {
   attachments?: string[];
   items: QuotationItemInput[];
   discountAmount?: number;
-  relevanceConfirmed?: boolean;
 }
 
 export interface UpdateQuotationPayload extends CreateQuotationPayload {
@@ -98,12 +95,6 @@ const saveRepairQuotation = async (
   if (!Number.isFinite(finalAmount) || finalAmount <= order.depositAmount) {
     throw new AppError("Tổng báo giá sau giảm giá phải lớn hơn tiền cọc.", 400);
   }
-  const relevance = await evaluateQuotationItemsForOrder(order, payload.items);
-  const blockedItems = getBlockedRelevanceItems(relevance);
-  if (blockedItems.length) {
-    throw new AppError(`Không thể lưu báo giá vì có hạng mục không phù hợp với dịch vụ ${relevance.serviceName}: ${blockedItems.slice(0, 3).map((item) => `"${item.title}"`).join(", ")}.`, 422);
-  }
-
   const update = "expectedRevision" in payload ? payload : null;
   const policy = await getBookingPolicy();
   const session = await mongoose.startSession();
@@ -324,7 +315,7 @@ export const AssignmentService = {
     }
 
     const assignedOrder = await Order.findById(assignment.orderId).select(
-      "addressId customerId orderCode orderType scheduledAt status recurringGroupId occurrenceNumber paymentStatus paymentMethod",
+      "addressId customerId orderCode orderType scheduledAt status recurringGroupId occurrenceNumber paymentStatus paymentMethod reassignment",
     );
     const assignedAddress = assignedOrder
       ? await Address.findById(assignedOrder.addressId).select("ward province")
@@ -401,6 +392,7 @@ export const AssignmentService = {
             providerId: provider._id,
             status: "accepted",
             bookingStatus: "confirmed",
+            ...(assignedOrder.reassignment?.status === "matching" ? { "reassignment.status": "matched" } : {}),
             paymentDueAt: null,
             readyForMatching: false,
           },
@@ -519,6 +511,7 @@ export const AssignmentService = {
 
         order.providerId = lockedProvider._id as Types.ObjectId;
         order.status = "accepted";
+        if (order.reassignment?.status === "matching") order.reassignment.status = "matched";
         order.readyForMatching = false;
         lockedProvider.availabilityStatus = "busy";
         await lockedProvider.save({ session });
@@ -756,6 +749,8 @@ export const AssignmentService = {
         quotation.directPaymentConfirmedAt = new Date();
         quotation.directPaymentConfirmedAmount = amount;
         await quotation.save({ session });
+        order.paymentStatus = "paid";
+        await earnOrderRewards(order, session);
         await AuditLog.create([{
           actorId: new Types.ObjectId(providerUserId), actorRole: "provider",
           action: "CONFIRM_QUOTATION_PAYMENT", targetType: "RepairQuotation", targetId: quotation._id,

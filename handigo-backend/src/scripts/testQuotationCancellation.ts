@@ -26,10 +26,7 @@ stubModule("../services/orderReassignment.service", {
 });
 stubModule("../services/providerSchedule.service", { lockProviderSchedule: async () => {} });
 stubModule("../services/providerWalletEligibility.service", {});
-stubModule("../services/quotationRelevance.service", {
-  evaluateQuotationItemsForOrder: async () => ({ status: "valid" }),
-  getBlockedRelevanceItems: () => [],
-});
+
 stubModule("../services/reward.service", {});
 stubModule("../services/wallet.service", {});
 stubModule("../services/dispatch.service", {});

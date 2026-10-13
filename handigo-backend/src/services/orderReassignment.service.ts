@@ -7,6 +7,7 @@ import { createLogger } from "../utils/logger";
 import { cancelOrderWithSettlement, cancelSystemOrderWithSettlement } from "./orderCancellation.service";
 import { createNotificationRecord } from "./notification.service";
 import { DispatchService } from "./dispatch.service";
+import { ActionPreconditionError } from "../utils/actionPreconditionError";
 
 export type ReassignmentDecision = "accept" | "decline";
 
@@ -213,6 +214,8 @@ export const respondToProviderReassignment = async (
   orderId: string,
   customerId: string,
   decision: ReassignmentDecision,
+  expectedVersion?: string,
+  confirmedCancellation?: { paidAmount: number; refundAmount: number; cancellationFee: number },
 ): Promise<IOrder> => {
   requireObjectId(orderId, "ID đơn hàng");
   requireObjectId(customerId, "ID khách hàng");
@@ -223,12 +226,19 @@ export const respondToProviderReassignment = async (
     customerId,
     status: "created",
     "reassignment.status": "awaiting_customer",
+    isDeleted: false,
   });
   if (!order) {
-    throw new AppError("Yêu cầu đổi kỹ thuật viên không còn khả dụng.", 409);
+    throw expectedVersion ? new ActionPreconditionError("Yêu cầu đổi kỹ thuật viên không còn khả dụng.")
+      : new AppError("Yêu cầu đổi kỹ thuật viên không còn khả dụng.", 409);
   }
+  if (expectedVersion && order.updatedAt.toISOString() !== expectedVersion) throw new ActionPreconditionError();
+  const responseFilter = { _id: order._id, customerId, status: "created" as const, isDeleted: false,
+    updatedAt: order.updatedAt, "reassignment.status": "awaiting_customer" as const,
+    "reassignment.expiresAt": { $gt: new Date() } };
 
   if (!order.reassignment || order.reassignment.expiresAt <= now) {
+    if (expectedVersion) throw new ActionPreconditionError("Yêu cầu đổi thợ đã hết hạn. Vui lòng kiểm tra lại đơn.");
     const expiredOrder = await Order.findOneAndUpdate(
       { _id: order._id, status: "created", "reassignment.status": "awaiting_customer" },
       { $set: { "reassignment.status": "expired", "reassignment.respondedAt": now } },
@@ -245,22 +255,24 @@ export const respondToProviderReassignment = async (
 
   if (decision === "decline") {
     const declinedOrder = await Order.findOneAndUpdate(
-      { _id: order._id, status: "created", "reassignment.status": "awaiting_customer" },
+      responseFilter,
       { $set: { "reassignment.status": "declined", "reassignment.respondedAt": now } },
       { new: true, runValidators: true },
     );
-    if (!declinedOrder) throw new AppError("Yêu cầu đổi kỹ thuật viên vừa được xử lý.", 409);
+    if (!declinedOrder) throw expectedVersion ? new ActionPreconditionError()
+      : new AppError("Yêu cầu đổi kỹ thuật viên vừa được xử lý.", 409);
 
     return cancelOrderWithSettlement({
       orderId,
       actorId: customerId,
       role: "customer",
       reason: "Khách hàng từ chối tìm kỹ thuật viên thay thế.",
+      confirmedExpectation: confirmedCancellation,
     });
   }
 
   const matchingOrder = await Order.findOneAndUpdate(
-    { _id: order._id, status: "created", "reassignment.status": "awaiting_customer" },
+    responseFilter,
     {
       $set: {
         "reassignment.status": "matching",
@@ -272,7 +284,8 @@ export const respondToProviderReassignment = async (
     },
     { new: true, runValidators: true },
   );
-  if (!matchingOrder) throw new AppError("Yêu cầu đổi kỹ thuật viên vừa được xử lý.", 409);
+  if (!matchingOrder) throw expectedVersion ? new ActionPreconditionError()
+    : new AppError("Yêu cầu đổi kỹ thuật viên vừa được xử lý.", 409);
 
   await DispatchService.dispatchReadyOrder(orderId);
   return (await Order.findById(orderId)) || matchingOrder;
