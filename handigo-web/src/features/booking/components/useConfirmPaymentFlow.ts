@@ -1,27 +1,30 @@
 import { useToastFeedback } from "@/components/common/Toast";
 import { useState, useEffect, useCallback } from 'react';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
-import type { Address, Order, Service, ServiceOption } from '../../../types/booking';
+import type { Address, Service, ServiceOption } from '../../../types/booking';
 import { getConfirmPaymentErrorMessage } from './confirmPaymentSubmitTypes';
 import { isRequiredOptionSelectionMissing } from '../utils/serviceOptionSelection';
 import { useToast } from '@/components/common/Toast';
 import { useConfirmPaymentVoucher } from './useConfirmPaymentVoucher';
 import { useBookingPreview } from '../hooks/useBookingPreview';
-import {
-  PENDING_ORDER_ID_KEY,
-  PENDING_ORDER_FINGERPRINT_KEY,
-  runConfirmPaymentSubmit,
-} from './confirmPaymentSubmit';
+import { runConfirmPaymentSubmit } from './confirmPaymentSubmit';
+import { PENDING_ORDER_ID_KEY, PENDING_ORDER_FINGERPRINT_KEY, PENDING_ORDER_VOUCHER_KEY,
+  clearPendingBooking, recoverPendingBooking } from './pendingBookingRecovery';
 
 export const getOptionPrice = (option: ServiceOption) =>
   option.price ?? option.fixedPrice ?? 0;
 
-/** State + logic thanh toán PayOS/ví/tiền mặt cho ConfirmPaymentPage — không đổi hành vi, chỉ tách khỏi trang. */
+/** Quản lý thanh toán và khôi phục bước xác nhận khi khách quay lại từ PayOS. */
 export const useConfirmPaymentFlow = () => {
+  const location = useLocation();
+  const [immediateBookingAt] = useState(() => {
+    const timestamp = (location.state as { immediateBookingAt?: string } | null)?.immediateBookingAt;
+    return timestamp && Number.isFinite(new Date(timestamp).getTime()) ? timestamp : new Date().toISOString();
+  });
   const { addToast } = useToast();
   const showSystemAlert = useCallback((message: string) => { addToast(message, "error"); }, [addToast]);
   const {
@@ -56,25 +59,47 @@ export const useConfirmPaymentFlow = () => {
   );
   const navigate = useNavigate();
   const currentPendingOrderId = sessionStorage.getItem(PENDING_ORDER_FINGERPRINT_KEY) === bookingFingerprint ? pendingOrderId : '';
-  const voucherLocked = Boolean(currentPendingOrderId);
-  const [pendingSnapshot, setPendingSnapshot] = useState<{ id: string; order?: Order; error?: string }>({ id: '' });
+  const [recoverPending, setRecoverPending] = useState(() => Boolean(currentPendingOrderId));
+  const [restoredVoucherCode, setRestoredVoucherCode] = useState(() => sessionStorage.getItem(PENDING_ORDER_VOUCHER_KEY) || '');
+  const [pendingError, setPendingError] = useState('');
   const [pendingRetry, setPendingRetry] = useState(0);
-  const pendingOrder = pendingSnapshot.id === currentPendingOrderId ? pendingSnapshot.order : undefined;
-  const pendingError = pendingSnapshot.id === currentPendingOrderId ? pendingSnapshot.error : undefined;
-  const pendingOrderLoading = voucherLocked && !pendingOrder && !pendingError;
+  const needsRecovery = Boolean(currentPendingOrderId && recoverPending);
+  const pendingOrderLoading = needsRecovery && !pendingError;
+
   useEffect(() => {
-    if (!currentPendingOrderId) return;
+    if (!needsRecovery) return;
     let active = true;
-    const timer = window.setTimeout(() => {
-      setPendingSnapshot({ id: currentPendingOrderId });
-      bookingApi.getOrderById(currentPendingOrderId).then((order) => {
-        if (active) setPendingSnapshot({ id: currentPendingOrderId, order });
-      }).catch((error: unknown) => {
-        if (active) setPendingSnapshot({ id: currentPendingOrderId, error: getConfirmPaymentErrorMessage(error) });
-      });
-    }, 0);
+    const restore = async () => {
+      setPendingError('');
+      try {
+        const result = await recoverPendingBooking(currentPendingOrderId);
+        if (!active) return;
+        if (result.voucherCode !== undefined) setRestoredVoucherCode(result.voucherCode);
+        clearPendingBooking();
+        setPendingOrderId('');
+        setRecoverPending(false);
+        if (result.paidOrder) {
+          reset();
+          navigate('/customer/bookings/success', { state: { order: result.paidOrder } });
+        }
+      } catch (error) {
+        if (active) setPendingError(getConfirmPaymentErrorMessage(error));
+      }
+    };
+    const timer = window.setTimeout(() => { void restore(); }, 0);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [currentPendingOrderId, pendingRetry]);
+  }, [currentPendingOrderId, needsRecovery, pendingRetry, navigate, reset]);
+
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && sessionStorage.getItem(PENDING_ORDER_ID_KEY)) {
+        setRecoverPending(true);
+        setPendingRetry((value) => value + 1);
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -121,18 +146,18 @@ export const useConfirmPaymentFlow = () => {
       : paymentMethod;
   const isAppointment = orderType === 'scheduled' || orderType === 'recurring';
 
-  const voucher = useConfirmPaymentVoucher(orderAmount, service?.serviceType === 'variable_price');
+  const voucher = useConfirmPaymentVoucher(orderAmount, service?.serviceType === 'variable_price', !needsRecovery, restoredVoucherCode);
   const { voucherCode, appliedVoucher, setVoucherError } = voucher;
   const previewVoucherCode = appliedVoucher ? voucherCode : undefined;
-  const { preview, error: previewError, retry: retryPreview } = useBookingPreview(previewVoucherCode, !voucherLocked);
+  const { preview, error: previewError, retry: retryPreview } = useBookingPreview(previewVoucherCode, !needsRecovery);
 
   const handleConfirm = () => {
-    if (voucherLocked && !pendingOrder) { setPaymentError(pendingError ?? 'Vui lòng chờ tải đơn đang chờ thanh toán.'); return; }
-    if (!voucherLocked && !preview) { setPaymentError(previewError ?? 'Vui lòng chờ cập nhật giá.'); retryPreview(); return; }
+    if (needsRecovery) { setPaymentError(pendingError || 'Vui lòng chờ kiểm tra thanh toán QR trước khi tiếp tục.'); return; }
+    if (!preview) { setPaymentError(previewError ?? 'Vui lòng chờ cập nhật giá.'); retryPreview(); return; }
     return runConfirmPaymentSubmit({
-      expectedBookingAmount: pendingOrder?.pricing.bookingAmount ?? preview!.bookingAmount,
-      expectedFinalAmount: pendingOrder?.pricing.totalPaidAmount ?? preview!.discountedAmount,
-      expectedVoucherCode: voucherLocked ? pendingOrder?.voucherSnapshot?.code ?? null : appliedVoucher?.code ?? null,
+      expectedBookingAmount: preview.bookingAmount,
+      expectedFinalAmount: preview.discountedAmount,
+      expectedVoucherCode: appliedVoucher?.code ?? null,
       hasServiceOptions: options.length > 0,
       serviceId,
       addressId,
@@ -148,8 +173,8 @@ export const useConfirmPaymentFlow = () => {
       problemDescription,
       customerAttachments,
       effectivePaymentMethod,
-      appliedVoucher: voucherLocked ? null : appliedVoucher,
-      voucherCode: voucherLocked ? '' : voucherCode,
+      appliedVoucher,
+      voucherCode,
       pendingOrderId: currentPendingOrderId,
       bookingFingerprint,
       isAppointment,
@@ -161,6 +186,8 @@ export const useConfirmPaymentFlow = () => {
       setPendingOrderId,
       reset,
       navigate,
+    }).then((result) => {
+      if (result !== 'redirected' && sessionStorage.getItem(PENDING_ORDER_ID_KEY)) setRecoverPending(true);
     }).finally(retryPreview);
   };
 
@@ -168,14 +195,14 @@ export const useConfirmPaymentFlow = () => {
     service, address, selectedOptions,
     effectivePaymentMethod, isAppointment,
     isSubmitting: isSubmitting || pendingOrderLoading, paymentError,
-    voucherLocked, pendingOrder, pendingError, retryPendingOrder: () => setPendingRetry((value) => value + 1),
+    pendingError, retryPendingOrder: () => setPendingRetry((value) => value + 1),
     handleConfirm, setPaymentMethod,
-    orderType, scheduledAt, preferredProviderId, preferredProviderName,
+    orderType, scheduledAt, immediateBookingAt, preferredProviderId, preferredProviderName,
     selectedOptionQuantities, uniformQuantity,
     ...voucher,
     previewVoucherCode,
-    voucherDiscountAmount: pendingOrder?.pricing.voucherDiscountAmount ?? preview?.voucherDiscountAmount ?? 0,
+    voucherDiscountAmount: preview?.voucherDiscountAmount ?? 0,
     previewError,
-    promotionName: pendingOrder?.promotionSnapshot?.name ?? preview?.promotionSnapshot?.name,
+    promotionName: preview?.promotionSnapshot?.name,
   };
 };

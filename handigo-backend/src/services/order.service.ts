@@ -514,6 +514,16 @@ export const OrderService = {
   },
 
   async discardUnpaidOrder(orderId: string, customerId: string) {
+    const draft = await Order.findOne({ _id: orderId, customerId });
+    if (!draft) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+    if (draft.isDeleted && draft.paymentStatus === "unpaid" && draft.status === "created") {
+      return { orderId: draft._id.toString() };
+    }
+    if (draft.isDeleted || draft.status !== "created" || draft.paymentStatus !== "unpaid" || draft.readyForMatching) {
+      throw new AppError("Đơn hàng không còn ở trạng thái có thể loại bỏ", 409);
+    }
+    const { cancelPendingPayosPaymentForOrder } = await import("./payment.service");
+    await cancelPendingPayosPaymentForOrder(orderId, { id: customerId, role: "CUSTOMER" });
     const session = await mongoose.startSession();
     try {
       return await session.withTransaction(async () => {
@@ -526,6 +536,9 @@ export const OrderService = {
           isDeleted: false,
         }).session(session);
         if (!order) {
+          const discarded = await Order.findOne({ _id: orderId, customerId, isDeleted: true,
+            status: "created", paymentStatus: "unpaid" }).session(session);
+          if (discarded) return { orderId: discarded._id.toString() };
           throw new AppError("Đơn hàng không còn ở trạng thái có thể loại bỏ", 409);
         }
 
@@ -544,7 +557,7 @@ export const OrderService = {
         await Payment.updateMany(
           { orderId: order._id, status: "failed" },
           { $set: { isDeleted: true } },
-          { session },
+          { session, runValidators: true },
         );
         await OrderAssignment.updateMany(
           { orderId: order._id, status: "pending" },

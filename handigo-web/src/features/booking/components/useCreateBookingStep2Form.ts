@@ -225,7 +225,9 @@ export const useCreateBookingStep2Form = () => {
 
   const handleContinue = () => {
     if (!validateStep()) return;
-    navigate('/customer/bookings/new/payment');
+    navigate('/customer/bookings/new/payment', {
+      state: { immediateBookingAt: orderType === 'normal' ? new Date().toISOString() : undefined },
+    });
   };
 
   return {

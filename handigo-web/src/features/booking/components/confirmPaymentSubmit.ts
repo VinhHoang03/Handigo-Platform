@@ -7,8 +7,9 @@ import {
   getConfirmPaymentErrorMessage,
 } from './confirmPaymentSubmitTypes';
 
-export const PENDING_ORDER_ID_KEY = 'pendingBookingOrderId';
-export const PENDING_ORDER_FINGERPRINT_KEY = 'pendingBookingFingerprint';
+import { PENDING_ORDER_ID_KEY, PENDING_ORDER_FINGERPRINT_KEY, PENDING_ORDER_VOUCHER_KEY,
+  clearPendingBooking, recoverPendingBooking } from './pendingBookingRecovery';
+export { PENDING_ORDER_ID_KEY, PENDING_ORDER_FINGERPRINT_KEY } from './pendingBookingRecovery';
 
 /**
  * Toàn bộ luồng tạo đơn + thanh toán (PayOS/ví/tiền mặt) của bước xác nhận.
@@ -74,6 +75,17 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   setVoucherError('');
   let orderId = pendingOrderId;
   try {
+    if (orderId) {
+      const recovery = await recoverPendingBooking(orderId);
+      clearPendingBooking();
+      setPendingOrderId('');
+      if (recovery.paidOrder) {
+        reset();
+        navigate('/customer/bookings/success', { state: { order: recovery.paidOrder } });
+        return;
+      }
+      orderId = '';
+    }
     const payload: CreateOrderPayload = {
       expectedBookingAmount: params.expectedBookingAmount,
       expectedFinalAmount: params.expectedFinalAmount,
@@ -103,25 +115,11 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       orderId = createdOrder._id;
       setPendingOrderId(orderId);
       sessionStorage.setItem(PENDING_ORDER_ID_KEY, orderId);
+      sessionStorage.setItem(PENDING_ORDER_VOUCHER_KEY, appliedVoucher?.code ?? '');
       sessionStorage.setItem(
         PENDING_ORDER_FINGERPRINT_KEY,
         bookingFingerprint,
       );
-    } else {
-      const existingOrder = await bookingApi.getOrderById(orderId);
-      const expectedVoucherCode = params.expectedVoucherCode !== undefined ? params.expectedVoucherCode : appliedVoucher?.code ?? null;
-      if ((existingOrder.voucherSnapshot?.code ?? null) !== expectedVoucherCode) {
-        setPaymentError('Voucher của đơn đang chờ đã thay đổi. Vui lòng kiểm tra lại đơn trước khi thanh toán.');
-        return;
-      }
-      if (existingOrder.pricing.bookingAmount !== params.expectedBookingAmount) {
-        navigate(`/customer/bookings/${orderId}`);
-        return;
-      }
-      if (existingOrder.pricing.totalPaidAmount !== params.expectedFinalAmount) {
-        setPaymentError('Tổng tiền sau giảm giá của đơn đang chờ khác với giá đang hiển thị. Vui lòng kiểm tra lại đơn trước khi thanh toán.');
-        return;
-      }
     }
 
     if (effectivePaymentMethod === 'bank') {
@@ -139,8 +137,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
 
       if (payment.payment.status === 'paid') {
         const orderDetail = await bookingApi.getOrderById(orderId);
-        sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
-        sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
+        clearPendingBooking();
         reset();
         navigate('/customer/bookings/result', { state: { order: orderDetail } });
         return;
@@ -153,7 +150,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
         sessionStorage.setItem('latestBookingOrderId', orderId);
         tokenStorage.prepareExternalRedirect();
         window.location.href = payment.checkoutUrl;
-        return;
+        return 'redirected' as const;
       }
     }
 
@@ -178,8 +175,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
 
     const orderDetail = await bookingApi.getOrderById(orderId);
 
-    sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
-    sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
+    clearPendingBooking();
     reset();
     navigate('/customer/bookings/result', { state: { order: orderDetail } });
   } catch (error) {
@@ -188,10 +184,9 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       try {
         await bookingApi.discardUnpaidOrder(orderId);
         setPendingOrderId('');
-        sessionStorage.removeItem(PENDING_ORDER_ID_KEY);
-        sessionStorage.removeItem(PENDING_ORDER_FINGERPRINT_KEY);
+        clearPendingBooking();
       } catch {
-        // Giữ lại mã đơn để lần thử sau tiếp tục trên cùng một đơn hợp lệ.
+        // Giữ mã đơn để đối soát thanh toán trước khi thử lại.
       }
     }
     console.error('Không thể tạo đơn đặt lịch.', error);

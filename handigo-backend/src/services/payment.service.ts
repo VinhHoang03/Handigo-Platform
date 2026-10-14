@@ -587,7 +587,81 @@ export const previewOrderPayment = async (user: RequestUser, orderId: string, me
       : "Sau xác nhận, mở liên kết PayOS để thanh toán. Tạo liên kết chưa có nghĩa đã thanh toán." };
 };
 
-// Chuyển phương thức theo số tiền đã xác nhận, dùng chung cho web và trợ lý.
+// Hủy và kiểm tra lại trên PayOS trước khi giải phóng giao dịch đang chờ.
+const cancelPendingPayosPayment = async (
+  payment: InstanceType<typeof Payment>, user: RequestUser,
+  reason: string, signal?: AbortSignal,
+) => {
+  const gatewayOrderCode = Number(payment.gatewayOrderCode);
+  if (!Number.isSafeInteger(gatewayOrderCode) || gatewayOrderCode <= 0) {
+    throw new ActionPreconditionError("Giao dịch thiếu mã đối soát hợp lệ. Hãy kiểm tra thanh toán trước khi đổi phương thức.");
+  }
+  const checkLink = async () => {
+    const link = await payos.paymentRequests.get(gatewayOrderCode).catch(() => {
+      throw new ActionPreconditionError("Không thể kiểm tra PayOS. Chưa tạo thanh toán mới; hãy kiểm tra thanh toán rồi thử lại.");
+    });
+    if ((payment.gatewayPaymentLinkId && link.id !== payment.gatewayPaymentLinkId)
+      || link.orderCode !== gatewayOrderCode || link.amount !== payment.amount) {
+      throw new ActionPreconditionError("Thông tin PayOS không khớp giao dịch. Hãy kiểm tra thanh toán.");
+    }
+    return link;
+  };
+  let link = await checkLink();
+  if (link.status === "PAID") {
+    await reconcilePayosPaymentForOrder(payment.orderId.toString(), user);
+    return "paid" as const;
+  }
+  if (!Number.isFinite(link.amountPaid) || link.amountPaid !== 0 || link.status === "PROCESSING") {
+    throw new ActionPreconditionError("PayOS đang xử lý hoặc đã nhận tiền. Hãy kiểm tra thanh toán; chưa thể đổi phương thức.");
+  }
+  if (link.status === "PENDING") {
+    signal?.throwIfAborted();
+    // Không mở giao dịch mới nếu hủy thất bại hoặc kết quả chưa rõ.
+    try {
+      await payos.paymentRequests.cancel(gatewayOrderCode, reason);
+    } catch {
+      // Có thể PayOS đã hủy hoặc vừa nhận tiền dù lời gọi trả lỗi; chỉ tin lần kiểm tra tiếp theo.
+    }
+    link = await checkLink();
+  }
+  if (link.status === "PAID") {
+    await reconcilePayosPaymentForOrder(payment.orderId.toString(), user);
+    return "paid" as const;
+  }
+  if (!["CANCELLED", "EXPIRED", "FAILED"].includes(link.status) || link.amountPaid !== 0) {
+    throw new ActionPreconditionError("Chưa xác minh được liên kết PayOS đã hủy và chưa nhận tiền. Hãy kiểm tra thanh toán trước khi tiếp tục.");
+  }
+  signal?.throwIfAborted();
+  const transition = await Payment.updateOne({ _id: payment._id, status: "pending", isDeleted: false }, {
+    $set: { status: "failed", failedAt: new Date(), failureReason: "Đã hủy PayOS để đổi phương thức thanh toán",
+      "gatewayResponse.statusCheck": { status: link.status, checkedAt: new Date(), amountPaid: link.amountPaid } },
+  }, { runValidators: true });
+  if (transition.modifiedCount !== 1) throw new ActionPreconditionError();
+  publishPaymentStatus({ _id: payment._id, orderId: payment.orderId, customerId: payment.customerId,
+    method: payment.method, status: "failed" });
+  return "failed" as const;
+};
+
+export const cancelPendingPayosPaymentForOrder = async (orderId: string, user: RequestUser) => {
+  const order = await Order.findOne({
+    _id: orderId, customerId: user.id, isDeleted: false,
+    status: "created", paymentStatus: "unpaid", readyForMatching: false,
+  });
+  if (!order) {
+    const discarded = await Order.findOne({ _id: orderId, customerId: user.id,
+      isDeleted: true, status: "created", paymentStatus: "unpaid" });
+    if (discarded) return;
+    throw new AppError("Đơn hàng không còn ở trạng thái có thể đổi thanh toán.", 409);
+  }
+  const payment = await Payment.findOne({
+    orderId: order._id, customerId: user.id, method: "payos", status: "pending", isDeleted: false,
+  });
+  if (payment && await cancelPendingPayosPayment(payment, user, "Khách hàng quay lại để thay đổi thanh toán") === "paid") {
+    throw new AppError("Đơn hàng đã được thanh toán qua PayOS.", 409);
+  }
+};
+
+// Chỉ luồng trợ lý có bản xác nhận chuyển giao dịch mới được đổi phương thức.
 export const createAgentOrderPayment = async (user: RequestUser, input: CreatePaymentInput, expected: ConfirmedPaymentExpectation, signal?: AbortSignal) => {
   signal?.throwIfAborted();
   const preview = await previewOrderPayment(user, input.orderId, input.method, true);
@@ -611,53 +685,8 @@ export const createAgentOrderPayment = async (user: RequestUser, input: CreatePa
     return result;
   }
   if (input.method === "PAYOS") throw new ActionPreconditionError();
-  const gatewayOrderCode = Number(payment.gatewayOrderCode);
-  if (!Number.isSafeInteger(gatewayOrderCode) || gatewayOrderCode <= 0) {
-    throw new ActionPreconditionError("Giao dịch thiếu mã đối soát hợp lệ. Hãy kiểm tra thanh toán trước khi đổi phương thức.");
-  }
-  const checkLink = async () => {
-    const link = await payos.paymentRequests.get(gatewayOrderCode).catch(() => {
-      throw new ActionPreconditionError("Không thể kiểm tra PayOS. Chưa tạo thanh toán mới; hãy kiểm tra thanh toán rồi thử lại.");
-    });
-    if ((payment.gatewayPaymentLinkId && link.id !== payment.gatewayPaymentLinkId)
-      || link.orderCode !== gatewayOrderCode || link.amount !== expected.amount) {
-      throw new ActionPreconditionError("Thông tin PayOS không khớp giao dịch. Hãy kiểm tra thanh toán.");
-    }
-    return link;
-  };
-  let link = await checkLink();
-  if (link.status === "PAID") {
-    await reconcilePayosPaymentForOrder(input.orderId, user);
-    return;
-  }
-  if (!Number.isFinite(link.amountPaid) || link.amountPaid !== 0 || link.status === "PROCESSING") {
-    throw new ActionPreconditionError("PayOS đang xử lý hoặc đã nhận tiền. Hãy kiểm tra thanh toán; chưa thể đổi phương thức.");
-  }
-  if (link.status === "PENDING") {
-    signal?.throwIfAborted();
-    // Không mở giao dịch mới nếu hủy thất bại hoặc kết quả chưa rõ.
-    try {
-      await payos.paymentRequests.cancel(gatewayOrderCode, "Khách hàng đổi phương thức thanh toán");
-    } catch {
-      // Có thể PayOS đã hủy hoặc vừa nhận tiền dù lời gọi trả lỗi; chỉ tin lần kiểm tra tiếp theo.
-    }
-    link = await checkLink();
-  }
-  if (link.status === "PAID") {
-    await reconcilePayosPaymentForOrder(input.orderId, user);
-    return;
-  }
-  if (!["CANCELLED", "EXPIRED", "FAILED"].includes(link.status) || link.amountPaid !== 0) {
-    throw new ActionPreconditionError("Chưa xác minh được liên kết PayOS đã hủy và chưa nhận tiền. Hãy kiểm tra thanh toán trước khi tiếp tục.");
-  }
-  signal?.throwIfAborted();
-  const transition = await Payment.updateOne({ _id: payment._id, status: "pending", isDeleted: false }, {
-    $set: { status: "failed", failedAt: new Date(), failureReason: "Đã hủy PayOS để đổi phương thức thanh toán",
-      "gatewayResponse.statusCheck": { status: link.status, checkedAt: new Date(), amountPaid: link.amountPaid } },
-  }, { runValidators: true });
-  if (transition.modifiedCount !== 1) throw new ActionPreconditionError();
-  publishPaymentStatus({ _id: payment._id, orderId: payment.orderId, customerId: payment.customerId,
-    method: payment.method, status: "failed" });
+  const result = await cancelPendingPayosPayment(payment, user, "Khách hàng đổi phương thức thanh toán qua trợ lý", signal);
+  if (result === "paid") return;
   // Các transaction và index duy nhất hiện có tiếp tục chặn thanh toán trùng.
   signal?.throwIfAborted();
   try {
