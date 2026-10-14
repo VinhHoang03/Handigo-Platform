@@ -40,12 +40,12 @@ export const BookingProviderDetails = ({ providerId, canSelect, onClose, onSelec
   }, [providerId, retryCount]);
 
   return (
-    <Modal open title="Hồ sơ chuyên gia" size="sm" placement="side" onClose={onClose}
+    <Modal open compact title="Hồ sơ chuyên gia" size="sm" placement="side" onClose={onClose}
       footer={(
         <div>
           {!canSelect && <p role="status" className="mb-sm text-xs text-on-surface-variant">Thợ không còn phù hợp với lịch hoặc địa chỉ hiện tại. Vui lòng chọn lại.</p>}
           <button type="button" disabled={isLoading || Boolean(error) || !profile || !canSelect} onClick={onSelect}
-            className="min-h-11 w-full rounded-xl bg-primary px-sm text-sm font-bold text-on-primary hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50">
+            className="min-h-11 w-full rounded-xl bg-primary px-sm text-[15px] font-bold text-on-primary hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50">
             Chọn thợ này
           </button>
         </div>
@@ -61,17 +61,17 @@ export const BookingProviderDetails = ({ providerId, canSelect, onClose, onSelec
           <button type="button" onClick={() => setRetryCount((count) => count + 1)} className="min-h-11 rounded-xl border border-outline-variant px-md font-bold">Thử lại</button>
         </div>
       ) : (
-        <div className="space-y-lg">
-          <ProviderProfileHeader profile={profile} />
-          <ProviderAboutSection bio={profile.provider.bio} description={profile.provider.description} certificates={profile.provider.certificates} />
-          <InfoSection title="Dịch vụ">
+        <div className="space-y-3.5 text-[15px] leading-6">
+          <ProviderProfileHeader compact profile={profile} />
+          <ProviderAboutSection compact bio={profile.provider.bio} description={profile.provider.description} certificates={profile.provider.certificates} />
+          <InfoSection compact title="Dịch vụ">
             <div className="flex flex-wrap gap-xs">
-              {profile.provider.services.map((service) => <span key={service.id} className="rounded-lg bg-primary/5 px-sm py-xs text-sm text-primary">{service.name}</span>)}
+              {profile.provider.services.map((service) => <span key={service.id} className="rounded-lg bg-primary/5 px-2 py-1 text-[13px] text-primary">{service.name}</span>)}
               {profile.provider.services.length === 0 && <p>Chưa cập nhật dịch vụ.</p>}
             </div>
           </InfoSection>
-          <ProviderServiceAreas areas={profile.provider.workingAreas.length ? profile.provider.workingAreas : [[profile.provider.serviceArea?.ward, profile.provider.serviceArea?.province].filter(Boolean).join(', ')].filter(Boolean)} />
-          <ProviderFeedbackSection feedbacks={profile.feedbacks} totalFeedbacks={profile.provider.totalFeedbacks} />
+          <ProviderServiceAreas compact areas={profile.provider.workingAreas.length ? profile.provider.workingAreas : [[profile.provider.serviceArea?.ward, profile.provider.serviceArea?.province].filter(Boolean).join(', ')].filter(Boolean)} />
+          <ProviderFeedbackSection compact feedbacks={profile.feedbacks} totalFeedbacks={profile.provider.totalFeedbacks} />
         </div>
       )}
     </Modal>

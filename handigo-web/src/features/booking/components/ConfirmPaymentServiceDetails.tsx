@@ -43,7 +43,7 @@ export const ConfirmPaymentServiceDetails = ({
       'Thời gian',
       scheduledAt
         ? new Date(scheduledAt).toLocaleString('vi-VN')
-        : 'Sớm nhất có thể',
+        : 'Chưa chọn thời gian',
     ],
     ...(addressText ? [[MapPin, 'Địa chỉ', addressText] as [LucideIcon, string, string]] : []),
     [
