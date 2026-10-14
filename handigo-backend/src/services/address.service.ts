@@ -5,6 +5,7 @@ import { AppError } from "../utils/appError";
 // import ServiceRequest from "../models/request.model";
 
 type AddressPayload = {
+  addressLabel?: string;
   recipientName?: string;
   recipientPhone?: string;
   fullAddress?: string;
@@ -43,6 +44,7 @@ export const ensureAddressCoordinates = async (address: IAddress): Promise<IAddr
 const pickAddressPayload = (data: AddressPayload): AddressPayload => {
   const payload: AddressPayload = {};
   const fields: (keyof AddressPayload)[] = [
+    "addressLabel",
     "recipientName",
     "recipientPhone",
     "fullAddress",

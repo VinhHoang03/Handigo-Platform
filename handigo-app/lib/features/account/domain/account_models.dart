@@ -1,6 +1,7 @@
 class AddressItem {
   const AddressItem({
     required this.id,
+    required this.addressLabel,
     required this.recipientName,
     required this.recipientPhone,
     required this.fullAddress,
@@ -11,6 +12,7 @@ class AddressItem {
   });
   factory AddressItem.fromJson(Map<String, dynamic> json) => AddressItem(
     id: _id(json),
+    addressLabel: '${json['addressLabel'] ?? ''}',
     recipientName: '${json['recipientName'] ?? ''}',
     recipientPhone: '${json['recipientPhone'] ?? ''}',
     fullAddress: '${json['fullAddress'] ?? json['addressLine'] ?? ''}',
@@ -19,7 +21,13 @@ class AddressItem {
     isDefault: json['isDefault'] == true,
     note: json['note'] as String?,
   );
-  final String id, recipientName, recipientPhone, fullAddress, province, ward;
+  final String id,
+      addressLabel,
+      recipientName,
+      recipientPhone,
+      fullAddress,
+      province,
+      ward;
   final bool isDefault;
   final String? note;
 }
