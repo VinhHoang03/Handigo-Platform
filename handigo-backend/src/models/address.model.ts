@@ -11,6 +11,7 @@ export interface IAddress extends Document {
   deletedAt?: Date | null;
   identityKey?: string;
   userId: Types.ObjectId;
+  addressLabel?: string;
   recipientName?: string;
   recipientPhone?: string;
   fullAddress: string;
@@ -36,6 +37,12 @@ const addressSchema = new Schema<IAddress>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    addressLabel: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: "Địa chỉ khác",
     },
     recipientName: {
       type: String,

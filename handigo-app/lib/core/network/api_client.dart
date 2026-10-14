@@ -5,6 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api_exception.dart';
 
+typedef ProviderAssetUploadResult = ({
+  String url,
+  Map<String, dynamic>? ocrSuggestion,
+});
+
 class ApiClient {
   ApiClient(this._dio, this._cookies) {
     // Trình duyệt tự quản lý cookie; dio_cookie_manager chỉ hỗ trợ native.
@@ -177,8 +182,19 @@ class ApiClient {
     XFile file, {
     required String purpose,
     required String documentKind,
+  }) async => (await uploadProviderApplicationAssetResult(
+    file,
+    purpose: purpose,
+    documentKind: documentKind,
+  )).url;
+
+  Future<ProviderAssetUploadResult> uploadProviderApplicationAssetResult(
+    XFile file, {
+    required String purpose,
+    required String documentKind,
+    void Function(int sent, int total)? onSendProgress,
   }) async {
-    Future<String> send() async {
+    Future<ProviderAssetUploadResult> send() async {
       final response = await _dio.post<Map<String, dynamic>>(
         '/provider-application-assets/images',
         data: FormData.fromMap({
@@ -189,12 +205,19 @@ class ApiClient {
         options: Options(
           headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
         ),
+        onSendProgress: onSendProgress,
       );
       final data = response.data?['data'];
       if (data is! Map || data['url'] is! String) {
         throw const ApiException('Phản hồi tải giấy tờ không hợp lệ.');
       }
-      return data['url'] as String;
+      final suggestion = data['ocrSuggestion'];
+      return (
+        url: data['url'] as String,
+        ocrSuggestion: suggestion is Map
+            ? Map<String, dynamic>.from(suggestion)
+            : null,
+      );
     }
 
     try {
