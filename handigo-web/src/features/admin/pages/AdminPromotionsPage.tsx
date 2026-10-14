@@ -11,6 +11,7 @@ import { PromotionHeader } from "../components/promotions/PromotionHeader";
 import { PromotionToolbar } from "../components/promotions/PromotionToolbar";
 import { buildVoucherColumns } from "../components/promotions/promotion-table-columns";
 import { VoucherModal } from "../components/promotions/VoucherModal";
+import { RewardOffersPanel } from "../components/promotions/RewardOffersPanel";
 import {
   buildPayload,
   emptyForm,
@@ -19,13 +20,16 @@ import {
   type VoucherFormState,
 } from "../components/promotions/promotion-format";
 import type { Voucher, VoucherQuery } from "../types/voucher.types";
+import { AutomaticPromotionsPanel } from '../components/promotions/AutomaticPromotionsPanel';
 
 export default function AdminPromotionsPage() {
+  const [automatic, setAutomatic] = useState(false);
   const [query, setQuery] = useState<VoucherQuery>({
     page: 1,
     limit: 10,
     search: "",
     status: "",
+    source: "all",
   });
   const [items, setItems] = useState<Voucher[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -87,6 +91,7 @@ export default function AdminPromotionsPage() {
       maxDiscountAmount: voucher.maxDiscountAmount == null ? "" : String(voucher.maxDiscountAmount),
       minOrderAmount: voucher.minOrderAmount == null ? "" : String(voucher.minOrderAmount),
       usageLimit: voucher.usageLimit == null ? "" : String(voucher.usageLimit),
+      perUserLimit: voucher.perUserLimit == null ? "" : String(voucher.perUserLimit),
       startAt: toLocalInputValue(voucher.startAt),
       endAt: toLocalInputValue(voucher.endAt),
       status: voucher.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
@@ -153,8 +158,14 @@ export default function AdminPromotionsPage() {
 
   return (
     <DashboardShell role="ADMIN">
+      <div className="mb-6 flex gap-3"><button type="button" aria-pressed={!automatic} onClick={() => setAutomatic(false)} className="rounded-xl border p-3">Voucher nhập mã</button><button type="button" aria-pressed={automatic} onClick={() => setAutomatic(true)} className="rounded-xl border p-3">Khuyến mãi tự động</button></div>
+      {automatic ? <AutomaticPromotionsPanel /> : <>
       <div className="space-y-6">
         <PromotionHeader stats={stats} notice={notice} error={error} onCreate={openCreate} />
+
+        <RewardOffersPanel />
+
+        <h2 className="text-lg font-bold text-on-surface">Mã giảm giá đã phát hành</h2>
 
         <PromotionToolbar query={query} onQueryChange={setQuery} onRefresh={() => void load()} />
 
@@ -193,6 +204,7 @@ export default function AdminPromotionsPage() {
         onCancelDelete={() => setDeleteTarget(null)}
         onConfirmDelete={confirmDelete}
       />
+      </>}
     </DashboardShell>
   );
 }

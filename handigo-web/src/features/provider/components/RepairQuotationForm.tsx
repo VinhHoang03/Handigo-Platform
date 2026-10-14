@@ -1,6 +1,6 @@
 import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { CircleAlert, FileSpreadsheet, ImagePlus, Mic, ScanLine, TriangleAlert, UploadCloud, X } from 'lucide-react';
+import { FileSpreadsheet, ImagePlus, Mic, ScanLine, TriangleAlert, UploadCloud, X } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { getErrorMessage } from '@/utils/apiError';
@@ -8,8 +8,6 @@ import { providerOrderApi } from '../api/providerOrder.api';
 import type {
   CreateQuotationPayload,
   QuotationDetail,
-  QuotationRelevanceEvaluation,
-  QuotationRelevanceResult,
 } from '../types/providerOrder.types';
 import { formatMoney } from '../utils/providerOrder.utils';
 import { getDirectRepairPayment } from '@/utils/quotationPayment';
@@ -35,7 +33,6 @@ const MAX_SCAN_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_GENERAL_TEXT_LENGTH = 2000;
 const MAX_ITEM_TITLE_LENGTH = 200;
 const MAX_ITEM_NOTE_LENGTH = 1000;
-const BLOCK_CONFIDENCE = 0.85;
 
 const isEmptyItem = (item: QuotationFormItem) =>
   !item.title &&
@@ -56,10 +53,6 @@ interface RepairQuotationFormProps {
   onCancel: () => void;
   busy?: boolean;
 }
-
-const isBlockedEvaluation = (evaluation: QuotationRelevanceEvaluation) =>
-  evaluation.level === 'irrelevant' &&
-  evaluation.confidence >= BLOCK_CONFIDENCE;
 
 export function RepairQuotationForm({
   appliedDepositAmount = 0,
@@ -93,15 +86,13 @@ export function RepairQuotationForm({
   const [scanComplete, setScanComplete] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [isScanningImage, setIsScanningImage] = useState(false);
-  const [scanImageError, setScanImageError] = useToastFeedback<string | null>(null, "error");
-  const [relevance, setRelevance] = useState<QuotationRelevanceResult | null>(null);
-  const [isValidatingRelevance, setIsValidatingRelevance] = useState(false);
-  const [error, setError] = useToastFeedback<string | null>(null, "error");
+  const [, setScanImageError] = useToastFeedback<string | null>(null, "error");
+  const [, setError] = useToastFeedback<string | null>(null, "error");
   const [discardOpen, setDiscardOpen] = useState(false);
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const finalAmount = Math.max(subtotal - discountAmount, 0);
-  const inputBusy = Boolean(busy || agentBusy || isScanningImage || isValidatingRelevance);
+  const inputBusy = Boolean(busy || agentBusy || isScanningImage);
   const selectedImageUrl = useMemo(() => selectedFile?.type.startsWith('image/')
     ? URL.createObjectURL(selectedFile) : null, [selectedFile]);
 
@@ -116,10 +107,10 @@ export function RepairQuotationForm({
     return () => window.removeEventListener('beforeunload', preventUnload);
   }, [formRevision]);
 
-  const changed = () => { revision.current++; setFormRevision(revision.current); setUndo(null); setRelevance(null); };
+  const changed = () => { revision.current++; setFormRevision(revision.current); setUndo(null); };
 
   const applyAgent = (result: QuotationAgentResult) => {
-    if (result.revision !== revision.current || busy || isValidatingRelevance || isScanningImage) return false;
+    if (result.revision !== revision.current || busy || isScanningImage) return false;
     const previous = { items, inspectionNote, recommendation };
     const next = [...items];
     for (const update of result.updates) {
@@ -140,7 +131,7 @@ export function RepairQuotationForm({
 
   const applyHistory = (rowId: string, expectedTitle: string, source: QuotationHistoryItem) => {
     const item = items.find((entry) => entry.rowId === rowId);
-    if (!item || item.title !== expectedTitle || busy || isValidatingRelevance) return;
+    if (!item || item.title !== expectedTitle || busy) return;
     const manual = new Set(item.manualFields);
     const patch: Partial<QuotationFormItem> = { title: source.title };
     if (!manual.has('itemType')) patch.itemType = source.itemType;
@@ -181,7 +172,6 @@ export function RepairQuotationForm({
       ...current,
       ...Array.from({ length: count }, newItem),
     ]);
-    setRelevance(null);
     setError(null);
   };
 
@@ -217,26 +207,14 @@ export function RepairQuotationForm({
         setScanImageError('Form đã thay đổi trong lúc đọc tệp. Vui lòng thử lại để giữ thông tin mới.');
         return;
       }
-      const blockedIndexes = new Set(
-        scanResult.relevance.evaluations
-          .filter(isBlockedEvaluation)
-          .map((evaluation) => evaluation.index),
-      );
-      const scannedItems = scanResult.items.filter(
-        (_, index) => !blockedIndexes.has(index),
-      );
+      const scannedItems = scanResult.items;
       const shouldReplaceEmptyItem = items.length === 1 && isEmptyItem(items[0]);
       const currentItems = shouldReplaceEmptyItem ? [] : items;
       const availableSlots = MAX_QUOTATION_ITEMS - currentItems.length;
       const acceptedItems = scannedItems.slice(0, availableSlots);
 
       if (!acceptedItems.length) {
-        setRelevance(scanResult.relevance);
-        setScanImageError(
-          blockedIndexes.size
-            ? `Không thể thêm ${blockedIndexes.size} hạng mục vì không phù hợp với dịch vụ ${scanResult.relevance.serviceName}.`
-            : "Form báo giá đã đạt giới hạn 100 hạng mục.",
-        );
+        setScanImageError("Form báo giá đã đạt giới hạn 100 hạng mục.");
         return;
       }
 
@@ -250,15 +228,9 @@ export function RepairQuotationForm({
           note: item.note || "",
         })),
       ]);
-      setRelevance(scanResult.relevance);
       if (acceptedItems.length < scannedItems.length) {
         setError(
           `Đã thêm ${acceptedItems.length} hạng mục. Các hạng mục còn lại vượt quá giới hạn 100 dòng.`,
-        );
-      }
-      if (blockedIndexes.size) {
-        setError(
-          `Đã bỏ qua ${blockedIndexes.size} hạng mục không phù hợp với dịch vụ ${scanResult.relevance.serviceName}.`,
         );
       }
       setScanComplete(true);
@@ -277,7 +249,7 @@ export function RepairQuotationForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (agentBusy || isScanningImage || busy || isValidatingRelevance) return;
+    if (agentBusy || isScanningImage || busy) return;
     const validItems = items.filter((item) => !isEmptyItem(item));
     if (validItems.some((item) => !item.title.trim() || item.unitPrice <= 0)) {
       setError('Vui lòng hoàn tất tên và đơn giá của tất cả hạng mục, hoặc xóa dòng chưa dùng.');
@@ -340,36 +312,16 @@ export function RepairQuotationForm({
 
     try {
       setError(null);
-      setIsValidatingRelevance(true);
-      const result = await providerOrderApi.validateQuotationItems(
-        orderId,
-        payload.items,
-      );
-      setRelevance(result);
-
-      if (result.status === 'blocked') {
-        const blockedCount = result.evaluations.filter(isBlockedEvaluation).length;
-        setError(
-          `Không thể lưu báo giá: có ${blockedCount} hạng mục không phù hợp với dịch vụ ${result.serviceName}.`,
-        );
-        return;
-      }
-
       await onSubmit(payload);
-    } catch (validationError) {
+    } catch (submitError) {
       setError(
         getErrorMessage(
-          validationError,
-          'Không thể kiểm tra độ phù hợp của báo giá. Vui lòng thử lại.',
+          submitError,
+          'Không thể lưu báo giá. Vui lòng thử lại.',
         ),
       );
-    } finally {
-      setIsValidatingRelevance(false);
     }
   };
-
-  const relevanceIssues =
-    relevance?.evaluations.filter((evaluation) => evaluation.level !== 'relevant') || [];
 
   return (
     <>
@@ -396,53 +348,11 @@ export function RepairQuotationForm({
         </div>
       </div>
 
-      {error && (
-        <div role="alert" className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">
-          {error}
-        </div>
-      )}
 
-      {relevance && relevanceIssues.length > 0 && (
-        <div
-          aria-live="polite"
-          className={`rounded-2xl border px-md py-sm ${
-            relevance.status === 'blocked'
-              ? 'border-error/30 bg-error/5 text-error'
-              : 'border-amber-300 bg-amber-50 text-amber-900'
-          }`}
-        >
-          <div className="flex items-start gap-2">
-            <CircleAlert aria-hidden="true" size={20} className="mt-0.5 shrink-0" />
-            <div className="min-w-0">
-              <p className="font-semibold">
-                {relevance.status === 'blocked'
-                  ? 'Có hạng mục không phù hợp và đã bị chặn'
-                  : 'Có hạng mục cần bạn kiểm tra lại'}
-              </p>
-              {relevance.systemWarning && (
-                <p className="mt-1 text-sm">{relevance.systemWarning}</p>
-              )}
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                {relevanceIssues.slice(0, 5).map((issue) => (
-                  <li key={`${issue.index}-${issue.title}`}>
-                    <strong>{issue.title}</strong>: {issue.reason}
-                  </li>
-                ))}
-              </ul>
-              {relevanceIssues.length > 5 && (
-                <p className="mt-2 text-xs">
-                  Và {relevanceIssues.length - 5} hạng mục khác cần kiểm tra.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {undo && <button type="button" className="text-sm text-primary underline" disabled={agentBusy || busy || isValidatingRelevance}
+      {undo && <button type="button" className="text-sm text-primary underline" disabled={agentBusy || busy}
         onClick={() => { if (revision.current !== undo.revision) return; const previous = undo; changed(); setItems(previous.items); setInspectionNote(previous.inspectionNote); setRecommendation(previous.recommendation); }}>Hoàn tác lần điền AI vừa rồi</button>}
 
-      <fieldset disabled={busy || isValidatingRelevance} className="space-y-md">
+      <fieldset disabled={busy} className="space-y-md">
       <div className="space-y-sm">
         <div className="flex flex-wrap items-end justify-between gap-sm">
           <div>
@@ -495,7 +405,6 @@ export function RepairQuotationForm({
             onRemove={() => {
               changed();
               setItems((current) => current.filter((_, i) => i !== index));
-              setRelevance(null);
             }}
           />
         ))}
@@ -536,9 +445,7 @@ export function RepairQuotationForm({
           disabled={inputBusy}
           className="btn-primary col-span-2 row-start-1 w-full sm:w-auto"
         >
-          {isValidatingRelevance
-            ? 'Đang kiểm tra hạng mục…'
-            : busy
+          {busy
               ? 'Đang lưu báo giá…'
               : initialQuotation ? 'Lưu thay đổi' : 'Lưu báo giá'}
         </button>
@@ -561,19 +468,18 @@ export function RepairQuotationForm({
               <div className="min-w-0 flex-1"><p className="break-words text-sm font-medium text-on-surface">{selectedFile.name}</p><p className="text-xs text-on-surface-variant">{Math.ceil(selectedFile.size / 1024)} KB</p></div>
               <button type="button" aria-label="Bỏ tệp đã chọn" disabled={inputBusy} onClick={() => handleSelectFile(undefined)} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"><X size={18} aria-hidden="true" /></button>
             </div>}
-            {scanImageError && <p role="alert" className="rounded-xl bg-error/10 px-3 py-2 text-sm text-error">{scanImageError}</p>}
             {scanStatus && <p role="status" className="text-sm text-on-surface-variant">{scanStatus}</p>}
             <button type="button" disabled={!selectedFile || inputBusy || scanComplete || items.length >= MAX_QUOTATION_ITEMS}
               onClick={() => void handleScanQuotationFile()} className="btn-secondary flex min-h-11 w-full items-center justify-center gap-2 sm:w-auto">
               <ScanLine size={18} aria-hidden="true" />{isScanningImage ? 'Đang đọc hạng mục…' : scanComplete ? 'Đã thêm hạng mục' : 'Đọc hạng mục'}
             </button>
-            {isScanningImage && <p role="status" className="text-sm text-on-surface-variant">Đang đọc tệp và kiểm tra hạng mục.</p>}
+            {isScanningImage && <p role="status" className="text-sm text-on-surface-variant">Đang đọc hạng mục từ tệp.</p>}
           </section>
         <div className="mt-4 flex justify-end">
           <button type="button" disabled={isScanningImage} onClick={() => setScanOpen(false)} className="btn-secondary">Trở về báo giá</button>
         </div>
       </Modal>
-          <QuotationAgentPanel orderId={orderId} key={orderId} open={voiceOpen} onClose={() => setVoiceOpen(false)} disabled={busy || isScanningImage || isValidatingRelevance}
+          <QuotationAgentPanel orderId={orderId} key={orderId} open={voiceOpen} onClose={() => setVoiceOpen(false)} disabled={busy || isScanningImage}
             snapshot={{ revision: formRevision, inspectionNote, recommendation,
               items: items.map(({ rowId, title, description, itemType, quantity, unitPrice, note }) => ({ rowId, title, description, itemType, quantity, unitPrice, note })) }}
             onApply={applyAgent} onBusyChange={setAgentBusy} />

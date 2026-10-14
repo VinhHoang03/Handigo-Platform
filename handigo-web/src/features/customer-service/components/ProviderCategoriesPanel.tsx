@@ -6,14 +6,14 @@ interface ProviderCategoriesPanelProps {
   categories: PublicProviderProfile["provider"]["serviceCategories"];
 }
 
-/** Danh mục dịch vụ mà thợ đăng ký, mở rộng để xem dịch vụ con. */
+/** Dịch vụ provider được thực hiện, nhóm theo danh mục để dễ xem. */
 export function ProviderCategoriesPanel({
   categories,
 }: ProviderCategoriesPanelProps) {
   return (
     <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm">
       <h3 className="text-xl font-bold text-on-background">
-        Danh mục dịch vụ
+        Dịch vụ có thể thực hiện
       </h3>
       <div className="mt-4 space-y-2">
         {categories.map((category) => (
@@ -55,7 +55,7 @@ export function ProviderCategoriesPanel({
         ))}
         {categories.length === 0 && (
           <p className="rounded-xl bg-surface-container-low p-3 text-sm text-on-surface-variant">
-            Chuyên gia chưa đăng ký danh mục dịch vụ.
+            Chuyên gia chưa đăng ký dịch vụ có thể thực hiện.
           </p>
         )}
       </div>

@@ -1,4 +1,7 @@
+import { ReliableImage } from '@/components/common/ReliableImage';
+import { ServiceImageCarousel } from '@/components/common/ServiceImageCarousel';
 import { AsyncState } from '@/components/common/AsyncState';
+import { ServiceProcessSection } from '@/components/common/ServiceProcessSection';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { DataTable } from '@/components/common/dashboard/DataTable';
 import { TableSkeleton } from '@/components/common/dashboard/TableSkeleton';
@@ -48,9 +51,9 @@ export function ServiceDetailPanel({
       <div className="border-b border-outline-variant/30 p-4 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row">
           <div className="relative shrink-0">
-            <div className="h-28 w-full overflow-hidden rounded-xl bg-surface-variant sm:w-28">
-              {service.image && isImageUrl(service.image) ? (
-                <img src={service.image} alt={service.name} width={112} height={112} className="h-full w-full object-cover" />
+            <div className="aspect-video w-full overflow-hidden rounded-xl bg-surface-variant sm:w-48">
+              {(service.coverImage === undefined ? service.image : service.coverImage) && isImageUrl((service.coverImage === undefined ? service.image : service.coverImage)) ? (
+                <ReliableImage src={(service.coverImage === undefined ? service.image : service.coverImage) || undefined} alt={service.name} width={1280} height={720} className="h-full w-full object-contain" />
               ) : (
                 <Wrench aria-hidden="true" size={48} className="flex h-full w-full items-center justify-center text-on-surface-variant" />
               )}
@@ -104,6 +107,11 @@ export function ServiceDetailPanel({
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="border-b border-outline-variant/30 p-4 sm:p-6">
+        <ServiceImageCarousel images={service.galleryImages} coverImage={service.coverImage === undefined ? service.image : service.coverImage} name={service.name} />
+        <ServiceProcessSection steps={service.processSteps} />
       </div>
 
       {isAirConditionerCleaning(service) ? (

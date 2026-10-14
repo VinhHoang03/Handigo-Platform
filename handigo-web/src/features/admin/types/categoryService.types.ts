@@ -1,3 +1,6 @@
+import type { ServiceProcessStep } from '@/types/serviceProcess';
+import type { OptionGroupDefinition } from '@/types/booking';
+
 export interface Pagination {
   page: number;
   limit: number;
@@ -18,15 +21,19 @@ export interface Category {
 }
 
 export interface Service {
+  optionGroups?: OptionGroupDefinition[];
   _id: string;
   categoryId: string | Pick<Category, '_id' | 'name' | 'slug' | 'isActive'> | null;
   name: string;
   slug: string;
   description?: string | null;
+  processSteps?: ServiceProcessStep[];
   serviceType: 'fixed_price' | 'variable_price';
   fixedPrice?: number | null;
   minOptionPrice?: number | null;
   depositAmount?: number | null;
+  coverImage?: string | null;
+  galleryImages?: string[];
   image?: string | null;
   requiresOptionSelection: boolean;
   isActive: boolean;
@@ -65,13 +72,17 @@ export interface CategoryPayload {
 }
 
 export interface ServicePayload {
+  optionGroups?: OptionGroupDefinition[];
   categoryId: string;
   name: string;
   slug?: string;
   description?: string | null;
+  processSteps?: ServiceProcessStep[];
   serviceType: 'fixed_price' | 'variable_price';
   fixedPrice?: number | null;
   depositAmount?: number | null;
+  coverImage?: string | null;
+  galleryImages?: string[];
   image?: string | null;
   requiresOptionSelection?: boolean;
   isActive?: boolean;
@@ -81,6 +92,8 @@ export type ServiceOptionType = "room_count" | "area_size" | "package" | "add_on
 export type ServiceOptionSelectionMode = "single" | "multiple";
 
 export interface ServiceOption {
+  groupId?: string | null;
+  isRequired?: boolean;
   _id: string;
   serviceId: string;
   name: string;
@@ -98,6 +111,7 @@ export interface ServiceOption {
 }
 
 export interface ServiceOptionPayload {
+  groupId?: string | null;
   name: string;
   description?: string | null;
   image?: string | null;

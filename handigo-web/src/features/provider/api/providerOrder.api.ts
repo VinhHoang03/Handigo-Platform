@@ -5,11 +5,16 @@ import type {
   OrderAssignment,
   ProviderOrdersResult,
   QuotationDetail,
-  QuotationRelevanceResult,
   ScannedQuotationResult,
 } from '../types/providerOrder.types';
 
 export const providerOrderApi = {
+  confirmQuotationPayment: async (orderId: string, quotationId: string, expectedRevision: number) => {
+    const response = await api.post<{ success: boolean; data: QuotationDetail['quotation'] }>(
+      `/orders/${orderId}/quotation/payment/confirm`, { quotationId, expectedRevision },
+    );
+    return response.data.data;
+  },
   updateExpectedEnd: async (orderId: string, expectedEndAt: string) => {
     const response = await api.patch<{ success: boolean; data: { order: Order; affectedOrderCount: number } }>(`/orders/${orderId}/expected-end`, { expectedEndAt });
     return response.data.data;
@@ -113,14 +118,5 @@ export const providerOrderApi = {
     return response.data.data;
   },
 
-  validateQuotationItems: async (
-    orderId: string,
-    items: CreateQuotationPayload['items'],
-  ) => {
-    const response = await api.post<{
-      success: boolean;
-      data: { relevance: QuotationRelevanceResult };
-    }>(`/orders/${orderId}/quotation-items/validate`, { items });
-    return response.data.data.relevance;
-  },
+
 };

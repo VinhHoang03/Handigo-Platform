@@ -47,7 +47,6 @@ export function CaseDetailModal({
   selectedTitle,
   detailEvidence,
   busy,
-  actionError,
   evidenceNote,
   onEvidenceNoteChange,
   onRequestEvidence,
@@ -149,7 +148,6 @@ export function CaseDetailModal({
                 {selected.item.endAt && <p className="mt-2"><b>Kết thúc:</b> {caseDateTime.format(new Date(selected.item.endAt))}</p>}
               </section>
             )}
-            {actionError && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{actionError}</p>}
           </aside>
         </div>
       ) : null}

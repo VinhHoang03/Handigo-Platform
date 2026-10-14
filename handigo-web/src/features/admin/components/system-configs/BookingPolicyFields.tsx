@@ -12,7 +12,7 @@ export function BookingPolicyFields({ value, onChange }: { value: string; onChan
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const [serviceId, setServiceId] = useState('');
-  const [error, setError] = useToastFeedback<string>('', "error");
+  const [, setError] = useToastFeedback<string>('', "error");
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -40,7 +40,6 @@ export function BookingPolicyFields({ value, onChange }: { value: string; onChan
     <div className="grid gap-3 sm:grid-cols-2">{bookingPolicyFields.map(([key, label, min, max]) => <label key={key} className="text-sm">{label}<input className={inputClass} type="number" required min={min} max={max} step={key.endsWith('Percent') ? '0.1' : '1'} value={policy[key]} onChange={(event) => update({ [key]: Number(event.target.value) })} /></label>)}</div>
     <div className="space-y-3 border-t border-outline-variant pt-4">
       <p className="font-semibold">Thời lượng theo dịch vụ và tùy chọn</p>
-      {error && <p role="alert" className="text-error">{error}</p>}
       <select aria-label="Dịch vụ cần cấu hình" className={inputClass} value={serviceId} onChange={(event) => { setServiceId(event.target.value); setOptions([]); }}>
         <option value="">Chọn dịch vụ ({services.length})</option>
         {services.map((service) => <option key={service._id} value={service._id}>{service.name}</option>)}

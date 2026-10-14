@@ -1,5 +1,6 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { tokenStorage } from "@/api/tokenStorage";
 import { getErrorMessage } from "@/utils/apiError";
@@ -14,8 +15,8 @@ export const useBookingPaymentFlow = (
   order: Order | null,
   busy: boolean,
   setBusy: (busy: boolean) => void,
-  loadData: () => Promise<void>,
 ) => {
+  const navigate = useNavigate();
   const { addToast } = useToast();
   const [paymentError, setPaymentError] = useToastFeedback<string | null>(null, "error");
   const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
@@ -53,16 +54,16 @@ export const useBookingPaymentFlow = (
     try {
       setBusy(true);
       setPaymentError(null);
-      const detailUrl = `${window.location.origin}/customer/bookings/${order._id}`;
+      const detailUrl = `${window.location.origin}/customer/bookings/result?orderId=${order._id}`;
       const result = await bookingApi.createPayment({
         orderId: order._id,
         method: initialPaymentMethod,
         paymentType: order.inspectionRequired ? "INSPECTION_DEPOSIT" : "FULL",
-        returnUrl: detailUrl,
-        cancelUrl: detailUrl,
+        returnUrl: `${detailUrl}&payos=success`,
+        cancelUrl: `${detailUrl}&payos=cancel`,
       });
 
-      if (initialPaymentMethod === "PAYOS") {
+      if (initialPaymentMethod === "PAYOS" && result.payment.status !== "paid") {
         if (!result.checkoutUrl) {
           throw new Error("PayOS không trả về liên kết thanh toán.");
         }
@@ -71,8 +72,10 @@ export const useBookingPaymentFlow = (
         return;
       }
       setPaymentMethodModalOpen(false);
-      addToast("Đã ghi nhận phương thức thanh toán.", "success");
-      await loadData();
+      addToast(result.payment.status === "paid" && result.payment.method === "payos" && initialPaymentMethod !== "PAYOS"
+        ? "Giao dịch PayOS đã thanh toán thành công. Hệ thống không thu thêm tiền."
+        : "Đã ghi nhận phương thức thanh toán.", "success");
+      navigate(`/customer/bookings/result?orderId=${order._id}`);
     } catch (error) {
       console.error("Không thể tiếp tục thanh toán đơn hàng:", error);
       setPaymentError(

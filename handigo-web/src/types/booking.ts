@@ -1,3 +1,5 @@
+import type { ServiceProcessStep } from './serviceProcess';
+
 export interface Category {
   _id: string;
   name: string;
@@ -10,21 +12,27 @@ export interface Category {
 }
 
 export interface Service {
+  optionGroups?: OptionGroupDefinition[];
   _id: string;
   categoryId: string;
   name: string;
   slug: string;
   description?: string;
+  processSteps?: ServiceProcessStep[];
   serviceType: "fixed_price" | "variable_price";
   fixedPrice?: number;
   minOptionPrice?: number | null;
   depositAmount?: number;
+  coverImage?: string | null;
+  galleryImages?: string[];
   image?: string;
   requiresOptionSelection: boolean;
   isActive: boolean;
 }
 
 export interface ServiceOption {
+  groupId?: string | null;
+  isRequired?: boolean;
   _id: string;
   serviceId: string;
   name: string;
@@ -50,6 +58,14 @@ export interface ServiceOption {
   isActive: boolean;
 }
 
+export interface OptionGroupDefinition {
+  _id: string;
+  name: string;
+  selectionMode: "single" | "multiple";
+  isRequired: boolean;
+  sortOrder: number;
+}
+
 export interface Payment {
   _id: string;
   orderId: string;
@@ -58,6 +74,7 @@ export interface Payment {
   paymentType: "full" | "remaining" | "inspection_deposit";
   status: "pending" | "paid" | "failed" | "refunded";
   transactionCode?: string | null;
+  gatewayResponse?: Record<string, unknown> | null;
 }
 
 export interface CreatePaymentResult {
@@ -96,8 +113,6 @@ export interface OrderCustomer {
 
 export interface OrderPricing {
   baseAmount?: number;
-  immediateFee?: number;
-  immediateProviderPercent?: number;
   bookingAmount: number;
   platformCommissionRate: number;
   platformCommissionAmount: number;
@@ -132,6 +147,7 @@ export interface OrderReassignment {
 }
 
 export interface Order {
+  statusHistory?: Array<{ _id: string; status: string; previousStatus?: string | null; changedByRole: string; note?: string | null; createdAt: string }>;
   schedule?: { durationMinutes: number; bufferMinutes: number; travelMinutes: number; expectedStartAt?: string | null; expectedEndAt?: string | null } | null;
   _id: string;
   orderCode: string;
@@ -278,6 +294,8 @@ export interface OrderQuotation {
     subtotalAmount?: number;
     discountAmount?: number;
     finalAmount: number;
+      directPaymentConfirmedAt?: string | null;
+      directPaymentConfirmedAmount?: number | null;
     inspectionNote?: string | null;
     recommendation?: string | null;
     rejectionReason?: string | null;
@@ -302,6 +320,8 @@ export interface BookingState {
   requestedProviderName?: string;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string;
+  /** Thời gian do form tự điền, chưa được khách chủ động chọn. */
+  isScheduleAutomatic: boolean;
   recurrenceUnit?: "weekly" | "monthly";
   recurrenceCount?: 1 | 2 | 3 | 4 | 8 | 12;
   problemDescription?: string;
@@ -324,7 +344,7 @@ export interface BookingState {
   setPreferredProviderId: (id?: string, name?: string) => void;
   setRequestedProvider: (id?: string, name?: string) => void;
   setOrderType: (type: BookingState["orderType"]) => void;
-  setScheduledAt: (date: string) => void;
+  setScheduledAt: (date: string, automatic?: boolean) => void;
   setRecurrenceUnit: (unit: "weekly" | "monthly") => void;
   setRecurrenceCount: (count: 1 | 2 | 3 | 4 | 8 | 12) => void;
   setProblemDescription: (desc: string) => void;

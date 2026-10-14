@@ -24,13 +24,11 @@ export const BookingServiceSummary = ({
   children,
 }: BookingServiceSummaryProps) => (
   <section className="rounded-3xl bg-surface-container-lowest p-lg shadow-sm border border-outline-variant/30">
-    {(order.pricing.immediateFee ?? 0) > 0 && <p className="mb-3 text-sm">Phí phục vụ ngay: {order.pricing.immediateFee?.toLocaleString('vi-VN')}đ (đã gồm trong tổng tiền).</p>}
-    {order.schedule && <p className="mb-3 text-sm">Thời lượng dự kiến: {order.schedule.durationMinutes} phút.{order.schedule.expectedEndAt && ` Hoàn thành dự kiến: ${new Date(order.schedule.expectedEndAt).toLocaleString('vi-VN')}.`}</p>}
     <div className="flex flex-col md:flex-row md:justify-between items-start gap-md mb-lg">
       <div className="flex gap-md items-center">
         <ReliableImage
-          className="w-20 h-20 rounded-2xl object-cover shadow-sm bg-surface-container"
-          src={order.serviceId?.image}
+          className="w-28 aspect-video shrink-0 rounded-2xl object-contain shadow-sm bg-surface-container"
+          src={(order.serviceId?.coverImage === undefined ? order.serviceId?.image : order.serviceId.coverImage)}
           alt={order.serviceId?.name}
         />
         <div>
@@ -126,7 +124,7 @@ export const BookingServiceSummary = ({
               >
                 <ReliableImage
                   src={url}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                   alt={`Attachment ${idx + 1}`}
                 />
               </div>

@@ -13,6 +13,23 @@ const formatTime = (value: string) =>
     minute: "2-digit",
   });
 
+function AgentMessageContent({ content }: { content: string }) {
+  const inline = (text: string) => text.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={index} className="font-semibold text-on-surface">{part.slice(2, -2)}</strong> : part);
+  return <div className="space-y-2 break-words [overflow-wrap:anywhere]">
+    {content.trim().split(/\n\s*\n/).map((paragraph, index) => {
+      const lines = paragraph.split("\n");
+      if (lines.every((line) => /^\s*(?:[-*•]|\d+[.)])\s+/.test(line))) {
+        return <ul key={index} className="list-disc space-y-1 pl-5 marker:text-primary/70">
+          {lines.map((line, lineIndex) => <li key={lineIndex}>{inline(line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, ""))}</li>)}
+        </ul>;
+      }
+      return <p key={index} className="whitespace-pre-wrap">{inline(paragraph)}</p>;
+    })}
+  </div>;
+}
+
 export function ChatbotMessageList({
   messages,
   isReplying,
@@ -89,13 +106,14 @@ export function ChatbotMessageList({
             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+              className={`${isUser ? "max-w-[85%]" : "min-w-0 max-w-[95%] sm:max-w-[90%]"} rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                 isUser
                   ? "rounded-br-md bg-primary text-on-primary"
                   : "rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest text-on-surface"
               }`}
             >
-              {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
+              {!isUser && <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary"><Bot size={14} aria-hidden="true" />Trợ lý Handigo</div>}
+              {message.content && (isUser ? <p className="whitespace-pre-wrap break-words">{message.content}</p> : <AgentMessageContent content={message.content} />)}
               {!isUser && message.confirmation && (
                 <AgentConfirmationCard action={message.confirmation}
                   readOnly={message.confirmation.actionId !== pendingActionId}

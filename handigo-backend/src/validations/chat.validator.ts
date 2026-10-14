@@ -17,7 +17,7 @@ export const sendMessageSchema = z
       if (data.messageType === "text") return Boolean(data.content);
       return Boolean(data.imageUrl);
     },
-    "Message content or image URL is required",
+    "Vui lòng nhập nội dung tin nhắn hoặc đường dẫn ảnh",
   );
 
 export const reportConversationSchema = z.object({

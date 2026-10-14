@@ -36,7 +36,6 @@ export function WalletDetailModal({
   onTransactionPageChange,
   onClose,
   busy,
-  actionError,
   direction,
   onDirectionChange,
   amount,
@@ -131,7 +130,6 @@ export function WalletDetailModal({
                 className="min-h-11 rounded-xl border border-outline-variant px-3"
               />
             </div>
-            {actionError && <p className="mt-3 text-sm font-semibold text-error">{actionError}</p>}
             <button
               type="submit"
               disabled={busy || !amount || !reason.trim()}

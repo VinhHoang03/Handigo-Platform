@@ -55,7 +55,6 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
         className="w-full min-w-0 rounded-xl border border-outline-variant px-3 py-2"
       />
       {query && loading && <p role="status" className="text-xs">Đang tìm hạng mục đã báo giá…</p>}
-      {error && <p role="alert" className="text-xs text-error">{error}</p>}
       {query && !loading && history.length > 0 && <div className="space-y-1 rounded-xl border p-2" aria-label="Gợi ý từ lịch sử báo giá">
         {history.map((entry) => <button key={entry.id} type="button" className="block w-full rounded-lg p-2 text-left text-xs hover:bg-primary/5"
           onClick={() => { onHistory(entry, query); setQuery(null); }}>

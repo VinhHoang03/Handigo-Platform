@@ -1,9 +1,11 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import { Feedback } from "../models/feedback.model";
 import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { OrderStatus } from "../models/orderStatus.model";
+import { Service } from "../models/service.model";
 
 interface FeedbackPayload {
   orderId: string;
@@ -30,7 +32,7 @@ interface PaginationQuery {
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${fieldName}`, 400);
+    throw new AppError(`Định danh ${fieldName} không hợp lệ`, 400);
   }
 };
 
@@ -80,8 +82,8 @@ export const recalculateProviderRating = async (providerId: Types.ObjectId | str
 };
 
 export const createFeedback = async (userId: string, payload: FeedbackPayload) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(payload.orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(payload.orderId, "đơn hàng");
 
   const order = await Order.findOne({
     _id: payload.orderId,
@@ -133,8 +135,8 @@ export const updateMyFeedback = async (
   feedbackId: string,
   payload: UpdateFeedbackPayload,
 ) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(feedbackId, "feedback id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(feedbackId, "đánh giá");
 
   const feedback = await Feedback.findOne({
     _id: feedbackId,
@@ -165,7 +167,7 @@ export const updateMyFeedback = async (
 };
 
 export const getMyFeedbacks = async (userId: string) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
 
   return Feedback.find({
     customerId: userId,
@@ -178,7 +180,7 @@ export const getMyFeedbacks = async (userId: string) => {
       select: "userId averageRating totalFeedbacks",
       populate: { path: "userId", select: "fullName avatar" },
     })
-    .populate("serviceId", "name image");
+    .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse });
 };
 
 export const getLatestPublicFeedbacks = async () => {
@@ -195,8 +197,8 @@ export const getLatestPublicFeedbacks = async () => {
 };
 
 export const getFeedbackByOrder = async (userId: string, orderId: string) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(orderId, "đơn hàng");
 
   const order = await Order.findOne({
     _id: orderId,
@@ -219,13 +221,13 @@ export const getFeedbackByOrder = async (userId: string, orderId: string) => {
       select: "userId averageRating totalFeedbacks",
       populate: { path: "userId", select: "fullName avatar" },
     })
-    .populate("serviceId", "name image")
+    .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
     .populate("providerReply.repliedBy", "fullName avatar");
 };
 
 export const getProviderFeedbackByOrder = async (userId: string, orderId: string) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(orderId, "đơn hàng");
 
   const provider = await Provider.findOne({ userId, isDeleted: false }).select("_id");
   if (!provider) {
@@ -247,13 +249,13 @@ export const getProviderFeedbackByOrder = async (userId: string, orderId: string
   })
     .populate("customerId", "fullName avatar")
     .populate("orderId", "orderCode status")
-    .populate("serviceId", "name image")
+    .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
     .populate("providerReply.repliedBy", "fullName avatar");
 };
 
 export const getOrderFeedbackContext = async (userId: string, orderId: string) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(orderId, "order id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(orderId, "đơn hàng");
 
   const order = await Order.findOne({
     _id: orderId,
@@ -261,7 +263,7 @@ export const getOrderFeedbackContext = async (userId: string, orderId: string) =
     isDeleted: false,
   })
     .select("orderCode status providerId serviceId createdAt")
-    .populate("serviceId", "name image")
+    .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
     .populate({
       path: "providerId",
       select: "userId",
@@ -283,7 +285,7 @@ export const getOrderFeedbackContext = async (userId: string, orderId: string) =
       select: "userId averageRating totalFeedbacks",
       populate: { path: "userId", select: "fullName avatar" },
     })
-    .populate("serviceId", "name image")
+    .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
     .populate("providerReply.repliedBy", "fullName avatar");
 
   const canReview = order.status === "completed" && Boolean(order.providerId);
@@ -342,11 +344,77 @@ const getRatingSummary = async (filter: Record<string, unknown>) => {
   return distribution;
 };
 
+export const getServiceFeedbacks = async (
+  serviceId: string,
+  query: PaginationQuery & {
+    optionId?: string;
+    sort?: "newest" | "rating";
+    positiveOnly?: string | boolean;
+  } = {},
+) => {
+  if (!Types.ObjectId.isValid(serviceId)) {
+    throw new AppError("Mã dịch vụ không hợp lệ", 400);
+  }
+  if (!await Service.exists({ _id: serviceId, isDeleted: false })) {
+    throw new AppError("Không tìm thấy dịch vụ", 404);
+  }
+  const { page, limit, skip } = getPagination(query);
+  const filter = buildFeedbackFilter(query, { serviceId, isVisible: true });
+  if (parseBoolean(query.positiveOnly) === true) {
+    if (filter.rating === undefined) filter.rating = { $gte: 4 };
+    else if (Number(filter.rating) < 4) filter.rating = { $in: [] };
+  }
+  if (query.optionId) {
+    if (!Types.ObjectId.isValid(query.optionId)) {
+      throw new AppError("Mã gói dịch vụ không hợp lệ", 400);
+    }
+    filter.orderId = { $in: await Order.distinct("_id", {
+      serviceId,
+      isDeleted: false,
+      $or: [
+        { selectedOptionIds: query.optionId },
+        { "selectedOptionsSnapshot.optionId": query.optionId },
+      ],
+    }) };
+  }
+  const [items, total] = await Promise.all([
+    Feedback.find(filter)
+      .select("rating comment images createdAt customerId orderId")
+      .sort(query.sort === "rating" ? { rating: -1, createdAt: -1, _id: -1 } : { createdAt: -1, _id: -1 })
+      .skip(skip).limit(limit)
+      .populate("customerId", "fullName avatar")
+      .populate("orderId", "selectedOptionsSnapshot")
+      .lean(),
+    Feedback.countDocuments(filter),
+  ]);
+  return {
+    items: items.map((item) => {
+      // Chỉ đưa thông tin hiển thị ra API công khai, không trả chi tiết đơn.
+      const customer = item.customerId as unknown as { fullName?: string; avatar?: string } | null;
+      const order = item.orderId as unknown as {
+        selectedOptionsSnapshot?: { optionId?: Types.ObjectId; name: string }[];
+      } | null;
+      return {
+        _id: item._id,
+        rating: item.rating,
+        comment: item.comment,
+        images: item.images,
+        createdAt: item.createdAt,
+        customer: { fullName: customer?.fullName ?? "Khách hàng", avatar: customer?.avatar ?? null },
+        options: (order?.selectedOptionsSnapshot ?? []).map((option) => ({
+          id: option.optionId?.toString() ?? null, name: option.name,
+        })),
+      };
+    }),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
 export const getProviderFeedbacks = async (
   providerId: string,
   query: PaginationQuery = {},
 ) => {
-  assertObjectId(providerId, "provider id");
+  assertObjectId(providerId, "nhà cung cấp");
 
   const provider = await Provider.findOne({
     _id: providerId,
@@ -376,7 +444,7 @@ export const getProviderFeedbacks = async (
       .limit(limit)
       .populate("customerId", "fullName avatar")
       .populate("orderId", "orderCode status scheduledAt createdAt")
-      .populate("serviceId", "name image")
+      .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
       .populate("providerReply.repliedBy", "fullName avatar"),
     Feedback.countDocuments(filter),
     getRatingSummary(summaryFilter),
@@ -426,7 +494,7 @@ export const getMyProviderFeedbacks = async (
   userId: string,
   query: PaginationQuery = {},
 ) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
 
   const provider = await Provider.findOne({
     userId,
@@ -444,7 +512,7 @@ export const setFeedbackVisibility = async (
   feedbackId: string,
   isVisible: boolean,
 ) => {
-  assertObjectId(feedbackId, "feedback id");
+  assertObjectId(feedbackId, "đánh giá");
 
   const feedback = await Feedback.findOneAndUpdate(
     {
@@ -470,8 +538,8 @@ export const upsertProviderReply = async (
   content: string,
   images?: string[],
 ) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(feedbackId, "feedback id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(feedbackId, "đánh giá");
 
   const provider = await Provider.findOne({ userId, isDeleted: false });
   if (!provider) {
@@ -527,7 +595,7 @@ export const getAdminFeedbacks = async (query: PaginationQuery = {}) => {
         populate: { path: "userId", select: "fullName email avatar" },
       })
       .populate("orderId", "orderCode status")
-      .populate("serviceId", "name image")
+      .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
       .populate("providerReply.repliedBy", "fullName avatar"),
     Feedback.countDocuments(filter),
   ]);

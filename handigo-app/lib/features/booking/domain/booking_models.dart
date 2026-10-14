@@ -48,6 +48,10 @@ class BookingPreview {
     required this.immediateFee,
     required this.depositAmount,
     required this.minAdvanceMinutes,
+    this.promotionDiscountAmount = 0,
+    this.voucherDiscountAmount = 0,
+    this.discountedAmount = 0,
+    this.promotionName,
   });
 
   factory BookingPreview.fromJson(Map<String, dynamic> json) => BookingPreview(
@@ -56,6 +60,10 @@ class BookingPreview {
         immediateFee: (json['immediateFee'] as num?)?.toDouble() ?? 0,
         depositAmount: (json['depositAmount'] as num?)?.toDouble() ?? 0,
         minAdvanceMinutes: (json['minAdvanceMinutes'] as num?)?.toInt() ?? 0,
+        promotionDiscountAmount: (json['promotionDiscountAmount'] as num?)?.toDouble() ?? 0,
+        voucherDiscountAmount: (json['voucherDiscountAmount'] as num?)?.toDouble() ?? 0,
+        discountedAmount: (json['discountedAmount'] as num?)?.toDouble() ?? (json['bookingAmount'] as num?)?.toDouble() ?? 0,
+        promotionName: (json['promotionSnapshot'] as Map?)?['name'] as String?,
       );
 
   final double baseAmount;
@@ -63,6 +71,8 @@ class BookingPreview {
   final double immediateFee;
   final double depositAmount;
   final int minAdvanceMinutes;
+  final double promotionDiscountAmount, voucherDiscountAmount, discountedAmount;
+  final String? promotionName;
 }
 
 class CreatedOrder {

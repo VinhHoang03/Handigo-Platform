@@ -22,13 +22,13 @@ import {
   completeOrderSchema,
   createRepairQuotationSchema,
   updateRepairQuotationSchema,
+  confirmQuotationPaymentSchema,
   createOrderSchema,
   previewBookingSchema,
   updateExpectedEndSchema,
   orderIdParamSchema,
   orderListQuerySchema,
   quotationIdParamSchema,
-  quotationItemsRelevanceSchema,
   recentOrderQuerySchema,
   reassignmentResponseSchema,
   rejectAssignmentSchema,
@@ -51,6 +51,7 @@ import {
   cancelRecurringSeries,
   startOrder,
   completeOrder,
+  confirmQuotationPayment,
   uploadOrderAttachment,
   acceptAssignment,
   rejectAssignment,
@@ -66,10 +67,7 @@ import {
   respondToReassignment,
 } from "../controllers/order.controller";
 import { getOrderMatchingProviders, getOrderTrackingRoute } from "../controllers/orderTracking.controller";
-import {
-  scanQuotationItems,
-  validateQuotationItemsRelevance,
-} from "../controllers/quotationImageAnalysis.controller";
+import { scanQuotationItems } from "../controllers/quotationImageAnalysis.controller";
 
 const router = Router();
 
@@ -140,15 +138,7 @@ router.post(
   scanQuotationItems,
 );
 
-router.post(
-  "/:orderId/quotation-items/validate",
-  roleMiddleware("PROVIDER"),
-  approvedProviderMiddleware,
-  ocrRateLimit,
-  validate(orderIdParamSchema, "params"),
-  validate(quotationItemsRelevanceSchema),
-  validateQuotationItemsRelevance,
-);
+
 
 router.get(
   "/:orderId/tracking-route",
@@ -223,6 +213,15 @@ router.post(
   approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
   startOrder,
+);
+
+router.post(
+  "/:orderId/quotation/payment/confirm",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  validate(orderIdParamSchema, "params"),
+  validate(confirmQuotationPaymentSchema),
+  confirmQuotationPayment,
 );
 
 // POST   /orders/:orderId/complete → Provider: complete order

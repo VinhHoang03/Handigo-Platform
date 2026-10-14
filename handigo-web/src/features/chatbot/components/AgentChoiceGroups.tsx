@@ -22,11 +22,11 @@ export function AgentChoiceGroups({ groups, disabled, onSend }: {
   };
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className="mt-3 space-y-4 border-t border-outline-variant/30 pt-3">
       {groups.map((group, index) => (
         <fieldset key={index} disabled={blocked} className="space-y-2">
           <legend className="text-xs font-semibold">{group.label}{group.multiple ? " (có thể chọn nhiều)" : ""}</legend>
-          <div className="flex flex-wrap gap-2">
+          <div className={group.label === "Địa chỉ" ? "grid gap-2" : "flex flex-wrap gap-2"}>
             {group.options.map((option, optionIndex) => {
               const checked = selected[index]?.includes(option) ?? false;
               return (
@@ -37,7 +37,7 @@ export function AgentChoiceGroups({ groups, disabled, onSend }: {
                     onChange={() => setSelected((current) => ({ ...current, [index]: group.multiple
                       ? checked ? (current[index] ?? []).filter((value) => value !== option) : [...(current[index] ?? []), option]
                       : [option] }))} />
-                  <span>{option}</span>
+                  <span className="min-w-0 break-words leading-5">{option}</span>
                 </label>
               );
             })}
@@ -45,7 +45,7 @@ export function AgentChoiceGroups({ groups, disabled, onSend }: {
         </fieldset>
       ))}
       <label className="block space-y-1 text-xs">
-        <span>Bổ sung số lượng, giờ hẹn hoặc yêu cầu khác</span>
+        <span>Thông tin bổ sung (không bắt buộc)</span>
         <textarea value={details} onChange={(event) => setDetails(event.target.value)} disabled={blocked}
           maxLength={1000} rows={2} placeholder="Ví dụ: 2 máy, 9 giờ sáng mai"
           className="w-full resize-none rounded-xl border border-outline-variant/50 bg-surface px-3 py-2 text-on-surface disabled:opacity-50" />
@@ -53,9 +53,8 @@ export function AgentChoiceGroups({ groups, disabled, onSend }: {
       {content.length > 4000 && <p role="alert" className="text-xs text-error">Vui lòng rút gọn thông tin hoặc giảm số lựa chọn để gửi.</p>}
       <button type="button" onClick={() => void submit()} disabled={blocked || !content || content.length > 4000}
         className="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-on-primary disabled:opacity-50">
-        Gửi các lựa chọn
+        {sending ? "Đang gửi…" : "Tiếp tục"}
       </button>
-      <p className="text-xs text-on-surface-variant">Bạn cũng có thể nhập yêu cầu hoặc bổ sung thông tin bên dưới.</p>
     </div>
   );
 }

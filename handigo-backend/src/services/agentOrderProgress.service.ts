@@ -24,14 +24,14 @@ const bookingLabels: Record<string, string> = {
   awaiting_provider: "Đang chờ nhà cung cấp xác nhận lịch hẹn.",
   awaiting_payment: "Nhà cung cấp đã nhận lịch hẹn. Vui lòng thanh toán để xác nhận lịch.",
   reserved: "Lịch hẹn đang được giữ chỗ.", confirmed: "Lịch hẹn đã được xác nhận.",
-  rejected: "Nhà cung cấp chưa thể nhận lịch hẹn.", expired: "Lịch hẹn đã hết thời hạn xác nhận.",
+  rejected: "Thợ đã từ chối hoặc chưa phản hồi yêu cầu. Bạn có thể chọn thợ khác ngay trong chat.", expired: "Lịch hẹn đã hết thời hạn xác nhận.",
 };
 const paymentLabels: Record<string, string> = {
   unpaid: "Đơn hàng chưa thanh toán.", partially_paid: "Đã nhận thanh toán một phần của đơn hàng.",
   paid: "Đã thanh toán đơn hàng thành công.", refunded: "Đã hoàn tiền cho đơn hàng.",
 };
 const reassignmentLabels: Record<string, string> = {
-  awaiting_customer: "Nhà cung cấp yêu cầu đổi kỹ thuật viên. Vui lòng phản hồi trong chi tiết đơn hàng.",
+  awaiting_customer: "Đơn đang chờ bạn chọn thợ thay thế hoặc phản hồi yêu cầu đổi thợ ngay trong chat.",
   matching: "Đang tìm kỹ thuật viên thay thế.", matched: "Đã tìm được kỹ thuật viên thay thế.",
   declined: "Bạn đã từ chối tìm kỹ thuật viên thay thế.", expired: "Yêu cầu đổi kỹ thuật viên đã hết hạn.",
   failed: "Chưa tìm được kỹ thuật viên thay thế.",
@@ -63,23 +63,47 @@ export function describeOrderProgress(fields: Record<string, unknown>) {
   const confirmation = fields.confirmation as Record<string, unknown> | undefined;
   if (confirmation?.providerConfirmedAt) lines.push("Nhà cung cấp đã xác nhận hoàn thành dịch vụ.");
   if (confirmation?.customerConfirmedAt) lines.push("Bạn đã xác nhận hoàn thành dịch vụ.");
-  const reassignment = fields.reassignment as { status?: string } | undefined;
+  const reassignment = fields.reassignment as { status?: string; reason?: string; expiresAt?: string | Date } | undefined;
   if (reassignment?.status && reassignmentLabels[reassignment.status]) lines.push(reassignmentLabels[reassignment.status]);
+  if (reassignment?.status === "awaiting_customer") {
+    if (reassignment.reason) lines.push(`Lý do: ${reassignment.reason}`);
+    const deadline = new Date(reassignment.expiresAt || "");
+    if (Number.isFinite(deadline.getTime())) lines.push(`Hạn phản hồi: ${deadline.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}.`);
+  }
   return [...new Set(lines)];
 }
 
 type Recipient = { sessionId: string; userId: string; orderId?: mongoose.Types.ObjectId; createdAt: Date };
 
 async function deliver(subscription: Recipient,
-  id: string, content: string, createdAt: Date) {
+  id: string, content: string, createdAt: Date,
+  choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>) {
   const result = await AgentOrderMessage.updateOne({ _id: id }, { $setOnInsert: {
     sessionId: subscription.sessionId, userId: subscription.userId,
     ...(subscription.orderId ? { orderId: subscription.orderId } : {}), content, createdAt,
+    ...(choiceGroups?.length ? { choiceGroups } : {}),
   } }, { upsert: true, runValidators: true });
   if (result.upsertedCount) emitToUser(subscription.userId, "agent:order:message", {
     sessionId: subscription.sessionId,
-    message: { _id: id, sender: "assistant", content, createdAt: createdAt.toISOString() },
+    message: { _id: id, sender: "assistant", content, createdAt: createdAt.toISOString(),
+      ...(choiceGroups?.length ? { choiceGroups } : {}) },
   });
+}
+
+export async function orderProviderChoices(userId: string, orderId: string) {
+  try {
+    const { AgentOrderProviderService } = await import("./agentOrderProvider.service");
+    const options = await AgentOrderProviderService.options(userId, orderId);
+    if (!options.canChoose) return undefined;
+    return [{ label: `Đổi thợ cho đơn ${options.orderCode}`, multiple: false,
+      options: [...options.available.slice(0, 9).map((item) => `${item.name} (${item.id.slice(-6)})`),
+        ...(options.canRespond ? ["Đồng ý để hệ thống tìm thợ thay thế", "Từ chối tìm thợ thay thế và hủy đơn"] : []),
+        "Kiểm tra lại thợ phù hợp"] }];
+  } catch {
+    // Tra cứu thợ thất bại không được làm mất thông báo từ chối hoặc ngắt change stream.
+    return [{ label: "Đổi thợ cho đơn đã tạo", multiple: false,
+      options: [`Xem thợ thay thế cho đơn ${orderId}`] }];
+  }
 }
 
 export async function trackAgentBooking(userId: string, sessionId: string, orderId: string) {
@@ -94,7 +118,8 @@ export async function trackAgentBooking(userId: string, sessionId: string, order
   const current = await Order.findOne({ _id: orderId, customerId: userId, isDeleted: false }).lean();
   if (!current) return;
   await recoverOrderDetails(userId, orderId);
-  await deliver(subscription, `booking:${orderId}`, `Mình sẽ tự động cập nhật tiến độ đơn ${current.orderCode} tại đây.\n${describeOrderProgress(current as unknown as Record<string, unknown>).join("\n")}`, subscription.createdAt);
+  await deliver(subscription, `booking:${orderId}`, `Mình sẽ tự động cập nhật tiến độ đơn ${current.orderCode} tại đây.\n${describeOrderProgress(current as unknown as Record<string, unknown>).join("\n")}`, subscription.createdAt,
+    current.bookingStatus === "rejected" || current.reassignment?.status === "awaiting_customer" ? await orderProviderChoices(userId, orderId) : undefined);
 }
 
 export async function safelyTrackAgentBooking(userId: string, sessionId: string, orderId: string) {
@@ -152,6 +177,7 @@ export async function mergeAgentOrderMessages(session: AgentSession) {
     const ids = new Set(session.conversation.map((message) => message.id));
     for (const update of updates) if (!ids.has(update._id)) session.conversation.push({
       id: update._id, role: "assistant", content: update.content, createdAt: update.createdAt.toISOString(),
+      ...(update.choiceGroups?.length ? { choiceGroups: update.choiceGroups } : {}),
     });
     session.conversation.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   } catch { logger.warn("Chưa thể nạp cập nhật tiến độ; kết quả thao tác trong phiên vẫn được giữ nguyên.", { sessionId: session.id }); }
@@ -273,7 +299,11 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
   }
   if (!lines.length) return;
   const id = `order-event:${createHash("sha256").update(JSON.stringify(change._id)).digest("hex")}`;
-  await deliver(subscription, id, `Cập nhật đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date());
+  const needsProviderChoice = orderEvent && (fields.bookingStatus === "rejected"
+    || fields["reassignment.status"] === "awaiting_customer"
+    || (fields.reassignment as { status?: string } | undefined)?.status === "awaiting_customer");
+  await deliver(subscription, id, `Cập nhật đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date(),
+    needsProviderChoice ? await orderProviderChoices(subscription.userId, String(orderId)) : undefined);
 }
 
 let stream: ChangeStream<Document> | null = null;
@@ -322,7 +352,8 @@ async function recoverProgress() {
     if (!order) continue;
     await deliver(subscription, `order-event:recovery:${order._id}:${order.updatedAt.toISOString()}`,
       `Đã kết nối lại theo dõi đơn ${order.orderCode}. Trạng thái hiện tại:\n${describeOrderProgress(order as unknown as Record<string, unknown>).join("\n")}`,
-      new Date());
+      new Date(), order.bookingStatus === "rejected" || order.reassignment?.status === "awaiting_customer"
+        ? await orderProviderChoices(subscription.userId, String(order._id)) : undefined);
     await recoverOrderDetails(subscription.userId, String(subscription.orderId));
   }
   for await (const subscription of AgentCaseSubscription.find().cursor()) {

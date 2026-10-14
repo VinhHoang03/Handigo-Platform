@@ -38,6 +38,7 @@ node_modules
 !**/.env.example
 
 # Build output
+/outputs/
 dist/
 dist-ssr
 dist
@@ -59,6 +60,9 @@ uploads/
 # Dữ liệu mẫu cục bộ của backend
 handigo-backend/sample-data/
 
+# Backup migration mã hóa, khóa và journal cục bộ
+handigo-backend/.migration-backups/
+
 # Local development files
 *.local
 *.tmp
@@ -66,6 +70,10 @@ handigo-backend/sample-data/
 # IDE và editor directories
 .vscode/*
 !.vscode/extensions.json
+# Cấu hình phát triển Flutter dùng chung, không chứa đường dẫn SDK cá nhân
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
 .idea
 .DS_Store
 *.suo

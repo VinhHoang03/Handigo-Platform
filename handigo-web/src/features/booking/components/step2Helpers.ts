@@ -34,6 +34,19 @@ export const getEarliestScheduledAt = (now = new Date()) => {
   return earliest;
 };
 
+export const isWithinImmediateBookingHours = (now = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value);
+
+  return hour >= 8 && (hour < 21 || (hour === 21 && minute === 0));
+};
+
 export const getTodayInputValue = (now = new Date()) => {
   const timezoneOffset = now.getTimezoneOffset() * 60000;
   return new Date(now.getTime() - timezoneOffset).toISOString().split('T')[0];
@@ -45,7 +58,8 @@ export const getDefaultScheduledAt = (now = new Date()) => {
   const currentMinute = new Date(now);
   currentMinute.setSeconds(0, 0);
   if (now.getHours() < 8) return `${date}T${timeSlots[0]}:00`;
-  if (now.getHours() <= 21 && currentMinute.getTime() >= earliest) {
+  if ((now.getHours() < 21 || (now.getHours() === 21 && now.getMinutes() === 0))
+    && currentMinute.getTime() >= earliest) {
     return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
   }
   const tomorrow = new Date(now);
@@ -59,7 +73,13 @@ export const getInitialScheduledAt = (scheduledAt: string | undefined, now = new
     const selected = new Date(hasSelectedTime ? scheduledAt : `${scheduledAt}T08:00:00`);
     if (Number.isFinite(selected.getTime())
       && selected.getTime() >= getEarliestScheduledAt(now).getTime()
-      && selected.getHours() >= 8 && selected.getHours() <= 21) {
+      && selected.getHours() >= 8
+      && (selected.getHours() < 21 || (
+        selected.getHours() === 21
+        && selected.getMinutes() === 0
+        && selected.getSeconds() === 0
+        && selected.getMilliseconds() === 0
+      ))) {
       if (hasSelectedTime) return scheduledAt;
       if (selected.getTime() > getEarliestScheduledAt(now).getTime()) return `${scheduledAt}T${timeSlots[0]}:00`;
     }
@@ -68,7 +88,7 @@ export const getInitialScheduledAt = (scheduledAt: string | undefined, now = new
 };
 
 export const getUpcomingDates = (now = new Date()) =>
-  Array.from({ length: 14 }, (_, index) => {
+  Array.from({ length: 7 }, (_, index) => {
     const date = new Date(now);
     date.setDate(date.getDate() + index);
     const timezoneOffset = date.getTimezoneOffset() * 60000;

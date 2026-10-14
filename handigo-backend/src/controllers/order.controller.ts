@@ -16,7 +16,7 @@ const uid = (req: Request): string => requireRequestUser(req).id;
 
 export const previewBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    return ok(res, await previewServiceBooking(req.body));
+    return ok(res, await previewServiceBooking(req.body, uid(req)));
   } catch (error) { return next(error); }
 };
 
@@ -263,6 +263,15 @@ export const startOrder = async (
   try {
     const order = await OrderService.startOrder(param(req, "orderId"), uid(req));
     return ok(res, order);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const confirmQuotationPayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { quotationId, expectedRevision } = req.body;
+    return ok(res, await AssignmentService.confirmQuotationPayment(param(req, "orderId"), uid(req), quotationId, expectedRevision));
   } catch (error) {
     return next(error);
   }

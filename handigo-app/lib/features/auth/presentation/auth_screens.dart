@@ -46,7 +46,7 @@ class AuthScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F7FF),
+      backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -70,7 +70,7 @@ class AuthScaffold extends StatelessWidget {
                           vertical: 7,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEDEAFF),
+                          color: Theme.of(context).colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -87,7 +87,7 @@ class AuthScaffold extends StatelessWidget {
                             Text(
                               statusText,
                               style: theme.textTheme.labelMedium?.copyWith(
-                                color: const Color(0xFF4C4658),
+                                color: theme.colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -112,11 +112,11 @@ class AuthScaffold extends StatelessWidget {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: const Color(0xFFE8E3F2),
+                                color: Theme.of(context).colorScheme.outlineVariant,
                               ),
                               boxShadow: const [
                                 BoxShadow(
-                                  color: Color(0x1A20164D),
+                                  color: Color(0x1A131B2E),
                                   blurRadius: 24,
                                   offset: Offset(0, 12),
                                 ),
@@ -134,7 +134,7 @@ class AuthScaffold extends StatelessWidget {
               child: Text(
                 '© 2026 Handigo · Bảo mật · Điều khoản',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: const Color(0xFF777184),
+                  color: Theme.of(context).colorScheme.outline,
                 ),
               ),
             ),
@@ -154,7 +154,7 @@ class AuthScaffold extends StatelessWidget {
         textAlign: TextAlign.center,
         style: theme.textTheme.headlineMedium?.copyWith(
           fontWeight: FontWeight.w700,
-          color: const Color(0xFF17132D),
+          color: theme.colorScheme.onSurface,
         ),
       ),
       const SizedBox(height: 8),
@@ -180,8 +180,8 @@ class _RoundIconButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(icon, size: 21),
       style: IconButton.styleFrom(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF17132D),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
         fixedSize: const Size(44, 44),
         shape: const CircleBorder(),
       ),
@@ -200,11 +200,11 @@ class _HandigoMark extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: const Color(0xFF3928D5),
+          color: AppTheme.primary,
           borderRadius: BorderRadius.circular(14),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x333928D5),
+              color: Color(0x333525CD),
               blurRadius: 10,
               offset: Offset(0, 5),
             ),
@@ -220,7 +220,7 @@ class _HandigoMark extends StatelessWidget {
       Text(
         'Handigo',
         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-          color: const Color(0xFF2F20BD),
+          color: Theme.of(context).colorScheme.primary,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.5,
         ),
@@ -245,9 +245,9 @@ class _SocialButton extends StatelessWidget {
     icon: icon,
     label: Text(label),
     style: OutlinedButton.styleFrom(
-      backgroundColor: const Color(0xFFF5F3FF),
-      foregroundColor: const Color(0xFF26213B),
-      side: const BorderSide(color: Color(0xFFE1DDF1)),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      foregroundColor: Theme.of(context).colorScheme.onSurface,
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       minimumSize: const Size(0, 52),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
@@ -435,17 +435,17 @@ class _AuthDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const Expanded(child: Divider(color: Color(0xFFE8E3F2))),
+      Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Text(
           label,
           style: Theme.of(
             context,
-          ).textTheme.labelSmall?.copyWith(color: const Color(0xFF777184)),
+          ).textTheme.labelSmall?.copyWith(color: Theme.of(context).colorScheme.outline),
         ),
       ),
-      const Expanded(child: Divider(color: Color(0xFFE8E3F2))),
+      Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
     ],
   );
 }
@@ -461,7 +461,7 @@ class _AuthFieldLabel extends StatelessWidget {
       text,
       textAlign: TextAlign.left,
       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        color: const Color(0xFF26213B),
+        color: Theme.of(context).colorScheme.onSurface,
         fontWeight: FontWeight.w600,
       ),
     ),
@@ -631,7 +631,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF777184)),
+            ).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.outline),
           ),
           const SizedBox(height: 22),
           const _AuthFieldLabel('Họ và tên'),
@@ -671,7 +671,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             'Dùng để nhận mã OTP và thợ liên hệ khi đến nhà',
             style: Theme.of(
               context,
-            ).textTheme.bodySmall?.copyWith(color: const Color(0xFF777184)),
+            ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
           ),
           const SizedBox(height: 16),
           const _AuthFieldLabel('Mật khẩu'),
@@ -700,8 +700,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     margin: EdgeInsets.only(right: index == 3 ? 0 : 4),
                     decoration: BoxDecoration(
                       color: index < _passwordStrength
-                          ? const Color(0xFF3928D5)
-                          : const Color(0xFFE1DDF1),
+                          ? AppTheme.primary
+                          : AppTheme.outlineVariant,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -850,16 +850,16 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEDEAFF),
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
                   shape: BoxShape.circle,
                   boxShadow: const [
-                    BoxShadow(color: Color(0x263928D5), blurRadius: 18),
+                    BoxShadow(color: Color(0x263525CD), blurRadius: 18),
                   ],
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.shield_outlined,
                   size: 38,
-                  color: Color(0xFF3928D5),
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -1043,13 +1043,13 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F3FF),
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE1DDF1)),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.email_outlined, color: Color(0xFF3928D5)),
+                  Icon(Icons.email_outlined, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text('Mã xác thực đã gửi đến\n${widget.email}'),

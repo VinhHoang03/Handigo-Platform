@@ -46,7 +46,6 @@ export function CaseDetailModal({
   selected,
   loading,
   busy,
-  actionError,
   onClose,
   onCancel,
   onAddEvidence,
@@ -140,7 +139,6 @@ export function CaseDetailModal({
             {selected.kind === "report" && selected.item.targetUserId && <section className="rounded-xl border border-outline-variant p-4 text-sm"><b>Đối tượng báo cáo:</b> {selected.item.targetUserId.fullName}{selected.item.targetUserId.email ? ` · ${selected.item.targetUserId.email}` : ""}</section>}
 
             {selected.item.resolutionNote && <section className="rounded-xl bg-success-container p-4 text-sm text-on-success-container"><b>Kết quả xử lý</b><p className="mt-2 whitespace-pre-wrap">{selected.item.resolutionNote}</p></section>}
-            {actionError && <p className="rounded-xl bg-error/10 p-3 text-sm font-semibold text-error">{actionError}</p>}
             {selected.kind !== "report" && !['resolved', 'rejected', 'closed', 'cancelled'].includes(selected.item.status) && <button type="button" onClick={() => setConfirmCancel(true)} disabled={busy} className="rounded-xl border border-error px-4 py-2.5 font-semibold text-error">Hủy yêu cầu</button>}
           </div>
         ) : null}

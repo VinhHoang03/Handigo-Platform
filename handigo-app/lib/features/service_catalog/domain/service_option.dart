@@ -6,9 +6,11 @@ class ServiceOption {
     this.description,
     this.optionType,
     this.selectionGroup,
-    this.selectionMode = 'single',
+    this.groupId,
+    bool? isRequired,
+    this.selectionMode = 'multiple',
     this.allowsQuantity = false,
-  });
+  }) : _isRequired = isRequired;
 
   factory ServiceOption.fromJson(Map<String, dynamic> json) => ServiceOption(
         id: (json['_id'] ?? json['id']) as String,
@@ -17,7 +19,9 @@ class ServiceOption {
         description: json['description'] as String?,
         optionType: json['optionType'] as String?,
         selectionGroup: json['selectionGroup'] as String?,
-        selectionMode: json['selectionMode'] as String? ?? 'single',
+        groupId: json['groupId'] as String?,
+        isRequired: json['isRequired'] as bool? ?? false,
+        selectionMode: json['selectionMode'] as String? ?? 'multiple',
         allowsQuantity: json['allowsQuantity'] as bool? ?? false,
       );
 
@@ -27,6 +31,9 @@ class ServiceOption {
   final String? description;
   final String? optionType;
   final String? selectionGroup;
+  final String? groupId;
+  final bool? _isRequired;
+  bool get isRequired => _isRequired ?? false;
   final String selectionMode;
   final bool allowsQuantity;
 }

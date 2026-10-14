@@ -22,7 +22,7 @@ export default function AdminWithdrawalsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>("", "error");
-  const [notice, setNotice] = useToastFeedback<string>("", "success");
+  const [, setNotice] = useToastFeedback<string>("", "success");
   const [selected, setSelected] = useState<AdminWithdrawal | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,11 +125,6 @@ export default function AdminWithdrawalsPage() {
         onRefresh={() => void load()}
       />
 
-      {notice && (
-        <p className="rounded-lg bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
-          {notice}
-        </p>
-      )}
 
       <AsyncState
         loading={loading}

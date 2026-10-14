@@ -36,7 +36,6 @@ export function NewsFormModal({
   onFormChange,
   isSaving,
   isUploading,
-  error,
   onSubmit,
   onClose,
   onUploadCover,
@@ -44,7 +43,6 @@ export function NewsFormModal({
   return (
     <Modal open={open} title={editing ? "Chỉnh sửa bài viết" : "Đăng bài mới"} size="xl" onClose={onClose} closeOnOverlayClick={!isSaving}>
       <form className="space-y-6" onSubmit={onSubmit}>
-        {error && <p role="alert" className="rounded-xl bg-error/10 px-4 py-3 text-error">{error}</p>}
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Tiêu đề bài viết" className="md:col-span-2">

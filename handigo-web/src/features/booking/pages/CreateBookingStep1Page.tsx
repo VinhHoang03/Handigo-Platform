@@ -22,7 +22,7 @@ const CreateBookingStep1Page = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [options, setOptions] = useState<ServiceOption[]>([]);
-  const [selectionError, setSelectionError] = useToastFeedback<string>('', "error");
+  const [, setSelectionError] = useToastFeedback<string>('', "error");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -65,7 +65,7 @@ const CreateBookingStep1Page = () => {
   const visibleCategories = categories.slice(0, 5);
   const selectedService = services.find((service) => service._id === serviceId);
   const isVariablePrice = selectedService?.serviceType === 'variable_price';
-  const isCleaning = isAirConditionerCleaning(selectedService);
+  const isCleaning = isAirConditionerCleaning(selectedService) && options.length === 0;
   const optionGroups = groupServiceOptions(options);
 
   const handleSelectCategory = (selectedCategoryId: string) => {
@@ -79,7 +79,7 @@ const CreateBookingStep1Page = () => {
       setSelectionError('Vui lòng chọn một dịch vụ cụ thể.');
       return;
     }
-    if (isRequiredOptionSelectionMissing(selectedService, selectedOptionIds)) {
+    if (isRequiredOptionSelectionMissing(selectedService, selectedOptionIds, options)) {
       setSelectionError('Vui lòng chọn ít nhất một tùy chọn dịch vụ.');
       return;
     }
@@ -134,7 +134,6 @@ const CreateBookingStep1Page = () => {
                   onQuantityChange={setOptionQuantity}
                 />
               )}
-              {selectionError && <p className="mt-sm text-sm font-semibold text-error">{selectionError}</p>}
             </div>
           </section>
         </div>

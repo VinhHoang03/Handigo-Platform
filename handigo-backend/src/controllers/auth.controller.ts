@@ -124,7 +124,7 @@ export const refreshToken = async (
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
 
     if (!refreshToken) {
-      return res.status(401).json({ message: "Missing refresh token" });
+      return res.status(401).json({ message: "Thiếu mã làm mới phiên đăng nhập" });
     }
 
     const result = await authService.refreshToken(refreshToken);
@@ -151,7 +151,7 @@ export const googleLogin = async (
   try {
     const { credential, accessToken, remember } = req.body;
     if (!credential && !accessToken) {
-      throw new AppError("Google credential or access token is required", 400);
+      throw new AppError("Vui lòng cung cấp thông tin xác thực hoặc mã truy cập Google", 400);
     }
 
     const result = await authService.googleLogin({ credential, accessToken });
@@ -190,7 +190,7 @@ export const facebookLogin = async (
   try {
     const { accessToken, remember } = req.body;
     if (!accessToken)
-      throw new AppError("Facebook access token is required", 400);
+      throw new AppError("Vui lòng cung cấp mã truy cập Facebook", 400);
 
     const result = await authService.facebookLogin(accessToken);
 

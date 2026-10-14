@@ -44,6 +44,39 @@ export const getRevenueRange = (period: RevenuePeriod) => {
   };
 };
 
+/** Gộp doanh thu tháng theo tuần, chỉ tính các ngày nằm trong tháng. */
+export function getRevenueChart(
+  period: RevenuePeriod,
+  dates: Date[],
+  earningsByDay: ReadonlyMap<string, number>,
+) {
+  if (period === "week") {
+    return dates.map((date) => ({
+      key: dateKey(date),
+      label: date.toLocaleDateString("vi-VN", { weekday: "short" }),
+      fullLabel: date.toLocaleDateString("vi-VN"),
+      amount: earningsByDay.get(dateKey(date)) ?? 0,
+    }));
+  }
+
+  const weeks: { key: string; label: string; fullLabel: string; amount: number }[] = [];
+  for (let index = 0; index < dates.length;) {
+    const start = dates[index];
+    const daysInWeek = 7 - ((start.getDay() + 6) % 7);
+    const weekDates = dates.slice(index, index + daysInWeek);
+    const end = weekDates[weekDates.length - 1];
+    const label = `Tuần ${weeks.length + 1}`;
+    weeks.push({
+      key: dateKey(start),
+      label,
+      fullLabel: `${label} (${start.toLocaleDateString("vi-VN")} - ${end.toLocaleDateString("vi-VN")})`,
+      amount: weekDates.reduce((total, date) => total + (earningsByDay.get(dateKey(date)) ?? 0), 0),
+    });
+    index += weekDates.length;
+  }
+  return weeks;
+}
+
 export const getOrderDate = (order: Order) =>
   new Date(order.scheduledAt || order.createdAt);
 

@@ -18,9 +18,9 @@ assert.equal(functions.length, 2);
 const js = ts.transpileModule(functions.join('\n') + '\nexports.wallet = createWalletPayment; exports.payos = syncPaidPayosPaymentToOrder;', {
   compilerOptions: { target: ts.ScriptTarget.ES2022 },
 }).outputText;
-async function check(method, orderType, paymentType = 'full', status = 'created', paid = 100000) {
+async function check(method, orderType, paymentType = 'full', status = 'created', paid = 100000, paymentStatus = 'unpaid') {
   const order = { _id: 'order', customerId: 'customer', orderType, status, inspectionRequired: paymentType === 'inspection_deposit',
-    pricing: { totalPaidAmount: 100000, baseAmount: 100000 }, readyForMatching: false, save: async () => {} };
+    pricing: { totalPaidAmount: 100000, baseAmount: 100000 }, paymentStatus, readyForMatching: false, save: async () => {} };
   let dispatchCount = 0;
   const session = { withTransaction: fn => fn(), endSession: async () => {} };
   const context = {
@@ -46,6 +46,7 @@ async function check(method, orderType, paymentType = 'full', status = 'created'
   assert.equal(dispatch, expected, `${method}/${orderType}/${paymentType}/${status}/${paid}`);
   assert.equal(order.readyForMatching, expected);
   if (expected && orderType !== 'normal') assert.equal(order.bookingStatus, 'awaiting_provider');
+  return order;
 }
 (async () => {
   for (const method of ['wallet', 'payos']) {
@@ -57,5 +58,9 @@ async function check(method, orderType, paymentType = 'full', status = 'created'
     }
   }
   await check('payos', 'scheduled', 'full', 'created', 50000);
+  const confirmedQuotationOrder = await check('payos', 'normal', 'inspection_deposit', 'in_progress', 40000, 'paid');
+  assert.equal(confirmedQuotationOrder.paymentStatus, 'paid', 'Webhook cọc lặp không hạ trạng thái đơn báo giá đã thanh toán.');
+  const depositOnlyOrder = await check('payos', 'normal', 'inspection_deposit', 'in_progress', 40000);
+  assert.equal(depositOnlyOrder.paymentStatus, 'partially_paid', 'Đơn mới chỉ thanh toán cọc vẫn được ghi nhận thanh toán một phần.');
   console.log('Đạt: điều phối sau thanh toán ví/PayOS cho giá cố định, lịch hẹn và định kỳ; chặn trả thiếu và thanh toán bổ sung.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

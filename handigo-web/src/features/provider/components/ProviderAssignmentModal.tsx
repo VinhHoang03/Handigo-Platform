@@ -55,7 +55,7 @@ export function ProviderAssignmentModal() {
           </div>
         </div>
 
-        <InfoTile label="Thời gian" value={formatDateTime(order.scheduledAt || order.createdAt)} />
+        {isAppointment && <InfoTile label="Thời gian thực hiện" value={formatDateTime(order.scheduledAt)} />}
 
         {order.orderType === 'recurring' && (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-sm text-sm text-on-surface">

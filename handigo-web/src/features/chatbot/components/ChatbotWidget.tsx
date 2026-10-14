@@ -323,6 +323,9 @@ export function ChatbotWidget({
             pendingRequest.current ??= { sessionId: sessionId.current, requestId: crypto.randomUUID(), paymentStatus: { orderId } };
             void sendMessage("");
           }}
+          onChangePaymentMethod={(orderId) => {
+            void sendMessage(`Tôi muốn đổi phương thức thanh toán cho đơn ${orderId}. Hãy cho tôi chọn phương thức khả dụng rồi chuẩn bị xác nhận đổi trên cùng đơn.`);
+          }}
           onDecision={(decision) => void decide(decision)}
           taskBlocked={agentSession?.requiresReconciliation || (usesAgent && Boolean(error))}
           onNewSession={usesAgent ? () => void resetSession() : undefined}

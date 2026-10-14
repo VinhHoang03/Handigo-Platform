@@ -42,9 +42,10 @@ for (const [path, exports] of [
   ['../services/providerSchedule.service', {}],
   ['../utils/logger', { createLogger: () => ({ info() {}, warn() {}, error() {} }) }],
 ]) stub(path, exports);
-const { DispatchService } = require('../services/dispatch.service');
+const { DispatchService, DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS } = require('../services/dispatch.service');
 
 async function run() {
+  assert.equal(DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS, 90_000, 'Yêu cầu chọn thợ có cùng thời hạn nhận đơn 90 giây');
   for (const scheduled of [false, true]) {
     for (const hasSearch of [false, true]) {
       const now = new Date();
@@ -65,6 +66,9 @@ async function run() {
       assert.equal(events[0].event, 'assignment:new');
       assert.equal(events[0].userId, candidate.userId.toString());
       assert.ok(assignments[0].responseDeadline > now);
+      const responseDuration = assignments[0].responseDeadline.getTime() - assignments[0].assignedAt.getTime();
+      assert.ok(responseDuration > 89_000 && responseDuration <= 90_000,
+        'Đơn thường và lịch hẹn đều có thời hạn nhận đơn 90 giây');
       await DispatchService.dispatchOrder(order._id.toString(), ctx);
       assert.equal(assignments.length, 1, 'Không gửi trùng đề nghị đang chờ');
       for (const patch of [{ readyForMatching: false }, { preferredProviderId: candidate.providerId }, { status: 'accepted' }]) {

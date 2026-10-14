@@ -3,7 +3,6 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { useNavigate } from "react-router-dom";
 import { getNotificationTarget } from "@/components/common/notification-bell/notificationBell.utils";
-import { NotificationBanner } from "../components/NotificationBanner";
 import { NotificationFilterSelects } from "../components/NotificationFilterSelects";
 import { NotificationList } from "../components/NotificationList";
 import { NotificationListSkeleton } from "../components/NotificationListSkeleton";
@@ -33,7 +32,6 @@ export default function NotificationsPage({
     unreadCount,
     loading,
     error,
-    notice,
     busy,
     sendOpen,
     setSendOpen,
@@ -66,8 +64,6 @@ export default function NotificationsPage({
         />
 
         <NotificationStatsGrid stats={stats} />
-
-        <NotificationBanner error={error} notice={notice} />
 
         <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
           <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

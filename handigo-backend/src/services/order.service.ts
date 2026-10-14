@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { earnOrderRewards } from "./reward.service";
@@ -7,12 +8,16 @@ import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
 import { Address } from "../models/address.model";
+import { recordOrderStatus } from "../utils/orderHistory";
+import { resolveAutomaticPromotion, claimPromotion, releaseOrderPromotion } from "./promotion.service";
+import { withOrderAddress } from "../utils/orderAddress";
+import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates } from "./address.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
 import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
-import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt } from "../utils/bookingPolicy";
+import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, isWithinAppointmentHours } from "../utils/bookingPolicy";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import {
   DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
@@ -35,13 +40,13 @@ import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
   reservePersonalVoucher,
+  releaseVoucherReservation,
 } from "./voucher.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const DEFAULT_PLATFORM_COMMISSION_PERCENT = 15;
 const PLATFORM_FEE_PERCENT_CONFIG_KEY = "PLATFORM_FEE_PERCENT";
-const DEFAULT_APPOINTMENT_RESPONSE_MINUTES = 2;
 
 function generateOrderCode(): string {
   return `ORD-${randomBytes(6).toString("hex").toUpperCase()}`;
@@ -93,7 +98,10 @@ function getPopulatedId(value: unknown): string | null {
 
 async function attachQuotationFinalAmounts<T extends {
   currentQuotationId?: unknown;
+  addressId?: unknown;
+  addressSnapshot?: IOrder["addressSnapshot"];
 }>(orders: T[]): Promise<Array<T & { quotationFinalAmount?: number }>> {
+  orders = orders.map(withOrderAddress);
   const quotationIds = orders
     .map((order) => getPopulatedId(order.currentQuotationId))
     .filter((id): id is string => Boolean(id));
@@ -125,11 +133,11 @@ async function attachQuotationFinalAmounts<T extends {
 
 export async function dispatchOrderForMatching(orderId: string) {
   const order = await Order.findById(orderId).select(
-    "addressId serviceId status readyForMatching",
+    "addressId addressSnapshot serviceId status readyForMatching",
   );
   if (!order || order.status !== "created" || !order.readyForMatching) return;
 
-  const address = await Address.findById(order.addressId).select(
+  const address = order.addressSnapshot ?? await Address.findById(order.addressId).select(
     "latitude longitude province ward",
   );
   if (!address) {
@@ -144,7 +152,7 @@ export async function dispatchOrderForMatching(orderId: string) {
     ward: address.ward,
   }).catch((err: unknown) =>
     console.error(
-      `[OrderService] Dispatch failed for order ${order._id}:`,
+      `[OrderService] Điều phối đơn hàng ${order._id} thất bại:`,
       err,
     ),
   );
@@ -154,8 +162,9 @@ export async function dispatchOrderForMatching(orderId: string) {
 
 export interface CreateOrderPayload {
   expectedBookingAmount?: number;
+  expectedFinalAmount?: number;
   uniformQuantity?: number;
-  confirmedExpectation?: { amount: number; addressVersion: string };
+  confirmedExpectation?: { amount: number; addressVersion: string; discountAmount?: number };
   customerId: string;
   serviceId: string;
   servicePackageId?: string;
@@ -201,19 +210,14 @@ export const OrderService = {
     ) {
       throw new AppError("Thời gian thực hiện không hợp lệ.", 400);
     }
-    const scheduledHour = scheduledAt
-      ? new Date(scheduledAt.getTime() + 7 * 60 * 60 * 1000).getUTCHours()
-      : null;
     if (
       ["scheduled", "recurring"].includes(orderType) &&
       (!scheduledAt
         || scheduledAt.getTime() < getEarliestScheduledAt().getTime()
-        || scheduledHour === null
-        || scheduledHour < 8
-        || scheduledHour > 21)
+        || !isWithinAppointmentHours(scheduledAt))
     ) {
       throw new AppError(
-        "Vui lòng chọn giờ từ 08:00 đến 21:59 và không sớm hơn phút hiện tại.",
+        "Vui lòng chọn giờ từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.",
         400,
       );
     }
@@ -278,11 +282,15 @@ export const OrderService = {
     const selectedAddress = await Address.findOne({
       _id: payload.addressId,
       userId: payload.customerId,
+      isDeleted: { $ne: true },
     });
     if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
     const address = await ensureAddressCoordinates(selectedAddress);
+    if (payload.confirmedExpectation && address.updatedAt.toISOString() !== payload.confirmedExpectation.addressVersion) {
+      throw new ActionPreconditionError();
+    }
 
     const pricingSnapshot = await buildServicePricingSnapshot(
       service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, orderType,
@@ -344,9 +352,11 @@ export const OrderService = {
         limit: 1,
         requireOnline: true,
         scheduledDates: isAppointment ? occurrenceDates : [],
+        scheduleIntervals,
       });
       preferredProvider = candidates[0] ?? null;
       if (!preferredProvider) {
+        if (payload.confirmedExpectation) throw new ActionPreconditionError("Chuyên gia không còn trực tuyến hoặc phù hợp. Vui lòng chọn lại chuyên gia.");
         throw new AppError(
           "Chuyên gia không còn phù hợp với dịch vụ hoặc khu vực đã chọn.",
           409,
@@ -381,12 +391,26 @@ export const OrderService = {
       : Math.max(platformCommissionPercent, 0) / 100;
     // Tiền đặt dịch vụ gồm giá gốc/cọc và phụ phí phục vụ ngay nếu có.
     const totalAmount = pricingSnapshot.bookingAmount;
-    if (payload.confirmedExpectation && totalAmount !== payload.confirmedExpectation.amount) {
-      throw new ActionPreconditionError();
-    }
+    const automaticPromotion = await resolveAutomaticPromotion(service._id, pricingSnapshot.baseAmount, Boolean(payload.voucherCode));
+    const amountBeforeVoucher = Math.max(pricingSnapshot.baseAmount - (automaticPromotion?.discountAmount ?? 0), 0);
     const voucherResult = payload.voucherCode
-      ? await resolveVoucherForAmount(payload.voucherCode, pricingSnapshot.baseAmount)
+      ? await resolveVoucherForAmount(payload.voucherCode, amountBeforeVoucher, undefined, payload.customerId, inspectionRequired)
+        .catch((error: unknown) => {
+          if (payload.confirmedExpectation && error instanceof AppError && error.statusCode < 500) {
+            throw new ActionPreconditionError(error.message);
+          }
+          throw error;
+        })
       : null;
+    if (payload.expectedFinalAmount !== undefined &&
+      Math.max(totalAmount - (automaticPromotion?.discountAmount ?? 0) - (voucherResult?.discountAmount ?? 0), 0) !== payload.expectedFinalAmount) {
+      throw new AppError("Tổng tiền sau giảm giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại giá mới.", 409);
+    }
+    if (payload.confirmedExpectation && (
+      Math.max(totalAmount - (automaticPromotion?.discountAmount ?? 0) - (voucherResult?.discountAmount ?? 0), 0) !== payload.confirmedExpectation.amount
+      || (payload.confirmedExpectation.discountAmount !== undefined
+        && (voucherResult?.discountAmount ?? 0) !== payload.confirmedExpectation.discountAmount)
+    )) throw new ActionPreconditionError();
 
 
     // 6. Persist order
@@ -395,11 +419,10 @@ export const OrderService = {
     const orderDocuments = orderDates.map((orderDate, index) => {
       const orderVoucher = index === 0 ? voucherResult : null;
       const voucherDiscountAmount = orderVoucher?.discountAmount ?? 0;
+      const promotionDiscountAmount = automaticPromotion?.discountAmount ?? 0;
       const { platformCommissionAmount, providerEarningAmount } = calculateBookingSettlement(
-        Math.max(totalAmount - voucherDiscountAmount, 0),
-        pricingSnapshot.immediateFee,
+        Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
         platformCommissionRate,
-        pricingSnapshot.immediateProviderPercent,
         inspectionRequired,
       );
       return {
@@ -414,6 +437,11 @@ export const OrderService = {
       selectedOptionIds: pricingSnapshot.optionIds,
       selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
       addressId: new Types.ObjectId(payload.addressId),
+      addressSnapshot: {
+        recipientName: address.recipientName, recipientPhone: address.recipientPhone,
+        fullAddress: address.fullAddress, province: address.province, ward: address.ward,
+        latitude: address.latitude, longitude: address.longitude,
+      },
       orderType,
       scheduledAt: orderDate,
       schedule: pricingSnapshot.schedule,
@@ -424,6 +452,7 @@ export const OrderService = {
       occurrenceNumber: orderType === "recurring" ? index + 1 : null,
       totalOccurrences: orderType === "recurring" ? orderDates.length : null,
       status: "created",
+      statusVersion: 1,
       paymentMethod: payload.paymentMethod,
       paymentStatus: "unpaid",
       readyForMatching: false,
@@ -435,32 +464,66 @@ export const OrderService = {
       customerAttachments: payload.customerAttachments ?? [],
       pricing: {
         baseAmount: pricingSnapshot.baseAmount,
-        immediateFee: pricingSnapshot.immediateFee,
-        immediateProviderPercent: pricingSnapshot.immediateProviderPercent,
         bookingAmount: totalAmount, // The amount including options for the current payment phase
         platformCommissionRate,
         platformCommissionAmount,
         providerEarningAmount,
-        promotionDiscountAmount: 0,
+        promotionDiscountAmount,
         voucherDiscountAmount,
-        totalPaidAmount: Math.max(totalAmount - voucherDiscountAmount, 0),
+        totalPaidAmount: Math.max(totalAmount - promotionDiscountAmount - voucherDiscountAmount, 0),
       },
       voucherSnapshot: orderVoucher?.snapshot ?? null,
+      promotionSnapshot: automaticPromotion?.snapshot ?? null,
+      promotionUsedAt: automaticPromotion ? new Date() : null,
       confirmation: {
         customerConfirmedAt: null,
         providerConfirmedAt: null,
       },
       };
     });
-    const createdOrders = (await Order.insertMany(
-      orderDocuments as Array<Partial<IOrder>>,
-    )) as Array<IOrder>;
+    // Giữ lượt ưu đãi và ghi lịch sử cùng giao dịch tạo đơn.
+    const saveOrders = async (session: mongoose.ClientSession) => {
+      if (voucherResult) {
+        const currentVoucher = await resolveVoucherForAmount(payload.voucherCode!, amountBeforeVoucher, session, payload.customerId, inspectionRequired);
+        if (currentVoucher.discountAmount !== voucherResult.discountAmount
+          || String(currentVoucher.snapshot.voucherId) !== String(voucherResult.snapshot.voucherId)) throw new ActionPreconditionError();
+      }
+      if (automaticPromotion) await claimPromotion(automaticPromotion.promotion, orderDocuments.length, session);
+      const documents = await Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
+      if (voucherResult) {
+        await reservePersonalVoucher(voucherResult.snapshot.voucherId, payload.customerId,
+          documents[0]._id as Types.ObjectId, inspectionRequired, session);
+      }
+      for (const document of documents) await recordOrderStatus({ _id: document._id, status: document.status, statusVersion: 1 }, null, session);
+      return documents;
+    };
+    let createdOrders: IOrder[];
+    const session = await mongoose.startSession();
+    try { createdOrders = (await session.withTransaction(() => saveOrders(session))) as IOrder[]; }
+    catch (error) {
+      // Lỗi nghiệp vụ đã rollback: trợ lý có thể lập bản xác nhận mới.
+      if (payload.confirmedExpectation && error instanceof AppError && error.statusCode < 500) {
+        throw new ActionPreconditionError(error.message);
+      }
+      throw error;
+    }
+    finally { await session.endSession(); }
     const order = createdOrders[0] as unknown as IOrder;
 
     return order;
   },
 
   async discardUnpaidOrder(orderId: string, customerId: string) {
+    const draft = await Order.findOne({ _id: orderId, customerId });
+    if (!draft) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+    if (draft.isDeleted && draft.paymentStatus === "unpaid" && draft.status === "created") {
+      return { orderId: draft._id.toString() };
+    }
+    if (draft.isDeleted || draft.status !== "created" || draft.paymentStatus !== "unpaid" || draft.readyForMatching) {
+      throw new AppError("Đơn hàng không còn ở trạng thái có thể loại bỏ", 409);
+    }
+    const { cancelPendingPayosPaymentForOrder } = await import("./payment.service");
+    await cancelPendingPayosPaymentForOrder(orderId, { id: customerId, role: "CUSTOMER" });
     const session = await mongoose.startSession();
     try {
       return await session.withTransaction(async () => {
@@ -473,6 +536,9 @@ export const OrderService = {
           isDeleted: false,
         }).session(session);
         if (!order) {
+          const discarded = await Order.findOne({ _id: orderId, customerId, isDeleted: true,
+            status: "created", paymentStatus: "unpaid" }).session(session);
+          if (discarded) return { orderId: discarded._id.toString() };
           throw new AppError("Đơn hàng không còn ở trạng thái có thể loại bỏ", 409);
         }
 
@@ -491,7 +557,7 @@ export const OrderService = {
         await Payment.updateMany(
           { orderId: order._id, status: "failed" },
           { $set: { isDeleted: true } },
-          { session },
+          { session, runValidators: true },
         );
         await OrderAssignment.updateMany(
           { orderId: order._id, status: "pending" },
@@ -506,6 +572,8 @@ export const OrderService = {
 
         order.isDeleted = true;
         order.readyForMatching = false;
+        await releaseVoucherReservation(order._id, session);
+        await releaseOrderPromotion(order._id, session);
         await order.save({ session });
         return { orderId: order._id.toString() };
       });
@@ -518,7 +586,9 @@ export const OrderService = {
     orderId: string,
     customerId: string,
     providerId: string,
+    expectedVersion?: string,
   ): Promise<IOrder> {
+    const unavailable = (message: string) => expectedVersion ? new ActionPreconditionError(message) : new AppError(message, 409);
     if (!Types.ObjectId.isValid(orderId) || !Types.ObjectId.isValid(providerId)) {
       throw new AppError("Đơn hàng hoặc chuyên gia không hợp lệ.", 400);
     }
@@ -527,14 +597,22 @@ export const OrderService = {
       _id: orderId,
       customerId,
       status: "created",
-      bookingStatus: "rejected",
+      $or: [{ bookingStatus: "rejected" }, { "reassignment.status": "awaiting_customer" }],
       isDeleted: false,
     });
     const isAppointment = Boolean(
       order && ["scheduled", "recurring"].includes(order.orderType),
     );
     if (!order || (isAppointment && !order.scheduledAt)) {
-      throw new AppError("Đơn hàng không ở trạng thái có thể chọn lại provider.", 409);
+      throw unavailable("Đơn hàng không ở trạng thái có thể chọn lại provider.");
+    }
+    if (expectedVersion && order.updatedAt.toISOString() !== expectedVersion) throw new ActionPreconditionError();
+    const replacing = order.reassignment?.status === "awaiting_customer";
+    if (replacing && order.reassignment!.expiresAt <= new Date()) {
+      throw unavailable("Yêu cầu đổi thợ đã hết hạn. Vui lòng kiểm tra trạng thái đơn.");
+    }
+    if (order.providerId || order.reassignment?.previousProviderIds.some((id) => String(id) === providerId)) {
+      throw unavailable("Không thể chọn lại thợ đã yêu cầu rời đơn hoặc đơn đã có người nhận.");
     }
 
     const relatedOrderIds = order.recurringGroupId
@@ -551,17 +629,14 @@ export const OrderService = {
       isDeleted: false,
     });
     if (hasDeclinedAssignment) {
-      throw new AppError(
-        "Chuyên gia này đã từ chối hoặc không phản hồi yêu cầu trước đó. Vui lòng chọn người khác.",
-        409,
-      );
+      throw unavailable("Chuyên gia này đã từ chối hoặc không phản hồi yêu cầu trước đó. Vui lòng chọn người khác.");
     }
 
-    const address = await Address.findOne({
+    const address = order.addressSnapshot ?? await Address.findOne({
       _id: order.addressId,
       userId: customerId,
     });
-    if (!address) throw new AppError("Địa chỉ không hợp lệ.", 404);
+    if (!address) throw expectedVersion ? new ActionPreconditionError("Địa chỉ không còn khả dụng. Vui lòng kiểm tra lại đơn.") : new AppError("Địa chỉ không hợp lệ.", 404);
 
     const appointmentOrders = order.recurringGroupId
       ? await Order.find({ recurringGroupId: order.recurringGroupId, status: "created", isDeleted: false })
@@ -580,43 +655,29 @@ export const OrderService = {
         requireOnline: true, scheduleIntervals,
     });
     const candidate = candidates[0];
-    if (!candidate) throw new AppError("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.", 409);
+    if (!candidate) throw unavailable("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.");
 
-    let responseDeadline: Date;
-    if (isAppointment) {
-      const responseMinutes = Math.max(
-        await getNumberConfigValue(
-          "APPOINTMENT_RESPONSE_MINUTES",
-          DEFAULT_APPOINTMENT_RESPONSE_MINUTES,
-        ),
-        2,
-      );
-      responseDeadline = new Date(
-        order.scheduledAt
-          ? Math.min(
-            Date.now() + responseMinutes * 60 * 1000,
-            order.scheduledAt.getTime(),
-          )
-          : Date.now() + responseMinutes * 60 * 1000,
-      );
-    } else {
-      responseDeadline = new Date(
-        Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
-      );
-    }
+    const responseDeadline = new Date(
+      Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+    );
     const claimedOrder = await Order.findOneAndUpdate(
-      { _id: order._id, status: "created", bookingStatus: "rejected" },
+      { _id: order._id, customerId, status: "created", providerId: null, isDeleted: false,
+        updatedAt: order.updatedAt,
+        ...(replacing ? { "reassignment.status": "awaiting_customer", "reassignment.expiresAt": { $gt: new Date() } }
+          : { bookingStatus: "rejected" }) },
       {
         $set: {
           preferredProviderId: candidate.providerId,
           bookingStatus: "awaiting_provider",
           paymentDueAt: null,
+          readyForMatching: !isAppointment,
+          ...(replacing ? { "reassignment.status": "matching", "reassignment.respondedAt": new Date() } : {}),
         },
       },
       { returnDocument: "after", runValidators: true },
     );
     if (!claimedOrder) {
-      throw new AppError("Lịch hẹn vừa được cập nhật bởi yêu cầu khác.", 409);
+      throw unavailable("Lịch hẹn vừa được cập nhật bởi yêu cầu khác.");
     }
     if (order.recurringGroupId) {
       await Order.updateMany(
@@ -737,7 +798,7 @@ export const OrderService = {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate("serviceId", "name image serviceType")
+        .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
         .lean(),
       Order.countDocuments(query),
     ]);
@@ -777,7 +838,7 @@ export const OrderService = {
       .sort({ createdAt: -1 })
       .limit(safeLimit)
       .populate("customerId", "fullName avatar phone")
-      .populate("serviceId", "name image serviceType")
+      .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
       .populate("addressId")
       .lean();
 
@@ -839,7 +900,7 @@ export const OrderService = {
         .skip(skip)
         .limit(limit)
         .populate("customerId", "fullName avatar phone")
-        .populate("serviceId", "name image serviceType")
+        .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
         .populate("addressId")
         .lean(),
       Order.countDocuments(query),
@@ -868,8 +929,7 @@ export const OrderService = {
     const order = await Order.findOne({ _id: orderId, isDeleted: false })
       .populate("customerId", "fullName avatar phone email")
       .populate(
-        "serviceId",
-        "name image serviceType categoryId depositAmount fixedPrice",
+        { path: "serviceId", select: "name image coverImage serviceType categoryId depositAmount fixedPrice", transform: serviceImageResponse },
       )
       .populate("addressId")
       .populate({
@@ -900,7 +960,10 @@ export const OrderService = {
           : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
-    return { ...order, matchingSearch, matchingExpiresAt };
+    const statusHistory = await OrderStatus.find({ orderId: order._id, isDeleted: false })
+      .select("status previousStatus statusVersion changedByRole note createdAt")
+      .sort({ createdAt: 1, statusVersion: 1 }).lean();
+    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {
@@ -1093,8 +1156,7 @@ export const OrderService = {
         const commissionRate = transactionalOrder.inspectionRequired
           ? 0
           : Math.max(transactionalOrder.pricing.platformCommissionRate, 0);
-        const immediateFee = transactionalOrder.pricing.immediateFee ?? 0;
-        const { platformCommissionAmount } = calculateBookingSettlement(totalAmount, immediateFee, commissionRate, transactionalOrder.pricing.immediateProviderPercent ?? 80, transactionalOrder.inspectionRequired);
+        const { platformCommissionAmount } = calculateBookingSettlement(totalAmount, commissionRate, transactionalOrder.inspectionRequired);
         transactionalOrder.pricing.platformCommissionAmount =
           platformCommissionAmount;
         transactionalOrder.pricing.totalPaidAmount = totalAmount;

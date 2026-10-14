@@ -9,7 +9,6 @@ import { FileUploadSlot } from "./ProviderAssetUpload";
 
 export function IdentityDocumentForm({
   form,
-  error,
   isSaving,
   uploadingAsset,
   onChange,
@@ -29,11 +28,6 @@ export function IdentityDocumentForm({
 }) {
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
-      {error && (
-        <div className="rounded-lg bg-error/10 p-3 text-sm text-error">
-          {error}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <ProfileSelectField<IdentityDocumentType>

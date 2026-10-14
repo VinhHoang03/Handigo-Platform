@@ -1,3 +1,4 @@
+import '../../../shared/widgets/service_images.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -111,7 +112,7 @@ class OrderSummaryCard extends StatelessWidget {
           ]),
           const SizedBox(height: 10),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _OrderServiceImage(url: order.serviceImage),
+            SizedBox(width: 88, child: ServiceCoverImage(url: order.serviceImage, name: order.serviceName)),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(order.serviceName, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
@@ -173,29 +174,6 @@ bool _matchesFilter(String status, String filter) {
 int _countFor(List<OrderSummary> orders, String filter) =>
     orders.where((order) => _matchesFilter(order.status, filter)).length;
 
-class _OrderServiceImage extends StatelessWidget {
-  const _OrderServiceImage({this.url});
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = usableMediaUrl(url);
-    final placeholder = Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Icon(Icons.cleaning_services_outlined, color: Theme.of(context).colorScheme.primary),
-    );
-    return SizedBox(
-      width: 58,
-      height: 58,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: imageUrl == null
-            ? placeholder
-            : Image.network(imageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder),
-      ),
-    );
-  }
-}
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge({required this.label, required this.color});
@@ -236,6 +214,14 @@ class OrderDetailScreen extends ConsumerWidget {
           ]))),
           if (order.providerName != null) _InfoTile(icon: Icons.person_outline, title: 'Nhà cung cấp', value: order.providerName!),
           if (order.addressLabel != null) _InfoTile(icon: Icons.location_on_outlined, title: 'Địa chỉ', value: order.addressLabel!),
+          if (order.statusHistory.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('Lịch sử trạng thái', style: Theme.of(context).textTheme.titleMedium),
+            for (final event in order.statusHistory) ListTile(
+              leading: const Icon(Icons.history), title: Text(orderStatusLabel(event.status)),
+              subtitle: event.createdAt == null ? null : Text(DateFormat('dd/MM/yyyy HH:mm').format(event.createdAt!.toLocal())),
+            ),
+          ],
           if (order.problemDescription?.isNotEmpty == true) _InfoTile(icon: Icons.notes_outlined, title: 'Mô tả', value: order.problemDescription!),
           const SizedBox(height: 8),
           if (order.status != 'cancelled' && order.status != 'completed') FilledButton.icon(

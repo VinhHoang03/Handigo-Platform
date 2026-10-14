@@ -15,7 +15,7 @@ export function AgentSessionHistory({ currentId, disabled, onSelect, onDelete }:
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useToastFeedback<string>("", "error");
+  const [, setDeleteError] = useToastFeedback<string>("", "error");
   const deleting = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -48,7 +48,6 @@ export function AgentSessionHistory({ currentId, disabled, onSelect, onDelete }:
   };
   return <section aria-label="Lịch sử trò chuyện" className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
     <h3 className="font-semibold text-on-surface">Cuộc trò chuyện của bạn</h3>
-    {deleteError && <p role="alert" className="text-sm text-error">{deleteError}</p>}
     {loading ? <p role="status" className="text-sm">Đang tải lịch sử…</p>
       : error ? <div role="alert" className="text-sm text-error">{error}
         <button type="button" className="ml-2 underline" onClick={() => { setLoading(true); setError(""); setAttempt(attempt + 1); }}>Thử lại</button>

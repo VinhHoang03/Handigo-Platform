@@ -14,6 +14,7 @@ export interface WalletSectionHandle {
 interface WalletTransactionsSectionProps {
   onError: (message: string) => void;
   pageSize?: number;
+  groupSettlements?: boolean;
   ref?: Ref<WalletSectionHandle>;
 }
 
@@ -32,7 +33,7 @@ const transactionsSkeleton = (
 );
 
 /** Lịch sử giao dịch ví: tự quản lý query/phân trang, cha chỉ nhận lỗi qua onError. */
-export function WalletTransactionsSection({ onError, ref, pageSize = 8 }: WalletTransactionsSectionProps) {
+export function WalletTransactionsSection({ onError, ref, pageSize = 8, groupSettlements = false }: WalletTransactionsSectionProps) {
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [query, setQuery] = useState<WalletTransactionQuery>({ page: 1, type: '' });
   const [totalPages, setTotalPages] = useState(1);
@@ -40,7 +41,7 @@ export function WalletTransactionsSection({ onError, ref, pageSize = 8 }: Wallet
 
   const load = useCallback(async () => {
     try {
-      const result = await walletApi.listTransactions({ ...query, limit: pageSize, type: query.type || undefined });
+      const result = await walletApi.listTransactions({ ...query, limit: pageSize, type: query.type || undefined, groupSettlements });
       setTransactions(result.items);
       setTotalPages(result.pagination.totalPages || 1);
     } catch (err) {
@@ -48,7 +49,7 @@ export function WalletTransactionsSection({ onError, ref, pageSize = 8 }: Wallet
     } finally {
       setLoading(false);
     }
-  }, [query, onError, pageSize]);
+  }, [query, onError, pageSize, groupSettlements]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -73,7 +74,7 @@ export function WalletTransactionsSection({ onError, ref, pageSize = 8 }: Wallet
         >
           <option value="">Tất cả loại giao dịch</option>
           {Object.entries(transactionLabels).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
+            <option key={value} value={value}>{groupSettlements && value === 'provider_earning' ? 'Thu nhập dịch vụ sau phí' : label}</option>
           ))}
         </select>
       </div>

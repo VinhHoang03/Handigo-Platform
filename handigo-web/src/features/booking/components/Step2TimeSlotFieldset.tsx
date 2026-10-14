@@ -30,7 +30,8 @@ export const Step2TimeSlotFieldset = ({
   const earliest = getEarliestScheduledAt(new Date(currentTimestamp)).getTime();
   const isUnavailable = (slot: string) => {
     const timestamp = new Date(`${selectedDate}T${slot}:00`).getTime();
-    return !Number.isFinite(timestamp) || timestamp < earliest;
+    const [hour, minute] = slot.split(':').map(Number);
+    return !Number.isFinite(timestamp) || timestamp < earliest || hour > 21 || (hour === 21 && minute > 0);
   };
 
   const firstAvailableMinute = (hour: string) => minutes.find((minute) => !isUnavailable(`${hour}:${minute}`));

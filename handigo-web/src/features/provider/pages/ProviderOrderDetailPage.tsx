@@ -40,6 +40,7 @@ export default function ProviderOrderDetailPage() {
     handleReject,
     handleStart,
     handleComplete,
+    handleConfirmQuotationPayment,
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,
@@ -150,6 +151,7 @@ export default function ProviderOrderDetailPage() {
               onCreateQuotation={handleCreateQuotation}
               onCancel={() => setCancelOpen(true)}
               onComplete={handleComplete}
+              onConfirmPayment={handleConfirmQuotationPayment}
             />
           ) : (
             <FixedPriceActionForm

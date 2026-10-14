@@ -32,7 +32,7 @@ export function MessageThread({
   const [deletingMessageId, setDeletingMessageId] = useState("");
   const [previewImageUrl, setPreviewImageUrl] = useState("");
   const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useToastFeedback<string>("", "error");
+  const [, setActionError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -81,11 +81,6 @@ export function MessageThread({
   return (
     <>
       <div className="flex-1 space-y-3 overflow-y-auto bg-surface-container-low/40 p-4">
-        {actionError && (
-          <p className="rounded-xl bg-error/10 px-3 py-2 text-xs text-error">
-            {actionError}
-          </p>
-        )}
         {messages.map((message) => {
           const isMine = getSenderId(message) === currentUserId;
           const isEditing = editingMessageId === message._id;

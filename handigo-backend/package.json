@@ -11,6 +11,7 @@
     "migrate:provider-service-ids": "ts-node src/scripts/migrateProviderServiceIds.ts",
     "migrate:provider-applications": "ts-node src/scripts/migrateProviderApplicationReviewHistory.ts",
     "migrate:single-user-role": "ts-node src/scripts/migrateSingleUserRole.ts",
+    "migrate:system": "ts-node src/scripts/migrateSystemData.ts",
     "migrate:fixed-option-pricing": "ts-node src/scripts/migrateFixedServiceOptionPricing.ts"
   },
   "keywords": [],

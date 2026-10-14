@@ -2,8 +2,9 @@ import { Link } from "react-router-dom";
 import type { AgentPayment } from "../types/agent.types";
 import { AgentPayosCheckout } from "./AgentPayosCheckout";
 
-export function AgentPaymentCard({ payment, disabled, onCheck }: {
+export function AgentPaymentCard({ payment, disabled, onCheck, onChangeMethod }: {
   payment: AgentPayment; disabled: boolean; onCheck: (orderId: string) => void;
+  onChangeMethod?: (orderId: string) => void;
 }) {
   const pendingPayos = payment.status === "pending" && (payment.method === "payos" || Boolean(payment.checkoutUrl));
   const canCheckPayment = ["pending", "cash_pending", "blocked", "failed"].includes(payment.status);
@@ -13,6 +14,8 @@ export function AgentPaymentCard({ payment, disabled, onCheck }: {
     {payment.amount != null && <p className="font-semibold text-primary">{payment.amount.toLocaleString("vi-VN")} đ</p>}
     <div className="flex flex-col gap-2">
       {pendingPayos && <AgentPayosCheckout key={`${payment.orderId}:${payment.paymentId ?? "payos"}`} payment={payment} disabled={disabled} onCheck={onCheck} />}
+      {(pendingPayos || payment.status === "cash_pending") && onChangeMethod && <button type="button" disabled={disabled} onClick={() => onChangeMethod(payment.orderId)}
+        className="min-h-11 rounded-xl border border-outline-variant px-3 py-2 font-medium hover:bg-surface-container-low disabled:opacity-50">Đổi phương thức thanh toán</button>}
       {canCheckPayment && <button type="button" disabled={disabled} onClick={() => onCheck(payment.orderId)}
         className="min-h-11 rounded-xl border border-outline-variant px-3 py-2 font-medium hover:bg-surface-container-low disabled:opacity-50">Kiểm tra thanh toán</button>}
       <div className="flex justify-between gap-3 text-xs font-medium text-primary">

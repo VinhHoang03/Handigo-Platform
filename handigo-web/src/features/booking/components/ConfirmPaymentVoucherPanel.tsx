@@ -32,6 +32,7 @@ export const ConfirmPaymentVoucherPanel = ({
             {voucher.code} · {voucher.discountType === 'PERCENT'
               ? `Giảm ${voucher.discountValue}%`
               : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}đ`}
+            {voucher.maxDiscountAmount != null ? ` · Tối đa ${voucher.maxDiscountAmount.toLocaleString('vi-VN')}đ` : ''}
           </option>
         ))}
       </select>

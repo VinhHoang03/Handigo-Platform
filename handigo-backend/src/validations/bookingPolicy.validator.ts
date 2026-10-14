@@ -7,6 +7,7 @@ const windowSchema = z.object({ start: minutes, end: minutes }).strict()
   .refine((value) => value.end > value.start, "Giờ kết thúc phải sau giờ bắt đầu");
 
 export const bookingPolicySchema = z.object({
+  // Giữ các trường cấu hình cũ để đọc dữ liệu đã lưu; không dùng để tính giá.
   immediatePercent: z.number().min(0).max(100).default(15),
   immediateMin: z.number().int().min(0).max(10000000).default(20000),
   immediateMax: z.number().int().min(0).max(10000000).default(60000),

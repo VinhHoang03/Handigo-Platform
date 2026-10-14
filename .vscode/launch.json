@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Handigo App: Debug trên thiết bị đã chọn",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/handigo-app",
+      "program": "${workspaceFolder}/handigo-app/lib/main.dart",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=${input:appApiBaseUrl}"
+      ]
+    },
+    {
+      "name": "Handigo App: Chrome local",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/handigo-app",
+      "program": "${workspaceFolder}/handigo-app/lib/main.dart",
+      "deviceId": "chrome",
+      "flutterMode": "debug",
+      "toolArgs": [
+        "--web-hostname=localhost",
+        "--web-port=8081",
+        "--dart-define=API_BASE_URL=http://localhost:5000"
+      ]
+    },
+    {
+      "name": "Handigo App: Gắn debugger vào app đang chạy",
+      "type": "dart",
+      "request": "attach",
+      "cwd": "${workspaceFolder}/handigo-app"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "appApiBaseUrl",
+      "type": "promptString",
+      "description": "Địa chỉ API: Android emulator dùng 10.0.2.2; điện thoại thật dùng IP LAN của máy chạy backend",
+      "default": "http://10.0.2.2:5000"
+    }
+  ]
+}

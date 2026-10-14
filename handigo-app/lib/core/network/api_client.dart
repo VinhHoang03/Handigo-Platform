@@ -77,6 +77,7 @@ class ApiClient {
     Map<String, dynamic>? data,
     Map<String, dynamic>? query,
     bool authenticated = false,
+    Duration? receiveTimeout,
   }) async {
     if (authenticated && _loggingOut) {
       throw const ApiException(
@@ -92,6 +93,7 @@ class ApiClient {
           queryParameters: query,
           options: Options(
             method: method,
+            receiveTimeout: receiveTimeout,
             headers: {
               if (authenticated && _token != null)
                 'Authorization': 'Bearer $_token',

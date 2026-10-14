@@ -5,6 +5,7 @@ import '../../features/auth/presentation/auth_controller.dart';
 import '../../features/auth/presentation/auth_screens.dart';
 import '../../features/home/presentation/customer_shell.dart';
 import '../../features/service_catalog/presentation/service_catalog_screens.dart';
+import '../../features/service_catalog/presentation/service_reviews_screen.dart';
 import '../../features/orders/presentation/order_screens.dart';
 import '../../features/orders/presentation/tracking_screen.dart';
 import '../../features/notifications/presentation/notification_screens.dart';
@@ -169,6 +170,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/customer/services/:id',
         builder: (_, state) =>
             ServiceDetailScreen(serviceId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/customer/services/:id/reviews',
+        builder: (_, state) => ServiceReviewsScreen(serviceId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/customer/bookings/new/:serviceId',

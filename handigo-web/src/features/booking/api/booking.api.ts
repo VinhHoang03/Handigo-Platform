@@ -18,6 +18,7 @@ export interface OrderPaymentsResult {
 
 export interface CreateOrderPayload {
   expectedBookingAmount?: number;
+  expectedFinalAmount?: number;
   serviceId: string;
   selectedOptionIds?: string[];
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
@@ -58,7 +59,7 @@ interface ReverseGeocodedAddress {
 }
 
 export const bookingApi = {
-  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity'>) => {
+  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity' | 'voucherCode'>) => {
     const response = await api.post<{ success: boolean; data: BookingPreview }>('/orders/preview', payload);
     return response.data.data;
   },
@@ -110,6 +111,7 @@ export const bookingApi = {
 
   createPayment: async (payload: {
     orderId: string;
+    expectedAmount?: number;
     method: "PAYOS" | "CASH" | "WALLET";
     paymentType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING";
     returnUrl?: string;
@@ -272,9 +274,12 @@ export const bookingApi = {
 };
 
 export interface BookingPreview {
+  promotionDiscountAmount: number;
+  voucherDiscountAmount: number;
+  discountedAmount: number;
+  promotionSnapshot?: { name: string } | null;
   baseAmount: number;
   bookingAmount: number;
-  immediateFee: number;
   depositAmount: number;
   minAdvanceMinutes: number;
   schedule: { durationMinutes: number; bufferMinutes: number; travelMinutes: number };

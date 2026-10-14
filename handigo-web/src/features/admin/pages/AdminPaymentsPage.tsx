@@ -31,7 +31,7 @@ export default function AdminPaymentsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [retryingRefund, setRetryingRefund] = useState(false);
   const [error, setError] = useToastFeedback<string>("", "error");
-  const [notice, setNotice] = useToastFeedback<string>("", "success");
+  const [, setNotice] = useToastFeedback<string>("", "success");
 
   const load = useCallback(async () => {
     try {
@@ -98,9 +98,6 @@ export default function AdminPaymentsPage() {
         </button>
       </header>
 
-      {notice && (
-        <p className="rounded-xl bg-primary/10 px-4 py-3 text-sm font-medium text-primary">{notice}</p>
-      )}
 
       <section className="grid gap-3 rounded-2xl border border-outline-variant/40 bg-surface p-4 sm:grid-cols-3">
         <select

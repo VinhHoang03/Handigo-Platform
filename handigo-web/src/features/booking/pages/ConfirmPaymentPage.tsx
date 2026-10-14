@@ -16,8 +16,10 @@ const ConfirmPaymentPage = () => {
     voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, voucherError, setVoucherError,
     applyVoucherCode, handleConfirm,
     setPaymentMethod,
-    scheduledAt, preferredProviderId, preferredProviderName,
+    scheduledAt, immediateBookingAt, preferredProviderId, preferredProviderName,
     selectedOptionQuantities, uniformQuantity,
+    previewVoucherCode, promotionName, previewError,
+    pendingError, retryPendingOrder,
   } = useConfirmPaymentFlow();
 
   return (
@@ -29,7 +31,7 @@ const ConfirmPaymentPage = () => {
           <ConfirmPaymentServiceDetails
             isAppointment={isAppointment}
             service={service}
-            scheduledAt={scheduledAt}
+            scheduledAt={isAppointment ? scheduledAt : immediateBookingAt}
             address={address}
             preferredProviderId={preferredProviderId}
             preferredProviderName={preferredProviderName}
@@ -50,10 +52,15 @@ const ConfirmPaymentPage = () => {
           <OrderSummaryCard
             step={3}
             discountAmount={voucherDiscountAmount}
+            voucherCode={previewVoucherCode}
             actionLabel="Xác nhận & Thanh toán"
             onAction={handleConfirm}
             isLoading={isSubmitting}
             summaryContent={
+              <>
+              {promotionName && <p className="mb-3 rounded-xl bg-primary/10 p-3 text-primary">Ưu đãi tự động: {promotionName}</p>}
+              {previewError && <p role="alert" className="mb-3 text-error">{previewError}</p>}
+              {pendingError && <p role="alert" className="mb-3 text-error">{pendingError} <button type="button" onClick={retryPendingOrder} className="underline">Thử lại</button></p>}
               <ConfirmPaymentVoucherPanel
                 voucherCode={voucherCode}
                 onSelectVoucher={(code) => {
@@ -76,6 +83,7 @@ const ConfirmPaymentPage = () => {
                 voucherError={voucherError}
                 isSubmitting={isSubmitting}
               />
+              </>
             }
           />
         </div>

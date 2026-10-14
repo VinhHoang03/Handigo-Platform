@@ -18,6 +18,7 @@ interface QuotationOrderPanelProps {
   onCreateQuotation: (payload: CreateQuotationPayload) => Promise<boolean>;
   onCancel: () => void;
   onComplete: (files: File[], note: string) => void | Promise<void>;
+  onConfirmPayment: (quotationId: string, expectedRevision: number) => Promise<boolean>;
 }
 
 /** Nhánh đơn dịch vụ yêu cầu khảo sát: báo giá hoặc thao tác thực hiện. */
@@ -31,6 +32,7 @@ export function QuotationOrderPanel({
   onCreateQuotation,
   onCancel,
   onComplete,
+  onConfirmPayment,
 }: QuotationOrderPanelProps) {
   const appliedDepositAmount = getAppliedQuotationDeposit(order);
   const [editing, setEditing] = useState(false);
@@ -59,6 +61,7 @@ export function QuotationOrderPanel({
           </div>
           <p className="text-xs text-on-surface-variant">Mã báo giá: {quotation.quotation.quotationCode} · Cập nhật: {new Date(quotation.quotation.updatedAt ?? quotation.quotation.createdAt).toLocaleString('vi-VN')}</p>
           {!canEdit && ['completed', 'cancelled'].includes(order.status) && <p className="text-sm text-on-surface-variant">Báo giá đã khóa vì đơn đã kết thúc.</p>}
+          {canEdit && quotation.quotation.directPaymentConfirmedAt && <p className="text-sm text-on-surface-variant">Nếu chỉnh sửa báo giá, bạn cần xác nhận thanh toán lại cho phiên bản mới.</p>}
           {quotation.quotation.inspectionNote && (
             <p className="whitespace-pre-wrap break-words text-sm text-on-surface-variant">{quotation.quotation.inspectionNote}</p>
           )}
@@ -97,7 +100,7 @@ export function QuotationOrderPanel({
             <dd className="ml-auto text-right tabular-nums">−{formatMoney(appliedDepositAmount)}</dd>
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-sm border-t border-primary/15 pt-3">
-            <dt className="text-base font-semibold text-primary">Thu trực tiếp từ khách</dt>
+            <dt className="text-base font-semibold text-primary">{quotation.quotation.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách' : 'Thu trực tiếp từ khách'}</dt>
             <dd className="ml-auto text-right text-headline-md font-bold tabular-nums text-primary">
               {formatMoney(getDirectRepairPayment(quotation.quotation.finalAmount, appliedDepositAmount))}
             </dd>
@@ -159,7 +162,7 @@ export function QuotationOrderPanel({
 
       {!showForm && ['in_progress', 'completed'].includes(order.status) && (
         <div className="space-y-md">
-          <FixedPriceActionForm order={order} onStart={onStart} onComplete={onComplete} onCancel={onCancel} busy={busy} />
+          <FixedPriceActionForm order={order} quotation={quotation} onConfirmPayment={onConfirmPayment} onStart={onStart} onComplete={onComplete} onCancel={onCancel} busy={busy} />
         </div>
       )}
     </>

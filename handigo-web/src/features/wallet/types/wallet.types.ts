@@ -42,6 +42,7 @@ export interface WalletTransaction {
   description?: string | null;
   createdAt: string;
   updatedAt: string;
+  settlementDetails?: { grossAmount: number; platformFee: number; netEarning: number };
 }
 
 export interface BankAccountSnapshot {
@@ -77,6 +78,7 @@ export interface ListResult<T> {
 }
 
 export interface WalletTransactionQuery {
+  groupSettlements?: boolean;
   page?: number;
   limit?: number;
   type?: WalletTransactionType | '';

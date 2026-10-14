@@ -16,6 +16,7 @@ interface NearbyProviderCardProps {
   allowSelection: boolean;
   requireSelection: boolean;
   onSelect: (provider: NearbyProvider) => void;
+  onViewProfile?: (provider: NearbyProvider) => void;
 }
 
 /** Thẻ hiển thị một thợ phù hợp, kèm nút chọn/ưu tiên thợ. */
@@ -26,23 +27,19 @@ export function NearbyProviderCard({
   allowSelection,
   requireSelection,
   onSelect,
+  onViewProfile,
 }: NearbyProviderCardProps) {
-  return (
-    <div
-      className={`rounded-lg border p-3 ${
-        isSelected
-          ? "border-primary bg-primary-container/10"
-          : "border-outline-variant/40 bg-surface-container-lowest"
-      }`}
-    >
-      <div className="flex items-center gap-3">
+  const statusLabel = provider.availabilityStatus === 'online' ? 'Đang hoạt động' : provider.availabilityStatus === 'busy' ? 'Đang bận' : 'Ngoại tuyến';
+  const statusClass = provider.availabilityStatus === 'online' ? 'bg-success' : provider.availabilityStatus === 'busy' ? 'bg-tertiary' : 'bg-on-surface-variant/50';
+  const identity = (
+    <>
         <div className="relative shrink-0">
           <InitialsAvatar
             name={provider.user.fullName || "Thợ"}
             src={provider.user.avatar}
             className="h-14 w-14"
           />
-          <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white bg-success" />
+          <span className={'absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white ' + statusClass} aria-label={statusLabel} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold text-on-surface">
@@ -56,19 +53,44 @@ export function NearbyProviderCard({
               </b>
             </span>
             <span>{provider.totalCompletedOrders}+ đơn</span>
+            <span>{statusLabel}</span>
             <span>
               {provider.distanceMeters >= 0 ? "Cách bạn " : ""}
               {formatDistance(provider.distanceMeters)}
             </span>
           </div>
         </div>
-        <Link
+
+    </>
+  );
+
+  return (
+    <div
+      className={`rounded-lg border p-3 ${
+        isSelected
+          ? "border-primary bg-primary-container/10"
+          : "border-outline-variant/40 bg-surface-container-lowest"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        {onViewProfile ? (
+          <button type="button" onClick={() => onViewProfile(provider)} aria-label={`Xem hồ sơ thợ ${provider.user.fullName}`}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15">
+            {identity}
+          </button>
+        ) : <div className="flex min-w-0 flex-1 items-center gap-3">{identity}</div>}
+        {onViewProfile ? (
+          <button type="button" onClick={() => onViewProfile(provider)}
+            className="min-h-11 shrink-0 rounded-lg px-xs text-xs font-bold text-primary underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15">
+            Xem hồ sơ
+          </button>
+        ) : (<Link
           to={`/customer/providers/${provider.id}${serviceId ? `?serviceId=${encodeURIComponent(serviceId)}` : ""}`}
           className="grid h-10 w-10 place-items-center rounded-full bg-primary-container/10 text-primary hover:bg-primary-container/20"
           aria-label={`Xem hồ sơ thợ ${provider.user.fullName}`}
         >
           <UserSearch aria-hidden="true" size={24} />
-        </Link>
+        </Link>)}
       </div>
 
       <p className="mt-3 line-clamp-1 text-xs text-on-surface-variant">
@@ -90,7 +112,7 @@ export function NearbyProviderCard({
                 : "border-primary text-primary hover:bg-primary/5"
             }`}
           >
-            {isSelected
+            {onViewProfile ? (isSelected ? 'Đã chọn thợ' : 'Chọn thợ') : isSelected
               ? requireSelection
                 ? "Đã chọn thợ"
                 : "Đã ưu tiên thợ"
