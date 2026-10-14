@@ -1,6 +1,7 @@
 import { ReliableImage } from '@/components/common/ReliableImage';
 import type { Order } from '../../../types/booking';
 import { Clock, MapPin } from "lucide-react";
+import { getOrderStatusMeta } from '@/utils/orderStatus';
 
 interface BookingSuccessOrderCardProps {
   order: Order;
@@ -8,35 +9,35 @@ interface BookingSuccessOrderCardProps {
 }
 
 export const BookingSuccessOrderCard = ({ order, addressText }: BookingSuccessOrderCardProps) => (
-  <section className="md:col-span-2 bg-surface-container-lowest border border-outline-variant/30 rounded-3xl p-md shadow-sm">
-    <div className="flex justify-between items-start mb-md">
+  <section className="md:col-span-2 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 shadow-sm">
+    <div className="flex justify-between items-start gap-3 mb-3">
       <div>
         <span className="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">
           Mã đơn hàng
         </span>
-        <p className="font-headline-md text-headline-md text-primary">{order.orderCode}</p>
+        <p className="font-headline-md text-lg font-semibold leading-7 text-primary">{order.orderCode}</p>
       </div>
       <div className="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-sm">
-        {order.status === 'created' ? 'Đang chờ xử lý' : 'Đã xác nhận'}
+        {getOrderStatusMeta(order.status).label}
       </div>
     </div>
 
-    <div className="space-y-md">
-      <div className="flex gap-md">
+    <div className="space-y-3">
+      <div className="flex gap-3">
         <ReliableImage
-          className="w-32 aspect-video shrink-0 rounded-2xl object-contain shadow-sm"
+          className="w-20 aspect-video shrink-0 rounded-xl object-contain shadow-sm"
           src={order.serviceId.coverImage === undefined ? order.serviceId.image : order.serviceId.coverImage}
           alt={order.serviceId.name}
         />
         <div className="flex flex-col justify-center">
-          <h2 className="font-headline-md text-headline-md text-on-surface">{order.serviceId.name}</h2>
-          <p className="text-on-surface-variant flex items-center gap-xs">
+          <h2 className="font-headline-md text-lg font-semibold leading-7 text-on-surface">{order.serviceId.name}</h2>
+          <p className="text-sm leading-5 text-on-surface-variant flex items-center gap-xs">
             Loại dịch vụ: {order.serviceId.serviceType === 'fixed_price' ? 'Giá cố định' : 'Báo giá sau'}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-md border-t border-outline-variant/30 pt-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-outline-variant/30 pt-3">
         <div className="flex items-start gap-sm">
           <div className="p-2 bg-surface-container rounded-lg text-primary">
             <Clock aria-hidden="true" size={24} />

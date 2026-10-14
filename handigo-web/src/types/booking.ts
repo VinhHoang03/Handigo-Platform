@@ -74,6 +74,7 @@ export interface Payment {
   paymentType: "full" | "remaining" | "inspection_deposit";
   status: "pending" | "paid" | "failed" | "refunded";
   transactionCode?: string | null;
+  gatewayResponse?: Record<string, unknown> | null;
 }
 
 export interface CreatePaymentResult {
@@ -293,6 +294,8 @@ export interface OrderQuotation {
     subtotalAmount?: number;
     discountAmount?: number;
     finalAmount: number;
+      directPaymentConfirmedAt?: string | null;
+      directPaymentConfirmedAmount?: number | null;
     inspectionNote?: string | null;
     recommendation?: string | null;
     rejectionReason?: string | null;

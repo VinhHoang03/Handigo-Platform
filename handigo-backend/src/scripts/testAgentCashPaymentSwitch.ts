@@ -16,7 +16,14 @@ async function run() {
   const gateway = new Module(gatewayPath);
   let gatewayCalls = 0;
   let gatewayFails = false;
-  gateway.exports = { payos: { paymentRequests: { create: async () => {
+  gateway.exports = { payos: { paymentRequests: { create: async (request: { returnUrl: string; cancelUrl: string }) => {
+    const returned = new URL(request.returnUrl); const cancelled = new URL(request.cancelUrl);
+    const returnedOrderId = returned.searchParams.get("orderId") ?? returned.pathname.split("/").pop();
+    const cancelledOrderId = cancelled.searchParams.get("orderId") ?? cancelled.pathname.split("/").pop();
+    assert.match(returnedOrderId ?? "", /^[a-f\d]{24}$/i);
+    assert.equal(returnedOrderId, cancelledOrderId);
+    assert.equal(returned.searchParams.get("payos"), "success");
+    assert.equal(cancelled.searchParams.get("payos"), "cancel");
     gatewayCalls++;
     if (gatewayFails) throw new Error("Không tạo được QR");
     return { paymentLinkId: "lien-ket-moi", checkoutUrl: "https://pay.payos.vn/web/lien-ket-moi", qrCode: "QR" };

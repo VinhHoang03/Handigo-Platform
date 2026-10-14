@@ -1,8 +1,8 @@
 import { useGoogleLogin } from "@react-oauth/google";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { loadFacebookSDK } from "@/utils/facebookSdk";
 import { useAuth } from "../hooks/useAuth";
-import { getRoleHomePath } from "../utils/roleNavigation";
+import { getPostLoginPath } from "../utils/roleNavigation";
 
 interface Props {
   rememberMe: boolean;
@@ -22,11 +22,12 @@ const googleClientId = import.meta.env.DEV
 export default function SocialLoginButtons({ rememberMe, onError }: Props) {
   const { googleLogin, facebookLogin, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleAuthenticatedUser = (
     user: Awaited<ReturnType<typeof googleLogin>>,
   ) => {
-    if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
+    if (user) navigate(getPostLoginPath(user.role, user.providerOnboardingStatus, location.state?.from), { replace: true });
   };
 
   const startGoogleLogin = useGoogleLogin({
@@ -65,7 +66,7 @@ export default function SocialLoginButtons({ rememberMe, onError }: Props) {
             return;
           }
           void facebookLogin(accessToken, rememberMe).then((user) => {
-            if (user) navigate(getRoleHomePath(user.role, user.providerOnboardingStatus), { replace: true });
+            if (user) navigate(getPostLoginPath(user.role, user.providerOnboardingStatus, location.state?.from), { replace: true });
             else onError?.("Đăng nhập Facebook thất bại.");
           });
         },

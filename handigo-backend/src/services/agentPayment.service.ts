@@ -5,6 +5,7 @@ import type { RequestUser } from "../middlewares/authContext";
 import type { CreatePaymentInput } from "../validations/payment.validator";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { buildOrderPaymentRedirects } from "../utils/paymentRedirect";
 
 export const agentPaymentResultSchema = z.object({
   orderId: z.string().regex(/^[a-f\d]{24}$/i), orderCode: z.string(),
@@ -98,12 +99,13 @@ export function createAgentPaymentService(deps = dependencies) {
           || current.previousPaymentId !== expected.previousPaymentId
           || current.previousPaymentMethod !== expected.previousPaymentMethod) throw new ActionPreconditionError();
         // URL trở về lấy từ cấu hình server, tuyệt đối không cho LLM chọn tên miền.
-        const frontend = process.env.FRONTEND_URL?.trim();
-        const detailUrl = frontend ? new URL(`/customer/bookings/${args.orderId}`, frontend).href : undefined;
+        const redirectUrls = buildOrderPaymentRedirects(args.orderId, process.env.FRONTEND_URL?.trim() || "https://localhost:5173", {
+          returnUrl: process.env.PAYOS_RETURN_URL, cancelUrl: process.env.PAYOS_CANCEL_URL,
+        });
         executionStarted = true;
         await deps.create(user, { ...args,
           paymentType: expected.paymentType === "inspection_deposit" ? "INSPECTION_DEPOSIT" : "FULL",
-          ...(detailUrl ? { returnUrl: detailUrl, cancelUrl: detailUrl } : {}),
+          ...redirectUrls,
         }, expected, signal);
       } catch (error) {
         if (error instanceof ActionPreconditionError || (!executionStarted && error instanceof AppError && error.statusCode < 500)) {

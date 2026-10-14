@@ -18,6 +18,7 @@ import { createLogger } from "../utils/logger";
 import { markOrderVoucherAsUsed } from "./voucher.service";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { publishPaymentStatus } from "./paymentStatus.service";
+import { buildOrderPaymentRedirects } from "../utils/paymentRedirect";
 
 export interface ConfirmedPaymentExpectation {
   amount: number;
@@ -36,8 +37,6 @@ const assertConfirmedPayment = (order: InstanceType<typeof Order>, amount: numbe
   }
 };
 
-const DEFAULT_RETURN_URL = process.env.PAYOS_RETURN_URL || "http://localhost:5173/payment/success";
-const DEFAULT_CANCEL_URL = process.env.PAYOS_CANCEL_URL || "http://localhost:5173/payment/cancel";
 const paymentLogger = createLogger("PaymentService");
 
 const isDuplicateKeyError = (error: unknown) =>
@@ -700,6 +699,38 @@ export const createAgentOrderPayment = async (user: RequestUser, input: CreatePa
   }
 };
 
+export const createOrderPayment = async (user: RequestUser, input: CreatePaymentInput) => {
+  if (input.method === "PAYOS") return createPayment(user, input);
+  const order = await Order.findById(input.orderId);
+  if (!order || order.isDeleted) throw new AppError("Không tìm thấy đơn hàng", 404);
+  if (order.customerId.toString() !== user.id) {
+    if (user.role === "ADMIN") return createPayment(user, input);
+    throw new AppError("Bạn không có quyền thanh toán đơn hàng này", 403);
+  }
+  if (order.status === "cancelled") throw new AppError("Đơn đã hủy, không thể đổi phương thức thanh toán.", 409);
+  const paymentType = getPaymentType(order, input.paymentType);
+  const previous = await Payment.findOne({ orderId: order._id, customerId: user.id, paymentType,
+    method: "payos", status: { $in: ["pending", "paid"] }, isDeleted: false });
+  if (!previous) return createPayment(user, input);
+  if (order.inspectionRequired && input.method === "CASH") {
+    throw new AppError("Tiền đặt cọc khảo sát chỉ thanh toán bằng chuyển khoản hoặc ví Handigo.", 400);
+  }
+  if (input.expectedAmount !== undefined && input.expectedAmount !== previous.amount) throw new ActionPreconditionError();
+  if (previous.status === "paid") return { payment: previous, amount: previous.amount, paymentType };
+  const preview = await previewOrderPayment(user, input.orderId, input.method, true);
+  if (input.expectedAmount !== undefined && input.expectedAmount !== preview.amount) throw new ActionPreconditionError();
+  const result = await createAgentOrderPayment(user, input, {
+    amount: preview.amount, paymentType: preview.paymentType,
+    previousPaymentId: preview.previousPaymentId, previousPaymentMethod: preview.previousPaymentMethod,
+  });
+  if (result) return result;
+  // PayOS vừa nhận tiền trong lúc đổi: trả giao dịch đã xác minh, không thu thêm.
+  const paid = await Payment.findOne({ _id: previous._id, orderId: order._id, customerId: user.id,
+    paymentType, method: "payos", status: "paid", isDeleted: false });
+  if (!paid || paid.amount !== preview.amount) throw new AppError("Chưa xác minh được kết quả thanh toán. Vui lòng kiểm tra lại đơn.", 409);
+  return { payment: paid, amount: paid.amount, paymentType };
+};
+
 export const createPayment = async (user: RequestUser, input: CreatePaymentInput, expected?: ConfirmedPaymentExpectation, previousCashPaymentId?: string) => {
   const order = await Order.findById(input.orderId);
 
@@ -806,6 +837,10 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     };
   }
 
+  const redirectUrls = buildOrderPaymentRedirects(order._id.toString(),
+    process.env.FRONTEND_URL?.trim() || input.returnUrl || input.cancelUrl || "https://localhost:5173", {
+      returnUrl: process.env.PAYOS_RETURN_URL, cancelUrl: process.env.PAYOS_CANCEL_URL,
+    });
   const orderCode = buildPayosOrderCode();
   const reserved = await reserveExternalPayment(
     user,
@@ -826,8 +861,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
       orderCode,
       amount: reservedAmount,
       description: reservedPaymentType === "inspection_deposit" ? "Dat coc FixNow" : "Thanh toan FixNow",
-      returnUrl: input.returnUrl || DEFAULT_RETURN_URL,
-      cancelUrl: input.cancelUrl || DEFAULT_CANCEL_URL,
+      ...redirectUrls,
       items: [
         {
           name: reservedPaymentType === "inspection_deposit" ? "Đặt cọc dịch vụ FixNow" : "Thanh toán dịch vụ FixNow",

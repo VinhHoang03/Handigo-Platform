@@ -53,8 +53,11 @@ async function run() {
   try {
     const payments = await import("../services/payment.service");
     mock.method(Order, "findOne", async (filter: { customerId: string }) => filter.customerId === user.id ? order : null);
-    mock.method(Payment, "findOne", async (filter: { _id?: string; customerId?: string }) => {
+    mock.method(Order, "findById", async () => order);
+    mock.method(Payment, "findOne", async (filter: { _id?: string; customerId?: string; method?: string; status?: string }) => {
       if (filter.customerId) assert.equal(filter.customerId, user.id);
+      if (filter.method && active?.method !== filter.method) return null;
+      if (typeof filter.status === "string" && active?.status !== filter.status) return null;
       return filter._id ? active?._id === filter._id ? active : null : active;
     });
     mock.method(Wallet, "findOne", () => ({ select: async () => ({ balance }) }));
@@ -72,7 +75,7 @@ async function run() {
       assert.equal(input.orderId, orderId); createCalls++;
       active = { ...oldPayment, _id: newId, method: input.method === "WALLET" ? "wallet" : "cash",
         status: input.method === "WALLET" ? "paid" : "pending" };
-      return {} as never;
+      return { payment: active, amount, paymentType: active.paymentType } as never;
     });
     mock.method(payments, "reconcilePayosPaymentForOrder", async () => {
       reconciliations++; oldPayment.status = "paid"; active = oldPayment; return {} as never;
@@ -141,6 +144,34 @@ async function run() {
     await execute(); assert.equal(createCalls, 0); assert.equal(cancelCalls, 0); assert.equal(reconciliations, 1);
     reset(); cancelMode = "paid";
     await execute(); assert.equal(createCalls, 0); assert.equal(reconciliations, 1);
+
+    // Cùng endpoint web: không cần khách tự hủy QR trước khi chọn ví/tiền mặt.
+    reset();
+    const webWallet = await payments.createOrderPayment(user, { orderId, method: "WALLET", expectedAmount: amount });
+    assert.equal(webWallet.payment.method, "wallet"); assert.equal(cancelCalls, 1); assert.equal(createCalls, 1);
+    reset();
+    const webCash = await payments.createOrderPayment(user, { orderId, method: "CASH", expectedAmount: amount });
+    assert.equal(webCash.payment.method, "cash"); assert.equal(webCash.payment.status, "pending"); assert.equal(cancelCalls, 1);
+    reset(); balance = 0;
+    await assert.rejects(payments.createOrderPayment(user, { orderId, method: "WALLET" }), /Ví còn thiếu/);
+    assert.equal(cancelCalls, 0); noNewPayment();
+    reset(); cancelMode = "error";
+    await assert.rejects(payments.createOrderPayment(user, { orderId, method: "CASH" }), /Chưa xác minh/); noNewPayment();
+    reset(); cancelMode = "paid";
+    const received = await payments.createOrderPayment(user, { orderId, method: "WALLET", expectedAmount: amount });
+    assert.equal(received.payment.method, "payos"); assert.equal(received.payment.status, "paid"); assert.equal(createCalls, 0);
+    reset(); oldPayment.status = "paid";
+    assert.equal((await payments.createOrderPayment(user, { orderId, method: "WALLET" })).payment._id, oldId);
+    assert.equal(createCalls, 0); assert.equal(cancelCalls, 0);
+    reset();
+    await assert.rejects(payments.createOrderPayment(user, { orderId, method: "WALLET", expectedAmount: amount - 1 }), /Thông tin hoặc chi phí đã thay đổi/);
+    assert.equal(cancelCalls, 0); noNewPayment();
+    reset(); order.inspectionRequired = true;
+    await assert.rejects(payments.createOrderPayment(user, { orderId, method: "CASH" }), /khảo sát/);
+    assert.equal(cancelCalls, 0); noNewPayment();
+    reset();
+    await assert.rejects(payments.createOrderPayment({ ...user, id: new Types.ObjectId().toString() }, { orderId, method: "WALLET" }), /không có quyền/);
+    assert.equal(cancelCalls, 0); noNewPayment();
 
     // Tích hợp service trợ lý: form cũ không được áp dụng cho giao dịch mới và lỗi hủy có thể kiểm tra lại.
     reset();

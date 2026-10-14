@@ -26,7 +26,7 @@ export const useBookingDetail = () => {
   const { isWaitingForProvider, matchingSecondsRemaining } =
     useMatchingCountdown(order);
 
-  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy, loadData);
+  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy);
   const cancellationFlow = useBookingCancellationFlow(
     order,
     quotation,
