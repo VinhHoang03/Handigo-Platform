@@ -10,6 +10,7 @@ export const addressIdParamSchema = z.object({
 });
 
 export const createAddressSchema = z.object({
+  addressLabel: z.string().trim().min(1, "Tên địa chỉ là bắt buộc").max(60).optional(),
   recipientName: personNameSchema,
   recipientPhone: vietnamesePhoneSchema,
   fullAddress: z
@@ -41,6 +42,7 @@ export const createAddressSchema = z.object({
 });
 
 export const updateAddressSchema = z.object({
+  addressLabel: z.string().trim().min(1, "Tên địa chỉ là bắt buộc").max(60).optional(),
   recipientName: personNameSchema.optional(),
   recipientPhone: vietnamesePhoneSchema.optional(),
   fullAddress: z

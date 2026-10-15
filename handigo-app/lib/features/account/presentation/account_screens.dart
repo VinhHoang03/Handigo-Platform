@@ -702,28 +702,34 @@ class AddressScreen extends ConsumerWidget {
                               onAdd: () => _addressForm(context, ref),
                             )
                           else
-                            ...items.expand(
-                              (item) => [
+                            ...items.asMap().entries.expand(
+                              (entry) => [
                                 _AddressCard(
-                                  item: item,
-                                  onSetDefault: item.isDefault
+                                  item: entry.value,
+                                  fallbackLabel: entry.value.isDefault
+                                      ? 'Nhà riêng'
+                                      : 'Địa chỉ ${entry.key + 1}',
+                                  onSetDefault: entry.value.isDefault
                                       ? null
                                       : () async {
                                           await ref
                                               .read(accountRepositoryProvider)
-                                              .updateAddress(item.id, {
+                                              .updateAddress(entry.value.id, {
                                                 'isDefault': true,
                                               });
                                           ref.invalidate(
                                             accountAddressesProvider,
                                           );
                                         },
-                                  onEdit: () =>
-                                      _addressForm(context, ref, item: item),
+                                  onEdit: () => _addressForm(
+                                    context,
+                                    ref,
+                                    item: entry.value,
+                                  ),
                                   onDelete: () async {
                                     await ref
                                         .read(accountRepositoryProvider)
-                                        .deleteAddress(item.id);
+                                        .deleteAddress(entry.value.id);
                                     ref.invalidate(accountAddressesProvider);
                                   },
                                 ),
@@ -758,7 +764,8 @@ Future<void> _addressForm(
   WidgetRef ref, {
   AddressItem? item,
 }) async {
-  final name = TextEditingController(text: item?.recipientName ?? ''),
+  final label = TextEditingController(text: item?.addressLabel ?? ''),
+      name = TextEditingController(text: item?.recipientName ?? ''),
       phone = TextEditingController(text: item?.recipientPhone ?? ''),
       address = TextEditingController(text: item?.fullAddress ?? ''),
       province = TextEditingController(text: item?.province ?? ''),
@@ -771,6 +778,7 @@ Future<void> _addressForm(
       content: SingleChildScrollView(
         child: Column(
           children: [
+            _field(label, 'Tên địa chỉ (VD: Nhà riêng, Văn phòng)'),
             _field(name, 'Người nhận'),
             _field(phone, 'Số điện thoại'),
             _field(address, 'Địa chỉ đầy đủ'),
@@ -787,6 +795,7 @@ Future<void> _addressForm(
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, {
+            'addressLabel': label.text,
             'recipientName': name.text,
             'recipientPhone': phone.text,
             'fullAddress': address.text,
@@ -802,6 +811,7 @@ Future<void> _addressForm(
   final requiredValues = form == null
       ? const <String>[]
       : [
+          form['addressLabel'] ?? '',
           form['recipientName'] ?? '',
           form['recipientPhone'] ?? '',
           form['fullAddress'] ?? '',
@@ -2444,198 +2454,212 @@ class _CurrentLocationSection extends StatelessWidget {
 class _AddressCard extends StatelessWidget {
   const _AddressCard({
     required this.item,
+    required this.fallbackLabel,
     required this.onSetDefault,
     required this.onEdit,
     required this.onDelete,
   });
 
   final AddressItem item;
+  final String fallbackLabel;
   final VoidCallback? onSetDefault;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: _accountSurface,
-      borderRadius: BorderRadius.circular(18),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                item.isDefault
-                    ? Icons.home_outlined
-                    : Icons.location_on_outlined,
-                color: _figmaPrimary,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  item.isDefault ? 'Nhà riêng' : 'Địa chỉ đã lưu',
-                  style: const TextStyle(
-                    color: _accountInk,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (item.isDefault)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _figmaPrimarySoft,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: const Text(
-                    'Mặc định',
-                    style: TextStyle(
-                      color: _figmaPrimary,
-                      fontSize: 11,
+  Widget build(BuildContext context) {
+    final label = item.addressLabel.trim().isEmpty
+        ? fallbackLabel
+        : item.addressLabel.trim();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _accountSurface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_addressLabelIcon(label), color: _figmaPrimary, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: _accountInk,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: item.recipientName,
-                  style: const TextStyle(
-                    color: _accountInk,
-                    fontWeight: FontWeight.w700,
+                if (item.isDefault)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _figmaPrimarySoft,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: const Text(
+                      'Mặc định',
+                      style: TextStyle(
+                        color: _figmaPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
-                const TextSpan(
-                  text: '  •  ',
-                  style: TextStyle(color: _accountMuted),
-                ),
-                TextSpan(
-                  text: item.recipientPhone,
-                  style: const TextStyle(color: _accountMuted),
-                ),
               ],
             ),
-            style: const TextStyle(fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _fullAddress(item),
-            style: const TextStyle(
-              color: _accountMuted,
-              fontSize: 13,
-              height: 1.45,
-            ),
-          ),
-          if (item.note?.trim().isNotEmpty == true) ...[
             const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.only(left: 12),
-              decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: _accountDivider, width: 2),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Text.rich(
+              TextSpan(
                 children: [
-                  const Text(
-                    'Ghi chú cho thợ:',
-                    style: TextStyle(
-                      color: _accountMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '“${item.note!.trim()}”',
+                  TextSpan(
+                    text: item.recipientName,
                     style: const TextStyle(
                       color: _accountInk,
-                      fontSize: 13,
-                      height: 1.4,
+                      fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  const TextSpan(
+                    text: '  •  ',
+                    style: TextStyle(color: _accountMuted),
+                  ),
+                  TextSpan(
+                    text: item.recipientPhone,
+                    style: const TextStyle(color: _accountMuted),
                   ),
                 ],
               ),
+              style: const TextStyle(fontSize: 13, height: 1.4),
             ),
-          ],
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
-            child: Divider(height: 1, color: _accountDivider),
-          ),
-          Row(
-            children: [
-              if (item.isDefault)
-                const Expanded(
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_rounded, color: _accountMuted, size: 17),
-                      SizedBox(width: 5),
-                      Flexible(
-                        child: Text(
-                          'Địa chỉ mặc định',
-                          style: TextStyle(
-                            color: _accountMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+            const SizedBox(height: 8),
+            Text(
+              _fullAddress(item),
+              style: const TextStyle(
+                color: _accountMuted,
+                fontSize: 13,
+                height: 1.45,
+              ),
+            ),
+            if (item.note?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.only(left: 12),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: _accountDivider, width: 2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Ghi chú cho thợ:',
+                      style: TextStyle(
+                        color: _accountMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '“${item.note!.trim()}”',
+                      style: const TextStyle(
+                        color: _accountInk,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Divider(height: 1, color: _accountDivider),
+            ),
+            Row(
+              children: [
+                if (item.isDefault)
+                  const Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_rounded,
+                          color: _accountMuted,
+                          size: 17,
+                        ),
+                        SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            'Địa chỉ mặc định',
+                            style: TextStyle(
+                              color: _accountMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Expanded(
-                  child: InkWell(
-                    onTap: onSetDefault,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 5),
-                      child: Text(
-                        'Đặt làm mặc định',
-                        style: TextStyle(
-                          color: _figmaPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                      ],
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: InkWell(
+                      onTap: onSetDefault,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 5),
+                        child: Text(
+                          'Đặt làm mặc định',
+                          style: TextStyle(
+                            color: _figmaPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
                   ),
+                TextButton.icon(
+                  onPressed: onEdit,
+                  style: _addressActionStyle(_accountInk),
+                  icon: const Icon(Icons.edit_outlined, size: 17),
+                  label: const Text('Chỉnh sửa'),
                 ),
-              TextButton.icon(
-                onPressed: onEdit,
-                style: _addressActionStyle(_accountInk),
-                icon: const Icon(Icons.edit_outlined, size: 17),
-                label: const Text('Chỉnh sửa'),
-              ),
-              IconButton(
-                tooltip: 'Xóa địa chỉ',
-                onPressed: onDelete,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: _accountDanger,
-                  size: 20,
+                IconButton(
+                  tooltip: 'Xóa địa chỉ',
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: _accountDanger,
+                    size: 20,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+IconData _addressLabelIcon(String label) {
+  final normalized = label.trim().toLowerCase();
+  if (normalized.contains('văn phòng') || normalized.contains('công ty')) {
+    return Icons.business_outlined;
+  }
+  if (normalized.contains('nhà')) return Icons.home_outlined;
+  return Icons.location_on_outlined;
 }
 
 String _fullAddress(AddressItem item) {
