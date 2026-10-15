@@ -805,7 +805,7 @@ export const OrderService = {
     ]);
 
     return {
-      items: data as IOrder[],
+      items: await attachQuotationFinalAmounts(data) as IOrder[],
       pagination: {
         page,
         limit,
