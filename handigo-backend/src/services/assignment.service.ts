@@ -336,11 +336,11 @@ export const AssignmentService = {
         || (assignedOrder.paymentMethod === "cash" && await Payment.exists({
           orderId: assignedOrder._id, method: "cash", status: "pending", isDeleted: false,
         }));
-      if (!hasInitialPayment) {
+      if (!hasInitialPayment && !(assignedOrder.reassignment?.automatic && assignedOrder.bookingStatus === "reserved")) {
         throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
       }
 
-      const appointmentOrders = assignedOrder.recurringGroupId
+      const appointmentOrders = assignedOrder.recurringGroupId && !assignedOrder.reassignment?.automatic
         ? await Order.find({
             recurringGroupId: assignedOrder.recurringGroupId,
             status: "created",
@@ -392,7 +392,7 @@ export const AssignmentService = {
           $set: {
             providerId: provider._id,
             status: "accepted",
-            bookingStatus: "confirmed",
+            bookingStatus: assignedOrder.bookingStatus === "reserved" ? "reserved" : "confirmed",
             ...(assignedOrder.reassignment?.status === "matching" ? { "reassignment.status": "matched" } : {}),
             paymentDueAt: null,
             readyForMatching: false,
@@ -411,7 +411,7 @@ export const AssignmentService = {
         throw new AppError("Lịch hẹn vừa được xử lý bởi yêu cầu khác.", 409);
       }
 
-      if (assignedOrder.recurringGroupId) {
+      if (assignedOrder.recurringGroupId && !assignedOrder.reassignment?.automatic) {
         await Order.updateMany(
           {
             _id: { $ne: order._id },

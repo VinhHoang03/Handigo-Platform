@@ -67,6 +67,7 @@ export const getMyRewardVouchers = async (userId: string, page: number) => {
     discountType: voucher.discountType, discountValue: voucher.discountValue,
     maxDiscountAmount: voucher.maxDiscountAmount, minOrderAmount: voucher.minOrderAmount,
     startAt: voucher.startAt, endAt: voucher.endAt, usedCount: voucher.usedCount,
+    neverExpires: voucher.neverExpires ?? false,
     isActive: voucher.isActive, status: voucher.status, reservedOrderId: voucher.reservedOrderId,
     applicableOrderType: voucher.applicableOrderType,
   }));

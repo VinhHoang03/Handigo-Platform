@@ -43,12 +43,13 @@ Nếu đơn có QR PayOS đang chờ và khách chọn ví/tiền mặt, cùng e
 
 ### URL trả về của thanh toán PayOS đơn hàng
 
-Web và agent ưu tiên hai biến cấu hình `PAYOS_RETURN_URL`, `PAYOS_CANCEL_URL`. Backend giữ nguyên domain, đường dẫn và tham số có sẵn của URL cấu hình, tự thêm `orderId` và `payos` để gắn đúng đơn. URL client gửi không ghi đè hai biến đã cấu hình.
+Web và agent ưu tiên `PAYOS_RETURN_URL` cho thanh toán thành công; backend giữ URL cấu hình và thêm `orderId`, `payos`. Khi hủy, QR quay thẳng về bước thanh toán đặt dịch vụ hoặc chi tiết đơn theo nơi bắt đầu, không đi qua `PAYOS_CANCEL_URL` để tránh lỗi truy cập callback backend. Origin của URL web gửi được ưu tiên nếu nằm trong danh sách origin được phép; sau đó mới dùng `FRONTEND_URL`. Cách này giữ đúng HTTP/HTTPS và cổng của web đang sử dụng.
 
-- Thành công: `<frontend>/customer/bookings/<orderId>?payos=success`.
-- Hủy: `<frontend>/customer/bookings/<orderId>?payos=cancel`.
+- Thành công khi không cấu hình URL: `<frontend>/customer/bookings/result?orderId=<orderId>&payos=success`.
+- Hủy từ bước thanh toán đặt dịch vụ: `<frontend>/customer/bookings/new/payment?payos=cancel`.
+- Hủy từ chi tiết đơn hoặc trợ lý: `<frontend>/customer/bookings/<orderId>?payos=cancel`.
 
-Khi chưa cấu hình hai biến, hệ thống dùng hai đường dẫn chi tiết đơn ở trên, với origin client hoặc `FRONTEND_URL`; local mặc định là `https://localhost:5173`.
+Luồng agent dùng `FRONTEND_URL` và mặc định local là `https://localhost:5173`. Nạp ví cũng kiểm tra origin như thanh toán đơn, quay về `/customer/wallet` hoặc `/provider/wallet` theo vai trò đã xác thực; không dùng đường dẫn dự phòng HTTP khác với web HTTPS.
 
 Ví dụ local qua backend:
 
@@ -58,7 +59,7 @@ PAYOS_RETURN_URL=http://localhost:5000/payment/success
 PAYOS_CANCEL_URL=http://localhost:5000/payment/cancel
 ```
 
-Backend nhận hai route `/payment/success`, `/payment/cancel` và chuyển sang cùng route trên frontend theo `FRONTEND_URL`. Có thể cấu hình hai URL trỏ thẳng tới frontend để bỏ qua bước chuyển này.
+Backend vẫn nhận `/payment/success`, `/payment/cancel` cho QR cũ. Thành công chuyển sang trang kết quả; hủy chuyển sang chi tiết đơn nếu có `orderId` hợp lệ. Các ví dụ `PAYOS_CANCEL_URL` dưới đây chỉ còn áp dụng cho QR cũ.
 
 Ví dụ production (thay domain mẫu bằng domain triển khai):
 
@@ -68,7 +69,7 @@ PAYOS_RETURN_URL=https://api.example.com/payment/success
 PAYOS_CANCEL_URL=https://api.example.com/payment/cancel
 ```
 
-Trang kết quả frontend đối soát PayOS qua backend, hiển thị thanh toán thành công, đã hủy, thất bại/hết hạn, đang chờ hoặc đã hoàn tiền. Không dùng tham số URL làm bằng chứng thanh toán. Nếu cần đăng nhập lại, mã đơn và URL callback được giữ để quay lại sau đăng nhập. QR đã tạo trước thay đổi giữ URL cũ trên PayOS và cần được hủy/tạo mới để dùng đường dẫn mới.
+Trang kết quả frontend đối soát PayOS qua backend, hiển thị thanh toán thành công, đã hủy, thất bại/hết hạn, đang chờ hoặc đã hoàn tiền. Không dùng tham số URL làm bằng chứng thanh toán. Nếu cần đăng nhập lại, mã đơn và URL callback được giữ để quay lại sau đăng nhập. Khi khách yêu cầu thanh toán lại, QR đơn hàng đang chờ mà thiếu hoặc khác URL hủy hiện tại sẽ được kiểm tra và hủy trên PayOS trước khi tạo QR thay thế. Giao dịch đã nhận tiền hoặc chưa xác minh được kết quả sẽ không bị thay bằng QR mới.
 
 ### Quản lý gói và mã
 

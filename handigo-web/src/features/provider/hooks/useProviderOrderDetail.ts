@@ -68,6 +68,33 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     void Promise.resolve().then(() => loadData());
   }, [loadData]);
 
+  // Cập nhật thanh toán trong lúc thợ chờ khách trả tiền, giữ nguyên ảnh và ghi chú đang nhập.
+  useEffect(() => {
+    if (!orderId || busy || order?.inspectionRequired || order?.status !== 'in_progress' || order.paymentStatus !== 'unpaid') return;
+    let active = true;
+    let pending = false;
+    const refreshPayment = async () => {
+      if (pending || document.visibilityState === 'hidden') return;
+      pending = true;
+      try {
+        const latest = await bookingApi.getOrderById(orderId);
+        if (active) setOrder((current) => current?._id === latest._id &&
+          new Date(current.updatedAt).getTime() > new Date(latest.updatedAt).getTime() ? current : latest);
+      } catch (error) {
+        console.error('Không thể cập nhật trạng thái thanh toán của đơn hàng.', error);
+      } finally {
+        pending = false;
+      }
+    };
+    const timer = window.setInterval(() => { void refreshPayment(); }, 5000);
+    window.addEventListener('focus', refreshPayment);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshPayment);
+    };
+  }, [orderId, busy, order?.inspectionRequired, order?.status, order?.paymentStatus]);
+
   const runAction = async (
     action: () => Promise<void>,
     fallbackMessage: string,
@@ -170,7 +197,8 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
     const succeeded = await runAction(async () => {
       await providerOrderApi.cancelOrder(order._id, cancellationReason);
-    }, 'Không thể hủy đơn.', false, 'Đã hủy đơn dịch vụ.');
+    }, 'Không thể hủy đơn.', false, order.inspectionRequired
+      ? 'Đã hủy đơn dịch vụ.' : 'Đã hủy nhận đơn. Handigo đang tự động tìm kỹ thuật viên thay thế.');
     if (!succeeded) return;
 
     setCancelConfirmOpen(false);

@@ -184,6 +184,12 @@ export function FixedPriceActionForm({
       ) : null}
 
       <div className="space-y-sm pt-md">
+        {showComplete && !order.inspectionRequired && order.paymentStatus === 'paid' && ['wallet', 'bank'].includes(order.paymentMethod) && (
+          <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
+            <CircleCheckBig aria-hidden="true" size={20} />
+            {order.paymentMethod === 'wallet' ? 'Đã thanh toán qua ví' : 'Đã thanh toán qua QR'}
+          </p>
+        )}
         {showPaymentConfirmation && (repairQuotation.directPaymentConfirmedAt && order.paymentStatus === 'paid' ? (
           <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
             <CircleCheckBig aria-hidden="true" size={20} />

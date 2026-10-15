@@ -35,7 +35,6 @@ import { MatchingService } from "./matching.service";
 import { emitToUser } from "../sockets/socketServer";
 import { createNotificationRecord } from "./notification.service";
 import { requestProviderReassignment } from "./orderReassignment.service";
-import { isQuotationDeclinedReason } from "./refundPolicy.service";
 import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
@@ -1228,13 +1227,11 @@ export const OrderService = {
     confirmedExpectation?: { paidAmount: number; refundAmount: number; cancellationFee: number },
   ): Promise<IOrder> {
     if (role === "provider") {
-      const order = await Order.findById(orderId).select("status orderType currentQuotationId inspectionRequired");
+      const order = await Order.findById(orderId).select("status currentQuotationId inspectionRequired reassignment");
       if (
-        order?.status === "accepted" &&
+        order && (order.status === "accepted" || order.reassignment?.automatic) &&
         !order.currentQuotationId &&
-        !order.inspectionRequired &&
-        !isQuotationDeclinedReason(reason) &&
-        ["normal", "urgent"].includes(order.orderType)
+        !order.inspectionRequired
       ) {
         return requestProviderReassignment(orderId, userId, reason);
       }

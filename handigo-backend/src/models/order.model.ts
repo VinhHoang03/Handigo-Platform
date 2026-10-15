@@ -65,6 +65,7 @@ export interface IOrderConfirmation {
 }
 
 export interface IOrderReassignment {
+  automatic?: boolean;
   status:
     | "awaiting_customer"
     | "matching"
@@ -354,6 +355,7 @@ const OrderSchema = new Schema<IOrder>(
     reassignment: {
       type: new Schema<IOrderReassignment>(
         {
+          automatic: { type: Boolean },
           status: {
             type: String,
             enum: [

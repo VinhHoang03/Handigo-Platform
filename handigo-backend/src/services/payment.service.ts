@@ -18,7 +18,7 @@ import { createLogger } from "../utils/logger";
 import { markOrderVoucherAsUsed } from "./voucher.service";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { publishPaymentStatus } from "./paymentStatus.service";
-import { buildOrderPaymentRedirects } from "../utils/paymentRedirect";
+import { buildOrderPaymentRedirects, resolvePaymentFrontendOrigin } from "../utils/paymentRedirect";
 
 export interface ConfirmedPaymentExpectation {
   amount: number;
@@ -27,12 +27,16 @@ export interface ConfirmedPaymentExpectation {
   previousPaymentMethod?: "cash" | "payos";
 }
 
+const isFixedPriceWorkPayment = (order: InstanceType<typeof Order>) =>
+  !order.inspectionRequired && order.status === "in_progress" && order.paymentStatus === "unpaid";
+
 // Kiểm tra lại bên trong transaction để số tiền trừ đúng với bản khách đã xác nhận.
 const assertConfirmedPayment = (order: InstanceType<typeof Order>, amount: number,
   paymentType: PaymentType, expected?: ConfirmedPaymentExpectation) => {
   if (!expected) return;
   if (expected.amount !== amount || expected.paymentType !== paymentType
-    || !["created", "accepted"].includes(order.status) || order.paymentStatus !== "unpaid") {
+    || (!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order))
+    || order.paymentStatus !== "unpaid") {
     throw new ActionPreconditionError();
   }
 };
@@ -173,6 +177,7 @@ const assertAppointmentPaymentReady = (
   paymentType?: PaymentType,
 ) => {
   if (paymentType === "remaining") return;
+  if (isFixedPriceWorkPayment(order)) return;
   if (!["scheduled", "recurring"].includes(order.orderType)) return;
   if (order.status === "created" && !order.providerId && order.bookingStatus !== "reserved") return;
   if (
@@ -382,7 +387,7 @@ const createWalletPayment = async (order: any, paymentType: PaymentType, amount:
       if (shouldDispatch) {
         transactionalOrder.readyForMatching = true;
       }
-      if (["scheduled", "recurring"].includes(transactionalOrder.orderType)) {
+      if (["created", "accepted"].includes(transactionalOrder.status) && ["scheduled", "recurring"].includes(transactionalOrder.orderType)) {
         transactionalOrder.bookingStatus = transactionalOrder.providerId ? "confirmed" : "awaiting_provider";
       }
 
@@ -517,7 +522,7 @@ const reserveExternalPayment = async (
       if (method === "cash") {
         order.paymentMethod = "cash";
         order.readyForMatching = order.status === "created";
-        if (["scheduled", "recurring"].includes(order.orderType)) {
+        if (["created", "accepted"].includes(order.status) && ["scheduled", "recurring"].includes(order.orderType)) {
           order.bookingStatus = order.providerId ? "confirmed" : "awaiting_provider";
         }
       } else {
@@ -550,7 +555,7 @@ const reserveExternalPayment = async (
 export const previewOrderPayment = async (user: RequestUser, orderId: string, method: CreatePaymentInput["method"], allowMethodSwitch = false) => {
   const order = await Order.findOne({ _id: orderId, customerId: user.id, isDeleted: false });
   if (!order) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
-  if (!["created", "accepted"].includes(order.status) || order.paymentStatus !== "unpaid") {
+  if ((!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) || order.paymentStatus !== "unpaid") {
     throw new AppError("Đơn không còn chờ thanh toán. Hãy kiểm tra trạng thái thanh toán của đơn.", 409);
   }
   const paymentType = getPaymentType(order);
@@ -700,7 +705,6 @@ export const createAgentOrderPayment = async (user: RequestUser, input: CreatePa
 };
 
 export const createOrderPayment = async (user: RequestUser, input: CreatePaymentInput) => {
-  if (input.method === "PAYOS") return createPayment(user, input);
   const order = await Order.findById(input.orderId);
   if (!order || order.isDeleted) throw new AppError("Không tìm thấy đơn hàng", 404);
   if (order.customerId.toString() !== user.id) {
@@ -710,8 +714,12 @@ export const createOrderPayment = async (user: RequestUser, input: CreatePayment
   if (order.status === "cancelled") throw new AppError("Đơn đã hủy, không thể đổi phương thức thanh toán.", 409);
   const paymentType = getPaymentType(order, input.paymentType);
   const previous = await Payment.findOne({ orderId: order._id, customerId: user.id, paymentType,
-    method: "payos", status: { $in: ["pending", "paid"] }, isDeleted: false });
+    method: { $in: ["payos", "cash"] }, status: { $in: ["pending", "paid"] }, isDeleted: false });
   if (!previous) return createPayment(user, input);
+  if (previous.method === "cash" && (!isFixedPriceWorkPayment(order) || input.method === "CASH")) {
+    return createPayment(user, input);
+  }
+  if (previous.method === "payos" && input.method === "PAYOS") return createPayment(user, input);
   if (order.inspectionRequired && input.method === "CASH") {
     throw new AppError("Tiền đặt cọc khảo sát chỉ thanh toán bằng chuyển khoản hoặc ví Handigo.", 400);
   }
@@ -784,6 +792,12 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     throw new AppError("Số tiền thanh toán không hợp lệ", 400);
   }
 
+  const redirectUrls = input.method === "PAYOS" ? buildOrderPaymentRedirects(order._id.toString(),
+    resolvePaymentFrontendOrigin(input.cancelUrl, input.returnUrl,
+      process.env.FRONTEND_URL, "https://localhost:5173"), {
+      returnUrl: process.env.PAYOS_RETURN_URL, cancelUrl: process.env.PAYOS_CANCEL_URL,
+      clientCancelUrl: input.cancelUrl,
+    }) : undefined;
   const duplicatePayment = await Payment.findOne({
     orderId: order._id,
     paymentType,
@@ -799,23 +813,34 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     duplicatePayment?.method === "payos" &&
     duplicatePayment.status === "pending"
   ) {
-    const pendingPayosLink = await reconcileExistingPendingPayosPayment(duplicatePayment);
-    if (pendingPayosLink) {
-      if (input.method !== "PAYOS") {
-        throw new AppError(
-          "Giao dịch PayOS vẫn đang chờ thanh toán. Hãy hủy giao dịch PayOS trước khi chọn phương thức khác.",
-          409,
-        );
+    const previousRedirects = duplicatePayment.gatewayResponse?.redirectUrls as { cancelUrl?: string } | undefined;
+    if (redirectUrls && previousRedirects?.cancelUrl !== redirectUrls.cancelUrl) {
+      // Không mở lại QR có URL hủy cũ; chỉ thay sau khi xác minh chưa nhận tiền.
+      const status = await cancelPendingPayosPayment(duplicatePayment, user, "Cập nhật đường dẫn quay lại sau khi hủy QR");
+      if (status === "paid") {
+        const paid = await Payment.findById(duplicatePayment._id);
+        if (!paid || paid.status !== "paid") throw new AppError("Chưa xác minh được kết quả thanh toán. Vui lòng kiểm tra lại đơn.", 409);
+        return { payment: paid, amount: paid.amount, paymentType };
       }
-      if (!pendingPayosLink.checkoutUrl) {
-        throw new AppError("Giao dịch PayOS không có liên kết thanh toán hợp lệ", 409);
+    } else {
+      const pendingPayosLink = await reconcileExistingPendingPayosPayment(duplicatePayment);
+      if (pendingPayosLink) {
+        if (input.method !== "PAYOS") {
+          throw new AppError(
+            "Giao dịch PayOS vẫn đang chờ thanh toán. Hãy hủy giao dịch PayOS trước khi chọn phương thức khác.",
+            409,
+          );
+        }
+        if (!pendingPayosLink.checkoutUrl) {
+          throw new AppError("Giao dịch PayOS không có liên kết thanh toán hợp lệ", 409);
+        }
+        return {
+          payment: duplicatePayment,
+          checkoutUrl: pendingPayosLink.checkoutUrl,
+          qrCode: pendingPayosLink.qrCode,
+          paymentType,
+        };
       }
-      return {
-        payment: duplicatePayment,
-        checkoutUrl: pendingPayosLink.checkoutUrl,
-        qrCode: pendingPayosLink.qrCode,
-        paymentType,
-      };
     }
   } else if (duplicatePayment && !switchingCash) {
     throw new AppError("Đơn hàng đã có giao dịch thanh toán cùng loại", 409);
@@ -837,10 +862,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     };
   }
 
-  const redirectUrls = buildOrderPaymentRedirects(order._id.toString(),
-    process.env.FRONTEND_URL?.trim() || input.returnUrl || input.cancelUrl || "https://localhost:5173", {
-      returnUrl: process.env.PAYOS_RETURN_URL, cancelUrl: process.env.PAYOS_CANCEL_URL,
-    });
+  if (!redirectUrls) throw new AppError("Không xác định được đường dẫn quay lại sau thanh toán.", 400);
   const orderCode = buildPayosOrderCode();
   const reserved = await reserveExternalPayment(
     user,
@@ -875,6 +897,7 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     payment.gatewayResponse = {
       ...((payment.gatewayResponse as Record<string, unknown>) || {}),
       paymentLink,
+      redirectUrls,
     };
     await payment.save();
   } catch (error: any) {
@@ -1022,7 +1045,7 @@ const syncPaidPayosPaymentToOrder = async (
   if (shouldDispatch) {
     order.readyForMatching = true;
   }
-  if (["scheduled", "recurring"].includes(order.orderType)) {
+  if (["created", "accepted"].includes(order.status) && ["scheduled", "recurring"].includes(order.orderType)) {
     order.bookingStatus = order.providerId ? "confirmed" : "awaiting_provider";
   }
   if (markVoucherUsed) {

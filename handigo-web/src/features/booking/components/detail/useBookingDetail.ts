@@ -26,7 +26,10 @@ export const useBookingDetail = () => {
   const { isWaitingForProvider, matchingSecondsRemaining } =
     useMatchingCountdown(order);
 
-  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy);
+  const canChangePayment = Boolean(order && !order.inspectionRequired &&
+    order.status === "in_progress" && order.paymentStatus === "unpaid" &&
+    !payments.some((payment) => payment.paymentType === "full" && payment.status === "paid"));
+  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy, canChangePayment, data.updateOrder);
   const cancellationFlow = useBookingCancellationFlow(
     order,
     quotation,
@@ -98,6 +101,7 @@ export const useBookingDetail = () => {
     appliedDepositAmount,
     remainingQuotationAmount,
     canMakeInitialPayment,
+    canChangePayment,
     timeline,
   };
 };

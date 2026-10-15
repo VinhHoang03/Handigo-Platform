@@ -6,7 +6,8 @@ import { AppError } from "../utils/appError";
 import { createLogger } from "../utils/logger";
 import { cancelOrderWithSettlement, cancelSystemOrderWithSettlement } from "./orderCancellation.service";
 import { createNotificationRecord } from "./notification.service";
-import { DispatchService } from "./dispatch.service";
+import { DispatchService, getMaxMatchingDurationSeconds } from "./dispatch.service";
+import { emitToUser } from "../sockets/socketServer";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 
 export type ReassignmentDecision = "accept" | "decline";
@@ -31,6 +32,7 @@ export const requestProviderReassignment = async (
   const reason = reasonInput.trim();
   if (!reason) throw new AppError("Vui lòng cung cấp lý do hủy đơn.", 400);
 
+  const matchingDurationSeconds = await getMaxMatchingDurationSeconds();
   const session = await mongoose.startSession();
   let updatedOrder: IOrder | null = null;
   let shouldNotify = false;
@@ -51,8 +53,9 @@ export const requestProviderReassignment = async (
       }
 
       if (
-        order.reassignment?.status === "awaiting_customer" &&
-        order.reassignment.requestedByProviderId.toString() === provider._id.toString()
+        order.reassignment?.automatic &&
+        order.reassignment.previousProviderIds.some((id) => id.toString() === provider._id.toString()) &&
+        order.providerId?.toString() !== provider._id.toString()
       ) {
         updatedOrder = order;
         return;
@@ -64,22 +67,22 @@ export const requestProviderReassignment = async (
       if (order.status !== "accepted") {
         throw new AppError("Chỉ có thể yêu cầu đổi kỹ thuật viên khi đơn đã được nhận và chưa bắt đầu.", 409);
       }
-      if (!['normal', 'urgent'].includes(order.orderType)) {
-        throw new AppError("Luồng tìm kỹ thuật viên thay thế chưa áp dụng cho đơn lịch hẹn hoặc định kỳ.", 409);
-      }
-      if (order.currentQuotationId) {
+      if (order.inspectionRequired || order.currentQuotationId) {
         throw new AppError("Không thể tự động đổi kỹ thuật viên khi đơn đã phát sinh báo giá.", 409);
       }
 
       const now = new Date();
       const reassignment = {
-        status: "awaiting_customer" as const,
+        automatic: true,
+        status: "matching" as const,
         requestedByProviderId: provider._id,
-        previousProviderIds: [provider._id],
+        previousProviderIds: [...new Map([
+          ...(order.reassignment?.previousProviderIds ?? []), provider._id,
+        ].map((id) => [id.toString(), id])).values()],
         reason,
         requestedAt: now,
-        expiresAt: new Date(now.getTime() + CUSTOMER_RESPONSE_TIMEOUT_MS),
-        respondedAt: null,
+        expiresAt: new Date(now.getTime() + matchingDurationSeconds * 1000),
+        respondedAt: now,
       };
 
       updatedOrder = await Order.findOneAndUpdate(
@@ -89,8 +92,10 @@ export const requestProviderReassignment = async (
             status: "created",
             providerId: null,
             preferredProviderId: null,
-            readyForMatching: false,
+            readyForMatching: true,
             matchingStartedAt: null,
+            matchingSearch: null,
+            bookingStatus: order.bookingStatus === "reserved" ? "reserved" : "not_required",
             reassignment,
           },
         },
@@ -134,15 +139,26 @@ export const requestProviderReassignment = async (
       userId: result.customerId,
       type: "ORDER",
       title: "Kỹ thuật viên không thể tiếp tục đơn hàng",
-      content: `Kỹ thuật viên đã hủy đơn ${result.orderCode}. Vui lòng chọn tìm kỹ thuật viên khác hoặc hủy đơn để được hoàn tiền.`,
+      content: `Kỹ thuật viên đã hủy đơn ${result.orderCode}. Handigo đang tự động tìm kỹ thuật viên thay thế. Nếu hết thời gian tìm kiếm, đơn sẽ được hủy và bạn được tặng voucher giảm 10%; khoản đã thanh toán qua ví hoặc QR được hoàn về ví Handigo.`,
       data: {
         orderId: result._id,
-        action: "order_reassignment_required",
+        action: "order_reassignment_matching",
         expiresAt: result.reassignment?.expiresAt,
       },
     });
   } catch (error) {
     reassignmentLogger.error("Không thể gửi thông báo đổi kỹ thuật viên.", error, { orderId });
+  }
+
+  if (shouldNotify) {
+    emitToUser(result.customerId.toString(), "order:updated", { orderId });
+    emitToUser(providerUserId, "order:updated", { orderId });
+    try {
+      await DispatchService.dispatchReadyOrder(orderId);
+    } catch (error) {
+      // Bộ quét điều phối sẽ tiếp tục xử lý đơn đã lưu sau lỗi tạm thời.
+      reassignmentLogger.error("Chưa thể điều phối kỹ thuật viên thay thế.", error, { orderId });
+    }
   }
 
   return result;

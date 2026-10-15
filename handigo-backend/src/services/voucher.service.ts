@@ -41,7 +41,7 @@ const isPromotionActive = (promotion: IPromotion, now = new Date()) => {
     status !== "INACTIVE" &&
     status !== "EXPIRED" &&
     promotion.startAt <= now &&
-    promotion.endAt >= now
+    (promotion.neverExpires || promotion.endAt >= now)
   );
 };
 
@@ -234,12 +234,13 @@ const buildVoucherInfo = (promotion: IPromotion, discountAmount?: number) => ({
   minOrderAmount: promotion.minOrderAmount,
   startAt: promotion.startAt,
   endAt: promotion.endAt,
+  neverExpires: promotion.neverExpires ?? false,
   applicableOrderType: promotion.applicableOrderType ?? (promotion.ownerId ? "fixed_price" : null),
 });
 
 const getAdminVoucherStatus = (promotion: IPromotion, now = new Date()) => {
   const status = promotion.status?.toUpperCase();
-  if (promotion.endAt < now || status === "EXPIRED") return "EXPIRED";
+  if ((!promotion.neverExpires && promotion.endAt < now) || status === "EXPIRED") return "EXPIRED";
   return !promotion.isActive || status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
 };
 
@@ -261,6 +262,7 @@ const toAdminVoucherResponse = (promotion: IPromotion) => ({
   usedCount: promotion.usedCount,
   startAt: promotion.startAt,
   endAt: promotion.endAt,
+  neverExpires: promotion.neverExpires ?? false,
   status: getAdminVoucherStatus(promotion),
   isActive: promotion.isActive,
   isDeleted: promotion.isDeleted,
@@ -561,11 +563,13 @@ export const getAvailableVouchers = async (user: RequestUser, query: AvailableVo
   }
 
   const promotions = await listStoredVouchers({
-    $and: [{ $or: [{ ownerId: null }, { ownerId: new Types.ObjectId(user.id) }] }],
+    $and: [
+      { $or: [{ ownerId: null }, { ownerId: new Types.ObjectId(user.id) }] },
+      { $or: [{ neverExpires: true }, { endAt: { $gte: now } }] },
+    ],
     isDeleted: false,
     isActive: true,
     startAt: { $lte: now },
-    endAt: { $gte: now },
     $or: [{ status: "ACTIVE" }, { status: "active" }, { status: { $exists: false } }],
   });
 
