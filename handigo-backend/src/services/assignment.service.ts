@@ -862,11 +862,6 @@ export const AssignmentService = {
       throw new AppError("Bạn không có quyền từ chối báo giá này.", 403);
     }
 
-    quotation.status = "rejected";
-    quotation.rejectedAt = new Date();
-    quotation.rejectionReason = rejectionReason ?? null;
-    await quotation.save();
-
     await cancelOrderWithSettlement({
       orderId: order._id.toString(),
       actorId: customerUserId,
@@ -875,6 +870,11 @@ export const AssignmentService = {
         "Từ chối báo giá sửa chữa: " +
         (rejectionReason ?? "không có lý do"),
     });
+
+    quotation.status = "rejected";
+    quotation.rejectedAt = new Date();
+    quotation.rejectionReason = rejectionReason ?? null;
+    await quotation.save();
 
     return quotation as any;
   },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/common/Toast";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { getErrorMessage } from "@/utils/apiError";
@@ -22,6 +22,18 @@ export const useBookingCancellationFlow = (
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
+  const [cancellationNow, setCancellationNow] = useState(() => Date.now());
+  const hasAcceptedProvider = order?.status === "accepted";
+  const cancellationDeadline = order?.customerCancellationDeadline
+    ? Date.parse(order.customerCancellationDeadline) : NaN;
+  const cancellationLocked = order?.status === "in_progress" || (hasAcceptedProvider
+    && (!Number.isFinite(cancellationDeadline) || cancellationNow > cancellationDeadline));
+
+  useEffect(() => {
+    if (!hasAcceptedProvider || !Number.isFinite(cancellationDeadline)) return;
+    const timer = window.setInterval(() => setCancellationNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [hasAcceptedProvider, cancellationDeadline]);
 
   const handleRejectQuotation = () => {
     if (!quotation) return;
@@ -29,7 +41,7 @@ export const useBookingCancellationFlow = (
   };
 
   const handleCancelOrder = async () => {
-    if (!order || !["created", "accepted"].includes(order.status)) return;
+    if (!order || cancellationLocked || !["created", "accepted"].includes(order.status)) return;
     try {
       setBusy(true);
       const preview = await bookingApi.getCancellationPreview(order._id);
@@ -57,6 +69,7 @@ export const useBookingCancellationFlow = (
   const handleCancelSeries = async () => {
     if (
       !order ||
+      cancellationLocked ||
       order.orderType !== "recurring" ||
       !["created", "accepted"].includes(order.status)
     ) return;
@@ -70,7 +83,7 @@ export const useBookingCancellationFlow = (
         additionalInfo: "",
         error: preview.canCancel
           ? undefined
-          : "Có buổi đã đến giờ thực hiện và không thể tự hủy.",
+          : preview.items.find((item) => !item.canCancel)?.policyReason || "Có buổi đã hết thời hạn hủy.",
       });
     } catch {
       addToast("Không thể tải chính sách hoàn tiền cho chuỗi lịch. Vui lòng đóng và thử lại.", "error");
@@ -114,6 +127,12 @@ export const useBookingCancellationFlow = (
     const isCancellationAction = ["cancelOrder", "cancelSeries"].includes(
       pendingAction.type,
     );
+    if (isCancellationAction && cancellationLocked) {
+      addToast(order?.status === "in_progress"
+        ? "Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng."
+        : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn.", "error");
+      return;
+    }
     if (!reason) {
       addToast(isCancellationAction ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.", "error");
       setPendingAction({
@@ -167,6 +186,7 @@ export const useBookingCancellationFlow = (
   };
 
   return {
+    cancellationLocked,
     cancellationPreview,
     pendingAction,
     handleRejectQuotation,

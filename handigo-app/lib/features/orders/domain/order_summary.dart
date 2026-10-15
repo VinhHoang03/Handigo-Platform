@@ -90,6 +90,7 @@ class OrderDetail {
     this.customerName,
     this.customerAvatar,
     List<OrderStatusEvent>? statusHistory,
+    this.customerCancellationDeadline,
   }) : _statusHistory = statusHistory;
 
   factory OrderDetail.fromJson(Map<String, dynamic> json) {
@@ -133,6 +134,7 @@ class OrderDetail {
       customerAvatar: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['avatar'] as String? : null,
       statusHistory: (json['statusHistory'] as List? ?? []).whereType<Map<String, dynamic>>().map(OrderStatusEvent.fromJson).toList(growable: false),
+      customerCancellationDeadline: _date(json['customerCancellationDeadline']),
     );
   }
 
@@ -154,6 +156,12 @@ class OrderDetail {
   final String? customerName;
   final String? customerAvatar;
   final List<OrderStatusEvent>? _statusHistory;
+  final DateTime? customerCancellationDeadline;
+  bool canCancelAt(DateTime now) {
+    if (status == 'created') return true;
+    if (status != 'accepted' && status != 'in_progress') return false;
+    return customerCancellationDeadline != null && !now.isAfter(customerCancellationDeadline!);
+  }
   List<OrderStatusEvent> get statusHistory => _statusHistory ?? const [];
 }
 
@@ -170,6 +178,7 @@ class CancellationPreview {
     required this.refundAmount,
     required this.cancellationFee,
     this.policyReason,
+    this.canCancel = true,
   });
   factory CancellationPreview.fromJson(Map<String, dynamic> json) =>
       CancellationPreview(
@@ -177,11 +186,13 @@ class CancellationPreview {
         refundAmount: _number(json['refundAmount']),
         cancellationFee: _number(json['cancellationFee']),
         policyReason: json['policyReason'] as String?,
+        canCancel: json['canCancel'] as bool? ?? false,
       );
   final double paidAmount;
   final double refundAmount;
   final double cancellationFee;
   final String? policyReason;
+  final bool canCancel;
 }
 
 class RepairQuotation {

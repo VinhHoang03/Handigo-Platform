@@ -32,7 +32,7 @@ function loadService(name, modules, internals = []) {
 }
 
 function query(value) {
-  return { select() { return this; }, session() { return this; }, lean() { return this; },
+  return { select() { return this; }, sort() { return this; }, session() { return this; }, lean() { return this; },
     then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } };
 }
 
@@ -110,10 +110,11 @@ test('Không đổi luồng đơn báo giá hoặc cho thợ khác hủy đơn',
   await assert.rejects(stranger.cancel(), /quyền/);
 });
 
-function cancellationSetup(method = 'wallet', { automatic = true, unavailable = true, status = 'created' } = {}) {
+function cancellationSetup(method = 'wallet', { automatic = true, unavailable = true, status = 'created',
+  customer = false, inspectionRequired = false, acceptedAt = new Date(Date.now() - 60000) } = {}) {
   const order = { _id: new Types.ObjectId(), customerId: new Types.ObjectId(), orderCode: 'ORD-HOANTIEN',
     status, orderType: 'normal', paymentMethod: method === 'payos' ? 'bank' : method,
-    providerId: null, inspectionRequired: false, paymentStatus: method === 'cash' ? 'unpaid' : 'paid',
+    providerId: customer ? new Types.ObjectId() : null, inspectionRequired, paymentStatus: method === 'cash' ? 'unpaid' : 'paid',
     reassignment: { automatic, status: 'matching' } };
   const payment = { _id: new Types.ObjectId(), orderId: order._id, customerId: order.customerId,
     method, status: method === 'cash' ? 'pending' : 'paid', amount: 180000, async save() {} };
@@ -125,8 +126,13 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
     mongoose: { __esModule: true, default: { startSession: async () => session }, Types },
     '../models/order.model': { Order: {
       findById: () => query(order),
+      findOne: () => query(order),
       async findOneAndUpdate(_, update) { setFields(order, update.$set); return order; },
       async updateOne(_, update) { setFields(order, update.$set); },
+    } },
+    '../models/orderStatus.model': { OrderStatus: { findOne: () => query(acceptedAt ? { createdAt: acceptedAt } : null) } },
+    '../models/provider.model': { Provider: {
+      async updateOne() {}, findById: () => query({ userId: new Types.ObjectId() }),
     } },
     '../models/payment.model': { Payment: {
       find(filter) {
@@ -156,7 +162,7 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
     '../models/voucher.model': { Voucher: { async updateOne(filter, update, options) {
       assert.equal(options.session, session); vouchers.push(update.$setOnInsert);
     } } },
-    '../models/orderAssignment.model': { OrderAssignment: { async updateMany() {} } },
+    '../models/orderAssignment.model': { OrderAssignment: { async updateMany() {}, findOne: () => query(null) } },
     '../models/refund.model': { Refund: {
       async findOneAndUpdate(_, update) {
         refund ??= { _id: new Types.ObjectId(), ...update.$setOnInsert };
@@ -177,7 +183,10 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
   };
   const service = loadService('orderCancellation.service', models);
   return { order, payment, wallet, vouchers, transactions, notifications,
-    cancel: () => service.cancelSystemOrderWithSettlement(order._id.toString(), 'Hết thời gian tìm thợ', unavailable ? 'provider_unavailable' : undefined) };
+    service,
+    cancel: () => customer
+      ? service.cancelOrderWithSettlement({ orderId: order._id.toString(), actorId: order.customerId.toString(), role: 'customer', reason: 'Khách thay đổi kế hoạch' })
+      : service.cancelSystemOrderWithSettlement(order._id.toString(), 'Hết thời gian tìm thợ', unavailable ? 'provider_unavailable' : undefined) };
 }
 
 for (const method of ['wallet', 'payos', 'cash']) {
@@ -300,4 +309,139 @@ test('Timer của đề nghị cũ không được kết thúc sớm đề ngh�
     } },
   });
   await service.DispatchService._onAssignmentTimeout(new Types.ObjectId().toString(), new Types.ObjectId().toString(), new Types.ObjectId(), {});
+});
+
+for (const inspectionRequired of [false, true]) {
+  for (const status of ['accepted', 'in_progress']) {
+    for (const method of ['wallet', 'payos', 'cash']) {
+      test(`${status === 'in_progress' ? 'Chặn khách hủy khi đã bắt đầu' : 'Khách được hủy trong 5 phút'}: ${inspectionRequired ? 'báo giá' : 'giá cố định'}, ${method}`, async () => {
+        const context = cancellationSetup(method, { customer: true, status, inspectionRequired });
+        if (inspectionRequired) context.order.currentQuotationId = new Types.ObjectId();
+        if (status === 'in_progress') {
+          const preview = await context.service.getCancellationPreview({
+            orderId: context.order._id.toString(), actorId: context.order.customerId.toString(), role: 'customer',
+          });
+          assert.equal(preview.canCancel, false);
+          assert.equal(preview.refundAmount, 0);
+          await assert.rejects(context.cancel(), /Thợ đã bắt đầu làm việc/);
+          assert.equal(context.order.status, 'in_progress');
+          assert.equal(context.payment.status, method === 'cash' ? 'pending' : 'paid');
+          assert.equal(context.wallet.balance, 20000);
+          assert.equal(context.transactions.length, 0);
+          assert.equal(context.vouchers.length, 0);
+          assert.equal(context.notifications.length, 0);
+          return;
+        }
+        await context.cancel();
+        assert.equal(context.order.status, 'cancelled');
+        assert.equal(context.order.cancellation.refundPolicy.refundRate, 100);
+        assert.equal(context.order.cancellation.refundPolicy.cancellationFee, 0);
+        assert.equal(context.wallet.balance, method === 'cash' ? 20000 : 200000);
+        assert.equal(context.payment.status, method === 'cash' ? 'failed' : 'refunded');
+        assert.equal(context.vouchers.length, 0);
+        await context.cancel();
+        assert.equal(context.wallet.balance, method === 'cash' ? 20000 : 200000);
+      });
+    }
+  }
+}
+
+test('API chặn khách hủy quá 5 phút, không thay đổi đơn, ví hoặc voucher', async () => {
+  for (const inspectionRequired of [false, true]) {
+    const context = cancellationSetup('payos', { customer: true, status: 'accepted', inspectionRequired,
+      acceptedAt: new Date(Date.now() - 301000) });
+    await assert.rejects(context.cancel(), /hết thời hạn hủy 5 phút/);
+    assert.equal(context.order.status, 'accepted');
+    assert.equal(context.payment.status, 'paid');
+    assert.equal(context.wallet.balance, 20000);
+    assert.equal(context.transactions.length, 0);
+    assert.equal(context.vouchers.length, 0);
+  }
+});
+
+test('Biên đúng 5 phút được hủy; quá 1ms bị chặn cho mọi loại lịch và dịch vụ', () => {
+  const { calculateRefundPolicy } = loadService('refundPolicy.service', {});
+  const acceptedAt = new Date('2026-10-15T01:00:00Z');
+  for (const orderType of ['normal', 'urgent', 'scheduled', 'recurring']) {
+    for (const inspectionRequired of [false, true]) {
+      for (const elapsed of [0, 299999, 300000, 300001]) {
+        const policy = calculateRefundPolicy({ role: 'customer', orderStatus: 'accepted', orderType,
+          hasAssignedProvider: true, inspectionRequired, paidAmount: 120000,
+          providerAcceptedAt: acceptedAt, now: new Date(acceptedAt.getTime() + elapsed) });
+        assert.equal(policy.canCancel, elapsed <= 300000);
+        assert.equal(policy.refundAmount, elapsed <= 300000 ? 120000 : 0);
+        assert.equal(policy.providerCompensation, 0);
+      }
+    }
+  }
+});
+
+test('Lấy mốc nhận gần nhất sau thay thợ, không lấy updatedAt', async () => {
+  const context = cancellationSetup('wallet', { customer: true, status: 'accepted' });
+  const recent = new Date('2026-10-15T01:05:00Z');
+  const deadline = await context.service.getCustomerCancellationDeadline(context.order, undefined, [
+    { status: 'accepted', createdAt: new Date('2026-10-15T01:00:00Z') },
+    { status: 'created', createdAt: new Date('2026-10-15T01:04:00Z') },
+    { status: 'accepted', createdAt: recent },
+    { status: 'in_progress', createdAt: new Date('2026-10-15T01:06:00Z') },
+  ]);
+  assert.equal(deadline.getTime(), recent.getTime() + 300000);
+});
+
+test('Đơn đang thực hiện không còn thời hạn hủy cho khách', async () => {
+  const context = cancellationSetup('wallet', { customer: true, status: 'in_progress' });
+  assert.equal(await context.service.getCustomerCancellationDeadline(context.order), null);
+});
+
+test('Chặn hủy sau khi bắt đầu cho mọi loại lịch, kể cả còn trong 5 phút hoặc thiếu provider', () => {
+  const { calculateRefundPolicy } = loadService('refundPolicy.service', {});
+  const now = new Date('2026-10-15T01:00:00Z');
+  for (const orderType of ['normal', 'urgent', 'scheduled', 'recurring']) {
+    for (const hasAssignedProvider of [false, true]) {
+      const policy = calculateRefundPolicy({ role: 'customer', orderStatus: 'in_progress',
+        orderType, hasAssignedProvider, paidAmount: 180000, providerAcceptedAt: now, now });
+      assert.equal(policy.canCancel, false);
+      assert.equal(policy.refundAmount, 0);
+      assert.match(policy.policyReason, /Thợ đã bắt đầu làm việc/);
+    }
+  }
+});
+
+test('Đơn cũ thiếu lịch sử dùng respondedAt; thiếu cả hai mốc thì không mở quyền hủy', async () => {
+  const respondedAt = new Date('2026-10-15T01:00:00Z');
+  let assignment = { respondedAt };
+  const service = loadService('orderCancellation.service', {
+    mongoose: { Types },
+    '../models/orderStatus.model': { OrderStatus: { findOne: () => query(null) } },
+    '../models/orderAssignment.model': { OrderAssignment: { findOne: () => query(assignment) } },
+    './refundPolicy.service': loadService('refundPolicy.service', {}),
+  });
+  const order = { _id: new Types.ObjectId(), providerId: new Types.ObjectId(), status: 'accepted' };
+  assert.equal((await service.getCustomerCancellationDeadline(order)).getTime(), respondedAt.getTime() + 300000);
+  assignment = null;
+  assert.equal(await service.getCustomerCancellationDeadline(order), null);
+});
+
+test('Xem trước quá hạn trả canCancel=false, API không tin thời điểm từ khách', async () => {
+  const context = cancellationSetup('wallet', { customer: true, status: 'accepted',
+    acceptedAt: new Date(Date.now() - 301000) });
+  const preview = await context.service.getCancellationPreview({
+    orderId: context.order._id.toString(), actorId: context.order.customerId.toString(), role: 'customer',
+  });
+  assert.equal(preview.canCancel, false);
+  assert.equal(preview.refundAmount, 0);
+  assert.equal(context.order.status, 'accepted');
+});
+
+test('QR nhận tiền muộn sau khi khách hủy vẫn hoàn về ví, không payout hoặc hoàn trùng', async () => {
+  const context = cancellationSetup('payos', { customer: true, status: 'accepted' });
+  context.payment.status = 'pending';
+  await context.cancel();
+  assert.equal(context.wallet.balance, 20000);
+  context.payment.status = 'paid';
+  await context.service.settleCancelledOrderPayments(context.order._id, 'Khách hủy trong thời hạn');
+  assert.equal(context.wallet.balance, 200000);
+  assert.equal(context.payment.status, 'refunded');
+  await context.service.settleCancelledOrderPayments(context.order._id, 'Khách hủy trong thời hạn');
+  assert.equal(context.wallet.balance, 200000);
 });

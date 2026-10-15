@@ -1,4 +1,6 @@
 export const REFUND_POLICY_VERSION = "HANDIGO_REFUND_V1";
+export const CUSTOMER_CANCELLATION_POLICY_VERSION = "HANDIGO_CUSTOMER_CANCEL_5M_V1";
+export const CUSTOMER_CANCELLATION_WINDOW_MS = 5 * 60 * 1000;
 export const QUOTATION_DEPOSIT_POLICY_VERSION = "HANDIGO_QUOTATION_DEPOSIT_V1";
 export const QUOTATION_DECLINED_REASON = "Khách hàng không đồng ý báo giá";
 export const isQuotationDeclinedReason = (reason = "") =>
@@ -23,6 +25,7 @@ export interface RefundPolicyInput {
   inspectionRequired?: boolean;
   paidInspectionDeposit?: number;
   cancellationReason?: string;
+  providerAcceptedAt?: Date | null;
 }
 
 export interface RefundPolicyResult {
@@ -65,7 +68,34 @@ export const calculateRefundPolicy = (
     };
   }
 
-  let canCancel = ["created", "accepted"].includes(input.orderStatus);
+  if (input.role === "customer" && input.orderStatus === "in_progress") {
+    return {
+      policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
+      canCancel: false, refundRate: 0, paidAmount, refundAmount: 0,
+      cancellationFee: 0, providerCompensation: 0, platformRetainedAmount: 0,
+      hoursBeforeStart,
+      policyReason: "Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng.",
+    };
+  }
+
+  if (input.role === "customer" && input.hasAssignedProvider
+    && input.orderStatus === "accepted") {
+    const acceptedAt = input.providerAcceptedAt?.getTime();
+    const elapsed = acceptedAt === undefined ? NaN : now.getTime() - acceptedAt;
+    const canCancel = Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= CUSTOMER_CANCELLATION_WINDOW_MS;
+    return {
+      policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
+      canCancel, refundRate: canCancel ? 100 : 0, paidAmount,
+      refundAmount: canCancel ? paidAmount : 0,
+      cancellationFee: 0, providerCompensation: 0, platformRetainedAmount: 0,
+      hoursBeforeStart,
+      policyReason: canCancel
+        ? "Hủy trong vòng 5 phút kể từ khi thợ nhận đơn, hoàn toàn bộ khoản đã thanh toán về ví Handigo."
+        : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn hoặc chưa xác minh được thời điểm nhận đơn.",
+    };
+  }
+
+  const canCancel = ["created", "accepted"].includes(input.orderStatus);
   let refundRate = 100;
   let policyReason = "Hoàn toàn bộ tiền đã thanh toán.";
 
@@ -73,27 +103,6 @@ export const calculateRefundPolicy = (
     policyReason = "Provider, quản trị viên hoặc hệ thống hủy đơn.";
   } else if (!input.hasAssignedProvider || input.orderStatus === "created") {
     policyReason = "Đơn chưa có provider nhận.";
-  } else if (["normal", "urgent"].includes(input.orderType)) {
-    refundRate = 70;
-    policyReason = "Khách hàng hủy đơn sau khi provider đã nhận.";
-  } else if (hoursBeforeStart === null) {
-    refundRate = 70;
-    policyReason = "Lịch hẹn thiếu thời gian bắt đầu; áp dụng mức hoàn an toàn 70%.";
-  } else if (hoursBeforeStart >= 24) {
-    policyReason = "Hủy trước lịch ít nhất 24 giờ.";
-  } else if (hoursBeforeStart >= 6) {
-    refundRate = 80;
-    policyReason = "Hủy trong khoảng từ 6 đến dưới 24 giờ trước lịch.";
-  } else if (hoursBeforeStart >= 2) {
-    refundRate = 50;
-    policyReason = "Hủy trong khoảng từ 2 đến dưới 6 giờ trước lịch.";
-  } else if (hoursBeforeStart > 0) {
-    refundRate = 20;
-    policyReason = "Hủy dưới 2 giờ trước lịch.";
-  } else {
-    canCancel = false;
-    refundRate = 0;
-    policyReason = "Lịch đã đến giờ thực hiện; vui lòng gửi yêu cầu hỗ trợ.";
   }
 
   if (!canCancel) {
