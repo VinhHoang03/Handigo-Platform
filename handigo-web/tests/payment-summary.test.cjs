@@ -90,7 +90,7 @@ test('Đơn báo giá: để trống khi chưa có giá, tách tiền cọc kh�
   const quotation = { quotation: { finalAmount: 150000, status: 'saved' } };
   const quoted = render(order, quotation, 'Đã thanh toán tiền cọc');
   assert.equal(value(quoted, 'Giá trị đơn hàng'), '150.000₫');
-  assert.equal(value(quoted, 'Cọc được khấu trừ'), '-30.000₫');
+  assert.doesNotMatch(quoted, /Cọc được khấu trừ|Thanh toán tiền sửa chữa|Đã xác nhận nhận tiền/);
   assert.equal(value(quoted, 'Còn cần thu trực tiếp'), '120.000₫');
   assert.doesNotMatch(quoted, /Thu nhập của thợ|Thu nhập dự kiến/);
   assert.doesNotMatch(quoted, />Phí nền tảng</);

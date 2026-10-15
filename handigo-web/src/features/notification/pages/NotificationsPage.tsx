@@ -2,7 +2,9 @@ import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { useNavigate } from "react-router-dom";
-import { getNotificationTarget } from "@/components/common/notification-bell/notificationBell.utils";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { getNotificationTarget, getNotificationUnavailableReason } from "@/components/common/notification-bell/notificationBell.utils";
+import { useToast } from "@/components/common/Toast";
 import { NotificationFilterSelects } from "../components/NotificationFilterSelects";
 import { NotificationList } from "../components/NotificationList";
 import { NotificationListSkeleton } from "../components/NotificationListSkeleton";
@@ -21,8 +23,18 @@ export default function NotificationsPage({
 }: {
   role: NotificationRole;
 }) {
+  const accountId = useAuthStore((state) =>
+    state.isAuthenticated ? state.user?.id || state.user?._id || "" : "",
+  );
+  if (!accountId) return null;
+  return <AccountNotificationsPage key={`${role}:${accountId}`} role={role} />;
+}
+
+function AccountNotificationsPage({ role }: { role: NotificationRole }) {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const {
+    isCurrentAccount,
     isAdmin,
     query,
     setQuery,
@@ -46,8 +58,15 @@ export default function NotificationsPage({
   } = useNotificationsPageController(role);
 
   const openNotification = async (item: Parameters<typeof getNotificationTarget>[0]) => {
-    await markOne(item);
-    const target = getNotificationTarget(item, role);
+    if (!isCurrentAccount()) return;
+    const latest = await markOne(item, false);
+    if (!isCurrentAccount() || !latest) return;
+    const unavailableReason = getNotificationUnavailableReason(latest);
+    if (unavailableReason) {
+      addToast(unavailableReason, "info");
+      return;
+    }
+    const target = getNotificationTarget(latest, role);
     if (target) navigate(target);
   };
 
@@ -73,12 +92,11 @@ export default function NotificationsPage({
               </h2>
               <p className="text-sm text-on-surface-variant">
                 {isAdmin
-                  ? "Sắp xếp theo thời gian mới nhất."
+                  ? "Thông báo dành cho tài khoản của bạn, sắp xếp theo thời gian mới nhất."
                   : "Thông báo mới nhất hiển thị trước, có thể tải thêm thông báo cũ hơn."}
               </p>
             </div>
             <NotificationFilterSelects
-              isAdmin={isAdmin}
               query={query}
               onQueryChange={setQuery}
             />
@@ -103,7 +121,6 @@ export default function NotificationsPage({
             <NotificationList
               items={items}
               busy={busy}
-              showRecipient={isAdmin}
               onMarkRead={markOne}
               onOpen={(item) => void openNotification(item)}
             />

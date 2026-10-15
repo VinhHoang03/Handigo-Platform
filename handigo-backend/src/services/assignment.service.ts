@@ -316,7 +316,7 @@ export const AssignmentService = {
     }
 
     const assignedOrder = await Order.findById(assignment.orderId).select(
-      "addressId customerId orderCode orderType scheduledAt status recurringGroupId occurrenceNumber paymentStatus paymentMethod reassignment",
+      "addressId customerId orderCode orderType scheduledAt status bookingStatus recurringGroupId occurrenceNumber paymentStatus paymentMethod reassignment",
     );
     const assignedAddress = assignedOrder
       ? await Address.findById(assignedOrder.addressId).select("ward province")
@@ -328,7 +328,8 @@ export const AssignmentService = {
 
     await assertProviderWalletEligible(provider.userId);
 
-    if (assignment.assignmentType === "appointment") {
+    const isAppointment = assignment.assignmentType === "appointment";
+    if (isAppointment) {
       if (!assignedOrder || !assignedOrder.scheduledAt || assignedOrder.status !== "created") {
         throw new AppError("Lịch hẹn không còn khả dụng.", 409);
       }
@@ -472,10 +473,13 @@ export const AssignmentService = {
           _id: assignment.orderId,
           status: "created",
           providerId: null,
-          readyForMatching: true,
+          ...(!isAppointment && { readyForMatching: true }),
           isDeleted: false,
         }).session(session);
         if (!order) throw new AppError("Đơn hàng không còn khả dụng để nhận.", 409);
+        if (isAppointment && !order.scheduledAt) {
+          throw new AppError("Lịch hẹn không còn khả dụng.", 409);
+        }
 
         const hasInitialPayment = ["paid", "partially_paid"].includes(order.paymentStatus)
           || (order.paymentMethod === "cash" && await Payment.exists({
@@ -494,7 +498,16 @@ export const AssignmentService = {
           expectedStartAt,
           expectedEndAt: new Date(expectedStartAt.getTime() + durationMinutes * 60000),
         };
-        await assertProviderSchedule(lockedProvider._id as Types.ObjectId, [order], session, policy);
+        const isReplacement = order.reassignment?.status === "matching";
+        const appointmentOrders = isAppointment && order.recurringGroupId && !isReplacement
+          ? await Order.find({
+              recurringGroupId: order.recurringGroupId,
+              status: "created",
+              providerId: null,
+              isDeleted: false,
+            }).session(session)
+          : [order];
+        await assertProviderSchedule(lockedProvider._id as Types.ObjectId, appointmentOrders, session, policy);
 
         const respondedAt = new Date();
         const claimedAssignment = await OrderAssignment.findOneAndUpdate(
@@ -514,8 +527,30 @@ export const AssignmentService = {
         order.status = "accepted";
         if (order.reassignment?.status === "matching") order.reassignment.status = "matched";
         order.readyForMatching = false;
-        lockedProvider.availabilityStatus = "busy";
-        await lockedProvider.save({ session });
+        if (isAppointment) {
+          order.bookingStatus = "confirmed";
+          order.paymentDueAt = null;
+          if (order.recurringGroupId && !isReplacement) {
+            await Order.updateMany(
+              {
+                _id: { $in: appointmentOrders.map((item) => item._id).filter((id) => id.toString() !== order._id.toString()) },
+                status: "created",
+                providerId: null,
+              },
+              { $set: {
+                providerId: lockedProvider._id,
+                status: "accepted",
+                bookingStatus: "reserved",
+                paymentDueAt: null,
+                readyForMatching: false,
+              } },
+              { session, runValidators: true },
+            );
+          }
+        } else {
+          lockedProvider.availabilityStatus = "busy";
+          await lockedProvider.save({ session });
+        }
         await order.save({ session });
         return { assignment: claimedAssignment, order };
       }) ?? null;
@@ -533,8 +568,10 @@ export const AssignmentService = {
       await createNotificationRecord({
         userId: result.order.customerId,
         type: "ORDER",
-        title: "Chuyên gia đã nhận đơn",
-        content: `Chuyên gia đã nhận đơn ${result.order.orderCode}.`,
+        title: isAppointment
+          ? (result.order.recurringGroupId ? "Chuyên gia đã nhận chuỗi lịch" : "Chuyên gia đã nhận lịch")
+          : "Chuyên gia đã nhận đơn",
+        content: `Chuyên gia đã nhận đơn ${result.order.orderCode}.${isAppointment ? " Chuyên gia sẽ thực hiện theo lịch hẹn." : ""}`,
         data: { orderId: result.order._id },
       });
     } catch (error) {

@@ -3,7 +3,8 @@ import { AuditLog } from "../models/auditLog.model";
 import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
 import { bookingPolicySchema, DEFAULT_BOOKING_POLICY } from "../validations/bookingPolicy.validator";
-import { rewardOfferSchema } from "../validations/reward.validator";
+import { rewardOfferSchema, rewardPolicySchema, DEFAULT_REWARD_POLICY } from "../validations/reward.validator";
+import { refundPolicySchema, DEFAULT_REFUND_POLICY } from "../validations/refundPolicy.validator";
 import { REWARD_POLICY } from "../configs/rewards";
 import type {
   CreateSystemConfigInput,
@@ -87,6 +88,12 @@ const assertConfigValueMatchesType = (value: unknown, type: SystemConfigType) =>
 };
 
 const assertMatchingConfig = async (key: string, value: unknown, type: SystemConfigType) => {
+  if (key === "MATCHING_PROVIDER_TIMEOUT_SECONDS") {
+    if (type !== "NUMBER" || typeof value !== "number" || !Number.isFinite(value) || value < 1) {
+      throw new AppError("Thời gian chờ nhận đơn phải là số từ 1 giây trở lên.", 400);
+    }
+    return;
+  }
   const limits: Record<string, number> = {
     INITIAL_PROVIDER_RADIUS_KM: 200,
     MAX_PROVIDER_RADIUS_KM: 200,
@@ -189,6 +196,7 @@ export const createConfig = async (admin: RequestUser, input: CreateSystemConfig
   assertAdmin(admin);
   validateRewardOffer(input.key, input.value, input.type, input.isPublic);
   validateBookingPolicy(input.key, input.value, input.type, input.isPublic);
+  validateBusinessPolicy(input.key, input.value, input.type, input.isPublic);
   assertConfigValueMatchesType(input.value, input.type);
   await assertMatchingConfig(input.key, input.value, input.type);
   await ensureIndexes();
@@ -242,6 +250,7 @@ export const updateConfig = async (
   const nextType = input.type ?? existing.type;
   validateRewardOffer(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   validateBookingPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
+  validateBusinessPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   assertConfigValueMatchesType(input.value, nextType);
   await assertMatchingConfig(key, input.value, nextType);
 
@@ -293,6 +302,29 @@ export const getBookingPolicy = async () => {
   if (!config) return DEFAULT_BOOKING_POLICY;
   const parsed = bookingPolicySchema.safeParse(config.value);
   if (!parsed.success) throw new AppError("Chính sách đặt dịch vụ không hợp lệ. Vui lòng liên hệ quản trị viên.", 503);
+  return parsed.data;
+};
+
+const validateBusinessPolicy = (key: string, value: unknown, type: SystemConfigType, isPublic: boolean) => {
+  if (key !== "REFUND_POLICY" && key !== "REWARD_POLICY") return;
+  if (type !== "JSON" || isPublic) throw new AppError("Chính sách nghiệp vụ phải là JSON nội bộ.", 400);
+  const parsed = key === "REFUND_POLICY" ? refundPolicySchema.safeParse(value) : rewardPolicySchema.safeParse(value);
+  if (!parsed.success) throw new AppError(`Chính sách không hợp lệ: ${parsed.error.issues.map((issue) => issue.code === "custom" ? issue.message : `Kiểm tra kiểu dữ liệu và giới hạn của ${issue.path.join(".")}`).join("; ")}`, 400);
+};
+
+export const getRefundPolicy = async (session?: mongoose.ClientSession) => {
+  const config = await collection().findOne({ key: "REFUND_POLICY" }, { session });
+  if (!config) return DEFAULT_REFUND_POLICY;
+  const parsed = refundPolicySchema.safeParse(config.value);
+  if (config.type !== "JSON" || !parsed.success) throw new AppError("Chính sách hoàn tiền không hợp lệ. Vui lòng liên hệ quản trị viên.", 503);
+  return parsed.data;
+};
+
+export const getRewardPolicy = async (session?: mongoose.ClientSession) => {
+  const config = await collection().findOne({ key: "REWARD_POLICY" }, { session });
+  if (!config) return DEFAULT_REWARD_POLICY;
+  const parsed = rewardPolicySchema.safeParse(config.value);
+  if (config.type !== "JSON" || !parsed.success) throw new AppError("Chính sách điểm thưởng không hợp lệ. Vui lòng liên hệ quản trị viên.", 503);
   return parsed.data;
 };
 

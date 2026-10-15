@@ -5,6 +5,11 @@ export interface MatchingSearch {
   expiresAt: Date;
 }
 
+/** Đề nghị nhận đơn không dài hơn khoảng chờ trước khi mở rộng tìm kiếm. */
+export function getProviderResponseTimeoutSeconds(responseSeconds: number, expandAfterMinutes: number) {
+  return Math.min(Math.max(responseSeconds, 1), Math.max(expandAfterMinutes, 0.1) * 60);
+}
+
 export function buildMatchingSearch(startedAt: Date, initialRadiusKm: number,
   expandedRadiusKm: number, expandAfterMinutes: number, expandedDurationMinutes: number): MatchingSearch {
   const expandsAt = new Date(startedAt.getTime() + expandAfterMinutes * 60_000);

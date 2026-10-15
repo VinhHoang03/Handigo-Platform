@@ -1,4 +1,4 @@
-import { useToastFeedback } from "@/components/common/Toast";
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -24,10 +24,10 @@ import type { SystemConfigPayload, SystemConfigQuery, UpdateSystemConfigPayload 
 import { Globe, Settings, Zap } from "lucide-react";
 
 export default function AdminSystemConfigsPage() {
+  const { addToast } = useToast();
   const [items, setItems] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>("", "error");
-  const [notice, setNotice] = useToastFeedback<string>("", "success");
   const [busy, setBusy] = useState(false);
   const [activeGroup, setActiveGroup] = useState<ConfigGroupKey | "all">("all");
   const [editing, setEditing] = useState<ConfigItem | null>(null);
@@ -86,7 +86,6 @@ export default function AdminSystemConfigsPage() {
     if (!editing) return;
 
     setError("");
-    setNotice("");
     try {
       const payload: SystemConfigPayload = {
         key: editing.key,
@@ -106,7 +105,6 @@ export default function AdminSystemConfigsPage() {
 
     setBusy(true);
     setError("");
-    setNotice("");
     try {
       const { item, payload } = pendingSave;
       if (item.existing) {
@@ -121,7 +119,7 @@ export default function AdminSystemConfigsPage() {
         await systemConfigApi.create(payload);
       }
 
-      setNotice(`Đã lưu cấu hình "${item.label}".`);
+      addToast(`Đã lưu cấu hình "${item.label}".`, "success");
       setEditing(null);
       setPendingSave(null);
       await load();
@@ -147,11 +145,9 @@ export default function AdminSystemConfigsPage() {
           <StatCard icon={Globe} label="Công khai" value={stats.publicCount} />
         </div>
 
-        {(notice || error) && (
-          <div
-            className={`rounded-xl px-4 py-3 ${error ? "bg-error/10 text-error" : "bg-success-container text-on-success-container"}`}
-          >
-            {error || notice}
+        {error && (
+          <div className="rounded-xl bg-error/10 px-4 py-3 text-error">
+            {error}
           </div>
         )}
 

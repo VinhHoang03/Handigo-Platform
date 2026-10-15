@@ -53,7 +53,7 @@ export function FixedPriceActionForm({
 
   const showStart = order.status === 'accepted' && !order.inspectionRequired;
   const showComplete = order.status === 'in_progress';
-  const showCancel = ['accepted', 'in_progress'].includes(order.status);
+  const showCancel = order.status === 'accepted';
   const repairQuotation = quotation?.quotation;
   const showPaymentConfirmation = order.inspectionRequired && onConfirmPayment && repairQuotation
     && order.status === 'completed'

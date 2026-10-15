@@ -4,6 +4,7 @@ import {
   notificationTypeLabels,
 } from "./notification-type-meta";
 import { Check } from "lucide-react";
+import { getNotificationUnavailableReason } from "@/components/common/notification-bell/notificationBell.utils";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",
@@ -52,6 +53,7 @@ function NotificationListItem({
   onMarkRead: (notification: AppNotification) => void;
   onOpen: (notification: AppNotification) => void;
 }) {
+  const unavailableReason = getNotificationUnavailableReason(item);
   return (
     <article
       role="button"
@@ -60,10 +62,10 @@ function NotificationListItem({
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") onOpen(item);
       }}
-      className={`flex gap-4 py-4 ${item.isRead ? "" : "bg-primary/5 px-3 sm:-mx-3"}`}
+      className={`flex gap-4 py-4 ${item.isRead || unavailableReason ? "" : "bg-primary/5 px-3 sm:-mx-3"}`}
     >
       <span
-        className={`mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${item.isRead ? "bg-surface-container-low text-on-surface-variant" : "bg-primary/10 text-primary"}`}
+        className={`mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${item.isRead || unavailableReason ? "bg-surface-container-low text-on-surface-variant" : "bg-primary/10 text-primary"}`}
       >
         {(() => {
           const TypeIcon = notificationTypeIcons[item.type];
@@ -74,11 +76,11 @@ function NotificationListItem({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold text-on-surface">{item.title}</h3>
+              <h3 className={`font-semibold ${unavailableReason ? "text-on-surface-variant line-through" : "text-on-surface"}`}>{item.title}</h3>
               <span className="inline-flex rounded-full bg-surface-container-low px-2 py-0.5 text-xs font-semibold text-on-surface-variant">
                 {notificationTypeLabels[item.type]}
               </span>
-              {!item.isRead && (
+              {!item.isRead && !unavailableReason && (
                 <span className="inline-flex rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-on-primary">
                   Mới
                 </span>
@@ -87,6 +89,12 @@ function NotificationListItem({
             <p className="mt-1 text-sm leading-6 text-on-surface-variant">
               {item.content}
             </p>
+            {unavailableReason && (
+              <p className="mt-2 text-sm text-on-surface-variant">
+                <span className="mr-2 rounded bg-surface-container-high px-2 py-0.5 text-xs font-semibold">Không còn hiệu lực</span>
+                {unavailableReason}
+              </p>
+            )}
             {showRecipient && item.recipient && (
               <p className="mt-2 text-sm text-on-surface-variant">
                 Người nhận:{" "}

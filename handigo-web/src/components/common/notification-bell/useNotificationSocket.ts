@@ -6,6 +6,7 @@ import type { AppNotification } from "@/features/notification/types/notification
 export function useNotificationSocket(
   enabled: boolean,
   onNotification: (notification: AppNotification) => void,
+  onOrderUpdated?: () => void,
 ) {
   useEffect(() => {
     if (!enabled) return undefined;
@@ -15,10 +16,12 @@ export function useNotificationSocket(
       onNotification(notification);
 
     socket.on("notification:new", handleNewNotification);
+    if (onOrderUpdated) socket.on("order:updated", onOrderUpdated);
 
     return () => {
       socket.off("notification:new", handleNewNotification);
+      if (onOrderUpdated) socket.off("order:updated", onOrderUpdated);
       dispose();
     };
-  }, [enabled, onNotification]);
+  }, [enabled, onNotification, onOrderUpdated]);
 }

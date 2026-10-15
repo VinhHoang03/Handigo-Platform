@@ -1,11 +1,9 @@
-import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from "react";
 import type {
   UserAddress,
   UserProfileData,
   UserProfileFormValue,
 } from "@/features/profile/types/profile.types";
-import { getErrorMessage } from "@/utils/apiError";
 import {
   isValidVietnamesePhone,
   normalizeVietnamesePhone,
@@ -37,19 +35,16 @@ export function useUserProfileForm({
   const [profileForm, setProfileForm] = useState<UserProfileFormValue>(() =>
     toProfileForm(user),
   );
-  const [localProfileError, setLocalProfileError] = useToastFeedback<string>("", "error");
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
 
   const startEditing = () => {
     setProfileForm(toProfileForm(user));
-    setLocalProfileError("");
     setFieldErrors({});
     setIsEditing(true);
   };
 
   const cancelEditing = () => {
     setProfileForm(toProfileForm(user));
-    setLocalProfileError("");
     setFieldErrors({});
     setIsEditing(false);
   };
@@ -64,7 +59,6 @@ export function useUserProfileForm({
 
   const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLocalProfileError("");
     setFieldErrors({});
 
     const normalizedName = profileForm.fullName.trim().replace(/\s+/g, " ");
@@ -102,16 +96,8 @@ export function useUserProfileForm({
         gender: profileForm.gender || null,
       });
       setIsEditing(false);
-    } catch (saveError) {
-      const message = getErrorMessage(
-        saveError,
-        "Không thể cập nhật hồ sơ. Vui lòng thử lại.",
-      );
-      if (message.toLowerCase().includes("số điện thoại")) {
-        setFieldErrors((current) => ({ ...current, phone: message }));
-      } else {
-        setLocalProfileError(message);
-      }
+    } catch {
+      // Hàm lưu đã báo lỗi qua toast; giữ form mở để người dùng chỉnh sửa.
     }
   };
 
@@ -135,7 +121,6 @@ export function useUserProfileForm({
     isEmailVisible,
     setIsEmailVisible,
     profileForm,
-    localProfileError,
     fieldErrors,
     startEditing,
     cancelEditing,

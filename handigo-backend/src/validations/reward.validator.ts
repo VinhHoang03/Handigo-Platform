@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const rewardPolicySchema = z.object({
+  amountPerPoint: z.number().int().min(1).max(100_000_000).default(10_000),
+  validityDays: z.number().int().min(1).max(3650).default(30),
+}).strict();
+
+export const DEFAULT_REWARD_POLICY = rewardPolicySchema.parse({});
+
 export const rewardPageSchema = z.object({ page: z.coerce.number().int().min(1).max(10000).default(1) });
 export const redeemRewardSchema = z.object({
   offerId: z.string().trim().min(1).max(40),

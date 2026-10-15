@@ -93,6 +93,11 @@ export const BookingRefundPanel = ({
                 cancellationPreview={cancellationPreview}
               />
             )}
+            {isCancellationAction && cancellationPreview && order.inspectionRequired && cancellationPreview.providerCompensation === 0 && (
+              <p className="text-sm leading-6 text-on-surface-variant">
+                Khi chưa có thợ nhận, toàn bộ tiền cọc đã thanh toán được hoàn lại cho bạn (100%).
+              </p>
+            )}
 
             {isCancellationAction ? (
               <BookingCancellationReasonForm

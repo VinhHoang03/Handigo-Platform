@@ -32,7 +32,7 @@ export const getPaymentStatusDisplay = (
   if (currentOrder.status === "cancelled") {
     if (currentOrder.cancellation?.refundPolicy?.policyVersion === "HANDIGO_QUOTATION_DEPOSIT_V1") {
       return {
-        label: "Cọc chuyển cho thợ; khoản trả thêm xử lý hoàn riêng",
+        label: "",
         className: toneTextClasses.neutral,
       };
     }
