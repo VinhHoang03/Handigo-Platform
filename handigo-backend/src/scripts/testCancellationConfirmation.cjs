@@ -63,6 +63,7 @@ const context = {
   refreshCancelledOrderPaymentStatus: async () => {},
   settleCancelledOrderPayments: async id => { assert.equal(active, false); settled.push(id); },
   notifyCancellation: async order => { assert.equal(active, false); notified.push(String(order._id)); },
+  emitToUser: () => { assert.equal(active, false); },
   cancellationLogger: { error() {} },
 };
 vm.runInNewContext(ts.transpileModule(declarations.join('\n'), {
@@ -96,5 +97,17 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
   const result = await cancelOrdersWithSettlement([input(orders[0], fullRefund), input(orders[1], providerCredit)]);
   assert.equal(result.length, 2); assert.equal(result.every(order => order.status === 'cancelled'), true);
   assert.equal(settled.length, 2); assert.equal(notified.length, 2);
+  orders = [makeOrder(false)]; ledger = []; settled = []; notified = [];
+  orders[0].reassignment = { automatic: true, status: 'matching' };
+  const timeoutInput = { orderId: String(orders[0]._id), role: 'admin', system: true,
+    systemCancellationType: 'provider_unavailable', reason: 'Không tìm thấy thợ phù hợp trong bán kính 10 km sau thời gian tìm kiếm.' };
+  await cancelOrderWithSettlement(timeoutInput);
+  assert.equal(orders[0].status, 'cancelled');
+  assert.equal(ledger.find(item => item.refund !== undefined).refund, 40000);
+  assert.equal(ledger.find(item => item.compensation !== undefined).compensation, 0);
+  orders = [makeOrder(true)]; ledger = [];
+  await cancelOrderWithSettlement({ ...timeoutInput, orderId: String(orders[0]._id) });
+  assert.equal(orders[0].status, 'accepted', 'Thợ mới đã nhận thì không hủy bởi tác vụ hết hạn tìm kiếm.');
+  assert.equal(ledger.length, 0);
   console.log('Đã kiểm tra xác nhận tiền hoàn, chặn dữ liệu cũ, xác nhận lại và hoàn tác cả chuỗi lịch.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

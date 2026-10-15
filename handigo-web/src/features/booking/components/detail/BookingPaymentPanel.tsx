@@ -1,6 +1,7 @@
 import { Modal } from "@/components/common/Modal";
 import { WalletBalanceText } from "@/features/wallet/components/WalletBalanceText";
 import type { Order } from "@/types/booking";
+import { formatCurrency } from "./bookingDetailFormatters";
 import {
   initialPaymentMethods,
   type InitialPaymentMethod,
@@ -10,6 +11,7 @@ type BookingPaymentPanelProps = {
   order: Order;
   busy: boolean;
   canMakeInitialPayment: boolean;
+  canChangePayment: boolean;
   paymentError: string | null;
   paymentMethodModalOpen: boolean;
   initialPaymentMethod: InitialPaymentMethod;
@@ -20,14 +22,13 @@ type BookingPaymentPanelProps = {
 };
 
 /**
- * ⚠️ Đụng tiền — banner nhắc thanh toán ban đầu và modal chọn phương thức
- * (PayOS/Ví/Tiền mặt). Giữ nguyên điều kiện hiển thị và luồng gọi API tạo
- * payment / điều hướng PayOS gốc.
+ * Nhắc thanh toán và chọn phương thức trước khi xác nhận đã thu tiền.
  */
 export const BookingPaymentPanel = ({
   order,
   busy,
   canMakeInitialPayment,
+  canChangePayment,
   paymentError,
   paymentMethodModalOpen,
   initialPaymentMethod,
@@ -37,10 +38,10 @@ export const BookingPaymentPanel = ({
   onSubmitPayment,
 }: BookingPaymentPanelProps) => (
   <>
-    {canMakeInitialPayment && (
-      <div className="mb-lg rounded-2xl border border-warning/30 bg-warning-container p-md text-sm text-on-warning-container">
+    {(canMakeInitialPayment || canChangePayment) && (
+      <div className={canChangePayment ? "mb-lg" : "mb-lg rounded-2xl border border-warning/30 bg-warning-container p-md text-sm text-on-warning-container"}>
         <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          {!canChangePayment && <div>
             <p className="font-bold">
               {order.bookingStatus === "awaiting_payment"
                 ? "Chuyên gia đã nhận lịch"
@@ -53,7 +54,7 @@ export const BookingPaymentPanel = ({
                     : "thời hạn giữ lịch"} để xác nhận lịch hẹn.`
                 : "Bạn có thể tiếp tục thanh toán để hoàn tất đơn hàng này."}
             </p>
-          </div>
+          </div>}
           <button
             type="button"
             disabled={busy}
@@ -62,7 +63,7 @@ export const BookingPaymentPanel = ({
           >
             {busy
               ? "Đang xử lý..."
-              : order.bookingStatus === "awaiting_payment"
+              : canChangePayment ? "Đổi phương thức thanh toán" : order.bookingStatus === "awaiting_payment"
                 ? "Thanh toán giữ lịch"
                 : "Tiếp tục thanh toán"}
           </button>
@@ -71,7 +72,7 @@ export const BookingPaymentPanel = ({
       </div>
     )}
 
-    {paymentMethodModalOpen && (
+    {paymentMethodModalOpen && (canMakeInitialPayment || canChangePayment) && (
       <Modal
         open
         title="Chọn phương thức thanh toán"
@@ -84,9 +85,16 @@ export const BookingPaymentPanel = ({
           <p className="text-sm text-on-surface-variant">
             Chọn phương thức bạn muốn dùng để thanh toán đơn #{order.orderCode}.
           </p>
+          {canChangePayment && (
+            <div className="rounded-xl bg-surface-container-low p-3 text-sm">
+              <p className="font-bold text-on-surface">Số tiền: {formatCurrency(order.pricing.totalPaidAmount)}</p>
+              <p className="mt-1 text-on-surface-variant">Giữ nguyên giá và voucher của đơn. Chỉ xác nhận nếu bạn chưa trả tiền mặt cho chuyên gia.</p>
+            </div>
+          )}
           <div className="space-y-3">
             {initialPaymentMethods
               .filter((method) => !order.inspectionRequired || method.value !== "CASH")
+              .filter((method) => !canChangePayment || method.value !== "CASH")
               .map((method) => (
                 <label
                   key={method.value}

@@ -1,4 +1,5 @@
 import { getBookingPolicy, getNumberConfigValue, getRefundPolicy } from "./systemConfig.service";
+import { getProviderResponseTimeoutSeconds } from "../utils/matchingSearch";
 
 /** Chỉ trả các điều khoản dành cho khách, không công khai lịch riêng hoặc cấu hình nội bộ. */
 export const getCustomerBookingPolicies = async () => {
@@ -17,7 +18,7 @@ export const getCustomerBookingPolicies = async () => {
       expandedRadiusKm: Math.max(expandedRadius, initialRadius, 0.1),
       expandAfterMinutes: Math.max(expandAfter, 0.1),
       expandedDurationMinutes: Math.max(expandedDuration, 0.1),
-      providerResponseSeconds: Math.max(responseTimeout, 1),
+      providerResponseSeconds: getProviderResponseTimeoutSeconds(responseTimeout, expandAfter),
     },
     fixedPriceRefund: {
       normalRefundPercent: refund.normalRefundPercent,

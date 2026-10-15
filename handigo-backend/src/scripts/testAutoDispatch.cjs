@@ -113,10 +113,10 @@ async function run() {
       'Đề nghị gửi muộn phải hết hạn đúng mốc chuyển vòng hoặc kết thúc tìm kiếm');
   }
   for (const scheduled of [false, true]) {
-    for (const [timeoutSeconds, expandMinutes] of [[45, 0.5], [45, 2], [90, 2]]) {
+    for (const [timeoutSeconds, expandMinutes] of [[90, 1], [45, 0.5], [45, 2], [90, 2]]) {
       configValues = { MATCHING_PROVIDER_TIMEOUT_SECONDS: timeoutSeconds, MATCHING_EXPAND_AFTER_MINUTES: expandMinutes };
-      assert.equal(await getProviderResponseTimeoutMs(), timeoutSeconds * 1000,
-        'Yêu cầu chọn thợ đọc thời hạn do admin thiết lập');
+      assert.equal(await getProviderResponseTimeoutMs(), Math.min(timeoutSeconds * 1000, expandMinutes * 60000),
+        'Yêu cầu chọn thợ không được chờ lâu hơn thời gian trước khi mở rộng tìm kiếm');
       assert.equal(await getMaxMatchingDurationSeconds(), expandMinutes * 60 + 180,
         'Tổng thời gian tìm kiếm dùng đúng mốc mở rộng do admin thiết lập');
       const now = new Date();
@@ -143,6 +143,24 @@ async function run() {
       assert.equal(assignments[0].responseDeadline.getTime(), storedDeadline, 'Đề nghị đang chờ giữ nguyên thời hạn');
     }
   }
+  for (const scheduled of [false, true]) {
+    configValues = { MATCHING_PROVIDER_TIMEOUT_SECONDS: 90, MATCHING_EXPAND_AFTER_MINUTES: 1 };
+    const now = Date.now();
+    order = { _id: new Types.ObjectId(), status: 'created', readyForMatching: true, preferredProviderId: null,
+      createdAt: new Date(now - 61000), matchingStartedAt: new Date(now - 61000),
+      matchingSearch: { initialRadiusKm: 5, expandedRadiusKm: 10,
+        expandsAt: new Date(now - 1000), expiresAt: new Date(now + 179000) } };
+    assignments = []; events = []; matchingCalls = 0;
+    await DispatchService.dispatchOrder(order._id.toString(), {
+      serviceId: new Types.ObjectId().toString(),
+      scheduledDates: scheduled ? [new Date(now + 86400000)] : [],
+    });
+    assert.equal(assignments.length, 1);
+    const duration = assignments[0].responseDeadline.getTime() - assignments[0].assignedAt.getTime();
+    assert.ok(duration > 59000 && duration <= 60000,
+      'Vòng 10 km cũng không trả về đề nghị 90 giây khi mốc mở rộng là 60 giây');
+    assert.equal(events[0].payload.responseDeadline.getTime(), assignments[0].responseDeadline.getTime());
+  }
   // Cấu hình tìm 10 phút không bị giới hạn cũ 6 phút hủy trước hạn.
   for (const expiredMinutes of [0, 7]) {
     const now = Date.now();
@@ -165,7 +183,7 @@ async function run() {
   const oldProvider = new Types.ObjectId();
   order = { _id: new Types.ObjectId(), status: 'created', inspectionRequired: true, readyForMatching: true,
     recurringGroupId: new Types.ObjectId(), createdAt: new Date(now), matchingStartedAt: new Date(now),
-    reassignment: { status: 'matching', previousProviderIds: [oldProvider] },
+    reassignment: { status: 'matching', automatic: true, previousProviderIds: [oldProvider] },
     matchingSearch: { initialRadiusKm: 5, expandedRadiusKm: 10,
       expandsAt: new Date(now - 1000), expiresAt: new Date(now + 120000) } };
   assignments = [];

@@ -2,6 +2,8 @@ import { ClientSession, Types } from "mongoose";
 import type { RequestUser } from "../middlewares/authContext";
 import { Notification, INotification } from "../models/notification.model";
 import User from "../models/user.model";
+import { Order } from "../models/order.model";
+import { Provider } from "../models/provider.model";
 import { AppError } from "../utils/appError";
 import { toObjectId } from "../utils/mongo";
 import { emitToUser } from "../sockets/socketServer";
@@ -32,6 +34,39 @@ const toNotificationResponse = (notification: INotification) => ({
   createdAt: notification.createdAt,
   updatedAt: notification.updatedAt,
 });
+
+const toUserNotificationResponses = async (user: RequestUser, notifications: INotification[]) => {
+  const items = notifications.map(toNotificationResponse);
+  if (user.role !== "PROVIDER") return items;
+
+  const getOrderId = (item: typeof items[number]) => {
+    const value = item.data?.orderId;
+    return typeof value === "string" || value instanceof Types.ObjectId ? String(value) : "";
+  };
+  const orderIds = [...new Set(items
+    .filter((item) => item.type === "ORDER" || item.type === "QUOTATION")
+    .map(getOrderId).filter((id) => Types.ObjectId.isValid(id)))];
+  if (!orderIds.length) return items;
+
+  const provider = await Provider.findOne({ userId: toObjectId(user.id), isDeleted: false }).select("_id").lean();
+  if (!provider) return items;
+
+  // Chỉ tra đơn từng giao cho thợ này; thông báo thanh toán và ví vẫn giữ hiệu lực.
+  const previousOrders = await Order.find({
+    _id: { $in: orderIds },
+    isDeleted: false,
+    providerId: { $ne: provider._id },
+    "reassignment.previousProviderIds": provider._id,
+  }).select("_id").lean();
+  const unavailableIds = new Set(previousOrders.map((order) => String(order._id)));
+
+  return items.map((item) =>
+    (item.type === "ORDER" || item.type === "QUOTATION") && unavailableIds.has(getOrderId(item))
+      ? { ...item, data: { ...item.data, orderUnavailable: true,
+        orderUnavailableReason: "Bạn không còn phụ trách đơn hàng này." } }
+      : item,
+  );
+};
 
 export const emitRealtimeNotification = (notification: INotification) => {
   emitToUser(
@@ -127,7 +162,7 @@ export const getMyNotifications = async (user: RequestUser, query: NotificationL
   ]);
 
   return {
-    items: items.map(toNotificationResponse),
+    items: await toUserNotificationResponses(user, items),
     pagination: {
       page: query.page,
       limit: query.limit,
@@ -211,7 +246,8 @@ export const markAsRead = async (user: RequestUser, notificationId: string) => {
     await notification.save();
   }
 
-  return toNotificationResponse(notification);
+  const [result] = await toUserNotificationResponses(user, [notification]);
+  return result;
 };
 
 export const markAllAsRead = async (user: RequestUser) => {

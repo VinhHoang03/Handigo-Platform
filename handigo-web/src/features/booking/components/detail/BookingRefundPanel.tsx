@@ -4,7 +4,6 @@ import { getActionDialogConfig, type PendingAction } from "./bookingDetailConsta
 import { BookingCancellationPreviewCard } from "./BookingCancellationPreviewCard";
 import { BookingCancellationReasonForm } from "./BookingCancellationReasonForm";
 import { X } from "lucide-react";
-import { formatCurrency } from "./bookingDetailFormatters";
 
 type BookingRefundPanelProps = {
   order: Order;
@@ -22,7 +21,7 @@ type BookingRefundPanelProps = {
 /**
  * ⚠️ Đụng tiền — nút hủy đơn/chuỗi lịch và modal xác nhận dùng chung cho cả
  * xác nhận/từ chối báo giá lẫn hủy đơn (kèm xem trước chính sách hoàn tiền).
- * Giữ nguyên toàn bộ điều kiện disable, validate lý do hủy và hiển thị hoàn tiền gốc.
+ * Giữ nguyên điều kiện disable và validation lý do hủy.
  */
 export const BookingRefundPanel = ({
   order,
@@ -42,6 +41,9 @@ export const BookingRefundPanel = ({
   const isCancellationAction = pendingAction
     ? ["cancelOrder", "cancelSeries"].includes(pendingAction.type)
     : false;
+  const hideRefundPolicy = order.paymentMethod === "cash"
+    && order.status === "created"
+    && !order.providerId;
 
   return (
     <>
@@ -86,16 +88,14 @@ export const BookingRefundPanel = ({
               {actionDialogConfig.message}
             </p>
 
-            {isCancellationAction && cancellationPreview && !order.inspectionRequired && (
+            {isCancellationAction && cancellationPreview && !hideRefundPolicy && (
               <BookingCancellationPreviewCard
                 cancellationPreview={cancellationPreview}
               />
             )}
-            {isCancellationAction && cancellationPreview && order.inspectionRequired && (
+            {isCancellationAction && cancellationPreview && order.inspectionRequired && cancellationPreview.providerCompensation === 0 && (
               <p className="text-sm leading-6 text-on-surface-variant">
-                {cancellationPreview.providerCompensation > 0
-                  ? `Tiền cọc ${formatCurrency(cancellationPreview.providerCompensation)} được chuyển vào ví thợ vì đơn đã có thợ nhận. Phần được hoàn cho bạn: ${formatCurrency(cancellationPreview.refundAmount)}.`
-                  : 'Khi chưa có thợ nhận, toàn bộ tiền cọc đã thanh toán được hoàn lại cho bạn (100%).'}
+                Khi chưa có thợ nhận, toàn bộ tiền cọc đã thanh toán được hoàn lại cho bạn (100%).
               </p>
             )}
 

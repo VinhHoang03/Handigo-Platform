@@ -19,6 +19,7 @@ export interface IPromotion extends Document, IBaseDocument {
   perUserLimit?: number;
   startAt: Date;
   endAt: Date;
+  neverExpires?: boolean;
   status?: "ACTIVE" | "INACTIVE" | "EXPIRED" | "active" | "inactive" | "expired";
   isActive: boolean;
   ownerId?: Types.ObjectId | null;

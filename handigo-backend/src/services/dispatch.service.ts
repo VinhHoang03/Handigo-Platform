@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { buildMatchingSearch, getMatchingSearchStage } from "../utils/matchingSearch";
+import { buildMatchingSearch, getMatchingSearchStage, getProviderResponseTimeoutSeconds } from "../utils/matchingSearch";
 
 import { Order } from "../models/order.model";
 import User from "../models/user.model";
@@ -36,10 +36,13 @@ const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
 const DEFAULT_MATCHING_BATCH_SIZE = 3;
 
 /** Đọc thời gian nhận đơn do admin cấu hình cho mọi loại đề nghị mới. */
-export const getProviderResponseTimeoutMs = async () => Math.max(
-  await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS),
-  1,
-) * 1000;
+export const getProviderResponseTimeoutMs = async () => {
+  const [responseSeconds, expandAfterMinutes] = await Promise.all([
+    getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS),
+    getNumberConfigValue("MATCHING_EXPAND_AFTER_MINUTES", 1),
+  ]);
+  return getProviderResponseTimeoutSeconds(responseSeconds, expandAfterMinutes) * 1000;
+};
 
 /** Số provider tối đa được thử sau khi khách đồng ý tìm provider thay thế. */
 export const MAX_DIRECT_PROVIDER_ATTEMPTS = 3;
@@ -111,12 +114,7 @@ async function cancelUnmatchedOrder(orderId: string, reason: string) {
     return false;
   }
 
-  await Order.updateOne(
-    { _id: orderId, "reassignment.status": "matching" },
-    { $set: { "reassignment.status": "failed" } },
-    { runValidators: true },
-  );
-  const orderIds = order.recurringGroupId && order.reassignment?.status !== "matching"
+  const orderIds = order.recurringGroupId && !order.reassignment?.automatic
     ? await Order.find({
       recurringGroupId: order.recurringGroupId,
       status: "created",
@@ -144,7 +142,7 @@ async function getDispatchContext(
   );
   if (!address) return null;
 
-  const scheduledDates = order.recurringGroupId && order.reassignment?.status !== "matching"
+  const scheduledDates = order.recurringGroupId && !order.reassignment?.automatic
     ? (await Order.find({
       recurringGroupId: order.recurringGroupId,
       status: "created",
@@ -217,18 +215,30 @@ async function sendAssignmentBatch(
   ctx: DispatchContext,
   batchNumber: number,
   deadline: Date,
+  reuseClosedAssignments = false,
 ) {
   const isAppointment = Boolean(ctx.scheduledDates?.length);
   const assignedAt = new Date();
-  const createAssignment = (candidate: ProviderCandidate) =>
-    OrderAssignment.create({
+  const createAssignment = async (candidate: ProviderCandidate) => {
+    const data = {
       orderId: new Types.ObjectId(orderId),
       providerId: candidate.providerId,
-      assignmentType: isAppointment ? "appointment" : "dispatch",
-      status: "pending",
+      assignmentType: isAppointment ? "appointment" as const : "dispatch" as const,
+      status: "pending" as const,
       assignedAt,
       responseDeadline: deadline,
-    });
+    };
+    if (reuseClosedAssignments) {
+      const existing = await OrderAssignment.findOneAndUpdate(
+        { orderId: data.orderId, providerId: data.providerId,
+          status: { $in: ["cancelled", "rejected", "timeout"] }, isDeleted: false },
+        { $set: { ...data, respondedAt: null, rejectReason: null } },
+        { new: true, runValidators: true },
+      );
+      if (existing) return existing;
+    }
+    return OrderAssignment.create(data);
+  };
 
   const [firstCandidate, ...remainingCandidates] = candidates;
   if (!firstCandidate) return;
@@ -488,11 +498,21 @@ export const DispatchService = {
     });
     if (hasPendingAssignment) return;
 
-    const isDirectReplacement = order.reassignment?.status === "matching" && !order.inspectionRequired;
+    const isAutomaticReplacement = order.reassignment?.status === "matching" && order.reassignment.automatic;
+    const matchingDeadline = order.matchingSearch.expiresAt;
+    if (matchingDeadline <= new Date()) {
+      await cancelUnmatchedOrder(
+        orderId,
+        "Không có provider nhận đơn trong vòng 5 phút.",
+      );
+      return;
+    }
+
+    const isDirectReplacement = order.reassignment?.status === "matching";
     const maxAttempts = isDirectReplacement
       ? MAX_DIRECT_PROVIDER_ATTEMPTS
       : maxMatchingAttempts;
-    if (triedProviderIds.length >= maxAttempts) {
+    if (!isAutomaticReplacement && triedProviderIds.length >= maxAttempts) {
       await cancelUnmatchedOrder(
         orderId,
         `Không có provider nhận đơn sau ${maxMatchingAttempts} lượt matching.`,
@@ -504,7 +524,7 @@ export const DispatchService = {
       return;
     }
 
-    const candidateLimit = isDirectReplacement
+    const candidateLimit = isAutomaticReplacement ? matchingBatchSize : isDirectReplacement
       ? 1
       : Math.min(
         matchingBatchSize,
@@ -546,6 +566,7 @@ export const DispatchService = {
       ctx,
       batchNumber,
       deadline,
+      Boolean(isAutomaticReplacement),
     );
   },
 
@@ -559,7 +580,7 @@ export const DispatchService = {
     ctx: DispatchContext,
   ): Promise<void> {
     const assignment = await OrderAssignment.findOneAndUpdate(
-      { _id: assignmentId, status: "pending" },
+      { _id: assignmentId, status: "pending", responseDeadline: { $lte: new Date() } },
       {
         $set: {
           status: "timeout",

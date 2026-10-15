@@ -1,5 +1,6 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { tokenStorage } from "@/api/tokenStorage";
@@ -8,13 +9,14 @@ import type { Order } from "@/types/booking";
 import type { InitialPaymentMethod } from "./bookingDetailConstants";
 
 /**
- * ⚠️ Luồng thanh toán ban đầu (PayOS/Ví/Tiền mặt) — đụng tiền.
- * Giữ nguyên logic tạo payment, điều hướng PayOS, điều kiện được phép thanh toán.
+ * Thanh toán ban đầu và đổi phương thức cho đơn giá cố định chưa thu tiền.
  */
 export const useBookingPaymentFlow = (
   order: Order | null,
   busy: boolean,
   setBusy: (busy: boolean) => void,
+  canChangePayment: boolean,
+  updateOrder: (order: Order) => void,
 ) => {
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -30,7 +32,7 @@ export const useBookingPaymentFlow = (
         ? "PAYOS"
         : order.paymentMethod === "wallet"
           ? "WALLET"
-          : order.inspectionRequired
+          : order.inspectionRequired || canChangePayment
             ? "PAYOS"
             : "CASH";
     setInitialPaymentMethod(currentMethod);
@@ -44,11 +46,11 @@ export const useBookingPaymentFlow = (
 
   const handleInitialPayment = async () => {
     if (
-      !order ||
+      busy || !order ||
       order.paymentStatus !== "unpaid" ||
-      order.paymentMethod === "cash" ||
+      (!canChangePayment && (order.paymentMethod === "cash" ||
       !["created", "accepted"].includes(order.status) ||
-      !["not_required", "awaiting_payment"].includes(order.bookingStatus || "")
+      !["not_required", "awaiting_payment"].includes(order.bookingStatus || "")))
     ) return;
 
     try {
@@ -57,16 +59,23 @@ export const useBookingPaymentFlow = (
       const detailUrl = `${window.location.origin}/customer/bookings/result?orderId=${order._id}`;
       const result = await bookingApi.createPayment({
         orderId: order._id,
+        expectedAmount: canChangePayment ? order.pricing.totalPaidAmount : undefined,
         method: initialPaymentMethod,
         paymentType: order.inspectionRequired ? "INSPECTION_DEPOSIT" : "FULL",
         returnUrl: `${detailUrl}&payos=success`,
-        cancelUrl: `${detailUrl}&payos=cancel`,
+        cancelUrl: `${window.location.origin}/customer/bookings/${order._id}?payos=cancel`,
       });
 
       if (initialPaymentMethod === "PAYOS" && result.payment.status !== "paid") {
         if (!result.checkoutUrl) {
           throw new Error("PayOS không trả về liên kết thanh toán.");
         }
+        const latestOrder = await bookingApi.getOrderById(order._id);
+        // Cập nhật trang trước khi rời đi để lịch sử trình duyệt không giữ phương thức cũ.
+        flushSync(() => {
+          updateOrder(latestOrder);
+          setPaymentMethodModalOpen(false);
+        });
         tokenStorage.prepareExternalRedirect();
         window.location.assign(result.checkoutUrl);
         return;

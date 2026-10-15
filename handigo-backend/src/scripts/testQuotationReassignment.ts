@@ -4,6 +4,7 @@ import mongoose, { Types } from "mongoose";
 import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
+import { Address } from "../models/address.model";
 
 // Cô lập thanh toán, điều phối và socket; không đọc bí mật hoặc kết nối database.
 const stub = (path: string, exports: object) => {
@@ -13,7 +14,7 @@ const dispatched: string[] = [];
 const notifications: any[] = [];
 const events: any[] = [];
 let failDispatch = false;
-stub("../services/dispatch.service", { DispatchService: { dispatchReadyOrder: async (id: string) => {
+stub("../services/dispatch.service", { getMaxMatchingDurationSeconds: async () => 240, DispatchService: { dispatchReadyOrder: async (id: string) => {
   dispatched.push(id); if (failDispatch) throw new Error("Lỗi điều phối kiểm thử.");
 } } });
 stub("../services/orderCancellation.service", {
@@ -23,7 +24,13 @@ stub("../services/orderCancellation.service", {
 stub("../services/notification.service", { createNotificationRecord: async (input: any) => { notifications.push(input); } });
 stub("../sockets/socketServer", { emitToUser: (...args: any[]) => { events.push(args); } });
 stub("../utils/logger", { createLogger: () => ({ error() {} }) });
+stub("../services/providerWalletEligibility.service", { assertProviderWalletEligible: async () => {} });
+for (const name of ["wallet", "address", "matching", "voucher", "systemConfig", "servicePricing", "providerSchedule", "reward", "promotion"]) {
+  stub(`../services/${name}.service`, {});
+}
 const { requestProviderReassignment } = require("../services/orderReassignment.service") as typeof import("../services/orderReassignment.service");
+const { OrderService } = require("../services/order.service") as typeof import("../services/order.service");
+const { AssignmentService } = require("../services/assignment.service") as typeof import("../services/assignment.service");
 
 async function scenario(orderType: "normal" | "urgent" | "scheduled" | "recurring", inspectionRequired: boolean) {
   const provider = new Provider({ userId: new Types.ObjectId(), verified: true });
@@ -76,34 +83,84 @@ async function scenario(orderType: "normal" | "urgent" | "scheduled" | "recurrin
     assert.equal(dispatched.length, beforeDispatch);
     assert.equal(assignmentCancelled, 0);
     wins = true;
-    const result = await requestProviderReassignment(order.id, provider.userId.toString(), "Không thể thực hiện");
+    const result = await OrderService.cancelOrder(order.id, provider.userId.toString(), "provider", "Không thể thực hiện");
     assert.equal(result.status, "created");
     assert.equal(result.providerId, null);
     assert.equal(result.preferredProviderId, null);
     assert.equal(result.matchingStartedAt, null);
     assert.equal(result.matchingSearch, null);
-    assert.equal(result.readyForMatching, inspectionRequired);
-    assert.equal(result.reassignment?.status, inspectionRequired ? "matching" : "awaiting_customer");
+    assert.equal(result.readyForMatching, true);
+    assert.equal(result.reassignment?.status, "matching");
+    assert.equal(result.reassignment?.automatic, true);
     assert.deepEqual(result.reassignment?.previousProviderIds.map(String), [String(previousProvider), provider.id]);
     assert.equal(result.paymentStatus, "partially_paid");
     assert.equal(result.depositAmount, 40000);
     assert.equal(result.cancellation, null);
     assert.equal(assignmentCancelled, 1);
     assert.equal(providerReleased, 1);
-    assert.equal(dispatched.length, beforeDispatch + Number(inspectionRequired));
+    assert.equal(dispatched.length, beforeDispatch + 1);
+    assert.ok(result.reassignment?.respondedAt);
+    assert.equal(notifications[notifications.length - 1].data.action, "order_reassignment_matching");
+    assert.ok(events.some((event) => event[0] === String(order.customerId) && event[1] === "order:updated"));
     if (inspectionRequired) {
-      assert.ok(result.reassignment?.respondedAt);
-      assert.equal(notifications[notifications.length - 1].data.action, "order_reassignment_matching");
-      assert.ok(events.some((event) => event[0] === String(order.customerId) && event[1] === "order:updated"));
+      assert.doesNotMatch(notifications[notifications.length - 1].content, /voucher/);
     }
+    await OrderService.cancelOrder(order.id, provider.userId.toString(), "provider", "Không thể thực hiện");
+    assert.equal(dispatched.length, beforeDispatch + 1, "Gửi lại thao tác hủy không khởi động vòng tìm thợ thứ hai.");
+    assert.equal(assignmentCancelled, 1);
+    assert.equal(providerReleased, 1);
   } finally { mock.restoreAll(); }
 }
 
 async function run() {
   for (const type of ["normal", "urgent", "scheduled", "recurring"] as const) await scenario(type, true);
   await scenario("normal", false);
+  for (const reserved of [false, true]) await acceptReplacement(reserved);
   failDispatch = true;
   await scenario("scheduled", true);
   console.log("Đạt: tự điều phối trước báo giá, giữ cọc, loại toàn bộ thợ đã hủy, lịch hẹn/định kỳ, phân quyền và khôi phục khi điều phối lỗi.");
+}
+
+async function acceptReplacement(reserved: boolean) {
+  const provider = new Provider({ userId: new Types.ObjectId(), verified: true, availabilityStatus: "online" });
+  const order = new Order({ customerId: new Types.ObjectId(), serviceId: new Types.ObjectId(),
+    addressId: new Types.ObjectId(), orderType: "recurring", recurringGroupId: new Types.ObjectId(),
+    status: "created", scheduledAt: new Date(Date.now() + 86400000), inspectionRequired: true,
+    bookingStatus: reserved ? "reserved" : "not_required", paymentMethod: "wallet",
+    paymentStatus: reserved ? "unpaid" : "partially_paid", depositAmount: 40000,
+    readyForMatching: true, reassignment: { automatic: true, status: "matching" },
+  });
+  const assignment = new OrderAssignment({ orderId: order._id, providerId: provider._id,
+    assignmentType: "appointment", responseDeadline: new Date(Date.now() + 60000) });
+  const query = (value: unknown): any => ({ then: (resolve: any) => Promise.resolve(value).then(resolve),
+    select: () => query(value), lean: () => query(value) });
+  mock.method(Provider, "findOne", () => query(provider));
+  mock.method(Address, "findById", () => query({ ward: "Phường kiểm thử", province: "Tỉnh kiểm thử" }));
+  mock.method(OrderAssignment, "findOne", () => query(assignment));
+  mock.method(OrderAssignment, "findOneAndUpdate", (_filter: any, update: any) => {
+    assignment.set(update.$set); return query(assignment);
+  });
+  mock.method(OrderAssignment, "find", () => query([]));
+  mock.method(Order, "findById", () => ({ select: (fields: string) => {
+    const raw = order.toObject();
+    const projected = Object.fromEntries(["_id", ...fields.split(" ")]
+      .filter((field) => field in raw).map((field) => [field, (raw as any)[field]]));
+    return query(projected);
+  } }) as any);
+  mock.method(Order, "exists", () => query(null));
+  mock.method(Order, "findOneAndUpdate", (_filter: any, update: any) => {
+    for (const [field, value] of Object.entries(update.$set)) order.set(field, value);
+    return query(order);
+  });
+  mock.method(Order, "updateMany", async () => assert.fail("Chỉ nhận buổi đang tìm thợ thay thế, không đổi các buổi khác."));
+  try {
+    const result = await AssignmentService.acceptAssignment(assignment.id, provider.userId.toString());
+    assert.equal(result.order.status, "accepted");
+    assert.equal(String(result.order.providerId), provider.id);
+    assert.equal(result.order.reassignment?.status, "matched");
+    assert.equal(result.order.bookingStatus, reserved ? "reserved" : "confirmed");
+    assert.equal(result.order.paymentStatus, reserved ? "unpaid" : "partially_paid");
+    assert.equal(result.order.readyForMatching, false);
+  } finally { mock.restoreAll(); }
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

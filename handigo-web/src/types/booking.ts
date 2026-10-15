@@ -131,6 +131,7 @@ export interface OrderDiscountSnapshot {
 }
 
 export interface OrderReassignment {
+  automatic?: boolean;
   status:
     | "awaiting_customer"
     | "matching"
@@ -176,6 +177,7 @@ export interface Order {
     verified?: boolean;
   } | null;
   serviceId: Service;
+  preferredProviderId?: string | null;
   selectedOptionIds: string[];
   selectedOptionsSnapshot?: Array<{
     optionId: string | null;

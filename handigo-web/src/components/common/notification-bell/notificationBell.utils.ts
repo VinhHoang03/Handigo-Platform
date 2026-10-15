@@ -19,6 +19,20 @@ export const dateTime = new Intl.DateTimeFormat("vi-VN", {
   timeStyle: "short",
 });
 
+export const isNotificationForUser = (item: AppNotification, userId: string) => {
+  const recipientId = typeof item.userId === "string"
+    ? item.userId
+    : item.userId?.id || item.userId?._id;
+  return Boolean(userId) && recipientId === userId;
+};
+
+export const getNotificationUnavailableReason = (item: AppNotification) => {
+  if (item.data?.orderUnavailable !== true) return null;
+  return typeof item.data.orderUnavailableReason === "string"
+    ? item.data.orderUnavailableReason
+    : "Bạn không còn phụ trách đơn hàng này.";
+};
+
 export const getNotificationPath = (role?: AppRole) => {
   if (role === "ADMIN") return "/admin/notifications";
   return "#";
@@ -36,6 +50,7 @@ export const getNotificationTarget = (
   item: AppNotification,
   role?: AppRole,
 ) => {
+  if (getNotificationUnavailableReason(item)) return null;
   const actionUrl = getDataString(item, "actionUrl");
   const orderId = getDataString(item, "orderId");
   const isWithdrawal = item.type === "WITHDRAWAL" || Boolean(getDataString(item, "withdrawalId"));

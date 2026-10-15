@@ -23,7 +23,7 @@ export function BookingPolicyConsent({ policies, loading, error, accepted, disab
     <div className="flex items-start gap-2.5">
       <input id={checkboxId} type="checkbox" checked={accepted} disabled={!canAccept}
         onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-primary" />
-      <p className="text-sm leading-6 text-on-surface-variant">
+      <p className="text-xs leading-5 text-on-surface-variant">
         <label htmlFor={checkboxId} className="cursor-pointer">Tôi đã đọc và đồng ý với </label>
         <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}
           className="font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">chính sách Handigo</button>.

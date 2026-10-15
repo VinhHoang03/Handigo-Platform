@@ -261,16 +261,18 @@ test('Hủy đơn báo giá không hiện khung chính sách, thông báo đúng
   assert.ok(find(render(false, true), (node) => node.type === 'refund-policy'));
 });
 
-test('Form hủy của thợ phân biệt tự tìm thợ thay thế và nhận cọc sau báo giá, áp dụng mọi lý do', () => {
+test('Form hủy của thợ chỉ xác nhận hủy nhận đơn và lý do hủy', () => {
   const { CancellationDialog, CancelConfirmationDialog } = load('features/provider/components/orders/CancelOrderDialogs.tsx', {
     '@/components/common/Modal': { Modal: 'modal' },
   });
   for (const reason of ['Khách hàng không đồng ý báo giá', 'Không thể sửa chữa hoặc thực hiện dịch vụ', 'Lý do khác']) {
-    const props = { reason, busy: false, canDeclineQuotation: true, explanation: '', error: '', isQuotationOrder: true };
-    assert.match(textContent(CancellationDialog({ ...props, isAwaitingQuotation: true })), /tự tìm thợ thay thế/);
-    assert.match(textContent(CancelConfirmationDialog({ ...props, isAwaitingQuotation: true })), /Bạn không nhận cọc/);
-    assert.match(textContent(CancellationDialog({ ...props, isAwaitingQuotation: false })), /Cọc đã thanh toán chuyển vào ví thợ/);
-    assert.match(textContent(CancelConfirmationDialog({ ...props, isAwaitingQuotation: false })), /Cọc đã thanh toán chuyển vào ví thợ/);
+    const props = { reason, busy: false, canDeclineQuotation: true, explanation: '', error: '' };
+    const confirmation = CancelConfirmationDialog(props);
+    assert.equal(confirmation.props.title, 'Xác nhận hủy đơn?');
+    assert.match(textContent(confirmation), /Bạn xác nhận hủy nhận đơn dịch vụ này/);
+    assert.match(textContent(confirmation), new RegExp(reason));
+    assert.ok(find(confirmation, (node) => node.type === 'button' && textContent(node).trim() === 'Hủy đơn'));
+    assert.doesNotMatch(textContent(CancellationDialog(props)) + textContent(confirmation), /tìm thợ thay thế|chuyển vào ví|gán.*thợ khác/);
   }
 });
 

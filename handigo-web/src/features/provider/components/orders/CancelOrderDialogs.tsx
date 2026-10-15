@@ -10,11 +10,7 @@ const cancellationReasons = [
   'Lý do khác',
 ];
 
-const providerDepositDescription = 'Cọc đã thanh toán chuyển vào ví thợ; khoản thanh toán thêm được hoàn cho khách.';
-const reassignmentDescription = 'Handigo tự tìm thợ thay thế và giữ nguyên tiền cọc. Bạn không nhận cọc. Nếu không có thợ nhận, khách được hoàn 100% tiền cọc.';
-
 interface CancellationDialogProps {
-  isAwaitingQuotation: boolean;
   canDeclineQuotation: boolean;
   reason: string;
   explanation: string;
@@ -27,7 +23,6 @@ interface CancellationDialogProps {
 }
 
 export function CancellationDialog({
-  isAwaitingQuotation,
   canDeclineQuotation,
   reason,
   explanation,
@@ -41,7 +36,6 @@ export function CancellationDialog({
   return (
     <Modal open title="Hủy đơn dịch vụ" onClose={onClose} size="lg" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <p className="text-sm text-on-surface-variant">Lý do hủy sẽ được lưu cùng đơn hàng và thông báo cho khách hàng.</p>
-      {canDeclineQuotation && <p className="mt-2 text-sm text-on-surface-variant">{isAwaitingQuotation ? reassignmentDescription : providerDepositDescription} Áp dụng cho mọi lý do hủy.</p>}
       <div className="mt-md space-y-2">
         {cancellationReasons.filter((item) => canDeclineQuotation || item !== cancellationReasons[0]).map((item) => (
           <label key={item} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${reason === item ? 'border-error bg-error/5' : 'border-outline-variant/40 hover:bg-surface-container-low'}`}>
@@ -66,22 +60,19 @@ export function CancellationDialog({
 }
 
 interface CancelConfirmationDialogProps {
-  isQuotationOrder: boolean;
-  isAwaitingQuotation: boolean;
   reason: string;
   busy: boolean;
   onBack: () => void;
   onConfirm: () => void;
 }
 
-export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm, isQuotationOrder, isAwaitingQuotation }: CancelConfirmationDialogProps) {
+export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: CancelConfirmationDialogProps) {
   return (
-    <Modal open title={isQuotationOrder && isAwaitingQuotation ? "Xác nhận tìm thợ thay thế?" : "Xác nhận hủy đơn?"} onClose={onBack} size="md" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
+    <Modal open title="Xác nhận hủy đơn?" onClose={onBack} size="md" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error">
         <TriangleAlert aria-hidden="true" size={30} />
       </div>
-      <p className="mt-2 text-sm leading-6 text-on-surface-variant">{isQuotationOrder && isAwaitingQuotation ? 'Bạn ngừng thực hiện đơn này; hệ thống sẽ tự điều phối thợ khác cho khách.' : 'Hành động này sẽ hủy đơn dịch vụ và thông báo cho khách hàng.'} Vui lòng kiểm tra lại trước khi xác nhận.</p>
-      {isQuotationOrder && <p className="mt-2 text-sm text-on-surface-variant">{isAwaitingQuotation ? reassignmentDescription : providerDepositDescription}</p>}
+      <p className="mt-2 text-sm leading-6 text-on-surface-variant">Bạn xác nhận hủy nhận đơn dịch vụ này? Lý do hủy sẽ được lưu và thông báo cho khách hàng.</p>
       <div className="mt-4 rounded-2xl bg-error/5 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-error">Lý do đã chọn</p>
         <p className="mt-1 text-sm font-medium text-on-surface">{reason}</p>
@@ -90,7 +81,7 @@ export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm, isQu
         <button type="button" onClick={onBack} disabled={busy} className="btn-secondary min-h-12">Kiểm tra lại</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
           <Trash aria-hidden="true" size={24} />
-          {busy ? 'Đang xử lý...' : isQuotationOrder && isAwaitingQuotation ? 'Tìm thợ thay thế' : 'Hủy đơn ngay'}
+          {busy ? 'Đang xử lý...' : 'Hủy đơn'}
         </button>
       </div>
     </Modal>

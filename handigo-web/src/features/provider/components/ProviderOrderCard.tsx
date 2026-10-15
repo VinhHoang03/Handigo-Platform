@@ -43,7 +43,9 @@ export function ProviderOrderCard({ order }: { order: Order }) {
       </div>
 
       <div className="flex items-center justify-between gap-sm sm:block sm:text-right">
-        <p className="font-bold tabular-nums text-primary">{formatProviderOrderAmount(order)}</p>
+        {order.status !== 'cancelled' && (
+          <p className="font-bold tabular-nums text-primary">{formatProviderOrderAmount(order)}</p>
+        )}
         <p className="text-xs text-on-surface-variant">{order.orderCode}</p>
       </div>
     </Link>

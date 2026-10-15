@@ -30,17 +30,15 @@ export function NotificationPageHeader({
           <RefreshCw aria-hidden="true" size={20} />
           Tải lại
         </button>
-        {!isAdmin && (
-          <button
-            type="button"
-            onClick={onMarkAll}
-            disabled={busy || unreadCount === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <CheckCheck aria-hidden="true" size={20} />
-            Đánh dấu tất cả
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onMarkAll}
+          disabled={busy || unreadCount === 0}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <CheckCheck aria-hidden="true" size={20} />
+          Đánh dấu tất cả
+        </button>
         {isAdmin && (
           <button
             type="button"

@@ -89,7 +89,6 @@ export default function ProviderOrderDetailPage() {
     order.bookingStatus !== 'confirmed';
   const isQuotationOrder =
     order.inspectionRequired || order.serviceId.serviceType === 'variable_price';
-  const hasQuotation = Boolean(order.currentQuotationId || quotation);
   const showQuotationForm =
     isQuotationOrder &&
     !isUnconfirmedAppointment &&
@@ -171,7 +170,6 @@ export default function ProviderOrderDetailPage() {
       {cancelOpen && !cancelConfirmOpen && (
         <CancellationDialog
           canDeclineQuotation={Boolean(order.status === 'accepted' && order.inspectionRequired)}
-          isAwaitingQuotation={Boolean(order.status === 'accepted' && order.inspectionRequired && !hasQuotation)}
           reason={cancelReason}
           explanation={cancelExplanation}
           error={cancelError}
@@ -184,8 +182,6 @@ export default function ProviderOrderDetailPage() {
       )}
       {cancelConfirmOpen && (
         <CancelConfirmationDialog
-          isQuotationOrder={isQuotationOrder}
-          isAwaitingQuotation={!hasQuotation}
           reason={cancelReason}
           busy={busy}
           onBack={() => setCancelConfirmOpen(false)}

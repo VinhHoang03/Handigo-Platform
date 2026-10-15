@@ -43,6 +43,7 @@ const BookingDetailPage = () => {
     appliedDepositAmount,
     remainingQuotationAmount,
     canMakeInitialPayment,
+    canChangePayment,
     timeline,
   } = useBookingDetail();
 
@@ -107,6 +108,7 @@ const BookingDetailPage = () => {
             order={order}
             busy={busy}
             canMakeInitialPayment={canMakeInitialPayment}
+            canChangePayment={canChangePayment}
             paymentError={paymentFlow.paymentError}
             paymentMethodModalOpen={paymentFlow.paymentMethodModalOpen}
             initialPaymentMethod={paymentFlow.initialPaymentMethod}

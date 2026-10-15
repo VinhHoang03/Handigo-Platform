@@ -12,6 +12,7 @@ export interface RewardOverview {
   policy: { amountPerPoint: number; validityDays: number; offers: RewardOffer[] };
 }
 export interface RewardVoucher {
+  neverExpires?: boolean;
   _id: string; code: string; name: string; discountValue: number; minOrderAmount: number;
   startAt: string; endAt: string; usedCount: number; isActive: boolean; status: string;
   reservedOrderId: string | null;

@@ -44,9 +44,11 @@ export const BookingStatusBanners = ({
         hiện thêm banner chờ xác nhận nữa. */}
     {order.status !== "cancelled" && order.bookingStatus === "awaiting_provider" && !isWaitingForProvider && (
       <div className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm text-on-surface">
-        <p className="font-bold">Đang chờ chuyên gia xác nhận lịch hẹn</p>
+        <p className="font-bold">{order.preferredProviderId ? 'Đang chờ chuyên gia bạn chọn nhận đơn' : 'Đang chờ chuyên gia xác nhận lịch hẹn'}</p>
         <p className="mt-1 text-on-surface-variant">
-          Handigo sẽ thông báo ngay khi chuyên gia nhận đơn.
+          {order.preferredProviderId
+            ? 'Handigo đã gửi yêu cầu đến chuyên gia bạn chọn. Vui lòng chờ chuyên gia phản hồi.'
+            : 'Handigo sẽ thông báo ngay khi chuyên gia nhận đơn.'}
         </p>
       </div>
     )}
@@ -55,10 +57,12 @@ export const BookingStatusBanners = ({
       <div className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm text-on-surface">
         <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-bold">Đang tìm chuyên gia nhận đơn</p>
+            <p className="font-bold">{order.preferredProviderId ? 'Đang chờ chuyên gia bạn chọn nhận đơn' : 'Đang tìm chuyên gia nhận đơn'}</p>
             <p className="mt-1 text-on-surface-variant">
-              {order.inspectionRequired && order.reassignment?.status === 'matching'
-                ? 'Thợ trước đã ngừng nhận đơn. Handigo đang tự tìm thợ thay thế và giữ nguyên cọc; nếu không có thợ nhận, bạn được hoàn 100% tiền cọc.'
+              {order.preferredProviderId
+                ? 'Handigo đã gửi yêu cầu đến chuyên gia bạn chọn. Vui lòng chờ chuyên gia phản hồi.'
+                : order.inspectionRequired && order.reassignment?.status === 'matching'
+                ? 'Thợ trước không thể tiếp tục thực hiện đơn. Handigo đang tìm thợ khác phù hợp để hỗ trợ bạn.'
                 : 'Handigo đang gửi yêu cầu đến các chuyên gia phù hợp gần bạn.'}
             </p>
           </div>
@@ -77,7 +81,9 @@ export const BookingStatusBanners = ({
         </div>
         {matchingSecondsRemaining === 0 && (
           <p className="mt-sm font-medium text-warning">
-            Đã hết thời gian tìm chuyên gia, hệ thống đang cập nhật kết quả đơn hàng.
+            {order.preferredProviderId
+              ? 'Đã hết thời gian chờ chuyên gia phản hồi, hệ thống đang cập nhật kết quả đơn hàng.'
+              : 'Đã hết thời gian tìm chuyên gia, hệ thống đang cập nhật kết quả đơn hàng.'}
           </p>
         )}
       </div>

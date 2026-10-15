@@ -87,7 +87,7 @@ export const configDefinitions: ConfigDefinition[] = [
     isPublic: false,
     description:
       "Số giây hệ thống chờ nhóm provider hiện tại phản hồi trước khi mở nhóm tiếp theo.",
-    effect: "Áp dụng cho đề nghị nhận đơn mới, gồm đơn thường, lịch hẹn và yêu cầu chọn thợ. Thời hạn không vượt mốc chuyển vòng tìm kiếm; đề nghị đang chờ giữ thời hạn đã lưu. Mặc định 60 giây khi chưa có cấu hình.",
+    effect: "Áp dụng cho đề nghị mới, gồm đơn thường, lịch hẹn, chọn thợ và tìm thợ thay thế. Thời hạn tối đa bằng thời gian trước khi mở rộng tìm kiếm; ví dụ mở rộng sau 1 phút thì mỗi đề nghị tối đa 60 giây, kể cả ở vòng mở rộng. Đề nghị đang chờ giữ thời hạn đã lưu.",
     isEffective: true,
   },
   {
