@@ -1,5 +1,5 @@
 import type { Order } from "@/types/booking";
-import { BadgeCheck, Check, HardHat, UserCheck, X, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Check, HardHat, Search, UserCheck, X, type LucideIcon } from "lucide-react";
 export type TimelineStep = {
   icon: LucideIcon;
   title: string;
@@ -37,8 +37,14 @@ const getCancellationDescription = (order: Order) => {
   return `Người hủy: ${actor || "Chưa có thông tin"}. ${reason ? `Lý do hủy: ${reason}` : "Chưa có thông tin lý do hủy đơn."}`;
 };
 
-export const buildOrderTimeline = (order: Order): TimelineStep[] => {
-  if (order.status === 'cancelled' && order.statusHistory?.length) {
+const isReassignmentEvent = (history: NonNullable<Order['statusHistory']>, index: number) => {
+  const event = history[index];
+  return event.status === 'created' && (event.previousStatus === 'accepted'
+    || (!event.previousStatus && history[index - 1]?.status === 'accepted'));
+};
+
+const buildHistoryTimeline = (order: Order): TimelineStep[] => {
+    const history = order.statusHistory ?? [];
     const names: Record<string, string> = { created: 'Đã tạo đơn hàng', accepted: 'Chuyên gia đã nhận đơn', in_progress: 'Đã bắt đầu thực hiện', completed: 'Đã hoàn tất', cancelled: 'Đơn hàng đã hủy', paid: 'Đã thanh toán', assigned: 'Đã điều phối chuyên gia' };
     const descriptions: Record<string, string> = {
       created: `Yêu cầu ${order.serviceId?.name || 'dịch vụ'} đã được ghi nhận với mã ${order.orderCode}.`,
@@ -48,19 +54,37 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
       paid: 'Hệ thống đã ghi nhận khoản thanh toán của đơn hàng.',
       assigned: 'Hệ thống đã chuyển yêu cầu dịch vụ đến chuyên gia.',
     };
-    const steps: TimelineStep[] = order.statusHistory.map(event => {
+    let findingReplacement = false;
+    const steps: TimelineStep[] = history.flatMap((event, index): TimelineStep[] => {
+      const active = index === history.length - 1 && order.status !== 'cancelled' && order.status !== 'completed';
+      if (isReassignmentEvent(history, index)) {
+        findingReplacement = true;
+        const time = formatTimelineTime(event.createdAt);
+        return [
+          { icon: X, title: 'Chuyên gia đã hủy nhận đơn',
+            description: 'Chuyên gia trước không thể tiếp tục thực hiện đơn.', time, state: 'done' },
+          { icon: Search, title: active ? 'Đang tìm chuyên gia thay thế' : 'Tìm chuyên gia thay thế',
+            description: active
+              ? 'Handigo đang tìm chuyên gia khác phù hợp để hỗ trợ bạn.'
+              : 'Handigo đã bắt đầu tìm chuyên gia khác để hỗ trợ bạn.',
+            time, state: active ? 'active' : 'done' },
+        ];
+      }
       const cancelled = event.status === 'cancelled';
-      return {
+      const replacementAccepted = findingReplacement && event.status === 'accepted';
+      return [{
         icon: cancelled ? X : event.status === 'in_progress' ? HardHat : event.status === 'accepted' ? UserCheck : Check,
-        title: names[event.status] ?? event.status,
+        title: replacementAccepted ? 'Chuyên gia mới đã nhận đơn' : names[event.status] ?? event.status,
         description: cancelled
           ? getCancellationDescription(order)
-          : event.note?.trim() || descriptions[event.status] || 'Trạng thái đơn hàng đã được cập nhật.',
+          : replacementAccepted
+            ? 'Chuyên gia mới đã xác nhận tiếp nhận yêu cầu dịch vụ.'
+            : event.note?.trim() || descriptions[event.status] || 'Trạng thái đơn hàng đã được cập nhật.',
         time: formatTimelineTime(cancelled ? order.cancellation?.cancelledAt || event.createdAt : event.createdAt),
-        state: cancelled ? 'cancelled' : 'done',
-      };
+        state: cancelled ? 'cancelled' : active ? 'active' : 'done',
+      }];
     });
-    if (!order.statusHistory.some(event => event.status === 'cancelled')) {
+    if (order.status === 'cancelled' && !history.some(event => event.status === 'cancelled')) {
       steps.push({
         icon: X, title: 'Đơn hàng đã hủy',
         description: getCancellationDescription(order),
@@ -68,6 +92,12 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
       });
     }
     return steps;
+};
+
+export const buildOrderTimeline = (order: Order): TimelineStep[] => {
+  const history = order.statusHistory ?? [];
+  if (order.status === 'cancelled' && history.length) {
+    return buildHistoryTimeline(order);
   }
   if (order.status === "cancelled") {
     return [
@@ -98,7 +128,7 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
   const hasPaid = ["paid", "partially_paid"].includes(order.paymentStatus);
   const scheduledTime = formatTimelineTime(order.scheduledAt);
 
-  return [
+  const timeline: TimelineStep[] = [
     {
       icon: Check,
       title: "Đã tạo đơn hàng",
@@ -163,4 +193,8 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
       state: currentStatusIndex === 3 ? "done" : "pending",
     },
   ];
+  if (history.some((_, index) => isReassignmentEvent(history, index))) {
+    return [...buildHistoryTimeline(order), ...timeline.filter((step) => step.state === 'pending')];
+  }
+  return timeline;
 };
