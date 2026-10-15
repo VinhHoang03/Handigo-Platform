@@ -65,6 +65,12 @@ class ProviderApplicationRepository {
     documentKind: documentKind,
     onSendProgress: onSendProgress,
   );
+  Future<ProviderAssetUploadResult> uploadCertificateAsset(XFile file) =>
+      _api.uploadProviderApplicationAssetResult(
+        file,
+        purpose: 'certificate',
+        documentKind: 'certificate',
+      );
   Future<List<AdministrativeArea>> provinces() =>
       _administrativeAreas('/vietnam-addresses/provinces');
   Future<List<AdministrativeArea>> wards(int provinceCode) =>
