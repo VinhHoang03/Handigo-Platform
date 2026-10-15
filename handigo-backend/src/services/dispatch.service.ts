@@ -23,29 +23,29 @@ async function createMatchingSearch(startedAt: Date) {
   const [initial, expanded, delay, duration] = await Promise.all([
     getNumberConfigValue("INITIAL_PROVIDER_RADIUS_KM", 5),
     getNumberConfigValue("MAX_PROVIDER_RADIUS_KM", 10),
-    getNumberConfigValue("MATCHING_EXPAND_AFTER_MINUTES", 3),
+    getNumberConfigValue("MATCHING_EXPAND_AFTER_MINUTES", 1),
     getNumberConfigValue("MATCHING_EXPANDED_DURATION_MINUTES", 3),
   ]);
   return buildMatchingSearch(startedAt, Math.max(initial, 0.1),
     Math.max(expanded, initial, 0.1), Math.max(delay, 0.1), Math.max(duration, 0.1));
 }
 /** Số giây một provider có thể phản hồi trước khi chuyển sang provider tiếp theo. */
-const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 90;
+const DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS = 60;
 
 /** Số provider nhận cùng một lượt đề nghị để cạnh tranh nhận đơn. */
 const DEFAULT_MATCHING_BATCH_SIZE = 3;
 
-/** Thời gian nhận đơn dùng chung cho đơn thường, lịch hẹn và yêu cầu chọn thợ. */
-export const DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS = DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS * 1000;
+/** Đọc thời gian nhận đơn do admin cấu hình cho mọi loại đề nghị mới. */
+export const getProviderResponseTimeoutMs = async () => Math.max(
+  await getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS),
+  1,
+) * 1000;
 
 /** Số provider tối đa được thử sau khi khách đồng ý tìm provider thay thế. */
 export const MAX_DIRECT_PROVIDER_ATTEMPTS = 3;
 
 /** Số lượt matching tối đa trước khi hủy đơn. */
 const DEFAULT_MAX_MATCHING_ATTEMPTS = 5;
-
-/** Tổng thời gian matching tối đa trước khi hủy đơn. */
-const DEFAULT_MAX_MATCHING_DURATION_SECONDS = 6 * 60;
 
 /** Bắt đầu tìm thợ trước giờ hẹn bao nhiêu phút. */
 const DEFAULT_SCHEDULED_DISPATCH_LEAD_MINUTES = 15;
@@ -68,15 +68,12 @@ interface DispatchContext {
 
 async function getMatchingConfig() {
   const [
-    maxMatchingDurationSecondsValue,
+    providerResponseTimeoutMs,
     maxMatchingAttemptsValue,
     scheduledDispatchLeadMinutesValue,
     matchingBatchSizeValue,
   ] = await Promise.all([
-    getNumberConfigValue(
-      "MAX_MATCHING_DURATION_SECONDS",
-      DEFAULT_MAX_MATCHING_DURATION_SECONDS,
-    ),
+    getProviderResponseTimeoutMs(),
     getNumberConfigValue(
       "MAX_MATCHING_ATTEMPTS",
       DEFAULT_MAX_MATCHING_ATTEMPTS,
@@ -89,11 +86,7 @@ async function getMatchingConfig() {
   ]);
 
   return {
-    matchingProviderTimeoutSeconds: DEFAULT_MATCHING_PROVIDER_TIMEOUT_SECONDS,
-    maxMatchingDurationSeconds: Math.max(
-      maxMatchingDurationSecondsValue,
-      DEFAULT_MAX_MATCHING_DURATION_SECONDS,
-    ),
+    matchingProviderTimeoutSeconds: providerResponseTimeoutMs / 1000,
     maxMatchingAttempts: Math.max(
       Math.floor(maxMatchingAttemptsValue),
       1,
@@ -113,7 +106,7 @@ export async function getMaxMatchingDurationSeconds(): Promise<number> {
 }
 
 async function cancelUnmatchedOrder(orderId: string, reason: string) {
-  const order = await Order.findById(orderId).select("status recurringGroupId");
+  const order = await Order.findById(orderId).select("status recurringGroupId reassignment");
   if (!order || order.status !== "created") {
     return false;
   }
@@ -123,7 +116,7 @@ async function cancelUnmatchedOrder(orderId: string, reason: string) {
     { $set: { "reassignment.status": "failed" } },
     { runValidators: true },
   );
-  const orderIds = order.recurringGroupId
+  const orderIds = order.recurringGroupId && order.reassignment?.status !== "matching"
     ? await Order.find({
       recurringGroupId: order.recurringGroupId,
       status: "created",
@@ -151,7 +144,7 @@ async function getDispatchContext(
   );
   if (!address) return null;
 
-  const scheduledDates = order.recurringGroupId
+  const scheduledDates = order.recurringGroupId && order.reassignment?.status !== "matching"
     ? (await Order.find({
       recurringGroupId: order.recurringGroupId,
       status: "created",
@@ -413,7 +406,7 @@ export const DispatchService = {
       const preferredCandidate = preferredCandidates[0];
       if (preferredCandidate) {
         const deadline = new Date(
-          Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+          Date.now() + await getProviderResponseTimeoutMs(),
         );
         await Order.updateOne(
           { _id: claimedOrder._id, status: "created" },
@@ -464,12 +457,11 @@ export const DispatchService = {
   ): Promise<void> {
     const {
       matchingProviderTimeoutSeconds,
-      maxMatchingDurationSeconds,
       maxMatchingAttempts,
       matchingBatchSize,
     } = await getMatchingConfig();
     let order = await Order.findById(orderId).select(
-      "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment",
+      "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment inspectionRequired",
     );
     if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId) return;
     if (!order.matchingSearch) {
@@ -479,14 +471,14 @@ export const DispatchService = {
         { runValidators: true },
       );
       order = await Order.findById(orderId).select(
-        "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment",
+        "status readyForMatching preferredProviderId matchingSearch createdAt matchingStartedAt reassignment inspectionRequired",
       );
     }
     if (!order || order.status !== "created" || !order.readyForMatching || order.preferredProviderId || !order.matchingSearch) return;
     const stage = getMatchingSearchStage(order.matchingSearch);
     if (stage.expired) {
       await cancelUnmatchedOrder(orderId,
-        `Không tìm thấy thợ nhận đơn trong bán kính ${order.matchingSearch.expandedRadiusKm} km sau thời gian tìm kiếm.`);
+        `Không tìm thấy thợ phù hợp trong bán kính ${order.matchingSearch.expandedRadiusKm} km sau thời gian tìm kiếm.`);
       return;
     }
     const hasPendingAssignment = await OrderAssignment.exists({
@@ -496,19 +488,7 @@ export const DispatchService = {
     });
     if (hasPendingAssignment) return;
 
-    const matchingDeadline = new Date(
-      (order.matchingStartedAt || order.createdAt).getTime() +
-      maxMatchingDurationSeconds * 1000,
-    );
-    if (matchingDeadline <= new Date()) {
-      await cancelUnmatchedOrder(
-        orderId,
-        "Không có provider nhận đơn trong vòng 5 phút.",
-      );
-      return;
-    }
-
-    const isDirectReplacement = order.reassignment?.status === "matching";
+    const isDirectReplacement = order.reassignment?.status === "matching" && !order.inspectionRequired;
     const maxAttempts = isDirectReplacement
       ? MAX_DIRECT_PROVIDER_ATTEMPTS
       : maxMatchingAttempts;
@@ -533,6 +513,7 @@ export const DispatchService = {
     const batchNumber = Math.floor(triedProviderIds.length / matchingBatchSize) + 1;
 
     const matchingOptions = {
+      maxDistanceMeters: stage.radiusKm * 1000,
       latitude: ctx.latitude,
       longitude: ctx.longitude,
       serviceId: ctx.serviceId,
@@ -554,10 +535,8 @@ export const DispatchService = {
 
     const deadline = new Date(
       Math.min(
-        Date.now() + (isDirectReplacement
-          ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
-          : matchingProviderTimeoutSeconds * 1000),
-        matchingDeadline.getTime(),
+        Date.now() + matchingProviderTimeoutSeconds * 1000,
+        stage.deadline.getTime(),
       ),
     );
 
@@ -614,7 +593,7 @@ export const DispatchService = {
       await requestDirectProviderReassignment(
         orderId,
         timedOutProviderId,
-        "Provider không phản hồi yêu cầu lịch hẹn trong 2 phút.",
+        "Provider không phản hồi yêu cầu lịch hẹn trong thời hạn nhận đơn.",
       );
       return;
     }

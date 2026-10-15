@@ -33,7 +33,7 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
   );
 
   const selectFiles = (selectedFiles: File[]) => {
-    const remaining = 5 - existingImages.length;
+    const remaining = 5 - existingImages.length - files.length;
     const invalidFile = selectedFiles.find(
       (file) => !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024,
     );
@@ -46,7 +46,7 @@ export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Prop
     } else {
       setMessage('');
     }
-    setFiles(selectedFiles.slice(0, remaining));
+    setFiles((current) => [...current, ...selectedFiles.slice(0, remaining)]);
   };
 
   const submit = async (event: React.FormEvent) => {

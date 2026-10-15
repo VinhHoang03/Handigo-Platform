@@ -53,6 +53,7 @@ export interface IOrderCancellation {
     refundAmount: Money;
     cancellationFee: Money;
     providerCompensation: Money;
+    providerCompensationRate?: number;
     platformRetainedAmount: Money;
     hoursBeforeStart?: number | null;
     policyReason: string;
@@ -338,6 +339,7 @@ const OrderSchema = new Schema<IOrder>(
                 refundAmount: { type: Number, required: true, min: 0 },
                 cancellationFee: { type: Number, required: true, min: 0 },
                 providerCompensation: { type: Number, required: true, min: 0 },
+                providerCompensationRate: { type: Number, min: 0, max: 100 },
                 platformRetainedAmount: { type: Number, required: true, min: 0 },
                 hoursBeforeStart: { type: Number, default: null },
                 policyReason: { type: String, required: true },

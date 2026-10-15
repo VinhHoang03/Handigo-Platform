@@ -10,6 +10,7 @@ import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
 import { REWARD_POLICY } from "../configs/rewards";
+import { DEFAULT_REWARD_POLICY } from "../validations/reward.validator";
 
 // Cô lập dịch vụ ngoài; không đọc bí mật, kết nối database hoặc gọi PayOS.
 const stubModule = (path: string, exports: object) => {
@@ -17,7 +18,7 @@ const stubModule = (path: string, exports: object) => {
 };
 let dispatches = 0;
 stubModule("../configs/payos.config", { payos: {}, payoutPayos: {} });
-stubModule("../services/systemConfig.service", { getRewardOffers: async () => REWARD_POLICY.offers.map((offer) => ({ ...offer, isActive: true })) });
+stubModule("../services/systemConfig.service", { getRewardOffers: async () => REWARD_POLICY.offers.map((offer) => ({ ...offer, isActive: true })), getRewardPolicy: async () => DEFAULT_REWARD_POLICY });
 stubModule("../services/notification.service", { createNotificationRecord: async () => ({}) });
 stubModule("../services/dispatch.service", { DispatchService: { dispatchReadyOrder: async () => { dispatches++; } } });
 const { createPayment } = require("../services/payment.service") as typeof import("../services/payment.service");

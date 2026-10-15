@@ -1,14 +1,12 @@
 import { useState } from "react";
+import { isAxiosError } from "axios";
 import { useToast } from "@/components/common/Toast";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { getErrorMessage } from "@/utils/apiError";
 import type { CancellationPreview, Order, OrderQuotation } from "@/types/booking";
 import type { PendingAction } from "./bookingDetailConstants";
 
-/**
- * ⚠️ Luồng từ chối báo giá và hủy đơn (kèm xem trước chính sách hoàn
- * tiền) — đụng tiền. Giữ nguyên toàn bộ điều kiện và thứ tự gọi API gốc.
- */
+/** Giữ số tiền khách đã xem để đối chiếu và yêu cầu xác nhận lại khi thay đổi. */
 export const useBookingCancellationFlow = (
   order: Order | null,
   quotation: OrderQuotation | null,
@@ -107,13 +105,17 @@ export const useBookingCancellationFlow = (
   };
 
   const executePendingAction = async () => {
-    if (!pendingAction) return;
+    if (!pendingAction || busy) return;
 
     let reason = pendingAction.reason.trim();
     const additionalInfo = pendingAction.additionalInfo?.trim() || "";
     const isCancellationAction = ["cancelOrder", "cancelSeries"].includes(
       pendingAction.type,
     );
+    if (isCancellationAction && (!cancellationPreview || !cancellationPreview.canCancel)) {
+      addToast("Vui lòng tải lại chính sách hoàn tiền trước khi xác nhận hủy.", "error");
+      return;
+    }
     if (!reason) {
       addToast(isCancellationAction ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.", "error");
       setPendingAction({
@@ -138,10 +140,17 @@ export const useBookingCancellationFlow = (
         await bookingApi.rejectQuotation(quotation.quotation._id, reason);
       } else if (pendingAction.type === "cancelOrder") {
         if (!order) return;
-        await bookingApi.cancelOrder(order._id, reason);
+        if (!cancellationPreview) return;
+        await bookingApi.cancelOrder(order._id, reason, {
+          paidAmount: cancellationPreview.paidAmount,
+          refundAmount: cancellationPreview.refundAmount,
+          cancellationFee: cancellationPreview.cancellationFee,
+          providerCompensation: cancellationPreview.providerCompensation,
+        });
       } else if (pendingAction.type === "cancelSeries") {
         if (!order) return;
-        await bookingApi.cancelRecurringSeries(order._id, reason);
+        if (!cancellationPreview) return;
+        await bookingApi.cancelRecurringSeries(order._id, reason, cancellationPreview.items);
       }
 
       addToast(pendingAction.type === "rejectQuotation" ? "Đã từ chối báo giá." : "Đã hủy lịch dịch vụ.", "success");
@@ -149,15 +158,29 @@ export const useBookingCancellationFlow = (
       setCancellationPreview(null);
       await loadData();
     } catch (error) {
-      addToast(getErrorMessage(error, "Không thể thực hiện thao tác. Vui lòng thử lại."), "error");
+      let message = getErrorMessage(error, "Không thể thực hiện thao tác. Vui lòng thử lại.");
+      if (isCancellationAction && order && isAxiosError(error) && error.response?.status === 409) {
+        setCancellationPreview(null);
+        try {
+          const preview = await bookingApi.getCancellationPreview(
+            order._id,
+            pendingAction.type === "cancelSeries" ? "series" : "single",
+          );
+          await loadData();
+          setCancellationPreview(preview);
+          message = preview.canCancel
+            ? "Thông tin hủy đơn đã thay đổi. Vui lòng xem số tiền vừa cập nhật và xác nhận lại nếu muốn tiếp tục hủy."
+            : "Đơn không còn đủ điều kiện hủy. Vui lòng kiểm tra lại trạng thái đơn.";
+        } catch {
+          message = "Không thể tải lại chính sách hoàn tiền. Vui lòng đóng và thử lại.";
+        }
+      }
+      addToast(message, "error");
       setPendingAction((current) =>
         current
           ? {
               ...current,
-              error: getErrorMessage(
-                error,
-                "Không thể thực hiện thao tác. Vui lòng thử lại.",
-              ),
+              error: message,
             }
           : current,
       );

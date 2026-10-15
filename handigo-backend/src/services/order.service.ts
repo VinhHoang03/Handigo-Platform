@@ -20,13 +20,15 @@ import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "
 import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, isWithinAppointmentHours } from "../utils/bookingPolicy";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import {
-  DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+  getProviderResponseTimeoutMs,
   DispatchService,
   getMaxMatchingDurationSeconds,
 } from "./dispatch.service";
 import {
   cancelOrderWithSettlement,
+  cancelOrdersWithSettlement,
   getCancellationPreview,
+  type CancellationExpectation,
 } from "./orderCancellation.service";
 import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
@@ -658,7 +660,7 @@ export const OrderService = {
     if (!candidate) throw unavailable("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.");
 
     const responseDeadline = new Date(
-      Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+      Date.now() + await getProviderResponseTimeoutMs(),
     );
     const claimedOrder = await Order.findOneAndUpdate(
       { _id: order._id, customerId, status: "created", providerId: null, isDeleted: false,
@@ -954,9 +956,13 @@ export const OrderService = {
 
     const matchingSearch = order.matchingStartedAt && !order.preferredProviderId
       ? order.matchingSearch : null;
+    const directAssignment = order.matchingStartedAt && order.preferredProviderId
+      ? await OrderAssignment.findOne({ orderId: order._id, assignmentType: { $in: ["direct_request", "appointment"] }, isDeleted: false })
+        .select("responseDeadline").sort({ assignedAt: -1 }).lean()
+      : null;
     const matchingExpiresAt = order.matchingStartedAt
-      ? matchingSearch?.expiresAt ?? new Date(order.matchingStartedAt.getTime()
-        + (order.preferredProviderId ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
+      ? matchingSearch?.expiresAt ?? directAssignment?.responseDeadline ?? new Date(order.matchingStartedAt.getTime()
+        + (order.preferredProviderId ? await getProviderResponseTimeoutMs()
           : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
@@ -1225,16 +1231,15 @@ export const OrderService = {
     userId: string,
     role: "customer" | "provider" | "admin",
     reason: string,
-    confirmedExpectation?: { paidAmount: number; refundAmount: number; cancellationFee: number },
+    confirmedExpectation?: CancellationExpectation,
   ): Promise<IOrder> {
     if (role === "provider") {
       const order = await Order.findById(orderId).select("status orderType currentQuotationId inspectionRequired");
       if (
         order?.status === "accepted" &&
         !order.currentQuotationId &&
-        !order.inspectionRequired &&
-        !isQuotationDeclinedReason(reason) &&
-        ["normal", "urgent"].includes(order.orderType)
+        (order.inspectionRequired || (!isQuotationDeclinedReason(reason)
+          && ["normal", "urgent"].includes(order.orderType)))
       ) {
         return requestProviderReassignment(orderId, userId, reason);
       }
@@ -1342,6 +1347,7 @@ export const OrderService = {
     orderId: string,
     customerId: string,
     reason: string,
+    confirmedExpectations?: Array<CancellationExpectation & { orderId: string }>,
   ): Promise<{ cancelledCount: number; orders: IOrder[] }> {
     const anchorOrder = await Order.findById(orderId).lean();
     if (!anchorOrder) throw new AppError("Đơn hàng không tồn tại.", 404);
@@ -1368,16 +1374,21 @@ export const OrderService = {
       throw new AppError("Không còn buổi nào có thể hủy trong chuỗi lịch này.", 409);
     }
 
-    const cancelledOrders: IOrder[] = [];
-    for (const recurringOrder of cancellableOrders) {
-      const cancelledOrder = await cancelOrderWithSettlement({
-        orderId: recurringOrder._id.toString(),
-        actorId: customerId,
-        role: "customer",
-        reason,
-      });
-      cancelledOrders.push(cancelledOrder);
+    const expectations = new Map(confirmedExpectations?.map((item) => [item.orderId, item]));
+    if (confirmedExpectations && (
+      expectations.size !== confirmedExpectations.length
+      || expectations.size !== cancellableOrders.length
+      || cancellableOrders.some((order) => !expectations.has(order._id.toString()))
+    )) {
+      throw new ActionPreconditionError("Chuỗi lịch đã thay đổi. Vui lòng kiểm tra và xác nhận lại trước khi hủy.");
     }
+    const cancelledOrders = await cancelOrdersWithSettlement(cancellableOrders.map((recurringOrder) => ({
+      orderId: recurringOrder._id.toString(),
+      actorId: customerId,
+      role: "customer" as const,
+      reason,
+      confirmedExpectation: expectations.get(recurringOrder._id.toString()),
+    })));
 
     return {
       cancelledCount: cancelledOrders.length,

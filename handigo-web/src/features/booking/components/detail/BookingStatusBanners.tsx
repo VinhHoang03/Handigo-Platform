@@ -57,7 +57,9 @@ export const BookingStatusBanners = ({
           <div>
             <p className="font-bold">Đang tìm chuyên gia nhận đơn</p>
             <p className="mt-1 text-on-surface-variant">
-              Handigo đang gửi yêu cầu đến các chuyên gia phù hợp gần bạn.
+              {order.inspectionRequired && order.reassignment?.status === 'matching'
+                ? 'Thợ trước đã ngừng nhận đơn. Handigo đang tự tìm thợ thay thế và giữ nguyên cọc; nếu không có thợ nhận, bạn được hoàn 100% tiền cọc.'
+                : 'Handigo đang gửi yêu cầu đến các chuyên gia phù hợp gần bạn.'}
             </p>
           </div>
           <div className="shrink-0 rounded-xl bg-surface px-5 py-3 text-center shadow-sm">

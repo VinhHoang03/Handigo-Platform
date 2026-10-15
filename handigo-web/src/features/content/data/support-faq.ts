@@ -57,7 +57,7 @@ export const supportFaqs: SupportFaqItem[] = [
     group: "Thanh toán",
     question: "Huỷ đơn thì được hoàn lại bao nhiêu?",
     answer:
-      "Đơn chưa có thợ nhận thì hoàn toàn bộ. Với đơn đã đặt lịch: huỷ trước giờ hẹn từ 24 giờ trở lên hoàn 100%, từ 6 đến dưới 24 giờ hoàn 80%, từ 2 đến dưới 6 giờ hoàn 50%, dưới 2 giờ hoàn 20%. Đơn thường và đơn gấp đã có thợ nhận hoàn 70%. Quá giờ hẹn thì không huỷ được, bạn cần gửi yêu cầu hỗ trợ.",
+      "Đơn chưa có thợ nhận thì hoàn toàn bộ. Với dịch vụ báo giá, khách hủy sau khi thợ nhận hoặc khách/thợ hủy sau báo giá thì cọc thực trả chuyển vào ví thợ. Thợ hủy trước báo giá sẽ tự tìm thợ khác; nếu không có thợ nhận thì khách được hoàn 100% cọc. Đơn giá cố định áp dụng mức hoàn theo thời điểm hủy và chính sách hiện hành; lịch hẹn giá cố định đã tới giờ thực hiện cần gửi yêu cầu hỗ trợ.",
   },
   {
     group: "Thanh toán",

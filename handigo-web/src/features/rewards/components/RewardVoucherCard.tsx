@@ -58,7 +58,7 @@ export function RewardVoucherCard({ voucher }: { voucher: RewardVoucher }) {
         </div>
         <h3 className="mt-3 text-[13px] font-semibold text-on-surface">{voucher.name}</h3>
         <p className="mt-2 text-[13px] leading-6 text-on-surface-variant">{voucher.applicableOrderType === "variable_price"
-          ? "Mã áp dụng với đơn báo giá. Hiệu lực 30 ngày từ khi đổi."
+          ? "Mã áp dụng với đơn báo giá. Hạn dùng được ghi bên dưới."
           : `Đơn giá cố định từ ${rewardMoney(voucher.minOrderAmount)}.`} Dùng một lần cho tài khoản của bạn.</p>
         {voucher.maxDiscountAmount != null && <p className="mt-2 text-[13px] font-medium text-on-surface-variant">Giảm tối đa {rewardMoney(voucher.maxDiscountAmount)}.</p>}
         <div className="my-3 flex items-center gap-2 rounded-xl bg-surface-container-low p-3">

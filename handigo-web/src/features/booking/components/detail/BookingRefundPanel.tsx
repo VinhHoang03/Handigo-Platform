@@ -4,6 +4,7 @@ import { getActionDialogConfig, type PendingAction } from "./bookingDetailConsta
 import { BookingCancellationPreviewCard } from "./BookingCancellationPreviewCard";
 import { BookingCancellationReasonForm } from "./BookingCancellationReasonForm";
 import { X } from "lucide-react";
+import { formatCurrency } from "./bookingDetailFormatters";
 
 type BookingRefundPanelProps = {
   order: Order;
@@ -85,10 +86,17 @@ export const BookingRefundPanel = ({
               {actionDialogConfig.message}
             </p>
 
-            {isCancellationAction && cancellationPreview && (
+            {isCancellationAction && cancellationPreview && !order.inspectionRequired && (
               <BookingCancellationPreviewCard
                 cancellationPreview={cancellationPreview}
               />
+            )}
+            {isCancellationAction && cancellationPreview && order.inspectionRequired && (
+              <p className="text-sm leading-6 text-on-surface-variant">
+                {cancellationPreview.providerCompensation > 0
+                  ? `Tiền cọc ${formatCurrency(cancellationPreview.providerCompensation)} được chuyển vào ví thợ vì đơn đã có thợ nhận. Phần được hoàn cho bạn: ${formatCurrency(cancellationPreview.refundAmount)}.`
+                  : 'Khi chưa có thợ nhận, toàn bộ tiền cọc đã thanh toán được hoàn lại cho bạn (100%).'}
+              </p>
             )}
 
             {isCancellationAction ? (

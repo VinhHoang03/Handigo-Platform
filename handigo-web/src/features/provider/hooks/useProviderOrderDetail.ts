@@ -170,7 +170,8 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
     const succeeded = await runAction(async () => {
       await providerOrderApi.cancelOrder(order._id, cancellationReason);
-    }, 'Không thể hủy đơn.', false, 'Đã hủy đơn dịch vụ.');
+    }, 'Không thể hủy đơn.', false, order.inspectionRequired && !order.currentQuotationId
+      ? 'Đã ngừng nhận đơn. Hệ thống đang tìm thợ thay thế cho khách.' : 'Đã hủy đơn dịch vụ.');
     if (!succeeded) return;
 
     setCancelConfirmOpen(false);

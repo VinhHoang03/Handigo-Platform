@@ -37,9 +37,31 @@ export const getNotificationTarget = (
   role?: AppRole,
 ) => {
   const actionUrl = getDataString(item, "actionUrl");
+  const orderId = getDataString(item, "orderId");
+  const isWithdrawal = item.type === "WITHDRAWAL" || Boolean(getDataString(item, "withdrawalId"));
+  // Thông báo cũ về ví có thể chỉ lưu orderId/paymentId và nội dung mô tả.
+  const mentionsWallet = /(?:^|\s)ví(?:\s|[.,!?;:]|$)/iu.test(
+    `${item.title ?? ""} ${item.content ?? ""}`.normalize("NFC"),
+  );
+  const isWalletPayment = item.type === "PAYMENT" && Boolean(
+    getDataString(item, "transactionId") || getDataString(item, "walletId")
+      || getDataString(item, "refundChannel") === "handigo_wallet"
+      || getDataString(item, "destination") === "handigo_wallet"
+      || !orderId,
+  );
+  if (isWithdrawal || isWalletPayment || mentionsWallet) {
+    const walletPath = role === "CUSTOMER" ? "/customer/wallet"
+      : role === "PROVIDER" ? "/provider/wallet"
+        : role === "ADMIN" ? isWithdrawal ? "/admin/withdrawals" : "/admin/wallets"
+          : null;
+    if (walletPath) {
+      if (actionUrl?.split(/[?#]/)[0] === walletPath) return actionUrl;
+      return walletPath;
+    }
+  }
+
   if (actionUrl && isInternalPath(actionUrl)) return actionUrl;
 
-  const orderId = getDataString(item, "orderId");
   if (orderId) {
     if (role === "CUSTOMER") return `/customer/bookings/${orderId}`;
     if (role === "PROVIDER") return `/provider/orders/${orderId}`;
@@ -49,10 +71,6 @@ export const getNotificationTarget = (
   const serviceId = getDataString(item, "serviceId");
   if (serviceId && role === "CUSTOMER") {
     return `/customer/services/${serviceId}`;
-  }
-
-  if (getDataString(item, "withdrawalId") && role === "ADMIN") {
-    return "/admin/withdrawals";
   }
 
   if (getDataString(item, "providerApplicationId") && role === "ADMIN") {

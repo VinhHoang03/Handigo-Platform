@@ -32,6 +32,10 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+// Nhiều modal có thể đóng không theo thứ tự mở, nên dùng chung trạng thái khóa cuộn.
+let openModalCount = 0;
+let previousBodyOverflow = '';
+
 export function Modal({
   open,
   title,
@@ -59,7 +63,8 @@ export function Modal({
     if (!open) return undefined;
 
     previousFocusRef.current = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
+    if (openModalCount === 0) previousBodyOverflow = document.body.style.overflow;
+    openModalCount += 1;
     document.body.style.overflow = 'hidden';
 
     window.requestAnimationFrame(() => {
@@ -69,7 +74,8 @@ export function Modal({
     });
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      openModalCount -= 1;
+      if (openModalCount === 0) document.body.style.overflow = previousBodyOverflow;
       const previousFocus = previousFocusRef.current;
       if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };

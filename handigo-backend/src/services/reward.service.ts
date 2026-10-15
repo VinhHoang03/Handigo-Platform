@@ -8,7 +8,7 @@ import { RepairQuotation } from "../models/repairQuotation.model";
 import { REWARD_POLICY, calculateRewardPoints } from "../configs/rewards";
 import { AppError } from "../utils/appError";
 import type { RequestUser } from "../middlewares/authContext";
-import { createConfig, getConfigByKey, getRewardOffers, updateConfig } from "./systemConfig.service";
+import { createConfig, getConfigByKey, getRewardOffers, getRewardPolicy, updateConfig } from "./systemConfig.service";
 import { rewardOfferSchema, type AdminRewardOfferInput } from "../validations/reward.validator";
 
 export const earnOrderRewards = async (order: IOrder, session: ClientSession) => {
@@ -25,9 +25,11 @@ export const earnOrderRewards = async (order: IOrder, session: ClientSession) =>
     // Tổng cuối cùng đã bao gồm phần cọc được khấu trừ, không cộng cọc lần nữa.
     rewardAmount = quotation.finalAmount;
   }
-  const points = calculateRewardPoints(rewardAmount);
   const key = `earn:${order._id}`;
-  if (!points || await RewardTransaction.exists({ _id: key }).session(session)) return;
+  if (await RewardTransaction.exists({ _id: key }).session(session)) return;
+  const policy = await getRewardPolicy(session);
+  const points = calculateRewardPoints(rewardAmount, policy.amountPerPoint);
+  if (!points) return;
   const account = await RewardAccount.findOneAndUpdate(
     { _id: order.customerId },
     { $inc: { balance: points, totalEarned: points }, $setOnInsert: { totalRedeemed: 0 } },
@@ -44,7 +46,7 @@ export const getRewardOverview = async (userId: string) => {
   return {
     balance: account?.balance ?? 0, totalEarned: account?.totalEarned ?? 0,
     totalRedeemed: account?.totalRedeemed ?? 0,
-    policy: { ...REWARD_POLICY, offers: (await getRewardOffers()).filter((offer) => offer.isActive) },
+    policy: { ...REWARD_POLICY, ...await getRewardPolicy(), offers: (await getRewardOffers()).filter((offer) => offer.isActive) },
   };
 };
 
@@ -99,13 +101,14 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
     );
     if (!account) throw new AppError("Bạn chưa đủ điểm để đổi ưu đãi này.", 409);
     const now = new Date();
+    const policy = await getRewardPolicy(session);
     const [voucher] = await Voucher.create([{
       ownerId: userId, code: `HD${randomUUID().replace(/-/g, "").toUpperCase()}`,
       name: offer.name, description: "Ưu đãi dành riêng cho khách hàng đổi điểm Handigo",
       discountType: offer.discountType ?? "AMOUNT", discountValue: offer.discountValue, minOrderAmount: offer.minOrderAmount,
       applicableOrderType: offer.applicableOrderType ?? "fixed_price",
       maxDiscountAmount: offer.maxDiscountAmount ?? null,
-      usageLimit: 1, startAt: now, endAt: new Date(now.getTime() + REWARD_POLICY.validityDays * 86_400_000),
+      usageLimit: 1, startAt: now, endAt: new Date(now.getTime() + policy.validityDays * 86_400_000),
     }], { session });
     await RewardTransaction.create([{
       _id: key, userId, kind: "REDEEM", points: -offer.points, balanceAfter: account.balance,

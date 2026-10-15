@@ -8,11 +8,17 @@ import { AppError } from "../utils/appError";
 import { previewServiceBooking } from "../services/servicePricing.service";
 import { updateExpectedEnd } from "../services/providerSchedule.service";
 import { respondToProviderReassignment } from "../services/orderReassignment.service";
+import { getCustomerBookingPolicies } from "../services/bookingPolicy.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
 
 const uid = (req: Request): string => requireRequestUser(req).id;
+
+export const getBookingPolicies = async (_req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await getCustomerBookingPolicies()); }
+  catch (error) { return next(error); }
+};
 
 export const previewBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -193,6 +199,7 @@ export const cancelOrder = async (
       uid(req),
       role,
       reason,
+      req.body.confirmedExpectation,
     );
     return ok(res, order);
   } catch (error) {
@@ -248,6 +255,7 @@ export const cancelRecurringSeries = async (
       param(req, "orderId"),
       uid(req),
       reason,
+      req.body.confirmedExpectations,
     );
     return ok(res, result);
   } catch (error) {

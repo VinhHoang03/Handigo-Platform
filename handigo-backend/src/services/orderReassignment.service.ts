@@ -8,6 +8,7 @@ import { cancelOrderWithSettlement, cancelSystemOrderWithSettlement } from "./or
 import { createNotificationRecord } from "./notification.service";
 import { DispatchService } from "./dispatch.service";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { emitToUser } from "../sockets/socketServer";
 
 export type ReassignmentDecision = "accept" | "decline";
 
@@ -64,7 +65,8 @@ export const requestProviderReassignment = async (
       if (order.status !== "accepted") {
         throw new AppError("Chỉ có thể yêu cầu đổi kỹ thuật viên khi đơn đã được nhận và chưa bắt đầu.", 409);
       }
-      if (!['normal', 'urgent'].includes(order.orderType)) {
+      const automatic = order.inspectionRequired;
+      if (!automatic && !['normal', 'urgent'].includes(order.orderType)) {
         throw new AppError("Luồng tìm kỹ thuật viên thay thế chưa áp dụng cho đơn lịch hẹn hoặc định kỳ.", 409);
       }
       if (order.currentQuotationId) {
@@ -73,24 +75,28 @@ export const requestProviderReassignment = async (
 
       const now = new Date();
       const reassignment = {
-        status: "awaiting_customer" as const,
+        status: automatic ? "matching" as const : "awaiting_customer" as const,
         requestedByProviderId: provider._id,
-        previousProviderIds: [provider._id],
+        previousProviderIds: [...new Map([...(order.reassignment?.previousProviderIds ?? []), provider._id]
+          .map((id) => [id.toString(), id])).values()],
         reason,
         requestedAt: now,
         expiresAt: new Date(now.getTime() + CUSTOMER_RESPONSE_TIMEOUT_MS),
-        respondedAt: null,
+        respondedAt: automatic ? now : null,
       };
 
       updatedOrder = await Order.findOneAndUpdate(
-        { _id: order._id, status: "accepted", providerId: provider._id },
+        { _id: order._id, status: "accepted", providerId: provider._id, currentQuotationId: null },
         {
           $set: {
             status: "created",
             providerId: null,
             preferredProviderId: null,
-            readyForMatching: false,
+            readyForMatching: automatic,
             matchingStartedAt: null,
+            matchingSearch: null,
+            ...(automatic ? { bookingStatus: ["scheduled", "recurring"].includes(order.orderType) ? "awaiting_provider" : "not_required",
+              paymentDueAt: null } : {}),
             reassignment,
           },
         },
@@ -133,11 +139,13 @@ export const requestProviderReassignment = async (
     await createNotificationRecord({
       userId: result.customerId,
       type: "ORDER",
-      title: "Kỹ thuật viên không thể tiếp tục đơn hàng",
-      content: `Kỹ thuật viên đã hủy đơn ${result.orderCode}. Vui lòng chọn tìm kỹ thuật viên khác hoặc hủy đơn để được hoàn tiền.`,
+      title: result.inspectionRequired ? "Đang tìm thợ thay thế" : "Kỹ thuật viên không thể tiếp tục đơn hàng",
+      content: result.inspectionRequired
+        ? `Thợ không thể tiếp tục đơn ${result.orderCode} trước khi báo giá. Handigo đang tự tìm thợ khác; nếu không có thợ nhận, bạn được hoàn 100% tiền cọc.`
+        : `Kỹ thuật viên đã hủy đơn ${result.orderCode}. Vui lòng chọn tìm kỹ thuật viên khác hoặc hủy đơn để được hoàn tiền.`,
       data: {
         orderId: result._id,
-        action: "order_reassignment_required",
+        action: result.inspectionRequired ? "order_reassignment_matching" : "order_reassignment_required",
         expiresAt: result.reassignment?.expiresAt,
       },
     });
@@ -145,7 +153,17 @@ export const requestProviderReassignment = async (
     reassignmentLogger.error("Không thể gửi thông báo đổi kỹ thuật viên.", error, { orderId });
   }
 
-  return result;
+  if (result.inspectionRequired && result.reassignment?.status === "matching") {
+    emitToUser(result.customerId.toString(), "order:updated", { orderId });
+    try {
+      await DispatchService.dispatchReadyOrder(orderId);
+    } catch (error) {
+      // Bộ quét điều phối sẽ thử lại các đơn đã sẵn sàng sau khi khởi động lỗi.
+      reassignmentLogger.error("Chưa thể khởi động tìm thợ thay thế cho đơn báo giá.", error, { orderId });
+    }
+  }
+
+  return (await Order.findById(orderId)) || result;
 };
 
 export const requestDirectProviderReassignment = async (

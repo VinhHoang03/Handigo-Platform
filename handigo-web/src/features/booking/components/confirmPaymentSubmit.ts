@@ -28,6 +28,11 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
 
   const isCleaning = isAirConditionerCleaning(service) && !params.hasServiceOptions;
 
+  if (!params.policyAccepted) {
+    setPaymentError('Vui lòng đọc và đồng ý với chính sách Handigo trước khi đặt đơn.');
+    return;
+  }
+
   if (!serviceId) {
     showSystemAlert('Vui lòng chọn dịch vụ trước khi thanh toán.', {
       title: 'Chưa chọn dịch vụ',

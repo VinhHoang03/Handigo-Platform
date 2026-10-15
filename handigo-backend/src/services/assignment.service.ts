@@ -328,140 +328,7 @@ export const AssignmentService = {
 
     await assertProviderWalletEligible(provider.userId);
 
-    if (assignment.assignmentType === "appointment") {
-      if (!assignedOrder || !assignedOrder.scheduledAt || assignedOrder.status !== "created") {
-        throw new AppError("Lịch hẹn không còn khả dụng.", 409);
-      }
-      const hasInitialPayment = ["paid", "partially_paid"].includes(assignedOrder.paymentStatus)
-        || (assignedOrder.paymentMethod === "cash" && await Payment.exists({
-          orderId: assignedOrder._id, method: "cash", status: "pending", isDeleted: false,
-        }));
-      if (!hasInitialPayment) {
-        throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
-      }
-
-      const appointmentOrders = assignedOrder.recurringGroupId
-        ? await Order.find({
-            recurringGroupId: assignedOrder.recurringGroupId,
-            status: "created",
-            isDeleted: false,
-          }).select("scheduledAt")
-        : [assignedOrder];
-      for (const appointmentOrder of appointmentOrders) {
-        if (!appointmentOrder.scheduledAt) continue;
-        const conflictStart = new Date(
-          appointmentOrder.scheduledAt.getTime() - 60 * 60 * 1000,
-        );
-        const slotEnd = new Date(
-          appointmentOrder.scheduledAt.getTime() + 60 * 60 * 1000,
-        );
-        const hasConflict = await Order.exists({
-          _id: { $nin: appointmentOrders.map((item) => item._id) },
-          providerId: provider._id,
-          status: { $in: ["accepted", "in_progress"] },
-          scheduledAt: { $gt: conflictStart, $lt: slotEnd },
-          isDeleted: false,
-        });
-        if (hasConflict) {
-          throw new AppError(
-            `Bạn đã có lịch vào ${appointmentOrder.scheduledAt.toLocaleString("vi-VN")}.`,
-            409,
-          );
-        }
-      }
-
-      const respondedAt = new Date();
-      const claimedAssignment = await OrderAssignment.findOneAndUpdate(
-        {
-          _id: assignment._id,
-          providerId: provider._id,
-          status: "pending",
-          responseDeadline: { $gt: respondedAt },
-          isDeleted: false,
-        },
-        { $set: { status: "accepted", respondedAt } },
-        { returnDocument: "after", runValidators: true },
-      );
-      if (!claimedAssignment) {
-        throw new AppError("Yêu cầu lịch hẹn không còn khả dụng.", 409);
-      }
-
-      const order = await Order.findOneAndUpdate(
-        { _id: assignment.orderId, status: "created", providerId: null },
-        {
-          $set: {
-            providerId: provider._id,
-            status: "accepted",
-            bookingStatus: "confirmed",
-            ...(assignedOrder.reassignment?.status === "matching" ? { "reassignment.status": "matched" } : {}),
-            paymentDueAt: null,
-            readyForMatching: false,
-          },
-        },
-        { returnDocument: "after", runValidators: true },
-      );
-      if (!order) {
-        await OrderAssignment.findByIdAndUpdate(claimedAssignment._id, {
-          $set: { status: "cancelled" },
-        });
-        emitToUser(providerUserId, "assignment:closed", {
-          assignmentId: assignment._id.toString(),
-          reason: "accepted_by_other",
-        });
-        throw new AppError("Lịch hẹn vừa được xử lý bởi yêu cầu khác.", 409);
-      }
-
-      if (assignedOrder.recurringGroupId) {
-        await Order.updateMany(
-          {
-            _id: { $ne: order._id },
-            recurringGroupId: assignedOrder.recurringGroupId,
-            status: "created",
-            providerId: null,
-          },
-          {
-            $set: {
-              providerId: provider._id,
-              status: "accepted",
-              bookingStatus: "reserved",
-              paymentDueAt: null,
-              readyForMatching: false,
-            },
-          },
-          { runValidators: true },
-        );
-      }
-
-      emitToUser(order.customerId.toString(), "order:updated", {
-        orderId: order._id.toString(),
-        recurringGroupId: order.recurringGroupId?.toString(),
-      });
-
-      await closeCompetingAssignments(
-        assignment.orderId,
-        claimedAssignment._id as Types.ObjectId,
-      );
-
-      emitToUser(providerUserId, "assignment:closed", {
-        assignmentId: assignment._id.toString(),
-        reason: "accepted",
-      });
-      await createNotificationRecord({
-        userId: order.customerId,
-        type: "ORDER",
-        title: assignedOrder.recurringGroupId
-          ? "Chuyên gia đã nhận chuỗi lịch"
-          : "Chuyên gia đã nhận lịch",
-        content: `Chuyên gia đã nhận đơn ${order.orderCode} và sẽ thực hiện theo lịch hẹn.`,
-        data: { orderId: order._id },
-      });
-
-      return {
-        assignment: claimedAssignment,
-        order,
-      };
-    }
-
+    const isAppointment = assignment.assignmentType === "appointment";
     const policy = await getBookingPolicy();
     const session = await mongoose.startSession();
     let result: AcceptAssignmentResult | null = null;
@@ -472,10 +339,13 @@ export const AssignmentService = {
           _id: assignment.orderId,
           status: "created",
           providerId: null,
-          readyForMatching: true,
+          ...(!isAppointment && { readyForMatching: true }),
           isDeleted: false,
         }).session(session);
         if (!order) throw new AppError("Đơn hàng không còn khả dụng để nhận.", 409);
+        if (isAppointment && !order.scheduledAt) {
+          throw new AppError("Lịch hẹn không còn khả dụng.", 409);
+        }
 
         const hasInitialPayment = ["paid", "partially_paid"].includes(order.paymentStatus)
           || (order.paymentMethod === "cash" && await Payment.exists({
@@ -494,7 +364,16 @@ export const AssignmentService = {
           expectedStartAt,
           expectedEndAt: new Date(expectedStartAt.getTime() + durationMinutes * 60000),
         };
-        await assertProviderSchedule(lockedProvider._id as Types.ObjectId, [order], session, policy);
+        const isReplacement = order.reassignment?.status === "matching";
+        const appointmentOrders = isAppointment && order.recurringGroupId && !isReplacement
+          ? await Order.find({
+              recurringGroupId: order.recurringGroupId,
+              status: "created",
+              providerId: null,
+              isDeleted: false,
+            }).session(session)
+          : [order];
+        await assertProviderSchedule(lockedProvider._id as Types.ObjectId, appointmentOrders, session, policy);
 
         const respondedAt = new Date();
         const claimedAssignment = await OrderAssignment.findOneAndUpdate(
@@ -514,8 +393,30 @@ export const AssignmentService = {
         order.status = "accepted";
         if (order.reassignment?.status === "matching") order.reassignment.status = "matched";
         order.readyForMatching = false;
-        lockedProvider.availabilityStatus = "busy";
-        await lockedProvider.save({ session });
+        if (isAppointment) {
+          order.bookingStatus = "confirmed";
+          order.paymentDueAt = null;
+          if (order.recurringGroupId && !isReplacement) {
+            await Order.updateMany(
+              {
+                _id: { $in: appointmentOrders.map((item) => item._id).filter((id) => id.toString() !== order._id.toString()) },
+                status: "created",
+                providerId: null,
+              },
+              { $set: {
+                providerId: lockedProvider._id,
+                status: "accepted",
+                bookingStatus: "reserved",
+                paymentDueAt: null,
+                readyForMatching: false,
+              } },
+              { session, runValidators: true },
+            );
+          }
+        } else {
+          lockedProvider.availabilityStatus = "busy";
+          await lockedProvider.save({ session });
+        }
         await order.save({ session });
         return { assignment: claimedAssignment, order };
       }) ?? null;
@@ -533,8 +434,10 @@ export const AssignmentService = {
       await createNotificationRecord({
         userId: result.order.customerId,
         type: "ORDER",
-        title: "Chuyên gia đã nhận đơn",
-        content: `Chuyên gia đã nhận đơn ${result.order.orderCode}.`,
+        title: isAppointment
+          ? (result.order.recurringGroupId ? "Chuyên gia đã nhận chuỗi lịch" : "Chuyên gia đã nhận lịch")
+          : "Chuyên gia đã nhận đơn",
+        content: `Chuyên gia đã nhận đơn ${result.order.orderCode}.${isAppointment ? " Chuyên gia sẽ thực hiện theo lịch hẹn." : ""}`,
         data: { orderId: result.order._id },
       });
     } catch (error) {

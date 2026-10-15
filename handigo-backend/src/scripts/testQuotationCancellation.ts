@@ -12,6 +12,7 @@ import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { QUOTATION_DECLINED_REASON, isQuotationDeclinedReason } from "../services/refundPolicy.service";
+import { DEFAULT_REFUND_POLICY } from "../validations/refundPolicy.validator";
 
 // Cô lập cấu hình và dịch vụ ngoài; không đọc bí mật hoặc truy cập database.
 function stubModule(path: string, exports: object) {
@@ -20,9 +21,10 @@ function stubModule(path: string, exports: object) {
 stubModule("../configs/payos.config", { payos: {}, payoutPayos: {} });
 stubModule("../services/notification.service", { createNotificationRecord: async () => {}, emitRealtimeNotification: () => {} });
 stubModule("../sockets/socketServer", { emitToUser: () => {} });
-stubModule("../services/systemConfig.service", { getBookingPolicy: async () => ({}) });
+stubModule("../services/systemConfig.service", { getBookingPolicy: async () => ({}), getRefundPolicy: async () => DEFAULT_REFUND_POLICY });
+let reassignmentRequests = 0;
 stubModule("../services/orderReassignment.service", {
-  requestProviderReassignment: () => { throw new Error("Không được tìm thợ thay thế khi khách từ chối báo giá."); },
+  requestProviderReassignment: async () => { reassignmentRequests++; return {} as any; },
 });
 stubModule("../services/providerSchedule.service", { lockProviderSchedule: async () => {} });
 stubModule("../services/providerWalletEligibility.service", {});
@@ -32,7 +34,7 @@ stubModule("../services/wallet.service", {});
 stubModule("../services/dispatch.service", {});
 stubModule("../services/address.service", {});
 stubModule("../services/matching.service", {});
-stubModule("../services/voucher.service", {});
+stubModule("../services/voucher.service", { releaseVoucherReservation: async () => {} });
 const { OrderService } = require("../services/order.service") as typeof import("../services/order.service");
 const { AssignmentService } = require("../services/assignment.service") as typeof import("../services/assignment.service");
 
@@ -42,10 +44,11 @@ function query(value: unknown): any {
     session: () => query(value), select: () => query(value), lean: () => query(value) };
 }
 
-async function testCancellation(method: string, fee = 0, invalid?: string) {
+async function testCancellation(method: string, fee = 0, invalid?: string,
+  actor: "customer" | "provider" = "provider", hasQuotation = true) {
   const provider = { _id: new Types.ObjectId(), userId: new Types.ObjectId() };
   const order: any = { _id: new Types.ObjectId(), customerId: new Types.ObjectId(),
-    providerId: provider._id, currentQuotationId: null, orderCode: "KIEM-THU",
+    providerId: provider._id, currentQuotationId: hasQuotation ? new Types.ObjectId() : null, orderCode: "KIEM-THU",
     status: "accepted", orderType: "normal", inspectionRequired: true, depositAmount: 40000 };
   const payment: any = { _id: new Types.ObjectId(), orderId: order._id, customerId: order.customerId,
     method, status: "paid", paymentType: "inspection_deposit", amount: 40000 + fee, compensatedToProviderId: null };
@@ -56,6 +59,7 @@ async function testCancellation(method: string, fee = 0, invalid?: string) {
   if (invalid === "completed") order.status = "completed";
   if (invalid === "in_progress") order.status = "in_progress";
   if (invalid === "ownership") order.providerId = new Types.ObjectId();
+  if (invalid === "unassigned") { order.status = "created"; order.providerId = null; }
   const session = { withTransaction: async (callback: () => Promise<void>) => callback(), endSession: async () => {} };
   mock.method(mongoose, "startSession", async () => session);
   mock.method(Order, "findById", () => query(order));
@@ -90,17 +94,18 @@ async function testCancellation(method: string, fee = 0, invalid?: string) {
   mock.method(WalletTransaction, "create", async (documents: any[], options: any) => {
     assert.equal(options.session, session); entries.push(...documents); return documents;
   });
-  const cancel = () => OrderService.cancelOrder(order._id.toString(), provider.userId.toString(), "provider", `${QUOTATION_DECLINED_REASON}: Khách không sửa nữa`);
-  if (invalid && invalid !== "unpaid") {
+  const cancel = () => OrderService.cancelOrder(order._id.toString(),
+    actor === "customer" ? order.customerId.toString() : provider.userId.toString(), actor, "Không thể sửa chữa hoặc thực hiện dịch vụ");
+  if (invalid && !["unpaid", "unassigned"].includes(invalid)) {
     await assert.rejects(cancel(), (error: any) => error.statusCode === (invalid === "ownership" ? 403 : 400));
     assert.equal(wallet.balance, 100000);
     assert.equal(entries.length, 0);
   } else {
     await cancel();
     assert.equal(order.status, "cancelled");
-    const expectedCompensation = invalid === "unpaid" ? 0 : 40000 + fee;
+    const expectedCompensation = ["unpaid", "unassigned"].includes(invalid ?? "") ? 0 : 40000 + fee;
     assert.equal(wallet.balance, 100000 + expectedCompensation);
-    assert.equal(customerWallet.balance, 0);
+    assert.equal(customerWallet.balance, invalid === "unassigned" ? 40000 + fee : 0);
     assert.equal(order.cancellation.refundPolicy.providerCompensation, expectedCompensation);
     assert.equal(order.cancellation.refundPolicy.platformRetainedAmount, 0);
     assert.equal(entries.filter((entry) => entry.type === "provider_earning").length, expectedCompensation ? 1 : 0);
@@ -140,8 +145,19 @@ async function run() {
   assert.equal(isQuotationDeclinedReason("Lý do khác: Khách hàng không đồng ý báo giá"), false);
   for (const method of ["wallet", "payos"]) await testCancellation(method);
   await testCancellation("wallet", 20000);
+  await testCancellation("wallet", 0, undefined, "customer", false);
+  await testCancellation("payos", 0, undefined, "customer");
+  await testCancellation("wallet", 0, "unassigned", "customer", false);
   for (const invalid of ["unpaid", "completed", "ownership", "in_progress"]) await testCancellation("wallet", 0, invalid);
   await testQuotationAmount();
+  for (const orderType of ["normal", "urgent", "scheduled", "recurring"]) {
+    const order = new Order({ status: "accepted", orderType, inspectionRequired: true });
+    mock.method(Order, "findById", () => query(order));
+    const before = reassignmentRequests;
+    await OrderService.cancelOrder(order.id, new Types.ObjectId().toString(), "provider", QUOTATION_DECLINED_REASON);
+    assert.equal(reassignmentRequests, before + 1, "Thợ hủy trước báo giá phải đi qua điều phối thay thế, kể cả lý do khách không đồng ý giá.");
+    mock.restoreAll();
+  }
   console.log("Đã kiểm tra hoàn đủ cọc, không cộng trùng, quyền hủy, điều kiện thanh toán và tổng báo giá lớn hơn cọc.");
 }
 run().catch((error) => { mock.restoreAll(); console.error(error); process.exitCode = 1; });

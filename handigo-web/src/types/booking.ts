@@ -216,6 +216,7 @@ export interface Order {
   inspectionRequired?: boolean;
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
+  currentQuotationId?: string | null;
   quotationFinalAmount?: number;
   pricing: OrderPricing;
   promotionSnapshot?: OrderDiscountSnapshot | null;
