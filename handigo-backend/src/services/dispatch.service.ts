@@ -113,17 +113,12 @@ export async function getMaxMatchingDurationSeconds(): Promise<number> {
 }
 
 async function cancelUnmatchedOrder(orderId: string, reason: string) {
-  const order = await Order.findById(orderId).select("status recurringGroupId");
+  const order = await Order.findById(orderId).select("status recurringGroupId reassignment");
   if (!order || order.status !== "created") {
     return false;
   }
 
-  await Order.updateOne(
-    { _id: orderId, "reassignment.status": "matching" },
-    { $set: { "reassignment.status": "failed" } },
-    { runValidators: true },
-  );
-  const orderIds = order.recurringGroupId
+  const orderIds = order.recurringGroupId && !order.reassignment?.automatic
     ? await Order.find({
       recurringGroupId: order.recurringGroupId,
       status: "created",
@@ -151,7 +146,7 @@ async function getDispatchContext(
   );
   if (!address) return null;
 
-  const scheduledDates = order.recurringGroupId
+  const scheduledDates = order.recurringGroupId && !order.reassignment?.automatic
     ? (await Order.find({
       recurringGroupId: order.recurringGroupId,
       status: "created",
@@ -224,18 +219,30 @@ async function sendAssignmentBatch(
   ctx: DispatchContext,
   batchNumber: number,
   deadline: Date,
+  reuseClosedAssignments = false,
 ) {
   const isAppointment = Boolean(ctx.scheduledDates?.length);
   const assignedAt = new Date();
-  const createAssignment = (candidate: ProviderCandidate) =>
-    OrderAssignment.create({
+  const createAssignment = async (candidate: ProviderCandidate) => {
+    const data = {
       orderId: new Types.ObjectId(orderId),
       providerId: candidate.providerId,
-      assignmentType: isAppointment ? "appointment" : "dispatch",
-      status: "pending",
+      assignmentType: isAppointment ? "appointment" as const : "dispatch" as const,
+      status: "pending" as const,
       assignedAt,
       responseDeadline: deadline,
-    });
+    };
+    if (reuseClosedAssignments) {
+      const existing = await OrderAssignment.findOneAndUpdate(
+        { orderId: data.orderId, providerId: data.providerId,
+          status: { $in: ["cancelled", "rejected", "timeout"] }, isDeleted: false },
+        { $set: { ...data, respondedAt: null, rejectReason: null } },
+        { new: true, runValidators: true },
+      );
+      if (existing) return existing;
+    }
+    return OrderAssignment.create(data);
+  };
 
   const [firstCandidate, ...remainingCandidates] = candidates;
   if (!firstCandidate) return;
@@ -496,7 +503,8 @@ export const DispatchService = {
     });
     if (hasPendingAssignment) return;
 
-    const matchingDeadline = new Date(
+    const isAutomaticReplacement = order.reassignment?.status === "matching" && order.reassignment.automatic;
+    const matchingDeadline = isAutomaticReplacement ? order.matchingSearch.expiresAt : new Date(
       (order.matchingStartedAt || order.createdAt).getTime() +
       maxMatchingDurationSeconds * 1000,
     );
@@ -512,7 +520,7 @@ export const DispatchService = {
     const maxAttempts = isDirectReplacement
       ? MAX_DIRECT_PROVIDER_ATTEMPTS
       : maxMatchingAttempts;
-    if (triedProviderIds.length >= maxAttempts) {
+    if (!isAutomaticReplacement && triedProviderIds.length >= maxAttempts) {
       await cancelUnmatchedOrder(
         orderId,
         `Không có provider nhận đơn sau ${maxMatchingAttempts} lượt matching.`,
@@ -524,7 +532,7 @@ export const DispatchService = {
       return;
     }
 
-    const candidateLimit = isDirectReplacement
+    const candidateLimit = isAutomaticReplacement ? matchingBatchSize : isDirectReplacement
       ? 1
       : Math.min(
         matchingBatchSize,
@@ -567,6 +575,7 @@ export const DispatchService = {
       ctx,
       batchNumber,
       deadline,
+      Boolean(isAutomaticReplacement),
     );
   },
 
@@ -580,7 +589,7 @@ export const DispatchService = {
     ctx: DispatchContext,
   ): Promise<void> {
     const assignment = await OrderAssignment.findOneAndUpdate(
-      { _id: assignmentId, status: "pending" },
+      { _id: assignmentId, status: "pending", responseDeadline: { $lte: new Date() } },
       {
         $set: {
           status: "timeout",

@@ -132,7 +132,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
             ? 'INSPECTION_DEPOSIT'
             : 'FULL',
         returnUrl: `${window.location.origin}/customer/bookings/result?orderId=${orderId}&payos=success`,
-        cancelUrl: `${window.location.origin}/customer/bookings/result?orderId=${orderId}&payos=cancel`,
+        cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
       });
 
       if (payment.payment.status === 'paid') {

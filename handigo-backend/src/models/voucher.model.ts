@@ -20,6 +20,7 @@ export interface IVoucher extends Document, IBaseDocument {
   perUserLimit: number;
   startAt: Date;
   endAt: Date;
+  neverExpires?: boolean;
   status: "ACTIVE" | "INACTIVE" | "EXPIRED" | "active" | "inactive" | "expired";
 }
 
@@ -43,6 +44,7 @@ const VoucherSchema = new Schema<IVoucher>(
     perUserLimit: { type: Number, default: 1, min: 1 },
     startAt: { type: Date, required: true },
     endAt: { type: Date, required: true },
+    neverExpires: { type: Boolean },
     status: { type: String, enum: ["ACTIVE", "INACTIVE", "EXPIRED", "active", "inactive", "expired"], default: "ACTIVE" },
     ...baseFields,
   },

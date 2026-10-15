@@ -128,7 +128,7 @@ export const AgentBookingService = {
     return vouchers.map((voucher) => ({ code: voucher.code!, name: voucher.name,
       discountAmount: voucher.discountAmount ?? 0,
       finalAmount: Math.max(snapshot.bookingAmount - promotionDiscountAmount - (voucher.discountAmount ?? 0), 0),
-      minOrderAmount: voucher.minOrderAmount, endAt: voucher.endAt.toISOString(),
+      minOrderAmount: voucher.minOrderAmount, endAt: voucher.endAt.toISOString(), neverExpires: voucher.neverExpires ?? false,
     })).filter((voucher) => voucher.discountAmount > 0 && voucher.finalAmount >= 0)
       .sort((a, b) => b.discountAmount - a.discountAmount);
   },

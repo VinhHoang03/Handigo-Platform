@@ -6,6 +6,7 @@ import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Payment, IPayment } from "../models/payment.model";
 import { Promotion } from "../models/promotion.model";
+import { Voucher } from "../models/voucher.model";
 import { updateStoredVoucher } from "./voucherStore.service";
 import { releaseVoucherReservation } from "./voucher.service";
 import { releaseOrderPromotion } from "./promotion.service";
@@ -20,6 +21,7 @@ import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { createLogger } from "../utils/logger";
 import { buildTransactionCode } from "../utils/transaction";
 import { createNotificationRecord } from "./notification.service";
+import { emitToUser } from "../sockets/socketServer";
 import {
   calculateRefundPolicy,
   QUOTATION_DEPOSIT_POLICY_VERSION,
@@ -246,9 +248,10 @@ const refundWalletPayments = async (
   session: ClientSession,
 ) => {
   const refunded: WalletRefundResult[] = [];
+  const refundQrToWallet = order.reassignment?.automatic && order.reassignment.status === "failed";
   const payments = await Payment.find({
     orderId: order._id,
-    method: "wallet",
+    method: refundQrToWallet ? { $in: ["wallet", "payos"] } : "wallet",
     status: "paid",
   }).session(session);
 
@@ -280,7 +283,8 @@ const refundWalletPayments = async (
       order,
       refundAmount,
       "succeeded",
-      { completedAt: new Date(), sourceMethod: "wallet" },
+      { completedAt: new Date(), sourceMethod: payment.method,
+        ...(refundQrToWallet ? { channel: "handigo_wallet", destination: "handigo_wallet" } : {}) },
     );
 
     const claimedPayment = await Payment.findOneAndUpdate(
@@ -307,7 +311,7 @@ const refundWalletPayments = async (
     const wallet = await Wallet.findOneAndUpdate(
       { userId: payment.customerId, isDeleted: false },
       { $inc: { balance: refundAmount } },
-      { new: true, session },
+      { new: true, session, runValidators: true, upsert: payment.method === "payos" },
     );
 
     if (!wallet) {
@@ -331,7 +335,7 @@ const refundWalletPayments = async (
           metadata: {
             orderCode: order.orderCode,
             reason,
-            sourceMethod: "wallet",
+            sourceMethod: payment.method,
             policyVersion: refundMetadata.policyVersion,
             refundRate: refundMetadata.rate,
           },
@@ -924,7 +928,7 @@ const refundPayosPaymentToWallet = async (
                 sourceMethod: "payos",
                 destination: "handigo_wallet",
                 referenceId: "REFUND" + payment._id.toString(),
-                fallbackReason: "source_account_unavailable",
+                fallbackReason: order.reassignment?.automatic ? "replacement_unavailable" : "source_account_unavailable",
                 amount: refundAmount,
                 completedAt: now,
               },
@@ -977,7 +981,7 @@ const refundPayosPaymentToWallet = async (
               orderCode: order.orderCode,
               reason,
               sourceMethod: "payos",
-              fallbackReason: "source_account_unavailable",
+              fallbackReason: order.reassignment?.automatic ? "replacement_unavailable" : "source_account_unavailable",
             },
           },
         ],
@@ -1018,7 +1022,7 @@ const refundPayosPaymentToWallet = async (
         type: "PAYMENT",
         title: "Hoàn tiền thành công",
         content:
-          "PayOS không cung cấp tài khoản nguồn. Tiền đã được hoàn vào ví Handigo của bạn.",
+          "Tiền thanh toán QR đã được hoàn vào ví Handigo của bạn.",
         data: {
           orderId: order._id,
           paymentId: payment._id,
@@ -1052,6 +1056,10 @@ const requestPayosRefund = async (
   if (!refund) return;
 
   try {
+    if (order.reassignment?.automatic && order.reassignment.status === "failed" && !refund.payoutId) {
+      await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
+      return;
+    }
     if (refund.payoutId) {
       await reconcilePayosRefund(payment, refund, reason, refund.payoutId);
       return;
@@ -1298,7 +1306,9 @@ const notifyCancellation = async (
     userId: order.customerId,
     type: "ORDER",
     title: customerNotification.title,
-    content: customerNotification.content + (isQuotationDepositPolicy(order)
+    content: customerNotification.content + (order.reassignment?.automatic && order.reassignment.status === "failed"
+      ? " Bạn được tặng voucher giảm 10% không hết hạn, không yêu cầu giá trị đơn tối thiểu. Khoản đã thanh toán qua ví hoặc QR được hoàn về ví Handigo; tiền mặt không phát sinh hoàn tiền."
+      : "") + (isQuotationDepositPolicy(order)
       ? " Tiền cọc khảo sát được chuyển cho thợ, không hoàn lại cho khách."
       : ""),
     data: {
@@ -1439,6 +1449,9 @@ export const cancelOrderWithSettlement = async (
         cancellation.cancelledBy = new Types.ObjectId(input.actorId);
       }
 
+      const replacementFailed = input.system && input.systemCancellationType === "provider_unavailable"
+        && order.reassignment?.automatic && order.reassignment.status === "matching" && !order.inspectionRequired;
+
       const claimedOrder = await Order.findOneAndUpdate(
         {
           _id: order._id,
@@ -1449,6 +1462,7 @@ export const cancelOrderWithSettlement = async (
             status: "cancelled",
             readyForMatching: false,
             cancellation,
+            ...(replacementFailed ? { "reassignment.status": "failed" } : {}),
           },
         },
         {
@@ -1464,6 +1478,24 @@ export const cancelOrderWithSettlement = async (
 
       newlyCancelled = true;
       cancelledOrder = claimedOrder;
+      if (replacementFailed) {
+        // Cấp mã trong cùng giao dịch hủy đơn, mã theo đơn ngăn cấp trùng khi thử lại.
+        await Voucher.updateOne(
+          { code: `HDREPLACE${claimedOrder._id.toString().toUpperCase()}` },
+          { $setOnInsert: {
+            ownerId: claimedOrder.customerId,
+            code: `HDREPLACE${claimedOrder._id.toString().toUpperCase()}`,
+            name: "Ưu đãi 10% khi không tìm được thợ thay thế",
+            description: "Giảm 10% cho đơn giá cố định, không hết hạn, không yêu cầu giá trị đơn tối thiểu. Dùng một lần.",
+            discountType: "PERCENT", discountValue: 10, minOrderAmount: 0, maxDiscountAmount: null,
+            applicableOrderType: "fixed_price", usageLimit: 1, perUserLimit: 1,
+            isActive: true, status: "ACTIVE", neverExpires: true, startAt: cancelledAt,
+            // Giữ trường ngày cho client cũ; neverExpires quyết định hiệu lực vĩnh viễn.
+            endAt: new Date("9999-12-31T23:59:59.999Z"),
+          } },
+          { upsert: true, session, runValidators: true },
+        );
+      }
       await releaseVoucherReservation(claimedOrder._id, session);
 
       await OrderAssignment.updateMany(
@@ -1540,6 +1572,7 @@ export const cancelOrderWithSettlement = async (
   await settleCancelledOrderPayments(input.orderId, reason);
 
   if (newlyCancelled) {
+    emitToUser((cancelledOrder as IOrder).customerId.toString(), "order:updated", { orderId: input.orderId });
     try {
       await notifyCancellation(
         cancelledOrder,

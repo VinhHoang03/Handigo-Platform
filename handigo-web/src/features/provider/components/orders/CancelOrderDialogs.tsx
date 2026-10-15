@@ -61,6 +61,7 @@ export function CancellationDialog({
 }
 
 interface CancelConfirmationDialogProps {
+  willFindReplacement?: boolean;
   isAwaitingQuotation: boolean;
   reason: string;
   busy: boolean;
@@ -68,13 +69,15 @@ interface CancelConfirmationDialogProps {
   onConfirm: () => void;
 }
 
-export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm, isAwaitingQuotation }: CancelConfirmationDialogProps) {
+export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm, isAwaitingQuotation, willFindReplacement }: CancelConfirmationDialogProps) {
   return (
     <Modal open title="Xác nhận hủy đơn?" onClose={onBack} size="md" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error">
         <TriangleAlert aria-hidden="true" size={30} />
       </div>
-      <p className="mt-2 text-sm leading-6 text-on-surface-variant">Hành động này sẽ hủy đơn dịch vụ và thông báo cho khách hàng. Vui lòng kiểm tra lại trước khi xác nhận.</p>
+      <p className="mt-2 text-sm leading-6 text-on-surface-variant">{willFindReplacement
+        ? 'Bạn sẽ ngừng thực hiện đơn này. Handigo tự động tìm kỹ thuật viên thay thế và thông báo cho khách hàng.'
+        : 'Hành động này sẽ hủy đơn dịch vụ và thông báo cho khách hàng. Vui lòng kiểm tra lại trước khi xác nhận.'}</p>
       {(isAwaitingQuotation || reason === cancellationReasons[0]) && <p className="mt-2 text-sm text-on-surface-variant">Khi xác nhận hủy ở bước báo giá, tiền cọc đã thanh toán được chuyển vào ví bạn, không hoàn cho khách. Bạn không cần tạo báo giá để thực hiện thao tác này.</p>}
       <div className="mt-4 rounded-2xl bg-error/5 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-error">Lý do đã chọn</p>

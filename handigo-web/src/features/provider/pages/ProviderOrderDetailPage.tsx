@@ -183,6 +183,7 @@ export default function ProviderOrderDetailPage() {
       )}
       {cancelConfirmOpen && (
         <CancelConfirmationDialog
+          willFindReplacement={order.status === 'accepted' && !order.inspectionRequired}
           isAwaitingQuotation={Boolean(order.status === 'accepted' && order.inspectionRequired && !quotation?.quotation)}
           reason={cancelReason}
           busy={busy}

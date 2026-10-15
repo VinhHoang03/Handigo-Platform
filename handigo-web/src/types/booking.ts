@@ -131,6 +131,7 @@ export interface OrderDiscountSnapshot {
 }
 
 export interface OrderReassignment {
+  automatic?: boolean;
   status:
     | "awaiting_customer"
     | "matching"

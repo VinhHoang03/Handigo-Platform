@@ -21,7 +21,7 @@ type BookingRefundPanelProps = {
 /**
  * ⚠️ Đụng tiền — nút hủy đơn/chuỗi lịch và modal xác nhận dùng chung cho cả
  * xác nhận/từ chối báo giá lẫn hủy đơn (kèm xem trước chính sách hoàn tiền).
- * Giữ nguyên toàn bộ điều kiện disable, validate lý do hủy và hiển thị hoàn tiền gốc.
+ * Giữ nguyên điều kiện disable và validation lý do hủy.
  */
 export const BookingRefundPanel = ({
   order,
@@ -41,6 +41,9 @@ export const BookingRefundPanel = ({
   const isCancellationAction = pendingAction
     ? ["cancelOrder", "cancelSeries"].includes(pendingAction.type)
     : false;
+  const hideRefundPolicy = order.paymentMethod === "cash"
+    && order.status === "created"
+    && !order.providerId;
 
   return (
     <>
@@ -85,7 +88,7 @@ export const BookingRefundPanel = ({
               {actionDialogConfig.message}
             </p>
 
-            {isCancellationAction && cancellationPreview && (
+            {isCancellationAction && cancellationPreview && !hideRefundPolicy && (
               <BookingCancellationPreviewCard
                 cancellationPreview={cancellationPreview}
               />

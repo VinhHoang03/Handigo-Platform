@@ -17,7 +17,7 @@ export function RewardVoucherCard({ voucher }: { voucher: RewardVoucher }) {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
-  const expired = new Date(voucher.endAt).getTime() < now;
+  const expired = !voucher.neverExpires && new Date(voucher.endAt).getTime() < now;
   const inactive = !voucher.isActive || ["INACTIVE", "EXPIRED"].includes(voucher.status.toUpperCase());
   const used = voucher.usedCount > 0;
   const available = !used && !expired && !inactive;
@@ -59,7 +59,7 @@ export function RewardVoucherCard({ voucher }: { voucher: RewardVoucher }) {
         <h3 className="mt-3 text-[13px] font-semibold text-on-surface">{voucher.name}</h3>
         <p className="mt-2 text-[13px] leading-6 text-on-surface-variant">{voucher.applicableOrderType === "variable_price"
           ? "Mã áp dụng với đơn báo giá. Hiệu lực 30 ngày từ khi đổi."
-          : `Đơn giá cố định từ ${rewardMoney(voucher.minOrderAmount)}.`} Dùng một lần cho tài khoản của bạn.</p>
+          : voucher.minOrderAmount > 0 ? `Đơn giá cố định từ ${rewardMoney(voucher.minOrderAmount)}.` : "Đơn giá cố định, không yêu cầu giá trị đơn tối thiểu."} Dùng một lần cho tài khoản của bạn.</p>
         {voucher.maxDiscountAmount != null && <p className="mt-2 text-[13px] font-medium text-on-surface-variant">Giảm tối đa {rewardMoney(voucher.maxDiscountAmount)}.</p>}
         <div className="my-3 flex items-center gap-2 rounded-xl bg-surface-container-low p-3">
           <div className="min-w-0 flex-1">
@@ -69,7 +69,7 @@ export function RewardVoucherCard({ voucher }: { voucher: RewardVoucher }) {
           <button type="button" onClick={() => void copy()} aria-label={`Sao chép mã ${voucher.code}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-primary hover:bg-primary-fixed focus-visible:outline-2 focus-visible:outline-primary"><Copy aria-hidden="true" size={18} /></button>
         </div>
         <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-outline-variant pt-4">
-          <p className="text-xs text-on-surface-variant">Hạn dùng: {rewardDate(voucher.endAt)}</p>
+          <p className="text-xs text-on-surface-variant">Hạn dùng: {voucher.neverExpires ? "Không hết hạn" : rewardDate(voucher.endAt)}</p>
           {available && (voucher.reservedOrderId ? (
             <Link to={`/customer/bookings/${voucher.reservedOrderId}`} className="text-[13px] font-semibold text-primary underline underline-offset-4">Xem đơn đang dùng mã</Link>
           ) : (

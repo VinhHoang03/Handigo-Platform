@@ -145,13 +145,23 @@ export const useBookingDetailData = (id: string | undefined) => {
     socket.on('quotation:updated', onUpdated);
     socket.on('order:updated', onOrderUpdated);
     socket.on('connect', refreshOrder);
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) void refreshOrder();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refreshOrder();
+    };
     window.addEventListener('focus', refreshOrder);
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       disposed = true;
       socket.off('quotation:updated', onUpdated);
       socket.off('order:updated', onOrderUpdated);
       socket.off('connect', refreshOrder);
       window.removeEventListener('focus', refreshOrder);
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       dispose();
     };
   }, [id, recurringGroupId, updateOrder]);
@@ -179,6 +189,7 @@ export const useBookingDetailData = (id: string | undefined) => {
   return {
     order,
     setOrder,
+    updateOrder,
     recurringOrders,
     quotation,
     payments,
