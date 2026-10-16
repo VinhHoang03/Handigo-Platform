@@ -27,7 +27,7 @@ const readPinnedCategoryIds = () => {
 
 /**
  * Toàn bộ state + hành động của trang danh mục (tải danh sách, phân trang,
- * modal thêm/sửa, xóa). Tách khỏi `AdminCategoriesPage` để trang chính chỉ
+ * modal thêm/sửa, bật/tắt trạng thái). Tách khỏi `AdminCategoriesPage` để trang chính chỉ
  * còn lo bố cục.
  */
 export function useAdminCategoriesController() {
@@ -60,9 +60,10 @@ export function useAdminCategoriesController() {
   const [colorLoading, setColorLoading] = useState(false);
   const [colorError, setColorError] = useToastFeedback<string>('', "error");
   const colorRequestId = useRef(0);
-  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const statusRequest = useRef(new Set<string>());
+  const [statusBusy, setStatusBusy] = useState<string[]>([]);
 
-  const load = async (overridePage = page) => {
+  const load = async (overridePage = page): Promise<void> => {
     setLoading(true);
     setError('');
     try {
@@ -73,16 +74,20 @@ export function useAdminCategoriesController() {
           search: search.trim() || undefined,
           isActive: statusFilter || undefined,
         }),
-        categoryServiceApi.listServices({ page: 1, limit: 200 }),
+        categoryServiceApi.listAllServices(),
         categoryServiceApi.listServices({ page: 1, limit: 100, isActive: 'true' }),
       ]);
+      if (overridePage > Math.max(1, categoryResult.pagination.totalPages)) {
+        await load(Math.max(1, categoryResult.pagination.totalPages));
+        return;
+      }
       setCategories(categoryResult.items);
       setTotal(categoryResult.pagination.total);
       setTotalPages(categoryResult.pagination.totalPages);
       setPage(overridePage);
-      setServiceCounts(countServicesByCategory(serviceResult.items));
+      setServiceCounts(countServicesByCategory(serviceResult));
       setServicesByCategory(
-        serviceResult.items.reduce<Record<string, Service[]>>((groups, service) => {
+        serviceResult.reduce<Record<string, Service[]>>((groups, service) => {
           const categoryId = typeof service.categoryId === 'string' ? service.categoryId : service.categoryId?._id ?? '';
           if (categoryId) groups[categoryId] = [...(groups[categoryId] || []), service];
           return groups;
@@ -90,7 +95,7 @@ export function useAdminCategoriesController() {
       );
       setServiceStats({
         active: activeServiceResult.pagination.total,
-        total: serviceResult.pagination.total,
+        total: serviceResult.length,
       });
     } catch (err) {
       setError(getErrorMessage(err, 'Có lỗi xảy ra.'));
@@ -230,25 +235,59 @@ export function useAdminCategoriesController() {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    const target = deleteTarget;
-    setDeleteTarget(null);
-    setBusy(true);
-    setNotice('');
+  const toggleStatus = async (item: Category | Service, kind: 'category' | 'service') => {
+    const requestKey = `${kind}:${item._id}`;
+    if (statusRequest.current.has(requestKey)) return;
+    statusRequest.current.add(requestKey);
+    setStatusBusy([...statusRequest.current]);
     try {
-      await categoryServiceApi.deleteCategory(target._id);
-      addToast('Đã xóa danh mục.', 'success');
-      void load();
-    } catch (err) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 409) {
-        addToast('Không thể xóa danh mục vì danh mục vẫn còn dịch vụ.', 'error');
+      if (kind === 'category') {
+        const updated = await categoryServiceApi.updateCategory(item._id, { isActive: !item.isActive });
+        setCategories(current => current.map(category => category._id === updated._id ? updated : category));
+        setServicesByCategory(current => ({
+          ...current,
+          [updated._id]: (current[updated._id] ?? []).map(service => ({
+            ...service,
+            categoryId: typeof service.categoryId === 'object' && service.categoryId
+              ? { ...service.categoryId, isActive: updated.isActive }
+              : service.categoryId,
+          })),
+        }));
+        const leavesFilter = statusFilter && String(updated.isActive) !== statusFilter;
+        const nextTotal = Math.max(0, total - (leavesFilter ? 1 : 0));
+        const nextPage = Math.min(page, Math.max(1, Math.ceil(nextTotal / LIMIT)));
+        if (leavesFilter) {
+          setCategories(current => current.filter(category => category._id !== updated._id));
+          setTotal(nextTotal);
+          setTotalPages(Math.ceil(nextTotal / LIMIT));
+          setPage(nextPage);
+        }
+        try {
+          const result = await categoryServiceApi.listCategories({
+            page: nextPage, limit: LIMIT, search: search.trim() || undefined, isActive: statusFilter || undefined,
+          });
+          setCategories(result.items);
+          setTotal(result.pagination.total);
+          setTotalPages(result.pagination.totalPages);
+        } catch (err) {
+          addToast(getErrorMessage(err, 'Đã đổi trạng thái nhưng chưa thể cập nhật thứ tự danh sách.'), 'error');
+        }
       } else {
-        addToast(getErrorMessage(err, 'Không thể xóa danh mục.'), 'error');
+        const updated = await categoryServiceApi.updateService(item._id, { isActive: !item.isActive });
+        setServicesByCategory(current => Object.fromEntries(Object.entries(current).map(([categoryId, services]) => [
+          categoryId,
+          services.map(service => service._id === updated._id
+            ? { ...service, ...updated, categoryId: service.categoryId }
+            : service),
+        ])));
+        setServiceStats(current => ({ ...current, active: current.active + Number(updated.isActive) - Number(item.isActive) }));
       }
+      addToast(item.isActive ? 'Đã ngừng hoạt động.' : 'Đã bật hoạt động.', 'success');
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Không thể cập nhật trạng thái.'), 'error');
     } finally {
-      setBusy(false);
+      statusRequest.current.delete(requestKey);
+      setStatusBusy([...statusRequest.current]);
     }
   };
 
@@ -288,13 +327,12 @@ export function useAdminCategoriesController() {
       .map((category) => [category.iconColor!.toLowerCase(), category.name])),
     reloadIconColors: () => void loadIconColors(editing?._id),
     setForm,
-    deleteTarget,
-    setDeleteTarget,
+    statusBusy,
+    toggleStatus,
     reload: load,
     changePage,
     openCreate,
     openEdit,
     save,
-    confirmDelete,
   };
 }

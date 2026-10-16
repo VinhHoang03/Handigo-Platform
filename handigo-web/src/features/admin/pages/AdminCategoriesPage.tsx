@@ -1,10 +1,9 @@
+import { CatalogStatusPill } from "../components/categories/CatalogStatusPill";
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
-import { CircleAlert, Image as ImageIcon, ListPlus, Pencil, PlusCircle, Trash2, Wrench } from "lucide-react";
+import { CircleAlert, Image as ImageIcon, ListPlus, Pencil, PlusCircle, Wrench } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
-import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { DataTable } from "@/components/common/dashboard/DataTable";
@@ -28,21 +27,26 @@ function CategoryServicesDropdown({
   optionCounts,
   optionsLoading,
   onEditService,
-  onDeleteService,
+  onToggleService,
+  statusBusy,
+  categoryActive,
 }: {
   services: Service[];
   optionCounts: Record<string, number>;
   optionsLoading: boolean;
   onEditService: (service: Service) => void;
-  onDeleteService: (service: Service) => void;
+  onToggleService: (service: Service) => void;
+  statusBusy: string[];
+  categoryActive: boolean;
 }) {
   return (
     <div className="-mt-2 space-y-2">
+      {!categoryActive && <p className="px-3 py-2 text-sm text-on-surface-variant">Danh mục đang ngừng hoạt động. Dịch vụ bên dưới giữ trạng thái riêng nhưng chưa hiển thị cho khách hàng và chưa thể đặt mới.</p>}
       {services.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant p-4 text-sm text-on-surface-variant">Danh mục chưa có dịch vụ.</p>
       ) : (
         <div className="space-y-3">
-          {services.map((service) => {
+          {[...services].sort((a, b) => Number(b.isActive) - Number(a.isActive)).map((service) => {
             const price = service.fixedPrice ?? service.minOptionPrice ?? service.depositAmount;
             return (
               <div key={service._id} onClick={() => onEditService(service)} className="group relative mx-3 flex w-full min-w-[62rem] cursor-pointer items-center gap-5 rounded-xl border border-outline-variant bg-surface-container-lowest px-5 py-3 shadow-sm transition-colors hover:border-primary/50 hover:bg-surface-container-high sm:mx-5">
@@ -68,12 +72,9 @@ function CategoryServicesDropdown({
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Cập nhật</small><strong className="font-medium text-on-surface-variant">{service.updatedAt ? serviceDateFormatter.format(new Date(service.updatedAt)) : '—'}</strong></span>
                 </div>
                 <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-                  <StatusBadge value={service.isActive ? 'active' : 'hidden'} />
+                  <CatalogStatusPill name={service.name} active={service.isActive} busy={statusBusy.includes(`service:${service._id}`)} onToggle={() => onToggleService(service)} />
                   <button type="button" onClick={(event) => { event.stopPropagation(); onEditService(service); }} className="rounded-lg p-2 text-on-surface-variant hover:bg-primary/10 hover:text-primary" aria-label="Sửa dịch vụ">
                     <Pencil aria-hidden="true" size={20} />
-                  </button>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); onDeleteService(service); }} className="rounded-lg p-2 text-on-surface-variant hover:bg-error/10 hover:text-error" aria-label="Xóa dịch vụ">
-                    <Trash2 aria-hidden="true" size={20} />
                   </button>
                 </div>
               </div>
@@ -96,7 +97,6 @@ export default function AdminCategoriesPage() {
   const [optionForm, setOptionForm] = useState<OptionForm>(emptyOptionForm);
   const [editingOption, setEditingOption] = useState<ServiceOption | null>(null);
   const [optionFormError, setOptionFormError] = useToastFeedback<string>('', "error");
-  const [serviceDeleteTarget, setServiceDeleteTarget] = useState<Service | null>(null);
   const [serviceBusy, setServiceBusy] = useState(false);
 
   const openEditService = (service: Service) => {
@@ -190,25 +190,10 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const confirmDeleteService = async () => {
-    if (!serviceDeleteTarget) return;
-    const target = serviceDeleteTarget;
-    setServiceDeleteTarget(null);
-    setServiceBusy(true);
-    try {
-      await categoryServiceApi.deleteService(target._id);
-      addToast('Đã xóa dịch vụ.', 'success');
-      await c.reload();
-    } catch (error) {
-      addToast(error instanceof Error ? error.message : 'Không thể xóa dịch vụ.', 'error');
-    } finally {
-      setServiceBusy(false);
-    }
-  };
-
   const sortedCategories = useMemo(
     () =>
       [...c.categories].sort((a, b) => {
+        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
         const aPinned = c.pinnedIds.includes(a._id);
         const bPinned = c.pinnedIds.includes(b._id);
         if (aPinned !== bPinned) return aPinned ? -1 : 1;
@@ -219,21 +204,17 @@ export default function AdminCategoriesPage() {
     [c.categories, c.pinnedIds, c.sortOrder],
   );
 
-  const columns = useMemo(
-    () =>
-      buildCategoryTableColumns({
+  const columns = buildCategoryTableColumns({
         serviceCounts: c.serviceCounts,
         onEdit: c.openEdit,
-        onDelete: c.setDeleteTarget,
+        onToggleStatus: (category) => void c.toggleStatus(category, 'category'),
+        statusBusy: c.statusBusy,
         pinnedIds: c.pinnedIds,
         onTogglePin: c.togglePinned,
         onCreateService: openCreateService,
         expandedId: c.expandedId,
         onToggleExpand: c.toggleExpanded,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [c.serviceCounts, c.pinnedIds, c.expandedId],
-  );
+      });
 
   return (
     <DashboardShell role="ADMIN">
@@ -289,7 +270,9 @@ export default function AdminCategoriesPage() {
                 optionCounts={c.optionCounts}
                 optionsLoading={c.optionsLoadingId === category._id}
                 onEditService={openEditService}
-                onDeleteService={setServiceDeleteTarget}
+                onToggleService={(service) => void c.toggleStatus(service, 'service')}
+                statusBusy={c.statusBusy}
+                categoryActive={category.isActive}
               />
             )}
             emptyState={
@@ -402,23 +385,6 @@ export default function AdminCategoriesPage() {
         onSubmit={saveOption}
       />
 
-      <ConfirmDialog
-        open={Boolean(serviceDeleteTarget)}
-        title="Xóa dịch vụ"
-        message={`Bạn chắc chắn muốn xóa dịch vụ "${serviceDeleteTarget?.name || ''}"?`}
-        busy={serviceBusy}
-        onCancel={() => setServiceDeleteTarget(null)}
-        onConfirm={confirmDeleteService}
-      />
-
-      <ConfirmDialog
-        open={Boolean(c.deleteTarget)}
-        title="Xóa danh mục"
-        message={`Bạn chắc chắn muốn xóa danh mục "${c.deleteTarget?.name}"? Hành động này không thể khôi phục.`}
-        busy={c.busy}
-        onCancel={() => c.setDeleteTarget(null)}
-        onConfirm={c.confirmDelete}
-      />
     </DashboardShell>
   );
 }
