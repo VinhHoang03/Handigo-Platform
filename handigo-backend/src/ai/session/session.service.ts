@@ -29,6 +29,19 @@ export interface SessionStore {
 }
 
 export class SessionService implements SessionStore {
+  async registerAttachment(id: string, userId: string, url: string) {
+    const { session, lockId } = await this.acquire(id, userId);
+    try {
+      if (session.requiresReconciliation || session.activeRequest || session.pendingAction
+        && session.pendingAction.tool !== "create_booking") throw new AppError("Vui lòng xử lý yêu cầu đang chờ trước khi tải ảnh.", 409);
+      const urls = session.uploadedAttachments ?? [];
+      if (urls.length >= 20) throw new AppError("Cuộc trò chuyện đã đạt giới hạn tải 20 ảnh. Vui lòng bắt đầu tác vụ mới.", 409);
+      session.uploadedAttachments = [...urls, url];
+      await this.save(session, lockId);
+      return { url };
+    } finally { await this.release(id, lockId); }
+  }
+
   async list(userId: string, page: number, limit: number) {
     const [documents, total] = await Promise.all([
       SessionModel.find({ userId }).sort({ updatedAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)

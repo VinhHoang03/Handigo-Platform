@@ -1,4 +1,5 @@
 export interface BookingPolicies {
+  version?: string;
   paymentHoldMinutes: number;
   matching: {
     initialRadiusKm: number;

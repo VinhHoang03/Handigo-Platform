@@ -2,6 +2,11 @@ import api from "@/api/client";
 import { unwrap } from "@/api/response";
 import type { AgentRequest, AgentSession, AgentProgress, AgentSessionHistory } from "../types/agent.types";
 export const agentApi = {
+  uploadAttachment: async (sessionId: string, file: File) => {
+    const form = new FormData();
+    form.append("image", file);
+    return unwrap<{ url: string }>(await api.post(`/ai/sessions/${sessionId}/attachments`, form));
+  },
   delete: async (sessionId: string) => unwrap<null>(await api.delete(`/ai/sessions/${sessionId}`)),
   list: async (page = 1, signal?: AbortSignal) => unwrap<AgentSessionHistory>(await api.get("/ai/sessions", { params: { page, limit: 20 }, signal })),
   get: async (sessionId: string) => unwrap<AgentSession>(await api.get(`/ai/sessions/${sessionId}`)),

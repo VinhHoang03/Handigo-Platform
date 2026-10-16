@@ -9,6 +9,7 @@ import { Refund } from "../models/refund.model";
 import { SupportTicket } from "../models/supportTicket.model";
 import { Complaint } from "../models/complaint.model";
 import type { AgentSession } from "../ai/agent/agent-state";
+import type { AgentPaymentResult } from "./agentPayment.service";
 import { emitToUser } from "../sockets/socketServer";
 import { AppError } from "../utils/appError";
 import { createLogger } from "../utils/logger";
@@ -16,22 +17,22 @@ import { createLogger } from "../utils/logger";
 const logger = createLogger("AgentOrderProgress");
 const CURSOR_ID = "booking-progress";
 const orderLabels: Record<string, string> = {
-  created: "Đã tạo đơn, đang chờ xử lý.", accepted: "Nhà cung cấp đã nhận đơn.",
-  in_progress: "Nhà cung cấp đang thực hiện dịch vụ.", completed: "Đơn hàng đã hoàn tất.",
+  created: "Đã tạo đơn, đang chờ xử lý.", accepted: "Thợ đã nhận đơn.",
+  in_progress: "Thợ đang thực hiện dịch vụ.", completed: "Đơn hàng đã hoàn tất.",
   cancelled: "Đơn hàng đã được hủy.",
 };
 const bookingLabels: Record<string, string> = {
-  awaiting_provider: "Đang chờ nhà cung cấp xác nhận lịch hẹn.",
-  awaiting_payment: "Nhà cung cấp đã nhận lịch hẹn. Vui lòng thanh toán để xác nhận lịch.",
+  awaiting_provider: "Đang chờ thợ xác nhận lịch hẹn.",
+  awaiting_payment: "Thợ đã nhận lịch. Vui lòng thanh toán để xác nhận.",
   reserved: "Lịch hẹn đang được giữ chỗ.", confirmed: "Lịch hẹn đã được xác nhận.",
-  rejected: "Thợ đã từ chối hoặc chưa phản hồi yêu cầu. Bạn có thể chọn thợ khác ngay trong chat.", expired: "Lịch hẹn đã hết thời hạn xác nhận.",
+  rejected: "Thợ đã từ chối hoặc chưa phản hồi. Bạn có thể chọn thợ khác.", expired: "Lịch hẹn đã hết thời hạn xác nhận.",
 };
 const paymentLabels: Record<string, string> = {
   unpaid: "Đơn hàng chưa thanh toán.", partially_paid: "Đã nhận thanh toán một phần của đơn hàng.",
   paid: "Đã thanh toán đơn hàng thành công.", refunded: "Đã hoàn tiền cho đơn hàng.",
 };
 const reassignmentLabels: Record<string, string> = {
-  awaiting_customer: "Đơn đang chờ bạn chọn thợ thay thế hoặc phản hồi yêu cầu đổi thợ ngay trong chat.",
+  awaiting_customer: "Vui lòng chọn thợ thay thế hoặc phản hồi yêu cầu đổi thợ.",
   matching: "Đang tìm kỹ thuật viên thay thế.", matched: "Đã tìm được kỹ thuật viên thay thế.",
   declined: "Bạn đã từ chối tìm kỹ thuật viên thay thế.", expired: "Yêu cầu đổi kỹ thuật viên đã hết hạn.",
   failed: "Chưa tìm được kỹ thuật viên thay thế.",
@@ -46,15 +47,22 @@ export function describeOrderProgress(fields: Record<string, unknown>) {
   };
   label("status", orderLabels);
   label("bookingStatus", bookingLabels);
-  label("paymentStatus", paymentLabels);
-  if (fields.depositPaidAt) lines.push("Đã nhận tiền cọc khảo sát.");
+  if (fields.paymentStatus !== "refunded") {
+    if (fields.depositPaidAt) lines.push("Đã thanh toán tiền cọc.");
+    else label("paymentStatus", paymentLabels);
+  }
+  if (fields.status === "cancelled") {
+    const cancellation = fields.cancellation as { reason?: unknown } | undefined;
+    const reason = fields["cancellation.reason"] ?? cancellation?.reason;
+    lines.push(`Lý do: ${typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 500) : "Chưa có thông tin."}`);
+  }
   if ("providerId" in fields) lines.push(fields.providerId
-    ? "Đã phân công nhà cung cấp cho đơn hàng." : "Đang tìm nhà cung cấp cho đơn hàng.");
-  if (fields.readyForMatching === true) lines.push("Đơn hàng đã sẵn sàng tìm nhà cung cấp.");
-  if (fields.currentQuotationId) lines.push("Nhà cung cấp đã gửi báo giá. Vui lòng xem trong chi tiết đơn hàng.");
+    ? "Đã phân công thợ cho đơn." : "Đang tìm thợ cho đơn.");
+  if (fields.readyForMatching === true) lines.push("Đơn đã sẵn sàng tìm thợ.");
+  if (fields.currentQuotationId) lines.push("Thợ đã gửi báo giá. Bạn có thể xem trong chi tiết đơn.");
   if (fields.scheduledAt) {
     const date = new Date(String(fields.scheduledAt));
-    if (Number.isFinite(date.getTime())) lines.push(`Lịch thực hiện: ${date.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}.`);
+    if (Number.isFinite(date.getTime())) lines.push(`Lịch thực hiện: ${date.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })} lúc ${date.toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" })}.`);
   }
   if (fields["confirmation.providerConfirmedAt"]) lines.push("Nhà cung cấp đã xác nhận hoàn thành dịch vụ.");
   if (fields["confirmation.customerConfirmedAt"]) lines.push("Bạn đã xác nhận hoàn thành dịch vụ.");
@@ -77,17 +85,55 @@ type Recipient = { sessionId: string; userId: string; orderId?: mongoose.Types.O
 
 async function deliver(subscription: Recipient,
   id: string, content: string, createdAt: Date,
-  choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>) {
-  const result = await AgentOrderMessage.updateOne({ _id: id }, { $setOnInsert: {
+  choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>, replaceContent = false, expectedContent?: string) {
+  const value = {
     sessionId: subscription.sessionId, userId: subscription.userId,
     ...(subscription.orderId ? { orderId: subscription.orderId } : {}), content, createdAt,
     ...(choiceGroups?.length ? { choiceGroups } : {}),
-  } }, { upsert: true, runValidators: true });
-  if (result.upsertedCount) emitToUser(subscription.userId, "agent:order:message", {
+  };
+  const { content: updatedContent, choiceGroups: updatedChoices, ...identity } = value;
+  const result = await AgentOrderMessage.updateOne({ _id: id, ...(expectedContent !== undefined ? { content: expectedContent } : {}) }, replaceContent ? {
+    $setOnInsert: identity, $set: { content: updatedContent, ...(updatedChoices ? { choiceGroups: updatedChoices } : {}) },
+  } : { $setOnInsert: value }, { upsert: expectedContent === undefined, runValidators: true });
+  if (result.upsertedCount || replaceContent && result.modifiedCount) emitToUser(subscription.userId, "agent:order:message", {
     sessionId: subscription.sessionId,
     message: { _id: id, sender: "assistant", content, createdAt: createdAt.toISOString(),
       ...(choiceGroups?.length ? { choiceGroups } : {}) },
   });
+  return result;
+}
+
+async function updateBookingPayment(subscription: Recipient, orderId: string, message: string) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const initial = await AgentOrderMessage.findOne({ _id: `booking:${orderId}`, sessionId: subscription.sessionId,
+      userId: subscription.userId, orderId }).lean();
+    if (!initial) return false;
+    const succeeded = /Đã thanh toán (?:tiền cọc|thành công)|Đã thanh toán đơn hàng thành công|Đã nhận tiền cọc khảo sát/;
+    // Phản hồi chờ QR đến muộn không được ghi đè mốc thanh toán thành công từ webhook.
+    if (!succeeded.test(message) && succeeded.test(initial.content)) return true;
+    const lines = initial.content.split("\n").filter((line) => !Object.values(paymentLabels).includes(line)
+      && !/^(?:Đã (?:nhận|thanh toán) tiền cọc|Đã thanh toán thành công\.|Đang chờ thanh toán\.|Đã chọn tiền mặt)/.test(line));
+    lines.splice(2, 0, message);
+    const result = await deliver(subscription, initial._id, lines.join("\n"), initial.createdAt, initial.choiceGroups, true, initial.content);
+    if (result.matchedCount) return true;
+  }
+  return false;
+}
+
+// Chỉ gộp kết quả thanh toán tự động trong cùng lượt tạo đơn; tra cứu riêng vẫn có phản hồi riêng.
+export async function combineAgentBookingPayment(session: AgentSession, result: unknown) {
+  const payment = result as AgentPaymentResult | undefined;
+  if (!payment?.orderId || !["paid", "deposit_paid", "pending", "cash_pending"].includes(payment.status)) return;
+  if (!session.conversation.some((item) => item.id === `booking:${payment.orderId}`)) return;
+  try {
+    const merged = await updateBookingPayment({ sessionId: session.id, userId: session.userId, createdAt: new Date() }, payment.orderId, payment.message);
+    if (!merged) return;
+    const reply = [...session.conversation].reverse().find((item) => item.role === "assistant"
+      && !item.id.startsWith("booking:") && !item.id.startsWith("order-event:")
+      && !item.confirmationActionId && !item.choiceGroups?.length && item.content === payment.message);
+    if (reply) session.conversation = session.conversation.filter((item) => item.id !== reply.id);
+    await mergeAgentOrderMessages(session);
+  } catch { logger.warn("Chưa gộp được thông báo đặt đơn và thanh toán; giữ phản hồi thanh toán trong phiên."); }
 }
 
 export async function orderProviderChoices(userId: string, orderId: string) {
@@ -174,11 +220,15 @@ export async function mergeAgentOrderMessages(session: AgentSession) {
   try {
     const updates = await AgentOrderMessage.find({ sessionId: session.id, userId: session.userId })
       .sort({ createdAt: 1, _id: 1 }).lean();
-    const ids = new Set(session.conversation.map((message) => message.id));
-    for (const update of updates) if (!ids.has(update._id)) session.conversation.push({
-      id: update._id, role: "assistant", content: update.content, createdAt: update.createdAt.toISOString(),
-      ...(update.choiceGroups?.length ? { choiceGroups: update.choiceGroups } : {}),
-    });
+    const existing = new Map(session.conversation.map((message) => [message.id, message]));
+    for (const update of updates) {
+      const previous = existing.get(update._id);
+      if (previous) { previous.content = update.content; previous.choiceGroups = update.choiceGroups; continue; }
+      session.conversation.push({
+        id: update._id, role: "assistant", content: update.content, createdAt: update.createdAt.toISOString(),
+        ...(update.choiceGroups?.length ? { choiceGroups: update.choiceGroups } : {}),
+      });
+    }
     session.conversation.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   } catch { logger.warn("Chưa thể nạp cập nhật tiến độ; kết quả thao tác trong phiên vẫn được giữ nguyên.", { sessionId: session.id }); }
   return session;
@@ -260,25 +310,44 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
   const subscription = await AgentOrderSubscription.findOne({ orderId }).lean();
   if (!subscription || (change.wallTime && change.wallTime < subscription.createdAt)) return;
   const order = await Order.findOne({ _id: orderId, customerId: subscription.userId, isDeleted: false })
-    .select("orderCode cancellation.refundPolicy").lean();
+    .select("orderCode status cancellation.reason cancellation.refundPolicy").lean();
   if (!order) return;
   let lines: string[] = [];
-  if (orderEvent) lines = describeOrderProgress(fields);
-  else if (change.ns.coll === Payment.collection.collectionName) {
-    if (fields.status === "paid") lines = [doc.paymentType === "inspection_deposit"
-      ? "Thanh toán tiền cọc khảo sát đã thành công."
-      : doc.paymentType === "remaining" ? "Thanh toán phần còn lại đã thành công." : "Giao dịch thanh toán đã thành công."];
+  if (orderEvent) {
+    // Thanh toán và hoàn tiền lấy từ giao dịch, tránh lặp cùng mốc từ Order.
+    const { paymentStatus: _payment, depositPaidAt: _deposit, ...progress } = fields;
+    if (progress.status === "cancelled" || order.status === "cancelled" && (fields.cancellation || fields["cancellation.reason"])) {
+      progress.status = "cancelled";
+      progress.cancellation = fields.cancellation ?? order.cancellation;
+    }
+    lines = describeOrderProgress(progress);
+    if (progress.status === "cancelled") {
+      await deliver(subscription, `order-event:cancelled:${orderId}`, `Cập nhật đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date(), undefined, true);
+      return;
+    }
+  } else if (change.ns.coll === Payment.collection.collectionName) {
+    if (fields.status === "paid") {
+      const message = doc.paymentType === "inspection_deposit"
+        ? "Đã thanh toán tiền cọc. Chi phí sau khảo sát trả trực tiếp cho thợ."
+        : doc.paymentType === "remaining" ? "Thanh toán phần còn lại đã thành công." : "Đã thanh toán thành công.";
+      if (doc.paymentType !== "remaining" && await updateBookingPayment(subscription, String(orderId), message)) return;
+      await deliver(subscription, `order-event:payment:${doc._id}:paid`, `Cập nhật đơn ${order.orderCode}:\n${message}`, change.wallTime ?? new Date());
+      return;
+    }
     if (fields.status === "refunded") {
+      // Chung ID với Refund theo paymentId; bản đầy đủ từ Refund sẽ bổ sung vào cùng tin.
       const refund = doc.metadata?.refund;
-      lines = ["Giao dịch đã được hoàn tiền."];
-      if (money(refund?.amount)) lines.push(`Số tiền hoàn: ${money(refund.amount)}.`);
-      if (doc.method === "wallet" || refund?.destination === "handigo_wallet") lines.push("Nơi nhận tiền: ví Handigo.");
-      if (refund?.destination === "source_account") lines.push("Nơi nhận tiền: tài khoản nguồn thanh toán.");
+      lines = describeRefundProgress({ amount: refund?.amount,
+        destination: refund?.destination ?? (doc.method === "wallet" ? "handigo_wallet" : undefined) }, "succeeded");
+      await deliver(subscription, `order-event:refund:${doc._id}:succeeded`, `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date());
+      return;
     }
     if (fields.status === "failed") lines = ["Giao dịch thanh toán đã thất bại hoặc hết hạn. Vui lòng kiểm tra thanh toán trong chi tiết đơn hàng."];
-    if (change.operationType === "insert" && doc.status === "pending") lines = [doc.method === "cash"
-      ? "Đã ghi nhận phương thức tiền mặt. Bạn thanh toán trực tiếp cho nhà cung cấp sau khi sử dụng dịch vụ."
-      : "Giao dịch thanh toán đang chờ xử lý. Mình sẽ thông báo khi có kết quả."];
+    if (change.operationType === "insert" && doc.status === "pending") {
+      const message = doc.method === "cash" ? "Đã chọn tiền mặt, chưa thanh toán. Bạn trả trực tiếp cho thợ." : "Đang chờ thanh toán.";
+      if (await updateBookingPayment(subscription, String(orderId), message)) return;
+      lines = [message];
+    }
   } else if (change.ns.coll === Refund.collection.collectionName) {
     if (String(doc.customerId) !== subscription.userId) return;
     lines = describeRefundProgress(doc, fields.status);
@@ -288,8 +357,8 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
       lines.push(`Đã thanh toán: ${money(policy.paidAmount)}. Phí hủy: ${money(policy.cancellationFee)}.`);
     }
     const stage = ["requesting", "pending"].includes(String(fields.status)) ? "processing" : String(fields.status);
-    await deliver(subscription, `order-event:refund:${doc._id}:${stage}`,
-      `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date());
+    await deliver(subscription, `order-event:refund:${stage === "succeeded" ? doc.paymentId ?? doc._id : doc._id}:${stage}`,
+      `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date(), undefined, stage === "succeeded");
     return;
   } else if (change.ns.coll === RepairQuotation.collection.collectionName) {
     const labels: Record<string, string> = { pending: "Có báo giá mới đang chờ bạn xác nhận.",
@@ -323,6 +392,9 @@ function snapshotChange(collection: string, doc: Document): ChangeStreamDocument
 async function recoverOrderDetails(userId: string, orderId: string) {
   const refunds = await Refund.find({ orderId, customerId: userId, isDeleted: false }).lean();
   for (const refund of refunds) await publishAgentOrderChange(snapshotChange(Refund.collection.collectionName, refund));
+  // Hoàn về ví và giao dịch cũ có thể chỉ lưu trên Payment, không có bản ghi Refund.
+  const refundedPayments = await Payment.find({ orderId, customerId: userId, status: "refunded", isDeleted: false }).lean();
+  for (const payment of refundedPayments) await publishAgentOrderChange(snapshotChange(Payment.collection.collectionName, payment));
   const tickets = await SupportTicket.find({ orderId, requesterId: userId, isDeleted: false }).lean();
   for (const ticket of tickets) await publishAgentOrderChange(snapshotChange(SupportTicket.collection.collectionName, ticket));
   const complaints = await Complaint.find({ orderId, complainantId: userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();

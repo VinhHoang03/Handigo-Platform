@@ -694,7 +694,7 @@ export const DispatchService = {
   startTimeoutMonitor(): void {
     if (timeoutMonitor) return;
 
-    const scan = async (recoverStalledOrders = false) => {
+    const scanOnce = async (recoverStalledOrders = false) => {
       const now = new Date();
       const overdueHours = Math.max(await getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24), 1);
       const overdueOrders = await Order.find({
@@ -873,6 +873,14 @@ export const DispatchService = {
           );
         }
       }
+    };
+
+    let scanning = false;
+    const scan = async (recoverStalledOrders = false) => {
+      if (scanning) return;
+      scanning = true;
+      try { await scanOnce(recoverStalledOrders); }
+      finally { scanning = false; }
     };
 
     scan(true).catch((error: unknown) =>

@@ -6,11 +6,13 @@ import { MessageRepository } from "../session/message.repository";
 import type { ToolContext } from "../tools/tool.interface";
 import { AgentLoop, toolError } from "./agent-loop.service";
 import type { AgentInput, AgentSession, PendingAction } from "./agent-state";
-import { agentPaymentResultSchema } from "../../services/agentPayment.service";
+import { AgentPaymentService, agentPaymentResultSchema } from "../../services/agentPayment.service";
 import { withAgentTimeout } from "./timeout";
 import { z } from "zod";
 import { sessionStorageFull } from "./session-lifecycle";
 import { bookingSchema } from "../tools/implementations/booking.schemas";
+import { requireBookingAttachments } from "./booking-attachments";
+import { combineAgentBookingPayment } from "../../services/agentOrderProgress.service";
 
 export function sessionView(session: AgentSession) {
   const requiresReconciliation = session.requiresReconciliation
@@ -40,8 +42,15 @@ export function sessionView(session: AgentSession) {
   return { sessionId: session.id, state: session.state, currentGoal: session.currentGoal,
     expiresAt: null,
     payment,
+    viewedOrder: session.viewedOrder ?? null,
+    retryableStep: session.recovery ? { tool: session.recovery.tool } : null,
+    rebookProposal: session.rebookProposal ? { id: session.rebookProposal.id } : null,
+    draftBackup: session.draftBackup && session.bookingDraft?.status !== "booked" && !session.bookingDraft?.orderId ? { id: session.draftBackup.id } : null,
     bookingDraft: session.bookingDraft ? { status: session.bookingDraft.status, revision: session.bookingDraft.revision,
-      summary: session.bookingDraft.summary, missing: session.bookingDraft.missing } : null,
+      summary: session.bookingDraft.summary, missing: session.bookingDraft.missing,
+      values: session.bookingDraft.values, providerCandidates: session.bookingDraft.providerCandidates ?? [],
+      hasDraftAddress: Boolean(session.bookingDraft.draftAddress),
+      orderId: session.bookingDraft.orderId } : null,
     messages: session.conversation.filter((item) => item.role !== "tool").map((item) => {
       const action = item.role === "assistant" && item.confirmationActionId
         ? actions.get(item.confirmationActionId) : undefined;
@@ -49,6 +58,11 @@ export function sessionView(session: AgentSession) {
         ? z.object({ orderId: z.string().regex(/^[a-f\d]{24}$/i), orderCode: z.string().optional() }).safeParse(action.result) : null;
       return {
         _id: item.id, sender: item.role, content: item.content, createdAt: item.createdAt,
+        ...(item.bookingSearch && item.role === "assistant" ? { bookingSearch: {
+          items: item.bookingSearch.items, pagination: item.bookingSearch.pagination,
+          ...(item.bookingSearch.kind ? { kind: item.bookingSearch.kind } : {}),
+        } } : {}),
+        ...(item.customerAttachments?.length ? { customerAttachments: item.customerAttachments } : {}),
         ...(item.choiceGroups?.length ? { choiceGroups: item.choiceGroups } : {}),
         ...(action ? { confirmation: { actionId: action.id, tool: action.tool, preview: action.preview,
           expiresAt: action.expiresAt, status: action.status === "WAITING_CONFIRMATION" && Date.parse(action.expiresAt) <= Date.now()
@@ -72,7 +86,7 @@ export class AgentService {
     const { session, lockId } = await this.sessions.acquire(sessionId, user.id);
     const checkpoint = () => this.sessions.save(session, lockId);
     const digest = createHash("sha256").update(JSON.stringify(input)).digest("hex");
-    const context: ToolContext = { user, sessionId, signal: AbortSignal.timeout(180_000) };
+    const context: ToolContext = { user, sessionId, session, signal: AbortSignal.timeout(180_000) };
     try {
       const receipt = session.receipts.find((item) => item.requestId === input.requestId);
       if (receipt) {
@@ -87,6 +101,7 @@ export class AgentService {
         const tool = this.loop.tools.get("get_payment_status", context);
         const args = tool.inputSchema.parse(input.paymentStatus);
         const result = agentPaymentResultSchema.parse(await withAgentTimeout(tool.execute(context, args), context.signal, 20000));
+        session.viewedOrder = { orderId: result.orderId, orderCode: result.orderCode };
         new MessageRepository().append(session, "tool", JSON.stringify(result), "get_payment_status");
         const unknown = session.pendingAction ?? [...session.actions].reverse().find((action) => action.status === "UNKNOWN");
         const original = unknown?.arguments as { orderId?: string; method?: string } | undefined;
@@ -94,10 +109,12 @@ export class AgentService {
         const samePayment = unknown?.tool === "create_payment" && original?.orderId === result.orderId
           && preview?.amount === result.amount && preview?.paymentType === result.paymentType
           && (({ PAYOS: "payos", WALLET: "wallet", CASH: "cash" } as Record<string, string>)[original?.method ?? ""] === result.method);
-        const resolved = samePayment && (["paid", "deposit_paid", "cash_pending"].includes(result.status)
+        const failed = samePayment && ["failed", "refunded"].includes(result.status)
+          && await withAgentTimeout(AgentPaymentService.failureConfirmed(user, result, unknown!.createdAt), context.signal, 20000);
+        const resolved = failed || samePayment && (["paid", "deposit_paid", "cash_pending"].includes(result.status)
           || (result.status === "pending" && Boolean(result.checkoutUrl)));
         if (resolved && session.requiresReconciliation) {
-          unknown!.status = "SUCCEEDED";
+          unknown!.status = failed ? "EXPIRED" : "SUCCEEDED";
           unknown!.result = result;
           if (session.pendingAction === unknown) { session.actions.push({ ...unknown! }); session.pendingAction = null; }
           session.requiresReconciliation = false;
@@ -113,6 +130,11 @@ export class AgentService {
         session.requiresReconciliation = true;
       }
       if (session.requiresReconciliation) {
+        if (await this.reconcileBooking(session, context, checkpoint)) {
+          session.receipts.push({ requestId: input.requestId, digest, message: session.conversation[session.conversation.length - 1]?.content ?? "" });
+          await checkpoint();
+          return sessionView(session);
+        }
         this.loop.reply(session, "FAILED", "Thao tác trước cần được đối soát. Vui lòng kiểm tra đơn hoặc yêu cầu trong Hỗ trợ của tôi; hệ thống sẽ không tự thực hiện lại.");
         await checkpoint();
         return sessionView(session);
@@ -137,6 +159,11 @@ export class AgentService {
         }
       } else {
         if ("confirmation" in input) this.loop.confirmation.requirePending(session, input.confirmation.actionId);
+        if ("message" in input && input.customerAttachments !== undefined) {
+          requireBookingAttachments(session, input.customerAttachments);
+          if (session.bookingDraft?.status === "booked" || session.bookingDraft?.orderId) throw new AppError("Đơn đã tạo không thể bổ sung ảnh qua bản nháp. Vui lòng bắt đầu tác vụ mới để đặt đơn khác.", 409);
+          if (session.pendingAction && session.pendingAction.tool !== "create_booking") throw new AppError("Vui lòng xử lý bản xác nhận đang chờ trước khi gửi ảnh.", 409);
+        }
         session.activeRequest = { requestId: input.requestId, digest, input };
         if ("confirmation" in input) {
           await this.confirm(session, context, input.confirmation, checkpoint);
@@ -154,6 +181,15 @@ export class AgentService {
             session.actions.push({ ...action });
             session.pendingAction = null;
             new MessageRepository().append(session, "tool", "Khách gửi yêu cầu mới. Bản xác nhận cũ đã hết hiệu lực; đọc yêu cầu mới và cập nhật bản nháp hoặc trả lời câu hỏi. Không thực hiện thao tác bằng xác nhận cũ.", "agent_protocol");
+          }
+          if (input.customerAttachments !== undefined) {
+            const message = [...session.conversation].reverse().find((item) => item.role === "user");
+            if (message) message.customerAttachments = input.customerAttachments;
+            session.bookingDraft ??= { revision: 0, status: "active", values: {}, sources: {}, missing: [], summary: [], choiceGroups: [] };
+            session.bookingDraft.values.customerAttachments = input.customerAttachments;
+            session.bookingDraft.sources.customerAttachments = "customer";
+            session.bookingDraft.status = "active";
+            session.bookingDraft.revision += 1;
           }
           if (session.pendingAction) {
             this.loop.reply(session, "WAITING_CONFIRMATION", "Hãy dùng nút xác nhận cho hành động đang chờ, hoặc từ chối trước khi sửa yêu cầu.");
@@ -177,13 +213,38 @@ export class AgentService {
     }
   }
 
+  private async reconcileBooking(session: AgentSession, context: ToolContext, checkpoint: () => Promise<void>) {
+    const action = session.pendingAction ?? [...session.actions].reverse().find((item) => item.status === "UNKNOWN");
+    if (action?.tool !== "create_booking" || !["UNKNOWN", "EXECUTING"].includes(action.status)) return false;
+    const tool = this.loop.tools.get(action.tool, context);
+    if (!tool.reconcile) return false;
+    const result = await withAgentTimeout(tool.reconcile({ ...context, session, actionId: action.id }, action.arguments), context.signal, 20000);
+    const booking = z.object({ orderId: z.string().regex(/^[a-f\d]{24}$/i), orderCode: z.string() }).safeParse(result);
+    if (!booking.success) return false;
+    action.status = "SUCCEEDED";
+    action.result = result;
+    if (session.pendingAction === action) { session.actions.push({ ...action }); session.pendingAction = null; }
+    if (session.bookingDraft) {
+      session.bookingDraft.status = "booked"; session.bookingDraft.orderId = booking.data.orderId;
+      session.bookingDraft.draftAddress = undefined;
+    }
+    session.requiresReconciliation = false;
+    session.activeRequest = null;
+    new MessageRepository().append(session, "tool", JSON.stringify(result), "create_booking");
+    await checkpoint();
+    if (!(await this.continueBooking(session, context, action, checkpoint))) {
+      this.loop.reply(session, "WAITING_USER_INPUT", `Đã tìm thấy đơn ${booking.data.orderCode}. Bạn có thể kiểm tra đơn và thanh toán; không cần đặt lại.`);
+    }
+    return true;
+  }
+
   private async confirm(session: AgentSession, context: ToolContext,
-    input: { actionId: string; decision: "CONFIRM" | "REJECT" }, checkpoint: () => Promise<void>) {
+    input: Extract<AgentInput, { confirmation: unknown }>["confirmation"], checkpoint: () => Promise<void>) {
     const action = this.loop.confirmation.requirePending(session, input.actionId);
     const expired = Date.parse(action.expiresAt) <= Date.now();
     new MessageRepository().append(session, "user", input.decision === "CONFIRM"
-      ? expired ? "Kiểm tra lại thông tin của bản xác nhận đã hết hạn." : "Xác nhận hành động đã xem."
-      : "Từ chối hành động đã xem.");
+      ? expired ? "Kiểm tra lại bản xác nhận." : "Xác nhận."
+      : "Từ chối.");
     if (input.decision === "REJECT" || new Date(action.expiresAt).getTime() <= Date.now()) {
       action.status = input.decision === "REJECT" ? "REJECTED" : "EXPIRED";
       session.actions.push({ ...action });
@@ -193,7 +254,7 @@ export class AgentService {
           const tool = this.loop.tools.get(action.tool, context);
           session.pendingAction = await this.loop.confirmation.prepare(tool, context, tool.inputSchema.parse(action.arguments));
           session.pendingAction.taskVersion = session.taskVersion;
-          this.loop.reply(session, "WAITING_CONFIRMATION", "Bản cũ đã hết hạn. Thông tin đã được kiểm tra lại; vui lòng xác nhận form mới để đặt đơn.");
+          this.loop.reply(session, "WAITING_CONFIRMATION", "Bản cũ đã hết hạn. Vui lòng kiểm tra và xác nhận bản mới.");
         } catch (error) {
           this.loop.reply(session, "WAITING_USER_INPUT", toolError(error));
         }
@@ -215,15 +276,25 @@ export class AgentService {
         session.actions.push({ ...action });
         session.pendingAction = await this.loop.confirmation.prepare(tool, context, args);
         session.pendingAction.taskVersion = session.taskVersion;
-        this.loop.reply(session, "WAITING_CONFIRMATION", "Thông tin hoặc chi phí đã thay đổi. Vui lòng kiểm tra và xác nhận lại bản mới.");
+        this.loop.reply(session, "WAITING_CONFIRMATION", "Thông tin hoặc chi phí đã đổi. Vui lòng kiểm tra và xác nhận lại.");
         return;
+      }
+      if (action.tool === "create_booking") {
+        const version = (action.preview as { policyVersion?: string }).policyVersion;
+        if (!version || input.policyConsent?.accepted !== true || input.policyConsent.version !== version) {
+          this.loop.reply(session, "WAITING_CONFIRMATION", "Vui lòng xem và đồng ý chính sách trước khi đặt đơn.");
+          return;
+        }
+        action.policyConsent = { version, acceptedAt: new Date().toISOString(), actionId: action.id };
       }
     } catch (error) {
       action.status = "EXPIRED";
       session.actions.push({ ...action });
       session.pendingAction = null;
       new MessageRepository().append(session, "tool", toolError(error), action.tool);
-      if (action.tool === "create_payment") {
+      if (action.tool === "create_booking" || action.tool === "create_payment") {
+        if (action.tool === "create_booking" && session.bookingDraft) session.recovery = { tool: "create_booking", arguments: action.arguments,
+          taskVersion: session.taskVersion, revision: session.bookingDraft.revision, stage: "preview" };
         this.loop.reply(session, "WAITING_USER_INPUT", toolError(error));
         return;
       }
@@ -262,6 +333,7 @@ export class AgentService {
       const payment = agentPaymentResultSchema.safeParse(previousPayment.result);
       this.loop.reply(session, "WAITING_USER_INPUT", payment.success ? payment.data.message
         : "Đã tạo đơn. Vui lòng kiểm tra thanh toán của đơn trước khi thực hiện thêm thao tác.");
+      if (payment.success) await combineAgentBookingPayment(session, payment.data);
       return true;
     }
     let message = "Đã tạo đơn. Vui lòng kiểm tra trạng thái thanh toán của đơn.";
@@ -285,7 +357,7 @@ export class AgentService {
           && current.data.paymentType === (confirmed.data.serviceType === "variable_price" ? "inspection_deposit" : "full");
         session.pendingAction = paymentAction;
         if (!authorized) {
-          this.loop.reply(session, "WAITING_CONFIRMATION", "Đã tạo đơn. Thông tin thanh toán chưa được xác nhận hoặc đã thay đổi. Vui lòng kiểm tra và xác nhận khoản thanh toán bên dưới.");
+          this.loop.reply(session, "WAITING_CONFIRMATION", "Đã tạo đơn. Vui lòng kiểm tra và xác nhận thông tin thanh toán bên dưới.");
           return true;
         }
       } catch (error) {
@@ -297,6 +369,7 @@ export class AgentService {
         // execute lưu trạng thái trước khi ghi; lỗi checkpoint phải được truyền ra để tiếp tục an toàn.
         const finished = await this.loop.execute(session, context, paymentTool, paymentArgs, checkpoint, paymentAction);
         if (!finished) this.loop.reply(session, "WAITING_USER_INPUT", "Đã tạo đơn. Vui lòng kiểm tra trạng thái thanh toán của đơn.");
+        if (paymentAction.status === "SUCCEEDED") await combineAgentBookingPayment(session, paymentAction.result);
         return true;
       }
     }

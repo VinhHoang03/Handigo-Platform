@@ -4,6 +4,7 @@ import { walletApi } from '../api/wallet.api';
 import { getErrorMessage, parseAmount } from './wallet-formatters';
 import { PENDING_DEPOSIT_ORDER_CODE_KEY } from './useWalletDepositReturn';
 import { tokenStorage } from '@/api/tokenStorage';
+import type { WalletDepositResult } from '../types/wallet.types';
 
 interface UseWalletAmountFormsParams {
   isProvider: boolean;
@@ -11,10 +12,11 @@ interface UseWalletAmountFormsParams {
   refreshAll: () => Promise<void>;
   setError: (message: string) => void;
   setNotice: (message: string) => void;
+  onDepositCreated?: (result: WalletDepositResult) => void;
 }
 
 /** Trạng thái + hành vi của 2 modal nhập số tiền: nạp ví và rút tiền. */
-export function useWalletAmountForms({ isProvider, walletBalance, refreshAll, setError, setNotice }: UseWalletAmountFormsParams) {
+export function useWalletAmountForms({ isProvider, walletBalance, refreshAll, setError, setNotice, onDepositCreated }: UseWalletAmountFormsParams) {
   const [busy, setBusy] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -71,6 +73,7 @@ export function useWalletAmountForms({ isProvider, walletBalance, refreshAll, se
       if (orderCode) {
         sessionStorage.setItem(PENDING_DEPOSIT_ORDER_CODE_KEY, orderCode);
       }
+      onDepositCreated?.(result);
       setDepositOpen(false);
       setDepositAmount('');
       setNotice('Đã tạo liên kết nạp ví. Bạn sẽ được chuyển sang cổng thanh toán.');

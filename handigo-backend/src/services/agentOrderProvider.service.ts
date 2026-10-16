@@ -26,7 +26,7 @@ export const AgentOrderProviderService = {
     if (!canChoose) return { ...base, available: [], note: expired
       ? "Yêu cầu đổi thợ đã hết hạn. Hãy kiểm tra trạng thái đơn và hoàn tiền."
       : "Đơn không còn ở trạng thái chọn lại thợ. Hãy kiểm tra trạng thái hiện tại." };
-    const address = await Address.findOne({ _id: order.addressId, userId });
+    const address = order.addressSnapshot ?? await Address.findOne({ _id: order.addressId, userId, isDeleted: { $ne: true } });
     if (!address) throw new AppError("Không tìm thấy địa chỉ thực hiện của đơn.", 404);
     const related = order.recurringGroupId ? await Order.find({ recurringGroupId: order.recurringGroupId,
       customerId: userId, isDeleted: false }) : [order];

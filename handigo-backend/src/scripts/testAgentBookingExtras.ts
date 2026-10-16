@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mock } from "node:test";
 import { Types } from "mongoose";
 import { updateBookingDraft, readyBookingArguments, bookingAddressLabel, type BookingDraftDependencies } from "../ai/agent/booking-draft";
@@ -11,6 +12,7 @@ import { newSession } from "../ai/agent/agent-state";
 import { AgentAddressService, agentAddressSchema } from "../services/agentAddress.service";
 import * as addressService from "../services/address.service";
 import * as geocoding from "../services/reverseGeocoding.service";
+import * as addressResolver from "../services/agentAddressResolver.service";
 import User from "../models/user.model";
 import { Address } from "../models/address.model";
 import { searchCustomerKnowledge } from "../ai/knowledge/customer-knowledge";
@@ -67,7 +69,7 @@ async function run() {
     { mode: "update", addressPreference: addressChoices.options[1] }, userId, differentRecipients);
   assert.equal(chosenRecipient.values.addressId, alternateId);
   assert.equal(draft.values.voucherCode, undefined);
-  assert.equal(readyBookingArguments(draft), null);
+  assert(readyBookingArguments(draft), "Chưa chọn voucher vẫn phải cho xem form với giá chưa giảm.");
   assert(draft.choiceGroups.some((group) => group.options.includes("Không dùng voucher")));
   const chosen = await updateBookingDraft(draft, { mode: "update", voucherCode: "giam30" }, userId, deps);
   assert.equal(readyBookingArguments(chosen)?.voucherCode, "GIAM30");
@@ -77,7 +79,7 @@ async function run() {
   assert.equal(stillDeclined.voucherDecision, "declined");
   assert(!stillDeclined.choiceGroups.some((group) => group.label.includes("Voucher")));
   const reopened = await updateBookingDraft(declined, { mode: "update", voucherPreference: "choose" }, userId, deps);
-  assert.equal(readyBookingArguments(reopened), null);
+  assert(readyBookingArguments(reopened), "Mở lựa chọn voucher không chặn form xác nhận.");
   const bestDeps: BookingDraftDependencies = { ...deps, vouchers: async () => [
     { code: "GIAM30", name: "Giảm 30", discountAmount: 30000, finalAmount: 170000, endAt: "2027-01-01T00:00:00Z" },
     { code: "GIAM50SAU", name: "Giảm 50", discountAmount: 50000, finalAmount: 150000, endAt: "2027-02-01T00:00:00Z" },
@@ -90,7 +92,7 @@ async function run() {
   assert.equal(readyBookingArguments(manual)?.voucherCode, "GIAM30");
   const noVouchers = await updateBookingDraft(best, { mode: "resume" }, userId, { ...deps, vouchers: async () => [] });
   assert.equal(readyBookingArguments(noVouchers)?.voucherCode, undefined);
-  assert(noVouchers.summary.some((line) => line.includes("không có voucher")));
+  assert(noVouchers.voucherFeedback?.includes("chưa có mã giảm giá"));
   const changed = await updateBookingDraft(chosen, { mode: "update", quantity: 3 }, userId, deps);
   assert.equal(readyBookingArguments(changed), null);
   assert.equal(changed.values.voucherCode, "GIAM30");
@@ -160,12 +162,21 @@ async function run() {
   assert.equal(providerFailure.values.preferredProviderId, nearId);
   assert.equal(providerFailure.providerCandidates?.length, 0);
   assert.equal(readyBookingArguments(providerFailure), null);
+  const pendingProvider = await updateBookingDraft(draft, { mode: "update", providerPreference: "Nguyễn Hùng" }, userId,
+    { ...deps, providers: async () => ({ available: [], requested: [] }) });
+  assert.equal(readyBookingArguments(pendingProvider), null);
+  assert(!pendingProvider.choiceGroups.some((group) => group.label.includes("Voucher")),
+    "Chưa đủ điều kiện lập form thì không chen lựa chọn voucher trước bước chọn thợ.");
   const voucherFailure = await updateBookingDraft(chosen, { mode: "update", quantity: 2 }, userId,
     { ...deps, vouchers: async () => { throw new Error("Lỗi tra cứu giả lập"); } });
   assert.equal(voucherFailure.values.uniformQuantity, 2);
   assert.equal(voucherFailure.values.voucherCode, "GIAM30");
   assert.equal(voucherFailure.availableVouchers?.length, 0);
   assert.equal(readyBookingArguments(voucherFailure), null);
+  const optionalVoucherFailure = await updateBookingDraft(undefined, { mode: "update", serviceId }, userId,
+    { ...deps, vouchers: async () => { throw new Error("Lỗi tra cứu giả lập"); } });
+  assert(readyBookingArguments(optionalVoucherFailure), "Lỗi gợi ý mã không chặn form khi khách chưa yêu cầu áp mã.");
+  assert(optionalVoucherFailure.choiceGroups.some((group) => group.options.includes("Kiểm tra lại voucher")));
   assert.equal(readyBookingArguments(await updateBookingDraft(voucherFailure, { mode: "resume" }, userId, bestDeps))?.voucherCode, "GIAM30");
   assert(readyBookingArguments(await updateBookingDraft(declined, { mode: "resume" }, userId,
     { ...deps, vouchers: async () => { throw new Error("Không được tra lại khi khách đã từ chối voucher"); } })));
@@ -173,7 +184,7 @@ async function run() {
   assert(searchCustomerKnowledge("thợ gần nhất đánh giá", "booking").articles.some((article) => article.title.includes("tiêu chí")));
   assert(searchCustomerKnowledge("địa chỉ người nhận không lưu", "account").articles.some((article) => article.title.includes("người nhận")));
 
-  // Agent phải dừng hỏi chọn voucher, không lập form tạo đơn khi thiếu quyết định.
+  // Form phải được gửi ngay; lựa chọn voucher đi kèm sau form và chưa tự áp mã.
   voucherActive = true;
   let previews = 0;
   const registry = new ToolRegistry().register(createUpdateBookingDraftTool(deps)).register({
@@ -189,20 +200,27 @@ async function run() {
     tool: "update_booking_draft", arguments: toolArguments }) }, registry,
     { maxIterations: 2, systemPrompt: "Kiểm thử", timeoutMs: 5000 });
   await loop.run(session, context, async () => {});
-  assert.equal(previews, 0);
-  assert.equal(session.state, "WAITING_USER_INPUT");
-  const firstReply = session.conversation[session.conversation.length - 1].content;
-  assert(firstReply.includes("Vệ sinh điều hòa"));
+  assert.equal(previews, 1);
+  assert.equal(session.state, "WAITING_CONFIRMATION");
+  const firstReply = session.conversation[session.conversation.length - 1];
+  assert.equal(firstReply.confirmationActionId, session.pendingAction?.id);
+  assert(firstReply.choiceGroups?.some((group) => group.options.includes("GIAM30 — giảm 30.000 đ")));
+  assert.equal((session.pendingAction?.preview as { amount: number }).amount, 200000);
+  const firstConfirmation = session.pendingAction!.id;
+  const bookingAgent = new AgentService({ acquire: async () => ({ session, lockId: "khoa-kiem-thu" }),
+    save: async () => {}, release: async () => {} }, loop);
   toolArguments = { quantity: 2 };
-  await loop.run(session, context, async () => {});
+  await bookingAgent.send(context.user, session.id, { requestId: randomUUID(), message: "Đổi số lượng thành 2." });
   const nextReply = session.conversation[session.conversation.length - 1].content;
   assert(!nextReply.includes("Địa chỉ:"));
   assert(!nextReply.includes("Thời gian:"));
   assert.equal(session.bookingDraft?.values.addressId, addressId);
   toolArguments = { voucherCode: "GIAM30" };
-  await loop.run(session, context, async () => {});
+  await bookingAgent.send(context.user, session.id, { requestId: randomUUID(), message: "Áp mã GIAM30" });
   assert.equal(session.state, "WAITING_CONFIRMATION");
   assert.equal((session.pendingAction?.preview as { amount: number }).amount, 170000);
+  assert.notEqual(session.pendingAction?.id, firstConfirmation, "Áp mã phải tạo bản xác nhận mới.");
+  assert.equal(session.actions.find((action) => action.id === firstConfirmation)?.status, "EXPIRED");
   assert.equal(registry.list({ ...context, user: { id: userId, role: "PROVIDER" } }).length, 0);
 
   // Hai bước đọc địa chỉ trong cùng lượt dùng chung kết quả; lượt mới phải đọc lại.
@@ -225,7 +243,7 @@ async function run() {
     { mode: "update", addressPreference: "34 Lê Lợi, Phường B, Hà Nội" }, userId, deps);
   registry.register({ name: "save_booking_address", description: "Lưu địa chỉ kiểm thử",
     inputSchema: agentAddressSchema, mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
-    preview: async (_toolContext, args) => ({ title: "Thêm địa chỉ", address: `${args.fullAddress}, ${args.ward}, ${args.province}` }),
+    preview: async (_toolContext, args) => ({ title: "Thêm địa chỉ", address: args.addressText ?? `${args.fullAddress}, ${args.ward}, ${args.province}` }),
     execute: async (toolContext) => {
       savedAddressId = new Types.ObjectId().toString();
       toolContext.session!.bookingDraft!.values.addressId = savedAddressId;
@@ -249,6 +267,7 @@ async function run() {
   assert.equal((addressSession.pendingAction?.arguments as { addressId: string }).addressId, savedAddressId);
   assert.equal(addressSession.bookingDraft.values.addressId, savedAddressId);
   const firstAddressSession = newSession("phien-dia-chi-moi", userId);
+  mock.method(AgentAddressService, "stage", async () => ({ addressId: savedAddressId!, draftAddress: undefined }));
   let step = 0;
   const firstAddressLoop = new AgentLoop({ generate: async () => ++step === 1
     ? { type: "TOOL_CALL" as const, tool: "update_booking_draft", arguments: { serviceQuery: "Vệ sinh điều hòa", quantity: 2,
@@ -256,10 +275,11 @@ async function run() {
     : { type: "TOOL_CALL" as const, tool: "save_booking_address", arguments: { fullAddress: "78 Hai Bà Trưng", ward: "Phường C", province: "Hà Nội" } } },
     registry, { maxIterations: 2, systemPrompt: "Kiểm thử", timeoutMs: 5000 });
   await firstAddressLoop.run(firstAddressSession, { ...context, sessionId: firstAddressSession.id }, async () => {});
-  assert.equal(firstAddressSession.pendingAction?.tool, "save_booking_address");
-  assert.equal(firstAddressSession.bookingDraft?.values.addressId, undefined);
+  assert.equal(firstAddressSession.pendingAction, null);
+  assert.equal(firstAddressSession.bookingDraft?.values.addressId, savedAddressId);
   assert.equal(firstAddressSession.bookingDraft?.values.uniformQuantity, 2);
   assert.equal(firstAddressSession.bookingDraft?.providerPreference, "Nguyễn Hùng");
+  assert(firstAddressSession.bookingDraft?.missing.some((item) => item.includes("chuyên gia")), "Giữ bước chọn thợ trùng tên sau khi cập nhật địa chỉ.");
 
   // Địa chỉ: quyền sở hữu, bổ sung dữ liệu từ hồ sơ, chống trùng và xác nhận cũ.
   const current = { _id: new Types.ObjectId(addressId), userId, fullAddress: "12 Nguyễn Trãi", ward: "Phường A",
@@ -268,6 +288,10 @@ async function run() {
   mock.method(addressService, "getUserAddresses", async () => [current]);
   mock.method(User, "findById", () => ({ select: () => ({ lean: async () => ({ fullName: "Nguyễn An", phone: "0912345678" }) }) }));
   mock.method(geocoding, "geocodeSavedAddress", async () => ({ latitude: 21.1, longitude: 105.1 }));
+  mock.method(addressResolver, "resolveAgentAddress", async (input: { fullAddress?: string; ward?: string; province?: string }) => ({
+    fullAddress: input.fullAddress, ward: input.ward, province: input.province,
+    latitude: 21.1, longitude: 105.1, provinceCode: 1, wardCode: 2, precision: "place",
+  }) as never);
   let saves = 0;
   mock.method(addressService, "createAddress", async (owner: string, payload: Record<string, unknown>) => {
     saves++; assert.equal(owner, userId); assert.equal(payload.latitude, 21.1);

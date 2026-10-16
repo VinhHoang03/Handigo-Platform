@@ -56,13 +56,26 @@ export type ReverseGeocodedAddress = {
   attribution: string;
 };
 
-type CacheEntry = {
+type CacheEntry<T = ReverseGeocodedAddress> = {
   expiresAt: number;
-  data: ReverseGeocodedAddress;
+  data: T;
 };
 
 const cache = new Map<string, CacheEntry>();
 const pendingRequests = new Map<string, Promise<ReverseGeocodedAddress>>();
+export interface AddressSearchCandidate {
+  fullAddress: string;
+  province: string;
+  administrativeNames: string[];
+  wardNames: string[];
+  latitude: number;
+  longitude: number;
+  placeId?: string;
+  matchLevel?: string;
+  category?: string;
+}
+const searchCache = new Map<string, CacheEntry<AddressSearchCandidate[]>>();
+const pendingSearches = new Map<string, Promise<AddressSearchCandidate[]>>();
 let requestQueue: Promise<void> = Promise.resolve();
 let lastRequestAt = 0;
 
@@ -322,6 +335,57 @@ export const reverseGeocode = async (query: ReverseGeocodeQuery) => {
     .then((data) => setCached(cacheKey, data))
     .finally(() => pendingRequests.delete(cacheKey));
   pendingRequests.set(cacheKey, request);
+  return request;
+};
+
+/** Tra địa điểm hoặc khu vực cho agent; việc xác thực phường/tỉnh nằm ở bộ phân giải địa chỉ. */
+export const searchAddressLocations = async (query: string): Promise<AddressSearchCandidate[]> => {
+  const key = query.trim().toLocaleLowerCase("vi-VN");
+  const cached = searchCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const pending = pendingSearches.get(key);
+  if (pending) return pending;
+  const request = enqueueLocationIqRequest(async () => {
+    try {
+      const response = await axios.get<Array<LocationIqResponse & {
+        lat?: string; lon?: string; class?: string;
+        matchquality?: { matchlevel?: string };
+      }>>("https://us1.locationiq.com/v1/search", {
+        params: { key: getLocationIqApiKey(), q: query, format: "json", countrycodes: "vn",
+          addressdetails: 1, matchquality: 1, limit: 5, "accept-language": "vi" },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      const candidates = (Array.isArray(response.data) ? response.data : []).flatMap((item) => {
+        const latitude = item.lat?.trim() ? Number(item.lat) : NaN;
+        const longitude = item.lon?.trim() ? Number(item.lon) : NaN;
+        if (item.address?.country_code !== "vn" || !Number.isFinite(latitude) || !Number.isFinite(longitude)
+          || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return [];
+        const address = item.address;
+        const wardNames = [address.quarter, address.suburb, address.neighbourhood, address.locality,
+          address.village, address.hamlet, address.municipality, address.borough]
+          .filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
+        return [{ fullAddress: item.display_name ?? "", province: resolveProvince(item),
+          wardNames, administrativeNames: [...wardNames, address.city_district, address.state_district,
+            address.district, address.county, address.city, address.town]
+            .filter((value): value is string => typeof value === "string" && Boolean(value.trim())),
+          latitude, longitude,
+          placeId: item.osm_type && item.osm_id ? `osm:${item.osm_type}:${item.osm_id}`
+            : item.place_id ? `locationiq:${item.place_id}` : undefined,
+          matchLevel: item.matchquality?.matchlevel, category: item.class,
+        }];
+      });
+      if (candidates.length) {
+        if (searchCache.size >= MAX_CACHE_ENTRIES) searchCache.delete(searchCache.keys().next().value!);
+        searchCache.set(key, { data: candidates, expiresAt: Date.now() + CACHE_TTL_MS });
+      }
+      return candidates;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (axios.isAxiosError(error) && error.response?.status === 404) return [];
+      throw new AppError("Chưa thể tra cứu vị trí địa chỉ lúc này. Vui lòng thử lại sau.", 503);
+    }
+  }).finally(() => pendingSearches.delete(key));
+  pendingSearches.set(key, request);
   return request;
 };
 

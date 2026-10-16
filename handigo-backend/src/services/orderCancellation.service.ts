@@ -16,11 +16,12 @@ import { Provider } from "../models/provider.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { Refund, IRefund } from "../models/refund.model";
+import { RepairQuotation } from "../models/repairQuotation.model";
 import User from "../models/user.model";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { createLogger } from "../utils/logger";
-import { buildTransactionCode } from "../utils/transaction";
+import { buildTransactionCode, withTransactionRetry } from "../utils/transaction";
 import { createNotificationRecord } from "./notification.service";
 import { emitToUser } from "../sockets/socketServer";
 import {
@@ -46,6 +47,7 @@ export interface CancellationExpectation {
 
 interface CancelOrderInput {
   confirmedExpectation?: CancellationExpectation;
+  quotationRejection?: { quotationId: string; revision: number; reason?: string };
   orderId: string;
   actorId?: string;
   role: CancellationRole;
@@ -1436,7 +1438,7 @@ export const cancelOrdersWithSettlement = async (
   }> = [];
 
   try {
-    await session.withTransaction(async () => {
+    await withTransactionRetry(session, async () => {
       results = [];
       for (const input of inputs) {
         const reason = input.reason.trim();
@@ -1455,6 +1457,7 @@ export const cancelOrdersWithSettlement = async (
         }
 
         if (order.status === "cancelled") {
+          if (input.quotationRejection) throw new ActionPreconditionError("Đơn đã được hủy trước đó. Vui lòng kiểm tra trạng thái báo giá và khoản hoàn hiện tại.");
           results.push({ input, order, newlyCancelled: false, walletRefunds: [] });
           continue;
         }
@@ -1468,6 +1471,21 @@ export const cancelOrdersWithSettlement = async (
             'Không thể hủy đơn hàng ở trạng thái "' + order.status + '".',
             400,
           );
+        }
+
+        if (input.quotationRejection) {
+          const expected = input.quotationRejection;
+          if (input.role !== "customer" || order.currentQuotationId?.toString() !== expected.quotationId) {
+            throw new ActionPreconditionError("Báo giá hiện tại đã thay đổi. Vui lòng xem và xác nhận lại.");
+          }
+          // Khóa phiên bản trong cùng transaction hủy và hoàn tiền, tránh từ chối báo giá vừa sửa.
+          const rejected = await RepairQuotation.findOneAndUpdate({
+            _id: expected.quotationId, orderId: order._id, customerId: order.customerId,
+            status: "pending", isDeleted: false,
+            ...(expected.revision === 0 ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] } : { revision: expected.revision }),
+          }, { $set: { status: "rejected", rejectedAt: new Date(), rejectionReason: expected.reason ?? null } },
+          { session, runValidators: true, returnDocument: "after" });
+          if (!rejected) throw new ActionPreconditionError("Báo giá đã thay đổi hoặc không còn chờ phản hồi. Vui lòng kiểm tra lại.");
         }
 
       const cancelledAt = new Date();
