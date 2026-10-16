@@ -2,7 +2,7 @@ import axios from 'axios';
 
 /** Hằng số & hàm thuần cho CreateBookingStep2Page — tách ra để trang chính giữ dưới 200 dòng. */
 
-export const timeSlots = Array.from({ length: 10 }, (_, index) => {
+export const timeSlots = Array.from({ length: 14 }, (_, index) => {
   const startHour = 8 + index;
   return `${String(startHour).padStart(2, '0')}:00`;
 });
@@ -27,15 +27,69 @@ export const getUploadErrorMessage = (error: unknown) => {
   return 'Không thể tải ảnh lên. Vui lòng thử lại.';
 };
 
-export const getTodayInputValue = () => {
-  const today = new Date();
-  const timezoneOffset = today.getTimezoneOffset() * 60000;
-  return new Date(today.getTime() - timezoneOffset).toISOString().split('T')[0];
+export const getEarliestScheduledAt = (now = new Date()) => {
+  const earliest = new Date(now);
+  earliest.setSeconds(0, 0);
+  if (earliest.getHours() < 8) earliest.setHours(8, 0, 0, 0);
+  return earliest;
 };
 
-export const getUpcomingDates = () =>
-  Array.from({ length: 14 }, (_, index) => {
-    const date = new Date();
+export const isWithinImmediateBookingHours = (now = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value);
+
+  return hour >= 8 && (hour < 21 || (hour === 21 && minute === 0));
+};
+
+export const getTodayInputValue = (now = new Date()) => {
+  const timezoneOffset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - timezoneOffset).toISOString().split('T')[0];
+};
+
+export const getDefaultScheduledAt = (now = new Date()) => {
+  const date = getTodayInputValue(now);
+  const earliest = getEarliestScheduledAt(now).getTime();
+  const currentMinute = new Date(now);
+  currentMinute.setSeconds(0, 0);
+  if (now.getHours() < 8) return `${date}T${timeSlots[0]}:00`;
+  if ((now.getHours() < 21 || (now.getHours() === 21 && now.getMinutes() === 0))
+    && currentMinute.getTime() >= earliest) {
+    return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
+  }
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return `${getTodayInputValue(tomorrow)}T${timeSlots[0]}:00`;
+};
+
+export const getInitialScheduledAt = (scheduledAt: string | undefined, now = new Date()) => {
+  if (scheduledAt) {
+    const hasSelectedTime = scheduledAt.includes('T');
+    const selected = new Date(hasSelectedTime ? scheduledAt : `${scheduledAt}T08:00:00`);
+    if (Number.isFinite(selected.getTime())
+      && selected.getTime() >= getEarliestScheduledAt(now).getTime()
+      && selected.getHours() >= 8
+      && (selected.getHours() < 21 || (
+        selected.getHours() === 21
+        && selected.getMinutes() === 0
+        && selected.getSeconds() === 0
+        && selected.getMilliseconds() === 0
+      ))) {
+      if (hasSelectedTime) return scheduledAt;
+      if (selected.getTime() > getEarliestScheduledAt(now).getTime()) return `${scheduledAt}T${timeSlots[0]}:00`;
+    }
+  }
+  return getDefaultScheduledAt(now);
+};
+
+export const getUpcomingDates = (now = new Date()) =>
+  Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now);
     date.setDate(date.getDate() + index);
     const timezoneOffset = date.getTimezoneOffset() * 60000;
     return {

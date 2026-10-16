@@ -4,6 +4,7 @@ import * as providerProfileService from "../services/providerProfile.service";
 import { AppError } from "../utils/appError";
 import {
   createCertificateSchema,
+  featuredProviderQuerySchema,
   submitIdentitySchema,
   updateCertificateSchema,
   updateProviderProfileSchema,
@@ -29,12 +30,13 @@ export const getMyProfile = async (
 };
 
 export const getFeaturedProviders = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const data = await providerProfileService.getFeaturedProviders();
+    const query = featuredProviderQuerySchema.parse(req.query);
+    const data = await providerProfileService.getFeaturedProviders(query);
     return res.json({ success: true, data });
   } catch (error) {
     return next(error);
@@ -67,6 +69,11 @@ export const getNearbyProviders = async (
       throw new AppError("Vui lòng chọn dịch vụ và địa chỉ.", 400);
     }
 
+    let selectedOptions: unknown;
+    if (req.query.selectedOptions) {
+      try { selectedOptions = JSON.parse(String(req.query.selectedOptions)); }
+      catch { throw new AppError("Tùy chọn dịch vụ không hợp lệ.", 400); }
+    }
     const data = await providerProfileService.getNearbyProvidersForCustomer(
       userId,
       serviceId,
@@ -75,6 +82,7 @@ export const getNearbyProviders = async (
       recurrenceUnit,
       recurrenceCount,
       orderId,
+      selectedOptions,
     );
 
     return res.json({ success: true, data });

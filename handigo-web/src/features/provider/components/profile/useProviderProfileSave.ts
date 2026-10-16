@@ -1,3 +1,4 @@
+import { useToast } from "@/components/common/Toast";
 import type { Dispatch, SetStateAction } from "react";
 import {
   updateUserAvatar,
@@ -27,6 +28,7 @@ export function useProviderProfileSave({
   setError,
   syncAuthUser,
 }: UseProviderProfileSaveParams) {
+  const { addToast } = useToast();
   async function handleUserProfileSave(payload: UserProfileFormValue) {
     setIsSaving(true);
     setError(null);
@@ -49,6 +51,7 @@ export function useProviderProfileSave({
           : current,
       );
       syncAuthUser(nextUser);
+      addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (saveError) {
       setError(
         getErrorMessage(
@@ -81,6 +84,7 @@ export function useProviderProfileSave({
           : current,
       );
       syncAuthUser(nextUser);
+      addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (saveError) {
       setError(
         getErrorMessage(

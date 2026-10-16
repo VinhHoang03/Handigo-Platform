@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import type { Category, Service, ServiceOption } from "@/types/booking";
 import { customerServiceApi } from "../api/customerService.api";
@@ -11,7 +12,7 @@ export function useServiceDetailData(serviceId: string | undefined) {
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const [relatedServices, setRelatedServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     const loadDetail = async () => {
@@ -46,7 +47,7 @@ export function useServiceDetailData(serviceId: string | undefined) {
     };
 
     void loadDetail();
-  }, [serviceId]);
+  }, [serviceId, setError]);
 
   return { service, categories, options, relatedServices, isLoading, error };
 }

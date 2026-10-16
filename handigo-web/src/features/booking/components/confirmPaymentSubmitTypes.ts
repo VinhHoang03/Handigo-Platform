@@ -5,6 +5,11 @@ import type { AvailableVoucher } from '../types/voucher.types';
 
 /** Tham số đầu vào cho `runConfirmPaymentSubmit` — tách riêng để giữ file logic dưới 200 dòng. */
 export interface ConfirmPaymentSubmitParams {
+  policyAccepted: boolean;
+  expectedBookingAmount: number;
+  expectedFinalAmount: number;
+  expectedVoucherCode?: string | null;
+  hasServiceOptions?: boolean;
   serviceId?: string;
   addressId?: string;
   orderType: CreateOrderPayload['orderType'];
@@ -12,6 +17,7 @@ export interface ConfirmPaymentSubmitParams {
   service: Service | null;
   selectedOptionIds: string[];
   selectedOptionQuantities?: Record<string, number>;
+  uniformQuantity?: number;
   preferredProviderId?: string;
   recurrenceUnit: CreateOrderPayload['recurrenceUnit'];
   recurrenceCount?: CreateOrderPayload['recurrenceCount'];

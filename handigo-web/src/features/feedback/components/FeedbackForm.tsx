@@ -1,3 +1,4 @@
+import { useToast } from "@/components/common/Toast";
 import { useEffect, useId, useMemo, useState } from 'react';
 import { ImagePlus, Send, X } from 'lucide-react';
 import { FloatingTextarea } from '@/components/common/FloatingField';
@@ -9,15 +10,18 @@ interface Props {
   feedback: Feedback | null;
   saving: boolean;
   save: (payload: FeedbackPayload, files: File[]) => Promise<void>;
+  onCancel?: () => void;
 }
 
-export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
+export function FeedbackForm({ orderId, feedback, saving, save, onCancel }: Props) {
+  const { addToast } = useToast();
   const fileInputId = useId();
   const [rating, setRating] = useState(feedback?.rating || 0);
   const [comment, setComment] = useState(feedback?.comment || '');
   const [existingImages, setExistingImages] = useState<string[]>(feedback?.images || []);
   const [files, setFiles] = useState<File[]>([]);
   const [message, setMessage] = useState('');
+  const reportError = (message: string) => { setMessage(message); addToast(message, "error"); };
   const previews = useMemo(
     () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [files],
@@ -29,39 +33,40 @@ export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
   );
 
   const selectFiles = (selectedFiles: File[]) => {
-    const remaining = 5 - existingImages.length;
+    const remaining = 5 - existingImages.length - files.length;
     const invalidFile = selectedFiles.find(
       (file) => !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024,
     );
     if (invalidFile) {
-      setMessage('Mỗi tệp phải là hình ảnh và có dung lượng không quá 5 MB.');
+      reportError('Mỗi tệp phải là hình ảnh và có dung lượng không quá 5 MB.');
       return;
     }
     if (selectedFiles.length > remaining) {
-      setMessage(`Bạn chỉ có thể chọn thêm tối đa ${remaining} ảnh.`);
+      reportError(`Bạn chỉ có thể chọn thêm tối đa ${remaining} ảnh.`);
     } else {
       setMessage('');
     }
-    setFiles(selectedFiles.slice(0, remaining));
+    setFiles((current) => [...current, ...selectedFiles.slice(0, remaining)]);
   };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!rating) {
-      setMessage('Vui lòng chọn số sao.');
+      reportError('Vui lòng chọn số sao.');
       return;
     }
     if (existingImages.length + files.length > 5) {
-      setMessage('Chỉ được tải tối đa 5 ảnh.');
+      reportError('Chỉ được tải tối đa 5 ảnh.');
       return;
     }
 
     try {
       await save({ orderId, rating, comment: comment.trim() || null, images: existingImages }, files);
       setFiles([]);
-      setMessage(feedback ? 'Đã cập nhật đánh giá.' : 'Đã gửi đánh giá.');
+      setMessage('');
+      addToast(feedback ? 'Đã cập nhật đánh giá.' : 'Đã gửi đánh giá.', 'success');
     } catch (requestError) {
-      setMessage(requestError instanceof Error ? requestError.message : 'Không thể lưu đánh giá.');
+      reportError(requestError instanceof Error ? requestError.message : 'Không thể lưu đánh giá.');
     }
   };
 
@@ -139,9 +144,17 @@ export function FeedbackForm({ orderId, feedback, saving, save }: Props) {
       </div>
 
       {message && <p className="rounded-2xl bg-primary/10 p-3 text-primary">{message}</p>}
-      <button disabled={saving} className="btn-primary w-full">
-        <Send size={18} /> {saving ? 'Đang lưu...' : feedback ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}
-      </button>
+      <div className={feedback && onCancel ? 'grid grid-cols-2 gap-2' : ''}>
+        {feedback && onCancel && (
+          <button type="button" disabled={saving} onClick={onCancel} className="btn-secondary min-w-0 px-3 text-sm">
+            Hủy chỉnh sửa
+          </button>
+        )}
+        <button type="submit" disabled={saving} className={`btn-primary w-full ${feedback && onCancel ? 'min-w-0 px-3 text-sm' : ''}`}>
+          <Send size={18} className="shrink-0" />
+          <span>{saving ? 'Đang lưu...' : feedback ? 'Cập nhật đánh giá' : 'Gửi đánh giá'}</span>
+        </button>
+      </div>
     </form>
   );
 }

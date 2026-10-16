@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AgentBookingService } from "../../services/agentBooking.service";
+import { uniqueBookingAddresses } from "../agent/booking-draft";
 import { ToolRegistry } from "./tool-registry";
 import type { ToolPolicy } from "./tool.interface";
 import { searchServicesTool } from "./implementations/search-services.tool";
@@ -23,9 +24,15 @@ import { cancelComplaintTool } from "./implementations/cancel-complaint.tool";
 import { searchCustomerKnowledgeTool } from "./implementations/search-customer-knowledge.tool";
 import { getSystemInfoTool } from "./implementations/get-system-info.tool";
 import { getCancellationPreviewTool } from "./implementations/get-cancellation-preview.tool";
+import { updateBookingDraftTool } from "./implementations/update-booking-draft.tool";
+import { getBookingVouchersTool, searchBookingProvidersTool, saveBookingAddressTool } from "./implementations/booking-extras.tools";
+import { getOrderProviderOptionsTool, selectOrderProviderTool, respondProviderReassignmentTool } from "./implementations/order-provider.tools";
 
 export function registerTools(policies: Record<string, ToolPolicy>) {
-  return new ToolRegistry(policies)
+  return new ToolRegistry(policies, true)
+    .register(updateBookingDraftTool)
+    .register(getOrderProviderOptionsTool).register(selectOrderProviderTool).register(respondProviderReassignmentTool)
+    .register(getBookingVouchersTool).register(searchBookingProvidersTool).register(saveBookingAddressTool)
     .register(createSupportTicketTool).register(getMySupportTicketsTool).register(getSupportTicketTool)
     .register(replySupportTicketTool).register(cancelSupportTicketTool)
     .register(createComplaintTool).register(getMyComplaintsTool).register(getComplaintTool).register(cancelComplaintTool)
@@ -38,7 +45,15 @@ export function registerTools(policies: Record<string, ToolPolicy>) {
     .register(getPriceTool).register(getAvailableTimesTool).register(createBookingTool).register(cancelBookingTool)
     .register({ name: "get_addresses", description: "Lấy địa chỉ đã lưu của chính khách hàng để chọn địa chỉ đặt dịch vụ.",
       inputSchema: z.object({}).strict(), mutates: false, requiresConfirmation: false, roles: ["CUSTOMER"],
-      execute: (context) => AgentBookingService.addresses(context.user.id) })
+      execute: async (context) => {
+        const lookup = () => AgentBookingService.addresses(context.user.id);
+        const addresses = context.bookingAddressLookup
+          ? await (context.bookingAddressLookup.value ??= lookup().catch((error) => {
+            context.bookingAddressLookup!.value = undefined;
+            throw error;
+          })) : await lookup();
+        return uniqueBookingAddresses(addresses, context.session?.bookingDraft?.values.addressId);
+      } })
     .register({ name: "get_booking", description: "Kiểm tra trạng thái đơn theo ID do hệ thống cung cấp.",
       inputSchema: z.object({ orderId: idSchema }).strict(), mutates: false, requiresConfirmation: false, roles: ["CUSTOMER"],
       execute: (context, args) => AgentBookingService.getBooking(context.user.id, args.orderId) })

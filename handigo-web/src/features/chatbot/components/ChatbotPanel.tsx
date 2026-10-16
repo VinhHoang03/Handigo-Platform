@@ -3,7 +3,8 @@ import type { ChatbotAudience, ChatbotMessage } from "../types/chatbot.types";
 import { ChatbotComposer } from "./ChatbotComposer";
 import { ChatbotMessageList } from "./ChatbotMessageList";
 import { ChatbotAvatar } from "./ChatbotAvatar";
-import { X } from "lucide-react";
+import { History, X } from "lucide-react";
+import type { ReactNode } from "react";
 import type { AgentConfirmation, AgentPayment } from "../types/agent.types";
 import { AgentPaymentCard } from "./AgentPaymentCard";
 import { AgentConfirmationCard } from "./AgentConfirmationCard";
@@ -19,6 +20,7 @@ export function ChatbotPanel({
   messages,
   isLoading,
   isReplying,
+  activity,
   error,
   availabilityMessage,
   onClose,
@@ -29,13 +31,18 @@ export function ChatbotPanel({
   onNewSession,
   taskBlocked = false,
   payment,
+  paymentMessageId,
   onCheckPayment,
+  onChangePaymentMethod,
   onContinue,
+  history,
+  onToggleHistory,
 }: {
   audience: ChatbotAudience;
   messages: ChatbotMessage[];
   isLoading: boolean;
   isReplying: boolean;
+  activity?: string;
   error: string;
   availabilityMessage: string;
   onClose: () => void;
@@ -46,8 +53,12 @@ export function ChatbotPanel({
   onNewSession?: () => void;
   taskBlocked?: boolean;
   payment?: AgentPayment | null;
+  paymentMessageId?: string;
   onCheckPayment?: (orderId: string) => void;
+  onChangePaymentMethod?: (orderId: string) => void;
   onContinue?: () => void;
+  history?: ReactNode;
+  onToggleHistory?: () => void;
 }) {
   return (
     <aside
@@ -70,6 +81,11 @@ export function ChatbotPanel({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {onToggleHistory && <button type="button" onClick={onToggleHistory}
+              disabled={isLoading || isReplying} aria-label={history ? "Quay lại cuộc trò chuyện" : "Mở lịch sử trò chuyện"}
+              aria-pressed={Boolean(history)} className="rounded-full p-2 hover:bg-white/15 disabled:opacity-40">
+              <History aria-hidden="true" size={20} />
+            </button>}
             <button
               type="button"
               onClick={onClose}
@@ -82,7 +98,7 @@ export function ChatbotPanel({
         </div>
       </header>
 
-      {isLoading ? (
+      {history || (isLoading ? (
         <div
           className="flex-1 space-y-3 overflow-y-auto p-4"
           role="status"
@@ -95,20 +111,29 @@ export function ChatbotPanel({
         </div>
       ) : (
         <ChatbotMessageList
+          onSend={onSend}
+          choicesDisabled={taskBlocked || Boolean(pendingConfirmation) || Boolean(availabilityMessage) || Boolean(error)}
           messages={messages}
           isReplying={isReplying}
+          activity={activity}
           audience={audience}
+          pendingActionId={pendingConfirmation?.actionId}
+          confirmationsDisabled={isLoading || taskBlocked || Boolean(error) || Boolean(availabilityMessage)}
+          onDecision={onDecision}
+          renderAfterMessage={(message) => payment && onCheckPayment && message._id === paymentMessageId
+            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
+            : null}
         >
-          {pendingConfirmation && onDecision && (
+          {pendingConfirmation && onDecision && !messages.some((message) => message.confirmation?.actionId === pendingConfirmation.actionId) && (
             <AgentConfirmationCard action={pendingConfirmation} disabled={isReplying || isLoading || taskBlocked} onDecision={onDecision} />
           )}
-          {payment && onCheckPayment && (
-            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} />
+          {payment && onCheckPayment && !messages.some((message) => message._id === paymentMessageId) && (
+            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
           )}
         </ChatbotMessageList>
-      )}
+      ))}
 
-      {onContinue && !pendingConfirmation && !taskBlocked && (
+      {!history && onContinue && !pendingConfirmation && !taskBlocked && (
         <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">Tiếp tục yêu cầu</button>
       )}
       {availabilityMessage && (
@@ -134,13 +159,13 @@ export function ChatbotPanel({
           </button>
         </div>
       )}
-      <ChatbotComposer
-        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation) || taskBlocked}
+      {!history && <ChatbotComposer
+        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking") || taskBlocked}
         onSend={onSend}
         onNewSession={onNewSession}
         resetDisabled={isLoading || isReplying || Boolean(pendingConfirmation) || taskBlocked}
         voiceEnabled={audience === "CUSTOMER"}
-      />
+      />}
     </aside>
   );
 }

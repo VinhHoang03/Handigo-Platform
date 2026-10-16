@@ -23,5 +23,10 @@ router.put(
   validate(currentLocationSchema),
   locationController.updateCurrentLocation,
 );
+router.delete(
+  "/me",
+  roleMiddleware("PROVIDER"),
+  locationController.deactivateCurrentLocation,
+);
 
 export default router;

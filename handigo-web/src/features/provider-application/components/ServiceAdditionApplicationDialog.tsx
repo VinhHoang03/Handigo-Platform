@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
 import { Modal } from "@/components/common/Modal";
 import { getErrorMessage } from "@/utils/apiError";
@@ -28,6 +29,7 @@ export function ServiceAdditionApplicationDialog({
   onClose,
   onSubmitted,
 }: Props) {
+  const { addToast } = useToast();
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(() =>
     application?.applicationType === "service_addition"
       ? application.serviceIds.map(serviceId)
@@ -35,7 +37,7 @@ export function ServiceAdditionApplicationDialog({
   );
   const [description, setDescription] = useState(application?.description || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useToastFeedback<string>("", "error");
   const {
     certificates,
     certificateForm,
@@ -90,6 +92,7 @@ export function ServiceAdditionApplicationDialog({
         await providerApplicationApi.createServiceAddition(payload);
       }
       onSubmitted();
+      addToast("Đã gửi đơn đăng ký thêm dịch vụ.", "success");
       onClose();
     } catch (submitError) {
       setError(getErrorMessage(submitError, "Không thể gửi đơn đăng ký dịch vụ."));
@@ -115,11 +118,6 @@ export function ServiceAdditionApplicationDialog({
           </p>
         </div>
 
-        {error && (
-          <p className="rounded-xl bg-error/10 p-3 text-sm font-medium text-error">
-            {error}
-          </p>
-        )}
 
         {isLoading ? (
           <div className="h-48 animate-pulse rounded-2xl bg-surface-container-low" />

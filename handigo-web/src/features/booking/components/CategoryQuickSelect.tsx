@@ -21,9 +21,9 @@ export const CategoryQuickSelect = ({ categories, categoryId, onSelect, onOpenMo
         <div className="mb-2 flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-primary-container/10 transition-colors group-hover:bg-primary-container/20">
           <CategoryIcon
             icon={cat.icon}
+            color={cat.iconColor}
             name={cat.name}
             className="h-6 w-6 text-primary"
-            imageClassName="h-7 w-7 object-contain"
           />
         </div>
         <span className="line-clamp-2 text-label-sm font-bold leading-snug text-on-surface">{cat.name}</span>

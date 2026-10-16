@@ -58,6 +58,7 @@ export function ProviderProfileMainGrid({
   canReceiveJobs,
   verificationItems,
   onPasswordClick,
+  canChangePassword,
   serviceArea,
   onEditServiceArea,
   applicationHistoryKey,
@@ -90,6 +91,7 @@ export function ProviderProfileMainGrid({
   canReceiveJobs: boolean;
   verificationItems: VerificationActionItem[];
   onPasswordClick: () => void;
+  canChangePassword: boolean;
   serviceArea: ServiceArea;
   onEditServiceArea: () => void;
   applicationHistoryKey: number;
@@ -152,7 +154,10 @@ export function ProviderProfileMainGrid({
 
       <div className="col-span-12 flex min-w-0 flex-col gap-gutter xl:col-span-5">
         <VerificationPanel items={verificationItems} />
-        <AccountFunctionsPanel onPasswordClick={onPasswordClick} />
+        <AccountFunctionsPanel
+          onPasswordClick={onPasswordClick}
+          canChangePassword={canChangePassword}
+        />
         <ServiceAreaPanel area={serviceArea} onEdit={onEditServiceArea} />
 
         <ProfileSection title="Lịch sử đơn/hồ sơ">

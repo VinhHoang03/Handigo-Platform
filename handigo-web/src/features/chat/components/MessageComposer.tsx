@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { ImagePlus, Loader2, X } from "lucide-react";
 
@@ -14,7 +15,7 @@ export function MessageComposer({
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [, setError] = useToastFeedback<string>('', "error");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,7 +77,6 @@ export function MessageComposer({
           </button>
         </div>
       )}
-      {error && <p className="mb-2 text-xs text-error">{error}</p>}
       <div className="flex items-end gap-2">
       <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={selectImage} className="hidden" />
       <button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || busy} aria-label="Chọn ảnh" className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary/10 disabled:opacity-40">

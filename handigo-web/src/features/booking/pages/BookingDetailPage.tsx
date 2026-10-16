@@ -43,6 +43,7 @@ const BookingDetailPage = () => {
     appliedDepositAmount,
     remainingQuotationAmount,
     canMakeInitialPayment,
+    canChangePayment,
     timeline,
   } = useBookingDetail();
 
@@ -107,6 +108,7 @@ const BookingDetailPage = () => {
             order={order}
             busy={busy}
             canMakeInitialPayment={canMakeInitialPayment}
+            canChangePayment={canChangePayment}
             paymentError={paymentFlow.paymentError}
             paymentMethodModalOpen={paymentFlow.paymentMethodModalOpen}
             initialPaymentMethod={paymentFlow.initialPaymentMethod}
@@ -140,14 +142,10 @@ const BookingDetailPage = () => {
               busy={busy}
               appliedDepositAmount={appliedDepositAmount}
               remainingQuotationAmount={remainingQuotationAmount}
-              onConfirm={cancellationFlow.handleConfirmQuotation}
               onReject={cancellationFlow.handleRejectQuotation}
             />
           </BookingServiceSummary>
 
-          {order.status === "completed" && (
-            <OrderFeedbackSection orderId={order._id} />
-          )}
         </div>
 
         <aside className="lg:col-span-4 flex flex-col gap-lg">
@@ -156,6 +154,7 @@ const BookingDetailPage = () => {
             orderId={order._id}
             orderStatus={order.status}
             hasSuccessfulPayment={hasSuccessfulPayment}
+            providerUnavailable={order.status === "cancelled" && /^Không (?:tìm thấy thợ (?:nhận đơn|phù hợp)|có provider nhận đơn)/u.test(order.cancellation?.reason || "")}
           />
 
           <BookingStatusTimeline
@@ -164,11 +163,16 @@ const BookingDetailPage = () => {
             timeline={timeline}
           />
 
+          {order.status === "completed" && (
+            <OrderFeedbackSection orderId={order._id} />
+          )}
+
           <BookingRefundPanel
             order={order}
             busy={busy}
             pendingAction={cancellationFlow.pendingAction}
             cancellationPreview={cancellationFlow.cancellationPreview}
+            cancellationLocked={cancellationFlow.cancellationLocked}
             onCancelOrder={() => void cancellationFlow.handleCancelOrder()}
             onCancelSeries={() => void cancellationFlow.handleCancelSeries()}
             onCloseDialog={cancellationFlow.closeActionDialog}

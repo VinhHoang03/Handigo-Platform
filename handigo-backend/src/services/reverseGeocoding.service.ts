@@ -25,6 +25,7 @@ type LocationIqAddress = {
   hamlet?: string;
   municipality?: string;
   city_district?: string;
+  state_district?: string;
   district?: string;
   county?: string;
   city?: string;
@@ -68,6 +69,14 @@ let lastRequestAt = 0;
 const firstValue = (...values: Array<string | undefined>) =>
   values.find((value) => value?.trim())?.trim() || "";
 
+const isLowerAdministrativeUnit = (value: string) =>
+  /^(phuong|xa|thi tran|quan|huyen)(?:\s|$)/.test(
+    value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+  );
+
+const firstProvinceValue = (...values: Array<string | undefined>) =>
+  values.find((value) => value?.trim() && !isLowerAdministrativeUnit(value))?.trim() || "";
+
 const getProvinceFromDisplayName = (
   fullAddress: string,
   country?: string,
@@ -76,7 +85,7 @@ const getProvinceFromDisplayName = (
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
-  const normalizedCountry = country?.trim().toLocaleLowerCase("vi-VN");
+  const normalizedCountry = country?.trim()?.toLocaleLowerCase("vi-VN");
 
   while (parts.length > 0) {
     const lastPart = parts[parts.length - 1];
@@ -90,6 +99,9 @@ const getProvinceFromDisplayName = (
       parts.pop();
       continue;
     }
+    if (isLowerAdministrativeUnit(lastPart)) {
+      return "";
+    }
     return lastPart;
   }
 
@@ -98,6 +110,19 @@ const getProvinceFromDisplayName = (
 
 const getCacheKey = ({ latitude, longitude }: ReverseGeocodeQuery) =>
   `${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+
+const validateCoordinates = ({ latitude, longitude }: ReverseGeocodeQuery) => {
+  if (
+    !Number.isFinite(latitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    !Number.isFinite(longitude) ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    throw new AppError("Tọa độ vị trí không hợp lệ.", 400);
+  }
+};
 
 const getCached = (key: string) => {
   const entry = cache.get(key);
@@ -139,23 +164,25 @@ const enqueueLocationIqRequest = async <T>(request: () => Promise<T>) => {
   }
 };
 
+const resolveProvince = (response: LocationIqResponse) => {
+  const address = response.address;
+  return firstProvinceValue(
+    address?.state,
+    address?.province,
+    getProvinceFromDisplayName(response.display_name || "", address?.country),
+    address?.city,
+    address?.region,
+  );
+};
+
 const normalizeResponse = (
   response: LocationIqResponse,
   query: ReverseGeocodeQuery,
+  resolvedProvince?: string,
 ): ReverseGeocodedAddress => {
   const address = response.address;
   const fullAddress = response.display_name?.trim() || "";
-  const provinceFromDisplayName = getProvinceFromDisplayName(
-    fullAddress,
-    address?.country,
-  );
-  const province = firstValue(
-    address?.state,
-    address?.province,
-    address?.region,
-    provinceFromDisplayName,
-    address?.city,
-  );
+  const province = resolvedProvince || resolveProvince(response);
   const ward = firstValue(
     address?.quarter,
     address?.suburb,
@@ -167,9 +194,11 @@ const normalizeResponse = (
     address?.municipality,
     address?.borough,
     address?.city_district,
+    address?.state_district,
     address?.district,
     address?.county,
     address?.city,
+    address?.state && isLowerAdministrativeUnit(address.state) ? address.state : undefined,
   );
 
   if (!fullAddress || !province || !ward) {
@@ -210,7 +239,7 @@ const getLocationIqApiKey = () => {
 
 const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
   try {
-    const response = await axios.get<LocationIqResponse>(LOCATIONIQ_URL, {
+    const requestOptions = {
       params: {
         key: getLocationIqApiKey(),
         lat: query.latitude,
@@ -218,13 +247,15 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
         format: "json",
         zoom: 18,
         addressdetails: 1,
+        normalizeaddress: 1,
         "accept-language": "vi",
       },
       headers: {
         Accept: "application/json",
       },
       timeout: REQUEST_TIMEOUT_MS,
-    });
+    };
+    const response = await axios.get<LocationIqResponse>(LOCATIONIQ_URL, requestOptions);
 
     if (response.data.error) {
       throw new AppError(
@@ -232,7 +263,19 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
         422,
       );
     }
-    return normalizeResponse(response.data, query);
+    // Giữ địa chỉ chi tiết; chỉ tra cứu cấp tỉnh khi kết quả cấp nhà thiếu tỉnh/thành.
+    let province = resolveProvince(response.data);
+    if (!province) {
+      const remainingDelay = MIN_REQUEST_INTERVAL_MS - (Date.now() - lastRequestAt);
+      if (remainingDelay > 0) await wait(remainingDelay);
+      lastRequestAt = Date.now();
+      const provinceResponse = await axios.get<LocationIqResponse>(LOCATIONIQ_URL, {
+        ...requestOptions,
+        params: { ...requestOptions.params, zoom: 5 },
+      });
+      province = resolveProvince(provinceResponse.data);
+    }
+    return normalizeResponse(response.data, query, province);
   } catch (error) {
     if (error instanceof AppError) throw error;
     if (axios.isAxiosError(error)) {
@@ -244,6 +287,20 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
           code: error.code,
         },
       );
+
+      if ([401, 403].includes(error.response?.status ?? 0)) {
+        throw new AppError(
+          "Dịch vụ xác định địa chỉ chưa được cấu hình đúng.",
+          503,
+        );
+      }
+
+      if (error.response?.status === 429) {
+        throw new AppError(
+          "Dịch vụ xác định địa chỉ đang quá tải. Vui lòng thử lại sau.",
+          503,
+        );
+      }
     }
     throw new AppError(
       "Dịch vụ xác định địa chỉ đang tạm thời gián đoạn. Vui lòng thử lại sau.",
@@ -253,6 +310,7 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
 };
 
 export const reverseGeocode = async (query: ReverseGeocodeQuery) => {
+  validateCoordinates(query);
   const cacheKey = getCacheKey(query);
   const cached = getCached(cacheKey);
   if (cached) return cached;

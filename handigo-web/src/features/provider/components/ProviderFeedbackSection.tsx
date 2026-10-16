@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import { TestimonialCard } from "@/components/common/TestimonialCard";
 import { TestimonialCardSkeleton } from "@/components/home/HomeSkeletons";
@@ -18,7 +19,7 @@ const performedAtOf = (feedback: Feedback) => {
 export function ProviderFeedbackSection({ enabled = true }: { enabled?: boolean }) {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     if (!enabled) {
@@ -32,7 +33,7 @@ export function ProviderFeedbackSection({ enabled = true }: { enabled?: boolean 
       .catch(() => { if (!cancelled) setError("Không thể tải đánh giá khách hàng."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [enabled]);
+  }, [enabled, setError]);
 
   return (
     <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm">

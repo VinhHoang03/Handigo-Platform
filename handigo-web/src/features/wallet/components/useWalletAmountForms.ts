@@ -1,7 +1,9 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState, type FormEvent } from 'react';
 import { walletApi } from '../api/wallet.api';
 import { getErrorMessage, parseAmount } from './wallet-formatters';
 import { PENDING_DEPOSIT_ORDER_CODE_KEY } from './useWalletDepositReturn';
+import { tokenStorage } from '@/api/tokenStorage';
 
 interface UseWalletAmountFormsParams {
   isProvider: boolean;
@@ -18,8 +20,8 @@ export function useWalletAmountForms({ isProvider, walletBalance, refreshAll, se
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [depositError, setDepositError] = useState('');
-  const [withdrawError, setWithdrawError] = useState('');
+  const [depositError, setDepositError] = useToastFeedback<string>('', "error");
+  const [withdrawError, setWithdrawError] = useToastFeedback<string>('', "error");
 
   const changeDepositAmount = (amount: string) => {
     setDepositAmount(amount);
@@ -73,7 +75,10 @@ export function useWalletAmountForms({ isProvider, walletBalance, refreshAll, se
       setDepositAmount('');
       setNotice('Đã tạo liên kết nạp ví. Bạn sẽ được chuyển sang cổng thanh toán.');
       await refreshAll();
-      if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
+      if (result.checkoutUrl) {
+        tokenStorage.prepareExternalRedirect();
+        window.location.assign(result.checkoutUrl);
+      }
     } catch (err) {
       setDepositError(getErrorMessage(err));
     } finally {

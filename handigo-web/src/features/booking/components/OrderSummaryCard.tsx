@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { useNavigate } from 'react-router-dom';
-import { selectedServiceImage } from '../constants/bookingImages';
+import { ReliableImage } from '@/components/common/ReliableImage';
 import { useBookingStore } from '../hooks/useBookingStore';
 import { serviceCatalogApi } from '@/features/customer-service/api/serviceCatalog.api';
 import type { Service, ServiceOption } from '../../../types/booking';
 import { OrderSummaryPriceDetails } from './OrderSummaryPriceDetails';
 import { OrderSummaryActions } from './OrderSummaryActions';
-import { Calendar, User } from "lucide-react";
+import { useBookingPreview } from '../hooks/useBookingPreview';
+import type { BookingPreview } from '../api/booking.api';
 
 const getOptionPrice = (option: ServiceOption) => option.price ?? option.fixedPrice ?? 0;
 
@@ -16,29 +18,42 @@ export const OrderSummaryCard: React.FC<{
   actionTo?: string;
   onAction?: () => void;
   isLoading?: boolean;
+  actionDisabled?: boolean;
   summaryContent?: React.ReactNode;
+  scheduleContent?: React.ReactNode;
+  providerContent?: React.ReactNode;
   discountAmount?: number;
+  voucherCode?: string;
+  priceSnapshot?: Pick<BookingPreview, 'bookingAmount' | 'discountedAmount' | 'promotionDiscountAmount' | 'voucherDiscountAmount' | 'depositAmount'>;
+  skipPricePreview?: boolean;
 }> = ({
   step,
   actionLabel,
   actionTo,
   onAction,
   isLoading,
+  actionDisabled = false,
   summaryContent,
+  scheduleContent,
+  providerContent,
   discountAmount = 0,
+  voucherCode,
+  priceSnapshot,
+  skipPricePreview = false,
 }) => {
   const {
     categoryId,
     serviceId,
     selectedOptionIds,
     selectedOptionQuantities,
+    uniformQuantity,
     orderType,
-    scheduledAt,
-    preferredProviderName,
   } = useBookingStore();
   const [service, setService] = useState<Service | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const navigate = useNavigate();
+  const { preview, loading: priceLoading, error: priceError, retry } = useBookingPreview(voucherCode, !skipPricePreview);
+  const effectivePreview = priceSnapshot ?? preview;
 
   useEffect(() => {
     let isMounted = true;
@@ -63,9 +78,11 @@ export const OrderSummaryCard: React.FC<{
     return () => { isMounted = false; };
   }, [serviceId, categoryId]);
 
-  const selectedOptions = options.filter(opt => selectedOptionIds.includes(opt._id));
+  const isCleaning = isAirConditionerCleaning(service) && options.length === 0;
+  const selectedOptions = options.filter(opt => !isCleaning && selectedOptionIds.includes(opt._id));
 
   const calculateTotal = () => {
+    if (isCleaning) return (service?.fixedPrice || 0) * uniformQuantity;
     let total = 0;
     if (service?.serviceType === 'fixed_price') {
       total = 0;
@@ -80,8 +97,9 @@ export const OrderSummaryCard: React.FC<{
     return total;
   };
 
-  const total = calculateTotal();
-  const finalTotal = Math.max(total - discountAmount, 0);
+  const total = effectivePreview?.bookingAmount ?? calculateTotal();
+  const effectiveDiscount = effectivePreview ? effectivePreview.promotionDiscountAmount + effectivePreview.voucherDiscountAmount : discountAmount;
+  const finalTotal = effectivePreview?.discountedAmount ?? Math.max(total - Math.min(discountAmount, total), 0);
 
   const handleAction = () => {
     if (onAction) {
@@ -92,15 +110,15 @@ export const OrderSummaryCard: React.FC<{
   };
 
   return (
-    <aside className="space-y-md lg:sticky lg:top-24">
+    <aside className="space-y-md lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto">
       <div className="bg-surface-container-lowest rounded-3xl p-md shadow-lg border border-outline-variant/30">
         <h3 className="font-headline-md text-headline-md text-primary mb-md">Tóm tắt đơn hàng</h3>
 
         <div className="space-y-md">
           <div className="flex gap-sm p-sm bg-surface-container-low rounded-2xl">
-            <img
-              className="w-16 h-16 rounded-xl object-cover"
-              src={service?.image || selectedServiceImage}
+            <ReliableImage
+              className="w-24 aspect-video shrink-0 rounded-xl object-contain"
+              src={service?.coverImage === undefined ? service?.image : service.coverImage}
               alt={service?.name || 'Dịch vụ'}
             />
             <div>
@@ -108,40 +126,18 @@ export const OrderSummaryCard: React.FC<{
               <p className="text-xs text-on-surface-variant truncate max-w-[150px]">
                 {service?.description || 'Vui lòng chọn dịch vụ'}
               </p>
-              <p className="text-sm font-bold text-primary mt-1">
+              {!isCleaning && <p className="text-sm font-bold text-primary mt-1">
                 {service?.serviceType === 'fixed_price'
                   ? 'Giá theo tùy chọn'
                   : service?.serviceType === 'variable_price'
-                    ? `Phí cọc: ${(service.depositAmount || 0).toLocaleString()}đ`
+                    ? `Phí cọc: ${(effectivePreview?.depositAmount ?? service.depositAmount ?? 0).toLocaleString()}đ`
                     : '0đ'}
-              </p>
+              </p>}
             </div>
           </div>
 
-          {step >= 2 && orderType !== 'normal' && (
-            <div className="space-y-sm border-t border-dashed border-outline-variant pt-md text-sm">
-              <div className="flex items-start gap-sm">
-                <Calendar aria-hidden="true" size={19} className="text-primary" />
-                <div>
-                  <p className="text-xs text-on-surface-variant">Lịch thực hiện</p>
-                  <p className="font-bold text-on-surface">
-                    {scheduledAt?.includes('T')
-                      ? new Date(scheduledAt).toLocaleString('vi-VN')
-                      : 'Chưa chọn đủ ngày giờ'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-sm">
-                <User aria-hidden="true" size={19} className="text-primary" />
-                <div>
-                  <p className="text-xs text-on-surface-variant">Chuyên gia</p>
-                  <p className="font-bold text-on-surface">
-                    {preferredProviderName || 'Handigo tự điều phối'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {step === 2 && scheduleContent}
+          {step === 2 && providerContent}
 
           <OrderSummaryPriceDetails
             service={service}
@@ -149,9 +145,11 @@ export const OrderSummaryCard: React.FC<{
             selectedOptionQuantities={selectedOptionQuantities}
             total={total}
             finalTotal={finalTotal}
-            discountAmount={discountAmount}
+            discountAmount={effectiveDiscount}
             summaryContent={summaryContent}
           />
+          {priceLoading && <p role="status" className="text-sm">Đang cập nhật giá…</p>}
+          {priceError && <p role="alert" className="text-sm text-error">{priceError} <button type="button" onClick={retry} className="underline">Thử lại</button></p>}
         </div>
 
         <OrderSummaryActions
@@ -159,7 +157,7 @@ export const OrderSummaryCard: React.FC<{
           orderType={orderType}
           actionLabel={actionLabel}
           isLoading={isLoading}
-          disableAction={Boolean(isLoading || (step === 1 && !serviceId))}
+          disableAction={Boolean(actionDisabled || isLoading || priceLoading || priceError || !effectivePreview || (step === 1 && !serviceId))}
           onBack={() => navigate(-1)}
           onAction={handleAction}
         />

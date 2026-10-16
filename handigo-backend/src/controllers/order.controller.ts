@@ -5,12 +5,31 @@ import { AssignmentService } from "../services/assignment.service";
 import { DispatchService } from "../services/dispatch.service";
 import { OrderService } from "../services/order.service";
 import { AppError } from "../utils/appError";
+import { previewServiceBooking } from "../services/servicePricing.service";
+import { updateExpectedEnd } from "../services/providerSchedule.service";
 import { respondToProviderReassignment } from "../services/orderReassignment.service";
+import { getCustomerBookingPolicies } from "../services/bookingPolicy.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
 
 const uid = (req: Request): string => requireRequestUser(req).id;
+
+export const getBookingPolicies = async (_req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await getCustomerBookingPolicies()); }
+  catch (error) { return next(error); }
+};
+
+export const previewBooking = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    return ok(res, await previewServiceBooking(req.body, uid(req)));
+  } catch (error) { return next(error); }
+};
+
+export const updateOrderExpectedEnd = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await updateExpectedEnd(String(req.params.orderId), uid(req), new Date(req.body.expectedEndAt))); }
+  catch (error) { return next(error); }
+};
 
 const toOrderActorRole = (role: UserRole): "customer" | "provider" | "admin" =>
   role.toLowerCase() as "customer" | "provider" | "admin";
@@ -180,6 +199,7 @@ export const cancelOrder = async (
       uid(req),
       role,
       reason,
+      req.body.confirmedExpectation,
     );
     return ok(res, order);
   } catch (error) {
@@ -235,6 +255,7 @@ export const cancelRecurringSeries = async (
       param(req, "orderId"),
       uid(req),
       reason,
+      req.body.confirmedExpectations,
     );
     return ok(res, result);
   } catch (error) {
@@ -255,13 +276,22 @@ export const startOrder = async (
   }
 };
 
+export const confirmQuotationPayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { quotationId, expectedRevision } = req.body;
+    return ok(res, await AssignmentService.confirmQuotationPayment(param(req, "orderId"), uid(req), quotationId, expectedRevision));
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const completeOrder = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const { completionEvidenceImages, completionNote } = req.body;
+    const { completionEvidenceImages, completionNote, expectedQuotationId, expectedQuotationRevision } = req.body;
     const evidenceImages = Array.isArray(completionEvidenceImages)
       ? completionEvidenceImages.filter(
           (url): url is string => typeof url === "string",
@@ -272,6 +302,9 @@ export const completeOrder = async (
       uid(req),
       evidenceImages,
       typeof completionNote === "string" ? completionNote : undefined,
+      expectedQuotationId && expectedQuotationRevision !== undefined
+        ? { quotationId: expectedQuotationId, revision: expectedQuotationRevision }
+        : undefined,
     );
     return ok(res, order);
   } catch (error) {
@@ -372,6 +405,20 @@ export const createRepairQuotation = async (
       providerUserId,
     );
     return ok(res, quotation, 201);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const updateRepairQuotation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    return ok(res, await AssignmentService.updateRepairQuotation(
+      { ...req.body, orderId: param(req, "orderId") }, uid(req),
+    ));
   } catch (error) {
     return next(error);
   }

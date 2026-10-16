@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import mongoose, { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import User from "../models/user.model";
@@ -5,7 +6,7 @@ import { Provider, type IIdentityDocument, type IProviderCertificate } from "../
 import { ProviderApplication } from "../models/providerApplication.model";
 import { Session } from "../models/session.model";
 import { Service } from "../models/service.model";
-import { createNotificationRecord } from "./notification.service";
+import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 
 const notifyInitialApplicationSubmitted = async (
   userId: string,
@@ -88,7 +89,7 @@ interface ApplicationQuery {
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${fieldName}`, 400);
+    throw new AppError(`Định danh ${fieldName} không hợp lệ`, 400);
   }
 };
 
@@ -101,10 +102,11 @@ const getPagination = (query: ApplicationQuery) => {
 
 const servicePopulate = {
   path: "serviceIds",
-  select: "name slug categoryId serviceType fixedPrice image",
+  select: "name slug categoryId serviceType fixedPrice image coverImage",
+  transform: serviceImageResponse,
   populate: {
     path: "categoryId",
-    select: "name slug icon",
+    select: "name slug icon iconColor",
   },
 };
 
@@ -117,7 +119,7 @@ const assertServicesActive = async (serviceIds: string[]) => {
   });
 
   if (count !== uniqueIds.length) {
-    throw new AppError("One or more services are invalid", 400);
+    throw new AppError("Một hoặc nhiều dịch vụ không hợp lệ", 400);
   }
 
   return uniqueIds;
@@ -316,7 +318,7 @@ export const createApplication = async (
   userId: string,
   payload: CreateProviderApplicationPayload,
 ) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
   const applicationType = payload.applicationType || "initial";
   const serviceIds = await assertServicesActive(payload.serviceIds);
 
@@ -327,7 +329,7 @@ export const createApplication = async (
   }
 
   if (user.status !== "active") {
-    throw new AppError("Account is not active", 403);
+    throw new AppError("Tài khoản không ở trạng thái hoạt động", 403);
   }
 
   const canSubmitInitial =
@@ -453,7 +455,7 @@ export const saveDraftApplication = async (
   userId: string,
   payload: SaveProviderApplicationDraftPayload,
 ) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
 
   const user = await User.findOne({ _id: userId, isDeleted: false });
 
@@ -462,7 +464,7 @@ export const saveDraftApplication = async (
   }
 
   if (user.status !== "active") {
-    throw new AppError("Account is not active", 403);
+    throw new AppError("Tài khoản không ở trạng thái hoạt động", 403);
   }
 
   const canSaveInitialDraft =
@@ -535,7 +537,7 @@ export const saveDraftApplication = async (
 };
 
 export const getMyApplication = async (userId: string) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
 
   const activeApplication = await ProviderApplication.findOne({
     userId,
@@ -560,7 +562,7 @@ export const getMyApplications = async (
   userId: string,
   query: ApplicationQuery = {},
 ) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
   const { page, limit, skip } = getPagination(query);
   const filter = { userId, isDeleted: false };
   const [items, total] = await Promise.all([
@@ -584,8 +586,8 @@ export const getMyApplicationById = async (
   userId: string,
   applicationId: string,
 ) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(applicationId, "application id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(applicationId, "hồ sơ đăng ký");
 
   const application = await ProviderApplication.findOne({
     _id: applicationId,
@@ -607,8 +609,8 @@ export const resubmitApplication = async (
   applicationId: string,
   payload: CreateProviderApplicationPayload,
 ) => {
-  assertObjectId(userId, "user id");
-  assertObjectId(applicationId, "application id");
+  assertObjectId(userId, "người dùng");
+  assertObjectId(applicationId, "hồ sơ đăng ký");
   const serviceIds = await assertServicesActive(payload.serviceIds);
 
   const activeApplication = await ProviderApplication.exists({
@@ -722,7 +724,7 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
   }
 
   if (query.categoryId) {
-    assertObjectId(String(query.categoryId), "category id");
+    assertObjectId(String(query.categoryId), "danh mục");
     const services = await Service.find({
       categoryId: new Types.ObjectId(String(query.categoryId)),
       isActive: true,
@@ -761,7 +763,7 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
 };
 
 export const getApplicationById = async (applicationId: string) => {
-  assertObjectId(applicationId, "application id");
+  assertObjectId(applicationId, "hồ sơ đăng ký");
 
   const application = await ProviderApplication.findOne({
     _id: applicationId,
@@ -773,7 +775,7 @@ export const getApplicationById = async (applicationId: string) => {
     .populate("reviewHistory.actorId", "fullName email role");
 
   if (!application) {
-    throw new AppError("Provider application not found", 404);
+    throw new AppError("Không tìm thấy hồ sơ đăng ký nhà cung cấp", 404);
   }
 
   return application;
@@ -784,10 +786,11 @@ export const reviewApplication = async (
   applicationId: string,
   payload: ReviewProviderApplicationPayload,
 ) => {
-  assertObjectId(adminId, "admin id");
-  assertObjectId(applicationId, "application id");
+  assertObjectId(adminId, "quản trị viên");
+  assertObjectId(applicationId, "hồ sơ đăng ký");
 
   const session = await mongoose.startSession();
+  let reviewNotification: Awaited<ReturnType<typeof createNotificationRecord>> | undefined;
 
   try {
     await session.withTransaction(async () => {
@@ -797,7 +800,7 @@ export const reviewApplication = async (
       }).session(session);
 
       if (!application) {
-        throw new AppError("Provider application not found", 404);
+        throw new AppError("Không tìm thấy hồ sơ đăng ký nhà cung cấp", 404);
       }
 
       if (!["pending", "resubmitted"].includes(application.status)) {
@@ -808,6 +811,27 @@ export const reviewApplication = async (
       application.status = payload.status;
       application.reviewedBy = new Types.ObjectId(adminId);
       application.reviewedAt = reviewedAt;
+
+      const isServiceAddition = application.applicationType === "service_addition";
+      const approved = payload.status === "approved";
+      reviewNotification = await createNotificationRecord({
+        userId: application.userId,
+        type: "SYSTEM",
+        title: approved ? "Hồ sơ Provider đã được phê duyệt" : "Hồ sơ Provider cần chỉnh sửa",
+        content: approved
+          ? isServiceAddition
+            ? "Đơn bổ sung dịch vụ đã được phê duyệt. Dịch vụ và chứng chỉ mới đã được thêm vào hồ sơ của bạn."
+            : "Hồ sơ của bạn đã được phê duyệt. Vui lòng đăng nhập lại để cập nhật quyền Provider và bắt đầu nhận việc."
+          : `Hồ sơ bị từ chối: ${payload.rejectionReason}. ${payload.rejectionNotes} Vui lòng chỉnh sửa và gửi lại.`,
+        data: {
+          providerApplicationId: application._id,
+          applicationType: application.applicationType || "initial",
+          status: payload.status,
+          actionUrl: isServiceAddition
+            ? "/provider/profile"
+            : approved ? "/login" : `/register-provider?applicationId=${applicationId}`,
+        },
+      }, { session, deferRealtime: true });
 
       if (payload.status === "rejected") {
         application.rejectionReason = payload.rejectionReason || null;
@@ -822,16 +846,18 @@ export const reviewApplication = async (
           notes: payload.rejectionNotes || null,
         });
         await application.save({ session });
-        await User.updateOne(
-          { _id: application.userId, role: "PROVIDER", isDeleted: false },
-          {
-            $set: {
-              providerOnboardingStatus: "REJECTED",
-              providerOnboardingStep: 3,
+        if (!isServiceAddition) {
+          await User.updateOne(
+            { _id: application.userId, role: "PROVIDER", isDeleted: false },
+            {
+              $set: {
+                providerOnboardingStatus: "REJECTED",
+                providerOnboardingStep: 3,
+              },
             },
-          },
-          { runValidators: true, session },
-        );
+            { runValidators: true, session },
+          );
+        }
         return;
       }
 
@@ -927,5 +953,6 @@ export const reviewApplication = async (
     await session.endSession();
   }
 
+  if (reviewNotification) emitRealtimeNotification(reviewNotification);
   return getApplicationById(applicationId);
 };

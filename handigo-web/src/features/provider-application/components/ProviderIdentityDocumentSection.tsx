@@ -57,7 +57,7 @@ export function ProviderIdentityDocumentSection({
           <>
             <FileUploadSlot
               id="application-identity-front"
-              label="Ảnh mặt trước"
+              label="Ảnh mặt trước (bắt buộc)"
               value={identity.frontImageUrl}
               uploading={uploadingKey === "identity-front"}
               onUpload={(file) =>
@@ -67,7 +67,7 @@ export function ProviderIdentityDocumentSection({
             />
             <FileUploadSlot
               id="application-identity-back"
-              label="Ảnh mặt sau"
+              label="Ảnh mặt sau (tùy chọn)"
               value={identity.backImageUrl}
               uploading={uploadingKey === "identity-back"}
               onUpload={(file) =>
@@ -79,7 +79,7 @@ export function ProviderIdentityDocumentSection({
         ) : (
           <FileUploadSlot
             id="application-identity-passport"
-            label="Ảnh hộ chiếu"
+            label="Ảnh hộ chiếu (bắt buộc)"
             value={identity.passportImageUrl}
             uploading={uploadingKey === "identity-passport"}
             onUpload={(file) =>

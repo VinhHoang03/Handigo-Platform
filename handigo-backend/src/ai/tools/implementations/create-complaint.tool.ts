@@ -11,6 +11,6 @@ export const createComplaintTool: AgentTool<z.infer<typeof agentComplaintSchema>
   mutates: true,
   requiresConfirmation: true,
   preview: (context, args) => care.previewComplaint(context.user.id, args),
-  execute: (context, args) => care.createComplaint(context.user.id, args),
+  execute: (context, args) => care.createComplaint(context.user.id, args, context.sessionId),
   reply: receipt("Đã gửi khiếu nại, đang chờ xem xét. Đây chưa phải quyết định hoàn tiền."),
 };

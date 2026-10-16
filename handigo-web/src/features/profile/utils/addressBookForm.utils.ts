@@ -52,10 +52,16 @@ const normalizeAdministrativeUnitName = (value: string) =>
     .replace(/[.,_-]/g, " ")
     .replace(/\s+/g, " ")
     .replace(
-      /^(tinh|thanh pho|tp|phuong|xa|thi tran|đac khu|dac khu)\s+/,
+      /^(tinh|thanh pho|tp|city|province|phuong|xa|ward|thi tran|đac khu|dac khu)\s+/,
       "",
     )
+    .replace(/\s+(city|province|municipality)$/, "")
     .trim();
+
+const getAdministrativeNameCandidates = (item: AdministrativeUnit) =>
+  [item.name, item.codeName]
+    .map(normalizeAdministrativeUnitName)
+    .filter((value) => value.length >= 3);
 
 export const findAdministrativeUnitByName = (
   items: AdministrativeUnit[],
@@ -65,15 +71,41 @@ export const findAdministrativeUnitByName = (
   if (!normalizedTarget) return undefined;
 
   return items.find((item) => {
-    const normalizedName = normalizeAdministrativeUnitName(item.name);
-    const normalizedCodeName = normalizeAdministrativeUnitName(item.codeName);
+    const candidates = getAdministrativeNameCandidates(item);
     return (
-      normalizedName === normalizedTarget ||
-      normalizedCodeName === normalizedTarget ||
-      normalizedName.includes(normalizedTarget) ||
-      normalizedTarget.includes(normalizedName)
+      candidates.some((candidate) => candidate === normalizedTarget) ||
+      candidates.some(
+        (candidate) =>
+          candidate.length >= 6 && candidate.includes(normalizedTarget),
+      ) ||
+      candidates.some(
+        (candidate) =>
+          candidate.length >= 6 && normalizedTarget.includes(candidate),
+      )
     );
   });
+};
+
+export const findAdministrativeUnitInAddress = (
+  items: AdministrativeUnit[],
+  address: string,
+) => {
+  const normalizedAddress = normalizeAddressPart(address)
+    .replace(/[.,_-]/g, " ")
+    .replace(/\s+/g, " ");
+  if (!normalizedAddress) return undefined;
+
+  return items
+    .map((item) => ({
+      item,
+      candidate: getAdministrativeNameCandidates(item).find((value) =>
+        normalizedAddress.includes(value),
+      ),
+    }))
+    .filter((entry): entry is { item: AdministrativeUnit; candidate: string } =>
+      Boolean(entry.candidate),
+    )
+    .sort((left, right) => right.candidate.length - left.candidate.length)[0]?.item;
 };
 
 export const clearGeocodedFields = (

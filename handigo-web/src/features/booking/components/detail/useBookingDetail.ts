@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
 import { useParams } from "react-router-dom";
 import { useBookingDetailData } from "./useBookingDetailData";
 import { useMatchingCountdown } from "./useMatchingCountdown";
@@ -25,7 +26,10 @@ export const useBookingDetail = () => {
   const { isWaitingForProvider, matchingSecondsRemaining } =
     useMatchingCountdown(order);
 
-  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy, loadData);
+  const canChangePayment = Boolean(order && !order.inspectionRequired &&
+    order.status === "in_progress" && order.paymentStatus === "unpaid" &&
+    !payments.some((payment) => payment.paymentType === "full" && payment.status === "paid"));
+  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy, canChangePayment, data.updateOrder);
   const cancellationFlow = useBookingCancellationFlow(
     order,
     quotation,
@@ -66,13 +70,9 @@ export const useBookingDetail = () => {
         payment.paymentType === "inspection_deposit",
     )
     .reduce((total, payment) => total + payment.amount, 0);
-  // Đơn đã ghi nhận `depositPaidAt` thì lấy mức cọc lớn hơn giữa khoản đã thu và
-  // mức cọc của đơn — tránh hụt khi bản ghi payment chưa khớp đủ.
-  const appliedDepositAmount = order?.depositPaidAt
-    ? Math.max(paidDepositAmount, order.depositAmount || 0)
-    : paidDepositAmount;
+  const appliedDepositAmount = order ? getAppliedQuotationDeposit(order, paidDepositAmount) : paidDepositAmount;
   const remainingQuotationAmount = quotation
-    ? Math.max(quotation.quotation.finalAmount - appliedDepositAmount, 0)
+    ? getDirectRepairPayment(quotation.quotation.finalAmount, appliedDepositAmount)
     : 0;
   const canMakeInitialPayment = Boolean(
     order &&
@@ -101,6 +101,7 @@ export const useBookingDetail = () => {
     appliedDepositAmount,
     remainingQuotationAmount,
     canMakeInitialPayment,
+    canChangePayment,
     timeline,
   };
 };

@@ -71,6 +71,11 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+export const verifyResetPasswordOtpSchema = z.object({
+  email: emailSchema,
+  otp: otpSchema,
+});
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),

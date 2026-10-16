@@ -1,9 +1,11 @@
 import type { NavigateFunction } from "react-router-dom";
-import type { Address, Service } from "@/types/booking";
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import type { Address, Service, ServiceOption } from "@/types/booking";
 import { getCategoryId } from "../utils/serviceDisplay";
 import { isRequiredOptionSelectionMissing } from "@/features/booking/utils/serviceOptionSelection";
 
 interface UseBookNowHandlerParams {
+  options: ServiceOption[];
   service: Service | null;
   isAuthenticated: boolean;
   navigate: NavigateFunction;
@@ -11,6 +13,7 @@ interface UseBookNowHandlerParams {
   addresses: Address[];
   selectedOptionIds: string[];
   selectedOptionQuantities: Record<string, number>;
+  uniformQuantity: number;
   setAddressSelectionError: (message: string) => void;
   setOptionSelectionError: (message: string) => void;
   selectService: (
@@ -18,11 +21,13 @@ interface UseBookNowHandlerParams {
     serviceId: string,
     optionIds: string[],
     optionQuantities: Record<string, number>,
+    uniformQuantity?: number,
   ) => void;
 }
 
 /** Xác thực điều kiện đặt lịch (đăng nhập, địa chỉ, thợ, tùy chọn) rồi điều hướng sang bước chọn lịch. */
 export function useBookNowHandler({
+  options,
   service,
   isAuthenticated,
   navigate,
@@ -30,6 +35,7 @@ export function useBookNowHandler({
   addresses,
   selectedOptionIds,
   selectedOptionQuantities,
+  uniformQuantity,
   setAddressSelectionError,
   setOptionSelectionError,
   selectService,
@@ -44,12 +50,18 @@ export function useBookNowHandler({
       setAddressSelectionError("Vui lòng chọn địa chỉ thực hiện trước khi đặt lịch.");
       return;
     }
-    if (isRequiredOptionSelectionMissing(service, selectedOptionIds)) {
-      setOptionSelectionError("Vui lòng chọn ít nhất một tùy chọn dịch vụ.");
+    if (isRequiredOptionSelectionMissing(service, selectedOptionIds, options)) {
+      setOptionSelectionError("Vui lòng chọn đủ các nhóm tùy chọn bắt buộc.");
       return;
     }
 
-    selectService(getCategoryId(service), service._id, selectedOptionIds, selectedOptionQuantities);
+    if (isAirConditionerCleaning(service) && options.length === 0 && !(service.fixedPrice && service.fixedPrice > 0)) {
+      setOptionSelectionError("Dịch vụ chưa có giá hợp lệ. Vui lòng thử lại sau.");
+      return;
+    }
+    selectService(getCategoryId(service), service._id,
+      isAirConditionerCleaning(service) && options.length === 0 ? [] : selectedOptionIds,
+      isAirConditionerCleaning(service) && options.length === 0 ? {} : selectedOptionQuantities, uniformQuantity);
     navigate("/customer/bookings/new/location", {
       state: { fromServiceDetail: true },
     });

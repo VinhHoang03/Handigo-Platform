@@ -1,9 +1,11 @@
-import { Children, useEffect, useRef, type ReactNode } from "react";
+import { Children, Fragment, useEffect, useRef, type ReactNode } from "react";
 import type {
   ChatbotAudience,
   ChatbotMessage,
 } from "../types/chatbot.types";
 import { Bot } from "lucide-react";
+import { AgentChoiceGroups } from "./AgentChoiceGroups";
+import { AgentConfirmationCard } from "./AgentConfirmationCard";
 
 const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString("vi-VN", {
@@ -11,21 +13,60 @@ const formatTime = (value: string) =>
     minute: "2-digit",
   });
 
+function AgentMessageContent({ content }: { content: string }) {
+  const inline = (text: string) => text.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={index} className="font-semibold text-on-surface">{part.slice(2, -2)}</strong> : part);
+  return <div className="space-y-2 break-words [overflow-wrap:anywhere]">
+    {content.trim().split(/\n\s*\n/).map((paragraph, index) => {
+      const lines = paragraph.split("\n");
+      if (lines.every((line) => /^\s*(?:[-*•]|\d+[.)])\s+/.test(line))) {
+        return <ul key={index} className="list-disc space-y-1 pl-5 marker:text-primary/70">
+          {lines.map((line, lineIndex) => <li key={lineIndex}>{inline(line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, ""))}</li>)}
+        </ul>;
+      }
+      return <p key={index} className="whitespace-pre-wrap">{inline(paragraph)}</p>;
+    })}
+  </div>;
+}
+
 export function ChatbotMessageList({
   messages,
   isReplying,
+  activity,
   audience,
   children,
+  onSend,
+  choicesDisabled = false,
+  pendingActionId,
+  confirmationsDisabled = false,
+  onDecision,
+  renderAfterMessage,
 }: {
   messages: ChatbotMessage[];
   isReplying: boolean;
+  activity?: string;
   audience: ChatbotAudience;
   children?: ReactNode;
+  onSend?: (content: string) => Promise<void>;
+  choicesDisabled?: boolean;
+  pendingActionId?: string;
+  confirmationsDisabled?: boolean;
+  onDecision?: (decision: "CONFIRM" | "REJECT") => void;
+  renderAfterMessage?: (message: ChatbotMessage) => ReactNode;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const followsLatest = useRef(true);
+  const lastUserMessageId = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
+    const container = scrollRef.current;
+    const userMessageId = messages.findLast((message) => message.sender === "user")?._id;
+    if (userMessageId && userMessageId !== lastUserMessageId.current) followsLatest.current = true;
+    lastUserMessageId.current = userMessageId;
+    if (container && followsLatest.current) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [isReplying, messages, children]);
 
   if (!messages.length && !isReplying && Children.toArray(children).length === 0) {
@@ -49,22 +90,39 @@ export function ChatbotMessageList({
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.08),transparent_38%)] px-4 py-5">
+    <div
+      ref={scrollRef}
+      onScroll={(event) => {
+        const container = event.currentTarget;
+        followsLatest.current = container.scrollHeight - container.scrollTop - container.clientHeight <= 48;
+      }}
+      className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(79,70,229,0.08),transparent_38%)] px-4 py-5"
+    >
       {messages.map((message) => {
         const isUser = message.sender === "user";
         return (
+          <Fragment key={message._id}>
           <div
-            key={message._id}
             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+              className={`${isUser ? "max-w-[85%]" : "min-w-0 max-w-[95%] sm:max-w-[90%]"} rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                 isUser
                   ? "rounded-br-md bg-primary text-on-primary"
                   : "rounded-bl-md border border-outline-variant/30 bg-surface-container-lowest text-on-surface"
               }`}
             >
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              {!isUser && <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary"><Bot size={14} aria-hidden="true" />Trợ lý Handigo</div>}
+              {message.content && (isUser ? <p className="whitespace-pre-wrap break-words">{message.content}</p> : <AgentMessageContent content={message.content} />)}
+              {!isUser && message.confirmation && (
+                <AgentConfirmationCard action={message.confirmation}
+                  readOnly={message.confirmation.actionId !== pendingActionId}
+                  disabled={isReplying || confirmationsDisabled} onDecision={onDecision} />
+              )}
+              {!isUser && message._id === messages.at(-1)?._id && Boolean(message.choiceGroups?.length) && onSend && (
+                <AgentChoiceGroups key={message._id} groups={message.choiceGroups!}
+                  disabled={isReplying || choicesDisabled} onSend={onSend} />
+              )}
               <time
                 className={`mt-1 block text-right text-[10px] ${
                   isUser ? "text-on-primary/70" : "text-on-surface-variant"
@@ -74,6 +132,8 @@ export function ChatbotMessageList({
               </time>
             </div>
           </div>
+          {renderAfterMessage?.(message)}
+          </Fragment>
         );
       })}
       {children}
@@ -88,12 +148,11 @@ export function ChatbotMessageList({
               />
             ))}
             <span className="ml-2 text-xs text-on-surface-variant">
-              Đang trả lời
+              {activity || "Đang trả lời"}
             </span>
           </div>
         </div>
       )}
-      <div ref={bottomRef} />
     </div>
   );
 }

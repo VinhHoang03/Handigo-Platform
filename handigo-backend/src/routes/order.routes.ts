@@ -4,24 +4,32 @@ import { roleMiddleware } from "../middlewares/role.middleware";
 import { approvedProviderMiddleware } from "../middlewares/approvedProvider.middleware";
 import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
 import { uploadQuotationImage } from "../middlewares/quotationImageUpload.middleware";
+import { uploadQuotationAudio } from "../middlewares/quotationAudioUpload.middleware";
+import { quotationAgentAssist, quotationAgentHistory, quotationAgentTranscribe } from "../controllers/quotationAgent.controller";
+import { quotationAgentInputSchema, quotationHistoryQuerySchema } from "../validations/quotationAgent.validator";
 import { validate } from "../middlewares/validate.middleware";
 import {
   dispatchRateLimit,
   ocrRateLimit,
   routingRateLimit,
   uploadRateLimit,
+  resourceIntensiveRateLimit,
 } from "../middlewares/rateLimit.middleware";
 import {
   assignmentIdParamSchema,
   cancellationPreviewQuerySchema,
   cancelOrderSchema,
+  cancelRecurringSeriesSchema,
   completeOrderSchema,
   createRepairQuotationSchema,
+  updateRepairQuotationSchema,
+  confirmQuotationPaymentSchema,
   createOrderSchema,
+  previewBookingSchema,
+  updateExpectedEndSchema,
   orderIdParamSchema,
   orderListQuerySchema,
   quotationIdParamSchema,
-  quotationItemsRelevanceSchema,
   recentOrderQuerySchema,
   reassignmentResponseSchema,
   rejectAssignmentSchema,
@@ -31,6 +39,9 @@ import {
 } from "../validations/order.validator";
 import {
   createOrder,
+  previewBooking,
+  getBookingPolicies,
+  updateOrderExpectedEnd,
   discardUnpaidOrder,
   getMyOrders,
   getProviderOrders,
@@ -42,6 +53,7 @@ import {
   cancelRecurringSeries,
   startOrder,
   completeOrder,
+  confirmQuotationPayment,
   uploadOrderAttachment,
   acceptAssignment,
   rejectAssignment,
@@ -49,6 +61,7 @@ import {
   getOrderAssignments,
   redispatchOrder,
   createRepairQuotation,
+  updateRepairQuotation,
   getRepairQuotation,
   confirmRepairQuotation,
   rejectRepairQuotation,
@@ -56,15 +69,22 @@ import {
   respondToReassignment,
 } from "../controllers/order.controller";
 import { getOrderMatchingProviders, getOrderTrackingRoute } from "../controllers/orderTracking.controller";
-import {
-  scanQuotationItems,
-  validateQuotationItemsRelevance,
-} from "../controllers/quotationImageAnalysis.controller";
+import { scanQuotationItems } from "../controllers/quotationImageAnalysis.controller";
 
 const router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
+router.get("/booking-policies", roleMiddleware("CUSTOMER"), getBookingPolicies);
+router.post("/preview", roleMiddleware("CUSTOMER"), validate(previewBookingSchema), previewBooking);
+router.patch("/:orderId/expected-end", roleMiddleware("PROVIDER"), approvedProviderMiddleware, validate(orderIdParamSchema, "params"), validate(updateExpectedEndSchema), updateOrderExpectedEnd);
+
+router.get("/:orderId/quotation-agent/history", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  resourceIntensiveRateLimit, validate(orderIdParamSchema, "params"), validate(quotationHistoryQuerySchema, "query"), quotationAgentHistory);
+router.post("/:orderId/quotation-agent/assist", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  ocrRateLimit, validate(orderIdParamSchema, "params"), validate(quotationAgentInputSchema), quotationAgentAssist);
+router.post("/:orderId/quotation-agent/transcribe", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  ocrRateLimit, validate(orderIdParamSchema, "params"), uploadQuotationAudio, quotationAgentTranscribe);
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
@@ -121,15 +141,7 @@ router.post(
   scanQuotationItems,
 );
 
-router.post(
-  "/:orderId/quotation-items/validate",
-  roleMiddleware("PROVIDER"),
-  approvedProviderMiddleware,
-  ocrRateLimit,
-  validate(orderIdParamSchema, "params"),
-  validate(quotationItemsRelevanceSchema),
-  validateQuotationItemsRelevance,
-);
+
 
 router.get(
   "/:orderId/tracking-route",
@@ -193,7 +205,7 @@ router.patch(
   "/:orderId/cancel-series",
   roleMiddleware("CUSTOMER"),
   validate(orderIdParamSchema, "params"),
-  validate(cancelOrderSchema),
+  validate(cancelRecurringSeriesSchema),
   cancelRecurringSeries,
 );
 
@@ -204,6 +216,15 @@ router.post(
   approvedProviderMiddleware,
   validate(orderIdParamSchema, "params"),
   startOrder,
+);
+
+router.post(
+  "/:orderId/quotation/payment/confirm",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  validate(orderIdParamSchema, "params"),
+  validate(confirmQuotationPaymentSchema),
+  confirmQuotationPayment,
 );
 
 // POST   /orders/:orderId/complete → Provider: complete order
@@ -278,6 +299,16 @@ router.post(
 );
 
 // GET    /orders/:orderId/quotation           → Provider: get current quotation
+router.patch(
+  "/:orderId/quotation",
+  roleMiddleware("PROVIDER"),
+  approvedProviderMiddleware,
+  ocrRateLimit,
+  validate(orderIdParamSchema, "params"),
+  validate(updateRepairQuotationSchema),
+  updateRepairQuotation,
+);
+
 router.get(
   "/:orderId/quotation",
   roleMiddleware("CUSTOMER", "PROVIDER"),
@@ -285,7 +316,7 @@ router.get(
   getRepairQuotation,
 );
 
-// POST   /orders/quotations/:quotationId/confirm → Customer: confirm quotation
+// POST   /orders/quotations/:quotationId/confirm → Customer: tương thích client cũ
 router.post(
   "/quotations/:quotationId/confirm",
   roleMiddleware("CUSTOMER"),

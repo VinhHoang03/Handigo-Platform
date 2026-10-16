@@ -1,18 +1,47 @@
 import { useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { AppRole } from "./Navbar";
 import { NotificationBellPanel } from "./notification-bell/NotificationBellPanel";
 import { ReassignmentPromptModal } from "./notification-bell/ReassignmentPromptModal";
 import { useNotificationFeed } from "./notification-bell/useNotificationFeed";
 import { useReassignmentPrompt } from "./notification-bell/useReassignmentPrompt";
 import { Bell } from "lucide-react";
+import { getNotificationTarget, getNotificationUnavailableReason, isNotificationForUser } from "./notification-bell/notificationBell.utils";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { useNotificationAccount } from "@/features/notification/hooks/useNotificationAccount";
+import { useToast } from "./Toast";
 
 export function NotificationBell({ role }: { role?: AppRole }) {
+  const accountId = useAuthStore((state) =>
+    state.isAuthenticated ? state.user?.id || state.user?._id || "" : "",
+  );
+  if (!accountId) return null;
+  return <AccountNotificationBell key={`${role}:${accountId}`} role={role} />;
+}
+
+function AccountNotificationBell({ role }: { role?: AppRole }) {
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  const { accountId, isCurrentAccount } = useNotificationAccount();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const reassignment = useReassignmentPrompt();
   const feed = useNotificationFeed(role, {
     onReassignmentRequired: reassignment.present,
   });
+
+  const openNotification = async (item: Parameters<typeof getNotificationTarget>[0]) => {
+    if (!isCurrentAccount() || !isNotificationForUser(item, accountId)) return;
+    const latest = await feed.markAsRead(item);
+    if (!isCurrentAccount() || !latest) return;
+    const unavailableReason = getNotificationUnavailableReason(latest);
+    if (unavailableReason) {
+      addToast(unavailableReason, "info");
+      return;
+    }
+    feed.setOpen(false);
+    const target = getNotificationTarget(latest, role);
+    if (target) navigate(target);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,7 +96,7 @@ export function NotificationBell({ role }: { role?: AppRole }) {
           loading={feed.loading}
           error={feed.error}
           items={feed.items}
-          onMarkAsRead={(item) => void feed.markAsRead(item)}
+          onOpen={(item) => void openNotification(item)}
           hasMore={(feed.query.page || 1) < feed.totalPages}
           loadingMore={feed.loadingMore}
           onLoadMore={feed.loadMore}

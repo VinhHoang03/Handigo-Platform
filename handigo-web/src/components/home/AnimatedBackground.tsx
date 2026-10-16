@@ -16,6 +16,11 @@ export const AnimatedBackground = () => {
     let frame = 0;
     let lastTime = 0;
     let phase = 0;
+    let elapsed = 0;
+    let lastRipple = -120;
+    let lastPointer: { x: number; y: number } | null = null;
+    const ripples: { x: number; y: number; born: number }[] = [];
+    const rippleLifetime = 1600;
     const target = { x: .65, y: .35 };
     const pointer = { ...target };
     const particles = Array.from({ length: 32 }, (_, index) => ({
@@ -24,6 +29,34 @@ export const AnimatedBackground = () => {
       radius: 1.4 + index % 3,
     }));
 
+    const displace = (x: number, y: number) => {
+      let offsetX = 0;
+      let offsetY = 0;
+      for (const ripple of ripples) {
+        const age = (elapsed - ripple.born) / rippleLifetime;
+        const dx = x - ripple.x;
+        const dy = y - ripple.y;
+        const distance = Math.hypot(dx, dy);
+        const wave = distance - age * 300;
+        const strength = Math.sin(wave * .065) * Math.exp(-(wave * wave) / 6000) * (1 - age) * 13;
+        if (distance > 0) {
+          offsetX += dx / distance * strength;
+          offsetY += dy / distance * strength;
+        }
+      }
+      return { x: x + offsetX, y: y + offsetY };
+    };
+    const drawLine = (startX: number, startY: number, endX: number, endY: number) => {
+      const steps = ripples.length ? Math.max(1, Math.ceil(Math.hypot(endX - startX, endY - startY) / 24)) : 1;
+      context.beginPath();
+      for (let step = 0; step <= steps; step++) {
+        const progress = step / steps;
+        const point = displace(startX + (endX - startX) * progress, startY + (endY - startY) * progress);
+        if (step === 0) context.moveTo(point.x, point.y);
+        else context.lineTo(point.x, point.y);
+      }
+      context.stroke();
+    };
     const draw = () => {
       context.clearRect(0, 0, width, height);
       const glow = context.createRadialGradient(pointer.x * width, pointer.y * height, 0, pointer.x * width, pointer.y * height, Math.max(width * .5, 350));
@@ -39,19 +72,26 @@ export const AnimatedBackground = () => {
       context.lineWidth = 1;
       context.strokeStyle = "rgba(89, 72, 191, .12)";
       for (let index = -12; index <= 12; index++) {
-        context.beginPath();
-        context.moveTo(center + index * 28, horizon);
-        context.lineTo(center + index * width / 7, height + 40);
-        context.stroke();
+        drawLine(center + index * 28, horizon, center + index * width / 7, height + 40);
       }
       for (let index = 0; index < 15; index++) {
         const depth = (index + drift) / 15;
         const y = horizon + depth * depth * (height - horizon + 70);
         context.strokeStyle = `rgba(89, 72, 191, ${.025 + depth * .13})`;
-        context.beginPath();
-        context.moveTo(0, y);
-        context.lineTo(width, y);
-        context.stroke();
+        drawLine(0, y, width, y);
+      }
+
+      for (const ripple of ripples) {
+        const age = (elapsed - ripple.born) / rippleLifetime;
+        const radius = 8 + age * 300;
+        const opacity = Math.sin(Math.min(age * 6, 1) * Math.PI / 2) * (1 - age) ** 2;
+        for (let ring = 0; ring < 2; ring++) {
+          context.beginPath();
+          context.lineWidth = ring === 0 ? 1.5 : 1;
+          context.strokeStyle = `rgba(89, 72, 191, ${opacity * (ring === 0 ? .3 : .12)})`;
+          context.arc(ripple.x, ripple.y, Math.max(1, radius - ring * 20), 0, Math.PI * 2);
+          context.stroke();
+        }
       }
 
       particles.forEach((particle, index) => {
@@ -68,6 +108,8 @@ export const AnimatedBackground = () => {
         const delta = lastTime ? Math.min(time - lastTime, 64) : 0;
         lastTime = time;
         phase += delta * .0001;
+        elapsed += delta;
+        while (ripples.length && elapsed - ripples[0].born >= rippleLifetime) ripples.shift();
         pointer.x += (target.x - pointer.x) * .09;
         pointer.y += (target.y - pointer.y) * .09;
         draw();
@@ -77,6 +119,9 @@ export const AnimatedBackground = () => {
     const sync = () => {
       cancelAnimationFrame(frame);
       lastTime = 0;
+      ripples.length = 0;
+      lastPointer = null;
+      lastRipple = -120;
       draw();
       if (!reduced.matches && !document.hidden) frame = requestAnimationFrame(tick);
     };
@@ -93,18 +138,26 @@ export const AnimatedBackground = () => {
       if (reduced.matches || !finePointer.matches || event.pointerType !== "mouse") return;
       target.x = event.clientX / width;
       target.y = event.clientY / height;
+      if (document.hidden || elapsed - lastRipple < 100) return;
+      if (lastPointer && Math.hypot(event.clientX - lastPointer.x, event.clientY - lastPointer.y) < 16) return;
+      lastPointer = { x: event.clientX, y: event.clientY };
+      lastRipple = elapsed;
+      ripples.push({ ...lastPointer, born: elapsed });
+      if (ripples.length > 10) ripples.shift();
     };
     resize();
     window.addEventListener("resize", resize);
     window.addEventListener("pointermove", move, { passive: true });
     document.addEventListener("visibilitychange", sync);
     reduced.addEventListener("change", sync);
+    finePointer.addEventListener("change", sync);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", move);
       document.removeEventListener("visibilitychange", sync);
       reduced.removeEventListener("change", sync);
+      finePointer.removeEventListener("change", sync);
     };
   }, []);
 

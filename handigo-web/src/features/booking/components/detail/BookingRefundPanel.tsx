@@ -10,6 +10,7 @@ type BookingRefundPanelProps = {
   busy: boolean;
   pendingAction: PendingAction | null;
   cancellationPreview: CancellationPreview | null;
+  cancellationLocked: boolean;
   onCancelOrder: () => void;
   onCancelSeries: () => void;
   onCloseDialog: () => void;
@@ -21,13 +22,14 @@ type BookingRefundPanelProps = {
 /**
  * ⚠️ Đụng tiền — nút hủy đơn/chuỗi lịch và modal xác nhận dùng chung cho cả
  * xác nhận/từ chối báo giá lẫn hủy đơn (kèm xem trước chính sách hoàn tiền).
- * Giữ nguyên toàn bộ điều kiện disable, validate lý do hủy và hiển thị hoàn tiền gốc.
+ * Giữ nguyên điều kiện disable và validation lý do hủy.
  */
 export const BookingRefundPanel = ({
   order,
   busy,
   pendingAction,
   cancellationPreview,
+  cancellationLocked,
   onCancelOrder,
   onCancelSeries,
   onCloseDialog,
@@ -41,6 +43,7 @@ export const BookingRefundPanel = ({
   const isCancellationAction = pendingAction
     ? ["cancelOrder", "cancelSeries"].includes(pendingAction.type)
     : false;
+  const hideRefundPolicy = order.paymentMethod === "cash";
 
   return (
     <>
@@ -48,7 +51,7 @@ export const BookingRefundPanel = ({
         order.reassignment?.status !== "awaiting_customer" && (
         <div className="space-y-2">
           <button
-            disabled={busy}
+            disabled={busy || cancellationLocked}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-error/20 py-3 font-bold text-error transition-all hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onCancelOrder}
           >
@@ -61,7 +64,7 @@ export const BookingRefundPanel = ({
           </button>
           {order.orderType === "recurring" && (
             <button
-              disabled={busy}
+              disabled={busy || cancellationLocked}
               className="w-full rounded-2xl bg-error py-3 font-bold text-on-error transition hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onCancelSeries}
             >
@@ -71,7 +74,8 @@ export const BookingRefundPanel = ({
         </div>
       )}
 
-      {pendingAction && actionDialogConfig && (
+      {pendingAction && actionDialogConfig &&
+        (!isCancellationAction || ["created", "accepted"].includes(order.status)) && (
         <Modal
           open
           title={actionDialogConfig.title}
@@ -85,10 +89,15 @@ export const BookingRefundPanel = ({
               {actionDialogConfig.message}
             </p>
 
-            {isCancellationAction && cancellationPreview && (
+            {isCancellationAction && cancellationPreview && !hideRefundPolicy && (
               <BookingCancellationPreviewCard
                 cancellationPreview={cancellationPreview}
               />
+            )}
+            {isCancellationAction && cancellationPreview && order.inspectionRequired && !order.providerId && cancellationPreview.providerCompensation === 0 && (
+              <p className="text-sm leading-6 text-on-surface-variant">
+                Khi chưa có thợ nhận, toàn bộ tiền cọc đã thanh toán được hoàn lại cho bạn (100%).
+              </p>
             )}
 
             {isCancellationAction ? (
@@ -135,7 +144,7 @@ export const BookingRefundPanel = ({
                 disabled={
                   busy ||
                   (isCancellationAction &&
-                    (!cancellationPreview || !cancellationPreview.canCancel))
+                    (cancellationLocked || !cancellationPreview || !cancellationPreview.canCancel))
                 }
                 onClick={onExecute}
                 className={`rounded-2xl px-5 py-3 font-bold text-on-primary transition disabled:opacity-50 ${

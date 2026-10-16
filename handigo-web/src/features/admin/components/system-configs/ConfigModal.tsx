@@ -3,6 +3,8 @@ import { Modal } from "@/components/common/Modal";
 import type { ConfigFormState, ConfigItem } from "./config-definitions";
 import { formatValue } from "./system-config-format";
 import { ToggleLeft, ToggleRight } from "lucide-react";
+import { BookingPolicyFields } from './BookingPolicyFields';
+import { BusinessPolicyFields } from './BusinessPolicyFields';
 
 export function ConfigModal({
   item,
@@ -30,10 +32,14 @@ export function ConfigModal({
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
-          <p className="text-sm text-on-surface-variant">Key hệ thống</p>
-          <p className="mt-1 font-mono font-semibold text-on-surface">
-            {item.key}
-          </p>
+          {item.group !== "policy" && (
+            <>
+              <p className="text-sm text-on-surface-variant">Key hệ thống</p>
+              <p className="mt-1 font-mono font-semibold text-on-surface">
+                {item.key}
+              </p>
+            </>
+          )}
           <p className="mt-2 text-sm text-on-surface-variant">{item.effect}</p>
         </div>
 
@@ -41,7 +47,9 @@ export function ConfigModal({
 
         <label className="flex items-center justify-between gap-4 rounded-lg bg-surface-container-low p-3">
           <span>
-            <span className="block font-semibold">Công khai cho client</span>
+            <span className="block font-semibold">
+              Công khai cho người dùng
+            </span>
             <span className="text-sm text-on-surface-variant">
               Chỉ bật cho dữ liệu hiển thị công khai, không dùng cho cấu hình
               nghiệp vụ nội bộ.
@@ -49,6 +57,7 @@ export function ConfigModal({
           </span>
           <input
             type="checkbox"
+            disabled={['BOOKING_POLICY', 'REFUND_POLICY', 'REWARD_POLICY'].includes(item.key)}
             checked={form.isPublic}
             onChange={(event) =>
               onChange({ ...form, isPublic: event.target.checked })
@@ -88,6 +97,8 @@ function ValueField({
   form: ConfigFormState;
   onChange: (form: ConfigFormState) => void;
 }) {
+  if (item.key === 'BOOKING_POLICY') return <BookingPolicyFields value={form.value} onChange={(value) => onChange({ ...form, value, isPublic: false })} />;
+  if (item.key === 'REFUND_POLICY' || item.key === 'REWARD_POLICY') return <BusinessPolicyFields configKey={item.key} value={form.value} onChange={(value) => onChange({ ...form, value, isPublic: false })} />;
   if (item.type === "BOOLEAN") {
     return (
       <div>
@@ -112,7 +123,11 @@ function ValueField({
             </span>
             <span className="text-sm">Bấm để chuyển trạng thái bật/tắt.</span>
           </span>
-          {form.value === "true" ? <ToggleRight aria-hidden="true" size={28} /> : <ToggleLeft aria-hidden="true" size={28} />}
+          {form.value === "true" ? (
+            <ToggleRight aria-hidden="true" size={28} />
+          ) : (
+            <ToggleLeft aria-hidden="true" size={28} />
+          )}
         </button>
       </div>
     );

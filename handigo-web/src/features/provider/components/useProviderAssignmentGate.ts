@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -20,9 +21,10 @@ export function useProviderAssignmentGate() {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { addToast } = useToast();
   const [assignment, setAssignment] = useState<OrderAssignment | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useToastFeedback<string | null>(null, "error");
   const [countdown, setCountdown] = useState('');
 
   const order = assignment ? getOrderFromAssignment(assignment) : null;
@@ -94,7 +96,7 @@ export function useProviderAssignmentGate() {
       socket.off('connect', loadPendingAssignment);
       dispose();
     };
-  }, [enabled, loadPendingAssignment, token]);
+  }, [enabled, loadPendingAssignment, setError, token]);
 
   useEffect(() => {
     if (!assignment) {
@@ -126,6 +128,7 @@ export function useProviderAssignmentGate() {
       setBusy(true);
       setError(null);
       const result = await providerOrderApi.acceptAssignment(assignment._id);
+      addToast("Đã nhận đơn dịch vụ.", "success");
       setAssignment(null);
       navigate(`/provider/orders/${result.order._id}`);
     } catch {
@@ -145,6 +148,7 @@ export function useProviderAssignmentGate() {
       setBusy(true);
       setError(null);
       await providerOrderApi.rejectAssignment(assignment._id);
+      addToast("Đã từ chối đơn dịch vụ.", "success");
       setAssignment(null);
     } catch {
       setError('Không thể từ chối đơn. Vui lòng thử lại.');

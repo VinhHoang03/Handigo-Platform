@@ -1,5 +1,6 @@
 import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument, Money } from "./common";
+import { installOrderHistory } from "../utils/orderHistory";
 
 export type OrderStatusValue =
   | "created"
@@ -9,7 +10,7 @@ export type OrderStatusValue =
   | "cancelled";
 
 export interface ISelectedOptionSnapshot {
-  optionId: Types.ObjectId;
+  optionId: Types.ObjectId | null;
   name: string;
   optionType: string;
   price: Money;
@@ -18,6 +19,9 @@ export interface ISelectedOptionSnapshot {
 }
 
 export interface IOrderPricing {
+  baseAmount?: Money;
+  immediateFee?: Money;
+  immediateProviderPercent?: number;
   bookingAmount: Money;
   platformCommissionRate: number;
   platformCommissionAmount: Money;
@@ -38,7 +42,7 @@ export interface IDiscountSnapshot {
 }
 
 export interface IOrderCancellation {
-  cancelledBy: Types.ObjectId;
+  cancelledBy?: Types.ObjectId;
   cancelledByRole: "customer" | "provider" | "admin";
   reason: string;
   cancelledAt: Date;
@@ -49,6 +53,7 @@ export interface IOrderCancellation {
     refundAmount: Money;
     cancellationFee: Money;
     providerCompensation: Money;
+    providerCompensationRate?: number;
     platformRetainedAmount: Money;
     hoursBeforeStart?: number | null;
     policyReason: string;
@@ -61,6 +66,7 @@ export interface IOrderConfirmation {
 }
 
 export interface IOrderReassignment {
+  automatic?: boolean;
   status:
     | "awaiting_customer"
     | "matching"
@@ -77,6 +83,23 @@ export interface IOrderReassignment {
 }
 
 export interface IOrder extends Document, IBaseDocument {
+  promotionUsedAt?: Date | null;
+  promotionReleasedAt?: Date | null;
+  statusVersion: number;
+  addressSnapshot?: {
+    recipientName?: string; recipientPhone?: string; fullAddress: string;
+    province: string; ward: string; latitude?: number; longitude?: number;
+  } | null;
+  overdueReview?: {
+    escalatedAt?: Date | null;
+  } | null;
+  schedule?: {
+    durationMinutes: number;
+    bufferMinutes: number;
+    travelMinutes: number;
+    expectedStartAt?: Date | null;
+    expectedEndAt?: Date | null;
+  } | null;
   orderCode: string;
   customerId: Types.ObjectId;
   providerId?: Types.ObjectId | null;
@@ -136,7 +159,7 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
     optionId: {
       type: Schema.Types.ObjectId,
       ref: "ServiceOption",
-      required: true,
+      default: null,
     },
     name: { type: String, required: true },
     optionType: { type: String, required: true },
@@ -149,6 +172,9 @@ const SelectedOptionSnapshotSchema = new Schema<ISelectedOptionSnapshot>(
 
 const OrderPricingSchema = new Schema<IOrderPricing>(
   {
+    baseAmount: { type: Number, min: 0 },
+    immediateFee: { type: Number, min: 0 },
+    immediateProviderPercent: { type: Number, min: 0, max: 100 },
     bookingAmount: { type: Number, required: true, min: 0 },
     platformCommissionRate: { type: Number, required: true, min: 0 },
     platformCommissionAmount: { type: Number, required: true, min: 0 },
@@ -179,6 +205,15 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    statusVersion: { type: Number, default: 0, min: 0 },
+    overdueReview: { type: new Schema({ escalatedAt: { type: Date, default: null } }, { _id: false }), default: null },
+    schedule: { type: new Schema({
+      durationMinutes: { type: Number, required: true, min: 1 },
+      bufferMinutes: { type: Number, required: true, min: 0 },
+      travelMinutes: { type: Number, required: true, min: 0 },
+      expectedStartAt: { type: Date, default: null },
+      expectedEndAt: { type: Date, default: null },
+    }, { _id: false }), default: null },
     orderCode: { type: String, required: true, unique: true, trim: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     providerId: { type: Schema.Types.ObjectId, ref: "Provider", default: null },
@@ -199,6 +234,11 @@ const OrderSchema = new Schema<IOrder>(
       default: [],
     },
     addressId: { type: Schema.Types.ObjectId, ref: "Address", required: true },
+    addressSnapshot: { type: new Schema({
+      recipientName: String, recipientPhone: String, fullAddress: { type: String, required: true },
+      province: { type: String, required: true }, ward: { type: String, required: true },
+      latitude: Number, longitude: Number,
+    }, { _id: false }), default: null },
     orderType: {
       type: String,
       enum: ["normal", "urgent", "scheduled", "recurring"],
@@ -269,6 +309,8 @@ const OrderSchema = new Schema<IOrder>(
     completionNote: { type: String, default: null, trim: true },
     pricing: { type: OrderPricingSchema, required: true },
     promotionSnapshot: { type: DiscountSnapshotSchema, default: null },
+    promotionUsedAt: { type: Date, default: null },
+    promotionReleasedAt: { type: Date, default: null },
     voucherSnapshot: { type: DiscountSnapshotSchema, default: null },
     voucherUsedAt: { type: Date, default: null },
     cancellation: {
@@ -277,7 +319,10 @@ const OrderSchema = new Schema<IOrder>(
           cancelledBy: {
             type: Schema.Types.ObjectId,
             ref: "User",
-            required: true,
+            // Hủy tự động dùng vai trò admin và không có người thao tác.
+            required: function (this: IOrderCancellation) {
+              return this.cancelledByRole !== "admin";
+            },
           },
           cancelledByRole: {
             type: String,
@@ -295,6 +340,7 @@ const OrderSchema = new Schema<IOrder>(
                 refundAmount: { type: Number, required: true, min: 0 },
                 cancellationFee: { type: Number, required: true, min: 0 },
                 providerCompensation: { type: Number, required: true, min: 0 },
+                providerCompensationRate: { type: Number, min: 0, max: 100 },
                 platformRetainedAmount: { type: Number, required: true, min: 0 },
                 hoursBeforeStart: { type: Number, default: null },
                 policyReason: { type: String, required: true },
@@ -311,6 +357,7 @@ const OrderSchema = new Schema<IOrder>(
     reassignment: {
       type: new Schema<IOrderReassignment>(
         {
+          automatic: { type: Boolean },
           status: {
             type: String,
             enum: [
@@ -359,8 +406,10 @@ OrderSchema.index({
   scheduledAt: 1,
 });
 OrderSchema.index({ providerId: 1, scheduledAt: 1, status: 1 });
+OrderSchema.index({ providerId: 1, status: 1, isDeleted: 1 });
 OrderSchema.index({ bookingStatus: 1, paymentDueAt: 1 });
 OrderSchema.index({ recurringGroupId: 1, occurrenceNumber: 1 });
 OrderSchema.index({ "reassignment.status": 1, "reassignment.expiresAt": 1 });
 
+installOrderHistory(OrderSchema);
 export const Order = model<IOrder>("Order", OrderSchema, "orders");

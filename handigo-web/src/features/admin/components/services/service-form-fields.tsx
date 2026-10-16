@@ -44,16 +44,16 @@ export function FormTextArea({ label, name, value, onChange }: { label: string; 
   );
 }
 
-export function ToggleRow({ checked, onChange, label, name }: { checked: boolean; onChange: (value: boolean) => void; label: string; name: string }) {
+export function ToggleRow({ checked, onChange, label, name, compact = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; name: string; compact?: boolean }) {
   return (
-    <label className="flex items-center justify-between rounded-xl bg-surface-container-low p-3">
-      <span className="font-semibold">{label}</span>
+    <label className={`flex items-center justify-between bg-surface-container-low font-semibold ${compact ? 'rounded-lg px-3 py-2 text-sm' : 'rounded-xl p-3'}`}>
+      <span>{label}</span>
       <input
         type="checkbox"
         name={name}
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-5 w-5 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30`}
       />
     </label>
   );

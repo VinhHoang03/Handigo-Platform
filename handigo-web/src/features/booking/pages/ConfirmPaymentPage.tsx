@@ -7,6 +7,7 @@ import { ConfirmPaymentServiceDetails } from '../components/ConfirmPaymentServic
 import { ConfirmPaymentMethodSelector } from '../components/ConfirmPaymentMethodSelector';
 import { ConfirmPaymentVoucherPanel } from '../components/ConfirmPaymentVoucherPanel';
 import { useConfirmPaymentFlow } from '../components/useConfirmPaymentFlow';
+import { BookingPolicyConsent } from '../components/BookingPolicyConsent';
 
 const ConfirmPaymentPage = () => {
   const {
@@ -16,8 +17,11 @@ const ConfirmPaymentPage = () => {
     voucherCode, setVoucherCode, appliedVoucher, setAppliedVoucher, voucherError, setVoucherError,
     applyVoucherCode, handleConfirm,
     setPaymentMethod,
-    orderType, scheduledAt, preferredProviderId, preferredProviderName,
-    selectedOptionQuantities,
+    scheduledAt, immediateBookingAt, preferredProviderId, preferredProviderName,
+    selectedOptionQuantities, uniformQuantity,
+    previewVoucherCode, promotionName, previewError,
+    pendingError, retryPendingOrder,
+    bookingPolicies, policyDepositAmount, policyPayableDeposit,
   } = useConfirmPaymentFlow();
 
   return (
@@ -29,16 +33,16 @@ const ConfirmPaymentPage = () => {
           <ConfirmPaymentServiceDetails
             isAppointment={isAppointment}
             service={service}
-            scheduledAt={scheduledAt}
+            scheduledAt={isAppointment ? scheduledAt : immediateBookingAt}
             address={address}
             preferredProviderId={preferredProviderId}
             preferredProviderName={preferredProviderName}
             selectedOptions={selectedOptions}
             selectedOptionQuantities={selectedOptionQuantities}
+            uniformQuantity={uniformQuantity}
           />
 
           <ConfirmPaymentMethodSelector
-            isAppointment={isAppointment}
             service={service}
             effectivePaymentMethod={effectivePaymentMethod}
             onChangeMethod={setPaymentMethod}
@@ -46,18 +50,20 @@ const ConfirmPaymentPage = () => {
           />
         </div>
 
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-4 lg:sticky lg:top-24">
           <OrderSummaryCard
             step={3}
             discountAmount={voucherDiscountAmount}
-            actionLabel={
-              orderType === 'scheduled' || orderType === 'recurring'
-                ? 'Gửi yêu cầu lịch hẹn'
-                : 'Xác nhận & Thanh toán'
-            }
+            voucherCode={previewVoucherCode}
+            actionLabel="Xác nhận & Thanh toán"
             onAction={handleConfirm}
             isLoading={isSubmitting}
+            actionDisabled={!bookingPolicies.accepted}
             summaryContent={
+              <>
+              {promotionName && <p className="mb-3 rounded-xl bg-primary/10 p-3 text-primary">Ưu đãi tự động: {promotionName}</p>}
+              {previewError && <p role="alert" className="mb-3 text-error">{previewError}</p>}
+              {pendingError && <p role="alert" className="mb-3 text-error">{pendingError} <button type="button" onClick={retryPendingOrder} className="underline">Thử lại</button></p>}
               <ConfirmPaymentVoucherPanel
                 voucherCode={voucherCode}
                 onSelectVoucher={(code) => {
@@ -80,6 +86,18 @@ const ConfirmPaymentPage = () => {
                 voucherError={voucherError}
                 isSubmitting={isSubmitting}
               />
+              <BookingPolicyConsent
+                policies={bookingPolicies.policies}
+                loading={bookingPolicies.loading}
+                error={bookingPolicies.error}
+                accepted={bookingPolicies.accepted}
+                disabled={isSubmitting}
+                onChange={bookingPolicies.setAccepted}
+                onRetry={bookingPolicies.retry}
+                depositAmount={policyDepositAmount}
+                payableDeposit={policyPayableDeposit}
+              />
+              </>
             }
           />
         </div>

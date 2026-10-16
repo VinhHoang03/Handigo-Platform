@@ -16,7 +16,6 @@ const paymentMethods = [
 type PaymentMethodValue = 'wallet' | 'bank' | 'cash';
 
 interface ConfirmPaymentMethodSelectorProps {
-  isAppointment: boolean;
   service: Service | null;
   effectivePaymentMethod: PaymentMethodValue;
   onChangeMethod: (value: PaymentMethodValue) => void;
@@ -25,18 +24,13 @@ interface ConfirmPaymentMethodSelectorProps {
 
 /** Thẻ chọn phương thức thanh toán (ví / chuyển khoản / tiền mặt). */
 export const ConfirmPaymentMethodSelector = ({
-  isAppointment, service, effectivePaymentMethod, onChangeMethod, paymentError,
+  service, effectivePaymentMethod, onChangeMethod, paymentError,
 }: ConfirmPaymentMethodSelectorProps) => (
   <section className="bg-surface-container-lowest rounded-xl p-md border border-outline-variant/30 shadow-sm">
-    <h2 className="font-headline-md text-headline-md mb-6 flex items-center gap-2">
+    <h2 className="font-headline-md text-headline-md mb-5 flex items-center gap-2">
       <Wallet aria-hidden="true" size={24} className="text-primary" />
-      {isAppointment ? 'Phương thức sẽ thanh toán' : 'Phương thức thanh toán'}
+      Phương thức thanh toán
     </h2>
-    {isAppointment && (
-      <p className="mb-4 text-sm text-on-surface-variant">
-        Phương thức này được lưu cho bước thanh toán sau khi chuyên gia nhận lịch.
-      </p>
-    )}
     <div className="space-y-3">
       {paymentMethods
         .filter(([, , , value]) => {
@@ -49,7 +43,7 @@ export const ConfirmPaymentMethodSelector = ({
         .map(([Icon, title, subtitle, value]) => (
           <label
             key={value}
-            className="group relative flex items-center p-4 rounded-xl border border-outline-variant/50 hover:border-primary cursor-pointer transition-colors bg-surface-container-low/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+            className="group relative flex items-center p-3 rounded-xl border border-outline-variant/50 hover:border-primary cursor-pointer transition-colors bg-surface-container-low/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
           >
             <input
               checked={effectivePaymentMethod === value}
@@ -59,11 +53,11 @@ export const ConfirmPaymentMethodSelector = ({
               type="radio"
               value={value}
             />
-            <div className="flex-1 flex items-center gap-4 peer-focus-visible:rounded-lg peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15">
+            <div className="flex-1 flex items-center gap-3 peer-focus-visible:rounded-lg peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15">
               <div
-                className={`w-12 h-12 rounded-lg flex items-center justify-center ${effectivePaymentMethod === value ? 'bg-primary text-on-primary' : 'bg-on-surface/5 text-on-surface'}`}
+                className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center ${effectivePaymentMethod === value ? 'bg-primary text-on-primary' : 'bg-on-surface/5 text-on-surface'}`}
               >
-                <Icon aria-hidden="true" size={24} />
+                <Icon aria-hidden="true" size={20} />
               </div>
               <div>
                 <p className="font-body-md text-body-md font-semibold">

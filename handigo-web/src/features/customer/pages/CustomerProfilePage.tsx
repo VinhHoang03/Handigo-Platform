@@ -15,6 +15,7 @@ import {
 import { SecurityTabSection } from "@/features/customer/components/SecurityTabSection";
 import { NotificationSettingsSection } from "@/features/customer/components/NotificationSettingsSection";
 import { PasswordSecurityModals } from "@/features/customer/components/PasswordSecurityModals";
+import { useAuthStore } from "@/features/auth/store/auth.store";
 
 const DEFAULT_AVATAR = undefined;
 
@@ -22,6 +23,7 @@ export default function CustomerProfilePage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<CustomerProfileTab>("profile");
   const passwordModal = usePasswordChangeModal();
+  const isGoogleAccount = useAuthStore((state) => state.user?.isGoogleAccount === true);
 
   const {
     profile,
@@ -116,7 +118,10 @@ export default function CustomerProfilePage() {
         )}
 
         {activeTab === "security" && (
-          <SecurityTabSection onPasswordClick={passwordModal.openConfirm} />
+          <SecurityTabSection
+            onPasswordClick={passwordModal.openConfirm}
+            canChangePassword={!isGoogleAccount}
+          />
         )}
 
         {activeTab === "profile" && <NotificationSettingsSection />}

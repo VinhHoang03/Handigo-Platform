@@ -32,7 +32,7 @@ export const BookingStatusTimeline = ({
 
         return (
           <div
-            key={step.title}
+            key={`${step.title}-${index}`}
             className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-sm pb-5 last:pb-0"
           >
             <div className="relative flex justify-center">

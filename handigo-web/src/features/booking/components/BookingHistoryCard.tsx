@@ -34,9 +34,9 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
     }}
     className={`group flex cursor-pointer flex-col items-stretch gap-md rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-primary/15 sm:flex-row sm:items-center ${booking?.statusTone === 'cancelled' ? 'opacity-80' : ''}`}
   >
-    <div className={`h-44 w-full rounded-xl overflow-hidden flex-shrink-0 sm:h-28 sm:w-28 ${booking?.statusTone === 'cancelled' ? 'grayscale' : ''}`}>
+    <div className={`aspect-video w-full rounded-xl overflow-hidden flex-shrink-0 sm:w-40 ${booking?.statusTone === 'cancelled' ? 'grayscale' : ''}`}>
       <ReliableImage
-        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+        className="w-full h-full object-contain"
         src={booking?.imageUrl}
         alt={booking?.serviceName || 'Dịch vụ'}
       />
@@ -54,9 +54,11 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
           {booking?.meta || 'Đang cập nhật'}
         </span>
       </div>
-      <p className={`font-bold text-primary font-body-lg text-body-lg ${booking?.statusTone === 'cancelled' ? 'line-through opacity-50' : ''}`}>
-        {booking?.price || '0đ'}
-      </p>
+      {booking.status !== 'cancelled' && booking.statusTone !== 'cancelled' && (
+        <p className="font-bold text-primary font-body-lg text-body-lg">
+          {booking?.price || '0đ'}
+        </p>
+      )}
     </div>
 
     <div className="flex w-full shrink-0 flex-col gap-sm sm:w-auto sm:min-w-52 sm:items-end sm:self-stretch sm:justify-between">

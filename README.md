@@ -1,48 +1,40 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/XhGpqJyF)
+## Phát triển ứng dụng Flutter bằng Codex và terminal
 
----
-
-## CI với GitHub Actions
-
-Workflow [CI Handigo](.github/workflows/ci.yml) chạy khi push lên `develop` hoặc `main`,
-hoặc khi mở/cập nhật pull request có nhánh đích là `develop` hoặc `main`.
-Pipeline sử dụng Node.js 22, cài dependency bằng `npm ci` theo lockfile của từng
-ứng dụng và lưu cache npm riêng cho backend/web.
-
-| Job | Nội dung kiểm tra |
-|---|---|
-| `Backend - build và kiểm thử` | Build TypeScript và chạy ba bộ test: chính sách hoàn tiền, xử lý hoàn tiền, trợ lý chăm sóc khách hàng |
-| `Web - lint và build` | ESLint toàn bộ frontend, kiểm tra TypeScript và build Vite |
-| `Web - kiểm thử Chromium` | Chạy Playwright sau khi job web thành công; kiểm tra đăng nhập, phân quyền giao diện và đặt dịch vụ với API mô phỏng |
-
-Các job không cần cấu hình secrets, backend đang chạy hay MongoDB. Test backend
-dùng dữ liệu/mô phỏng cục bộ; Playwright tự mở Vite và mô phỏng API.
-Job Chromium dùng Google client ID giả để dựng giao diện đăng nhập, không kiểm thử
-OAuth hoặc tích hợp với các dịch vụ thật. Pipeline chỉ kiểm tra, không triển khai.
-Báo cáo Playwright, ảnh và trace khi test lỗi được lưu trong artifact
-`bao-cao-playwright` trong 7 ngày. Lượt chạy cũ cùng nhánh/pull request được hủy
-khi có lượt mới.
-
-Sau khi đưa workflow lên GitHub, mở **Actions → CI Handigo** để xem kết quả.
-Nếu muốn chặn merge khi CI lỗi, quản trị viên cấu hình ruleset/branch protection
-cho nhánh đích và chọn cả ba job trên làm kiểm tra bắt buộc sau lượt chạy đầu tiên.
-
-Chạy lại các kiểm tra từ thư mục gốc:
+Mở emulator Android trước. Chạy backend trong terminal riêng:
 
 ```powershell
-npm --prefix handigo-backend ci
-npm --prefix handigo-backend run build
-npm --prefix handigo-backend run test:refund-policy
-npm --prefix handigo-backend run test:refund-processing
-npm --prefix handigo-backend run test:agent-customer-care
-npm --prefix handigo-web ci
-npm --prefix handigo-web run lint
-npm --prefix handigo-web run build
+npm --prefix handigo-backend run dev
 ```
 
-Để chạy kiểm thử trình duyệt, xem [hướng dẫn Playwright](handigo-web/tests/e2e/README.md).
-Quy trình cài Chromium và lưu báo cáo tham khảo
-[tài liệu CI chính thức của Playwright](https://playwright.dev/docs/ci-intro).
+Trong terminal thứ hai, tại thư mục gốc Handigo:
+
+```powershell
+node scripts/dev-app.mjs
+```
+
+Lệnh chạy app ở chế độ debug và tự hot reload khi file Dart trong
+`handigo-app/lib` thay đổi, kể cả khi Codex sửa file. Các thay đổi liên tiếp
+được gom lại trước khi reload; thay đổi trong lúc Flutter đang build được
+áp dụng sau khi app sẵn sàng. Không cần cài package Node.js cho script này.
+
+- Nhập `r` rồi Enter: hot reload, giữ trạng thái app khi Flutter hỗ trợ.
+- Nhập `R` rồi Enter: hot restart, khởi tạo lại trạng thái Dart.
+- Nhập `q` rồi Enter hoặc `Ctrl+C`: dừng phiên chạy app.
+- Thêm `--no-watch` nếu chỉ muốn reload thủ công.
+
+Mặc định dùng `emulator-5554` và API `http://10.0.2.2:5000`.
+Kiểm tra mã thiết bị bằng `flutter devices`, rồi đổi khi cần:
+
+```powershell
+node scripts/dev-app.mjs --device emulator-5556 --api http://10.0.2.2:5000
+```
+
+Với điện thoại thật, dùng mã thiết bị và địa chỉ IP LAN của máy chạy backend.
+Khi thay đổi `main()`, `initState()` hoặc giá trị khởi tạo, có thể cần `R`.
+Khi thay đổi plugin native, Gradle, AndroidManifest hoặc `--dart-define`, dừng
+và chạy lại app. Hot reload không khắc phục lỗi DNS/Internet của emulator.
+
+Hướng dẫn IDE và các lệnh kiểm tra nằm trong [README của app](handigo-app/README.md).
 
 ## Scripts Reference
 

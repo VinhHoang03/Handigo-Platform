@@ -91,6 +91,7 @@ export function ServiceFilterSheet({
           >
             <CategoryIcon
               icon={category.icon}
+              color={selectedCategoryId === category._id ? undefined : category.iconColor}
               name={category.name}
               className="h-5 w-5 shrink-0"
             />

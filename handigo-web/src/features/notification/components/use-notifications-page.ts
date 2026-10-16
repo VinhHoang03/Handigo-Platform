@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { notificationApi } from "../api/notification.api";
 import type {
@@ -8,6 +9,8 @@ import { getNotificationErrorMessage } from "./notification-error";
 import type { SendFormState } from "./SendNotificationModal";
 import { useNotificationsFetch } from "./use-notifications-fetch";
 import { Bell, Inbox, MailOpen } from "lucide-react";
+import { useNotificationAccount } from "../hooks/useNotificationAccount";
+import { isNotificationForUser } from "@/components/common/notification-bell/notificationBell.utils";
 
 export type NotificationRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
@@ -22,6 +25,7 @@ const emptySendForm: SendFormState = {
  * Tách ra khỏi component để trang chỉ còn lo bố cục — không đổi hành vi gốc.
  */
 export function useNotificationsPageController(role: NotificationRole) {
+  const { accountId, isCurrentAccount } = useNotificationAccount();
   const [query, setQuery] = useState<NotificationQuery>({
     page: 1,
     limit: 8,
@@ -34,8 +38,8 @@ export function useNotificationsPageController(role: NotificationRole) {
   const [totalPages, setTotalPages] = useState(1);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
   const [busy, setBusy] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [sendForm, setSendForm] = useState<SendFormState>(emptySendForm);
@@ -43,6 +47,8 @@ export function useNotificationsPageController(role: NotificationRole) {
   const isAdmin = role === "ADMIN";
 
   const { load, loadUserNotifications } = useNotificationsFetch({
+    accountId,
+    isCurrentAccount,
     isAdmin,
     query,
     setQuery,
@@ -64,6 +70,7 @@ export function useNotificationsPageController(role: NotificationRole) {
   }, [items, unreadCount]);
 
   const refresh = async () => {
+    if (!isCurrentAccount()) return;
     if (isAdmin) {
       await load();
       return;
@@ -75,46 +82,52 @@ export function useNotificationsPageController(role: NotificationRole) {
   };
 
   const loadMore = async () => {
-    if (isAdmin || (query.page || 1) >= totalPages) return;
+    if (!isCurrentAccount() || isAdmin || (query.page || 1) >= totalPages) return;
 
     const nextQuery = { ...query, page: (query.page || 1) + 1 };
     setQuery(nextQuery);
     await loadUserNotifications(nextQuery, true);
   };
 
-  const markOne = async (notification: AppNotification) => {
-    if (notification.isRead) return;
+  const markOne = async (notification: AppNotification, showNotice = true) => {
+    if (!isCurrentAccount() || !isNotificationForUser(notification, accountId)) return;
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      await notificationApi.markAsRead(notification.id);
-      setNotice("Đã đánh dấu thông báo là đã đọc.");
+      const latest = await notificationApi.markAsRead(notification.id);
+      if (!isCurrentAccount()) return;
+      setItems((current) => current.map((item) => item.id === latest.id ? latest : item));
+      if (!notification.isRead && showNotice) setNotice("Đã đánh dấu thông báo là đã đọc.");
       await refresh();
+      return latest;
     } catch (err) {
-      setError(getNotificationErrorMessage(err));
+      if (isCurrentAccount()) setError(getNotificationErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (isCurrentAccount()) setBusy(false);
     }
   };
 
   const markAll = async () => {
+    if (!isCurrentAccount()) return;
     setBusy(true);
     setError("");
     setNotice("");
     try {
       const result = await notificationApi.markAllAsRead();
+      if (!isCurrentAccount()) return;
       setNotice(`Đã đánh dấu ${result.modifiedCount} thông báo là đã đọc.`);
       await refresh();
     } catch (err) {
-      setError(getNotificationErrorMessage(err));
+      if (isCurrentAccount()) setError(getNotificationErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (isCurrentAccount()) setBusy(false);
     }
   };
 
   const submitSystemNotification = async (event: FormEvent) => {
     event.preventDefault();
+    if (!isCurrentAccount() || !isAdmin) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -125,6 +138,7 @@ export function useNotificationsPageController(role: NotificationRole) {
         content: sendForm.content.trim(),
         type: "SYSTEM",
       });
+      if (!isCurrentAccount()) return;
       setSendOpen(false);
       setSendForm(emptySendForm);
       setNotice(
@@ -132,13 +146,14 @@ export function useNotificationsPageController(role: NotificationRole) {
       );
       await load();
     } catch (err) {
-      setError(getNotificationErrorMessage(err));
+      if (isCurrentAccount()) setError(getNotificationErrorMessage(err));
     } finally {
-      setBusy(false);
+      if (isCurrentAccount()) setBusy(false);
     }
   };
 
   return {
+    isCurrentAccount,
     isAdmin,
     query,
     setQuery,

@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BookingHistoryCard, BookingPageHeader, BookingShell } from '../components/BookingComponents';
@@ -8,6 +9,7 @@ import { bookingApi } from '@/features/booking/api/booking.api';
 import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
 import type { Order } from '../../../types/booking';
 import { ChevronDown, FileClock, Plus, Search, X } from "lucide-react";
+import { formatCurrency } from '@/utils/currency';
 
 const filters = [
   { label: 'Tất cả', value: 'all' },
@@ -20,7 +22,7 @@ const filters = [
 const BookingHistoryPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -51,7 +53,7 @@ const BookingHistoryPage = () => {
     } finally {
       setTimeout(() => setLoading(false), 0);
     }
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -80,8 +82,11 @@ const BookingHistoryPage = () => {
     status: order?.status || 'created',
     schedule: order?.scheduledAt ? new Date(order.scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất',
     meta: order?.providerId ? `Chuyên gia: ${order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
-    price: `${order?.pricing?.totalPaidAmount?.toLocaleString() || '0'}đ`,
-    imageUrl: order?.serviceId?.image,
+    price: formatCurrency(order.status === 'completed'
+      && (order.inspectionRequired || order.serviceId?.serviceType === 'variable_price')
+      ? order.quotationFinalAmount ?? order.pricing?.totalPaidAmount ?? 0
+      : order.pricing?.totalPaidAmount ?? 0),
+    imageUrl: (order?.serviceId?.coverImage === undefined ? order?.serviceId?.image : order.serviceId.coverImage) || undefined,
     primaryAction: order?.status === 'completed' ? 'Đánh giá' : 'Xem chi tiết',
   }));
 

@@ -1,3 +1,4 @@
+import { serviceImageResponse } from "../utils/serviceImageResponse";
 import { Types } from "mongoose";
 import User from "../models/user.model";
 import {
@@ -15,7 +16,13 @@ import { Service } from "../models/service.model";
 import { Address } from "../models/address.model";
 import { Feedback } from "../models/feedback.model";
 import { Category } from "../models/category.model";
+import { Location } from "../models/location.model";
 import { MatchingService } from "./matching.service";
+import { haversineMeters } from "./matching.service";
+import { buildServicePricingSnapshot } from "./servicePricing.service";
+import { getBookingPolicy } from "./systemConfig.service";
+import { getOrderInterval } from "../utils/providerSchedule";
+import { getEarliestScheduledAt, isWithinAppointmentHours, type ScheduleInterval } from "../utils/bookingPolicy";
 import { Order } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import {
@@ -34,7 +41,8 @@ const safeUserSelect =
 
 const servicePopulate = {
   path: "serviceIds",
-  select: "name slug categoryId serviceType fixedPrice image",
+  select: "name slug categoryId serviceType fixedPrice image coverImage",
+  transform: serviceImageResponse,
 };
 
 const assertObjectId = (id: string, fieldName: string) => {
@@ -219,6 +227,11 @@ const formatProviderProfile = async (provider: IProvider) => {
       mainServiceText: provider.mainServiceText,
       experienceYears: provider.experienceYears,
       availabilityStatus: provider.availabilityStatus,
+      autoAcceptScheduledBookings: false,
+      autoAcceptScheduledBookingMinAdvanceMinutes:
+        provider.autoAcceptScheduledBookingMinAdvanceMinutes,
+      autoAcceptScheduledBookingHorizonDays:
+        provider.autoAcceptScheduledBookingHorizonDays,
       verified: provider.verified,
       serviceIds: (provider.serviceIds as unknown[]).map(toIdString),
       services: formatServices(provider),
@@ -233,7 +246,10 @@ const formatProviderProfile = async (provider: IProvider) => {
   };
 };
 
-export const getFeaturedProviders = async () => {
+export const getFeaturedProviders = async (origin?: {
+  latitude?: number;
+  longitude?: number;
+}) => {
   const activeUserIds = await User.distinct("_id", {
     status: "active",
     isDeleted: false,
@@ -250,7 +266,31 @@ export const getFeaturedProviders = async () => {
     .populate(servicePopulate)
     .lean();
 
-  return providers
+  const distanceByUserId = new Map<string, number>();
+  if (origin?.latitude !== undefined && origin.longitude !== undefined) {
+    const locations = await Location.find({
+      userId: { $in: providers.map((provider) => provider.userId) },
+      ownerType: "provider",
+      isActive: true,
+      isDeleted: false,
+    })
+      .select("userId coordinates lastUpdatedAt")
+      .sort({ lastUpdatedAt: -1 })
+      .lean();
+
+    for (const location of locations) {
+      const userId = location.userId.toString();
+      if (distanceByUserId.has(userId)) continue;
+      const [longitude, latitude] = location.coordinates.coordinates;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+      distanceByUserId.set(
+        userId,
+        haversineMeters(origin.latitude, origin.longitude, latitude, longitude),
+      );
+    }
+  }
+
+  const featuredProviders = providers
     .filter((provider) => provider.userId)
     .map((provider) => {
       const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string };
@@ -270,8 +310,19 @@ export const getFeaturedProviders = async () => {
         })),
         averageRating: provider.averageRating,
         totalFeedbacks: provider.totalFeedbacks,
+        distanceMeters: distanceByUserId.get(user._id.toString()) ?? null,
       };
     });
+
+  if (origin?.latitude !== undefined && origin.longitude !== undefined) {
+    featuredProviders.sort((a, b) => {
+      if (a.distanceMeters == null) return b.distanceMeters == null ? 0 : 1;
+      if (b.distanceMeters == null) return -1;
+      return a.distanceMeters - b.distanceMeters;
+    });
+  }
+
+  return featuredProviders;
 };
 
 export const getNearbyProvidersForCustomer = async (
@@ -282,6 +333,7 @@ export const getNearbyProvidersForCustomer = async (
   recurrenceUnitValue?: string,
   recurrenceCountValue?: number,
   orderIdValue?: string,
+  selectedOptions?: unknown,
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(serviceId, "service id");
@@ -293,7 +345,7 @@ export const getNearbyProvidersForCustomer = async (
       _id: serviceId,
       isActive: true,
       isDeleted: false,
-    }).lean(),
+    }),
     Address.findOne({
       _id: addressId,
       userId: new Types.ObjectId(userId),
@@ -309,7 +361,7 @@ export const getNearbyProvidersForCustomer = async (
   }
 
   const scheduledAt = scheduledAtValue ? new Date(scheduledAtValue) : null;
-  if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date())) {
+  if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt < getEarliestScheduledAt() || !isWithinAppointmentHours(scheduledAt))) {
     throw new AppError("Thời gian lịch hẹn không hợp lệ.", 400);
   }
   const recurrenceUnit = ["weekly", "monthly"].includes(recurrenceUnitValue || "")
@@ -346,25 +398,34 @@ export const getNearbyProvidersForCustomer = async (
     : [];
 
   let excludeProviderIds: Types.ObjectId[] = [];
+  let savedIntervals: ScheduleInterval[] | undefined;
   if (orderIdValue) {
     const order = await Order.findOne({
       _id: orderIdValue,
       customerId: new Types.ObjectId(userId),
       isDeleted: false,
     })
-      .select("_id recurringGroupId")
       .lean();
     if (!order) {
       throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
     }
 
-    const relatedOrderIds = order.recurringGroupId
+    const relatedOrders = order.recurringGroupId
       ? await Order.find({
           recurringGroupId: order.recurringGroupId,
           customerId: new Types.ObjectId(userId),
+          status: "created",
           isDeleted: false,
-        }).distinct("_id")
-      : [order._id];
+        }).lean()
+      : [order];
+    const policy = await getBookingPolicy();
+    savedIntervals = relatedOrders.map((item) => {
+      const interval = getOrderInterval(item, policy);
+      if (item.scheduledAt) return interval;
+      const start = Date.now() + interval.travelMinutes * 60000;
+      return { ...interval, start, end: start + (interval.end - interval.start) };
+    });
+    const relatedOrderIds = relatedOrders.map((item) => item._id);
     excludeProviderIds = await OrderAssignment.find({
       orderId: { $in: relatedOrderIds },
       status: { $in: ["rejected", "timeout"] },
@@ -372,6 +433,11 @@ export const getNearbyProvidersForCustomer = async (
     }).distinct("providerId");
   }
 
+  const pricing = selectedOptions !== undefined
+    ? await buildServicePricingSnapshot(service, [], selectedOptions, undefined, scheduledAt ? "scheduled" : "normal")
+    : null;
+  const scheduleIntervals = pricing ? (occurrenceDates.length ? occurrenceDates : [new Date(Date.now() + pricing.schedule.travelMinutes * 60000)])
+    .map((date) => ({ ...pricing.schedule, start: date.getTime(), end: date.getTime() + pricing.schedule.durationMinutes * 60000 })) : undefined;
   const candidates = await MatchingService.findNearestProviders({
     latitude: address.latitude,
     longitude: address.longitude,
@@ -379,8 +445,9 @@ export const getNearbyProvidersForCustomer = async (
     province: address.province,
     ward: address.ward,
     limit: 5,
-    requireOnline: !scheduledAt,
+    requireOnline: true,
     scheduledDates: occurrenceDates,
+    scheduleIntervals: savedIntervals ?? scheduleIntervals,
     excludeProviderIds,
   });
 
@@ -481,14 +548,14 @@ export const getPublicProviderProfile = async (providerId: string) => {
       .sort({ createdAt: -1 })
       .limit(5)
       .populate("customerId", "fullName avatar")
-      .populate("serviceId", "name image")
+      .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
       .lean(),
     Category.find({
       _id: { $in: categoryIds },
       isActive: true,
       isDeleted: false,
     })
-      .select("name slug icon")
+      .select("name slug icon iconColor")
       .sort({ name: 1 })
       .lean(),
   ]);
@@ -519,6 +586,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
         name: category.name,
         slug: category.slug,
         icon: category.icon,
+        iconColor: category.iconColor,
         services: services
           .filter(
             (service) =>
@@ -551,6 +619,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
       };
       const service = feedback.serviceId as unknown as {
         name?: string;
+        coverImage?: string | null;
         image?: string | null;
       };
 
@@ -566,7 +635,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
         },
         service: {
           name: service?.name || "Dịch vụ",
-          image: service?.image || null,
+          image: (service?.coverImage === undefined ? service?.image : service.coverImage) || null,
         },
         providerReply: feedback.providerReply
           ? {
@@ -638,7 +707,6 @@ export const updateMyProviderProfile = async (
   if (payload.workingAreas !== undefined) {
     provider.workingAreas = [...new Set(payload.workingAreas)];
   }
-
   await provider.save();
   await provider.populate(servicePopulate);
 

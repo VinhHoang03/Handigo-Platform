@@ -26,7 +26,7 @@ const dateStringSchema = z.string().refine((value) => !Number.isNaN(Date.parse(v
 const positiveNumberSchema = z.coerce.number().min(0);
 
 const adminVoucherBaseSchema = z.object({
-  code: z.string().trim().min(1, "Ma voucher la bat buoc").max(50).transform((value) => value.toUpperCase()),
+  code: z.string().trim().min(1, "Vui lòng nhập mã giảm giá").max(50).transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(500).nullable().optional(),
   discountType: discountTypeSchema,
@@ -34,6 +34,7 @@ const adminVoucherBaseSchema = z.object({
   maxDiscountAmount: positiveNumberSchema.nullable().optional(),
   minOrderAmount: positiveNumberSchema.nullable().optional(),
   usageLimit: z.coerce.number().int().min(0).nullable().optional(),
+  perUserLimit: z.coerce.number().int().min(1, "Giới hạn mỗi khách phải ít nhất một lượt.").optional(),
   startAt: dateStringSchema,
   endAt: dateStringSchema,
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
@@ -45,7 +46,7 @@ export const createAdminVoucherSchema = adminVoucherBaseSchema
       ctx.addIssue({
         code: "custom",
         path: ["discountValue"],
-        message: "Gia tri phan tram phai tu 1 den 100",
+        message: "Giá trị phần trăm phải từ 1 đến 100",
       });
     }
 
@@ -53,7 +54,7 @@ export const createAdminVoucherSchema = adminVoucherBaseSchema
       ctx.addIssue({
         code: "custom",
         path: ["endAt"],
-        message: "startAt phai truoc endAt",
+        message: "Thời gian bắt đầu phải trước thời gian kết thúc",
       });
     }
   });
@@ -72,7 +73,7 @@ export const updateAdminVoucherSchema = adminVoucherBaseSchema
       ctx.addIssue({
         code: "custom",
         path: ["discountValue"],
-        message: "Gia tri phan tram phai tu 1 den 100",
+        message: "Giá trị phần trăm phải từ 1 đến 100",
       });
     }
 
@@ -80,12 +81,13 @@ export const updateAdminVoucherSchema = adminVoucherBaseSchema
       ctx.addIssue({
         code: "custom",
         path: ["endAt"],
-        message: "startAt phai truoc endAt",
+        message: "Thời gian bắt đầu phải trước thời gian kết thúc",
       });
     }
   });
 
 export const adminVoucherQuerySchema = z.object({
+  source: z.enum(["all", "public", "reward"]).default("public"),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   search: z.string().trim().optional(),

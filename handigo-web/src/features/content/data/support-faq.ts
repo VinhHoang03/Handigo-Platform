@@ -57,7 +57,7 @@ export const supportFaqs: SupportFaqItem[] = [
     group: "Thanh toán",
     question: "Huỷ đơn thì được hoàn lại bao nhiêu?",
     answer:
-      "Đơn chưa có thợ nhận thì hoàn toàn bộ. Với đơn đã đặt lịch: huỷ trước giờ hẹn từ 24 giờ trở lên hoàn 100%, từ 6 đến dưới 24 giờ hoàn 80%, từ 2 đến dưới 6 giờ hoàn 50%, dưới 2 giờ hoàn 20%. Đơn thường và đơn gấp đã có thợ nhận hoàn 70%. Quá giờ hẹn thì không huỷ được, bạn cần gửi yêu cầu hỗ trợ.",
+      "Đơn chưa có thợ nhận thì hoàn toàn bộ khoản đã thanh toán. Sau khi thợ nhận, khách được hủy trong vòng 5 phút nếu thợ chưa bắt đầu làm việc và được hoàn 100% khoản đã thanh toán về ví Handigo, bao gồm cọc thực trả của dịch vụ báo giá. Hết 5 phút hoặc thợ đã bắt đầu thì khách không thể hủy. Tiền mặt chưa thanh toán không phát sinh hoàn tiền.",
   },
   {
     group: "Thanh toán",

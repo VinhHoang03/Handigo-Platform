@@ -7,20 +7,22 @@ export function Metric({
   label,
   value,
   icon: Icon,
+  compact = false,
 }: {
   label: string;
   value: string;
   icon?: LucideIcon;
+  compact?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-5 text-center shadow-sm">
-      <p className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+    <div className={`${compact ? 'min-w-0 rounded-lg px-1.5 py-2.5' : 'rounded-2xl p-5'} border border-outline-variant/10 bg-surface-container-lowest text-center shadow-sm`}>
+      <p title={label} className={`text-on-surface-variant ${compact ? 'mb-0.5 truncate text-[11px] font-medium leading-4 tracking-tight' : 'mb-1 text-xs font-bold uppercase tracking-wider'}`}>
         {label}
       </p>
-      <div className="flex items-center justify-center gap-1 text-2xl font-bold text-primary">
+      <div className={`flex items-center justify-center font-bold text-primary ${compact ? 'gap-0.5 whitespace-nowrap text-base leading-6 tabular-nums' : 'gap-1 text-2xl'}`}>
         {value}
         {Icon && (
-          <Icon aria-hidden="true" size={24} className="text-star-gold" />
+          <Icon aria-hidden="true" size={compact ? 14 : 24} className="shrink-0 text-star-gold" />
         )}
       </div>
     </div>
@@ -30,14 +32,16 @@ export function Metric({
 export function InfoSection({
   title,
   children,
+  compact = false,
 }: {
   title: string;
   children: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm">
-      <h2 className="mb-4 text-2xl font-bold text-on-background">{title}</h2>
-      <div className="space-y-3 leading-7 text-on-surface-variant">
+    <section className={`${compact ? 'rounded-xl p-3' : 'rounded-2xl p-6'} border border-outline-variant/10 bg-surface-container-lowest shadow-sm`}>
+      <h2 className={`font-bold text-on-background ${compact ? 'mb-2 text-base leading-6' : 'mb-4 text-2xl'}`}>{title}</h2>
+      <div className={`text-on-surface-variant ${compact ? 'space-y-2 text-[15px] leading-6' : 'space-y-3 leading-7'}`}>
         {children}
       </div>
     </section>
@@ -48,19 +52,21 @@ export function VerificationRow({
   icon: Icon,
   title,
   description,
+  compact = false,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-xl bg-surface-container-low p-3">
-      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-        <Icon aria-hidden="true" size={24} />
+    <div className={`flex items-center rounded-xl bg-surface-container-low ${compact ? 'gap-2 p-2' : 'gap-4 p-3'}`}>
+      <div className={`grid shrink-0 place-items-center rounded-full bg-primary/10 text-primary ${compact ? 'h-9 w-9' : 'h-12 w-12'}`}>
+        <Icon aria-hidden="true" size={compact ? 18 : 24} />
       </div>
       <div>
-        <p className="font-bold text-on-background">{title}</p>
-        <p className="text-sm text-on-surface-variant">{description}</p>
+        <p className={`font-bold text-on-background ${compact ? 'text-[15px]' : ''}`}>{title}</p>
+        <p className={`text-on-surface-variant ${compact ? 'text-[13px] leading-5' : 'text-sm'}`}>{description}</p>
       </div>
     </div>
   );

@@ -33,7 +33,7 @@ const getSystemInstruction = (role: RequestUser["role"]) => {
     role === "CUSTOMER"
       ? [
           "Bạn đang hỗ trợ người dùng có vai trò Khách hàng (CUSTOMER).",
-          "Ưu tiên hướng dẫn chọn dịch vụ phù hợp, tạo đơn thường hoặc đặt lịch, chọn địa chỉ và nhà cung cấp, theo dõi trạng thái đơn, thanh toán, xác nhận báo giá, nhắn tin với nhà cung cấp, đánh giá và gửi khiếu nại.",
+          "Ưu tiên hướng dẫn chọn dịch vụ phù hợp, tạo đơn thường hoặc đặt lịch, chọn địa chỉ và nhà cung cấp, theo dõi trạng thái đơn, thanh toán, xem báo giá sửa chữa, nhắn tin với nhà cung cấp, đánh giá và gửi khiếu nại.",
           "Khi tư vấn về đơn hàng, chỉ sử dụng các đơn thuộc khách hàng có trong Dữ liệu hệ thống đã kiểm tra.",
           "Không hướng dẫn khách hàng sử dụng chức năng nội bộ dành cho nhà cung cấp hoặc quản trị viên.",
         ].join(" ")

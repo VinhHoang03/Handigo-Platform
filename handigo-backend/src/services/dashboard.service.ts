@@ -96,6 +96,7 @@ const baseTransactionMatch = (query: DashboardQuery) => ({
 const providerSettlementMatch = (query: DashboardQuery) => ({
   ...baseTransactionMatch(query),
   type: { $in: ["provider_earning", "platform_fee"] },
+  "metadata.systemRevenueOnly": { $ne: true },
 });
 
 const providerNetEarningExpression = {
@@ -245,6 +246,9 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
   const providerNetRevenueExpression = {
     $ifNull: ["$metadata.netEarning", 0],
   };
+  const completedGrossRevenueExpression = {
+    $ifNull: ["$metadata.grossAmount", "$amount"],
+  };
   const cashCompletedRevenueMatch = {
     ...completedOrderRevenueMatch,
     "metadata.paymentMethod": "cash",
@@ -276,16 +280,16 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     seriesAggregate(Payment, paidPaymentMatch, "%G-W%V", "$amount", "week", "paidAt"),
     seriesAggregate(Payment, paidPaymentMatch, "%Y-%m", "$amount", "month", "paidAt"),
     seriesAggregate(WalletTransaction, platformFeeMatch, "%Y-%m", "$amount", "month"),
-    seriesAggregate(WalletTransaction, completedOrderRevenueMatch, "%Y-%m", "$amount", "month"),
+    seriesAggregate(WalletTransaction, completedOrderRevenueMatch, "%Y-%m", completedGrossRevenueExpression, "month"),
     seriesAggregate(Payment, depositMatch, "%Y-%m", "$amount", "month", "paidAt"),
     sumAggregate(WalletTransaction, platformFeeMatch, "$amount"),
-    sumAggregate(WalletTransaction, completedOrderRevenueMatch, "$amount"),
+    sumAggregate(WalletTransaction, completedOrderRevenueMatch, completedGrossRevenueExpression),
     sumAggregate(Payment, depositMatch, "$amount"),
     sumAggregate(Payment, collectedPaymentMatch, "$amount"),
     sumAggregate(Payment, refundedPaymentMatch, refundedAmountExpression),
     sumAggregate(WalletTransaction, completedOrderRevenueMatch, providerNetRevenueExpression),
-    sumAggregate(WalletTransaction, cashCompletedRevenueMatch, "$amount"),
-    sumAggregate(WalletTransaction, onlineCompletedRevenueMatch, "$amount"),
+    sumAggregate(WalletTransaction, cashCompletedRevenueMatch, completedGrossRevenueExpression),
+    sumAggregate(WalletTransaction, onlineCompletedRevenueMatch, completedGrossRevenueExpression),
     seriesAggregate(
       WalletTransaction,
       completedOrderRevenueMatch,

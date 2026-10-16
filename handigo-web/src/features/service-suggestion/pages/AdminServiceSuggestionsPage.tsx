@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useState } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -29,8 +30,8 @@ export default function AdminServiceSuggestionsPage() {
   const [createdCategoryId, setCreatedCategoryId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const [, setNotice] = useToastFeedback<string>("", "success");
+  const [, setError] = useToastFeedback<string>("", "error");
 
   const loadData = async () => {
     setIsLoading(true);
@@ -149,15 +150,6 @@ export default function AdminServiceSuggestionsPage() {
           onRefresh={() => void loadData()}
         />
 
-        {(notice || error) && (
-          <div
-            className={`rounded-lg px-4 py-3 text-sm font-medium ${
-              error ? "bg-error/10 text-error" : "bg-success-container text-on-success-container"
-            }`}
-          >
-            {error || notice}
-          </div>
-        )}
 
         <AsyncState
           loading={isLoading}

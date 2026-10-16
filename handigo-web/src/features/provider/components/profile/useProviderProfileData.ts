@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import type { UserProfileData } from "@/features/profile/types/profile.types";
@@ -25,9 +26,10 @@ import { useProviderProfileSave } from "./useProviderProfileSave";
  * page (hero, performance stats, service area).
  */
 export function useProviderProfileData(availabilityStatus: string) {
+  const { addToast } = useToast();
   const [profile, setProfile] = useState<ProviderProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useToastFeedback<string | null>(null, "error");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingProfessional, setIsEditingProfessional] = useState(false);
   const [professionalForm, setProfessionalForm] = useState<ProfessionalForm>(
@@ -71,7 +73,7 @@ export function useProviderProfileData(availabilityStatus: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [syncAuthUser]);
+  }, [setError, syncAuthUser]);
 
   useEffect(() => {
     // Initial remote loads are intentionally started from this effect.
@@ -112,6 +114,7 @@ export function useProviderProfileData(availabilityStatus: string) {
       setProfile(nextProfile);
       setProfessionalForm(toProfessionalForm(nextProfile));
       setIsEditingProfessional(false);
+      addToast("Đã cập nhật hồ sơ nghề nghiệp.", "success");
     } catch (saveError) {
       setError(
         getErrorMessage(

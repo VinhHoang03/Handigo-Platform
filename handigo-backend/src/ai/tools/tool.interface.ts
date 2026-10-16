@@ -2,10 +2,12 @@ import type { z } from "zod";
 import type { RequestUser } from "../../middlewares/authContext";
 
 export interface ToolContext {
+  session?: import("../agent/agent-state").AgentSession;
   user: RequestUser;
   sessionId: string;
   signal: AbortSignal;
   confirmedPreview?: unknown;
+  bookingAddressLookup?: { value?: Promise<import("../agent/booking-draft").DraftAddress[]> };
 }
 
 export interface AgentTool<T = unknown> {

@@ -1,6 +1,6 @@
 import { Modal } from "@/components/common/Modal";
 import type { PendingSave } from "./config-definitions";
-import { formatValue } from "./system-config-format";
+import { formatConfigValue } from "./system-config-format";
 
 export function SaveConfirmModal({
   pendingSave,
@@ -33,11 +33,11 @@ export function SaveConfirmModal({
         <div className="grid gap-3 sm:grid-cols-2">
           <CompareBlock
             label="Giá trị hiện tại"
-            value={formatValue(item.currentValue, item.type, item.unit)}
+            value={formatConfigValue(item, item.currentValue)}
           />
           <CompareBlock
             label="Giá trị mới"
-            value={formatValue(payload.value, item.type, item.unit)}
+            value={formatConfigValue(item, payload.value)}
           />
         </div>
 
@@ -45,10 +45,10 @@ export function SaveConfirmModal({
           <p>
             <span className="font-semibold">Cấu hình:</span> {item.label}
           </p>
-          <p>
+          {item.group !== "policy" && <p>
             <span className="font-semibold">Key:</span>{" "}
             <span className="font-mono">{item.key}</span>
-          </p>
+          </p>}
           <p>
             <span className="font-semibold">Hiệu lực:</span> {item.effect}
           </p>
@@ -81,9 +81,9 @@ function CompareBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-outline-variant/30 p-3">
       <p className="mb-2 text-sm font-semibold text-on-surface">{label}</p>
-      <code className="block max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-container-low px-3 py-2 text-sm tabular-nums text-on-surface">
+      <div className="block max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-container-low px-3 py-2 text-sm leading-6 tabular-nums text-on-surface">
         {value}
-      </code>
+      </div>
     </div>
   );
 }

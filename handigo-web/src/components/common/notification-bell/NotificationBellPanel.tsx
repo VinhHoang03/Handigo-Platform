@@ -13,7 +13,7 @@ interface NotificationBellPanelProps {
   loading: boolean;
   error: string;
   items: AppNotification[];
-  onMarkAsRead: (item: AppNotification) => void;
+  onOpen: (item: AppNotification) => void;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -28,7 +28,7 @@ export function NotificationBellPanel({
   loading,
   error,
   items,
-  onMarkAsRead,
+  onOpen,
   hasMore,
   loadingMore,
   onLoadMore,
@@ -94,7 +94,11 @@ export function NotificationBellPanel({
           </div>
         )}
         {items.map((item) => (
-          <NotificationItem key={item.id} item={item} onMarkAsRead={onMarkAsRead} />
+          <NotificationItem
+            key={item.id}
+            item={item}
+            onOpen={onOpen}
+          />
         ))}
       </div>
 

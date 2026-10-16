@@ -2,6 +2,8 @@ import {
   Bar,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   BarChart as RechartsBarChart,
   ResponsiveContainer,
   Tooltip,
@@ -60,10 +62,14 @@ interface BarChartProps {
   /** `vertical` = cột đứng (theo thời gian); `horizontal` = cột ngang (xếp hạng). */
   orientation?: "vertical" | "horizontal";
   height?: number;
+  /** Khoảng trống hai bên cột trong mỗi danh mục. */
+  barCategoryGap?: string | number;
   formatValue?: (value: number) => string;
   formatAxisValue?: (value: number) => string;
   /** Dùng một màu cho mọi cột khi dữ liệu không phân loại. */
   singleColor?: boolean;
+  /** Nối các đỉnh cột đứng bằng đường cong mềm. */
+  connectTops?: boolean;
 }
 
 export function BarChart({
@@ -71,12 +77,16 @@ export function BarChart({
   ariaLabel,
   orientation = "vertical",
   height = 280,
+  barCategoryGap,
   formatValue = String,
   formatAxisValue,
   singleColor = false,
+  connectTops = false,
 }: BarChartProps) {
   const reducedMotion = usePrefersReducedMotion();
   const isHorizontal = orientation === "horizontal";
+  const showLine = connectTops && !isHorizontal;
+  const ChartComponent = showLine ? ComposedChart : RechartsBarChart;
   const { ref, width: containerWidth } = useElementWidth<HTMLDivElement>();
 
   // Trục Y chiếm tối đa 38% khung, kẹp trong [76, 140]. Số ký tự nhãn suy ra từ
@@ -97,8 +107,9 @@ export function BarChart({
     <>
       <div role="img" aria-label={ariaLabel} ref={ref}>
         <ResponsiveContainer width="100%" height={height}>
-          <RechartsBarChart
+          <ChartComponent
             data={data}
+            barCategoryGap={barCategoryGap}
             layout={isHorizontal ? "vertical" : "horizontal"}
             margin={{ top: 8, right: 16, bottom: 4, left: isHorizontal ? 8 : 4 }}
           >
@@ -153,7 +164,21 @@ export function BarChart({
                 <Cell key={datum.label} fill={barColor(datum, index)} />
               ))}
             </Bar>
-          </RechartsBarChart>
+            {showLine && (
+              <Line
+                type="monotoneX"
+                dataKey="value"
+                stroke="var(--color-secondary)"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                dot={false}
+                activeDot={{ r: 4, fill: "var(--color-surface-container-lowest)", stroke: "var(--color-secondary)", strokeWidth: 2 }}
+                tooltipType="none"
+                isAnimationActive={!reducedMotion}
+              />
+            )}
+          </ChartComponent>
         </ResponsiveContainer>
       </div>
 

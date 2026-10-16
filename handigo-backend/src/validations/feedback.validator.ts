@@ -3,7 +3,7 @@ import { z } from "zod";
 const objectIdSchema = z
   .string()
   .trim()
-  .regex(/^[0-9a-fA-F]{24}$/, "Invalid Mongo object id");
+  .regex(/^[0-9a-fA-F]{24}$/, "Định danh MongoDB không hợp lệ");
 
 const imageUrlSchema = z.string().trim().url("Image must be a valid URL");
 
@@ -21,6 +21,12 @@ export const feedbackListQuerySchema = z.object({
   isVisible: booleanQuerySchema.optional(),
 });
 
+export const serviceFeedbackQuerySchema = feedbackListQuerySchema.extend({
+  optionId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Mã gói dịch vụ không hợp lệ").optional(),
+  sort: z.enum(["newest", "rating"]).default("newest"),
+  positiveOnly: booleanQuerySchema.optional(),
+});
+
 export const createFeedbackSchema = z.object({
   orderId: objectIdSchema,
   rating: z.number().int().min(1).max(5),
@@ -36,7 +42,7 @@ export const updateFeedbackSchema = z
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
-    "At least one field is required",
+    "Vui lòng cung cấp ít nhất một trường dữ liệu",
   );
 
 export const visibilitySchema = z.object({

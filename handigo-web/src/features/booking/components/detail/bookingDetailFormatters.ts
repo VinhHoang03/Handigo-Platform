@@ -30,6 +30,12 @@ export const getPaymentStatusDisplay = (
     currentOrder.serviceId?.serviceType !== "fixed_price";
 
   if (currentOrder.status === "cancelled") {
+    if (currentOrder.cancellation?.refundPolicy?.policyVersion === "HANDIGO_QUOTATION_DEPOSIT_V1") {
+      return {
+        label: "",
+        className: toneTextClasses.neutral,
+      };
+    }
     if (currentOrder.paymentStatus === "refunded") {
       const refundPolicy = currentOrder.cancellation?.refundPolicy;
       return {
@@ -64,16 +70,16 @@ export const getPaymentStatusDisplay = (
     };
   }
 
-  if (currentOrder.inspectionRequired && hasPaidInitialPayment) {
+  if (currentOrder.paymentStatus === "paid") {
     return {
-      label: "Đã thanh toán tiền cọc",
+      label: "Đã thanh toán",
       className: toneTextClasses.success,
     };
   }
 
-  if (currentOrder.paymentStatus === "paid") {
+  if (currentOrder.inspectionRequired && hasPaidInitialPayment) {
     return {
-      label: "Đã thanh toán",
+      label: "Đã thanh toán tiền cọc",
       className: toneTextClasses.success,
     };
   }
@@ -113,6 +119,8 @@ export const getQuotationStatusLabel = (
   status: OrderQuotation["quotation"]["status"],
 ) => {
   switch (status) {
+    case "saved":
+      return "Đã lưu";
     case "pending":
       return "Chờ xác nhận";
     case "approved":
@@ -132,6 +140,7 @@ export const getQuotationStatusClass = (
   status: OrderQuotation["quotation"]["status"],
 ) => {
   switch (status) {
+    case "saved":
     case "approved":
       return toneChipClasses.success;
     case "rejected":

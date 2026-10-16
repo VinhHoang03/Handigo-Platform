@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import User from "../models/user.model";
 import { Session } from "../models/session.model";
+import { disconnectUserSockets } from "../sockets/socketServer";
 import * as providerApplicationService from "./providerApplication.service";
 import { getAdminFeedbacks as listFeedbacks } from "./feedback.service";
 import { SAFE_USER_PROJECTION } from "./user.service";
@@ -16,7 +17,7 @@ interface UserQuery {
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`Invalid ${fieldName}`, 400);
+    throw new AppError(`Định danh ${fieldName} không hợp lệ`, 400);
   }
 };
 
@@ -68,7 +69,7 @@ export const getUsers = async (query: UserQuery = {}) => {
 };
 
 export const getUserById = async (userId: string) => {
-  assertObjectId(userId, "user id");
+  assertObjectId(userId, "người dùng");
 
   const user = await User.findOne({ _id: userId, isDeleted: false }).select(
     SAFE_USER_PROJECTION,
@@ -86,11 +87,11 @@ export const updateUserStatus = async (
   userId: string,
   status: "active" | "locked",
 ) => {
-  assertObjectId(adminId, "admin id");
-  assertObjectId(userId, "user id");
+  assertObjectId(adminId, "quản trị viên");
+  assertObjectId(userId, "người dùng");
 
   if (adminId === userId && status === "locked") {
-    throw new AppError("You cannot lock your own account", 400);
+    throw new AppError("Bạn không thể khóa tài khoản của chính mình", 400);
   }
 
   const user = await User.findOne({ _id: userId, isDeleted: false });
@@ -100,13 +101,14 @@ export const updateUserStatus = async (
   }
 
   if (user.role === "ADMIN" && status === "locked") {
-    throw new AppError("Admin accounts cannot be locked in this version", 400);
+    throw new AppError("Không thể khóa tài khoản quản trị trong phiên bản này", 400);
   }
 
   user.status = status;
   await user.save();
 
   if (status === "locked") {
+    disconnectUserSockets(userId);
     await Session.updateMany(
       { userId: user._id, revokedAt: null },
       { revokedAt: new Date() },

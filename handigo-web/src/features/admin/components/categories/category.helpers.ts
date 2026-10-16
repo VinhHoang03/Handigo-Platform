@@ -10,6 +10,7 @@ export interface CategoryFormState {
   name: string;
   slug: string;
   icon: string;
+  iconColor: string;
   description: string;
   isActive: boolean;
 }
@@ -17,7 +18,8 @@ export interface CategoryFormState {
 export const emptyCategoryForm: CategoryFormState = {
   name: '',
   slug: '',
-  icon: '',
+  icon: 'lucide:grid2_x2',
+  iconColor: '',
   description: '',
   isActive: true,
 };
@@ -26,6 +28,7 @@ export const toCategoryPayload = (form: CategoryFormState): CategoryPayload => (
   name: form.name.trim(),
   slug: form.slug.trim() || undefined,
   icon: form.icon.trim() || undefined,
+  iconColor: form.iconColor || null,
   description: form.description.trim() || undefined,
   isActive: form.isActive,
 });

@@ -30,13 +30,16 @@ export const BankAccountPanel: React.FC<{ account: BankAccount }> = ({
 
 export const AccountFunctionsPanel: React.FC<{
   onPasswordClick: () => void;
-}> = ({ onPasswordClick }) => {
+  canChangePassword: boolean;
+}> = ({ onPasswordClick, canChangePassword }) => {
   const items = [
     {
       icon: Lock,
       label: "Mật khẩu và bảo mật",
-      description: "Cập nhật mật khẩu đăng nhập.",
-      onClick: onPasswordClick,
+      description: canChangePassword
+        ? "Cập nhật mật khẩu đăng nhập."
+        : "Tài khoản Google không đổi mật khẩu tại đây.",
+      onClick: canChangePassword ? onPasswordClick : undefined,
     },
     {
       icon: Shield,
@@ -60,8 +63,9 @@ export const AccountFunctionsPanel: React.FC<{
           <button
             key={item.label}
             type="button"
-            className="group flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className={`group flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${item.onClick ? "hover:bg-surface-container-low" : "cursor-not-allowed opacity-60"}`}
             onClick={item.onClick}
+            disabled={!item.onClick}
           >
             <span className="flex min-w-0 items-center gap-3">
               <item.icon aria-hidden="true" size={24} className="text-on-surface-variant transition-colors group-hover:text-primary" />

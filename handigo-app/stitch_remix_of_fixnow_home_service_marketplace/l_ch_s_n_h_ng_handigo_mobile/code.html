@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lịch sử đơn hàng - Handigo</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "inverse-on-surface": "#eef0ff",
+            "on-primary": "#ffffff",
+            "on-surface": "#131b2e",
+            "surface": "#faf8ff",
+            "error": "#ba1a1a",
+            "on-primary-container": "#b1afff",
+            "outline": "#777587",
+            "background": "#faf8ff",
+            "surface-container-highest": "#dae2fc",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-high": "#e1e7ff",
+            "secondary-fixed-dim": "#86d2e6",
+            "surface-variant": "#dae2fc",
+            "tertiary-fixed": "#ffdbcc",
+            "tertiary-fixed-dim": "#ffb694",
+            "surface-container": "#eaedff",
+            "primary": "#1e00a9",
+            "surface-container-low": "#f2f3ff",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface-dim": "#d2d9f4",
+            "on-background": "#131b2e",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "outline-variant": "#c7c4d8",
+            "on-primary-fixed-variant": "#3323cc",
+            "tertiary-container": "#7d3000",
+            "primary-container": "#3525cd",
+            "on-surface-variant": "#464555",
+            "on-error-container": "#93000a",
+            "on-tertiary": "#ffffff",
+            "on-secondary-fixed": "#001f26",
+            "surface-tint": "#4d44e3",
+            "primary-fixed": "#e2dfff",
+            "error-container": "#ffdad6",
+            "secondary": "#00687a",
+            "on-secondary-container": "#076a7c",
+            "inverse-surface": "#283044",
+            "primary-fixed-dim": "#c3c0ff",
+            "success-green": "#4ade80",
+            "on-tertiary-container": "#ff9f72",
+            "on-tertiary-fixed": "#351000",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "secondary-container": "#9ce8fd",
+            "star-gold": "#facc15",
+            "secondary-fixed": "#abedff",
+            "tertiary": "#592000",
+            "surface-bright": "#faf8ff",
+            "on-secondary": "#ffffff",
+            "on-error": "#ffffff",
+            "inverse-primary": "#c3c0ff",
+            "surface-glass": "rgba(255, 255, 255, 0.7)"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xl": "80px",
+            "sm": "12px",
+            "md": "24px",
+            "lg": "48px",
+            "gutter": "24px",
+            "base": "8px",
+            "container-max": "1280px",
+            "xs": "4px"
+          },
+          "fontFamily": {
+            "headline-xl": ["Hanken Grotesk"],
+            "label-md": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "headline-lg-mobile": ["Hanken Grotesk"],
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "label-sm": ["Inter"],
+            "body-lg": ["Inter"]
+          },
+          "fontSize": {
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex justify-center selection:bg-primary-fixed selection:text-primary">
+<!-- Mobile Viewport Container (App Shell) -->
+<div class="w-full max-w-md min-h-screen flex flex-col bg-surface relative pb-28">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 right-0 max-w-md mx-auto z-40 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md px-4 h-16 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-2">
+<button aria-label="Quay lại" class="w-10 h-10 flex items-center justify-center rounded-xl text-primary hover:bg-surface-container active:scale-95 transition-all">
+<span class="material-symbols-outlined text-headline-md font-headline-md">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface tracking-tight">Lịch sử đơn hàng</h1>
+</div>
+<div class="flex items-center gap-1">
+<button aria-label="Tìm kiếm" class="w-10 h-10 flex items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container active:scale-95 transition-all">
+<span class="material-symbols-outlined text-headline-md font-headline-md">search</span>
+</button>
+<button aria-label="Bộ lọc" class="w-10 h-10 flex items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container active:scale-95 transition-all">
+<span class="material-symbols-outlined text-headline-md font-headline-md">tune</span>
+</button>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 pt-16 px-4 flex flex-col gap-4">
+<!-- Status Segmented Tabs -->
+<section class="pt-3 pb-1 -mx-4 px-4 sticky top-16 z-30 bg-surface/90 backdrop-blur-md">
+<div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
+<button class="whitespace-nowrap px-4 py-2 rounded-full font-label-md text-label-md bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95">
+            Tất cả
+          </button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full font-label-md text-label-md bg-primary-container text-on-primary font-semibold shadow-sm flex items-center gap-1.5 active:scale-95 transition-transform">
+<span>Đang thực hiện</span>
+<span class="w-5 h-5 rounded-full bg-surface-container-lowest text-primary text-xs flex items-center justify-center font-bold">2</span>
+</button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full font-label-md text-label-md bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95">
+            Đã hoàn thành
+          </button>
+<button class="whitespace-nowrap px-4 py-2 rounded-full font-label-md text-label-md bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors active:scale-95">
+            Đã hủy
+          </button>
+</div>
+</section>
+<!-- Order List Container -->
+<div class="flex flex-col gap-4 mt-1">
+<!-- CARD 1: Đang di chuyển (Active Tracker) -->
+<article class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3 transition-all hover:shadow-md">
+<!-- Top Row: ID & Status Badge -->
+<div class="flex items-center justify-between gap-2 border-b border-surface-container-high pb-3">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-body-lg font-body-lg">handyman</span>
+<span class="font-label-sm text-label-sm text-outline font-semibold tracking-wider">#HDG-8924A</span>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-low text-on-surface font-label-sm text-label-sm border border-success-green/30">
+<span class="w-2 h-2 rounded-full bg-success-green animate-pulse"></span>
+<span class="font-semibold text-secondary">Thợ đang đến (12 phút)</span>
+</span>
+</div>
+<!-- Service Info & Price -->
+<div class="flex items-start gap-3">
+<div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-surface-container flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="A modern close-up photo of professional plumber tools and a polished stainless steel kitchen sink drain repair. Bright natural indoor lighting reflects on chrome fixtures, evoking cleanliness, reliability, and precision craft. Professional aesthetic with subtle blue and neutral tones matching modern service platforms." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBO-TH3lPfr3864wnTIoeH9cGEe_uZ0q4xBz6yNn5qcHFc-dBU55uW3jqB5olD5VGlzvSC6ZABWNdMLX-J-b2H7qZgnrhk94A85GI-vxDObofBXyWqrkDecEHNh-Z8XmpAVMAt21YWfFe95q2hTitjHDJ6J4C_gTI8ksHvDnHqy3bl0QbleTqe0AmfXhvIxPoA5ry1Po8crjZJv1wjTo2vnN3nqWQN_nAf6bZAzzd4nWw1AjjvT0pG1Mw"/>
+</div>
+<div class="flex-1 min-w-0">
+<h2 class="font-headline-md text-body-lg font-bold text-on-surface truncate">Sửa rò rỉ ống nước bồn rửa</h2>
+<p class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-label-sm font-label-sm text-outline">schedule</span>
+                Dự kiến đến: 14:15 hôm nay
+              </p>
+<div class="font-headline-md text-body-lg font-bold text-primary mt-1">150.000đ</div>
+</div>
+</div>
+<!-- Technician snippet -->
+<div class="bg-surface-container-low p-2.5 rounded-lg flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full overflow-hidden bg-primary-fixed flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="A professional Vietnamese technician portrait in clean blue branded work polo shirt smiling warmly against a subtle bright background. High-key natural lighting portrays friendly expertise, trustworthiness, and competence in modern urban home repair services." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCjgB_Zqqjsh1iv4QVxfDGmPwjOvdvR10a5k2oxnMgfaG-vYMX3m5gnbpvRDywmcGI_nOA8lPKk7SDQ6bQvtlxtf6sWFkTVrgHoeRWlzPfgLbwNGYDYLcHFslIgIsTeqS_dZIhzaeP9r3bq2fTOYfz1oa7GS4YOl0Y1yoCcNmYfSTAkKO946E8lRPys_KF9R8lgwv_eZ6IZeBdqEUtvtZqE7Me2IhfP6ldWkUqoMz87hVdQD3yMJAA5w"/>
+</div>
+<div>
+<p class="font-label-md text-label-md font-semibold text-on-surface">Trần Văn Cường</p>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-star-gold text-label-sm font-label-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">4.9 (128 việc)</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-sm font-label-sm bg-secondary-fixed text-on-secondary-fixed font-medium">Đối tác Vàng</span>
+</div>
+<!-- Action Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="h-11 px-3 rounded-lg border border-outline-variant/60 font-label-md text-label-md font-semibold text-on-surface hover:bg-surface-container flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-body-md font-body-md text-primary">chat</span>
+              Nhắn tin
+            </button>
+<button class="h-11 px-3 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md font-semibold shadow-sm hover:opacity-95 flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-body-md font-body-md" style="font-variation-settings: 'FILL' 1;">near_me</span>
+              Theo dõi thợ
+            </button>
+</div>
+</article>
+<!-- CARD 2: Đang sửa chữa -->
+<article class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3 transition-all hover:shadow-md">
+<div class="flex items-center justify-between gap-2 border-b border-surface-container-high pb-3">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-body-lg font-body-lg">ac_unit</span>
+<span class="font-label-sm text-label-sm text-outline font-semibold tracking-wider">#HDG-7812B</span>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-tertiary-container animate-ping"></span>
+<span class="font-semibold">Đang sửa chữa</span>
+</span>
+</div>
+<div class="flex items-start gap-3">
+<div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-surface-container flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="A clean indoor air conditioning unit servicing process with specialized technician inspection equipment. Soft bright daylight illumines the crisp white wall and modern appliance in a high-end apartment living room, portraying cleanliness, meticulous maintenance, and high technology." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2EmLTLWu3kwg21kXXTq6YCk5bmUagqL2o4i4xiHeOLzCH7vz3BCToXW7h2CUoDk_WBX-bP9587a3Ql26ft15cMdvHEWdLuicrihFq8OyYfuZwMPODEoqOFlxUVhEmNMGzluzavgp8EkvEKDOJ4tRP1oppfoxpzq3BfEWtrRdi5lYnaxavLWY1lbIYNH_CGTdXpZxWwkdklyvlSMozwUzLmzHi1C2hsFGLjYw57FeBQ6DZcjmp-THmYQ"/>
+</div>
+<div class="flex-1 min-w-0">
+<h2 class="font-headline-md text-body-lg font-bold text-on-surface truncate">Vệ sinh &amp; Nạp gas máy lạnh Panasonic</h2>
+<p class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-label-sm font-label-sm text-outline">history_toggle_off</span>
+                Hôm nay, 10:30 (Đang diễn ra)
+              </p>
+<div class="font-headline-md text-body-lg font-bold text-primary mt-1">510.000đ</div>
+</div>
+</div>
+<!-- Progress Indicator Bar -->
+<div class="space-y-1.5 pt-1">
+<div class="flex justify-between font-label-sm text-label-sm text-on-surface-variant">
+<span>Tiến độ dịch vụ</span>
+<span class="font-semibold text-primary">Bước 2/3: Nạp gas R32</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-surface-container overflow-hidden">
+<div class="h-full bg-primary-container rounded-full w-2/3 transition-all"></div>
+</div>
+</div>
+<div class="pt-1">
+<button class="w-full h-11 px-4 rounded-lg bg-surface-container-high text-primary font-label-md text-label-md font-semibold hover:bg-surface-variant flex items-center justify-center gap-2 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-body-md font-body-md">visibility</span>
+              Xem tiến trình
+            </button>
+</div>
+</article>
+<!-- CARD 3: Đã hoàn thành -->
+<article class="bg-surface-container-lowest rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3 transition-all hover:shadow-md opacity-95">
+<div class="flex items-center justify-between gap-2 border-b border-surface-container-high pb-3">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-outline text-body-lg font-body-lg">bolt</span>
+<span class="font-label-sm text-label-sm text-outline font-semibold tracking-wider">#HDG-6601C</span>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-label-sm font-label-sm">check_circle</span>
+              Hoàn thành
+            </span>
+</div>
+<div class="flex items-start gap-3">
+<div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-surface-container flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="Close up shot of modern electrical breaker circuit box neatly installed on a clean white wall with sleek switches. Clean contemporary lighting emphasizes safety, high quality craftsmanship, and neat wiring arrangement in an urban condo." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBUZk5AEj0wknUsThYcIdb1Qd31td2lU29AoldHtVQUqFRG_eOTMhRzQQtzh_Sy-6wJQFo-XmWlluWxCIOjEPB2xlP7-oeYr3iVnEaRUm0j-Fx3CJOiwkt-rD4XAx_KrIJsaB0dbpyuNCl6gmmlkaBKo1_L88zUuW0a3qFYS9Cr1vV6mFo-q60h6PqqgtwjMpno9fzeAzCYMFZsoCYWFMmXDpWkKJ-iuOzk-X5WmsP4PKou5v4oBepIw"/>
+</div>
+<div class="flex-1 min-w-0">
+<h2 class="font-headline-md text-body-lg font-bold text-on-surface truncate">Lắp đặt công tắc &amp; sửa aptomat</h2>
+<p class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-label-sm font-label-sm text-outline">event_available</span>
+                12/10/2024 · Thanh toán Thẻ
+              </p>
+<div class="font-headline-md text-body-lg font-bold text-on-surface mt-1">200.000đ</div>
+</div>
+</div>
+<!-- Completed Action Buttons -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="h-11 px-3 rounded-lg border border-outline-variant/60 font-label-md text-label-md font-semibold text-primary hover:bg-surface-container flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-body-md font-body-md">autorenew</span>
+              Đặt lại dịch vụ
+            </button>
+<button class="h-11 px-3 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-variant flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-star-gold text-body-md font-body-md" style="font-variation-settings: 'FILL' 1;">star</span>
+              Đánh giá 5⭐
+            </button>
+</div>
+</article>
+<!-- CARD 4: Đã hủy & Hoàn tiền -->
+<article class="bg-surface-container-lowest/80 rounded-xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3 transition-all hover:shadow-md">
+<div class="flex items-center justify-between gap-2 border-b border-surface-container-high pb-3">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-outline text-body-lg font-body-lg">chair</span>
+<span class="font-label-sm text-label-sm text-outline font-semibold tracking-wider">#HDG-5510D</span>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-label-sm font-label-sm text-error">cancel</span>
+              Đã hủy &amp; Hoàn tiền
+            </span>
+</div>
+<div class="flex items-start gap-3">
+<div class="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-surface-container flex items-center justify-center opacity-75">
+<img class="w-full h-full object-cover" data-alt="Cozy minimalist living room featuring a clean fabric sofa and neutral modern interior design. Bright gentle sunlight pours through large glass windows, highlighting warm timber flooring and pristine upholstery maintenance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhXb80AsYvV8o-QPODXxfIsJhpVDBiurr3I_EISoQpx03bAgIdcYvru5fILJSztfWwZ_UrJY1BQW35iQWTFj-u9CXT_KiV1Jlym0y9mTacNabQ4IEe5OXP2y8vRBQh2U0MoepIC8iI4adnCz6I9928PGvBOp4NbtZ5B4EgifevU0X77TX_SGd-ly1S3DvohVIRRQXAkl7I1ovny3EtG_L0MydJlc_W-dYHcWEFQFM1fBfI3aP7OiBKqw"/>
+</div>
+<div class="flex-1 min-w-0">
+<h2 class="font-headline-md text-body-lg font-bold text-on-surface-variant truncate">Vệ sinh sofa phòng khách</h2>
+<p class="font-label-md text-label-md text-outline flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-label-sm font-label-sm text-outline">event_busy</span>
+                Hủy ngày 05/10/2024
+              </p>
+<div class="font-label-md text-label-md font-medium text-secondary mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-label-sm font-label-sm">account_balance_wallet</span>
+                Đã hoàn 180.000đ vào Ví Handigo
+              </div>
+</div>
+</div>
+<div class="pt-1">
+<button class="w-full h-11 px-4 rounded-lg border border-outline-variant/60 font-label-md text-label-md font-semibold text-on-surface hover:bg-surface-container flex items-center justify-center gap-2 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-body-md font-body-md text-primary">replay</span>
+              Đặt lại đơn này
+            </button>
+</div>
+</article>
+</div>
+</main>
+<!-- BottomNavBar (Shared Component Blueprint mapped to 4 core tabs with Bookings/Đơn hàng active) -->
+<nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md flex justify-around items-center px-4 py-2 shadow-lg">
+<!-- Tab 1: Explore / Trang chủ -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-3 py-1.5 hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined text-headline-md font-headline-md">grid_view</span>
+<span class="font-label-sm text-label-sm mt-0.5">Trang chủ</span>
+</a>
+<!-- Tab 2: Bookings / Đơn hàng (ACTIVE) -->
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container dark:bg-primary dark:text-on-primary rounded-xl px-3 py-1.5 active:scale-95 transition-transform duration-150 shadow-sm" href="#">
+<span class="material-symbols-outlined text-headline-md font-headline-md" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-label-sm text-label-sm mt-0.5 font-bold text-on-primary">Đơn hàng</span>
+</a>
+<!-- Tab 3: Inbox / Tin nhắn -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-3 py-1.5 hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-95 duration-150 relative" href="#">
+<div class="relative">
+<span class="material-symbols-outlined text-headline-md font-headline-md">chat_bubble</span>
+<span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-surface"></span>
+</div>
+<span class="font-label-sm text-label-sm mt-0.5">Tin nhắn</span>
+</a>
+<!-- Tab 4: Profile / Tài khoản -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-3 py-1.5 hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined text-headline-md font-headline-md">person</span>
+<span class="font-label-sm text-label-sm mt-0.5">Tài khoản</span>
+</a>
+</nav>
+</div>
+</body></html>

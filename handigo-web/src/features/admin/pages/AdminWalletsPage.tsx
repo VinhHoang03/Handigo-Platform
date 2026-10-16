@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -16,6 +17,7 @@ import type {
 } from "../types/adminOperations.types";
 
 export default function AdminWalletsPage() {
+  const { addToast } = useToast();
   const [query, setQuery] = useState<AdminWalletQuery>({ page: 1, limit: 20, sortByBalance: "desc" });
   const [searchInput, setSearchInput] = useState("");
   const [items, setItems] = useState<AdminWalletRow[]>([]);
@@ -27,8 +29,8 @@ export default function AdminWalletsPage() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [actionError, setActionError] = useToastFeedback<string>("", "error");
   const [direction, setDirection] = useState<"in" | "out">("in");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -45,7 +47,7 @@ export default function AdminWalletsPage() {
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, setError]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void load(), 0);
@@ -88,6 +90,7 @@ export default function AdminWalletsPage() {
         reason: reason.trim(),
       });
       setAmount("");
+      addToast("Đã điều chỉnh số dư ví.", "success");
       setReason("");
       await Promise.all([load(), loadDetail(selected.providerId, 1)]);
     } catch (requestError) {

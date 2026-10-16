@@ -13,7 +13,7 @@ interface OrderSummaryPriceDetailsProps {
   summaryContent?: ReactNode;
 }
 
-/** Khối liệt kê phí cọc/tuỳ chọn đã chọn và tổng tiền cuối cùng. */
+/** Khối liệt kê tùy chọn đã chọn và tổng tiền cuối cùng. */
 export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> = ({
   service,
   selectedOptions,
@@ -24,13 +24,7 @@ export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> =
   summaryContent,
 }) => (
   <>
-    <div className="border-t border-dashed border-outline-variant pt-md space-y-sm text-sm">
-      {service?.serviceType === 'variable_price' && (
-        <div className="flex justify-between">
-          <span className="text-on-surface-variant">Phí đặt cọc</span>
-          <span className="font-medium">{(service?.depositAmount || 0).toLocaleString()}đ</span>
-        </div>
-      )}
+    {selectedOptions.length > 0 && <div className="border-t border-dashed border-outline-variant pt-md space-y-sm text-sm">
       {selectedOptions.map(opt => (
         <div key={opt._id} className="flex justify-between">
           <span className="text-on-surface-variant">
@@ -46,7 +40,7 @@ export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> =
           )}
         </div>
       ))}
-    </div>
+    </div>}
 
     <div className="pt-md border-t border-outline-variant flex justify-between items-center">
       <div>

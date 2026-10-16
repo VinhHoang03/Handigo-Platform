@@ -71,7 +71,11 @@ export const refreshAccessToken = async () => {
   if (!refreshPromise) {
     refreshPromise = refreshAcrossTabs()
       .catch((error) => {
-        if (!isNetworkError(error)) {
+        const shouldLogout =
+          !isNetworkError(error) &&
+          (!axios.isAxiosError(error) ||
+            [401, 403].includes(error.response?.status ?? 0));
+        if (shouldLogout) {
           useAuthStore.getState().logout();
         }
         throw error;

@@ -5,9 +5,13 @@ import type {
   NotificationQuery,
 } from "@/features/notification/types/notification.types";
 import type { AppRole } from "../Navbar";
-import { getErrorMessage, getNotificationPath } from "./notificationBell.utils";
+import { getErrorMessage, getNotificationPath, isNotificationForUser } from "./notificationBell.utils";
 import { useNotificationReadActions } from "./useNotificationReadActions";
 import { useNotificationSocket } from "./useNotificationSocket";
+import { useToast } from "../Toast";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { getMeApi } from "@/features/auth/api/auth.api";
+import { useNotificationAccount } from "@/features/notification/hooks/useNotificationAccount";
 
 interface UseNotificationFeedOptions {
   /** Gọi khi có thông báo yêu cầu chọn kỹ thuật viên khác (chỉ áp dụng cho CUSTOMER). */
@@ -19,7 +23,9 @@ export function useNotificationFeed(
   role: AppRole | undefined,
   { onReassignmentRequired }: UseNotificationFeedOptions,
 ) {
+  const { accountId, isCurrentAccount } = useNotificationAccount();
   const [open, setOpen] = useState(false);
+  const { addToast } = useToast();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [query, setQuery] = useState<NotificationQuery>({
     page: 1,
@@ -33,9 +39,11 @@ export function useNotificationFeed(
   const [error, setError] = useState("");
   const queryRef = useRef(query);
   const notificationPath = getNotificationPath(role);
-  const canUseUserNotifications = role === "CUSTOMER" || role === "PROVIDER";
+  const canUseUserNotifications = Boolean(accountId) && (role === "CUSTOMER" || role === "PROVIDER");
 
   const { markAsRead, markAll } = useNotificationReadActions({
+    accountId,
+    isCurrentAccount,
     isReadFilter: query.isRead,
     setItems,
     setUnreadCount,
@@ -44,7 +52,7 @@ export function useNotificationFeed(
 
   const load = useCallback(
     async (nextQuery: NotificationQuery = query, append = false) => {
-      if (!canUseUserNotifications) return;
+      if (!canUseUserNotifications || !isCurrentAccount()) return;
 
       if (append) {
         setLoadingMore(true);
@@ -57,19 +65,23 @@ export function useNotificationFeed(
           notificationApi.list(nextQuery),
           notificationApi.unreadCount(),
         ]);
+        if (!isCurrentAccount()) return;
+        const ownItems = listResult.items.filter((item) => isNotificationForUser(item, accountId));
         setItems((current) =>
-          append ? [...current, ...listResult.items] : listResult.items,
+          append ? [...current, ...ownItems] : ownItems,
         );
         setTotalPages(listResult.pagination.totalPages || 1);
         setUnreadCount(countResult.count);
       } catch (err) {
-        setError(getErrorMessage(err));
+        if (isCurrentAccount()) setError(getErrorMessage(err));
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (isCurrentAccount()) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
-    [canUseUserNotifications, query],
+    [canUseUserNotifications, query, accountId, isCurrentAccount],
   );
 
   useEffect(() => {
@@ -87,7 +99,27 @@ export function useNotificationFeed(
 
   const handleIncomingNotification = useCallback(
     (notification: AppNotification) => {
+      if (!isCurrentAccount() || !isNotificationForUser(notification, accountId)) return;
       setUnreadCount((current) => current + 1);
+
+      if (notification.type === "SYSTEM" && notification.data?.providerApplicationId &&
+        (notification.data.status === "approved" || notification.data.status === "rejected")) {
+        const approved = notification.data.status === "approved";
+        addToast(notification.content, approved ? "success" : "info", approved ? 0 : 10000);
+        if (notification.data.applicationType === "initial") {
+          if (approved) {
+            // Phiên đã bị thu hồi khi duyệt; hiển thị lý do trước khi yêu cầu đăng nhập lại.
+            useAuthStore.getState().logout();
+          } else {
+            void getMeApi().then((user) => {
+              const store = useAuthStore.getState();
+              if (isCurrentAccount() && (user.id || user._id) === accountId) store.setUser(user);
+            }).catch(() => {
+              // Thông báo vẫn hiển thị; lần khôi phục phiên tiếp theo sẽ đồng bộ trạng thái.
+            });
+          }
+        }
+      }
 
       const currentQuery = queryRef.current;
       if (currentQuery.isRead === true) return;
@@ -110,12 +142,18 @@ export function useNotificationFeed(
         );
       }
     },
-    [role, onReassignmentRequired],
+    [role, onReassignmentRequired, addToast, accountId, isCurrentAccount],
   );
 
-  useNotificationSocket(canUseUserNotifications, handleIncomingNotification);
+  const refreshOnOrderUpdated = useCallback(() => {
+    const nextQuery = { ...queryRef.current, page: 1 };
+    setQuery(nextQuery);
+    void load(nextQuery, false);
+  }, [load]);
+  useNotificationSocket(canUseUserNotifications, handleIncomingNotification, refreshOnOrderUpdated);
 
   const clearUnreadBadge = async () => {
+    if (!isCurrentAccount()) return;
     setUnreadCount(0);
     setItems((current) =>
       current.map((item) => ({
@@ -127,9 +165,10 @@ export function useNotificationFeed(
 
     try {
       await notificationApi.markAllAsRead();
+      if (!isCurrentAccount()) return;
       await load({ ...queryRef.current, page: 1 }, false);
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (isCurrentAccount()) setError(getErrorMessage(err));
     }
   };
 

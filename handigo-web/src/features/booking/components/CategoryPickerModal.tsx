@@ -24,9 +24,9 @@ export const CategoryPickerModal = ({ open, categories, categoryId, onSelect, on
           <div className="mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary-container/10 transition-colors group-hover:bg-primary-container/20">
             <CategoryIcon
               icon={cat.icon}
+              color={cat.iconColor}
               name={cat.name}
               className="h-6 w-6 text-primary"
-              imageClassName="h-7 w-7 object-contain"
             />
           </div>
           <span className="line-clamp-2 text-label-md font-bold leading-snug text-on-surface">{cat.name}</span>

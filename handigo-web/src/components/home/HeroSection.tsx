@@ -11,39 +11,85 @@ export const HeroSection = ({ items }: { items: CategoryShowcaseItem[] }) => {
 
   useEffect(() => {
     const hero = heroRef.current;
-    if (!hero) return;
-    const motion = window.matchMedia("(prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine)");
+    const scene = hero?.querySelector<HTMLElement>(".home-scene");
+    if (!hero || !scene) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: no-preference)");
+    const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
     let frame = 0;
+    let lastTime = 0;
+    let phase = 0;
+    let visible = false;
+    let following = false;
+    const target = { x: 0, y: 0 };
+    const position = { x: 0, y: 0 };
     let bounds: DOMRect | undefined;
-    const reset = () => {
-      cancelAnimationFrame(frame);
+    const release = () => {
+      following = false;
       bounds = undefined;
-      hero.style.removeProperty("--home-x");
-      hero.style.removeProperty("--home-y");
+    };
+    const tick = (time: number) => {
+      const delta = lastTime ? Math.min(time - lastTime, 64) : 16;
+      lastTime = time;
+      phase += delta * .0006;
+      const x = following ? target.x : Math.sin(phase) * 12;
+      const y = following ? target.y : Math.sin(phase * 1.3) * 9;
+      const easing = 1 - Math.exp(-delta / 180);
+      position.x += (x - position.x) * easing;
+      position.y += (y - position.y) * easing;
+      hero.style.setProperty("--home-x", `${position.x}px`);
+      hero.style.setProperty("--home-y", `${position.y}px`);
+      frame = requestAnimationFrame(tick);
+    };
+    const sync = () => {
+      cancelAnimationFrame(frame);
+      lastTime = 0;
+      release();
+      if (!motion.matches) {
+        position.x = 0;
+        position.y = 0;
+        hero.style.removeProperty("--home-x");
+        hero.style.removeProperty("--home-y");
+      } else if (visible && !document.hidden) {
+        frame = requestAnimationFrame(tick);
+      }
     };
     const move = (event: PointerEvent) => {
-      if (!motion.matches || event.pointerType !== "mouse") return;
-      bounds ??= hero.getBoundingClientRect();
+      if (!motion.matches || !finePointer.matches || event.pointerType !== "mouse") return;
+      bounds ??= scene.getBoundingClientRect();
       const x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1));
       const y = Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1));
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        hero.style.setProperty("--home-x", `${x * 16}px`);
-        hero.style.setProperty("--home-y", `${y * 12}px`);
-      });
+      following = true;
+      target.x = x * 16;
+      target.y = y * 12;
     };
-    hero.addEventListener("pointermove", move, { passive: true });
-    hero.addEventListener("pointerleave", reset);
-    window.addEventListener("resize", reset);
-    window.addEventListener("scroll", reset, { passive: true });
-    motion.addEventListener("change", reset);
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      sync();
+    });
+    observer.observe(scene);
+    scene.addEventListener("pointerenter", move, { passive: true });
+    scene.addEventListener("pointermove", move, { passive: true });
+    scene.addEventListener("pointerleave", release);
+    scene.addEventListener("pointercancel", release);
+    window.addEventListener("resize", release);
+    window.addEventListener("scroll", release, { passive: true });
+    document.addEventListener("visibilitychange", sync);
+    motion.addEventListener("change", sync);
+    finePointer.addEventListener("change", release);
     return () => {
-      reset();
-      hero.removeEventListener("pointermove", move);
-      hero.removeEventListener("pointerleave", reset);
-      window.removeEventListener("resize", reset);
-      window.removeEventListener("scroll", reset);
-      motion.removeEventListener("change", reset);
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      hero.style.removeProperty("--home-x");
+      hero.style.removeProperty("--home-y");
+      scene.removeEventListener("pointerenter", move);
+      scene.removeEventListener("pointermove", move);
+      scene.removeEventListener("pointerleave", release);
+      scene.removeEventListener("pointercancel", release);
+      window.removeEventListener("resize", release);
+      window.removeEventListener("scroll", release);
+      document.removeEventListener("visibilitychange", sync);
+      motion.removeEventListener("change", sync);
+      finePointer.removeEventListener("change", release);
     };
   }, []);
 

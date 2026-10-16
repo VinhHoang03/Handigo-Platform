@@ -50,7 +50,7 @@ export function CategorySelectionStep({
               >
                 <div className="mb-3 flex items-center gap-2">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                    <CategoryIcon icon={category.icon} name={category.name} className="h-5 w-5" />
+                    <CategoryIcon icon={category.icon} color={category.iconColor} name={category.name} className="h-5 w-5" />
                   </span>
                   <h3 className="font-bold text-on-surface">{category.name}</h3>
                 </div>

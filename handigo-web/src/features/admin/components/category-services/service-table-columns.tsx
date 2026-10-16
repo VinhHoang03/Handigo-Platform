@@ -1,4 +1,6 @@
+import { ReliableImage } from '@/components/common/ReliableImage';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { getPriceLabel } from '../services/service.helpers';
 import type { DataTableColumn } from '@/components/common/dashboard/DataTable';
 import type { Service } from '../../types/categoryService.types';
 import { categoryServiceMoney } from './category-service.helpers';
@@ -17,9 +19,9 @@ export function buildServiceTableColumns({ onEdit, onDelete }: ServiceTableConte
       header: 'Tên dịch vụ',
       render: (service) => (
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-variant">
-            {service.image ? (
-              <img alt={service.name} src={service.image} className="h-full w-full object-cover" />
+          <div className="aspect-video w-20 shrink-0 overflow-hidden rounded-lg bg-surface-variant">
+            {(service.coverImage === undefined ? service.image : service.coverImage) ? (
+              <ReliableImage alt={service.name} src={(service.coverImage === undefined ? service.image : service.coverImage) || undefined} className="h-full w-full object-contain" />
             ) : (
               <Wrench aria-hidden="true" size={24} className="flex h-full w-full items-center justify-center text-on-surface-variant" />
             )}
@@ -40,7 +42,7 @@ export function buildServiceTableColumns({ onEdit, onDelete }: ServiceTableConte
       key: 'price',
       header: 'Giá',
       className: 'tabular-nums font-medium',
-      render: (service) => (service.serviceType === 'fixed_price' ? 'Theo tùy chọn' : 'Giá linh hoạt'),
+      render: getPriceLabel,
     },
     {
       key: 'deposit',

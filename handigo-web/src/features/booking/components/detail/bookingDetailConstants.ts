@@ -1,6 +1,6 @@
 import { Banknote, Landmark, Wallet, type LucideIcon } from "lucide-react";
 export type PendingAction = {
-  type: "confirmQuotation" | "rejectQuotation" | "cancelOrder" | "cancelSeries";
+  type: "rejectQuotation" | "cancelOrder" | "cancelSeries";
   reason: string;
   additionalInfo?: string;
   error?: string;
@@ -52,14 +52,6 @@ export type ActionDialogConfig = {
 };
 
 const actionDialogConfigs: Record<PendingAction["type"], ActionDialogConfig> = {
-  confirmQuotation: {
-    title: "Xác nhận báo giá",
-    message:
-      "Khi bạn đồng ý, chuyên gia có thể bắt đầu thực hiện công việc. Chi phí báo giá do bạn và chuyên gia tự thanh toán trực tiếp, không qua Handigo.",
-    confirmLabel: "Đồng ý",
-    tone: "primary",
-    requiresReason: false,
-  },
   rejectQuotation: {
     title: "Từ chối báo giá",
     message: "Nhập lý do từ chối để chuyển phản hồi cho chuyên gia.",

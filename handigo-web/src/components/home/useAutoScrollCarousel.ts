@@ -33,6 +33,17 @@ export const useAutoScrollCarousel = (itemCount: number) => {
     ).matches;
 
     let animationFrame = 0;
+    let fractionalDistance = 0;
+    let isFocused = false;
+    const pauseOnFocus = () => {
+      isFocused = true;
+      velocityRef.current = 0;
+    };
+    const resumeOnBlur = (event: FocusEvent) => {
+      isFocused = event.relatedTarget instanceof Node && carousel.contains(event.relatedTarget);
+    };
+    carousel.addEventListener("focusin", pauseOnFocus);
+    carousel.addEventListener("focusout", resumeOnBlur);
     let previousTime = performance.now();
     const initializeFrame = requestAnimationFrame(() => {
       const cycleStart = carousel.querySelector<HTMLElement>(
@@ -49,9 +60,13 @@ export const useAutoScrollCarousel = (itemCount: number) => {
       );
       const cycleWidth = cycleStart?.offsetLeft || 0;
 
-      if (!dragState.current.active) {
-        const autoSpeed = prefersReducedMotion ? 0 : 0.025 * elapsed;
-        carousel.scrollLeft += autoSpeed + velocityRef.current * elapsed;
+      if (!dragState.current.active && !isFocused) {
+        const autoSpeed = prefersReducedMotion ? 0 : 0.09 * elapsed;
+        // Giữ phần lẻ để tốc độ không mất đi khi trình duyệt làm tròn pixel cuộn.
+        fractionalDistance += autoSpeed + velocityRef.current * elapsed;
+        const distance = Math.trunc(fractionalDistance);
+        carousel.scrollLeft += distance;
+        fractionalDistance -= distance;
         velocityRef.current *= Math.pow(0.94, elapsed / 16.67);
         if (Math.abs(velocityRef.current) < 0.01) velocityRef.current = 0;
       }
@@ -67,6 +82,8 @@ export const useAutoScrollCarousel = (itemCount: number) => {
 
     animationFrame = requestAnimationFrame(animate);
     return () => {
+      carousel.removeEventListener("focusin", pauseOnFocus);
+      carousel.removeEventListener("focusout", resumeOnBlur);
       cancelAnimationFrame(initializeFrame);
       cancelAnimationFrame(animationFrame);
     };

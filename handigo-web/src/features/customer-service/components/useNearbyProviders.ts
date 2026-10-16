@@ -1,4 +1,7 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
+import { useBookingStore } from '@/features/booking/hooks/useBookingStore';
+import { getDefaultScheduledAt, getEarliestScheduledAt } from '@/features/booking/components/step2Helpers';
 import {
   customerServiceApi,
   type NearbyProvider,
@@ -44,9 +47,12 @@ export function useNearbyProviders({
   onAvailabilityChange,
 }: UseNearbyProvidersArgs) {
   const [providers, setProviders] = useState<NearbyProvider[]>([]);
+  const booking = useBookingStore();
+  const selectedOptions = !orderId && booking.serviceId === serviceId && booking.selectedOptionIds.length
+    ? JSON.stringify(booking.selectedOptionIds.map((optionId) => ({ optionId, quantity: booking.selectedOptionQuantities?.[optionId] ?? 1 }))) : undefined;
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
     let isMounted = true;
@@ -58,7 +64,30 @@ export function useNearbyProviders({
       };
     }
 
+    const isExpiredSchedule = () => scheduledAt
+      ? new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime()
+      : false;
+    const refreshExpiredDefault = () => {
+      const currentBooking = useBookingStore.getState();
+      if (orderId || currentBooking.serviceId !== serviceId || !currentBooking.isScheduleAutomatic
+        || currentBooking.scheduledAt !== scheduledAt || !isExpiredSchedule()) return false;
+      currentBooking.setScheduledAt(getDefaultScheduledAt(), true);
+      return true;
+    };
+    const expiredScheduleMessage = 'Thời gian đã chọn đã qua. Vui lòng chọn lại ngày hoặc giờ thực hiện.';
     const loadProviders = async () => {
+      if (refreshExpiredDefault()) {
+        onAvailabilityChange?.('loading');
+        return;
+      }
+      if (isExpiredSchedule()) {
+        setProviders([]);
+        setIsLoading(false);
+        setHasLoaded(false);
+        setError(expiredScheduleMessage);
+        onAvailabilityChange?.('error');
+        return;
+      }
       setIsLoading(true);
       setHasLoaded(false);
       setError("");
@@ -72,6 +101,7 @@ export function useNearbyProviders({
           recurrenceUnit,
           recurrenceCount,
           orderId,
+          selectedOptions,
         );
         if (isMounted) {
           setProviders(data);
@@ -79,8 +109,9 @@ export function useNearbyProviders({
         }
       } catch {
         if (!isMounted) return;
+        if (refreshExpiredDefault()) return;
         setProviders([]);
-        setError("Không tải được danh sách thợ ở địa chỉ này.");
+        setError(isExpiredSchedule() ? expiredScheduleMessage : "Không tải được danh sách thợ ở địa chỉ này.");
         onAvailabilityChange?.("error");
       } finally {
         if (isMounted) {
@@ -95,7 +126,7 @@ export function useNearbyProviders({
     return () => {
       isMounted = false;
     };
-  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId]);
+  }, [addressId, enabled, onAvailabilityChange, orderId, recurrenceCount, recurrenceUnit, requireSelection, scheduledAt, serviceId, selectedOptions, setError]);
 
   useEffect(() => {
     if (!allowSelection || !hasLoaded || !onSelectProvider || !selectedProviderId) return;

@@ -2,6 +2,7 @@ import { Document, Schema, model, Types } from "mongoose";
 import { baseFields, IBaseDocument, Money } from "./common";
 
 export type RepairQuotationStatus =
+  | "saved"
   | "pending"
   | "approved"
   | "rejected"
@@ -9,11 +10,13 @@ export type RepairQuotationStatus =
   | "cancelled";
 
 export interface IRepairQuotation extends Document, IBaseDocument {
+  estimatedDurationMinutes?: number;
   quotationCode: string;
   orderId: Types.ObjectId;
   customerId: Types.ObjectId;
   providerId: Types.ObjectId;
   status: RepairQuotationStatus;
+  revision: number;
   inspectionNote?: string | null;
   recommendation?: string | null;
   attachments: string[];
@@ -27,10 +30,13 @@ export interface IRepairQuotation extends Document, IBaseDocument {
   cancelledAt?: Date | null;
   customerConfirmed: boolean;
   providerConfirmed: boolean;
+  directPaymentConfirmedAt?: Date | null;
+  directPaymentConfirmedAmount?: Money | null;
 }
 
 const RepairQuotationSchema = new Schema<IRepairQuotation>(
   {
+    estimatedDurationMinutes: { type: Number, min: 1, max: 1440 },
     quotationCode: { type: String, required: true, unique: true, trim: true },
     orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -41,9 +47,10 @@ const RepairQuotationSchema = new Schema<IRepairQuotation>(
     },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "expired", "cancelled"],
+      enum: ["saved", "pending", "approved", "rejected", "expired", "cancelled"],
       default: "pending",
     },
+    revision: { type: Number, min: 0, default: 0 },
     inspectionNote: { type: String, default: null, trim: true },
     recommendation: { type: String, default: null, trim: true },
     attachments: { type: [String], default: [] },
@@ -57,6 +64,8 @@ const RepairQuotationSchema = new Schema<IRepairQuotation>(
     cancelledAt: { type: Date, default: null },
     customerConfirmed: { type: Boolean, default: false },
     providerConfirmed: { type: Boolean, default: true },
+    directPaymentConfirmedAt: { type: Date, default: null },
+    directPaymentConfirmedAmount: { type: Number, min: 0, default: null },
     ...baseFields,
   },
   { timestamps: true },

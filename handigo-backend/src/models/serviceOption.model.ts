@@ -16,6 +16,7 @@ export interface IServiceOption extends Document, IBaseDocument {
   optionType: ServiceOptionType;
   price: Money;
   selectionGroup?: string | null;
+  groupId?: Types.ObjectId | null;
   selectionMode: "single" | "multiple";
   allowsQuantity: boolean;
   isRequired: boolean;
@@ -37,6 +38,7 @@ const ServiceOptionSchema = new Schema<IServiceOption>(
     },
     price: { type: Number, required: true, min: 0 },
     selectionGroup: { type: String, default: null, trim: true, maxlength: 120 },
+    groupId: { type: Schema.Types.ObjectId, default: null },
     selectionMode: {
       type: String,
       enum: ["single", "multiple"],

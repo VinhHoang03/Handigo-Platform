@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { getErrorMessage } from "@/utils/apiError";
 import { adminSupportApi } from "../../api/adminSupport.api";
@@ -10,6 +11,7 @@ import { EMPTY_SUMMARY } from "./support.constants";
  * `AdminSupportPage` để trang chính chỉ còn lo bố cục (bảng, modal).
  */
 export function useAdminSupportController() {
+  const { addToast } = useToast();
   const [query, setQuery] = useState<SupportTicketQuery>({ page: 1, limit: 10 });
   const [searchInput, setSearchInput] = useState("");
   const [items, setItems] = useState<AdminSupportTicket[]>([]);
@@ -21,8 +23,8 @@ export function useAdminSupportController() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [actionError, setActionError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [actionError, setActionError] = useToastFeedback<string>("", "error");
 
   const load = useCallback(async () => {
     try {
@@ -37,7 +39,7 @@ export function useAdminSupportController() {
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, setError]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void load(), 0);
@@ -68,6 +70,7 @@ export function useAdminSupportController() {
       setBusy(true);
       setActionError("");
       setSelected(await action());
+      addToast("Đã cập nhật yêu cầu hỗ trợ.", "success");
       await load();
       return true;
     } catch (requestError) {

@@ -40,9 +40,11 @@ export default function ProviderOrderDetailPage() {
     handleReject,
     handleStart,
     handleComplete,
+    handleConfirmQuotationPayment,
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,
+    reload,
   } = useProviderOrderDetail(orderId, navigate);
 
   if (loading) {
@@ -85,8 +87,10 @@ export default function ProviderOrderDetailPage() {
   const isUnconfirmedAppointment =
     ['scheduled', 'recurring'].includes(order.orderType) &&
     order.bookingStatus !== 'confirmed';
+  const isQuotationOrder =
+    order.inspectionRequired || order.serviceId.serviceType === 'variable_price';
   const showQuotationForm =
-    order.inspectionRequired &&
+    isQuotationOrder &&
     !isUnconfirmedAppointment &&
     ['accepted', 'in_progress'].includes(order.status) &&
     !quotation;
@@ -100,7 +104,10 @@ export default function ProviderOrderDetailPage() {
         </Link>
 
         {error && (
-          <div className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">{error}</div>
+          <div role="alert" className="rounded-2xl bg-error/10 px-md py-sm text-sm text-error">
+            {error}
+            <button type="button" disabled={busy} onClick={() => void reload()} className="ml-3 font-semibold underline">Tải lại dữ liệu</button>
+          </div>
         )}
 
         {assignment && (
@@ -119,7 +126,6 @@ export default function ProviderOrderDetailPage() {
             order={order}
             customer={customer}
             addressLine={addressLine}
-            addressNote={address.note}
             orderType={orderTypeLabels[order.orderType]}
           />
           <PaymentSummaryCard
@@ -133,8 +139,9 @@ export default function ProviderOrderDetailPage() {
         <OrderTrackingMap order={order} viewerRole="PROVIDER" />
 
         <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-2">
-          {order.inspectionRequired ? (
+          {isQuotationOrder ? (
             <QuotationOrderPanel
+              key={order._id}
               order={order}
               quotation={quotation}
               busy={busy}
@@ -144,6 +151,7 @@ export default function ProviderOrderDetailPage() {
               onCreateQuotation={handleCreateQuotation}
               onCancel={() => setCancelOpen(true)}
               onComplete={handleComplete}
+              onConfirmPayment={handleConfirmQuotationPayment}
             />
           ) : (
             <FixedPriceActionForm
@@ -161,6 +169,7 @@ export default function ProviderOrderDetailPage() {
 
       {cancelOpen && !cancelConfirmOpen && (
         <CancellationDialog
+          canDeclineQuotation={Boolean(order.status === 'accepted' && order.inspectionRequired)}
           reason={cancelReason}
           explanation={cancelExplanation}
           error={cancelError}

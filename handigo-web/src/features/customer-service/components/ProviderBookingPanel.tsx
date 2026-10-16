@@ -38,6 +38,9 @@ export function ProviderBookingPanel({
             onChange={(event) => onSelectService(event.target.value)}
             className="min-h-12 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
           >
+            {!selectedServiceId && (
+              <option value="" disabled>Dịch vụ đã chọn không còn khả dụng. Vui lòng chọn lại.</option>
+            )}
             {services.map((service) => (
               <option key={service.id} value={service.id}>
                 {service.name}

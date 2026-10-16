@@ -7,7 +7,11 @@ import {
 } from "../utils/profileValidation";
 
 export interface IAddress extends Document {
+  isDeleted: boolean;
+  deletedAt?: Date | null;
+  identityKey?: string;
   userId: Types.ObjectId;
+  addressLabel?: string;
   recipientName?: string;
   recipientPhone?: string;
   fullAddress: string;
@@ -26,10 +30,19 @@ export interface IAddress extends Document {
 
 const addressSchema = new Schema<IAddress>(
   {
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
+    identityKey: { type: String, select: false },
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    addressLabel: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: "Địa chỉ khác",
     },
     recipientName: {
       type: String,
@@ -91,5 +104,8 @@ const addressSchema = new Schema<IAddress>(
 );
 
 addressSchema.index({ userId: 1 });
+addressSchema.index({ userId: 1, identityKey: 1 }, {
+  unique: true, partialFilterExpression: { identityKey: { $type: "string" } },
+});
 
 export const Address = model<IAddress>("Address", addressSchema, "addresses");

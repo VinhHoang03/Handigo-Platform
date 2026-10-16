@@ -74,6 +74,10 @@ export interface IProvider extends Document, IBaseDocument {
   serviceArea?: IProviderServiceArea;
   experienceYears: number;
   availabilityStatus: "online" | "offline" | "busy";
+  autoAcceptScheduledBookings: boolean;
+  autoAcceptScheduledBookingMinAdvanceMinutes: number;
+  autoAcceptScheduledBookingHorizonDays: number;
+  scheduleVersion?: number;
   verified: boolean;
   serviceIds: Types.ObjectId[];
   workingAreas: string[];
@@ -167,10 +171,24 @@ const ProviderSchema = new Schema<IProvider>(
     mainServiceText: { type: String, trim: true, maxlength: 200 },
     serviceArea: { type: ProviderServiceAreaSchema, default: undefined },
     experienceYears: { type: Number, required: true, min: 0, default: 0 },
+    scheduleVersion: { type: Number, default: 0, min: 0 },
     availabilityStatus: {
       type: String,
       enum: ["online", "offline", "busy"],
       default: "offline",
+    },
+    autoAcceptScheduledBookings: { type: Boolean, default: false },
+    autoAcceptScheduledBookingMinAdvanceMinutes: {
+      type: Number,
+      default: 720,
+      min: 60,
+      max: 4320,
+    },
+    autoAcceptScheduledBookingHorizonDays: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 30,
     },
     verified: { type: Boolean, default: false },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: "Service" }],

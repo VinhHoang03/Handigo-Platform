@@ -37,3 +37,11 @@ export const updateCurrentLocation = async (
     },
   ).lean();
 };
+
+export const deactivateCurrentLocation = async (userId: string) => {
+  await Location.updateMany(
+    { userId, ownerType: "provider", isDeleted: false },
+    { $set: { isActive: false } },
+    { runValidators: true },
+  );
+};

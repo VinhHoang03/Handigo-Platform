@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cài đặt Thông báo & Bảo mật - Handigo</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-primary-fixed-variant": "#3323cc",
+            "inverse-on-surface": "#eef0ff",
+            "secondary-fixed": "#abedff",
+            "surface-container-lowest": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-high": "#e1e7ff",
+            "on-primary": "#ffffff",
+            "surface": "#faf8ff",
+            "on-error": "#ffffff",
+            "inverse-surface": "#283044",
+            "on-error-container": "#93000a",
+            "on-tertiary-container": "#ff9f72",
+            "on-tertiary-fixed": "#351000",
+            "secondary-container": "#9ce8fd",
+            "success-green": "#4ade80",
+            "on-surface": "#131b2e",
+            "surface-variant": "#dae2fc",
+            "outline-variant": "#c7c4d8",
+            "on-background": "#131b2e",
+            "primary-fixed-dim": "#c3c0ff",
+            "on-primary-container": "#b1afff",
+            "on-secondary": "#ffffff",
+            "on-surface-variant": "#464555",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "primary-fixed": "#e2dfff",
+            "background": "#faf8ff",
+            "tertiary-fixed-dim": "#ffb694",
+            "on-secondary-fixed": "#001f26",
+            "error-container": "#ffdad6",
+            "primary": "#1e00a9",
+            "surface-dim": "#d2d9f4",
+            "surface-container-low": "#f2f3ff",
+            "secondary-fixed-dim": "#86d2e6",
+            "on-secondary-container": "#076a7c",
+            "tertiary": "#592000",
+            "star-gold": "#facc15",
+            "inverse-primary": "#c3c0ff",
+            "tertiary-fixed": "#ffdbcc",
+            "surface-tint": "#4d44e3",
+            "primary-container": "#3525cd",
+            "outline": "#777587",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#7d3000",
+            "error": "#ba1a1a",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "secondary": "#00687a",
+            "surface-bright": "#faf8ff",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "surface-container-highest": "#dae2fc"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xl": "80px",
+            "xs": "4px",
+            "md": "24px",
+            "base": "8px",
+            "lg": "48px",
+            "gutter": "24px",
+            "container-max": "1280px",
+            "sm": "12px"
+          },
+          "fontFamily": {
+            "label-sm": ["Inter"],
+            "headline-xl": ["Hanken Grotesk"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "label-md": ["Inter"],
+            "headline-lg-mobile": ["Hanken Grotesk"]
+          },
+          "fontSize": {
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .material-symbols-fill {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    /* Smooth toggle animation */
+    .toggle-checkbox:checked {
+      right: 0;
+      border-color: #3525cd;
+      background-color: #ffffff;
+    }
+    .toggle-checkbox:checked + .toggle-label {
+      background-color: #3525cd;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased min-h-screen selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- Main Mobile App Canvas (Constrained width for modern mobile simulation while fully responsive on web) -->
+<div class="max-w-md mx-auto min-h-screen flex flex-col bg-surface relative shadow-2xl">
+<!-- TopAppBar (Shared Component Implementation) -->
+<header class="bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md text-primary dark:text-inverse-primary docked full-width top-0 sticky z-50 shadow-sm dark:shadow-none">
+<div class="flex justify-between items-center w-full px-base py-sm max-w-container-max mx-auto">
+<button aria-label="Quay lại" class="p-base rounded-full hover:bg-surface-container dark:hover:bg-inverse-surface transition-colors duration-150 active:scale-95 transition-transform flex items-center justify-center text-primary" type="button">
+<span class="material-symbols-outlined text-primary text-[24px]">arrow_back</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-semibold text-primary dark:text-inverse-primary tracking-tight">
+          Cài đặt & Bảo mật
+        </h1>
+<button aria-label="Trợ giúp" class="p-base rounded-full hover:bg-surface-container dark:hover:bg-inverse-surface transition-colors duration-150 active:scale-95 transition-transform flex items-center justify-center text-on-surface-variant" type="button">
+<span class="material-symbols-outlined text-on-surface-variant text-[24px]">help_outline</span>
+</button>
+</div>
+</header>
+<!-- Main Content Container -->
+<main class="flex-1 px-base md:px-md pt-sm pb-xl space-y-md">
+<!-- Safety Shield Banner / Status Card -->
+<section class="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary-container to-secondary p-md text-on-primary shadow-lg">
+<div class="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-secondary-container/20 blur-xl pointer-events-none"></div>
+<div class="relative z-10 flex items-start space-x-base">
+<div class="w-12 h-12 rounded-xl bg-surface-container-lowest/15 backdrop-blur-md border border-surface-container-lowest/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined material-symbols-fill text-success-green text-[28px]">verified_user</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center space-x-xs">
+<span class="font-headline-md text-headline-md text-on-primary font-bold">Cực kỳ an toàn</span>
+<span class="w-2 h-2 rounded-full bg-success-green animate-pulse"></span>
+</div>
+<p class="font-body-md text-body-md text-surface-container-high/90 mt-xs leading-snug">
+              Tài khoản của bạn đang được bảo vệ ở cấp độ cao nhất bởi hệ thống bảo mật đa tầng Handigo.
+            </p>
+<div class="mt-base flex items-center space-x-base">
+<span class="inline-flex items-center space-x-xs px-base py-xs rounded-full bg-surface-container-lowest/10 text-label-sm font-label-sm text-surface-container-high backdrop-blur-sm border border-surface-container-lowest/10">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+<span>Mã hóa E2E</span>
+</span>
+<span class="inline-flex items-center space-x-xs px-base py-xs rounded-full bg-surface-container-lowest/10 text-label-sm font-label-sm text-surface-container-high backdrop-blur-sm border border-surface-container-lowest/10">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+<span>Chống giả mạo</span>
+</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Thông báo đẩy & Tin nhắn -->
+<section class="space-y-base">
+<div class="flex items-center space-x-xs px-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">notifications_active</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-semibold text-[18px]">Thông báo đẩy & Tin nhắn</h2>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 divide-y divide-surface-container space-y-base">
+<!-- Item 1: Trạng thái đơn hàng & Thợ di chuyển -->
+<div class="flex items-center justify-between pt-base first:pt-0">
+<div class="flex items-start space-x-sm pr-base">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 mt-xs">
+<span class="material-symbols-outlined text-primary text-[22px]">local_shipping</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Trạng thái đơn hàng & Thợ di chuyển</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-xs">
+                  Nhận thông báo tức thì khi thợ nhận việc, đang di chuyển, và chuẩn bị tới địa chỉ của bạn.
+                </p>
+</div>
+</div>
+<!-- Switch Toggle (ON - Primary Green/Purple) -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-12 h-7 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-container-lowest after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-outline-variant after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Item 2: Tin nhắn trò chuyện (Chat) -->
+<div class="flex items-center justify-between pt-base">
+<div class="flex items-start space-x-sm pr-base">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 mt-xs">
+<span class="material-symbols-outlined text-secondary text-[22px]">forum</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Tin nhắn trò chuyện (Chat)</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-xs">
+                  Báo chuông và rung thông minh khi thợ gửi tin nhắn trao đổi trong tiến trình xử lý đơn.
+                </p>
+</div>
+</div>
+<!-- Switch Toggle (ON) -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-12 h-7 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-container-lowest after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-outline-variant after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Item 3: Khuyến mãi & Ưu đãi dịch vụ -->
+<div class="flex items-center justify-between pt-base">
+<div class="flex items-start space-x-sm pr-base">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 mt-xs">
+<span class="material-symbols-outlined text-tertiary-container text-[22px]">local_offer</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Khuyến mãi & Ưu đãi dịch vụ</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-xs">
+                  Nhận sớm các voucher giảm giá, mã miễn phí kiểm tra sự cố và ưu đãi dịch vụ mùa nóng.
+                </p>
+</div>
+</div>
+<!-- Switch Toggle (ON) -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-12 h-7 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-container-lowest after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-outline-variant after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Item 4: Nhắc lịch bảo dưỡng định kỳ (OFF) -->
+<div class="flex items-center justify-between pt-base">
+<div class="flex items-start space-x-sm pr-base">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 mt-xs">
+<span class="material-symbols-outlined text-outline text-[22px]">calendar_month</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Nhắc lịch bảo dưỡng định kỳ</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-xs">
+                  Tự động nhắc bảo dưỡng điều hòa, lọc nước và vệ sinh lồng giặt định kỳ sau mỗi 3 tháng.
+                </p>
+</div>
+</div>
+<!-- Switch Toggle (OFF) -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-12 h-7 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-container-lowest after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-outline-variant after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- Section: Bảo mật & Quyền riêng tư -->
+<section class="space-y-base">
+<div class="flex items-center space-x-xs px-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">security</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-semibold text-[18px]">Bảo mật & Quyền riêng tư</h2>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 divide-y divide-surface-container space-y-base">
+<!-- Biometrics Lock -->
+<div class="flex items-center justify-between pt-base first:pt-0">
+<div class="flex items-start space-x-sm pr-base">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 mt-xs">
+<span class="material-symbols-outlined text-primary text-[22px]">fingerprint</span>
+</div>
+<div>
+<div class="flex items-center space-x-xs">
+<p class="font-label-md text-label-md text-on-surface font-semibold">Face ID / Vân tay</p>
+<span class="px-xs py-0.5 rounded bg-surface-container-high text-on-primary-fixed-variant text-[10px] font-bold">KHUYÊN DÙNG</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-xs">
+                  Yêu cầu nhận diện sinh trắc học mỗi khi mở ứng dụng hoặc thanh toán tiền sửa chữa.
+                </p>
+</div>
+</div>
+<!-- Switch Toggle (ON) -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-12 h-7 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface-container-lowest after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:border-outline-variant after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Change Password -->
+<button class="w-full flex items-center justify-between pt-base text-left hover:bg-surface-container-low/50 -mx-base px-base transition-colors duration-150 rounded-lg group" type="button">
+<div class="flex items-center space-x-sm">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-[22px]">lock_reset</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Đổi mật khẩu đăng nhập</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-0.5">Cập nhật mật khẩu định kỳ để tăng cường an toàn</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:translate-x-1 transition-transform text-[20px]">chevron_right</span>
+</button>
+<!-- 2-Factor Authentication (2FA) -->
+<button class="w-full flex items-center justify-between pt-base text-left hover:bg-surface-container-low/50 -mx-base px-base transition-colors duration-150 rounded-lg group" type="button">
+<div class="flex items-center space-x-sm">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-[22px]">phonelink_lock</span>
+</div>
+<div>
+<div class="flex items-center space-x-xs">
+<p class="font-label-md text-label-md text-on-surface font-semibold">Xác thực 2 bước (2FA)</p>
+<span class="w-2 h-2 rounded-full bg-success-green"></span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-0.5">Bảo vệ tài khoản qua mã SMS / OTP thiết bị</p>
+</div>
+</div>
+<div class="flex items-center space-x-xs">
+<span class="font-label-sm text-label-sm text-primary font-medium">Đang bật</span>
+<span class="material-symbols-outlined text-outline group-hover:translate-x-1 transition-transform text-[20px]">chevron_right</span>
+</div>
+</button>
+<!-- Manage Login Devices -->
+<div class="pt-base">
+<div class="flex items-center justify-between mb-xs">
+<div class="flex items-center space-x-sm">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[22px]">devices</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Quản lý thiết bị đăng nhập</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-normal mt-0.5">Kiểm soát các phiên làm việc đang hoạt động</p>
+</div>
+</div>
+<button class="text-primary font-label-sm text-label-sm font-semibold hover:underline">Chi tiết</button>
+</div>
+<!-- Active Device Badge -->
+<div class="mt-sm p-sm rounded-lg bg-surface-container-low border border-outline-variant/30 flex items-center justify-between">
+<div class="flex items-center space-x-sm">
+<span class="material-symbols-outlined text-primary text-[24px]">smartphone</span>
+<div>
+<div class="flex items-center space-x-xs">
+<span class="font-label-md text-label-md font-semibold text-on-surface">iPhone 14 Pro Max</span>
+<span class="px-xs py-0.5 rounded-full bg-secondary-container/50 text-on-secondary-container text-[10px] font-bold">Hiện tại</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Hà Nội, Việt Nam • Vừa mới truy cập</p>
+</div>
+</div>
+<span class="w-2.5 h-2.5 rounded-full bg-success-green"></span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Quyền ứng dụng (App Permissions) -->
+<section class="space-y-base">
+<div class="flex items-center space-x-xs px-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">tune</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-semibold text-[18px]">Quyền ứng dụng</h2>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 space-y-base">
+<!-- Location Permission -->
+<div class="flex items-center justify-between p-sm rounded-lg bg-surface-container-low/40">
+<div class="flex items-center space-x-sm">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-[22px]">near_me</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Vị trí hiện tại (GPS)</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Xác định địa điểm sự cố để gửi thợ gần nhất</p>
+</div>
+</div>
+<div class="text-right">
+<span class="inline-flex items-center px-base py-xs rounded-full bg-surface-container text-primary font-label-sm text-label-sm font-semibold">
+                Khi dùng app
+              </span>
+</div>
+</div>
+<!-- Camera & Photos Permission -->
+<div class="flex items-center justify-between p-sm rounded-lg bg-surface-container-low/40">
+<div class="flex items-center space-x-sm">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary text-[22px]">photo_camera</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Máy ảnh & Thư viện</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Chụp hình ống nước vỡ, bảng điện gửi thợ</p>
+</div>
+</div>
+<div class="text-right">
+<span class="inline-flex items-center px-base py-xs rounded-full bg-surface-container text-success-green font-label-sm text-label-sm font-semibold">
+                Đã cấp quyền
+              </span>
+</div>
+</div>
+<div class="text-center pt-xs">
+<button class="inline-flex items-center space-x-xs text-primary font-label-sm text-label-sm font-semibold hover:underline">
+<span>Mở cài đặt hệ thống của thiết bị</span>
+<span class="material-symbols-outlined text-[16px]">open_in_new</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Account Deletion / Advanced Danger Zone (Subtle) -->
+<section class="pt-sm pb-lg text-center">
+<button class="text-error hover:text-on-error-container text-label-md font-label-md font-medium transition-colors" type="button">
+          Yêu cầu trích xuất dữ liệu cá nhân hoặc Xóa tài khoản
+        </button>
+<p class="font-label-sm text-label-sm text-outline mt-xs">Phiên bản ứng dụng Handigo v3.4.2 (Build 2408)</p>
+</section>
+</main>
+<!-- BottomNavBar (Shared Component Implementation) -->
+<!-- Active context: "Account" is active as this screen is within Account & Settings -->
+<nav class="bg-surface-container-lowest/90 dark:bg-inverse-surface/90 backdrop-blur-md text-primary-container dark:text-inverse-primary docked full-width bottom-0 fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-base py-xs max-w-container-max mx-auto shadow-lg dark:shadow-none">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-base py-xs hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[24px]">home</span>
+<span class="font-label-sm text-label-sm mt-0.5">Home</span>
+</a>
+<!-- Bookings -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-base py-xs hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[24px]">calendar_today</span>
+<span class="font-label-sm text-label-sm mt-0.5">Bookings</span>
+</a>
+<!-- Activity -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-surface-variant px-base py-xs hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined text-[24px]">chat_bubble_outline</span>
+<span class="font-label-sm text-label-sm mt-0.5">Activity</span>
+</a>
+<!-- Account (ACTIVE - highlighted according to Semantic Shell Rule & exact match) -->
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-xl px-base py-xs active:scale-95 transition-transform shadow-sm" href="#">
+<span class="material-symbols-outlined text-[24px] text-white">person</span>
+<span class="font-label-sm text-label-sm mt-0.5 text-white font-semibold">Account</span>
+</a>
+</nav>
+</div>
+</body></html>

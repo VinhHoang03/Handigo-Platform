@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Handigo - Trò chuyện Hỗ trợ &amp; Khách hàng với Thợ</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "error-container": "#ffdad6",
+            "on-primary-container": "#b1afff",
+            "on-primary": "#ffffff",
+            "on-background": "#131b2e",
+            "primary-container": "#3525cd",
+            "on-error-container": "#93000a",
+            "primary-fixed-dim": "#c3c0ff",
+            "surface-container-high": "#e1e7ff",
+            "primary-fixed": "#e2dfff",
+            "surface-variant": "#dae2fc",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "secondary-fixed": "#abedff",
+            "surface-dim": "#d2d9f4",
+            "error": "#ba1a1a",
+            "on-primary-fixed-variant": "#3323cc",
+            "outline": "#777587",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface": "#faf8ff",
+            "surface-container-lowest": "#ffffff",
+            "on-surface": "#131b2e",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "on-surface-variant": "#464555",
+            "on-secondary-fixed": "#001f26",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "on-error": "#ffffff",
+            "secondary": "#00687a",
+            "surface-bright": "#faf8ff",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#7d3000",
+            "primary": "#1e00a9",
+            "inverse-surface": "#283044",
+            "inverse-on-surface": "#eef0ff",
+            "surface-tint": "#4d44e3",
+            "background": "#faf8ff",
+            "surface-container-low": "#f2f3ff",
+            "on-primary-fixed": "#0f0069",
+            "tertiary-fixed": "#ffdbcc",
+            "star-gold": "#facc15",
+            "surface-container-highest": "#dae2fc",
+            "success-green": "#4ade80",
+            "on-tertiary": "#ffffff",
+            "tertiary": "#592000",
+            "on-secondary": "#ffffff",
+            "secondary-fixed-dim": "#86d2e6",
+            "outline-variant": "#c7c4d8",
+            "tertiary-fixed-dim": "#ffb694",
+            "secondary-container": "#9ce8fd",
+            "on-secondary-container": "#076a7c",
+            "inverse-primary": "#c3c0ff",
+            "on-tertiary-container": "#ff9f72",
+            "on-tertiary-fixed": "#351000"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "md": "24px",
+            "container-max": "1280px",
+            "xl": "80px",
+            "gutter": "24px",
+            "base": "8px",
+            "sm": "12px",
+            "xs": "4px",
+            "lg": "48px"
+          },
+          "fontFamily": {
+            "label-md": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "headline-lg": ["Hanken Grotesk"],
+            "headline-xl": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "body-lg": ["Inter"],
+            "label-sm": ["Inter"],
+            "headline-lg-mobile": ["Hanken Grotesk"]
+          },
+          "fontSize": {
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface antialiased flex justify-center min-h-screen">
+<!-- Container optimized for Mobile App view -->
+<div class="w-full max-w-md bg-surface-container-lowest min-h-screen flex flex-col shadow-2xl relative overflow-x-hidden">
+<!-- Top Header (Chat Bar) -->
+<header class="sticky top-0 z-40 bg-surface-glass/90 backdrop-blur-md px-4 py-3 flex items-center justify-between shadow-sm">
+<div class="flex items-center space-x-3">
+<!-- Back Button -->
+<button aria-label="Quay lại" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors active:scale-95">
+<span class="material-symbols-outlined text-primary text-[24px]">arrow_back</span>
+</button>
+<!-- Technician Avatar & Meta -->
+<div class="flex items-center space-x-2.5">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover shadow-sm ring-2 ring-surface-container-high" data-alt="A professional male Vietnamese technician in a neat blue work uniform smiling warmly. Soft cinematic studio lighting, crisp focus on facial details with modern pristine background, conveying trustworthiness and expertise." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJEN0D1P2laZtM9ImYbILT5nZdFX3vQidzePBLTUv2CyncLSDrQkhh2PwHxQzpNDe1PYNYXf7SPSM0eB3J2jVHiecRe_U2c5FbBTi6nlqiPk0S4EdNwMwjOb2WIdkKKTo1FAvaDGlS0tjSoih1IXcwcN4r7jRkE8rYp8Y4MNbt9_DcIdcJ-He496wBCTnC-YEUxgOeROvH32KxIrKxq6S4_LU1KuvUlP5S1O9hw3-u-6H4-tBxVvOUJw"/>
+<span class="absolute bottom-0 right-0 w-3 h-3 bg-success-green border-2 border-surface-container-lowest rounded-full shadow-sm animate-pulse"></span>
+</div>
+<div>
+<div class="flex items-center space-x-1">
+<h1 class="font-headline-md text-label-md text-on-surface font-bold tracking-tight">Trần Văn Cường</h1>
+<span class="text-[11px] font-label-sm text-primary bg-surface-container-high px-1.5 py-0.5 rounded-full font-medium">Kỹ thuật viên</span>
+</div>
+<p class="text-[12px] font-label-sm text-on-surface-variant flex items-center gap-1">
+<span>Đơn hàng</span>
+<span class="font-semibold text-primary">#HDG-8924A</span>
+</p>
+</div>
+</div>
+</div>
+<!-- Action Icons: Phone Call & Menu -->
+<div class="flex items-center space-x-1">
+<button aria-label="Gọi thoại" class="w-9 h-9 rounded-full flex items-center justify-center text-primary hover:bg-surface-container transition-colors active:scale-95">
+<span class="material-symbols-outlined text-[22px]">call</span>
+</button>
+<button aria-label="Tùy chọn khác" class="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors active:scale-95">
+<span class="material-symbols-outlined text-[22px]">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Pinned Order Status Banner -->
+<section class="bg-surface-container-low/90 backdrop-blur-sm px-4 py-2.5 mx-3 mt-2 rounded-xl flex items-center justify-between border border-outline-variant/30 shadow-sm z-30">
+<div class="flex items-center space-x-2.5 overflow-hidden">
+<div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[18px]">plumbing</span>
+</div>
+<div class="truncate">
+<p class="text-label-sm font-semibold text-on-surface truncate">Đơn sửa điện nước</p>
+<p class="text-[11px] font-label-sm text-primary flex items-center gap-1 font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-ping"></span>
+            Thợ đang trên đường tới (cách 1.2km)
+          </p>
+</div>
+</div>
+<button class="shrink-0 text-xs font-label-sm text-primary font-semibold bg-surface-container-lowest px-2.5 py-1.5 rounded-lg border border-outline-variant/30 hover:bg-surface-container transition-colors shadow-xs active:scale-95">
+        Chi tiết
+      </button>
+</section>
+<!-- Message Thread Canvas -->
+<main class="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+<!-- System Notification Banner -->
+<div class="flex justify-center my-2">
+<div class="bg-surface-container px-3.5 py-1.5 rounded-full max-w-[85%] text-center shadow-xs">
+<p class="text-[11px] font-label-sm text-on-surface-variant leading-relaxed">
+<span class="material-symbols-outlined text-[12px] align-middle text-primary mr-0.5">verified_user</span>
+            Đơn hàng <span class="font-semibold text-on-surface">#HDG-8924A</span> đã được kết nối thành công với thợ <span class="font-semibold text-on-surface">Trần Văn Cường</span>.
+          </p>
+</div>
+</div>
+<div class="text-center">
+<span class="text-[11px] font-label-sm text-outline px-2 py-0.5 rounded-md bg-surface-container-low/60">Hôm nay, 14:10</span>
+</div>
+<!-- Message 1: Technician (Left) -->
+<div class="flex items-end space-x-2">
+<img class="w-7 h-7 rounded-full object-cover shrink-0 mb-1 ring-1 ring-outline-variant/40" data-alt="Professional Vietnamese technician headshot avatar, warm expression in blue working uniform under soft balanced lighting on white backdrop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSH4vPy7pG_IHCrkCerK6yIggGXaVviEbKWFgVCE5joL_lw1BrVT5uXPlgb2_hbbw3sOQ5kHwz8hxQGVGHuxAbtJeSd0otm07IXisRPO8MCFW6r7hDU36OCBNDphusLzjTcnPda30IJhJwhUxu6Hs7Yv15U8p_o255O8rjUr_CtyESuiJ0P6g3wdgaIyk3M2utQX1vyBZZQN9DZ9N16xYeXkkBy2jLqKXFxswSQnFshUJAULu6laPSTg"/>
+<div class="max-w-[78%]">
+<div class="bg-surface-container-low text-on-surface text-body-md text-[14px] leading-relaxed p-3 rounded-2xl rounded-bl-xs border border-outline-variant/30 shadow-sm">
+            Chào anh, tôi đã nhận đơn và đang chuẩn bị dụng cụ qua nhà anh nhé.
+          </div>
+<span class="text-[10px] font-label-sm text-outline mt-1 block ml-1">14:12</span>
+</div>
+</div>
+<!-- Message 2: Customer (Right - Indigo Primary Bubble) -->
+<div class="flex flex-col items-end">
+<div class="max-w-[78%]">
+<div class="bg-primary-container text-on-primary text-body-md text-[14px] leading-relaxed p-3 rounded-2xl rounded-br-xs shadow-md">
+            Chào bạn, nước đang rỉ khá nhiều dưới bồn rửa, bạn tới sớm giúp mình nhé.
+          </div>
+<span class="text-[10px] font-label-sm text-outline mt-1 block text-right mr-1">14:14</span>
+</div>
+</div>
+<!-- Message 3: Customer Attached Image (Right) -->
+<div class="flex flex-col items-end">
+<div class="max-w-[75%] space-y-1">
+<div class="p-1.5 bg-primary-container rounded-2xl rounded-br-xs shadow-md overflow-hidden">
+<img class="w-full h-44 object-cover rounded-xl shadow-inner" data-alt="Close up photograph of a leaking water pipe under a kitchen sink with visible drops of clear water and damp surface, modern clean plumbing context, natural high key lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVp3RmKE7sNcqmTbhbU-8kQLKcMhTed7EVaJ5Q6aJ25TTVfvsmTC5naxHewnoc075aIdOwUEle_Z3CPEkd-Z6uWoHjdjTNri8hIEFjA6f3auHP27GotVZ2wIEtC0nb-XE9e_PlGlbADtSMr0jrZ69qCejXAp_kBvXc6GjCpZMmvFEo8jC2sqZIlSDZiCDrYjgDeWaCoejZ8_6kbL1V5APU8uMNlu9tr3n4upyc272qoum46_FMBVNf3Q"/>
+</div>
+<div class="flex items-center justify-end space-x-1 text-right mr-1">
+<span class="text-[10px] font-label-sm text-outline">14:15</span>
+<span class="material-symbols-outlined text-[13px] text-primary" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</div>
+</div>
+</div>
+<!-- Message 4: Technician (Left) -->
+<div class="flex items-end space-x-2">
+<img class="w-7 h-7 rounded-full object-cover shrink-0 mb-1 ring-1 ring-outline-variant/40" data-alt="Professional Vietnamese technician headshot avatar, warm expression in blue working uniform under soft balanced lighting on white backdrop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiF8k69qVyfzBi1LqBxFII0z_ZzMgsiPHv50QivYZnfLp_HjTinC61bP7OuVCOxMJrD3_xX9SbEX7K12vlF0V_iQq6yfXg8Wl5Bat-A1dY_Kp5-4_70q4RvTilxQw7tcovVzHT-cA_O6rkPN59DMLmcwMLovdgOe9d6lj3dpdzxbJXX05xH0sCP5H818DuWceoXWqW8CxGc7lbwjn-iJ93L2p9ZyZZjWg1-TLv46bxaFwUvXJTZYY-4A"/>
+<div class="max-w-[78%]">
+<div class="bg-surface-container-low text-on-surface text-body-md text-[14px] leading-relaxed p-3 rounded-2xl rounded-bl-xs border border-outline-variant/30 shadow-sm">
+            Vâng anh yên tâm, tôi đang cách đó khoảng 2km, tầm 10 phút nữa tôi có mặt ạ.
+          </div>
+<div class="flex items-center space-x-2 mt-1 ml-1">
+<span class="text-[10px] font-label-sm text-outline">14:17</span>
+<span class="text-[10px] font-label-sm text-secondary font-medium">Đã xem 14:18</span>
+</div>
+</div>
+</div>
+<!-- Typing Indicator -->
+<div class="flex items-center space-x-2 pl-9">
+<div class="bg-surface-container-low px-3 py-1.5 rounded-full flex items-center space-x-1 border border-outline-variant/20 shadow-xs">
+<div class="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:0.2s]"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:0.4s]"></div>
+<span class="text-[11px] font-label-sm text-on-surface-variant ml-1 font-normal">Thợ đang nhập...</span>
+</div>
+</div>
+</main>
+<!-- Quick Suggestions Chip Bar -->
+<div class="px-4 py-1.5 flex items-center space-x-2 overflow-x-auto no-scrollbar bg-surface-container-lowest">
+<button class="whitespace-nowrap px-3 py-1 text-[12px] font-label-sm bg-surface-container-low hover:bg-surface-container text-on-surface rounded-full border border-outline-variant/30 transition-colors">
+        Tới nơi gọi tôi nhé 📞
+      </button>
+<button class="whitespace-nowrap px-3 py-1 text-[12px] font-label-sm bg-surface-container-low hover:bg-surface-container text-on-surface rounded-full border border-outline-variant/30 transition-colors">
+        Nhà có chỗ để xe máy 🛵
+      </button>
+<button class="whitespace-nowrap px-3 py-1 text-[12px] font-label-sm bg-surface-container-low hover:bg-surface-container text-on-surface rounded-full border border-outline-variant/30 transition-colors">
+        Tôi đã tắt van nước chính 🚰
+      </button>
+</div>
+<!-- Sticky Chat Input Bar -->
+<footer class="sticky bottom-0 z-40 bg-surface-glass/95 backdrop-blur-md px-3 py-2.5 pb-5 shadow-lg border-t border-outline-variant/20">
+<form class="flex items-center space-x-2" onsubmit="event.preventDefault();">
+<!-- Media Attach Button -->
+<button aria-label="Đính kèm ảnh" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors active:scale-95" type="button">
+<span class="material-symbols-outlined text-[22px]">photo_camera</span>
+</button>
+<!-- Location Button -->
+<button aria-label="Gửi vị trí" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors active:scale-95" type="button">
+<span class="material-symbols-outlined text-[22px]">location_on</span>
+</button>
+<!-- Input Field Container -->
+<div class="flex-1 relative flex items-center">
+<input class="w-full bg-surface-container-low border-0 focus:ring-2 focus:ring-primary text-on-surface text-[14px] font-body-md rounded-2xl px-4 py-2.5 placeholder:text-outline focus:outline-none transition-all" placeholder="Nhập tin nhắn..." type="text"/>
+<button aria-label="Chọn biểu tượng cảm xúc" class="absolute right-2 text-outline hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">sentiment_satisfied</span>
+</button>
+</div>
+<!-- Send Button -->
+<button aria-label="Gửi tin nhắn" class="w-11 h-11 rounded-full bg-primary-container text-on-primary flex items-center justify-center shadow-md hover:bg-primary transition-all active:scale-95 shrink-0" type="submit">
+<span class="material-symbols-outlined text-[20px] -rotate-45 translate-x-0.5">send</span>
+</button>
+</form>
+</footer>
+</div>
+</body></html>

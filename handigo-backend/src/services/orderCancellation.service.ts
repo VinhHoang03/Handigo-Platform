@@ -4,8 +4,14 @@ import type { Payout } from "@payos/node";
 import { payos, payoutPayos } from "../configs/payos.config";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
+import { OrderStatus } from "../models/orderStatus.model";
 import { Payment, IPayment } from "../models/payment.model";
 import { Promotion } from "../models/promotion.model";
+import { Voucher } from "../models/voucher.model";
+import { updateStoredVoucher } from "./voucherStore.service";
+import { releaseVoucherReservation } from "./voucher.service";
+import { releaseOrderPromotion } from "./promotion.service";
+import { VoucherUsage } from "../models/voucherUsage.model";
 import { Provider } from "../models/provider.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
@@ -16,17 +22,30 @@ import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { createLogger } from "../utils/logger";
 import { buildTransactionCode } from "../utils/transaction";
 import { createNotificationRecord } from "./notification.service";
+import { emitToUser } from "../sockets/socketServer";
 import {
   calculateRefundPolicy,
+  CUSTOMER_CANCELLATION_POLICY_VERSION,
+  CUSTOMER_CANCELLATION_WINDOW_MS,
+  QUOTATION_DEPOSIT_POLICY_VERSION,
+  isQuotationDeclinedReason,
   type RefundPolicyResult,
 } from "./refundPolicy.service";
 import { getRefundRetryDecision } from "./refundProcessing";
+import { getRefundPolicy } from "./systemConfig.service";
 
 type CancellationRole = "customer" | "provider" | "admin";
 type SystemCancellationType = "payment_timeout" | "provider_unavailable";
 
+export interface CancellationExpectation {
+  paidAmount: number;
+  refundAmount: number;
+  cancellationFee: number;
+  providerCompensation?: number;
+}
+
 interface CancelOrderInput {
-  confirmedExpectation?: { paidAmount: number; refundAmount: number; cancellationFee: number };
+  confirmedExpectation?: CancellationExpectation;
   orderId: string;
   actorId?: string;
   role: CancellationRole;
@@ -53,7 +72,7 @@ interface LegacyRefundMetadata {
   completedAt?: Date;
 }
 
-export interface CancellationPreview extends RefundPolicyResult {
+export interface CancellationPreview extends Omit<RefundPolicyResult, "providerCompensationRate"> {
   orderId: string;
   orderCode: string;
   scheduledAt: Date | null;
@@ -145,13 +164,47 @@ const getPaidOrderAmount = async (
   return payments.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0);
 };
 
-const calculateOrderRefundPolicy = (
+export const getCustomerCancellationDeadline = async (
+  order: { _id: Types.ObjectId; status: string; providerId?: unknown },
+  session?: ClientSession,
+  history?: Array<{ status: string; createdAt: Date }>,
+): Promise<Date | null> => {
+  if (order.status !== "accepted" || !order.providerId) return null;
+  const accepted = history
+    ? [...history].reverse().find((event) => event.status === "accepted")
+    : await OrderStatus.findOne({ orderId: order._id, status: "accepted", isDeleted: false })
+      .sort({ createdAt: -1, _id: -1 }).select("createdAt").session(session ?? null).lean();
+  let acceptedAt = accepted?.createdAt;
+  if (!acceptedAt) {
+    // Tương thích đơn cũ chưa có lịch sử trạng thái; không dùng updatedAt để tính thời hạn.
+    const assignment = await OrderAssignment.findOne({
+      orderId: order._id, providerId: order.providerId, status: "accepted", isDeleted: false,
+    }).sort({ respondedAt: -1 }).select("respondedAt").session(session ?? null).lean();
+    acceptedAt = assignment?.respondedAt ?? undefined;
+  }
+  return acceptedAt && Number.isFinite(acceptedAt.getTime())
+    ? new Date(acceptedAt.getTime() + CUSTOMER_CANCELLATION_WINDOW_MS) : null;
+};
+
+const calculateOrderRefundPolicy = async (
   order: IOrder,
   role: CancellationRole,
   paidAmount: number,
   now = new Date(),
-) =>
-  calculateRefundPolicy({
+  session?: ClientSession,
+  cancellationReason?: string,
+) => {
+  const quotationDeclined = role === "provider" && isQuotationDeclinedReason(cancellationReason);
+  const hasRepairQuotation = Boolean(order.currentQuotationId);
+  const deadline = role === "customer" ? await getCustomerCancellationDeadline(order, session) : null;
+  if (quotationDeclined && (!order.inspectionRequired || order.status !== "accepted")) {
+    throw new AppError("Chỉ được hủy do khách không đồng ý báo giá khi đơn sửa chữa đã được nhận và chưa bắt đầu thực hiện.", 409);
+  }
+  const deposits = role === "provider" && order.inspectionRequired && order.status === "accepted"
+    ? await Payment.find({ orderId: order._id, paymentType: "inspection_deposit", status: "paid", isDeleted: false }).session(session || null)
+    : [];
+  const policy = role === "customer" || order.inspectionRequired ? undefined : await getRefundPolicy(session);
+  return calculateRefundPolicy({
     role,
     orderType: order.orderType,
     orderStatus: order.status,
@@ -159,7 +212,28 @@ const calculateOrderRefundPolicy = (
     hasAssignedProvider: Boolean(order.providerId),
     paidAmount,
     now,
-  });
+    hasRepairQuotation,
+    inspectionRequired: order.inspectionRequired,
+    cancellationReason,
+    paidInspectionDeposit: deposits.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0),
+    providerAcceptedAt: deadline ? new Date(deadline.getTime() - CUSTOMER_CANCELLATION_WINDOW_MS) : null,
+  }, policy);
+};
+
+const isQuotationDepositPolicy = (order: IOrder) =>
+  order.cancellation?.refundPolicy?.policyVersion === QUOTATION_DEPOSIT_POLICY_VERSION;
+
+const shouldRefundQrToWallet = (order: IOrder) =>
+  (order.reassignment?.automatic && order.reassignment.status === "failed")
+  || (order.cancellation?.cancelledByRole === "customer"
+    && order.cancellation.refundPolicy?.policyVersion === CUSTOMER_CANCELLATION_POLICY_VERSION);
+
+// Lưu tỷ lệ theo lần hủy để cấu hình mới không đổi các khoản đang xử lý.
+const getStoredCompensationRate = (order: IOrder) => {
+  if (isQuotationDepositPolicy(order)) return 1;
+  const rate = order.cancellation?.refundPolicy?.providerCompensationRate;
+  return typeof rate === "number" && Number.isFinite(rate) ? Math.min(100, Math.max(0, rate)) / 100 : 0.8;
+};
 
 const getStoredRefundRate = (order: IOrder) => {
   const rate = Number(order.cancellation?.refundPolicy?.refundRate);
@@ -167,7 +241,9 @@ const getStoredRefundRate = (order: IOrder) => {
 };
 
 const getPaymentRefundAmount = (order: IOrder, payment: IPayment) =>
-  Math.round((getPaidPaymentAmount(payment) * getStoredRefundRate(order)) / 100);
+  isQuotationDepositPolicy(order)
+    ? payment.paymentType === "inspection_deposit" ? 0 : getPaidPaymentAmount(payment)
+    : Math.round((getPaidPaymentAmount(payment) * getStoredRefundRate(order)) / 100);
 
 const buildRefundMetadata = (
   order: IOrder,
@@ -201,13 +277,14 @@ export const getCancellationPreview = async (input: {
 
     await assertCancellationAccess(order, { ...input, reason: "Xem trước" }, session);
     const paidAmount = await getPaidOrderAmount(order._id as Types.ObjectId, session);
-    const policy = calculateOrderRefundPolicy(order, input.role, paidAmount);
+    const policy = await calculateOrderRefundPolicy(order, input.role, paidAmount, new Date(), session);
+    const { providerCompensationRate: _providerCompensationRate, ...preview } = policy;
 
     return {
       orderId: order._id.toString(),
       orderCode: order.orderCode,
       scheduledAt: order.scheduledAt || null,
-      ...policy,
+      ...preview,
     };
   } finally {
     await session.endSession();
@@ -220,14 +297,16 @@ const refundWalletPayments = async (
   session: ClientSession,
 ) => {
   const refunded: WalletRefundResult[] = [];
+  const refundQrToWallet = shouldRefundQrToWallet(order);
   const payments = await Payment.find({
     orderId: order._id,
-    method: "wallet",
+    method: refundQrToWallet ? { $in: ["wallet", "payos"] } : "wallet",
     status: "paid",
   }).session(session);
 
   for (const payment of payments) {
     const refundAmount = getPaymentRefundAmount(order, payment);
+    if (isQuotationDepositPolicy(order) && refundAmount === 0) continue;
     const existingRefund = await WalletTransaction.findOne({
       relatedPaymentId: payment._id,
       type: "refund",
@@ -253,7 +332,8 @@ const refundWalletPayments = async (
       order,
       refundAmount,
       "succeeded",
-      { completedAt: new Date(), sourceMethod: "wallet" },
+      { completedAt: new Date(), sourceMethod: payment.method,
+        ...(refundQrToWallet ? { channel: "handigo_wallet", destination: "handigo_wallet" } : {}) },
     );
 
     const claimedPayment = await Payment.findOneAndUpdate(
@@ -280,7 +360,7 @@ const refundWalletPayments = async (
     const wallet = await Wallet.findOneAndUpdate(
       { userId: payment.customerId, isDeleted: false },
       { $inc: { balance: refundAmount } },
-      { new: true, session },
+      { new: true, session, runValidators: true, upsert: payment.method === "payos" },
     );
 
     if (!wallet) {
@@ -304,7 +384,7 @@ const refundWalletPayments = async (
           metadata: {
             orderCode: order.orderCode,
             reason,
-            sourceMethod: "wallet",
+            sourceMethod: payment.method,
             policyVersion: refundMetadata.policyVersion,
             refundRate: refundMetadata.rate,
           },
@@ -326,7 +406,7 @@ const compensateProviderPayments = async (
   order: IOrder,
   session: ClientSession,
 ) => {
-  if (!order.providerId || getStoredRefundRate(order) >= 100) return;
+  if (!order.providerId || (!isQuotationDepositPolicy(order) && getStoredRefundRate(order) >= 100)) return;
 
   const provider = await Provider.findOne({
     _id: order.providerId,
@@ -345,7 +425,8 @@ const compensateProviderPayments = async (
   for (const payment of payments) {
     const cancellationFee =
       getPaidPaymentAmount(payment) - getPaymentRefundAmount(order, payment);
-    const compensationAmount = Math.max(0, Math.round(cancellationFee * 0.8));
+    const compensationRate = getStoredCompensationRate(order);
+    const compensationAmount = Math.max(0, Math.round(cancellationFee * compensationRate));
     if (compensationAmount === 0) continue;
 
     const claimedPayment = await Payment.findOneAndUpdate(
@@ -364,7 +445,7 @@ const compensateProviderPayments = async (
                 order.cancellation?.refundPolicy?.policyVersion ||
                 "LEGACY_FULL_REFUND",
               amount: compensationAmount,
-              rate: 80,
+              rate: compensationRate * 100,
             },
           }),
         },
@@ -410,9 +491,11 @@ const compensateProviderPayments = async (
           balanceAfter: wallet.balance,
           status: "success",
           transactionCode: buildTransactionCode("CANCEL_COMP"),
-          description: "Bồi thường phí hủy đơn từ khách hàng",
+          description: isQuotationDepositPolicy(order)
+          ? "Nhận tiền cọc khi hủy đơn báo giá đã có thợ nhận"
+            : "Bồi thường phí hủy đơn từ khách hàng",
           metadata: {
-            source: "cancellation_fee",
+            source: isQuotationDepositPolicy(order) ? "quotation_inspection_deposit" : "cancellation_fee",
             orderCode: order.orderCode,
             policyVersion:
               order.cancellation?.refundPolicy?.policyVersion ||
@@ -823,6 +906,10 @@ const refundPayosPaymentToWallet = async (
 ) => {
   const session = await mongoose.startSession();
   let walletRefund: WalletRefundResult | null = null;
+  const refundOrigin = order.cancellation?.refundPolicy?.policyVersion === CUSTOMER_CANCELLATION_POLICY_VERSION
+    ? "customer_cancellation_window"
+    : order.reassignment?.automatic && order.reassignment.status === "failed"
+      ? "replacement_unavailable" : "source_account_unavailable";
 
   try {
     await session.withTransaction(async () => {
@@ -894,7 +981,7 @@ const refundPayosPaymentToWallet = async (
                 sourceMethod: "payos",
                 destination: "handigo_wallet",
                 referenceId: "REFUND" + payment._id.toString(),
-                fallbackReason: "source_account_unavailable",
+                fallbackReason: refundOrigin,
                 amount: refundAmount,
                 completedAt: now,
               },
@@ -947,7 +1034,7 @@ const refundPayosPaymentToWallet = async (
               orderCode: order.orderCode,
               reason,
               sourceMethod: "payos",
-              fallbackReason: "source_account_unavailable",
+              fallbackReason: refundOrigin,
             },
           },
         ],
@@ -988,7 +1075,7 @@ const refundPayosPaymentToWallet = async (
         type: "PAYMENT",
         title: "Hoàn tiền thành công",
         content:
-          "PayOS không cung cấp tài khoản nguồn. Tiền đã được hoàn vào ví Handigo của bạn.",
+          "Tiền thanh toán QR đã được hoàn vào ví Handigo của bạn.",
         data: {
           orderId: order._id,
           paymentId: payment._id,
@@ -1011,6 +1098,7 @@ const requestPayosRefund = async (
   reason: string,
   refundAmount: number,
 ) => {
+  if (refundAmount <= 0) return;
   const queuedRefund = await ensurePayosRefundRecord(
     payment,
     order,
@@ -1021,6 +1109,10 @@ const requestPayosRefund = async (
   if (!refund) return;
 
   try {
+    if (shouldRefundQrToWallet(order) && !refund.payoutId) {
+      await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
+      return;
+    }
     if (refund.payoutId) {
       await reconcilePayosRefund(payment, refund, reason, refund.payoutId);
       return;
@@ -1132,13 +1224,13 @@ const settlePendingPayosPayment = async (
       const refundAmount = getPaymentRefundAmount(order, paidPayment);
       const cancellationFee = actualPaidAmount - refundAmount;
       const providerCompensation = order.providerId
-        ? Math.round(cancellationFee * 0.8)
+        ? Math.round(cancellationFee * getStoredCompensationRate(order))
         : 0;
       const platformRetainedAmount = cancellationFee - providerCompensation;
 
       const detectedPaymentStatus =
         payment.paymentType === "inspection_deposit" ||
-        paymentLink.amountPaid < payment.amount
+          paymentLink.amountPaid < payment.amount
           ? "partially_paid"
           : "paid";
       await Order.updateOne(
@@ -1150,16 +1242,16 @@ const settlePendingPayosPayment = async (
           },
           ...(order.cancellation?.refundPolicy
             ? {
-                $inc: {
-                  "cancellation.refundPolicy.paidAmount": actualPaidAmount,
-                  "cancellation.refundPolicy.refundAmount": refundAmount,
-                  "cancellation.refundPolicy.cancellationFee": cancellationFee,
-                  "cancellation.refundPolicy.providerCompensation":
-                    providerCompensation,
-                  "cancellation.refundPolicy.platformRetainedAmount":
-                    platformRetainedAmount,
-                },
-              }
+              $inc: {
+                "cancellation.refundPolicy.paidAmount": actualPaidAmount,
+                "cancellation.refundPolicy.refundAmount": refundAmount,
+                "cancellation.refundPolicy.cancellationFee": cancellationFee,
+                "cancellation.refundPolicy.providerCompensation":
+                  providerCompensation,
+                "cancellation.refundPolicy.platformRetainedAmount":
+                  platformRetainedAmount,
+              },
+            }
             : {}),
         },
       );
@@ -1244,30 +1336,34 @@ const notifyCancellation = async (
   const customerNotification =
     systemCancellationType === "payment_timeout"
       ? {
-          title: "Đơn hàng đã hủy do quá hạn thanh toán",
-          content:
-            "Đơn " +
-            order.orderCode +
-            " đã tự động hủy vì bạn chưa thanh toán trong thời hạn giữ lịch.",
-        }
+        title: "Đơn hàng đã hủy do quá hạn thanh toán",
+        content:
+          "Đơn " +
+          order.orderCode +
+          " đã tự động hủy vì bạn chưa thanh toán trong thời hạn giữ lịch.",
+      }
       : systemCancellationType === "provider_unavailable"
         ? {
-            title: "Đơn hàng đã hủy vì chưa tìm được chuyên gia",
-            content:
-              "Handigo chưa tìm được chuyên gia nhận đơn " +
-              order.orderCode +
-              " trong thời gian quy định. Vui lòng đặt lại khi phù hợp.",
-          }
+          title: "Đơn hàng đã hủy vì chưa tìm được chuyên gia",
+          content:
+            "Handigo chưa tìm được chuyên gia nhận đơn " +
+            order.orderCode +
+            " trong thời gian quy định. Vui lòng đặt lại khi phù hợp.",
+        }
         : {
-            title: "Đơn hàng đã được hủy",
-            content: "Đơn " + order.orderCode + " đã được hủy. Lý do: " + reason,
-          };
+          title: "Đơn hàng đã được hủy",
+          content: "Đơn " + order.orderCode + " đã được hủy. Lý do: " + reason,
+        };
 
   await createNotificationRecord({
     userId: order.customerId,
     type: "ORDER",
     title: customerNotification.title,
-    content: customerNotification.content,
+    content: customerNotification.content + (order.reassignment?.automatic && order.reassignment.status === "failed"
+      ? " Bạn được tặng voucher giảm 10% không hết hạn, không yêu cầu giá trị đơn tối thiểu. Khoản đã thanh toán qua ví hoặc QR được hoàn về ví Handigo; tiền mặt không phát sinh hoàn tiền."
+      : "") + (isQuotationDepositPolicy(order)
+      ? " Tiền cọc khảo sát được chuyển cho thợ, không hoàn lại cho khách."
+      : ""),
     data: {
       orderId: order._id,
       orderCode: order.orderCode,
@@ -1298,7 +1394,9 @@ const notifyCancellation = async (
         userId: provider.userId,
         type: "ORDER",
         title: "Đơn hàng đã được hủy",
-        content: "Đơn " + order.orderCode + " đã được hủy.",
+        content: "Đơn " + order.orderCode + " đã được hủy." + (isQuotationDepositPolicy(order)
+          ? " Tiền cọc khảo sát đã thanh toán được cộng vào ví của bạn."
+          : ""),
         data: {
           orderId: order._id,
           orderCode: order.orderCode,
@@ -1310,63 +1408,80 @@ const notifyCancellation = async (
   }
 };
 
-export const cancelOrderWithSettlement = async (
-  input: CancelOrderInput,
-): Promise<IOrder> => {
-  assertObjectId(input.orderId, "ID đơn hàng");
-  if (input.actorId) {
-    assertObjectId(input.actorId, "ID người thực hiện");
-  }
+export const cancelOrdersWithSettlement = async (
+  inputs: CancelOrderInput[],
+): Promise<IOrder[]> => {
+  for (const input of inputs) {
+    assertObjectId(input.orderId, "ID đơn hàng");
+    if (!input.actorId && (!input.system || input.role !== "admin")) {
+      throw new AppError("Không xác định được người thực hiện hủy đơn", 401);
+    }
+    if (input.actorId) {
+      assertObjectId(input.actorId, "ID người thực hiện");
+    }
 
-  const reason = input.reason.trim();
-  if (!reason) {
-    throw new AppError("Vui lòng cung cấp lý do hủy.", 400);
+    const reason = input.reason.trim();
+    if (!reason) {
+      throw new AppError("Vui lòng cung cấp lý do hủy.", 400);
+    }
   }
 
   const session = await mongoose.startSession();
-  let cancelledOrder: IOrder | null = null;
-  let skippedOrder: IOrder | null = null;
-  let newlyCancelled = false;
-  let walletRefunds: WalletRefundResult[] = [];
+  let results: Array<{
+    input: CancelOrderInput;
+    order: IOrder;
+    newlyCancelled: boolean;
+    walletRefunds: WalletRefundResult[];
+    skipped?: boolean;
+  }> = [];
 
   try {
     await session.withTransaction(async () => {
-      const order = await Order.findById(input.orderId).session(session);
-      if (!order || order.isDeleted) {
-        throw new AppError("Đơn hàng không tồn tại.", 404);
-      }
+      results = [];
+      for (const input of inputs) {
+        const reason = input.reason.trim();
+        const order = await Order.findById(input.orderId).session(session);
+        if (!order || order.isDeleted) {
+          throw new AppError("Đơn hàng không tồn tại.", 404);
+        }
 
-      await assertCancellationAccess(order, input, session);
+        await assertCancellationAccess(order, input, session);
 
-      // Thợ có thể vừa nhận đơn khi bộ quét hết hạn đang chạy.
-      if (input.system && input.systemCancellationType === "provider_unavailable"
-        && order.status !== "created") {
-        skippedOrder = order;
-        return;
-      }
+        // Thợ có thể vừa nhận đơn khi bộ quét hết hạn đang chạy.
+        if (input.system && input.systemCancellationType === "provider_unavailable"
+          && order.status !== "created") {
+          results.push({ input, order, newlyCancelled: false, walletRefunds: [], skipped: true });
+          continue;
+        }
 
-      if (order.status === "cancelled") {
-        cancelledOrder = order;
-        return;
-      }
+        if (order.status === "cancelled") {
+          results.push({ input, order, newlyCancelled: false, walletRefunds: [] });
+          continue;
+        }
 
-      if (!CANCELLABLE_STATUSES.includes(order.status as any)) {
-        throw new AppError(
-          'Không thể hủy đơn hàng ở trạng thái "' + order.status + '".',
-          400,
-        );
-      }
+        if (input.role === "customer" && order.status === "in_progress") {
+          throw new AppError("Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng.", 409);
+        }
+
+        if (!CANCELLABLE_STATUSES.includes(order.status as any)) {
+          throw new AppError(
+            'Không thể hủy đơn hàng ở trạng thái "' + order.status + '".',
+            400,
+          );
+        }
 
       const cancelledAt = new Date();
       const paidAmount = await getPaidOrderAmount(
         order._id as Types.ObjectId,
         session,
       );
-      const refundPolicy = calculateOrderRefundPolicy(
+      const refundPolicy = await calculateOrderRefundPolicy(
         order,
         input.role,
         paidAmount,
         cancelledAt,
+        session,
+        input.system ? undefined : reason,
       );
       if (!refundPolicy.canCancel) {
         throw new AppError(refundPolicy.policyReason, 409);
@@ -1375,8 +1490,10 @@ export const cancelOrderWithSettlement = async (
         refundPolicy.paidAmount !== input.confirmedExpectation.paidAmount
         || refundPolicy.refundAmount !== input.confirmedExpectation.refundAmount
         || refundPolicy.cancellationFee !== input.confirmedExpectation.cancellationFee
+        || (input.confirmedExpectation.providerCompensation !== undefined
+          && refundPolicy.providerCompensation !== input.confirmedExpectation.providerCompensation)
       )) {
-        throw new ActionPreconditionError();
+        throw new ActionPreconditionError("Tiền hoàn hoặc tiền chuyển cho thợ đã thay đổi. Đơn chưa được hủy. Vui lòng kiểm tra và xác nhận lại.");
       }
 
       const cancellation: Record<string, unknown> = {
@@ -1390,6 +1507,7 @@ export const cancelOrderWithSettlement = async (
           refundAmount: refundPolicy.refundAmount,
           cancellationFee: refundPolicy.cancellationFee,
           providerCompensation: refundPolicy.providerCompensation,
+          providerCompensationRate: refundPolicy.providerCompensationRate,
           platformRetainedAmount: refundPolicy.platformRetainedAmount,
           hoursBeforeStart: refundPolicy.hoursBeforeStart,
           policyReason: refundPolicy.policyReason,
@@ -1398,6 +1516,10 @@ export const cancelOrderWithSettlement = async (
       if (input.actorId) {
         cancellation.cancelledBy = new Types.ObjectId(input.actorId);
       }
+
+      const replacementFailed = input.system && input.systemCancellationType === "provider_unavailable"
+        && order.reassignment?.automatic && order.reassignment.status === "matching" && !order.inspectionRequired;
+      const wasInProgress = order.status === "in_progress";
 
       const claimedOrder = await Order.findOneAndUpdate(
         {
@@ -1409,12 +1531,13 @@ export const cancelOrderWithSettlement = async (
             status: "cancelled",
             readyForMatching: false,
             cancellation,
+            ...(replacementFailed ? { "reassignment.status": "failed" } : {}),
           },
         },
         {
-          new: true,
+          returnDocument: "after",
           session,
-          runValidators: Boolean(input.actorId),
+          runValidators: true,
         },
       );
 
@@ -1422,100 +1545,131 @@ export const cancelOrderWithSettlement = async (
         throw new AppError("Đơn hàng vừa được xử lý bởi yêu cầu khác.", 409);
       }
 
-      newlyCancelled = true;
-      cancelledOrder = claimedOrder;
+      if (replacementFailed) {
+        // Cấp mã trong cùng giao dịch hủy đơn, mã theo đơn ngăn cấp trùng khi thử lại.
+        await Voucher.updateOne(
+          { code: `HDREPLACE${claimedOrder._id.toString().toUpperCase()}` },
+          { $setOnInsert: {
+            ownerId: claimedOrder.customerId,
+            code: `HDREPLACE${claimedOrder._id.toString().toUpperCase()}`,
+            name: "Ưu đãi 10% khi không tìm được thợ thay thế",
+            description: "Giảm 10% cho đơn giá cố định, không hết hạn, không yêu cầu giá trị đơn tối thiểu. Dùng một lần.",
+            discountType: "PERCENT", discountValue: 10, minOrderAmount: 0, maxDiscountAmount: null,
+            applicableOrderType: "fixed_price", usageLimit: 1, perUserLimit: 1,
+            isActive: true, status: "ACTIVE", neverExpires: true, startAt: cancelledAt,
+            // Giữ trường ngày cho client cũ; neverExpires quyết định hiệu lực vĩnh viễn.
+            endAt: new Date("9999-12-31T23:59:59.999Z"),
+          } },
+          { upsert: true, session, runValidators: true },
+        );
+      }
+        await releaseVoucherReservation(claimedOrder._id, session);
 
-      await OrderAssignment.updateMany(
-        { orderId: claimedOrder._id, status: "pending" },
-        {
-          $set: {
-            status: "cancelled",
-            respondedAt: new Date(),
-          },
-        },
-        { session },
-      );
-
-      if (
-        claimedOrder.voucherSnapshot?.voucherId &&
-        claimedOrder.voucherUsedAt
-      ) {
-        await Promotion.updateOne(
+        await OrderAssignment.updateMany(
+          { orderId: claimedOrder._id, status: "pending" },
           {
-            _id: claimedOrder.voucherSnapshot.voucherId,
-            usedCount: { $gt: 0 },
+            $set: {
+              status: "cancelled",
+              respondedAt: new Date(),
+            },
           },
-          { $inc: { usedCount: -1 } },
           { session },
         );
-      }
 
-      await Payment.updateMany(
-        {
-          orderId: claimedOrder._id,
-          method: "cash",
-          status: "pending",
-        },
-        {
-          $set: {
-            status: "failed",
-            failedAt: new Date(),
-            failureReason: "Đơn hàng đã hủy",
+        if (
+          claimedOrder.voucherSnapshot?.voucherId &&
+          claimedOrder.voucherUsedAt
+        ) {
+          await updateStoredVoucher(claimedOrder.voucherSnapshot.voucherId,
+            {
+              _id: claimedOrder.voucherSnapshot.voucherId,
+              usedCount: { $gt: 0 },
+            },
+            { $inc: { usedCount: -1 } },
+            session,
+          );
+          await VoucherUsage.updateOne({ voucherId: claimedOrder.voucherSnapshot.voucherId, orderId: claimedOrder._id, status: "used" },
+            { $set: { status: "restored", restoredAt: new Date() } }, { session, runValidators: true });
+        }
+        await releaseOrderPromotion(claimedOrder._id, session);
+
+        await Payment.updateMany(
+          {
+            orderId: claimedOrder._id,
+            method: "cash",
+            status: "pending",
           },
-        },
-        { session },
-      );
-
-      walletRefunds = await refundWalletPayments(
-        claimedOrder,
-        reason,
-        session,
-      );
-      await compensateProviderPayments(claimedOrder, session);
-
-      if (claimedOrder.providerId && claimedOrder.orderType === "normal") {
-        await Provider.updateOne(
-          { _id: claimedOrder.providerId },
-          { $set: { availabilityStatus: "online" } },
+          {
+            $set: {
+              status: "failed",
+              failedAt: new Date(),
+              failureReason: "Đơn hàng đã hủy",
+            },
+          },
           { session },
         );
-      }
 
-      await refreshCancelledOrderPaymentStatus(claimedOrder._id, session);
+        const walletRefunds = await refundWalletPayments(
+          claimedOrder,
+          reason,
+          session,
+        );
+        await compensateProviderPayments(claimedOrder, session);
+
+        if (claimedOrder.providerId && (wasInProgress || ["normal", "urgent"].includes(claimedOrder.orderType))) {
+          await Provider.updateOne(
+            { _id: claimedOrder.providerId },
+            { $set: { availabilityStatus: "online" } },
+            { session },
+          );
+        }
+
+        await refreshCancelledOrderPaymentStatus(claimedOrder._id, session);
+        results.push({ input, order: claimedOrder, newlyCancelled: true, walletRefunds });
+      }
     });
   } finally {
     await session.endSession();
   }
 
-  if (skippedOrder) return skippedOrder;
-
-  if (!cancelledOrder) {
-    throw new AppError("Không thể hủy đơn hàng", 500);
-  }
-
-  await settleCancelledOrderPayments(input.orderId, reason);
-
-  if (newlyCancelled) {
-    try {
-      await notifyCancellation(
-        cancelledOrder,
-        walletRefunds,
-        reason,
-        input.systemCancellationType,
-      );
-    } catch (error) {
-      cancellationLogger.error("Không thể tạo thông báo hủy đơn.", error, {
-        orderId: input.orderId,
-      });
+  const orders: IOrder[] = [];
+  for (const { input, order, newlyCancelled, walletRefunds, skipped } of results) {
+    if (skipped) {
+      orders.push(order);
+      continue;
     }
-  }
+    const reason = input.reason.trim();
+    await settleCancelledOrderPayments(input.orderId, reason);
 
-  const result = await Order.findById(input.orderId);
-  if (!result) {
-    throw new AppError("Đơn hàng không tồn tại.", 404);
-  }
+    if (newlyCancelled) {
+      try {
+        emitToUser(order.customerId.toString(), "order:updated", { orderId: input.orderId });
+        await notifyCancellation(
+          order,
+          walletRefunds,
+          reason,
+          input.systemCancellationType,
+        );
+      } catch (error) {
+        cancellationLogger.error("Không thể tạo thông báo hủy đơn.", error, {
+          orderId: input.orderId,
+        });
+      }
+    }
 
-  return result;
+    const result = await Order.findById(input.orderId);
+    if (!result) {
+      throw new AppError("Đơn hàng không tồn tại.", 404);
+    }
+
+    orders.push(result);
+  }
+  return orders;
+};
+
+export const cancelOrderWithSettlement = async (input: CancelOrderInput): Promise<IOrder> => {
+  const [order] = await cancelOrdersWithSettlement([input]);
+  return order;
 };
 
 export const cancelSystemOrderWithSettlement = async (

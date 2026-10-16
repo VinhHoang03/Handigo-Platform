@@ -1,4 +1,5 @@
 import api from "@/api/client";
+import { isAxiosError } from "axios";
 import type {
   Address,
   CancellationPreview,
@@ -9,6 +10,7 @@ import type {
   Payment,
 } from "@/types/booking";
 import type { WalletTransaction } from "@/features/wallet/types/wallet.types";
+import type { BookingPolicies } from "../types/bookingPolicy.types";
 
 export interface OrderPaymentsResult {
   payments: Payment[];
@@ -16,9 +18,12 @@ export interface OrderPaymentsResult {
 }
 
 export interface CreateOrderPayload {
+  expectedBookingAmount?: number;
+  expectedFinalAmount?: number;
   serviceId: string;
   selectedOptionIds?: string[];
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
+  uniformQuantity?: number;
   addressId: string;
   preferredProviderId?: string;
   orderType?: "normal" | "urgent" | "scheduled" | "recurring";
@@ -55,6 +60,14 @@ interface ReverseGeocodedAddress {
 }
 
 export const bookingApi = {
+  getBookingPolicies: async () => {
+    const response = await api.get<{ success: boolean; data: BookingPolicies }>("/orders/booking-policies");
+    return response.data.data;
+  },
+  preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity' | 'voucherCode'>) => {
+    const response = await api.post<{ success: boolean; data: BookingPreview }>('/orders/preview', payload);
+    return response.data.data;
+  },
   getAddresses: async () => {
     const response = await api.get<{ success: boolean; data: Address[] }>(
       "/addresses",
@@ -103,6 +116,7 @@ export const bookingApi = {
 
   createPayment: async (payload: {
     orderId: string;
+    expectedAmount?: number;
     method: "PAYOS" | "CASH" | "WALLET";
     paymentType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING";
     returnUrl?: string;
@@ -120,6 +134,23 @@ export const bookingApi = {
       `/payments/${paymentId}`,
     );
     return response.data.data;
+  },
+
+  getPaymentQr: async (paymentId: string) => {
+    try {
+      const response = await api.get<Blob>(`/payments/${paymentId}/qr`, { responseType: "blob" });
+      if (response.data.type !== "image/png") throw new Error("Chưa nhận được ảnh QR thanh toán hợp lệ.");
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.data instanceof Blob) {
+        const details = await error.response.data.text();
+        try {
+          const body = JSON.parse(details) as { message?: unknown };
+          if (typeof body.message === "string") error.response.data = { message: body.message };
+        } catch { /* Giữ lỗi gốc nếu phản hồi không phải JSON. */ }
+      }
+      throw error;
+    }
   },
 
   getPaymentsByOrder: async (orderId: string) => {
@@ -192,10 +223,14 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  cancelOrder: async (orderId: string, reason: string) => {
+  cancelOrder: async (
+    orderId: string,
+    reason: string,
+    confirmedExpectation?: Pick<CancellationPreview, "paidAmount" | "refundAmount" | "cancellationFee" | "providerCompensation">,
+  ) => {
     const response = await api.patch<{ success: boolean; data: Order }>(
       `/orders/${orderId}/cancel`,
-      { reason },
+      { reason, confirmedExpectation },
     );
     return response.data.data;
   },
@@ -222,11 +257,15 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  cancelRecurringSeries: async (orderId: string, reason: string) => {
+  cancelRecurringSeries: async (
+    orderId: string,
+    reason: string,
+    confirmedExpectations?: CancellationPreview["items"],
+  ) => {
     const response = await api.patch<{
       success: boolean;
       data: { cancelledCount: number; orders: Order[] };
-    }>(`/orders/${orderId}/cancel-series`, { reason });
+    }>(`/orders/${orderId}/cancel-series`, { reason, confirmedExpectations });
     return response.data.data;
   },
 
@@ -238,13 +277,6 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  confirmQuotation: async (quotationId: string) => {
-    const response = await api.post<{ success: boolean; data: OrderQuotation }>(
-      `/orders/quotations/${quotationId}/confirm`,
-    );
-    return response.data.data;
-  },
-
   rejectQuotation: async (quotationId: string, reason?: string) => {
     const response = await api.post<{ success: boolean; data: OrderQuotation }>(
       `/orders/quotations/${quotationId}/reject`,
@@ -253,3 +285,15 @@ export const bookingApi = {
     return response.data.data;
   },
 };
+
+export interface BookingPreview {
+  promotionDiscountAmount: number;
+  voucherDiscountAmount: number;
+  discountedAmount: number;
+  promotionSnapshot?: { name: string } | null;
+  baseAmount: number;
+  bookingAmount: number;
+  depositAmount: number;
+  minAdvanceMinutes: number;
+  schedule: { durationMinutes: number; bufferMinutes: number; travelMinutes: number };
+}

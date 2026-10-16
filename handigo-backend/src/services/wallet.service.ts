@@ -7,12 +7,14 @@ import type { IOrder } from "../models/order.model";
 import User from "../models/user.model";
 import { toObjectId } from "../utils/mongo";
 import { buildTransactionCode } from "../utils/transaction";
+import { getGroupedWalletTransactionHistory } from "./walletHistory.service";
 import { Wallet } from "../models/wallet.model";
 import {
   WalletTransaction,
   WalletTransactionType,
 } from "../models/walletTransaction.model";
 import { AppError } from "../utils/appError";
+import { resolvePaymentFrontendOrigin } from "../utils/paymentRedirect";
 import type {
   AdminWalletAdjustmentInput,
   AdminWalletListQuery,
@@ -44,11 +46,6 @@ const isDuplicateKeyError = (error: unknown) =>
   error !== null &&
   "code" in error &&
   (error as { code?: number }).code === 11000;
-
-const DEFAULT_WALLET_DEPOSIT_RETURN_URL =
-  process.env.PAYOS_WALLET_DEPOSIT_RETURN_URL || "http://localhost:5173/wallet/deposit/success";
-const DEFAULT_WALLET_DEPOSIT_CANCEL_URL =
-  process.env.PAYOS_WALLET_DEPOSIT_CANCEL_URL || "http://localhost:5173/wallet/deposit/cancel";
 
 const appendQueryParams = (url: string, params: Record<string, string>) => {
   try {
@@ -170,6 +167,8 @@ const sumTransactions = async (
   if (direction) {
     match.direction = direction;
   }
+  // Khoản phân bổ cho hệ thống không phải tiền bị trừ từ ví thợ.
+  match["metadata.systemRevenueOnly"] = { $ne: true };
 
   const [result] = await WalletTransaction.aggregate([
     { $match: match },
@@ -239,7 +238,7 @@ const buildTransactionFilter = (
   query: WalletTransactionQuery,
 ) => {
   const filter: Record<string, unknown> = {
-    userId,
+    userId: toObjectId(userId),
     isDeleted: false,
   };
 
@@ -301,6 +300,10 @@ export const getWalletTransactionHistory = async (
   await assertWalletAccess(user);
 
   const filter = buildTransactionFilter(user.id, query);
+  filter["metadata.systemRevenueOnly"] = { $ne: true };
+  if (user.role === "PROVIDER" && query.groupSettlements && (!query.type || query.type === "provider_earning")) {
+    return getGroupedWalletTransactionHistory(filter, query);
+  }
   const skip = (query.page - 1) * query.limit;
 
   const [items, total] = await Promise.all([
@@ -321,6 +324,10 @@ export const getWalletTransactionHistory = async (
 
 export const createWalletDeposit = async (user: RequestUser, input: WalletDepositInput) => {
   assertPositiveAmount(input.amount);
+  const frontendOrigin = resolvePaymentFrontendOrigin(input.cancelUrl, input.returnUrl,
+    process.env.FRONTEND_URL, process.env.PAYOS_WALLET_DEPOSIT_CANCEL_URL,
+    process.env.PAYOS_WALLET_DEPOSIT_RETURN_URL, "https://localhost:5173");
+  const walletUrl = new URL(user.role === "PROVIDER" ? "/provider/wallet" : "/customer/wallet", frontendOrigin).href;
 
   await assertWalletAccess(user);
   const provider = user.role === "PROVIDER" ? await getProviderByUserId(user.id) : null;
@@ -351,11 +358,11 @@ export const createWalletDeposit = async (user: RequestUser, input: WalletDeposi
   let paymentLink;
 
   try {
-    const returnUrl = appendQueryParams(input.returnUrl || DEFAULT_WALLET_DEPOSIT_RETURN_URL, {
+    const returnUrl = appendQueryParams(walletUrl, {
       walletDeposit: "success",
       orderCode: orderCode.toString(),
     });
-    const cancelUrl = appendQueryParams(input.cancelUrl || DEFAULT_WALLET_DEPOSIT_CANCEL_URL, {
+    const cancelUrl = appendQueryParams(walletUrl, {
       walletDeposit: "cancelled",
       orderCode: orderCode.toString(),
     });
@@ -718,10 +725,14 @@ export const recordCompletedOrderSettlement = async (
     );
   }
 
-  const balanceAfterGross = isCashOrder
+  const balanceAfterGross = order.inspectionRequired
+    ? balanceBefore + netEarning
+    : isCashOrder
     ? balanceBefore
     : balanceBefore + grossAmount;
-  const balanceAfterSettlement = balanceAfterGross - platformFee;
+  const balanceAfterSettlement = order.inspectionRequired
+    ? balanceAfterGross
+    : balanceAfterGross - platformFee;
   wallet.balance = balanceAfterSettlement;
   await wallet.save({ session });
 
@@ -742,9 +753,11 @@ export const recordCompletedOrderSettlement = async (
       relatedOrderId: order._id as Types.ObjectId,
       type: "provider_earning",
       direction: "in",
-      amount: grossAmount,
+      amount: order.inspectionRequired ? netEarning : grossAmount,
       balanceAfter: balanceAfterGross,
-      description: isCashOrder
+      description: order.inspectionRequired
+        ? undefined
+        : isCashOrder
         ? "Ghi nhận doanh thu tiền mặt khi đơn hàng hoàn tất"
         : "Cộng doanh thu dịch vụ khi đơn hàng hoàn tất",
       transactionCodePrefix: "PROVIDER_EARNING",
@@ -767,13 +780,16 @@ export const recordCompletedOrderSettlement = async (
             direction: "out",
             amount: platformFee,
             balanceAfter: balanceAfterSettlement,
-            description: isCashOrder
+            description: order.inspectionRequired
+              ? undefined
+              : isCashOrder
               ? "Trừ phí nền tảng của đơn hàng thanh toán tiền mặt"
               : "Khấu trừ phí nền tảng từ doanh thu dịch vụ",
             transactionCodePrefix: "PLATFORM_FEE",
             metadata: {
               ...commonMetadata,
-              affectsWalletBalance: true,
+              affectsWalletBalance: !order.inspectionRequired,
+              systemRevenueOnly: order.inspectionRequired,
             },
           },
           session,

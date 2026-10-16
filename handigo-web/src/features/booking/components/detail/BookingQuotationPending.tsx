@@ -3,7 +3,7 @@ type BookingQuotationPendingProps = {
   orderStatus: string;
 };
 
-/** Trạng thái chờ chuyên gia gửi báo giá (chưa có báo giá nào). */
+/** Trạng thái chờ chuyên gia lưu báo giá. */
 export const BookingQuotationPending = ({
   orderStatus,
 }: BookingQuotationPendingProps) => (
@@ -15,7 +15,7 @@ export const BookingQuotationPending = ({
 
       <div className="min-w-0 flex-1 text-center sm:text-left">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="min-w-0 whitespace-normal break-words text-base font-bold leading-snug text-on-surface sm:text-lg">
+          <h3 className="min-w-0 whitespace-normal break-words text-base font-bold leading-snug text-on-surface">
             Đang chờ chuyên gia báo giá
           </h3>
           <span className="mx-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-warning-container px-3 py-1 text-xs font-bold text-on-warning-container sm:mx-0">
@@ -27,12 +27,12 @@ export const BookingQuotationPending = ({
         <div className="mt-3 space-y-2 text-sm leading-relaxed text-on-surface-variant">
           <p className="whitespace-normal break-words">
             {orderStatus === "created"
-              ? "Đơn của bạn đã được ghi nhận. Sau khi chuyên gia nhận đơn, họ sẽ khảo sát và gửi báo giá chi tiết."
+              ? "Đơn của bạn đã được ghi nhận. Sau khi chuyên gia nhận đơn, họ sẽ khảo sát và lưu báo giá chi tiết."
               : "Chuyên gia đang kiểm tra thông tin và lập báo giá chi tiết cho đơn này."}
           </p>
           <p className="whitespace-normal break-words">
-            Khi có báo giá, bạn sẽ nhận được thông báo để xem chi phí và xác
-            nhận trước khi tiếp tục.
+            Khi có báo giá, bạn sẽ nhận được thông báo để xem chi phí; chuyên
+            gia có thể bổ sung báo giá cho đến khi hoàn thành công việc.
           </p>
         </div>
       </div>

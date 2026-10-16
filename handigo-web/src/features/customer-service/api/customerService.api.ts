@@ -56,6 +56,7 @@ export interface PublicProviderProfile {
       name: string;
       slug: string;
       icon?: string | null;
+      iconColor?: string | null;
       services: Array<{
         id: string;
         name: string;
@@ -117,10 +118,11 @@ export const customerServiceApi = {
     recurrenceUnit?: "weekly" | "monthly",
     recurrenceCount?: number,
     orderId?: string,
+    selectedOptions?: string,
   ) =>
     unwrap<NearbyProvider[]>(
       await api.get("/providers/nearby", {
-        params: { serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount, orderId },
+        params: { serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount, orderId, selectedOptions },
       }),
     ),
 

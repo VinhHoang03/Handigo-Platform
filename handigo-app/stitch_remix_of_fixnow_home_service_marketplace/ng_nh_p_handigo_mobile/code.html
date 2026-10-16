@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Đăng nhập Handigo | Dịch Vụ Gia Đình Chuẩn 5 Sao</title>
+<!-- Google Fonts: Hanken Grotesk & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "inverse-on-surface": "#eef0ff",
+            "on-primary": "#ffffff",
+            "on-surface": "#131b2e",
+            "surface": "#faf8ff",
+            "error": "#ba1a1a",
+            "on-primary-container": "#b1afff",
+            "outline": "#777587",
+            "background": "#faf8ff",
+            "surface-container-highest": "#dae2fc",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-high": "#e1e7ff",
+            "secondary-fixed-dim": "#86d2e6",
+            "surface-variant": "#dae2fc",
+            "tertiary-fixed": "#ffdbcc",
+            "tertiary-fixed-dim": "#ffb694",
+            "surface-container": "#eaedff",
+            "primary": "#1e00a9",
+            "surface-container-low": "#f2f3ff",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface-dim": "#d2d9f4",
+            "on-background": "#131b2e",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "outline-variant": "#c7c4d8",
+            "on-primary-fixed-variant": "#3323cc",
+            "tertiary-container": "#7d3000",
+            "primary-container": "#3525cd",
+            "on-surface-variant": "#464555",
+            "on-error-container": "#93000a",
+            "on-tertiary": "#ffffff",
+            "on-secondary-fixed": "#001f26",
+            "surface-tint": "#4d44e3",
+            "primary-fixed": "#e2dfff",
+            "error-container": "#ffdad6",
+            "secondary": "#00687a",
+            "on-secondary-container": "#076a7c",
+            "inverse-surface": "#283044",
+            "primary-fixed-dim": "#c3c0ff",
+            "success-green": "#4ade80",
+            "on-tertiary-container": "#ff9f72",
+            "on-tertiary-fixed": "#351000",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "secondary-container": "#9ce8fd",
+            "star-gold": "#facc15",
+            "secondary-fixed": "#abedff",
+            "tertiary": "#592000",
+            "surface-bright": "#faf8ff",
+            "on-secondary": "#ffffff",
+            "on-error": "#ffffff",
+            "inverse-primary": "#c3c0ff",
+            "surface-glass": "rgba(255, 255, 255, 0.7)"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xl": "80px",
+            "sm": "12px",
+            "md": "24px",
+            "lg": "48px",
+            "gutter": "24px",
+            "base": "8px",
+            "container-max": "1280px",
+            "xs": "4px"
+          },
+          "fontFamily": {
+            "headline-xl": ["Hanken Grotesk"],
+            "label-md": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "headline-lg-mobile": ["Hanken Grotesk"],
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "label-sm": ["Inter"],
+            "body-lg": ["Inter"]
+          },
+          "fontSize": {
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-primary-fixed selection:text-on-primary-fixed relative overflow-x-hidden">
+<!-- Subtle Ambient Glows -->
+<div class="fixed top-[-100px] right-[-100px] w-96 h-96 rounded-full bg-primary-fixed/40 blur-3xl pointer-events-none -z-10"></div>
+<div class="fixed bottom-[-80px] left-[-80px] w-80 h-80 rounded-full bg-secondary-fixed/30 blur-3xl pointer-events-none -z-10"></div>
+<!-- Minimalist Mobile App Header Bar -->
+<header class="w-full max-w-container-max mx-auto px-4 md:px-8 py-4 flex items-center justify-between z-10">
+<button aria-label="Quay lại" class="w-10 h-10 rounded-full bg-surface-container-lowest/80 backdrop-blur-md shadow-sm flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all duration-150" type="button">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+</button>
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-success-green animate-pulse"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Hệ thống sẵn sàng</span>
+</div>
+<a aria-label="Trung tâm hỗ trợ" class="w-10 h-10 rounded-full bg-surface-container-lowest/80 backdrop-blur-md shadow-sm flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]">support_agent</span>
+</a>
+</header>
+<!-- Main Mobile Card Wrapper -->
+<main class="w-full max-w-md mx-auto px-4 py-2 flex-grow flex flex-col justify-center z-10">
+<div class="bg-surface-container-lowest/90 backdrop-blur-md rounded-2xl shadow-lg border border-outline-variant/30 p-6 md:p-8">
+<!-- Brand & Greeting Header -->
+<div class="text-center mb-6">
+<div class="inline-flex items-center justify-center gap-2 mb-3">
+<div class="w-11 h-11 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shadow-md shadow-primary-container/20">
+<span class="material-symbols-outlined text-[24px]">handyman</span>
+</div>
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-primary">Handigo</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-semibold mb-2">Chào mừng trở lại!</h1>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+          Đăng nhập để trải nghiệm dịch vụ tiện ích gia đình chuẩn 5 sao.
+        </p>
+</div>
+<!-- Login Form -->
+<form class="space-y-4" id="loginForm" onsubmit="event.preventDefault();">
+<!-- Phone / Email Field -->
+<div>
+<label class="block font-label-md text-label-md font-medium text-on-surface mb-1.5" for="identifier">Số điện thoại hoặc Email</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px] pointer-events-none">mail</span>
+<input class="w-full h-12 pl-11 pr-4 bg-surface-container-low border border-outline-variant/40 rounded-xl font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-fixed transition-all" id="identifier" name="identifier" placeholder="VD: 0912 345 678 hoặc user@domain.com" required="" type="text"/>
+</div>
+</div>
+<!-- Password Field -->
+<div>
+<label class="block font-label-md text-label-md font-medium text-on-surface mb-1.5" for="password">Mật khẩu</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3.5 text-outline text-[20px] pointer-events-none">lock</span>
+<input class="w-full h-12 pl-11 pr-11 bg-surface-container-low border border-outline-variant/40 rounded-xl font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-fixed transition-all" id="password" name="password" placeholder="Nhập mật khẩu an toàn" required="" type="password"/>
+<button aria-label="Ẩn hiện mật khẩu" class="absolute right-3 text-outline hover:text-on-surface active:scale-90 transition-transform p-1" id="togglePassword" type="button">
+<span class="material-symbols-outlined text-[20px]" id="eyeIcon">visibility_off</span>
+</button>
+</div>
+</div>
+<!-- Remember Me & Forgot Password -->
+<div class="flex items-center justify-between pt-1">
+<label class="flex items-center gap-2 cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded text-primary-container border-outline-variant focus:ring-primary-container/30 focus:ring-offset-0" type="checkbox"/>
+<span class="font-label-md text-label-md text-on-surface-variant">Ghi nhớ đăng nhập</span>
+</label>
+<a class="font-label-md text-label-md font-semibold text-primary-container hover:text-primary transition-colors" href="#">
+            Quên mật khẩu?
+          </a>
+</div>
+<!-- Primary CTA Button -->
+<div class="pt-2">
+<button class="w-full h-12 bg-primary-container text-on-primary font-headline-md text-[16px] font-semibold rounded-xl shadow-md shadow-primary-container/25 flex items-center justify-center gap-2 hover:bg-primary active:scale-95 transition-all duration-150" type="submit">
+<span>Đăng nhập</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Divider -->
+<div class="relative my-6 flex items-center justify-center">
+<div class="w-full border-t border-outline-variant/30"></div>
+<span class="absolute bg-surface-container-lowest px-3 font-label-sm text-label-sm text-outline">
+          Hoặc đăng nhập với
+        </span>
+</div>
+<!-- Social Logins -->
+<div class="grid grid-cols-3 gap-2.5">
+<!-- Google -->
+<button aria-label="Tiếp tục với Google" class="h-12 bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 rounded-xl flex items-center justify-center gap-2 font-label-md text-label-md text-on-surface font-medium active:scale-95 transition-all duration-150 shadow-sm" type="button">
+<svg class="w-5 h-5 flex-shrink-0" viewbox="0 0 24 24">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"></path>
+</svg>
+<span class="hidden sm:inline">Google</span>
+</button>
+<!-- Apple -->
+<button aria-label="Tiếp tục với Apple" class="h-12 bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 rounded-xl flex items-center justify-center gap-2 font-label-md text-label-md text-on-surface font-medium active:scale-95 transition-all duration-150 shadow-sm" type="button">
+<svg class="w-5 h-5 flex-shrink-0 fill-current text-on-surface" viewbox="0 0 24 24">
+<path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.61-.75 1.04-1.8 0.92-2.85-.9.04-2 .61-2.64 1.36-.56.65-1.05 1.71-.92 2.73 1.01.08 2.03-.49 2.64-1.24"></path>
+</svg>
+<span class="hidden sm:inline">Apple</span>
+</button>
+<!-- Zalo / Facebook -->
+<button aria-label="Tiếp tục với Zalo" class="h-12 bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 rounded-xl flex items-center justify-center gap-2 font-label-md text-label-md text-on-surface font-medium active:scale-95 transition-all duration-150 shadow-sm" type="button">
+<span class="w-5 h-5 rounded-full bg-[#0068FF] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">Z</span>
+<span>Zalo</span>
+</button>
+</div>
+<!-- Registration Redirection Link -->
+<div class="mt-6 text-center pt-3 border-t border-outline-variant/20">
+<p class="font-body-md text-body-md text-on-surface-variant">
+          Bạn chưa có tài khoản? 
+          <a class="font-semibold text-primary-container hover:text-primary transition-colors underline-offset-4 hover:underline ml-1" href="#">
+            Đăng ký ngay
+          </a>
+</p>
+</div>
+</div>
+<!-- Security & Trust Badge Footer -->
+<div class="mt-6 mb-4 text-center">
+<div class="inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container/70 border border-outline-variant/30 backdrop-blur-sm">
+<span class="material-symbols-outlined text-[16px] text-primary-container" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Bảo mật mã hóa 256-bit • Đạt chuẩn PCI-DSS &amp; ISO 27001</span>
+</div>
+<p class="font-label-sm text-[11px] text-outline mt-2">
+        © 2024 Handigo Domestic Platform. Bảo lưu mọi quyền.
+      </p>
+</div>
+</main>
+<!-- Interactive Script for Micro-interactions -->
+<script>
+    const togglePasswordBtn = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const eyeIcon = document.getElementById('eyeIcon');
+
+    if (togglePasswordBtn && passwordInput && eyeIcon) {
+      togglePasswordBtn.addEventListener('click', () => {
+        const isPassword = passwordInput.getAttribute('type') === 'password';
+        passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+        eyeIcon.textContent = isPassword ? 'visibility' : 'visibility_off';
+      });
+    }
+  </script>
+</body></html>

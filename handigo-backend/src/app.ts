@@ -7,6 +7,8 @@ import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.routes";
 import voucherRoutes from "./routes/voucher.routes";
+import promotionRoutes from "./routes/promotion.routes";
+import rewardRoutes from "./routes/reward.routes";
 import walletRoutes from "./routes/wallet.routes";
 import withdrawalRoutes from "./routes/withdrawal.routes";
 import bankAccountRoutes from "./routes/bankAccount.routes";
@@ -41,6 +43,7 @@ import { isAllowedOrigin } from "./configs/cors";
 import { createLogger } from "./utils/logger";
 import { AppError } from "./utils/appError";
 import { securityHeaders } from "./middlewares/securityHeaders.middleware";
+import { paymentReturn } from "./controllers/payment.controller";
 
 const app: Application = express();
 const appLogger = createLogger("App");
@@ -66,6 +69,7 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.get(["/payment/success", "/payment/cancel"], paymentReturn);
 
 app.get("/health", (_req, res) => {
   res.status(200).json({
@@ -117,6 +121,8 @@ app.use((req, res, next) => {
 app.use("/auth", authRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/vouchers", voucherRoutes);
+app.use("/promotions", promotionRoutes);
+app.use("/rewards", rewardRoutes);
 app.use("/withdrawals", withdrawalRoutes);
 app.use("/wallets", walletRoutes);
 app.use("/bank-accounts", bankAccountRoutes);
@@ -167,7 +173,7 @@ app.use(
     res: Response,
     _next: NextFunction,
   ) => {
-    appLogger.error("Lỗi xử lý request", err, {
+    appLogger.error("Lỗi xử lý yêu cầu", err, {
       method: req.method,
       path: req.path,
     });

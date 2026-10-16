@@ -1,36 +1,37 @@
-import { CalendarDays, RefreshCcw, Zap } from "lucide-react";
-type SelectableOrderType = 'normal' | 'scheduled' | 'recurring';
-type OrderType = SelectableOrderType | 'urgent';
+import { CalendarDays } from 'lucide-react';
 
-const orderTypeOptions = [
-  { icon: Zap, type: 'normal' as const, title: 'Đặt lịch ngay', desc: 'Có mặt sớm nhất' },
-  { icon: CalendarDays, type: 'scheduled' as const, title: 'Lên lịch hẹn', desc: 'Chọn giờ cụ thể' },
-  { icon: RefreshCcw, type: 'recurring' as const, title: 'Đặt định kỳ', desc: 'Theo tuần hoặc tháng' },
-];
+type SelectableOrderType = 'normal' | 'scheduled';
+type OrderType = SelectableOrderType | 'urgent' | 'recurring';
 
 interface Step2OrderTypeSelectorProps {
   orderType: OrderType;
+  scheduledAt: string;
+  isDialogOpen: boolean;
   onChange: (type: SelectableOrderType) => void;
 }
 
-/** 3 lựa chọn kiểu đặt lịch: ngay / hẹn giờ / định kỳ. */
-export const Step2OrderTypeSelector = ({ orderType, onChange }: Step2OrderTypeSelectorProps) => (
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-sm">
-    {orderTypeOptions.map(({ icon: Icon, type, title, desc }) => (
-      <label key={title} className="cursor-pointer">
-        <input
-          checked={orderType === type}
-          onChange={() => onChange(type)}
-          className="peer sr-only"
-          name="booking_type"
-          type="radio"
-        />
-        <div className="p-sm rounded-2xl border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary-container/5 peer-focus-visible:ring-4 peer-focus-visible:ring-primary/15 text-center transition-colors h-full flex flex-col items-center">
-          <Icon aria-hidden="true" size={24} className="mb-xs" />
-          <p className="font-bold text-sm">{title}</p>
-          <p className="text-xs text-on-surface-variant mt-1">{desc}</p>
-        </div>
-      </label>
-    ))}
-  </div>
-);
+export const Step2OrderTypeSelector = ({ orderType, scheduledAt, isDialogOpen, onChange }: Step2OrderTypeSelectorProps) => {
+  const isScheduled = orderType === 'scheduled' || orderType === 'recurring';
+  const selectedDate = new Date(scheduledAt);
+  const label = isScheduled && Number.isFinite(selectedDate.getTime())
+    ? `${selectedDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })} · ${selectedDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+    : 'Hẹn giờ';
+
+  return (
+    <button
+      type="button"
+      aria-pressed={isScheduled}
+      aria-haspopup="dialog"
+      aria-expanded={isDialogOpen}
+      aria-controls={isDialogOpen ? 'booking-date-time-picker' : undefined}
+      onClick={() => onChange('scheduled')}
+      className={`flex min-h-11 w-full items-center justify-center gap-xs rounded-xl border px-sm py-sm text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 ${isScheduled
+        ? 'border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover active:border-primary-pressed active:bg-primary-pressed'
+        : 'border-outline-variant bg-surface-container-low text-on-surface-variant hover:border-primary hover:bg-primary/10 hover:text-primary active:border-primary-pressed active:bg-primary/15'
+        }`}
+    >
+      <CalendarDays size={20} aria-hidden="true" className="shrink-0" />
+      {label}
+    </button>
+  );
+};

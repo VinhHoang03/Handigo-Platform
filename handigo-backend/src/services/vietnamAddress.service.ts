@@ -78,7 +78,7 @@ const normalizeWard = (ward: ExternalWard): AdministrativeUnit => ({
 });
 
 const wrapExternalError = (error: unknown): Error & { statusCode?: number } => {
-  const wrapped = new Error("Cannot load Vietnam administrative data") as Error & {
+  const wrapped = new Error("Không thể tải dữ liệu đơn vị hành chính Việt Nam") as Error & {
     statusCode?: number;
   };
   wrapped.statusCode = 502;

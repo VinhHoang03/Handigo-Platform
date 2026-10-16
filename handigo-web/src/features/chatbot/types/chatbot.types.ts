@@ -1,4 +1,6 @@
 export interface ChatbotMessage {
+  confirmation?: import("./agent.types").AgentConfirmation;
+  choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>;
   _id: string;
   sender: "user" | "assistant";
   content: string;

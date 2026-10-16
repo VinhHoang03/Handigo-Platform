@@ -40,4 +40,6 @@ export const providerDashboardApi = {
         longitude,
       }),
     ),
+  deactivateCurrentLocation: async () =>
+    data(await api.delete("/locations/me")),
 };

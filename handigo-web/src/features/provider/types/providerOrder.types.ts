@@ -25,10 +25,13 @@ export interface QuotationItem {
 }
 
 export interface RepairQuotation {
+  estimatedDurationMinutes?: number;
   _id: string;
   quotationCode: string;
   orderId: string;
-  status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+  status: 'saved' | 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
+  revision?: number;
+  attachments?: string[];
   inspectionNote?: string | null;
   recommendation?: string | null;
   subtotalAmount: number;
@@ -36,9 +39,12 @@ export interface RepairQuotation {
   finalAmount: number;
   customerConfirmed: boolean;
   providerConfirmed: boolean;
+  directPaymentConfirmedAt?: string | null;
+  directPaymentConfirmedAmount?: number | null;
   approvedAt?: string | null;
   rejectedAt?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface QuotationDetail {
@@ -47,9 +53,11 @@ export interface QuotationDetail {
 }
 
 export interface CreateQuotationPayload {
+  estimatedDurationMinutes?: number;
   inspectionNote?: string;
   recommendation?: string;
   discountAmount?: number;
+  attachments?: string[];
   items: Array<{
     title: string;
     description?: string;
@@ -58,7 +66,6 @@ export interface CreateQuotationPayload {
     unitPrice: number;
     note?: string;
   }>;
-  relevanceConfirmed?: boolean;
 }
 
 export type ScannedQuotationItem = CreateQuotationPayload['items'][number] & {
@@ -66,29 +73,8 @@ export type ScannedQuotationItem = CreateQuotationPayload['items'][number] & {
   note: string;
 };
 
-export type QuotationRelevanceLevel =
-  | 'relevant'
-  | 'uncertain'
-  | 'irrelevant';
-
-export interface QuotationRelevanceEvaluation {
-  index: number;
-  title: string;
-  level: QuotationRelevanceLevel;
-  confidence: number;
-  reason: string;
-}
-
-export interface QuotationRelevanceResult {
-  status: 'passed' | 'warning' | 'blocked';
-  serviceName: string;
-  evaluations: QuotationRelevanceEvaluation[];
-  systemWarning?: string;
-}
-
 export interface ScannedQuotationResult {
   items: ScannedQuotationItem[];
-  relevance: QuotationRelevanceResult;
 }
 
 export interface ProviderOrdersResult {

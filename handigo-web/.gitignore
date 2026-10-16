@@ -26,6 +26,3 @@ dist-ssr
 .env*
 !.env.example
 
-/playwright-report/
-/test-results/
-/playwright/.auth/

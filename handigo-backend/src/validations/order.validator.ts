@@ -16,7 +16,14 @@ const objectIdSchema = z
   .regex(/^[0-9a-fA-F]{24}$/, "ID không hợp lệ");
 
 export const createOrderSchema = z.object({
+  expectedBookingAmount: z.number().int().min(0).optional(),
+  expectedFinalAmount: z.number().int().min(0).optional(),
   serviceId: objectIdSchema,
+  uniformQuantity: z.coerce.number()
+    .int("Số lượng máy phải là số nguyên")
+    .min(1, "Số lượng máy tối thiểu là 1")
+    .max(99, "Số lượng máy tối đa là 99")
+    .optional(),
   servicePackageId: objectIdSchema.optional(),
   selectedOptionIds: z.array(objectIdSchema).max(50).optional(),
   selectedOptions: z.array(z.object({
@@ -76,12 +83,38 @@ export const createOrderSchema = z.object({
   }
 });
 
+const cancellationAmountSchema = z.number({ error: "Số tiền xác nhận phải là số hợp lệ." })
+  .finite("Số tiền xác nhận phải là số hữu hạn.")
+  .nonnegative("Số tiền xác nhận không được âm.");
+
+const cancellationExpectationSchema = z.object({
+  paidAmount: cancellationAmountSchema,
+  refundAmount: cancellationAmountSchema,
+  cancellationFee: cancellationAmountSchema,
+  providerCompensation: cancellationAmountSchema.optional(),
+});
+
 export const cancelOrderSchema = z.object({
   reason: z
     .string()
     .trim()
     .min(3, "Lý do hủy phải có ít nhất 3 ký tự")
     .max(500, "Lý do hủy không được vượt quá 500 ký tự"),
+  confirmedExpectation: cancellationExpectationSchema.optional(),
+});
+
+export const cancelRecurringSeriesSchema = cancelOrderSchema.omit({ confirmedExpectation: true }).extend({
+  confirmedExpectations: z.array(cancellationExpectationSchema.extend({ orderId: objectIdSchema }))
+    .min(1, "Cần xác nhận số tiền của ít nhất một buổi trong chuỗi lịch.").optional(),
+});
+
+export const previewBookingSchema = z.object({
+  voucherCode: createOrderSchema.shape.voucherCode,
+  serviceId: createOrderSchema.shape.serviceId,
+  uniformQuantity: createOrderSchema.shape.uniformQuantity,
+  selectedOptionIds: createOrderSchema.shape.selectedOptionIds,
+  selectedOptions: createOrderSchema.shape.selectedOptions,
+  orderType: createOrderSchema.shape.orderType,
 });
 
 export const reassignmentResponseSchema = z.object({
@@ -93,6 +126,8 @@ export const reassignmentResponseSchema = z.object({
 export const orderIdParamSchema = z.object({
   orderId: objectIdSchema,
 });
+
+export const updateExpectedEndSchema = z.object({ expectedEndAt: z.string().datetime({ offset: true }) });
 
 export const quotationIdParamSchema = z.object({
   quotationId: objectIdSchema,
@@ -169,15 +204,9 @@ const quotationItemSchema = z.object({
   ),
 });
 
-export const quotationItemsRelevanceSchema = z.object({
-  items: z
-    .array(quotationItemSchema)
-    .min(1, "Báo giá phải có ít nhất một hạng mục")
-    .max(100, "Báo giá không được vượt quá 100 hạng mục"),
-});
-
 export const createRepairQuotationSchema = z
   .object({
+    estimatedDurationMinutes: z.number().int().min(1).max(1440).optional(),
     inspectionNote: optionalTextSchema(
       2000,
       "Ghi chú khảo sát không được vượt quá 2000 ký tự",
@@ -199,7 +228,6 @@ export const createRepairQuotationSchema = z
       .finite()
       .nonnegative("Số tiền giảm giá không được âm")
       .optional(),
-    relevanceConfirmed: z.boolean().optional(),
   })
   .superRefine((payload, context) => {
     const subtotal = payload.items.reduce(
@@ -215,6 +243,18 @@ export const createRepairQuotationSchema = z
     }
   });
 
+export const updateRepairQuotationSchema = createRepairQuotationSchema.safeExtend({
+  quotationId: objectIdSchema,
+  expectedRevision: z.number().int().nonnegative(),
+});
+
+export const confirmQuotationPaymentSchema = z.object({
+  quotationId: objectIdSchema,
+  expectedRevision: z.number({ error: "Phiên bản báo giá phải là số." })
+    .int("Phiên bản báo giá phải là số nguyên.")
+    .nonnegative("Phiên bản báo giá không được âm."),
+});
+
 export const rejectRepairQuotationSchema = z.object({
   rejectionReason: optionalTextSchema(
     500,
@@ -223,6 +263,8 @@ export const rejectRepairQuotationSchema = z.object({
 });
 
 export const completeOrderSchema = z.object({
+  expectedQuotationId: objectIdSchema.optional(),
+  expectedQuotationRevision: z.number().int().nonnegative().optional(),
   completionEvidenceImages: z
     .array(z.string().trim().url("Ảnh nghiệm thu phải là đường dẫn hợp lệ"))
     .min(1, "Vui lòng cung cấp ít nhất một ảnh nghiệm thu")
@@ -231,6 +273,10 @@ export const completeOrderSchema = z.object({
     1000,
     "Ghi chú hoàn thành không được vượt quá 1000 ký tự",
   ),
+}).superRefine((payload, context) => {
+  if ((payload.expectedQuotationId !== undefined) !== (payload.expectedQuotationRevision !== undefined)) {
+    context.addIssue({ code: "custom", path: ["expectedQuotationRevision"], message: "Vui lòng cung cấp cả mã và phiên bản báo giá khi kiểm tra trước khi hoàn thành." });
+  }
 });
 
 export const rejectAssignmentSchema = z.object({

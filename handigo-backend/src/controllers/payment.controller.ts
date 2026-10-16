@@ -8,11 +8,31 @@ import {
   paymentIdParamSchema,
 } from "../validations/payment.validator";
 import { retryPayosRefundByPaymentId } from "../services/orderCancellation.service";
+import { getPayosPaymentQr } from "../services/payosQr.service";
+import { buildPaymentReturnRelay } from "../utils/paymentRedirect";
+
+export const paymentReturn = (req: Request, res: Response) => {
+  try {
+    return res.redirect(303, buildPaymentReturnRelay(req.path.endsWith("/cancel") ? "cancel" : "success",
+      process.env.FRONTEND_URL?.trim() || "https://localhost:5173", req.query));
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
+
+export const getPaymentQr = async (req: Request, res: Response) => {
+  try {
+    const { id } = paymentIdParamSchema.parse(req.params);
+    const image = await getPayosPaymentQr(id, requireRequestUser(req));
+    res.setHeader("Cache-Control", "no-store");
+    return res.type("png").send(image);
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
 
 export const createPayment = async (req: Request, res: Response) => {
   try {
     const user = requireRequestUser(req);
-    const result = await paymentService.createPayment(user, req.body);
+    const result = await paymentService.createOrderPayment(user, req.body);
 
     return res.status(201).json({
       success: true,

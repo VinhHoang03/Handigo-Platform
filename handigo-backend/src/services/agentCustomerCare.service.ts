@@ -3,6 +3,7 @@ import * as tickets from "./supportTicket.service";
 import * as complaints from "./complaint.service";
 import { AgentBookingService } from "./agentBooking.service";
 import { AppError } from "../utils/appError";
+import { safelyTrackAgentCase } from "./agentOrderProgress.service";
 import { createSupportTicketSchema, addSupportTicketResponseSchema } from "../validations/supportTicket.validator";
 import { createComplaintSchema } from "../validations/complaint.validator";
 
@@ -60,8 +61,10 @@ export const AgentCustomerCareService = {
       orderCode: order?.orderCode ?? "Không gắn với đơn dịch vụ",
       note: "Yêu cầu được gửi tới bộ phận hỗ trợ. Đây chưa phải kết quả xử lý." };
   },
-  async createTicket(userId: string, args: z.infer<typeof agentTicketSchema>) {
-    return customerCaseView(await tickets.createSupportTicket(userId, "CUSTOMER", args), true);
+  async createTicket(userId: string, args: z.infer<typeof agentTicketSchema>, sessionId?: string) {
+    const result = customerCaseView(await tickets.createSupportTicket(userId, "CUSTOMER", args), true);
+    if (sessionId) void safelyTrackAgentCase(userId, sessionId, result.id, "ticket");
+    return result;
   },
   async listTickets(userId: string, query: Parameters<typeof tickets.getMySupportTickets>[1]) {
     const result = await tickets.getMySupportTickets(userId, query);
@@ -92,8 +95,10 @@ export const AgentCustomerCareService = {
     return { title: "Gửi khiếu nại dịch vụ", subject: args.title, description: args.description,
       orderCode: order.orderCode, note: "Khiếu nại sẽ được xem xét, chưa có quyết định hoàn tiền. Bạn có thể bổ sung bằng chứng tại mục Hỗ trợ của tôi." };
   },
-  async createComplaint(userId: string, args: z.infer<typeof agentComplaintSchema>) {
-    return customerCaseView(await complaints.createComplaint(userId, "CUSTOMER", args), true);
+  async createComplaint(userId: string, args: z.infer<typeof agentComplaintSchema>, sessionId?: string) {
+    const result = customerCaseView(await complaints.createComplaint(userId, "CUSTOMER", args), true);
+    if (sessionId) void safelyTrackAgentCase(userId, sessionId, result.id, "complaint");
+    return result;
   },
   async listComplaints(userId: string, query: Parameters<typeof complaints.getMyComplaints>[1]) {
     const result = await complaints.getMyComplaints(userId, query);

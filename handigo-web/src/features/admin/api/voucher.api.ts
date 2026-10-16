@@ -1,8 +1,10 @@
 import api from '@/api/client';
 import { unwrap } from '@/api/response';
-import type { Voucher, VoucherListResult, VoucherPayload, VoucherQuery } from '../types/voucher.types';
+import type { AdminRewardOffer, Voucher, VoucherListResult, VoucherPayload, VoucherQuery } from '../types/voucher.types';
 
 export const voucherApi = {
+  rewardOffers: async () => unwrap<AdminRewardOffer[]>(await api.get('/rewards/admin/offers')),
+  saveRewardOffer: async (offer: AdminRewardOffer) => unwrap<AdminRewardOffer>(await api.put('/rewards/admin/offers', offer)),
   list: async (query: VoucherQuery) =>
     unwrap<VoucherListResult>(await api.get('/vouchers', { params: query })),
 

@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { getErrorMessage } from "@/utils/apiError";
 import { providerProfileApi } from "../../api/providerProfile.api";
@@ -15,9 +16,10 @@ export function useProviderServiceAreaFlow({
   setProfile,
   setIsSaving,
 }: UseProviderServiceAreaFlowParams) {
+  const { addToast } = useToast();
   const [isServiceAreaModalOpen, setIsServiceAreaModalOpen] = useState(false);
   const [workingAreasForm, setWorkingAreasForm] = useState<string[]>([]);
-  const [serviceAreaError, setServiceAreaError] = useState("");
+  const [serviceAreaError, setServiceAreaError] = useToastFeedback<string>("", "error");
 
   function openServiceAreaEdit() {
     if (!profile) return;
@@ -56,6 +58,7 @@ export function useProviderServiceAreaFlow({
       });
       setProfile(nextProfile);
       setIsServiceAreaModalOpen(false);
+      addToast("Đã cập nhật khu vực phục vụ.", "success");
     } catch (saveError) {
       setServiceAreaError(
         getErrorMessage(saveError, "Không thể cập nhật khu vực phục vụ."),

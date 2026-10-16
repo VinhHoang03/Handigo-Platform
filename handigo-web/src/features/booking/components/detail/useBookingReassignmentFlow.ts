@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import type { Order } from "@/types/booking";
@@ -15,9 +16,10 @@ export const useBookingReassignmentFlow = (
   setBusy: (busy: boolean) => void,
   loadData: () => Promise<void>,
 ) => {
+  const { addToast } = useToast();
   const [replacementProviderId, setReplacementProviderId] = useState<string>();
-  const [replacementProviderError, setReplacementProviderError] = useState<string | null>(null);
-  const [reassignmentError, setReassignmentError] = useState<string | null>(null);
+  const [replacementProviderError, setReplacementProviderError] = useToastFeedback<string | null>(null, "error");
+  const [reassignmentError, setReassignmentError] = useToastFeedback<string | null>(null, "error");
 
   const handleSelectReplacementProvider = async () => {
     if (!order || !replacementProviderId) {
@@ -29,6 +31,7 @@ export const useBookingReassignmentFlow = (
       setReplacementProviderError(null);
       await bookingApi.selectAppointmentProvider(order._id, replacementProviderId);
       setReplacementProviderId(undefined);
+      addToast("Đã gửi yêu cầu cho chuyên gia thay thế.", "success");
       await loadData();
     } catch (error) {
       console.error("Không thể gửi lại yêu cầu lịch hẹn:", error);
@@ -52,6 +55,7 @@ export const useBookingReassignmentFlow = (
         decision,
       );
       setOrder(updatedOrder);
+      addToast("Đã ghi nhận phản hồi đổi kỹ thuật viên.", "success");
       setReassignmentModalOpen(false);
       await loadData();
     } catch (error) {

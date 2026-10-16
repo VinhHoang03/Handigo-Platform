@@ -5,6 +5,8 @@ import type {
   ServiceOptionType,
   ServicePayload,
 } from '../../types/categoryService.types';
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import type { ServiceProcessStep } from '@/types/serviceProcess';
 
 export const serviceMoney = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
@@ -25,8 +27,10 @@ export type ServiceForm = {
   categoryId: string;
   name: string;
   slug: string;
-  image: string;
+  coverImage: string;
+  galleryImages: string[];
   description: string;
+  processSteps: ServiceProcessStep[];
   serviceType: 'fixed_price' | 'variable_price';
   fixedPrice: string;
   depositAmount: string;
@@ -38,8 +42,10 @@ export const emptyServiceForm: ServiceForm = {
   categoryId: '',
   name: '',
   slug: '',
-  image: '',
+  coverImage: '',
+  galleryImages: [],
   description: '',
+  processSteps: [],
   serviceType: 'fixed_price',
   fixedPrice: '',
   depositAmount: '',
@@ -48,6 +54,7 @@ export const emptyServiceForm: ServiceForm = {
 };
 
 export type OptionForm = {
+  groupId: string;
   name: string;
   description: string;
   image: string;
@@ -56,11 +63,11 @@ export type OptionForm = {
   selectionGroup: string;
   selectionMode: ServiceOptionSelectionMode;
   allowsQuantity: boolean;
-  sortOrder: string;
   isActive: boolean;
 };
 
 export const emptyOptionForm: OptionForm = {
+  groupId: '',
   name: '',
   description: '',
   image: '',
@@ -69,20 +76,19 @@ export const emptyOptionForm: OptionForm = {
   selectionGroup: '',
   selectionMode: 'multiple',
   allowsQuantity: false,
-  sortOrder: '0',
   isActive: true,
 };
 
-export const toOptionPayload = (form: OptionForm, serviceType: Service['serviceType']): ServiceOptionPayload => ({
+export const toOptionPayload = (form: OptionForm): ServiceOptionPayload => ({
+  groupId: form.groupId || null,
   name: form.name.trim(),
   description: form.description.trim() || undefined,
   image: form.image.trim() || undefined,
   optionType: form.optionType,
-  price: serviceType === 'variable_price' ? 0 : Number(form.price) || 0,
+  price: Number(form.price) || 0,
   selectionGroup: form.selectionGroup.trim() || null,
   selectionMode: form.selectionMode,
   allowsQuantity: form.allowsQuantity,
-  sortOrder: Number(form.sortOrder) || 0,
   isActive: form.isActive,
 });
 
@@ -90,14 +96,16 @@ export const toServicePayload = (form: ServiceForm): ServicePayload => ({
   categoryId: form.categoryId,
   name: form.name.trim(),
   slug: form.slug.trim() || undefined,
-  image: form.image.trim() || undefined,
+  coverImage: form.coverImage.trim() || null,
+  galleryImages: form.galleryImages,
   description: form.description.trim() || undefined,
+  processSteps: form.processSteps.map((step) => ({ title: step.title.trim(), description: step.description.trim() })),
   serviceType: form.serviceType,
-  fixedPrice: null,
+  fixedPrice: form.fixedPrice === '' ? null : Number(form.fixedPrice),
   depositAmount: form.serviceType === 'variable_price' ? Number(form.depositAmount) : null,
-  requiresOptionSelection: form.serviceType === 'fixed_price' ? true : form.requiresOptionSelection,
+  requiresOptionSelection: form.requiresOptionSelection,
   isActive: form.isActive,
 });
 
 export const getPriceLabel = (service: Service) =>
-  service.serviceType === 'variable_price' ? 'Giá linh hoạt' : 'Theo tùy chọn';
+  isAirConditionerCleaning(service) ? `${serviceMoney.format(service.fixedPrice || 0)} / máy` : service.serviceType === 'variable_price' ? 'Giá linh hoạt' : 'Theo tùy chọn';

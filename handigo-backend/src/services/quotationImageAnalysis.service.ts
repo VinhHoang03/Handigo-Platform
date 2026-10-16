@@ -20,7 +20,7 @@ const ITEM_TYPES = new Set<RepairQuotationItemType>([
   "other",
 ]);
 
-const getGeminiApiKey = () => process.env.GEMINI_API_KEY_1?.trim();
+const getGeminiApiKey = () => process.env.QUOTATION_AI_API_KEY?.trim();
 
 const extractJsonObject = (text: string) => {
   const cleaned = text.replace(/```json|```/gi, "").trim();
@@ -83,7 +83,7 @@ export const analyzeQuotationImage = async (
 ): Promise<ScannedQuotationItem[]> => {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new AppError("Chưa cấu hình GEMINI_API_KEY_1", 503);
+    throw new AppError("Chưa cấu hình QUOTATION_AI_API_KEY cho AI báo giá.", 503);
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);

@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { AppError } from "../../utils/appError";
 import type { AgentTool, ToolContext, ToolPolicy } from "./tool.interface";
+import { COMMON_TOOLS, TOOL_GROUPS, selectToolGroup, type ToolIntent } from "./tool-groups";
 
 export class ToolRegistry {
   private readonly tools = new Map<string, AgentTool>();
-  constructor(private readonly policies: Record<string, ToolPolicy> = {}) {}
+  constructor(private readonly policies: Record<string, ToolPolicy> = {}, readonly routeByIntent = false) {}
 
   register<T>(tool: AgentTool<T>) {
     if (this.tools.has(tool.name)) throw new Error("Tool đã được đăng ký.");
@@ -27,8 +28,9 @@ export class ToolRegistry {
     return tool.mutates || tool.requiresConfirmation || this.policies[tool.name]?.requiresConfirmation === true;
   }
 
-  list(context: ToolContext) {
+  list(context: ToolContext, names?: readonly string[]) {
     return [...this.tools.values()].flatMap((tool) => {
+      if (names && !names.includes(tool.name)) return [];
       try {
         this.get(tool.name, context);
         return [{ name: tool.name, description: tool.description,
@@ -36,5 +38,10 @@ export class ToolRegistry {
           inputSchema: z.toJSONSchema(tool.inputSchema, { io: "input" }) }];
       } catch { return []; }
     });
+  }
+
+  forIntent(context: ToolContext, intent?: ToolIntent) {
+    if (!this.routeByIntent) return this.list(context);
+    return [...this.list(context, [...COMMON_TOOLS, ...(intent ? TOOL_GROUPS[intent] : [])]), selectToolGroup];
   }
 }

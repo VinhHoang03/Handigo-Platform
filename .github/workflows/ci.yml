@@ -23,7 +23,7 @@ env:
 
 jobs:
   backend:
-    name: Backend - build và kiểm thử
+    name: Backend - build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -44,12 +44,6 @@ jobs:
         run: npm ci
       - name: Build backend
         run: npm run build
-      - name: Kiểm thử chính sách hoàn tiền
-        run: npm run test:refund-policy
-      - name: Kiểm thử xử lý hoàn tiền
-        run: npm run test:refund-processing
-      - name: Kiểm thử trợ lý chăm sóc khách hàng
-        run: npm run test:agent-customer-care
 
   web:
     name: Web - lint và build

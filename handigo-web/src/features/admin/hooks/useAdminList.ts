@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from 'react';
 import { adminApi } from '../api/admin.api';
 import type { AdminApplication, AdminQuery, AdminUser, ListResult } from '../types/admin.types';
@@ -5,14 +6,14 @@ import type { AdminApplication, AdminQuery, AdminUser, ListResult } from '../typ
 export function useAdminList(mode: 'users' | 'applications', query: AdminQuery) {
   const [result, setResult] = useState<ListResult<AdminUser | AdminApplication> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const load = useCallback(async () => {
     try {
       setLoading(true); setError('');
       setResult(mode === 'users' ? await adminApi.users(query) : await adminApi.applications(query));
     } catch (e) { setError(e instanceof Error ? e.message : 'Không thể tải dữ liệu.'); }
     finally { setLoading(false); }
-  }, [mode, query]);
+  }, [mode, query, setError]);
   useEffect(() => {
     let active = true;
     const request = mode === 'users' ? adminApi.users(query) : adminApi.applications(query);
@@ -21,6 +22,6 @@ export function useAdminList(mode: 'users' | 'applications', query: AdminQuery) 
       .catch((e: unknown) => { if (active) setError(e instanceof Error ? e.message : 'Không thể tải dữ liệu.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [mode, query]);
+  }, [mode, query, setError]);
   return { result, loading, error, load };
 }

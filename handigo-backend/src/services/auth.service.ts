@@ -71,6 +71,7 @@ type AuthUserResponse = {
   role: string;
   status: string;
   isEmailVerified: boolean;
+  isGoogleAccount: boolean;
   providerOnboardingStatus?: string | null;
   providerOnboardingStep?: number | null;
 };
@@ -117,15 +118,15 @@ const ensureOtpValid = (
   expireDate?: Date,
 ): void => {
   if (!storedOtp || !expireDate) {
-    throw new AppError("OTP is not available or has expired", 400);
+    throw new AppError("Mã OTP không tồn tại hoặc đã hết hạn", 400);
   }
 
   if (expireDate.getTime() < Date.now()) {
-    throw new AppError("OTP has expired", 400);
+    throw new AppError("Mã OTP đã hết hạn", 400);
   }
 
   if (storedOtp !== hashOtp(otp)) {
-    throw new AppError("Invalid OTP", 400);
+    throw new AppError("Mã OTP không đúng", 400);
   }
 };
 
@@ -136,7 +137,7 @@ const getJwtExpiresAt = (token: string): Date => {
   const decoded = jwt.decode(token) as jwt.JwtPayload | null;
 
   if (!decoded?.exp) {
-    throw new AppError("Invalid refresh token expiry", 500);
+    throw new AppError("Thời hạn mã làm mới phiên đăng nhập không hợp lệ", 500);
   }
 
   return new Date(decoded.exp * 1000);
@@ -179,6 +180,7 @@ const toAuthUserResponse = (user: IUser): AuthUserResponse => ({
   role: user.role,
   status: user.status,
   isEmailVerified: user.isEmailVerified,
+  isGoogleAccount: Boolean(user.googleId),
   providerOnboardingStatus: user.providerOnboardingStatus,
   providerOnboardingStep: user.providerOnboardingStep,
 });
@@ -221,7 +223,7 @@ export const register = async (payload: {
   const existingUser = await User.findOne({ email: payload.email });
 
   if (existingUser?.isEmailVerified) {
-    throw new AppError("Email is already registered", 409);
+    throw new AppError("Email đã được đăng ký", 409);
   }
 
   if (payload.phone) {
@@ -288,7 +290,7 @@ export const verifyRegisterOtp = async (
   }
 
   if (user.isEmailVerified) {
-    throw new AppError("Email is already verified", 409);
+    throw new AppError("Email đã được xác thực", 409);
   }
 
   ensureOtpValid(otp, user.registerOtp, user.registerOtpExpire);
@@ -320,7 +322,7 @@ export const resendRegisterOtp = async (email: string): Promise<void> => {
   }
 
   if (user.isEmailVerified) {
-    throw new AppError("Email is already verified", 409);
+    throw new AppError("Email đã được xác thực", 409);
   }
 
   await createAndSendRegisterOtp(user);
@@ -333,25 +335,25 @@ export const login = async (
   const user = await User.findOne({ email });
 
   if (!user) {
-    throw new AppError("Invalid email or password", 401);
+    throw new AppError("Email hoặc mật khẩu không đúng", 401);
   }
 
   if (user.status === "locked") {
-    throw new AppError("Account is not allowed to login", 403);
+    throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
 
   if (!user.isEmailVerified) {
-    throw new AppError("Email is not verified", 403);
+    throw new AppError("Email chưa được xác thực", 403);
   }
 
   if (!user.passwordHash) {
-    throw new AppError("Password login is not available for this account", 400);
+    throw new AppError("Tài khoản này không hỗ trợ đăng nhập bằng mật khẩu", 400);
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!isPasswordValid) {
-    throw new AppError("Invalid email or password", 401);
+    throw new AppError("Email hoặc mật khẩu không đúng", 401);
   }
 
   if (user.role === "PROVIDER") {
@@ -381,7 +383,7 @@ const getGoogleProfileFromCredential = async (
   const payload = ticket.getPayload();
   if (!payload?.sub || !payload.email || payload.email_verified !== true) {
     throw new AppError(
-      "Google login failed: invalid or unverified Google account",
+      "Đăng nhập Google thất bại: tài khoản Google không hợp lệ hoặc chưa được xác thực",
       400,
     );
   }
@@ -415,7 +417,7 @@ const getGoogleProfileFromAccessToken = async (
       !isGoogleEmailVerified(tokenInfo.email_verified)
     ) {
       throw new AppError(
-        "Google login failed: invalid or unverified Google account",
+        "Đăng nhập Google thất bại: tài khoản Google không hợp lệ hoặc chưa được xác thực",
         400,
       );
     }
@@ -437,7 +439,7 @@ const getGoogleProfileFromAccessToken = async (
       throw error;
     }
 
-    throw new AppError("Google login failed: unable to verify access token", 400);
+    throw new AppError("Đăng nhập Google thất bại: không thể xác minh mã truy cập", 400);
   }
 };
 
@@ -450,7 +452,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
 
   if (!googleProfile?.email || !googleProfile.emailVerified) {
     throw new AppError(
-      "Google login failed: invalid or unverified Google account",
+      "Đăng nhập Google thất bại: tài khoản Google không hợp lệ hoặc chưa được xác thực",
       400,
     );
   }
@@ -463,7 +465,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
   });
 
   if (user && user.status === "locked") {
-    throw new AppError("Account is not allowed to login", 403);
+    throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
 
   let authenticatedUser = user;
@@ -518,7 +520,7 @@ export const facebookLogin = async (accessToken: string) => {
   const { app_id, is_valid, user_id, error } = debugRes.data?.data ?? {};
   if (!is_valid || !user_id || app_id !== appId) {
     throw new AppError(
-      `Invalid Facebook access token: ${error?.message || "unknown error"}`,
+      `Mã truy cập Facebook không hợp lệ: ${error?.message || "lỗi không xác định"}`,
       400,
     );
   }
@@ -547,7 +549,7 @@ export const facebookLogin = async (accessToken: string) => {
   });
 
   if (existingUser && existingUser.status === "locked") {
-    throw new AppError("Account is not allowed to login", 403);
+    throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
 
   let authenticatedUser = existingUser;
@@ -604,7 +606,7 @@ export const forgotPassword = async (email: string): Promise<void> => {
   const user = await User.findOne({ email });
 
   if (!user) {
-    return;
+    throw new AppError("Không tìm thấy tài khoản với email này.", 404);
   }
 
   const otp = generateOtp();
@@ -613,6 +615,17 @@ export const forgotPassword = async (email: string): Promise<void> => {
   await user.save();
 
   await sendOtpEmail(user.email, "Reset your Handigo password", otp);
+};
+
+export const verifyResetPasswordOtp = async (
+  email: string,
+  otp: string,
+): Promise<void> => {
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new AppError("Mã OTP không hợp lệ hoặc đã hết hạn", 400);
+  }
+  ensureOtpValid(otp, user.resetPasswordOtp, user.resetPasswordOtpExpire);
 };
 
 export const resetPassword = async (
@@ -652,11 +665,11 @@ export const refreshToken = async (
       getRefreshSecret(),
     ) as RefreshTokenPayload;
   } catch (error) {
-    throw new AppError("Invalid or expired refresh token", 401);
+    throw new AppError("Mã làm mới phiên đăng nhập không hợp lệ hoặc đã hết hạn", 401);
   }
 
   if (!decoded.id || !decoded.sessionId) {
-    throw new AppError("Invalid refresh token", 401);
+    throw new AppError("Mã làm mới phiên đăng nhập không hợp lệ", 401);
   }
 
   const user = await User.findById(decoded.id);
@@ -675,12 +688,12 @@ export const refreshToken = async (
   });
 
   if (!session) {
-    throw new AppError("Refresh session is invalid or expired", 401);
+    throw new AppError("Phiên làm mới đăng nhập không hợp lệ hoặc đã hết hạn", 401);
   }
 
   if (user.status === "locked") {
     await Session.findByIdAndUpdate(session._id, { revokedAt: new Date() });
-    throw new AppError("Account is not allowed to login", 403);
+    throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
 
   return issueSessionTokens(user, decoded.sessionId);
@@ -730,8 +743,15 @@ export const changePassword = async (
     throw new AppError("Không tìm thấy người dùng", 404);
   }
 
+  if (user.googleId) {
+    throw new AppError(
+      "Tài khoản đăng nhập bằng Google không thể đổi mật khẩu tại đây.",
+      400,
+    );
+  }
+
   if (!user.passwordHash) {
-    throw new AppError("Password login is not available for this account", 400);
+    throw new AppError("Tài khoản này không hỗ trợ đăng nhập bằng mật khẩu", 400);
   }
 
   const isPasswordValid = await bcrypt.compare(
@@ -740,7 +760,7 @@ export const changePassword = async (
   );
 
   if (!isPasswordValid) {
-    throw new AppError("Current password is incorrect", 400);
+    throw new AppError("Mật khẩu hiện tại không đúng", 400);
   }
 
   user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
@@ -754,7 +774,7 @@ export const changePassword = async (
 
 export const getCurrentUser = async (
   userId: string,
-): Promise<Partial<IUser>> => {
+): Promise<Partial<IUser> & { isGoogleAccount: boolean }> => {
   const user = await User.findById(userId).select(
     "-passwordHash -registerOtp -resetPasswordOtp",
   );
@@ -763,5 +783,8 @@ export const getCurrentUser = async (
     throw new AppError("Không tìm thấy người dùng", 404);
   }
 
-  return user;
+  return {
+    ...user.toObject(),
+    isGoogleAccount: Boolean(user.googleId),
+  };
 };

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Thông tin cá nhân - Handigo</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-primary-fixed-variant": "#3323cc",
+            "inverse-on-surface": "#eef0ff",
+            "secondary-fixed": "#abedff",
+            "surface-container-lowest": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-high": "#e1e7ff",
+            "on-primary": "#ffffff",
+            "surface": "#faf8ff",
+            "on-error": "#ffffff",
+            "inverse-surface": "#283044",
+            "on-error-container": "#93000a",
+            "on-tertiary-container": "#ff9f72",
+            "on-tertiary-fixed": "#351000",
+            "secondary-container": "#9ce8fd",
+            "success-green": "#4ade80",
+            "on-surface": "#131b2e",
+            "surface-variant": "#dae2fc",
+            "outline-variant": "#c7c4d8",
+            "on-background": "#131b2e",
+            "primary-fixed-dim": "#c3c0ff",
+            "on-primary-container": "#b1afff",
+            "on-secondary": "#ffffff",
+            "on-surface-variant": "#464555",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "primary-fixed": "#e2dfff",
+            "background": "#faf8ff",
+            "tertiary-fixed-dim": "#ffb694",
+            "on-secondary-fixed": "#001f26",
+            "error-container": "#ffdad6",
+            "primary": "#1e00a9",
+            "surface-dim": "#d2d9f4",
+            "surface-container-low": "#f2f3ff",
+            "secondary-fixed-dim": "#86d2e6",
+            "on-secondary-container": "#076a7c",
+            "tertiary": "#592000",
+            "star-gold": "#facc15",
+            "inverse-primary": "#c3c0ff",
+            "tertiary-fixed": "#ffdbcc",
+            "surface-tint": "#4d44e3",
+            "primary-container": "#3525cd",
+            "outline": "#777587",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#7d3000",
+            "error": "#ba1a1a",
+            "surface-glass": "rgba(255, 255, 255, 0.7)",
+            "secondary": "#00687a",
+            "surface-bright": "#faf8ff",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "surface-container-highest": "#dae2fc"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xl": "80px",
+            "xs": "4px",
+            "md": "24px",
+            "base": "8px",
+            "lg": "48px",
+            "gutter": "24px",
+            "container-max": "1280px",
+            "sm": "12px"
+          },
+          "fontFamily": {
+            "label-sm": ["Inter"],
+            "headline-xl": ["Hanken Grotesk"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "label-md": ["Inter"],
+            "headline-lg-mobile": ["Hanken Grotesk"]
+          },
+          "fontSize": {
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md text-body-md antialiased min-h-screen pb-32">
+<!-- TOP APP BAR -->
+<header class="bg-surface/80 backdrop-blur-md docked full-width top-0 sticky z-50 shadow-sm">
+<div class="flex justify-between items-center w-full px-md py-sm max-w-container-max mx-auto">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container active:scale-95 transition-all text-on-surface" type="button">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-semibold text-primary tracking-tight">
+        Thông tin cá nhân
+      </h1>
+<button class="px-base py-xs rounded-xl bg-primary-container text-on-primary font-label-md text-label-md active:scale-95 transition-transform hover:shadow-sm" type="button">
+        Lưu
+      </button>
+</div>
+</header>
+<!-- MAIN CONTAINER -->
+<main class="max-w-[640px] mx-auto px-base sm:px-md pt-sm">
+<!-- AVATAR PICKER SECTION -->
+<section class="flex flex-col items-center justify-center my-md">
+<div class="relative group cursor-pointer">
+<!-- Glow Effect behind Avatar -->
+<div class="absolute -inset-1.5 bg-gradient-to-r from-primary to-secondary rounded-full blur-md opacity-30 group-hover:opacity-60 transition duration-300"></div>
+<!-- Profile Picture Container -->
+<div class="relative w-28 h-28 rounded-full ring-4 ring-surface-container-lowest overflow-hidden shadow-lg bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="A polished, modern portrait photo of a Vietnamese male professional in his late 20s with a clean haircut and warm friendly smile, dressed in a smart casual polo shirt. Crisp indoor studio lighting with subtle ambient blue and indigo light accents highlighting facial contours, conveying high trust, service readiness, and modern lifestyle quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvr2r_4WwQ2bs58bPntoqhisLaiCneHHOOB7nWUoZ_3Raqdg9itiIx4ywfC04NkU9zg66GcjuEV80xhV1CESdDfTvtIVZ0TKhq--KvZhuVPHLxD2blkM21SgwAubHP4KbKlS49K8C4WxEUE3zfPTDwgU4ZR5WIqMHLz9GqWI_Y2XcwlNA-lyP_pPVVcM9qjGPRX6uUs6gZUmGPwe7P4bze__eiAFlBNq6mF3UWumN1hxsOKOx6cM366w"/>
+</div>
+<!-- Camera Edit Badge Button -->
+<button aria-label="Thay đổi ảnh đại diện" class="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-primary-container text-on-primary flex items-center justify-center shadow-md active:scale-95 ring-2 ring-surface-container-lowest transition-all hover:bg-primary" type="button">
+<span class="material-symbols-outlined text-[18px]">photo_camera</span>
+</button>
+</div>
+<div class="text-center mt-sm">
+<div class="flex items-center justify-center gap-xs">
+<span class="font-headline-md text-[18px] font-bold text-on-surface">Trần Anh Tuấn</span>
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Mã thành viên: #HDG-884920</p>
+</div>
+</section>
+<!-- FORM FIELDS CONTAINER -->
+<form class="space-y-md">
+<!-- Họ và tên -->
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 transition-all focus-within:border-primary focus-within:shadow-md">
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-xs">Họ và tên</label>
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">person</span>
+<input class="w-full bg-transparent border-0 p-0 text-on-surface font-body-md text-body-md font-medium focus:ring-0 focus:outline-none" placeholder="Nhập họ và tên" type="text" value="Trần Anh Tuấn"/>
+</div>
+</div>
+<!-- Số điện thoại (kèm badge & nút đổi) -->
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30">
+<div class="flex justify-between items-center mb-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Số điện thoại</label>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-secondary-container font-label-sm text-[11px]">
+<span class="material-symbols-outlined text-[13px] text-success-green" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+            Đã xác thực SMS
+          </span>
+</div>
+<div class="flex items-center justify-between gap-base">
+<div class="flex items-center gap-sm flex-1">
+<span class="material-symbols-outlined text-primary text-[22px]">phone_iphone</span>
+<input class="w-full bg-transparent border-0 p-0 text-on-surface font-body-md text-body-md font-semibold tracking-wide focus:ring-0" readonly="" type="text" value="0908 123 456"/>
+</div>
+<button class="px-base py-1 rounded-lg border border-outline-variant/50 text-primary font-label-sm text-label-sm hover:bg-surface-container-low active:scale-95 transition-all" type="button">
+            Đổi số
+          </button>
+</div>
+</div>
+<!-- Email (kèm badge) -->
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 transition-all focus-within:border-primary focus-within:shadow-md">
+<div class="flex justify-between items-center mb-xs">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Địa chỉ Email</label>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-secondary-container font-label-sm text-[11px]">
+<span class="material-symbols-outlined text-[13px] text-success-green" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+            Đã xác minh
+          </span>
+</div>
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">mail</span>
+<input class="w-full bg-transparent border-0 p-0 text-on-surface font-body-md text-body-md font-medium focus:ring-0 focus:outline-none" placeholder="example@gmail.com" type="email" value="anhtuan.tran@gmail.com"/>
+</div>
+</div>
+<!-- Grid: Ngày sinh & Giới tính -->
+<div class="grid grid-cols-2 gap-sm">
+<!-- Ngày sinh -->
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 transition-all focus-within:border-primary">
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-xs">Ngày sinh</label>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
+<input class="w-full bg-transparent border-0 p-0 text-on-surface font-body-md text-body-md font-medium focus:ring-0 focus:outline-none" type="text" value="18/09/1995"/>
+</div>
+</div>
+<!-- Giới tính -->
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 transition-all focus-within:border-primary">
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-xs">Giới tính</label>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">wc</span>
+<select class="w-full bg-transparent border-0 p-0 text-on-surface font-body-md text-body-md font-medium focus:ring-0 focus:outline-none">
+<option selected="" value="male">Nam</option>
+<option value="female">Nữ</option>
+<option value="other">Khác</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Khu vực thường trú / Thành phố -->
+<div class="bg-surface-container-lowest rounded-xl p-base shadow-sm border border-outline-variant/30 transition-all focus-within:border-primary">
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-xs">Khu vực thường trú</label>
+<div class="flex items-center justify-between gap-sm">
+<div class="flex items-center gap-sm flex-1">
+<span class="material-symbols-outlined text-primary text-[22px]">location_on</span>
+<span class="text-on-surface font-body-md text-body-md font-medium">TP. Hồ Chí Minh</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary" type="button">
+<span class="material-symbols-outlined text-[20px]">expand_more</span>
+</button>
+</div>
+</div>
+<!-- VAI TRÒ HỆ THỐNG (BENTO / DUAL ROLE BADGES) -->
+<div class="pt-base">
+<div class="flex items-center justify-between mb-sm">
+<h2 class="font-headline-md text-[16px] font-bold text-on-surface">Vai trò &amp; Tư cách thành viên</h2>
+<span class="font-label-sm text-[12px] text-primary font-semibold">2 tư cách</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-sm">
+<!-- Role 1: Khách hàng -->
+<div class="bg-surface-container-lowest/80 backdrop-blur-md rounded-xl p-base border border-outline-variant/40 shadow-sm relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary mb-2">
+<span class="material-symbols-outlined text-[22px]">home_repair_service</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-[11px] font-semibold">
+                Đang dùng
+              </span>
+</div>
+<div class="font-headline-md text-[15px] font-bold text-on-surface">Khách hàng</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Đặt thợ sửa chữa, tiện ích tại nhà</p>
+</div>
+<!-- Role 2: Đối tác kỹ thuật -->
+<div class="bg-surface-container-lowest/80 backdrop-blur-md rounded-xl p-base border border-secondary-container shadow-sm relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="w-10 h-10 rounded-lg bg-secondary-container/40 flex items-center justify-center text-on-secondary-container mb-2">
+<span class="material-symbols-outlined text-[22px]">engineering</span>
+</div>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-semibold">
+<span class="material-symbols-outlined text-[12px] text-on-secondary-container" style="font-variation-settings: 'FILL' 1;">verified</span>
+                Đã duyệt
+              </span>
+</div>
+<div class="font-headline-md text-[15px] font-bold text-on-surface">Đối tác Handigo</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Cung cấp dịch vụ Điện - Lạnh</p>
+</div>
+</div>
+<!-- Action Card: Liên kết thông tin Thợ & Chứng chỉ -->
+<div class="mt-sm bg-surface-container-low rounded-xl p-base flex items-center justify-between border border-outline-variant/30 hover:bg-surface-container transition cursor-pointer">
+<div class="flex items-center gap-sm">
+<div class="w-9 h-9 rounded-full bg-surface-container-lowest flex items-center justify-center text-primary shadow-xs">
+<span class="material-symbols-outlined text-[20px]">badge</span>
+</div>
+<div>
+<div class="font-label-md text-label-md font-semibold text-on-surface">Chứng chỉ nghề &amp; Hồ sơ Thợ</div>
+<div class="font-label-sm text-[12px] text-on-surface-variant">Cập nhật bằng cấp, giấy phép hành nghề</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">chevron_right</span>
+</div>
+</div>
+</form>
+</main>
+<!-- BOTTOM FIXED CTA -->
+<div class="fixed bottom-0 left-0 w-full z-40 bg-surface-container-lowest/90 backdrop-blur-md shadow-lg py-sm px-base">
+<div class="max-w-[640px] mx-auto">
+<button class="w-full h-12 rounded-xl bg-primary-container text-on-primary font-headline-md text-[16px] font-semibold flex items-center justify-center gap-base active:scale-95 hover:bg-primary transition-all shadow-md" type="button">
+<span class="material-symbols-outlined text-[20px]">save</span>
+        Cập nhật hồ sơ
+      </button>
+</div>
+</div>
+</body></html>

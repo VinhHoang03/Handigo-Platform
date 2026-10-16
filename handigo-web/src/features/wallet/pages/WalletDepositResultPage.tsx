@@ -1,3 +1,4 @@
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/auth.store';
@@ -31,10 +32,11 @@ const getError = (error: unknown) => {
 };
 
 export default function WalletDepositResultPage({ callback }: { callback: Callback }) {
+  const { addToast } = useToast();
   const role = useAuthStore((state) => state.user?.role);
   const handled = useRef(false);
   const [result, setResult] = useState<Result>('processing');
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', "error");
   const orderCode = new URLSearchParams(window.location.search).get('orderCode')
     || sessionStorage.getItem(STORAGE_KEY) || '';
   const walletPath = role?.toUpperCase() === 'PROVIDER' ? '/provider/wallet' : '/customer/wallet';
@@ -53,12 +55,15 @@ export default function WalletDepositResultPage({ callback }: { callback: Callba
         : await walletApi.syncDeposit(orderCode);
       const nextResult = getResult(transaction);
       setResult(nextResult);
+      if (nextResult === 'success') addToast('Nạp ví thành công.', 'success');
+      else if (nextResult === 'failed') addToast('Nạp ví chưa thành công. Số dư ví không thay đổi.', 'error');
+      else if (nextResult === 'cancelled') addToast('Đã hủy giao dịch nạp ví.', 'info');
       if (nextResult !== 'pending') sessionStorage.removeItem(STORAGE_KEY);
     } catch (requestError) {
       setResult('error');
       setError(getError(requestError));
     }
-  }, [callback, orderCode]);
+  }, [addToast, callback, orderCode, setError]);
 
   useEffect(() => {
     if (handled.current) return;

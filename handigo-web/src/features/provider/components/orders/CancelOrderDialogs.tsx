@@ -2,6 +2,7 @@ import { Modal } from '@/components/common/Modal';
 import { Trash, TriangleAlert } from "lucide-react";
 
 const cancellationReasons = [
+  'Khách hàng không đồng ý báo giá',
   'Không thể sửa chữa hoặc thực hiện dịch vụ',
   'Khách hàng cung cấp thông tin chưa đầy đủ',
   'Không thể liên hệ với khách hàng',
@@ -10,6 +11,7 @@ const cancellationReasons = [
 ];
 
 interface CancellationDialogProps {
+  canDeclineQuotation: boolean;
   reason: string;
   explanation: string;
   error: string;
@@ -21,6 +23,7 @@ interface CancellationDialogProps {
 }
 
 export function CancellationDialog({
+  canDeclineQuotation,
   reason,
   explanation,
   error,
@@ -34,10 +37,12 @@ export function CancellationDialog({
     <Modal open title="Hủy đơn dịch vụ" onClose={onClose} size="lg" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <p className="text-sm text-on-surface-variant">Lý do hủy sẽ được lưu cùng đơn hàng và thông báo cho khách hàng.</p>
       <div className="mt-md space-y-2">
-        {cancellationReasons.map((item) => (
+        {cancellationReasons.filter((item) => canDeclineQuotation || item !== cancellationReasons[0]).map((item) => (
           <label key={item} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${reason === item ? 'border-error bg-error/5' : 'border-outline-variant/40 hover:bg-surface-container-low'}`}>
             <input type="radio" name="cancel-reason" value={item} checked={reason === item} onChange={() => onReasonChange(item)} className="mt-1 text-error focus:ring-error" />
-            <span className="text-sm font-medium text-on-surface">{item}</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-on-surface">{item}</span>
+            </span>
           </label>
         ))}
       </div>
@@ -46,7 +51,6 @@ export function CancellationDialog({
         <textarea value={explanation} onChange={(event) => onExplanationChange(event.target.value)} maxLength={500} rows={5} aria-invalid={Boolean(error)} className="mt-2 w-full resize-none rounded-2xl border border-outline-variant px-4 py-3 outline-none focus:border-error focus:ring-4 focus:ring-error/10" placeholder={reason === 'Lý do khác' ? 'Mô tả cụ thể lý do hủy (ít nhất 10 ký tự)...' : 'Bổ sung thông tin để khách hàng hiểu rõ hơn (không bắt buộc)...'} />
         <span className="mt-1 block text-right text-xs text-on-surface-variant">{explanation.length}/500</span>
       </label>
-      {error && <p className="mt-2 text-sm text-error">{error}</p>}
       <div className="mt-md flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
         <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50"><TriangleAlert aria-hidden="true" size={24} />Tiếp tục hủy đơn</button>
@@ -68,7 +72,7 @@ export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: Ca
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error">
         <TriangleAlert aria-hidden="true" size={30} />
       </div>
-      <p className="mt-2 text-sm leading-6 text-on-surface-variant">Hành động này sẽ hủy đơn dịch vụ và thông báo cho khách hàng. Vui lòng kiểm tra lại trước khi xác nhận.</p>
+      <p className="mt-2 text-sm leading-6 text-on-surface-variant">Bạn xác nhận hủy nhận đơn dịch vụ này? Lý do hủy sẽ được lưu và thông báo cho khách hàng.</p>
       <div className="mt-4 rounded-2xl bg-error/5 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-error">Lý do đã chọn</p>
         <p className="mt-1 text-sm font-medium text-on-surface">{reason}</p>
@@ -77,7 +81,7 @@ export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: Ca
         <button type="button" onClick={onBack} disabled={busy} className="btn-secondary min-h-12">Kiểm tra lại</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
           <Trash aria-hidden="true" size={24} />
-          {busy ? 'Đang hủy đơn...' : 'Hủy đơn ngay'}
+          {busy ? 'Đang xử lý...' : 'Hủy đơn'}
         </button>
       </div>
     </Modal>

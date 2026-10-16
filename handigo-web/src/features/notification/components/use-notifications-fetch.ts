@@ -5,8 +5,11 @@ import type {
   NotificationQuery,
 } from "../types/notification.types";
 import { getNotificationErrorMessage } from "./notification-error";
+import { isNotificationForUser } from "@/components/common/notification-bell/notificationBell.utils";
 
 type UseNotificationsFetchParams = {
+  accountId: string;
+  isCurrentAccount: () => boolean;
   isAdmin: boolean;
   query: NotificationQuery;
   setQuery: Dispatch<SetStateAction<NotificationQuery>>;
@@ -24,6 +27,8 @@ type UseNotificationsFetchParams = {
  * hành vi (thời điểm gọi API, debounce 150ms, cách gộp trang) giữ nguyên 100%.
  */
 export function useNotificationsFetch({
+  accountId,
+  isCurrentAccount,
   isAdmin,
   query,
   setQuery,
@@ -35,25 +40,25 @@ export function useNotificationsFetch({
   setError,
 }: UseNotificationsFetchParams) {
   const load = useCallback(async () => {
+    if (!isCurrentAccount()) return;
     setLoading(true);
     setError("");
     try {
-      const listResult = isAdmin
-        ? await notificationApi.adminList(query)
-        : await notificationApi.list(query);
-      const countResult = isAdmin
-        ? { count: listResult.items.filter((item) => !item.isRead).length }
-        : await notificationApi.unreadCount();
-      setItems(listResult.items);
+      const listResult = await notificationApi.list(query);
+      if (!isCurrentAccount()) return;
+      const countResult = await notificationApi.unreadCount();
+      if (!isCurrentAccount()) return;
+      setItems(listResult.items.filter((item) => isNotificationForUser(item, accountId)));
       setTotalPages(listResult.pagination.totalPages || 1);
       setUnreadCount(countResult.count);
     } catch (err) {
-      setError(getNotificationErrorMessage(err));
+      if (isCurrentAccount()) setError(getNotificationErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (isCurrentAccount()) setLoading(false);
     }
   }, [
-    isAdmin,
+    accountId,
+    isCurrentAccount,
     query,
     setError,
     setItems,
@@ -64,7 +69,7 @@ export function useNotificationsFetch({
 
   const loadUserNotifications = useCallback(
     async (nextQuery: NotificationQuery, append = false) => {
-      if (isAdmin) return;
+      if (isAdmin || !isCurrentAccount()) return;
 
       if (append) {
         setLoadingMore(true);
@@ -78,20 +83,25 @@ export function useNotificationsFetch({
           notificationApi.list(nextQuery),
           notificationApi.unreadCount(),
         ]);
-
+        if (!isCurrentAccount()) return;
+        const ownItems = listResult.items.filter((item) => isNotificationForUser(item, accountId));
         setItems((current) =>
-          append ? [...current, ...listResult.items] : listResult.items,
+          append ? [...current, ...ownItems] : ownItems,
         );
         setTotalPages(listResult.pagination.totalPages || 1);
         setUnreadCount(countResult.count);
       } catch (err) {
-        setError(getNotificationErrorMessage(err));
+        if (isCurrentAccount()) setError(getNotificationErrorMessage(err));
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (isCurrentAccount()) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [
+      accountId,
+      isCurrentAccount,
       isAdmin,
       setError,
       setItems,

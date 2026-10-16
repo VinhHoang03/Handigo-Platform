@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quên mật khẩu &amp; Xác thực OTP | Handigo</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "inverse-on-surface": "#eef0ff",
+            "on-primary": "#ffffff",
+            "on-surface": "#131b2e",
+            "surface": "#faf8ff",
+            "error": "#ba1a1a",
+            "on-primary-container": "#b1afff",
+            "outline": "#777587",
+            "background": "#faf8ff",
+            "surface-container-highest": "#dae2fc",
+            "on-primary-fixed": "#0f0069",
+            "surface-container-high": "#e1e7ff",
+            "secondary-fixed-dim": "#86d2e6",
+            "surface-variant": "#dae2fc",
+            "tertiary-fixed": "#ffdbcc",
+            "tertiary-fixed-dim": "#ffb694",
+            "surface-container": "#eaedff",
+            "primary": "#1e00a9",
+            "surface-container-low": "#f2f3ff",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-fixed-variant": "#004e5c",
+            "surface-dim": "#d2d9f4",
+            "on-background": "#131b2e",
+            "on-tertiary-fixed-variant": "#7b2f00",
+            "outline-variant": "#c7c4d8",
+            "on-primary-fixed-variant": "#3323cc",
+            "tertiary-container": "#7d3000",
+            "primary-container": "#3525cd",
+            "on-surface-variant": "#464555",
+            "on-error-container": "#93000a",
+            "on-tertiary": "#ffffff",
+            "on-secondary-fixed": "#001f26",
+            "surface-tint": "#4d44e3",
+            "primary-fixed": "#e2dfff",
+            "error-container": "#ffdad6",
+            "secondary": "#00687a",
+            "on-secondary-container": "#076a7c",
+            "inverse-surface": "#283044",
+            "primary-fixed-dim": "#c3c0ff",
+            "success-green": "#4ade80",
+            "on-tertiary-container": "#ff9f72",
+            "on-tertiary-fixed": "#351000",
+            "surface-glass-dark": "rgba(40, 48, 68, 0.7)",
+            "secondary-container": "#9ce8fd",
+            "star-gold": "#facc15",
+            "secondary-fixed": "#abedff",
+            "tertiary": "#592000",
+            "surface-bright": "#faf8ff",
+            "on-secondary": "#ffffff",
+            "on-error": "#ffffff",
+            "inverse-primary": "#c3c0ff",
+            "surface-glass": "rgba(255, 255, 255, 0.7)"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xl": "80px",
+            "sm": "12px",
+            "md": "24px",
+            "lg": "48px",
+            "gutter": "24px",
+            "base": "8px",
+            "container-max": "1280px",
+            "xs": "4px"
+          },
+          "fontFamily": {
+            "headline-xl": ["Hanken Grotesk"],
+            "label-md": ["Inter"],
+            "headline-md": ["Hanken Grotesk"],
+            "headline-lg-mobile": ["Hanken Grotesk"],
+            "headline-lg": ["Hanken Grotesk"],
+            "body-md": ["Inter"],
+            "label-sm": ["Inter"],
+            "body-lg": ["Inter"]
+          },
+          "fontSize": {
+            "headline-xl": ["56px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+            "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+            "label-sm": ["12px", { "lineHeight": "1.3", "fontWeight": "600" }],
+            "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen selection:bg-primary-fixed selection:text-primary relative overflow-x-hidden flex flex-col justify-between">
+<!-- Background Ambient Glow & Glassmorphism Blur Layers -->
+<div class="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+<div class="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-primary-fixed opacity-60 blur-3xl"></div>
+<div class="absolute top-1/3 -right-24 w-72 h-72 rounded-full bg-secondary-fixed opacity-40 blur-3xl"></div>
+<div class="absolute -bottom-20 left-1/4 w-96 h-96 rounded-full bg-surface-container-high opacity-50 blur-3xl"></div>
+</div>
+<!-- Focused Task Shell Header: Top Navigation without Global Shell items (Linear Sub-page Rule) -->
+<header class="w-full max-w-container-max mx-auto px-4 pt-4 pb-2 flex items-center justify-between z-20">
+<button aria-label="Quay lại" class="w-11 h-11 flex items-center justify-center rounded-xl bg-surface-container-lowest/80 backdrop-blur-md shadow-sm border border-outline-variant/30 text-on-surface hover:bg-surface-container active:scale-95 transition-all" onclick="history.back()">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<div class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-surface-container-high/60 backdrop-blur-md border border-outline-variant/20">
+<span class="w-2 h-2 rounded-full bg-success-green animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">Bảo mật mã hóa 256-bit</span>
+</div>
+<button aria-label="Hỗ trợ" class="w-11 h-11 flex items-center justify-center rounded-xl bg-surface-container-lowest/80 backdrop-blur-md shadow-sm border border-outline-variant/30 text-on-surface-variant hover:text-primary active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+</header>
+<!-- Main Content Flow Container (Centered Mobile Architecture) -->
+<main class="w-full max-w-md mx-auto px-4 pt-2 pb-8 flex-1 flex flex-col justify-start items-center">
+<!-- 3D Security Shield & Key Visual Identity Bento Card -->
+<div class="relative w-full flex flex-col items-center pt-2 pb-4">
+<div class="relative flex items-center justify-center">
+<!-- Multi-layered Outer Glow Rings -->
+<div class="absolute w-28 h-28 rounded-full bg-primary/10 blur-xl"></div>
+<div class="absolute w-20 h-20 rounded-2xl bg-secondary-fixed/50 rotate-12 blur-sm"></div>
+<!-- Premium Glass Badge with Lock/Shield -->
+<div class="relative w-24 h-24 rounded-3xl bg-surface-container-lowest/90 backdrop-blur-md border border-outline-variant/40 shadow-lg flex items-center justify-center transform hover:scale-105 transition-transform duration-300">
+<div class="w-16 h-16 rounded-2xl bg-primary-container flex items-center justify-center shadow-inner relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-tr from-primary to-primary-container opacity-80"></div>
+<span class="material-symbols-outlined text-on-primary text-[38px] relative z-10" style="font-variation-settings: 'FILL' 1;">shield_lock</span>
+<div class="absolute -right-2 -bottom-2 w-8 h-8 rounded-full bg-secondary-fixed-dim/40 blur-xs"></div>
+</div>
+<!-- Mini Floating Indicator Pill -->
+<div class="absolute -bottom-2 -right-1 px-2 py-0.5 rounded-full bg-surface-container-lowest shadow-md border border-outline-variant/30 flex items-center space-x-1">
+<span class="material-symbols-outlined text-primary text-[14px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">OTP</span>
+</div>
+</div>
+</div>
+<!-- Typography Section -->
+<div class="text-center mt-5 space-y-1.5 px-2">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface tracking-tight">
+          Quên mật khẩu?
+        </h1>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+          Nhập số điện thoại đã đăng ký để nhận mã xác thực OTP 6 số qua tin nhắn SMS hoặc Zalo ZNS.
+        </p>
+</div>
+</div>
+<!-- Active Delivery Status / Phone Selector Card -->
+<div class="w-full bg-surface-container-lowest/90 backdrop-blur-md rounded-2xl p-3.5 border border-outline-variant/30 shadow-sm flex items-center justify-between mb-6 transition-all hover:shadow-md">
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-primary flex-shrink-0">
+<span class="material-symbols-outlined text-[22px]">smartphone</span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Đã gửi mã xác thực tới</span>
+<span class="font-headline-md text-base font-bold text-on-surface tracking-wide">+84 908 *** 456</span>
+</div>
+</div>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-high text-primary hover:bg-primary-fixed active:scale-95 font-label-md text-label-md font-semibold transition-all" type="button">
+        Đổi số khác
+      </button>
+</div>
+<!-- OTP Form Section -->
+<form autocomplete="off" class="w-full space-y-6" onsubmit="event.preventDefault();">
+<!-- Digit Input Container (6 Segments) -->
+<div>
+<div class="flex items-center justify-between mb-2.5 px-1">
+<label class="font-label-md text-label-md font-medium text-on-surface">Mã xác thực gồm 6 chữ số</label>
+<span class="font-label-sm text-label-sm text-outline flex items-center space-x-1">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+<span>Tự động điền OTP</span>
+</span>
+</div>
+<div class="grid grid-cols-6 gap-2 sm:gap-2.5" id="otp-container">
+<input autofocus="" class="w-full h-13 py-3 text-center font-headline-md text-headline-md font-bold text-on-surface bg-surface-container-lowest rounded-xl border-2 border-primary-container shadow-sm focus:border-primary-container focus:ring-2 focus:ring-primary-fixed transition-all outline-none" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text" value="5"/>
+<input class="w-full h-13 py-3 text-center font-headline-md text-headline-md font-bold text-on-surface bg-surface-container-lowest rounded-xl border-2 border-primary-container shadow-sm focus:border-primary-container focus:ring-2 focus:ring-primary-fixed transition-all outline-none" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text" value="8"/>
+<input class="w-full h-13 py-3 text-center font-headline-md text-headline-md font-bold text-on-surface bg-surface-container-lowest rounded-xl border-2 border-primary-container shadow-sm focus:border-primary-container focus:ring-2 focus:ring-primary-fixed transition-all outline-none" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text" value="2"/>
+<input class="w-full h-13 py-3 text-center font-headline-md text-headline-md font-bold text-on-surface bg-surface-container-lowest rounded-xl border-2 border-outline-variant/40 shadow-sm focus:border-primary-container focus:ring-2 focus:ring-primary-fixed transition-all outline-none" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text"/>
+<input class="w-full h-13 py-3 text-center font-headline-md text-headline-md font-bold text-on-surface bg-surface-container-lowest rounded-xl border-2 border-outline-variant/40 shadow-sm focus:border-primary-container focus:ring-2 focus:ring-primary-fixed transition-all outline-none" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text"/>
+<input class="w-full h-13 py-3 text-center font-headline-md text-headline-md font-bold text-on-surface bg-surface-container-lowest rounded-xl border-2 border-outline-variant/40 shadow-sm focus:border-primary-container focus:ring-2 focus:ring-primary-fixed transition-all outline-none" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text"/>
+</div>
+</div>
+<!-- Resend & Alternative Channel Actions -->
+<div class="bg-surface-container-low/70 backdrop-blur-sm rounded-xl p-3.5 border border-outline-variant/20 space-y-3">
+<!-- Timer countdown status -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px] text-primary">schedule</span>
+<span class="font-label-md text-label-md">Gửi lại mã sau <span class="font-bold text-primary font-mono" id="countdown-timer">45s</span></span>
+</div>
+<button class="font-label-md text-label-md font-semibold text-outline cursor-not-allowed opacity-60 flex items-center space-x-1" disabled="" id="btn-resend" type="button">
+<span class="material-symbols-outlined text-[16px]">sync</span>
+<span>Gửi lại mã OTP</span>
+</button>
+</div>
+<div class="h-px bg-outline-variant/30 w-full"></div>
+<!-- Voice Call Alternative Option -->
+<div class="flex items-center justify-between pt-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Chưa nhận được tin nhắn?</span>
+<button class="inline-flex items-center space-x-1.5 text-secondary hover:text-on-secondary-fixed-variant font-label-md text-label-md font-semibold active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">phone_in_talk</span>
+<span>Nhận mã qua cuộc gọi thoại tự động</span>
+</button>
+</div>
+</div>
+<!-- Main Primary CTA Button -->
+<div class="pt-2">
+<button class="w-full min-h-[48px] py-3.5 px-6 rounded-xl bg-primary-container text-on-primary font-headline-md text-base font-bold shadow-lg shadow-primary/20 hover:bg-primary active:scale-95 transition-all duration-150 flex items-center justify-center space-x-2" type="submit">
+<span>Xác nhận mã OTP</span>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Support Assistance Box -->
+<div class="mt-8 w-full">
+<div class="rounded-xl border border-outline-variant/30 bg-surface-container-lowest/60 backdrop-blur-md p-3.5 flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-primary flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">support_agent</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant font-medium">Cần hỗ trợ trợ giúp xác minh tài khoản?</p>
+<p class="font-label-md text-label-md font-bold text-primary">Liên hệ CSKH 1900 8924</p>
+</div>
+</div>
+<a aria-label="Gọi tổng đài" class="p-2 rounded-lg bg-surface-container text-primary hover:bg-primary hover:text-on-primary active:scale-95 transition-all" href="tel:19008924">
+<span class="material-symbols-outlined text-[18px]">call</span>
+</a>
+</div>
+</div>
+</main>
+<!-- Clean Bottom Space Spacer for Accessibility -->
+<footer class="w-full py-3 text-center">
+<p class="font-label-sm text-label-sm text-outline">Handigo • Bản quyền bảo lưu © 2025</p>
+</footer>
+<!-- Micro-interactions Script for OTP Autonavigation & Dynamic Timer -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputs = Array.from(document.querySelectorAll('#otp-container input'));
+      
+      inputs.forEach((input, index) => {
+        input.addEventListener('input', (e) => {
+          if (e.target.value.length >= 1) {
+            e.target.value = e.target.value.slice(-1);
+            if (index < inputs.length - 1) {
+              inputs[index + 1].focus();
+              inputs[index + 1].classList.remove('border-outline-variant/40');
+              inputs[index + 1].classList.add('border-primary-container');
+            }
+          }
+        });
+
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Backspace' && !input.value && index > 0) {
+            inputs[index - 1].focus();
+          }
+        });
+
+        input.addEventListener('focus', () => {
+          input.classList.remove('border-outline-variant/40');
+          input.classList.add('border-primary-container');
+        });
+
+        input.addEventListener('blur', () => {
+          if (!input.value) {
+            input.classList.add('border-outline-variant/40');
+            input.classList.remove('border-primary-container');
+          }
+        });
+      });
+
+      // Countdown Timer simulation
+      let timeLeft = 45;
+      const countdownEl = document.getElementById('countdown-timer');
+      const resendBtn = document.getElementById('btn-resend');
+
+      const timerInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0) {
+          countdownEl.textContent = timeLeft + 's';
+        } else {
+          clearInterval(timerInterval);
+          countdownEl.parentElement.textContent = 'Mã đã hết hiệu lực';
+          resendBtn.removeAttribute('disabled');
+          resendBtn.classList.remove('text-outline', 'cursor-not-allowed', 'opacity-60');
+          resendBtn.classList.add('text-primary', 'hover:underline', 'cursor-pointer');
+        }
+      }, 1000);
+    });
+  </script>
+</body></html>

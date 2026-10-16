@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useRef, useState } from "react";
 
 interface Recognition {
@@ -26,7 +27,7 @@ const getRecognition = () => {
 export function useVoiceInput(disabled: boolean, maxLength: number, onText: (text: string) => void) {
   const [supported] = useState(() => Boolean(getRecognition()));
   const [listening, setListening] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
   const recognition = useRef<Recognition | null>(null);
 
   const cancel = () => {

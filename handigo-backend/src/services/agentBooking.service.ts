@@ -1,13 +1,32 @@
 import { AppError } from "../utils/appError";
 import { getServiceById, listServices } from "./service.service";
 import { getOptionsByServiceId } from "./serviceOption.service";
-import { buildServicePricingSnapshot } from "./servicePricing.service";
-import { getUserAddresses } from "./address.service";
+import { buildServicePricingSnapshot, previewServiceBooking } from "./servicePricing.service";
+import { getUserAddresses, ensureAddressCoordinates } from "./address.service";
+import { Address } from "../models/address.model";
+import { Provider } from "../models/provider.model";
+import User from "../models/user.model";
+import { Types } from "mongoose";
+import { getAvailableVouchers } from "./voucher.service";
+import { resolveAutomaticPromotion } from "./promotion.service";
 import { MatchingService } from "./matching.service";
 import { OrderService, type CreateOrderPayload } from "./order.service";
+import { safelyTrackAgentBooking } from "./agentOrderProgress.service";
+import type { IOrder } from "../models/order.model";
 
-type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions">;
-type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "paymentMethod" | "problemDescription"> & {
+function bookingView(order: Pick<IOrder, "_id" | "orderCode" | "status" | "bookingStatus" | "paymentStatus"
+  | "orderType" | "paymentMethod" | "inspectionRequired" | "scheduledAt" | "depositAmount" | "pricing" | "voucherSnapshot" | "preferredProviderId">) {
+  return {
+    orderId: String(order._id), orderCode: order.orderCode, status: order.status,
+    bookingStatus: order.bookingStatus, paymentStatus: order.paymentStatus,
+    orderType: order.orderType, paymentMethod: order.paymentMethod, inspectionRequired: order.inspectionRequired,
+    scheduledAt: order.scheduledAt, amount: order.pricing.totalPaidAmount ?? (order.inspectionRequired ? order.depositAmount : order.pricing.bookingAmount),
+    voucherCode: order.voucherSnapshot?.code, preferredProviderId: order.preferredProviderId ? String(order.preferredProviderId) : undefined,
+  };
+}
+
+type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions" | "uniformQuantity">;
+type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "paymentMethod" | "problemDescription" | "voucherCode" | "preferredProviderId"> & {
   orderType: "normal" | "scheduled";
   scheduledAt?: string;
 };
@@ -21,33 +40,138 @@ async function activeService(id: string) {
 }
 
 async function ownedAddress(userId: string, addressId: string) {
-  const address = (await getUserAddresses(userId)).find((item) => String(item._id) === addressId);
+  const address = await Address.findOne({ _id: addressId, userId });
   if (!address) throw new AppError("Địa chỉ không thuộc tài khoản của bạn.", 404);
-  return address;
+  return ensureAddressCoordinates(address);
 }
 
 export const AgentBookingService = {
   async search(search: string) {
-    const result = await listServices({ search, isActive: "true", limit: "10" });
-    return result.items.filter((item) => (item.categoryId as unknown as { isActive?: boolean } | null)?.isActive)
-      .map((item) => ({ id: String(item._id), name: item.name, serviceType: item.serviceType, minOptionPrice: item.minOptionPrice }));
+    // Tách query thành các token để tìm từng từ riêng ($and), giúp khớp được
+    // "sửa điều hòa" với "Sửa chữa điều hòa" dù không liền nhau.
+    const { Service } = await import("../models/service.model");
+    const { ServiceOption } = await import("../models/serviceOption.model");
+
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const tokens = search.trim().split(/\s+/).filter(Boolean).map(escape);
+
+    const tokenFilter = tokens.length <= 1
+      ? { $or: [{ name: { $regex: tokens[0] ?? "", $options: "i" } }, { slug: { $regex: tokens[0] ?? "", $options: "i" } }] }
+      : { $and: tokens.map((t) => ({ $or: [{ name: { $regex: t, $options: "i" } }, { slug: { $regex: t, $options: "i" } }] })) };
+
+    const queryDocs = async (extraFilter: object) => {
+      const docs = await Service.find({ isDeleted: false, isActive: true, ...extraFilter })
+        .populate("categoryId", "name slug isActive")
+        .sort({ createdAt: -1 })
+        .limit(10);
+      return docs.filter((d) => (d.categoryId as unknown as { isActive?: boolean } | null)?.isActive);
+    };
+
+    let docs = await queryDocs(tokenFilter);
+
+    // Fallback sang tìm phrase nguyên nếu multi-token không ra kết quả
+    if (!docs.length && tokens.length > 1) {
+      const phraseEscaped = escape(search.trim());
+      docs = await queryDocs({ $or: [{ name: { $regex: phraseEscaped, $options: "i" } }, { slug: { $regex: phraseEscaped, $options: "i" } }] });
+    }
+
+    if (!docs.length) return [];
+
+    const minPrices = await ServiceOption.aggregate<{ _id: import("mongoose").Types.ObjectId; minOptionPrice: number }>([
+      { $match: { serviceId: { $in: docs.map((d) => d._id) }, price: { $gt: 0 }, isActive: true, isDeleted: false } },
+      { $group: { _id: "$serviceId", minOptionPrice: { $min: "$price" } } },
+    ]);
+    const priceMap = new Map(minPrices.map((p) => [p._id.toString(), p.minOptionPrice]));
+
+    return docs.map((d) => ({ id: String(d._id), name: d.name, serviceType: d.serviceType, minOptionPrice: priceMap.get(String(d._id)) ?? null }));
   },
   async service(serviceId: string) {
     const service = await activeService(serviceId);
     const options = await getOptionsByServiceId(serviceId);
-    return { id: String(service._id), name: service.name, serviceType: service.serviceType,
-      requiresOptionSelection: service.requiresOptionSelection, options };
+    return {
+      id: String(service._id), name: service.name, serviceType: service.serviceType,
+      fixedPrice: service.fixedPrice,
+      optionGroups: service.optionGroups,
+      requiresOptionSelection: service.requiresOptionSelection, options: options.map((option) => ({
+        _id: String(option._id), name: option.name, description: option.description,
+        groupId: option.groupId,
+        price: option.price, optionType: option.optionType, selectionGroup: option.selectionGroup,
+        selectionMode: option.selectionMode, allowsQuantity: option.allowsQuantity, isRequired: option.isRequired,
+      }))
+    };
   },
   async addresses(userId: string) {
-    return (await getUserAddresses(userId)).slice(0, 30).map((item) => ({
+    return (await getUserAddresses(userId)).sort((a, b) => Number(b.isDefault) - Number(a.isDefault)).slice(0, 30).map((item) => ({
       id: String(item._id), fullAddress: item.fullAddress, ward: item.ward, province: item.province, isDefault: item.isDefault,
+      recipientName: item.recipientName, recipientPhone: item.recipientPhone,
+      note: item.note,
     }));
   },
   async price(args: PriceArguments) {
     const service = await activeService(args.serviceId);
-    const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions);
-    return { serviceName: service.name, serviceType: service.serviceType, amount: snapshot.bookingAmount,
-      depositAmount: snapshot.depositAmount, currency: "VND", options: snapshot.selectedOptionsSnapshot };
+    const snapshot = await previewServiceBooking({ serviceId: args.serviceId,
+      selectedOptions: args.selectedOptions, uniformQuantity: args.uniformQuantity });
+    return {
+      serviceName: service.name, serviceType: service.serviceType, amount: snapshot.discountedAmount,
+      promotionName: snapshot.promotionSnapshot?.name,
+      depositAmount: snapshot.depositAmount, currency: "VND", options: snapshot.selectedOptionsSnapshot
+    };
+  },
+  async vouchers(userId: string, args: PriceArguments) {
+    const service = await activeService(args.serviceId);
+    const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions, args.uniformQuantity);
+    const promotion = await resolveAutomaticPromotion(service._id, snapshot.baseAmount, true);
+    const promotionDiscountAmount = promotion?.discountAmount ?? 0;
+    const vouchers = await getAvailableVouchers({ id: userId, role: "CUSTOMER" }, {}, {
+      amountBeforeVoucher: Math.max(snapshot.baseAmount - promotionDiscountAmount, 0), inspectionRequired: service.serviceType === "variable_price",
+    });
+    return vouchers.map((voucher) => ({ code: voucher.code!, name: voucher.name,
+      discountAmount: voucher.discountAmount ?? 0,
+      finalAmount: Math.max(snapshot.bookingAmount - promotionDiscountAmount - (voucher.discountAmount ?? 0), 0),
+      minOrderAmount: voucher.minOrderAmount, endAt: voucher.endAt.toISOString(), neverExpires: voucher.neverExpires ?? false,
+    })).filter((voucher) => voucher.discountAmount > 0 && voucher.finalAmount >= 0)
+      .sort((a, b) => b.discountAmount - a.discountAmount);
+  },
+  async providers(userId: string, args: BookingArguments & { providerQuery?: string }) {
+    const service = await activeService(args.serviceId);
+    const address = await ownedAddress(userId, args.addressId);
+    const snapshot = await buildServicePricingSnapshot(service, [], args.selectedOptions, args.uniformQuantity);
+    const startsAt = args.scheduledAt ? new Date(args.scheduledAt)
+      : new Date(Date.now() + snapshot.schedule.travelMinutes * 60000);
+    const matching = { serviceId: args.serviceId, latitude: address.latitude, longitude: address.longitude,
+      province: address.province, ward: address.ward, requireOnline: true,
+      scheduledDates: args.scheduledAt ? [startsAt] : [],
+      scheduleIntervals: [{ start: startsAt.getTime(), end: startsAt.getTime() + snapshot.schedule.durationMinutes * 60000, ...snapshot.schedule }],
+    };
+    const candidates = await MatchingService.findNearestProviders({ ...matching, limit: 10 });
+    const names = await User.find({ _id: { $in: candidates.map((item) => item.userId) } }).select("fullName").lean();
+    const available = candidates.map((item) => ({ id: String(item.providerId),
+      name: names.find((user) => String(user._id) === String(item.userId))?.fullName || "Chuyên gia Handigo",
+      averageRating: item.averageRating, totalCompletedOrders: item.totalCompletedOrders,
+      distanceMeters: item.distanceMeters >= 0 ? item.distanceMeters : undefined,
+    }));
+    const requested = [];
+    if (args.preferredProviderId || args.providerQuery) {
+      const escaped = args.providerQuery?.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const users = escaped ? await User.find({ fullName: { $regex: escaped, $options: "i" }, isDeleted: false })
+        .select("_id fullName").limit(20).lean() : [];
+      const profiles = await Provider.find({ verified: true, isDeleted: false,
+        ...(args.preferredProviderId ? { _id: args.preferredProviderId } : { userId: { $in: users.map((user) => user._id) } }),
+      }).select("userId availabilityStatus serviceIds").populate<{ userId: { fullName: string } }>("userId", "fullName").limit(10).lean();
+      for (const profile of profiles) {
+        const supportsService = profile.serviceIds.some((id) => String(id) === args.serviceId);
+        const online = profile.availabilityStatus === "online";
+        const eligible = supportsService && online
+          ? await MatchingService.findNearestProviders({ ...matching, onlyProviderId: new Types.ObjectId(String(profile._id)), limit: 1 }) : [];
+        requested.push({ id: String(profile._id), name: profile.userId?.fullName || "Chuyên gia Handigo",
+          eligible: eligible.length > 0, reason: !online ? "Chuyên gia đang ngoại tuyến hoặc bận."
+            : !supportsService ? "Chuyên gia không cung cấp dịch vụ này."
+              : !eligible.length ? "Chuyên gia hiện không phù hợp khu vực hoặc lịch thực hiện, hoặc chưa đủ điều kiện nhận đơn."
+                : "Chuyên gia đang trực tuyến và phù hợp tại thời điểm kiểm tra.",
+        });
+      }
+    }
+    return { available, requested, note: "Chưa giữ chỗ; hệ thống kiểm tra lại khi xác nhận. Không tự đổi sang thợ khác khi khách chưa chọn." };
   },
   async availableTimes(userId: string, args: AvailabilityArguments) {
     await activeService(args.serviceId);
@@ -60,7 +184,7 @@ export const AgentBookingService = {
       if (Date.parse(time) <= Date.now()) throw new AppError("Giờ hẹn phải nằm trong tương lai.", 400);
       const candidates = await MatchingService.findNearestProviders({
         serviceId: args.serviceId, latitude: address.latitude, longitude: address.longitude,
-        province: address.province, ward: address.ward, scheduledDates: [new Date(time)], requireOnline: false, limit: 1,
+        province: address.province, ward: address.ward, scheduledDates: [new Date(time)], requireOnline: true, limit: 1,
       });
       times.push({ time, hasCandidate: candidates.length > 0 });
     }
@@ -68,40 +192,69 @@ export const AgentBookingService = {
   },
   async preview(userId: string, args: BookingArguments) {
     const address = await ownedAddress(userId, args.addressId);
-    const price = await this.price(args);
-    return { title: "Tạo đơn dịch vụ", service: price.serviceName,
-      options: price.options.map((option) => `${option.name} × ${option.quantity}: ${option.subtotal.toLocaleString("vi-VN")} đ`),
+    const service = await activeService(args.serviceId);
+    const snapshot = await previewServiceBooking(args, userId);
+    const discountAmount = snapshot.voucherDiscountAmount;
+    const price = { serviceName: service.name, serviceType: service.serviceType,
+      amount: snapshot.discountedAmount + discountAmount,
+      options: snapshot.selectedOptionsSnapshot, currency: "VND", promotionName: snapshot.promotionSnapshot?.name };
+    let providerName: string | undefined;
+    if (args.preferredProviderId) {
+      const result = await this.providers(userId, args);
+      const chosen = result.requested.find((item) => item.id === args.preferredProviderId && item.eligible);
+      if (!chosen) throw new AppError("Chuyên gia đã chọn không còn trực tuyến hoặc phù hợp. Hãy chọn lại chuyên gia.", 409);
+      providerName = chosen.name;
+    }
+    const paymentOnConfirmation = true;
+    const quantityPrice = price.options.length === 1 && price.options[0].optionId === null
+      ? price.options[0] : undefined;
+    const paymentNote = snapshot.discountedAmount === 0
+      ? "Sau xác nhận, hệ thống ghi nhận khoản thanh toán 0đ; không cần chuyển khoản hoặc trừ tiền ví."
+      : args.paymentMethod === "bank"
+      ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và liên kết PayOS để bạn chuyển khoản."
+      : args.paymentMethod === "wallet"
+        ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và trừ số tiền hiển thị ở trên từ ví Handigo."
+        : "Vui lòng kiểm tra thông tin của bạn và xác nhận để tạo đơn dịch vụ. Bạn thanh toán tiền mặt trực tiếp cho nhà cung cấp sau khi sử dụng dịch vụ.";
+    return {
+      title: "Tạo đơn dịch vụ", service: price.serviceName,
+      ...(quantityPrice ? { unitPrice: quantityPrice.price, quantity: quantityPrice.quantity }
+        : { options: price.options.map((option) => `${option.name} × ${option.quantity}: ${option.subtotal.toLocaleString("vi-VN")} đ`) }),
       address: `${address.fullAddress}, ${address.ward}, ${address.province}`,
       addressVersion: address.updatedAt.toISOString(),
       schedule: args.scheduledAt ?? "Đặt ngay", orderType: args.orderType,
-      paymentMethod: args.paymentMethod, amount: price.amount, currency: price.currency,
-      description: args.problemDescription ?? "", serviceType: price.serviceType,
-      note: price.serviceType === "variable_price" ? "Đây là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát."
-        : "Đơn mới chưa thanh toán; lịch hẹn cần kỹ thuật viên chấp nhận." };
+      paymentMethod: args.paymentMethod, originalAmount: price.amount, discountAmount,
+      voucherCode: args.voucherCode, providerName,
+      amount: Math.max(price.amount - discountAmount, 0), currency: price.currency,
+      description: args.problemDescription ?? "", serviceType: price.serviceType, paymentOnConfirmation,
+      note: [paymentNote, price.promotionName ? `Đã áp dụng ưu đãi tự động: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
+        quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ")
+    };
   },
-  async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string }) {
+  async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string; discountAmount?: number }, sessionId?: string) {
     const order = await OrderService.createOrder({ ...args, customerId: userId, confirmedExpectation });
-    return this.getBooking(userId, String(order._id));
+    if (sessionId) void safelyTrackAgentBooking(userId, sessionId, String(order._id));
+    return bookingView(order);
   },
   async getBooking(userId: string, orderId: string) {
     const order = await OrderService.getOrderById(orderId, userId);
-    return { orderId: String(order._id), orderCode: order.orderCode, status: order.status,
-      bookingStatus: order.bookingStatus, paymentStatus: order.paymentStatus,
-      orderType: order.orderType, paymentMethod: order.paymentMethod, inspectionRequired: order.inspectionRequired,
-      scheduledAt: order.scheduledAt, amount: order.inspectionRequired ? order.depositAmount : order.pricing.bookingAmount };
+    return bookingView(order);
   },
   async bookings(userId: string, search?: string) {
     const result = await OrderService.getOrdersByCustomer(userId, 1, 10, { search });
-    return result.items.map((order) => ({ orderId: String(order._id), orderCode: order.orderCode,
-      status: order.status, scheduledAt: order.scheduledAt, paymentStatus: order.paymentStatus }));
+    return result.items.map((order) => ({
+      orderId: String(order._id), orderCode: order.orderCode,
+      status: order.status, scheduledAt: order.scheduledAt, paymentStatus: order.paymentStatus
+    }));
   },
   async previewCancel(userId: string, orderId: string, reason: string) {
     const result = await OrderService.previewCancellation(orderId, userId, "customer");
     if (!result.canCancel) throw new AppError("Đơn không thể hủy ở trạng thái hiện tại.", 409);
     const order = await this.getBooking(userId, orderId);
-    return { title: "Hủy đơn dịch vụ", orderCode: order.orderCode, orderId, reason,
+    return {
+      title: "Hủy đơn dịch vụ", orderCode: order.orderCode, orderId, reason,
       paidAmount: result.paidAmount, refundAmount: result.refundAmount,
-      cancellationFee: result.cancellationFee, currency: "VND", policyVersion: result.policyVersion };
+      cancellationFee: result.cancellationFee, currency: "VND", policyVersion: result.policyVersion
+    };
   },
   async cancel(userId: string, orderId: string, reason: string,
     confirmedExpectation: { paidAmount: number; refundAmount: number; cancellationFee: number }) {

@@ -1,28 +1,31 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../api/providerOrder.api';
 import type { OrderAssignment, QuotationDetail } from '../types/providerOrder.types';
+import { useToast } from '@/components/common/Toast';
 
 /** State, tải dữ liệu và các thao tác của trang chi tiết đơn dịch vụ (thợ). */
 export function useProviderOrderDetail(orderId: string | undefined, navigate: NavigateFunction) {
+  const { addToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [assignment, setAssignment] = useState<OrderAssignment | null>(null);
   const [quotation, setQuotation] = useState<QuotationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useToastFeedback<string | null>(null, "error");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelExplanation, setCancelExplanation] = useState('');
-  const [cancelError, setCancelError] = useState('');
+  const [cancelError, setCancelError] = useToastFeedback<string>('', "error");
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (showLoading = true) => {
     if (!orderId) return;
 
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const [orderData, pendingAssignments] = await Promise.all([
         bookingApi.getOrderById(orderId),
@@ -41,7 +44,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
         ['scheduled', 'recurring'].includes(orderData.orderType) &&
         orderData.bookingStatus !== 'confirmed';
       if (
-        orderData.inspectionRequired &&
+        (orderData.inspectionRequired || orderData.serviceId.serviceType === 'variable_price') &&
         orderData.status !== 'created' &&
         !isUnconfirmedAppointment
       ) {
@@ -54,26 +57,56 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       setError(null);
     } catch {
       setError('Không thể tải chi tiết đơn dịch vụ.');
-      setOrder(null);
+      if (showLoading) setOrder(null);
+      else throw new Error('Không thể tải dữ liệu mới nhất. Vui lòng tải lại đơn hàng.');
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, setError]);
 
   useEffect(() => {
-    void Promise.resolve().then(loadData);
+    void Promise.resolve().then(() => loadData());
   }, [loadData]);
+
+  // Cập nhật thanh toán trong lúc thợ chờ khách trả tiền, giữ nguyên ảnh và ghi chú đang nhập.
+  useEffect(() => {
+    if (!orderId || busy || order?.inspectionRequired || order?.status !== 'in_progress' || order.paymentStatus !== 'unpaid') return;
+    let active = true;
+    let pending = false;
+    const refreshPayment = async () => {
+      if (pending || document.visibilityState === 'hidden') return;
+      pending = true;
+      try {
+        const latest = await bookingApi.getOrderById(orderId);
+        if (active) setOrder((current) => current?._id === latest._id &&
+          new Date(current.updatedAt).getTime() > new Date(latest.updatedAt).getTime() ? current : latest);
+      } catch (error) {
+        console.error('Không thể cập nhật trạng thái thanh toán của đơn hàng.', error);
+      } finally {
+        pending = false;
+      }
+    };
+    const timer = window.setInterval(() => { void refreshPayment(); }, 5000);
+    window.addEventListener('focus', refreshPayment);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshPayment);
+    };
+  }, [orderId, busy, order?.inspectionRequired, order?.status, order?.paymentStatus]);
 
   const runAction = async (
     action: () => Promise<void>,
     fallbackMessage: string,
     reload = true,
+    successMessage?: string,
   ) => {
     try {
       setBusy(true);
       setError(null);
       await action();
-      if (reload) await loadData();
+      if (successMessage) addToast(successMessage, "success");
+      if (reload) await loadData(false);
       return true;
     } catch (err: unknown) {
       const message =
@@ -96,7 +129,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     if (!assignment) return;
     await runAction(async () => {
       await providerOrderApi.acceptAssignment(assignment._id);
-    }, 'Không thể nhận đơn.');
+    }, 'Không thể nhận đơn.', true, 'Đã nhận đơn dịch vụ.');
   };
 
   const handleReject = async () => {
@@ -104,14 +137,14 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     const reason = window.prompt('Lý do từ chối (tùy chọn):') ?? undefined;
     await runAction(async () => {
       await providerOrderApi.rejectAssignment(assignment._id, reason);
-    }, 'Không thể từ chối đơn.');
+    }, 'Không thể từ chối đơn.', true, 'Đã từ chối đơn dịch vụ.');
   };
 
   const handleStart = async () => {
     if (!order) return;
     await runAction(async () => {
       await providerOrderApi.startOrder(order._id);
-    }, 'Không thể bắt đầu đơn.');
+    }, 'Không thể bắt đầu đơn.', true, 'Đã bắt đầu thực hiện đơn dịch vụ.');
   };
 
   const handleComplete = async (files: File[], completionNote: string) => {
@@ -123,8 +156,19 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       await providerOrderApi.completeOrder(order._id, {
         completionEvidenceImages,
         completionNote,
+        ...(quotation ? {
+          expectedQuotationId: quotation.quotation._id,
+          expectedQuotationRevision: quotation.quotation.revision ?? 0,
+        } : {}),
       });
-    }, 'Không thể hoàn thành đơn.');
+    }, 'Không thể hoàn thành đơn.', true, 'Đã hoàn thành đơn dịch vụ.');
+  };
+
+  const handleConfirmQuotationPayment = async (quotationId: string, expectedRevision: number) => {
+    if (!order || busy) return false;
+    return runAction(async () => {
+      await providerOrderApi.confirmQuotationPayment(order._id, quotationId, expectedRevision);
+    }, 'Không thể xác nhận thanh toán báo giá.', true, 'Đã xác nhận nhận đủ tiền sửa chữa theo báo giá.');
   };
 
   const requestCancelConfirmation = () => {
@@ -153,7 +197,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
     const succeeded = await runAction(async () => {
       await providerOrderApi.cancelOrder(order._id, cancellationReason);
-    }, 'Không thể hủy đơn.', false);
+    }, 'Không thể hủy đơn.', false, 'Đã hủy nhận đơn dịch vụ.');
     if (!succeeded) return;
 
     setCancelConfirmOpen(false);
@@ -164,10 +208,16 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   };
 
   const handleCreateQuotation = async (payload: Parameters<typeof providerOrderApi.createQuotation>[1]) => {
-    if (!orderId) return;
-    await runAction(async () => {
-      await providerOrderApi.createQuotation(orderId, payload);
-    }, 'Không thể gửi báo giá.');
+    if (!orderId) return false;
+    const succeeded = await runAction(async () => {
+      if (quotation) {
+        await providerOrderApi.updateQuotation(orderId, quotation.quotation._id, quotation.quotation.revision ?? 0, payload);
+      } else {
+        await providerOrderApi.createQuotation(orderId, payload);
+      }
+    }, 'Không thể lưu báo giá.');
+    if (succeeded) addToast('Đã lưu báo giá.', 'success');
+    return succeeded;
   };
 
   return {
@@ -191,8 +241,10 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     handleReject,
     handleStart,
     handleComplete,
+    handleConfirmQuotationPayment,
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,
+    reload: loadData,
   };
 }

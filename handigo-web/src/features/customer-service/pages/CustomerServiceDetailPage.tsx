@@ -1,9 +1,13 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useState } from "react";
+import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import { ServiceQuantityPanel } from '@/features/booking/components/ServiceQuantityPanel';
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import type { ServiceOption } from "@/types/booking";
 import { AsyncState } from "@/components/common/AsyncState";
+import { ServiceProcessSection } from '@/components/common/ServiceProcessSection';
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import { NearbyProviderSelector } from "../components/NearbyProviderSelector";
 import { ServiceDetailSkeleton } from "../components/ServiceDetailSkeleton";
@@ -24,6 +28,7 @@ import {
   toggleServiceOption,
 } from "@/features/booking/utils/serviceOptionSelection";
 import { ChevronRight } from "lucide-react";
+import { PromotionBanner } from "../components/PromotionBanner";
 
 export default function CustomerServiceDetailPage() {
   const { serviceId } = useParams();
@@ -36,17 +41,13 @@ export default function CustomerServiceDetailPage() {
     useServiceDetailData(serviceId);
 
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
-  const [selectedOptionQuantities, setSelectedOptionQuantities] = useState<
-    Record<string, number>
-  >({});
-  const [optionSelectionError, setOptionSelectionError] = useState("");
+  const [selectedOptionQuantities, setSelectedOptionQuantities] = useState<Record<string, number>>({});
+  const [optionSelectionError, setOptionSelectionError] = useToastFeedback<string>("", "error");
+  const [quantitySelection, setQuantitySelection] = useState({ serviceId, quantity: 1 });
+  const uniformQuantity = quantitySelection.serviceId === serviceId ? quantitySelection.quantity : 1;
+  const isCleaning = isAirConditionerCleaning(service) && options.length === 0;
 
-  const { estimatePrice } = useServicePricing(
-    service,
-    options,
-    selectedOptionIds,
-    selectedOptionQuantities,
-  );
+  const { estimatePrice } = useServicePricing(service, options, selectedOptionIds, selectedOptionQuantities);
 
   const {
     addresses,
@@ -77,13 +78,11 @@ export default function CustomerServiceDetailPage() {
   const handleToggleOption = (option: ServiceOption) => {
     setOptionSelectionError("");
     setSelectedOptionIds((current) => toggleServiceOption(current, option, options));
-    setSelectedOptionQuantities((current) => ({
-      ...current,
-      [option._id]: current[option._id] ?? 1,
-    }));
+    setSelectedOptionQuantities((current) => ({ ...current, [option._id]: current[option._id] ?? 1 }));
   };
 
   const handleBookNow = useBookNowHandler({
+    options,
     service,
     isAuthenticated,
     navigate,
@@ -92,6 +91,7 @@ export default function CustomerServiceDetailPage() {
     selectedOptionIds,
     selectedOptionQuantities,
     setAddressSelectionError,
+    uniformQuantity,
     setOptionSelectionError,
     selectService,
   });
@@ -105,26 +105,24 @@ export default function CustomerServiceDetailPage() {
           </div>
         ) : (
           <>
+            <PromotionBanner serviceId={service._id} />
             <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
-              <Link to="/customer" className="inline-flex min-h-11 items-center hover:text-primary">
-                Trang chủ
-              </Link>
+              <Link to="/customer" className="inline-flex min-h-11 items-center hover:text-primary">Trang chủ</Link>
               <ChevronRight aria-hidden="true" size={16} />
-              <Link to="/customer/services" className="inline-flex min-h-11 items-center hover:text-primary">
-                Dịch vụ
-              </Link>
+              <Link to="/customer/services" className="inline-flex min-h-11 items-center hover:text-primary">Dịch vụ</Link>
               <ChevronRight aria-hidden="true" size={16} />
               <span className="font-semibold text-on-surface">{service.name}</span>
             </nav>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
               <div className="space-y-8 lg:col-span-8">
-                <ServiceGallery
-                  service={service}
-                  categoryName={getCategoryName(service, categories)}
-                />
+                <ServiceGallery service={service} categoryName={getCategoryName(service, categories)} />
                 <ServiceDescriptionSection service={service} />
-                <ServiceOptionsSection
+                <ServiceProcessSection steps={service.processSteps} />
+                {isCleaning ? <>
+                  <ServiceQuantityPanel price={service.fixedPrice} quantity={uniformQuantity}
+                    onChange={(quantity) => setQuantitySelection({ serviceId, quantity })} />
+                </> : <ServiceOptionsSection
                   service={service}
                   options={options}
                   optionGroups={optionGroups}
@@ -138,7 +136,7 @@ export default function CustomerServiceDetailPage() {
                       [optionId]: quantity,
                     }))
                   }
-                />
+                />}
                 <ServiceChecklistSection />
                 <RelatedServicesSection relatedServices={relatedServices} />
               </div>
@@ -146,7 +144,7 @@ export default function CustomerServiceDetailPage() {
               <aside className="space-y-5 lg:sticky lg:top-28 lg:col-span-4">
                 <BookingSidebar
                   service={service}
-                  estimatePrice={estimatePrice}
+                  estimatePrice={isCleaning ? (service.fixedPrice || 0) * uniformQuantity : estimatePrice}
                   addresses={addresses}
                   addressId={addressId}
                   isLoadingAddresses={isLoadingAddresses}
@@ -154,17 +152,13 @@ export default function CustomerServiceDetailPage() {
                   addressSelectionError={addressSelectionError}
                   requiresPhoneUpdate={requiresPhoneUpdate}
                   onAddressChange={handleAddressChange}
-                  isBookDisabled={false}
+                  isBookDisabled={isCleaning && !(service.fixedPrice && service.fixedPrice > 0)}
                   onBookNow={handleBookNow}
                 />
-
                 <NearbyProviderSelector
                   serviceId={service._id}
                   addressId={addressId}
-                  enabled={
-                    !isLoadingAddresses &&
-                    addresses.some((address) => address._id === addressId)
-                  }
+                  enabled={!isLoadingAddresses && addresses.some((address) => address._id === addressId)}
                   allowSelection={false}
                 />
               </aside>

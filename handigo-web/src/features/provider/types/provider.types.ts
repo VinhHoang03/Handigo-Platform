@@ -174,6 +174,9 @@ export interface ProviderProfileResponse {
     mainServiceText?: string;
     experienceYears: number;
     availabilityStatus: 'online' | 'offline' | 'busy';
+    autoAcceptScheduledBookings: boolean;
+    autoAcceptScheduledBookingMinAdvanceMinutes: number;
+    autoAcceptScheduledBookingHorizonDays: number;
     verified: boolean;
     serviceIds: string[];
     services?: ProviderServiceRef[];

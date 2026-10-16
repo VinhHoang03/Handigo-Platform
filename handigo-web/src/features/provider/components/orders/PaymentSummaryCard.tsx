@@ -1,4 +1,5 @@
 import type { Order } from '@/types/booking';
+import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
 import type { QuotationDetail } from '../../types/providerOrder.types';
 import { formatMoney, getPaymentMethodLabel } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
@@ -12,52 +13,54 @@ interface PaymentSummaryCardProps {
 
 export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentSummaryCardProps) {
   const discount = (order.pricing?.promotionDiscountAmount || 0) + (order.pricing?.voucherDiscountAmount || 0);
-  const discountCode = order.voucherSnapshot?.code || order.promotionSnapshot?.code;
-  const isQuotationOrder = Boolean(order.inspectionRequired);
-  const quotationAmount = quotation?.quotation.finalAmount;
-  const orderValue = isQuotationOrder
-    ? quotationAmount === undefined
-      ? 'Chưa báo giá'
-      : formatMoney(quotationAmount)
-    : formatMoney(order.pricing?.totalPaidAmount);
-  const providerEarning = isQuotationOrder
-    ? quotationAmount === undefined
-      ? 'Chưa báo giá'
-      : formatMoney(quotationAmount)
-    : formatMoney(order.pricing?.providerEarningAmount);
+  const isQuotationOrder = Boolean(order.inspectionRequired || order.serviceId?.serviceType === 'variable_price');
+  const isCancelled = order.status === 'cancelled';
+  const isCash = order.paymentMethod === 'cash';
+  const repairQuotation = quotation?.quotation;
+  const quotationAmount = repairQuotation?.finalAmount;
+  const appliedDepositAmount = getAppliedQuotationDeposit(order);
+  const directRepairAmount = quotationAmount === undefined
+    ? undefined : getDirectRepairPayment(quotationAmount, appliedDepositAmount);
+  const displayedPaymentStatus = !isQuotationOrder && !isCancelled && isCash
+    ? order.paymentStatus === 'paid' ? 'Đã thu tiền mặt' : 'Chưa thu tiền'
+    : paymentStatus;
+  const paymentMethod = order.paymentMethod === 'bank' ? 'QR PayOS' : getPaymentMethodLabel(order.paymentMethod);
 
   return (
     <section className="order-3 h-full rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg md:col-span-2 lg:order-2 lg:col-span-1">
-      <CardTitle icon={Wallet} title="Thanh toán và thu nhập" />
-      <div className="mt-md flex items-center justify-between gap-3 rounded-2xl bg-surface-container-low p-3">
-        <span className="text-sm text-on-surface-variant">Trạng thái thanh toán</span>
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{paymentStatus}</span>
-      </div>
-      <div className="mt-md space-y-3 text-sm">
+      <CardTitle icon={Wallet} title="Thanh toán đơn hàng" />
+      <dl className="mt-md space-y-3 text-sm">
+        {displayedPaymentStatus && <FinancialRow label={isQuotationOrder ? 'Trạng thái tiền cọc' : 'Trạng thái thanh toán'} value={displayedPaymentStatus} />}
         {isQuotationOrder && (
-          <FinancialRow label="Tiền cọc đơn hàng" value={formatMoney(order.depositAmount)} />
+          <>
+            <FinancialRow label="Tiền cọc đã thanh toán" value={formatMoney(appliedDepositAmount)} />
+            <FinancialRow label="Giá trị đơn hàng" value={quotationAmount === undefined ? '' : formatMoney(quotationAmount)} total />
+            {quotationAmount !== undefined && !isCancelled && (
+              <>
+                <FinancialRow
+                  label={repairQuotation?.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách' : 'Còn cần thu trực tiếp'}
+                  value={formatMoney(directRepairAmount)}
+                  total
+                />
+              </>
+            )}
+          </>
         )}
-        <FinancialRow label="Giá trị đơn hàng" value={orderValue} strong />
-        {(order.cancellation?.refundPolicy?.providerCompensation || 0) > 0 && (
-          <FinancialRow
-            label="Bồi thường phí hủy"
-            value={formatMoney(order.cancellation?.refundPolicy?.providerCompensation)}
-            strong
-          />
+        {!isQuotationOrder && (
+          <>
+            <FinancialRow label="Giá trị dịch vụ" value={formatMoney(order.pricing.bookingAmount)} />
+            {discount > 0 && <FinancialRow label="Giảm giá" value={`-${formatMoney(discount)}`} />}
+            <FinancialRow label="Tổng tiền khách phải trả" value={formatMoney(order.pricing.totalPaidAmount)} total />
+          </>
         )}
-        {!isQuotationOrder && discountCode && <FinancialRow label="Mã giảm giá" value={discountCode} />}
-        {!isQuotationOrder && <FinancialRow label="Số tiền giảm giá" value={`-${formatMoney(discount)}`} tone="discount" />}
-        {!isQuotationOrder && <FinancialRow label="Phí nền tảng" value={`-${formatMoney(order.pricing?.platformCommissionAmount)}`} tone="fee" />}
-        {!isQuotationOrder && <FinancialRow label="Tỷ lệ phí nền tảng" value={`${Math.round((order.pricing?.platformCommissionRate || 0) * 100)}%`} />}
         <FinancialRow
-          label={isQuotationOrder ? 'Phương thức thanh toán tiền cọc' : 'Phương thức thanh toán'}
-          value={getPaymentMethodLabel(order.paymentMethod)}
+          label={isQuotationOrder ? 'Phương thức thanh toán tiền cọc' : 'Phương thức'}
+          value={paymentMethod}
         />
-      </div>
-      <div className="mt-md rounded-2xl bg-success-container p-4">
-        <p className="text-xs font-bold uppercase tracking-wide text-on-success-container">Thu nhập thực nhận</p>
-        <p className="mt-1 text-2xl font-bold tabular-nums text-on-success-container">{providerEarning}</p>
-      </div>
+      </dl>
+      {!isQuotationOrder && !isCancelled && !isCash && order.paymentStatus === 'paid' && (
+        <p className="mt-3 text-xs text-on-surface-variant">Khách đã thanh toán trực tuyến. Không thu thêm tiền mặt từ khách.</p>
+      )}
     </section>
   );
 }
@@ -65,19 +68,16 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
 function FinancialRow({
   label,
   value,
-  strong,
-  tone,
+  total,
 }: {
   label: string;
   value: string;
-  strong?: boolean;
-  tone?: 'discount' | 'fee';
+  total?: boolean;
 }) {
-  const valueColor = tone === 'discount' ? 'text-success' : tone === 'fee' ? 'text-error' : 'text-on-surface';
   return (
     <div className="flex items-start justify-between gap-4 border-b border-outline-variant/20 pb-3 last:border-0 last:pb-0">
-      <span className="text-on-surface-variant">{label}</span>
-      <span className={`text-right tabular-nums ${strong ? 'font-bold' : 'font-semibold'} ${valueColor}`}>{value}</span>
+      <dt className={total ? 'font-bold text-on-surface' : 'text-on-surface-variant'}>{label}</dt>
+      <dd className={`min-w-0 break-words text-right tabular-nums text-on-surface ${total ? 'text-base font-bold' : 'font-semibold'}`}>{value}</dd>
     </div>
   );
 }

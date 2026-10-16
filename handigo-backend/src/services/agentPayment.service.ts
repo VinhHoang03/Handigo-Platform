@@ -5,6 +5,7 @@ import type { RequestUser } from "../middlewares/authContext";
 import type { CreatePaymentInput } from "../validations/payment.validator";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { buildOrderPaymentRedirects } from "../utils/paymentRedirect";
 
 export const agentPaymentResultSchema = z.object({
   orderId: z.string().regex(/^[a-f\d]{24}$/i), orderCode: z.string(),
@@ -12,10 +13,13 @@ export const agentPaymentResultSchema = z.object({
   message: z.string(), amount: z.number().nonnegative().optional(),
   method: z.string().optional(), paymentType: z.string().optional(),
   checkoutUrl: z.string().url().optional(),
+  paymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
 });
 export type AgentPaymentResult = z.infer<typeof agentPaymentResultSchema>;
 export type AgentPaymentArguments = { orderId: string; method: CreatePaymentInput["method"] };
-export const paymentExpectationSchema = z.object({ amount: z.number().positive(), paymentType: z.enum(["full", "inspection_deposit"]) });
+export const paymentExpectationSchema = z.object({ amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]),
+  previousPaymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
+  previousPaymentMethod: z.enum(["cash", "payos"]).optional() });
 
 // Liên kết chỉ lấy từ giao dịch backend, không lấy từ nội dung LLM.
 export const safePayosUrl = (value: unknown) => {
@@ -31,9 +35,9 @@ const dependencies = {
   order: (user: RequestUser, orderId: string) => Order.findOne({ _id: orderId, customerId: user.id, isDeleted: false }).exec(),
   payments: (orderId: string) => Payment.find({ orderId, isDeleted: false }).sort({ createdAt: -1 }).exec(),
   preview: async (user: RequestUser, args: AgentPaymentArguments) =>
-    (await import("./payment.service")).previewOrderPayment(user, args.orderId, args.method),
-  create: async (user: RequestUser, input: CreatePaymentInput, expected: z.infer<typeof paymentExpectationSchema>) =>
-    (await import("./payment.service")).createPayment(user, input, expected),
+    (await import("./payment.service")).previewOrderPayment(user, args.orderId, args.method, true),
+  create: async (user: RequestUser, input: CreatePaymentInput, expected: z.infer<typeof paymentExpectationSchema>, signal?: AbortSignal) =>
+    (await import("./payment.service")).createAgentOrderPayment(user, input, expected, signal),
   reconcile: async (user: RequestUser, orderId: string) =>
     (await import("./payment.service")).reconcilePayosPaymentForOrder(orderId, user),
 };
@@ -55,7 +59,7 @@ export function createAgentPaymentService(deps = dependencies) {
     }
     const payment = payments.find((item) => ["paid", "pending"].includes(item.status)) ?? payments[0];
     const base = { orderId, orderCode: order.orderCode, amount: payment?.amount,
-      method: payment?.method, paymentType: payment?.paymentType };
+      method: payment?.method, paymentType: payment?.paymentType, paymentId: payment ? String(payment._id) : undefined };
     if (payment?.status === "paid") return { ...base,
       status: payment.paymentType === "inspection_deposit" ? "deposit_paid" : "paid",
       message: payment.paymentType === "inspection_deposit"
@@ -68,9 +72,10 @@ export function createAgentPaymentService(deps = dependencies) {
       if (payment.method === "cash") return { ...base, status: "cash_pending", message: "Đã ghi nhận thanh toán tiền mặt. Bạn thanh toán trực tiếp cho nhà cung cấp; đơn chưa được đánh dấu đã thanh toán." };
       const link = payment.gatewayResponse?.paymentLink as { checkoutUrl?: unknown } | undefined;
       return { ...base, status: "pending", checkoutUrl: safePayosUrl(link?.checkoutUrl),
-        message: "Giao dịch đang chờ thanh toán. Mở PayOS để thanh toán hoặc hủy giao dịch trước khi đổi phương thức, sau đó chọn Kiểm tra thanh toán. Không tạo đơn mới." };
+        message: "Giao dịch đang chờ thanh toán. Quét mã QR trong khung thanh toán ngay tại đây. Hệ thống sẽ xác minh kết quả thanh toán cho bạn." };
     }
     if (["scheduled", "recurring"].includes(order.orderType)
+      && !(order.status === "created" && !order.providerId && order.bookingStatus !== "reserved")
       && (order.status !== "accepted" || order.bookingStatus !== "awaiting_payment" || !order.providerId)) {
       return { ...base, status: "blocked", message: "Lịch hẹn đang chờ chuyên gia xác nhận. Chỉ thanh toán khi đơn chuyển sang chờ thanh toán." };
     }
@@ -84,21 +89,24 @@ export function createAgentPaymentService(deps = dependencies) {
       await ownedOrder(user, args.orderId);
       return deps.preview(user, args);
     },
-    async pay(user: RequestUser, args: AgentPaymentArguments, confirmed: unknown): Promise<AgentPaymentResult> {
+    async pay(user: RequestUser, args: AgentPaymentArguments, confirmed: unknown, signal?: AbortSignal): Promise<AgentPaymentResult> {
       const order = await ownedOrder(user, args.orderId);
       const expected = paymentExpectationSchema.parse(confirmed);
       let executionStarted = false;
       try {
         const current = await deps.preview(user, args);
-        if (current.amount !== expected.amount || current.paymentType !== expected.paymentType) throw new ActionPreconditionError();
+        if (current.amount !== expected.amount || current.paymentType !== expected.paymentType
+          || current.previousPaymentId !== expected.previousPaymentId
+          || current.previousPaymentMethod !== expected.previousPaymentMethod) throw new ActionPreconditionError();
         // URL trở về lấy từ cấu hình server, tuyệt đối không cho LLM chọn tên miền.
-        const frontend = process.env.FRONTEND_URL?.trim();
-        const detailUrl = frontend ? new URL(`/customer/bookings/${args.orderId}`, frontend).href : undefined;
+        const redirectUrls = buildOrderPaymentRedirects(args.orderId, process.env.FRONTEND_URL?.trim() || "https://localhost:5173", {
+          returnUrl: process.env.PAYOS_RETURN_URL, cancelUrl: process.env.PAYOS_CANCEL_URL,
+        });
         executionStarted = true;
         await deps.create(user, { ...args,
           paymentType: expected.paymentType === "inspection_deposit" ? "INSPECTION_DEPOSIT" : "FULL",
-          ...(detailUrl ? { returnUrl: detailUrl, cancelUrl: detailUrl } : {}),
-        }, expected);
+          ...redirectUrls,
+        }, expected, signal);
       } catch (error) {
         if (error instanceof ActionPreconditionError || (!executionStarted && error instanceof AppError && error.statusCode < 500)) {
           return { orderId: args.orderId, orderCode: order.orderCode, status: "blocked", message: error.message };

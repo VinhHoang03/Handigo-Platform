@@ -2,6 +2,8 @@ import { lazy } from "react";
 import { Route } from "react-router-dom";
 import { RouteGuard } from "@/components/common/RouteGuard";
 import { HomeRoute, WalletPage, CaseManagementPage } from "./shared-lazy-pages";
+const CustomerRewardsPage = lazy(() => import("@/features/rewards/pages/CustomerRewardsPage"));
+const PaymentReturnPage = lazy(() => import("@/features/booking/pages/PaymentReturnPage"));
 
 const BookingDetailPage = lazy(
   () => import("@/features/booking/pages/BookingDetailPage"),
@@ -18,8 +20,8 @@ const CreateBookingStep1Page = lazy(
 const CreateBookingStep2Page = lazy(
   () => import("@/features/booking/pages/CreateBookingStep2Page"),
 );
-const BookingSuccessPage = lazy(
-  () => import("@/features/booking/pages/BookingSuccessPage"),
+const BookingResultPage = lazy(
+  () => import("@/features/booking/pages/BookingResultPage"),
 );
 const CustomerProfilePage = lazy(
   () => import("@/features/customer/pages/CustomerProfilePage"),
@@ -36,6 +38,9 @@ const PublicProviderProfilePage = lazy(
 const CustomerFeedbackPage = lazy(
   () => import("@/features/feedback/pages/CustomerFeedbackPage"),
 );
+const CustomerBankAccountsPage = lazy(
+  () => import("@/features/bank-account/pages/ProviderBankAccountsPage"),
+);
 
 /** Customer-area routes (guarded by RouteGuard where required). Called as a
  * function inside <Routes> so the returned Fragment's <Route> children are
@@ -43,6 +48,10 @@ const CustomerFeedbackPage = lazy(
 export function CustomerRoutes() {
   return (
     <>
+      <Route path="/customer/bookings/success" element={<RouteGuard roles={["CUSTOMER"]}><PaymentReturnPage /></RouteGuard>} />
+      <Route path="/payment/success" element={<RouteGuard roles={["CUSTOMER"]}><PaymentReturnPage /></RouteGuard>} />
+      <Route path="/payment/cancel" element={<RouteGuard roles={["CUSTOMER"]}><PaymentReturnPage /></RouteGuard>} />
+      <Route path="/customer/rewards" element={<RouteGuard roles={["CUSTOMER"]}><CustomerRewardsPage /></RouteGuard>} />
       <Route
         path="/customer/bookings"
         element={
@@ -76,10 +85,10 @@ export function CustomerRoutes() {
         }
       />
       <Route
-        path="/customer/bookings/success"
+        path="/customer/bookings/result"
         element={
           <RouteGuard roles={["CUSTOMER"]}>
-            <BookingSuccessPage />
+            <BookingResultPage />
           </RouteGuard>
         }
       />
@@ -128,6 +137,14 @@ export function CustomerRoutes() {
         element={
           <RouteGuard roles={["CUSTOMER"]}>
             <WalletPage role="CUSTOMER" />
+          </RouteGuard>
+        }
+      />
+      <Route
+        path="/customer/bank-accounts"
+        element={
+          <RouteGuard roles={["CUSTOMER"]}>
+            <CustomerBankAccountsPage role="CUSTOMER" />
           </RouteGuard>
         }
       />

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToastFeedback } from "@/components/common/Toast";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import { useBookingStore } from '../hooks/useBookingStore';
@@ -7,10 +8,13 @@ import type { ProviderAvailabilityStatus } from '@/features/customer-service/com
 import {
   type Step2FormErrors,
   MIN_DESCRIPTION_LENGTH,
-  buildRecurringPreview,
+  getEarliestScheduledAt,
+  getDefaultScheduledAt,
+  getInitialScheduledAt,
   getTodayInputValue,
   getUpcomingDates,
   getUploadErrorMessage,
+  isWithinImmediateBookingHours,
   validateImageFile,
 } from './step2Helpers';
 
@@ -20,46 +24,72 @@ export const useCreateBookingStep2Form = () => {
   const location = useLocation();
   const {
     serviceId, addressId, setAddressId,
-    preferredProviderId, setPreferredProviderId,
+    preferredProviderId, preferredProviderName, setPreferredProviderId,
     requestedProviderId,
     orderType, setOrderType,
-    scheduledAt, setScheduledAt, problemDescription, setProblemDescription,
-    recurrenceUnit = 'weekly', setRecurrenceUnit,
-    recurrenceCount = 1, setRecurrenceCount,
+    scheduledAt, setScheduledAt, isScheduleAutomatic, problemDescription, setProblemDescription,
     customerAttachments, setCustomerAttachments,
   } = useBookingStore();
   const [isUploadingImages, setIsUploadingImages] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useToastFeedback<string | null>(null, "error");
   const [formErrors, setFormErrors] = useState<Step2FormErrors>({});
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [providerAvailability, setProviderAvailability] = useState<ProviderAvailabilityStatus>('idle');
-  const todayInputValue = useMemo(() => getTodayInputValue(), []);
-  const upcomingDates = useMemo(() => getUpcomingDates(), []);
-  const recurringPreview = useMemo(
-    () => buildRecurringPreview(scheduledAt, recurrenceUnit, recurrenceCount),
-    [recurrenceCount, recurrenceUnit, scheduledAt],
-  );
-  const recurrenceCountOptions = recurrenceUnit === 'weekly'
-    ? ([1, 2, 3, 4] as const)
-    : ([4, 8, 12] as const);
+  const scheduleInitialized = useRef(false);
+  const todayInputValue = getTodayInputValue(new Date(currentTimestamp));
+  const upcomingDates = useMemo(() => getUpcomingDates(new Date(`${todayInputValue}T00:00:00`)), [todayInputValue]);
+  const isImmediateBookingAvailable = isWithinImmediateBookingHours(new Date(currentTimestamp));
   const isFromServiceDetail = Boolean(
     (location.state as { fromServiceDetail?: boolean } | null)?.fromServiceDetail,
   );
 
   useEffect(() => {
-    const timer = window.setInterval(() => setCurrentTimestamp(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
+    let interval: number | undefined;
+    const updateCurrentTime = () => {
+      const now = new Date();
+      const booking = useBookingStore.getState();
+      if (booking.isScheduleAutomatic && booking.orderType === 'scheduled') {
+        const nextScheduledAt = getDefaultScheduledAt(now);
+        if (nextScheduledAt !== booking.scheduledAt) {
+          booking.setScheduledAt(nextScheduledAt, true);
+        }
+      }
+      setCurrentTimestamp(now.getTime());
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') updateCurrentTime();
+    };
+    const timeout = window.setTimeout(() => {
+      updateCurrentTime();
+      interval = window.setInterval(updateCurrentTime, 60_000);
+    }, 60_000 - (Date.now() % 60_000));
+    window.addEventListener('focus', updateCurrentTime);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.clearTimeout(timeout);
+      if (interval !== undefined) window.clearInterval(interval);
+      window.removeEventListener('focus', updateCurrentTime);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
-    const isValidCount = recurrenceUnit === 'weekly'
-      ? [1, 2, 3, 4].some((count) => count === recurrenceCount)
-      : [4, 8, 12].some((count) => count === recurrenceCount);
-    if (!isValidCount) {
-      setRecurrenceCount(recurrenceUnit === 'weekly' ? 1 : 4);
+    if (orderType === 'urgent' || orderType === 'recurring') {
+      setOrderType(orderType === 'urgent' ? 'normal' : 'scheduled');
       setPreferredProviderId(undefined);
     }
-  }, [recurrenceCount, recurrenceUnit, setPreferredProviderId, setRecurrenceCount]);
+  }, [orderType, setOrderType, setPreferredProviderId]);
+
+  useEffect(() => {
+    if (scheduleInitialized.current || orderType !== 'scheduled') return;
+    scheduleInitialized.current = true;
+    if (scheduledAt && !isScheduleAutomatic) return;
+    const initialScheduledAt = getInitialScheduledAt(scheduledAt);
+    if (initialScheduledAt !== scheduledAt) {
+      setScheduledAt(initialScheduledAt, true);
+      setPreferredProviderId(undefined);
+    }
+  }, [orderType, scheduledAt, isScheduleAutomatic, setScheduledAt, setPreferredProviderId]);
 
   const handleUploadImages = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -115,14 +145,16 @@ export const useCreateBookingStep2Form = () => {
     setCustomerAttachments(customerAttachments.filter((item) => item !== url));
   };
 
-  const handleOrderTypeChange = (type: 'normal' | 'scheduled' | 'recurring') => {
+  const handleOrderTypeChange = (type: 'normal' | 'scheduled') => {
+    setCurrentTimestamp(Date.now());
+    if (type === orderType) return;
     setOrderType(type);
     setPreferredProviderId(undefined);
     setProviderAvailability('idle');
     if (type === 'normal') setScheduledAt('');
   };
 
-  const shouldShowSchedulePicker = orderType !== 'normal';
+  const shouldShowSchedulePicker = orderType === 'scheduled';
 
   const clearFormError = useCallback((field: keyof Step2FormErrors) => {
     setFormErrors((currentErrors) => {
@@ -155,6 +187,10 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.problemDescription = 'Vui lòng mô tả tình trạng tối thiểu ' + MIN_DESCRIPTION_LENGTH + ' ký tự.';
     }
 
+    if (orderType === 'normal' && !isWithinImmediateBookingHours(new Date())) {
+      nextErrors.scheduledAt = 'Đặt ngay chỉ khả dụng từ 08:00 đến 21:00. Vui lòng chọn Hẹn giờ.';
+    }
+
     if (shouldShowSchedulePicker && !scheduleDate) {
       nextErrors.scheduledAt = 'Vui lòng chọn ngày thực hiện dịch vụ.';
     } else if (shouldShowSchedulePicker && !scheduledAt?.includes('T')) {
@@ -162,8 +198,20 @@ export const useCreateBookingStep2Form = () => {
     } else if (scheduleDate && scheduleDate < todayInputValue) {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
     }
-    // Chỉ kiểm tra sẵn sàng khi khách chọn thợ cụ thể; tìm tự động chạy sau khi tạo đơn.
-    if (preferredProviderId && providerAvailability !== 'available') {
+    if (shouldShowSchedulePicker && scheduledAt?.includes('T')
+      && (new Date(scheduledAt).getHours() < 8
+        || new Date(scheduledAt).getHours() > 21
+        || (new Date(scheduledAt).getHours() === 21 && (
+          new Date(scheduledAt).getMinutes() > 0
+          || new Date(scheduledAt).getSeconds() > 0
+          || new Date(scheduledAt).getMilliseconds() > 0
+        ))
+        || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())) {
+      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.';
+    }
+    // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
+    // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.
+    if (providerAvailability !== 'available') {
       nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
         ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
         : shouldShowSchedulePicker
@@ -177,16 +225,17 @@ export const useCreateBookingStep2Form = () => {
 
   const handleContinue = () => {
     if (!validateStep()) return;
-    navigate('/customer/bookings/new/payment');
+    navigate('/customer/bookings/new/payment', {
+      state: { immediateBookingAt: orderType === 'normal' ? new Date().toISOString() : undefined },
+    });
   };
 
   return {
-    serviceId, addressId, preferredProviderId, requestedProviderId, orderType,
+    serviceId, addressId, preferredProviderId, preferredProviderName, requestedProviderId, orderType,
     scheduledAt, setScheduledAt, problemDescription, setProblemDescription,
-    recurrenceUnit, setRecurrenceUnit, recurrenceCount, setRecurrenceCount,
     customerAttachments, setPreferredProviderId,
     isUploadingImages, uploadError, formErrors, currentTimestamp, providerAvailability,
-    todayInputValue, upcomingDates, recurringPreview, recurrenceCountOptions, isFromServiceDetail,
+    todayInputValue, upcomingDates, isFromServiceDetail, isImmediateBookingAvailable,
     shouldShowSchedulePicker,
     handleUploadImages, handleRemoveAttachment, handleOrderTypeChange, clearFormError,
     handleSelectAddress, handleContinue, setProviderAvailability,

@@ -1,4 +1,6 @@
 import vision from "@google-cloud/vision";
+import { existsSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import { PDFDocument } from "pdf-lib";
 
 export type OcrDocumentKind =
@@ -32,6 +34,26 @@ export interface OcrResult {
 
 // Vision client tự tìm thông tin xác thực theo chuẩn Application Default Credentials.
 let visionClient: InstanceType<typeof vision.ImageAnnotatorClient> | null = null;
+
+const hasMissingExplicitCredentials = () => {
+  const credentialPath = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  if (!credentialPath) return false;
+
+  const resolvedPath = resolve(credentialPath);
+  if (!existsSync(resolvedPath)) return true;
+
+  try {
+    return !statSync(resolvedPath).isFile();
+  } catch {
+    return true;
+  }
+};
+
+const getOcrUnavailableSuggestion = (): OcrSuggestion => ({
+  warnings: [
+    "Google Cloud Vision OCR chưa được cấu hình. Vui lòng nhập thông tin giấy tờ thủ công.",
+  ],
+});
 
 const getVisionClient = () => {
   if (!visionClient) {
@@ -326,6 +348,10 @@ export const extractDocumentSuggestion = async (
   mimeType: string,
   kind: OcrDocumentKind,
 ): Promise<OcrSuggestion> => {
+  if (hasMissingExplicitCredentials()) {
+    return getOcrUnavailableSuggestion();
+  }
+
   const result = await extractText(buffer, mimeType);
   const suggestion =
     kind === "certificate"

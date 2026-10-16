@@ -1,3 +1,4 @@
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -10,6 +11,7 @@ import { PromotionHeader } from "../components/promotions/PromotionHeader";
 import { PromotionToolbar } from "../components/promotions/PromotionToolbar";
 import { buildVoucherColumns } from "../components/promotions/promotion-table-columns";
 import { VoucherModal } from "../components/promotions/VoucherModal";
+import { RewardOffersPanel } from "../components/promotions/RewardOffersPanel";
 import {
   buildPayload,
   emptyForm,
@@ -18,19 +20,22 @@ import {
   type VoucherFormState,
 } from "../components/promotions/promotion-format";
 import type { Voucher, VoucherQuery } from "../types/voucher.types";
+import { AutomaticPromotionsPanel } from '../components/promotions/AutomaticPromotionsPanel';
 
 export default function AdminPromotionsPage() {
+  const [automatic, setAutomatic] = useState(false);
   const [query, setQuery] = useState<VoucherQuery>({
     page: 1,
     limit: 10,
     search: "",
     status: "",
+    source: "all",
   });
   const [items, setItems] = useState<Voucher[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [notice, setNotice] = useToastFeedback<string>("", "success");
   const [busy, setBusy] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
   const [form, setForm] = useState<VoucherFormState>(emptyForm);
@@ -55,7 +60,7 @@ export default function AdminPromotionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, setError]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 250);
@@ -86,6 +91,7 @@ export default function AdminPromotionsPage() {
       maxDiscountAmount: voucher.maxDiscountAmount == null ? "" : String(voucher.maxDiscountAmount),
       minOrderAmount: voucher.minOrderAmount == null ? "" : String(voucher.minOrderAmount),
       usageLimit: voucher.usageLimit == null ? "" : String(voucher.usageLimit),
+      perUserLimit: voucher.perUserLimit == null ? "" : String(voucher.perUserLimit),
       startAt: toLocalInputValue(voucher.startAt),
       endAt: toLocalInputValue(voucher.endAt),
       status: voucher.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
@@ -152,8 +158,14 @@ export default function AdminPromotionsPage() {
 
   return (
     <DashboardShell role="ADMIN">
+      <div className="mb-6 flex gap-3"><button type="button" aria-pressed={!automatic} onClick={() => setAutomatic(false)} className="rounded-xl border p-3">Voucher nhập mã</button><button type="button" aria-pressed={automatic} onClick={() => setAutomatic(true)} className="rounded-xl border p-3">Khuyến mãi tự động</button></div>
+      {automatic ? <AutomaticPromotionsPanel /> : <>
       <div className="space-y-6">
         <PromotionHeader stats={stats} notice={notice} error={error} onCreate={openCreate} />
+
+        <RewardOffersPanel />
+
+        <h2 className="text-lg font-bold text-on-surface">Mã giảm giá đã phát hành</h2>
 
         <PromotionToolbar query={query} onQueryChange={setQuery} onRefresh={() => void load()} />
 
@@ -192,6 +204,7 @@ export default function AdminPromotionsPage() {
         onCancelDelete={() => setDeleteTarget(null)}
         onConfirmDelete={confirmDelete}
       />
+      </>}
     </DashboardShell>
   );
 }
