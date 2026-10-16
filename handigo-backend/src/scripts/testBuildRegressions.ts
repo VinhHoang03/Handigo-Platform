@@ -176,7 +176,7 @@ async function testAssignments() {
   order.scheduledAt = new Date(Date.now() + 2 * 86400000);
   order.recurringGroupId = new Types.ObjectId();
   let relatedUpdated = false;
-  mock.method(Order, "find", () => ({ select: async () => [order] }));
+  mock.method(Order, "find", () => ({ session: async () => [order] }));
   mock.method(Order, "exists", async () => null);
   mock.method(Order, "findOneAndUpdate", async (_filter: unknown, update: { $set: object }) => {
     Object.assign(order, update.$set);
@@ -186,6 +186,9 @@ async function testAssignments() {
     assert.equal(update.$set.bookingStatus, "reserved");
     relatedUpdated = true;
   });
+  await assert.rejects(AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString()), /Trùng lịch/);
+  assert.equal(claimed, claimsBeforeConflict, "Lịch hẹn cũng phải chặn trùng lịch trước khi nhận");
+  scheduleCheck.mock.mockImplementation(async () => { assert.equal(active, true); });
   const appointment = await AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString());
   assert.equal(appointment.order.status, "accepted");
   assert.equal(appointment.order.bookingStatus, "confirmed");
@@ -271,6 +274,11 @@ async function testOrderCreation() {
 }
 
 async function run() {
+  if (process.argv.includes("--assignments-only")) {
+    await testAssignments();
+    console.log("Đã kiểm tra nhận đơn thường và lịch hẹn: quyền, thanh toán, giao dịch, xung đột lịch và giữ chuỗi lịch.");
+    return;
+  }
   assert.deepEqual(updateProviderProfileSchema.parse({
     autoAcceptScheduledBookings: true,
     autoAcceptScheduledBookingHorizonDays: 7,

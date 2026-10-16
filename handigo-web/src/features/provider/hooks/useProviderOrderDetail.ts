@@ -197,8 +197,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
     const succeeded = await runAction(async () => {
       await providerOrderApi.cancelOrder(order._id, cancellationReason);
-    }, 'Không thể hủy đơn.', false, order.inspectionRequired
-      ? 'Đã hủy đơn dịch vụ.' : 'Đã hủy nhận đơn. Handigo đang tự động tìm kỹ thuật viên thay thế.');
+    }, 'Không thể hủy đơn.', false, 'Đã hủy nhận đơn dịch vụ.');
     if (!succeeded) return;
 
     setCancelConfirmOpen(false);

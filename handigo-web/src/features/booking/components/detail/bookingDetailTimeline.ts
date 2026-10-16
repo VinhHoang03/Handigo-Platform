@@ -11,6 +11,32 @@ export type TimelineStep = {
 export const formatTimelineTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString("vi-VN") : "";
 
+const getCancellationDescription = (order: Order) => {
+  const event = [...(order.statusHistory ?? [])].reverse()
+    .find((item) => item.status === "cancelled");
+  const cancellation = order.cancellation;
+  const role = cancellation
+    ? cancellation.cancelledByRole === "admin" && !cancellation.cancelledBy
+      ? "system"
+      : cancellation.cancelledByRole
+    : event?.changedByRole;
+  const reason = cancellation?.reason?.trim() || event?.note?.trim();
+  if (role === "system" && reason
+    && /^Không (?:tìm thấy thợ (?:nhận đơn|phù hợp)|có provider nhận đơn)/u.test(reason)) {
+    return `Lý do hủy: ${reason.replace(/^Không tìm thấy thợ nhận đơn/u, "Không tìm thấy thợ phù hợp")}`;
+  }
+  const customerName = typeof order.customerId === "object" ? order.customerId?.fullName : undefined;
+  const providerName = order.providerId?.userId?.fullName || order.providerId?.name;
+  const actors: Record<string, string> = {
+    customer: customerName ? `Khách hàng (${customerName})` : "Khách hàng",
+    provider: providerName ? `Chuyên gia (${providerName})` : "Chuyên gia",
+    admin: "Quản trị viên",
+    system: "Hệ thống",
+  };
+  const actor = role ? actors[role] : undefined;
+  return `Người hủy: ${actor || "Chưa có thông tin"}. ${reason ? `Lý do hủy: ${reason}` : "Chưa có thông tin lý do hủy đơn."}`;
+};
+
 export const buildOrderTimeline = (order: Order): TimelineStep[] => {
   if (order.status === 'cancelled' && order.statusHistory?.length) {
     const names: Record<string, string> = { created: 'Đã tạo đơn hàng', accepted: 'Chuyên gia đã nhận đơn', in_progress: 'Đã bắt đầu thực hiện', completed: 'Đã hoàn tất', cancelled: 'Đơn hàng đã hủy', paid: 'Đã thanh toán', assigned: 'Đã điều phối chuyên gia' };
@@ -24,12 +50,11 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
     };
     const steps: TimelineStep[] = order.statusHistory.map(event => {
       const cancelled = event.status === 'cancelled';
-      const reason = order.cancellation?.reason?.trim() || event.note?.trim();
       return {
         icon: cancelled ? X : event.status === 'in_progress' ? HardHat : event.status === 'accepted' ? UserCheck : Check,
         title: names[event.status] ?? event.status,
         description: cancelled
-          ? reason ? `Lý do hủy: ${reason}` : 'Chưa có thông tin lý do hủy đơn.'
+          ? getCancellationDescription(order)
           : event.note?.trim() || descriptions[event.status] || 'Trạng thái đơn hàng đã được cập nhật.',
         time: formatTimelineTime(cancelled ? order.cancellation?.cancelledAt || event.createdAt : event.createdAt),
         state: cancelled ? 'cancelled' : 'done',
@@ -38,7 +63,7 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
     if (!order.statusHistory.some(event => event.status === 'cancelled')) {
       steps.push({
         icon: X, title: 'Đơn hàng đã hủy',
-        description: order.cancellation?.reason ? `Lý do hủy: ${order.cancellation.reason}` : 'Chưa có thông tin lý do hủy đơn.',
+        description: getCancellationDescription(order),
         time: formatTimelineTime(order.cancellation?.cancelledAt || order.updatedAt), state: 'cancelled',
       });
     }
@@ -49,9 +74,7 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
       {
         icon: X,
         title: "Đơn hàng đã hủy",
-        description: order.cancellation?.reason
-          ? `Lý do hủy: ${order.cancellation.reason}`
-          : 'Chưa có thông tin lý do hủy đơn.',
+        description: getCancellationDescription(order),
         time: formatTimelineTime(
           order.cancellation?.cancelledAt || order.updatedAt,
         ),

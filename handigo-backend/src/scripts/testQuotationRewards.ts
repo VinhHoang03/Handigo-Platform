@@ -5,9 +5,13 @@ import { Order } from "../models/order.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
 import { earnOrderRewards } from "../services/reward.service";
+import * as config from "../services/systemConfig.service";
+import { DEFAULT_REWARD_POLICY } from "../validations/reward.validator";
 
 // Cô lập database; kiểm tra số điểm, điều kiện thanh toán và chống cộng trùng.
 async function run() {
+  let amountPerPoint = DEFAULT_REWARD_POLICY.amountPerPoint;
+  mock.method(config, "getRewardPolicy", async () => ({ ...DEFAULT_REWARD_POLICY, amountPerPoint }));
   const session = {} as ClientSession;
   const order = new Order({
     customerId: new Types.ObjectId(), providerId: new Types.ObjectId(),
@@ -73,6 +77,10 @@ async function run() {
     order.inspectionRequired = false;
     order.pricing.totalPaidAmount = 105000;
     await earn(); assert.equal(balance, 35, "Đơn giá cố định vẫn tích điểm theo tiền thực trả.");
+    amountPerPoint = 5000;
+    await earn(); assert.equal(balance, 35, "Đổi cấu hình không tính lại điểm đã cộng.");
+    order._id = new Types.ObjectId();
+    await earn(); assert.equal(balance, 56, "Đơn tích điểm mới áp dụng mức chi tiêu admin đã cấu hình.");
     console.log("Đạt: tích điểm báo giá theo tổng cuối cùng, xác nhận thanh toán, làm tròn, chống trùng và đơn giá cố định.");
   } finally { mock.restoreAll(); }
 }

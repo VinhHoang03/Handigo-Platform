@@ -6,7 +6,7 @@ import { Promotion } from "../models/promotion.model";
 import { Voucher } from "../models/voucher.model";
 import { Order } from "../models/order.model";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
-import { getRewardOffers, updateConfig } from "../services/systemConfig.service";
+import { getRewardOffers, updateConfig, createConfig } from "../services/systemConfig.service";
 import { getAdminRewardOffers, saveAdminRewardOffer, getRewardOverview, getMyRewardVouchers, redeemReward } from "../services/reward.service";
 import { getAdminVouchers, updateAdminVoucher, disableAdminVoucher, enableAdminVoucher, deleteAdminVoucher } from "../services/voucher.service";
 import { rewardOfferSchema } from "../validations/reward.validator";
@@ -35,7 +35,7 @@ async function run() {
   const collection = {
     createIndex: async () => "key_1",
     findOne: async ({ key }: any) => configs.get(key) ?? null,
-    find: () => ({ toArray: async () => [...configs.values()] }),
+    find: ({ key }: any) => ({ toArray: async () => [...configs.values()].filter((row) => !key?.$regex || new RegExp(key.$regex).test(row.key)) }),
     insertOne: async (value: any) => {
       const row = { ...value, _id: new Types.ObjectId() }; configs.set(value.key, row);
       return { insertedId: row._id };
@@ -81,6 +81,15 @@ async function run() {
     assert.equal(voucher.maxDiscountAmount, 30000);
     assert.equal(voucher.applicableOrderType, "variable_price");
     assert.equal(voucher.endAt.getTime() - voucher.startAt.getTime(), 30 * 86400000);
+    await createConfig(admin, { key: "REWARD_POLICY", type: "JSON", isPublic: false, value: { amountPerPoint: 5000, validityDays: 7 } });
+    assert.equal((await getRewardOverview(customer.id)).policy.amountPerPoint, 5000);
+    assert.equal((await getRewardOverview(customer.id)).policy.validityDays, 7);
+    assert.equal((await redeemReward(customer.id, offer.id, "lan-doi-1"))!.id, voucher.id);
+    assert.equal(voucher.endAt.getTime() - voucher.startAt.getTime(), 30 * 86400000, "Mã cũ giữ hạn dùng sau khi thay đổi chính sách.");
+    const newVoucher = (await redeemReward(customer.id, offer.id, "lan-doi-chinh-sach-moi"))!;
+    assert.equal(newVoucher.endAt.getTime() - newVoucher.startAt.getTime(), 7 * 86400000);
+    const balanceAfterNewVoucher = balance;
+    promotions.delete(newVoucher.id);
     const mine = await getMyRewardVouchers(customer.id, 1);
     assert.equal(mine.total, 2);
     assert.deepEqual(mine.items.map((item) => String(item._id)), [voucher.id, legacy.id], "Khách thấy cả mã vừa đổi và mã cũ, mới nhất trước.");
@@ -90,7 +99,7 @@ async function run() {
     assert.equal((await getRewardOverview(customer.id)).policy.offers.some((item) => item.id === offer.id), false);
     await assert.rejects(redeemReward(customer.id, offer.id, "lan-doi-2"), /ngừng áp dụng/);
     assert.equal((await redeemReward(customer.id, offer.id, "lan-doi-1"))!.id, voucher.id);
-    assert.equal(balance, 1550, "Thử lại yêu cầu cũ không bị trừ điểm lần nữa dù gói đã tạm dừng.");
+    assert.equal(balance, balanceAfterNewVoucher, "Thử lại yêu cầu cũ không bị trừ điểm lần nữa dù gói đã tạm dừng.");
     const added = { ...defaults[0], id: "GOI-MOI", name: "Gói mới", points: 350 };
     await saveAdminRewardOffer(admin, added);
     assert.ok((await getRewardOverview(customer.id)).policy.offers.some((item) => item.id === added.id));

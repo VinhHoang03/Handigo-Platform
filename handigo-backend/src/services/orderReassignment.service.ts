@@ -67,7 +67,7 @@ export const requestProviderReassignment = async (
       if (order.status !== "accepted") {
         throw new AppError("Chỉ có thể yêu cầu đổi kỹ thuật viên khi đơn đã được nhận và chưa bắt đầu.", 409);
       }
-      if (order.inspectionRequired || order.currentQuotationId) {
+      if (order.currentQuotationId) {
         throw new AppError("Không thể tự động đổi kỹ thuật viên khi đơn đã phát sinh báo giá.", 409);
       }
 
@@ -86,7 +86,7 @@ export const requestProviderReassignment = async (
       };
 
       updatedOrder = await Order.findOneAndUpdate(
-        { _id: order._id, status: "accepted", providerId: provider._id },
+        { _id: order._id, status: "accepted", providerId: provider._id, currentQuotationId: null },
         {
           $set: {
             status: "created",
@@ -139,7 +139,9 @@ export const requestProviderReassignment = async (
       userId: result.customerId,
       type: "ORDER",
       title: "Kỹ thuật viên không thể tiếp tục đơn hàng",
-      content: `Kỹ thuật viên đã hủy đơn ${result.orderCode}. Handigo đang tự động tìm kỹ thuật viên thay thế. Nếu hết thời gian tìm kiếm, đơn sẽ được hủy và bạn được tặng voucher giảm 10%; khoản đã thanh toán qua ví hoặc QR được hoàn về ví Handigo.`,
+      content: result.inspectionRequired
+        ? `Kỹ thuật viên đã hủy nhận đơn ${result.orderCode}. Handigo đang tự động tìm kỹ thuật viên thay thế và giữ nguyên tiền cọc. Nếu hết thời gian tìm kiếm mà không có người nhận, tiền cọc thực trả được hoàn 100% về ví Handigo.`
+        : `Kỹ thuật viên đã hủy đơn ${result.orderCode}. Handigo đang tự động tìm kỹ thuật viên thay thế. Nếu hết thời gian tìm kiếm, đơn sẽ được hủy và bạn được tặng voucher giảm 10%; khoản đã thanh toán qua ví hoặc QR được hoàn về ví Handigo.`,
       data: {
         orderId: result._id,
         action: "order_reassignment_matching",

@@ -50,6 +50,7 @@ async function run() {
     mock.method(OrderAssignment, "exists", async () => rejected);
     mock.method(User, "find", () => query([{ _id: providerUserId, fullName: "Nguyễn Minh" }]));
     mock.method(config, "getBookingPolicy", async () => DEFAULT_BOOKING_POLICY);
+    mock.method(config, "getNumberConfigValue", async (_key: string, fallback: number) => fallback);
     mock.method(MatchingService, "findNearestProviders", async (options: FindNearestProvidersOptions) => {
       assert.equal(options.requireOnline, true); assert(options.scheduleIntervals?.length);
       if (options.excludeProviderIds) assert(options.excludeProviderIds.some((id) => String(id) === String(oldProvider)));

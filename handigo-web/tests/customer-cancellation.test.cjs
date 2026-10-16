@@ -16,6 +16,7 @@ function setup(order) {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
   }).outputText;
   const modules = {
+    axios: { isAxiosError: () => false },
     react: {
       useState(initial) {
         const index = cursor++;
@@ -53,7 +54,7 @@ function setup(order) {
   return { render, calls, messages, advance(value) { now = value; tick?.(); } };
 }
 
-for (const status of ['accepted', 'in_progress']) {
+for (const status of ['accepted']) {
   test(`${status}: khóa hủy sau 5 phút mà không cần tải lại trang`, async () => {
     const context = setup({ _id: 'don-kiem-thu', status, customerCancellationDeadline: new Date(300000).toISOString() });
     assert.equal(context.render().cancellationLocked, false);
@@ -66,6 +67,19 @@ for (const status of ['accepted', 'in_progress']) {
     assert.deepEqual(context.calls, []);
   });
 }
+
+test('Thợ đã bắt đầu: khóa hủy ngay dù còn trong thời hạn 5 phút', async () => {
+  const order = { _id: 'don-kiem-thu', status: 'accepted', customerCancellationDeadline: new Date(300000).toISOString() };
+  const context = setup(order);
+  await context.render().handleCancelOrder();
+  context.render().updateActionReason('Thay đổi kế hoạch');
+  order.status = 'in_progress';
+  assert.equal(context.render().cancellationLocked, true);
+  await context.render().executePendingAction();
+  await context.render().handleCancelOrder();
+  assert.deepEqual(context.calls, ['preview']);
+  assert.match(context.messages[0], /Thợ đã bắt đầu làm việc/);
+});
 
 test('Hộp thoại đã mở cũng không gửi yêu cầu hủy khi quá hạn', async () => {
   const context = setup({ _id: 'don-kiem-thu', status: 'accepted', customerCancellationDeadline: new Date(300000).toISOString() });

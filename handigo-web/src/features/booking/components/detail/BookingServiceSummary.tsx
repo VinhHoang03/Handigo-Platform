@@ -94,10 +94,13 @@ export const BookingServiceSummary = ({
               Thanh toán
             </h4>
             <p className="font-medium text-on-surface mt-1">
-              {paymentMethodLabel} -
-              <span className={`${paymentStatusDisplay.className} ml-1`}>
-                {paymentStatusDisplay.label}
-              </span>
+              {paymentMethodLabel}
+              {paymentStatusDisplay.label && <>
+                {' -'}
+                <span className={`${paymentStatusDisplay.className} ml-1`}>
+                  {paymentStatusDisplay.label}
+                </span>
+              </>}
             </p>
           </div>
         </div>

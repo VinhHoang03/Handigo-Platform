@@ -4,9 +4,11 @@ import type {
   AppNotification,
   NotificationQuery,
 } from "@/features/notification/types/notification.types";
-import { getErrorMessage } from "./notificationBell.utils";
+import { getErrorMessage, isNotificationForUser } from "./notificationBell.utils";
 
 interface UseNotificationReadActionsParams {
+  accountId: string;
+  isCurrentAccount: () => boolean;
   isReadFilter: NotificationQuery["isRead"];
   setItems: Dispatch<SetStateAction<AppNotification[]>>;
   setUnreadCount: Dispatch<SetStateAction<number>>;
@@ -15,41 +17,43 @@ interface UseNotificationReadActionsParams {
 
 /** Đánh dấu một hoặc toàn bộ thông báo là đã đọc. */
 export function useNotificationReadActions({
+  accountId,
+  isCurrentAccount,
   isReadFilter,
   setItems,
   setUnreadCount,
   setError,
 }: UseNotificationReadActionsParams) {
   const markAsRead = async (item: AppNotification) => {
-    if (item.isRead) return;
+    if (!isCurrentAccount() || !isNotificationForUser(item, accountId)) return;
 
     try {
-      await notificationApi.markAsRead(item.id);
+      const latest = await notificationApi.markAsRead(item.id);
+      if (!isCurrentAccount()) return;
       setItems((current) =>
         current.map((notification) =>
           notification.id === item.id
-            ? {
-                ...notification,
-                isRead: true,
-                readAt: new Date().toISOString(),
-              }
+            ? latest
             : notification,
         ),
       );
-      setUnreadCount((current) => Math.max(current - 1, 0));
+      if (!item.isRead) setUnreadCount((current) => Math.max(current - 1, 0));
       if (isReadFilter === false) {
         setItems((current) =>
           current.filter((notification) => notification.id !== item.id),
         );
       }
+      return latest;
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (isCurrentAccount()) setError(getErrorMessage(err));
     }
   };
 
   const markAll = async () => {
+    if (!isCurrentAccount()) return;
     try {
       await notificationApi.markAllAsRead();
+      if (!isCurrentAccount()) return;
       setItems((current) =>
         current.map((item) => ({
           ...item,
@@ -59,7 +63,7 @@ export function useNotificationReadActions({
       );
       setUnreadCount(0);
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (isCurrentAccount()) setError(getErrorMessage(err));
     }
   };
 

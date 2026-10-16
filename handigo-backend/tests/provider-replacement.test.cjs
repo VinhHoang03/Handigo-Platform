@@ -24,6 +24,8 @@ function loadService(name, modules, internals = []) {
         return { AppError: Error, ActionPreconditionError: Error };
       }
       if (name === '../utils/logger') return { createLogger: () => ({ info() {}, warn() {}, error() {}, debug() {} }) };
+      if (name === '../validations/refundPolicy.validator') return { DEFAULT_REFUND_POLICY: { providerCompensationPercent: 80 } };
+      if (name === './systemConfig.service') return { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }) };
       // Chỉ nạp các module được giả lập, không chạm cấu hình hoặc database thật.
       return {};
     },
@@ -101,9 +103,10 @@ test('Giữ danh sách tất cả thợ đã hủy qua nhiều lần thay thế'
   assert.deepEqual(Array.from(context.order.reassignment.previousProviderIds, String), [firstProvider, context.providerId].map(String));
 });
 
-test('Không đổi luồng đơn báo giá hoặc cho thợ khác hủy đơn', async () => {
+test('Đơn báo giá đã lưu không tìm thợ thay thế và thợ khác không được hủy đơn', async () => {
   const quotation = reassignmentSetup();
   quotation.order.inspectionRequired = true;
+  quotation.order.currentQuotationId = new Types.ObjectId();
   await assert.rejects(quotation.cancel(), /báo giá/);
   const stranger = reassignmentSetup();
   stranger.order.providerId = new Types.ObjectId();
@@ -244,6 +247,7 @@ test('Điều phối thay thế chờ hết thời gian hiện có dù đã vư�
     './systemConfig.service': { getNumberConfigValue: async (_, fallback) => fallback },
     './matching.service': { MatchingService: { findNearestProviders: async () => [] } },
     '../utils/matchingSearch': {
+      getProviderResponseTimeoutSeconds: (seconds) => seconds,
       getMatchingSearchStage: search => ({ expired: search.expiresAt.getTime() <= Date.now(), deadline: search.expiresAt }),
     },
     './orderCancellation.service': { async cancelSystemOrderWithSettlement(...args) { cancellations.push(args); } },

@@ -19,6 +19,7 @@ import {
   assignmentIdParamSchema,
   cancellationPreviewQuerySchema,
   cancelOrderSchema,
+  cancelRecurringSeriesSchema,
   completeOrderSchema,
   createRepairQuotationSchema,
   updateRepairQuotationSchema,
@@ -39,6 +40,7 @@ import {
 import {
   createOrder,
   previewBooking,
+  getBookingPolicies,
   updateOrderExpectedEnd,
   discardUnpaidOrder,
   getMyOrders,
@@ -73,6 +75,7 @@ const router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
+router.get("/booking-policies", roleMiddleware("CUSTOMER"), getBookingPolicies);
 router.post("/preview", roleMiddleware("CUSTOMER"), validate(previewBookingSchema), previewBooking);
 router.patch("/:orderId/expected-end", roleMiddleware("PROVIDER"), approvedProviderMiddleware, validate(orderIdParamSchema, "params"), validate(updateExpectedEndSchema), updateOrderExpectedEnd);
 
@@ -202,7 +205,7 @@ router.patch(
   "/:orderId/cancel-series",
   roleMiddleware("CUSTOMER"),
   validate(orderIdParamSchema, "params"),
-  validate(cancelOrderSchema),
+  validate(cancelRecurringSeriesSchema),
   cancelRecurringSeries,
 );
 

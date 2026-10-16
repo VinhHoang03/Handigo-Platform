@@ -2,7 +2,7 @@ import mongoose, { ClientSession, Types } from "mongoose";
 import { Order, IOrder } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { AppError } from "../utils/appError";
-import { intervalsConflict, ScheduleInterval } from "../utils/bookingPolicy";
+import { calculateDuration, intervalsConflict, ScheduleInterval } from "../utils/bookingPolicy";
 import { getOrderInterval, isWithinWorkingCalendar } from '../utils/providerSchedule';
 import { BookingPolicy } from "../validations/bookingPolicy.validator";
 import { getBookingPolicy } from "./systemConfig.service";
@@ -20,13 +20,26 @@ export const getAvailableProviderIds = async (
   const orders = await Order.find({
     providerId: { $in: providerIds },
     _id: { $nin: options.excludeOrderIds ?? [] },
-    status: { $in: ["accepted", "in_progress"] },
+    status: { $in: ["accepted", "in_progress", "completed"] },
     isDeleted: false,
   }).session(options.session ?? null);
   return new Set(providerIds.filter((id) => {
     if (!intervals.every((interval) => isWithinWorkingCalendar(id.toString(), interval, policy))) return false;
-    return !orders.some((order) => order.providerId?.toString() === id.toString()
-      && intervals.some((interval) => intervalsConflict(getOrderInterval(order, policy), interval)));
+    return !orders.some((order) => {
+      if (order.providerId?.toString() !== id.toString()) return false;
+      const actualInterval = getOrderInterval(order, policy);
+      const scheduledStart = order.scheduledAt?.getTime();
+      // Làm sớm hoặc hoàn thành không giải phóng khung giờ khách đã đặt.
+      const reservedInterval = scheduledStart === undefined ? actualInterval : {
+        ...actualInterval,
+        start: scheduledStart,
+        end: scheduledStart + (order.schedule?.durationMinutes ?? calculateDuration(
+          order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot ?? [], policy,
+        )) * 60000,
+      };
+      return intervals.some((interval) => intervalsConflict(actualInterval, interval)
+        || intervalsConflict(reservedInterval, interval));
+    });
   }).map(String));
 };
 

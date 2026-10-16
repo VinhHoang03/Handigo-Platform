@@ -1,10 +1,24 @@
 import type { Order } from '@/types/booking';
+import { BookingStatusTimeline } from '@/features/booking/components/detail/BookingStatusTimeline';
+import { buildOrderTimeline } from '@/features/booking/components/detail/bookingDetailTimeline';
 import { formatDateTime } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
 import { Check, CircleCheckBig, ClipboardCheck, HardHat, Route } from "lucide-react";
 const rank: Record<Order['status'], number> = { created: 0, accepted: 1, in_progress: 2, completed: 3, cancelled: 0 };
 
 export function OrderProgressCard({ order }: { order: Order }) {
+  if (order.status === 'cancelled') {
+    return (
+      <div className="order-2 lg:order-3">
+        <BookingStatusTimeline
+          status={order.status}
+          statusLabel="Đã hủy"
+          timeline={buildOrderTimeline(order)}
+        />
+      </div>
+    );
+  }
+
   const currentRank = rank[order.status];
   const steps = [
     { key: 'accepted', label: 'Đã nhận đơn', icon: ClipboardCheck, note: 'Provider đã nhận đơn hàng.' },

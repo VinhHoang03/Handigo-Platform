@@ -84,7 +84,7 @@ export function RewardOffersPanel() {
   ];
   return <section className="space-y-4 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5" aria-labelledby="reward-offers-heading">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 id="reward-offers-heading" className="text-lg font-bold">Gói đổi điểm thưởng</h2><p className="mt-1 text-sm text-on-surface-variant">Mã có hiệu lực 30 ngày từ khi đổi. Chỉnh sửa gói không thay đổi mã đã cấp cho khách.</p></div>
+      <div><h2 id="reward-offers-heading" className="text-lg font-bold">Gói đổi điểm thưởng</h2><p className="mt-1 text-sm text-on-surface-variant">Hạn dùng mã được thiết lập tại Cấu hình hệ thống → Chính sách. Chỉnh sửa gói không thay đổi mã đã cấp cho khách.</p></div>
       <button type="button" disabled={busy || loading || Boolean(error)} onClick={() => { setForm(emptyForm); setMode("create"); }} className={`${buttonClass} bg-primary text-on-primary`}><Plus aria-hidden="true" size={18} />Thêm gói</button>
     </div>
     <AsyncState loading={loading} error={error} onRetry={load} skeleton={<TableSkeleton columns={6} rowCount={5} />}>

@@ -6,10 +6,23 @@ import { ReassignmentPromptModal } from "./notification-bell/ReassignmentPromptM
 import { useNotificationFeed } from "./notification-bell/useNotificationFeed";
 import { useReassignmentPrompt } from "./notification-bell/useReassignmentPrompt";
 import { Bell } from "lucide-react";
-import { getNotificationTarget } from "./notification-bell/notificationBell.utils";
+import { getNotificationTarget, getNotificationUnavailableReason, isNotificationForUser } from "./notification-bell/notificationBell.utils";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { useNotificationAccount } from "@/features/notification/hooks/useNotificationAccount";
+import { useToast } from "./Toast";
 
 export function NotificationBell({ role }: { role?: AppRole }) {
+  const accountId = useAuthStore((state) =>
+    state.isAuthenticated ? state.user?.id || state.user?._id || "" : "",
+  );
+  if (!accountId) return null;
+  return <AccountNotificationBell key={`${role}:${accountId}`} role={role} />;
+}
+
+function AccountNotificationBell({ role }: { role?: AppRole }) {
   const navigate = useNavigate();
+  const { addToast } = useToast();
+  const { accountId, isCurrentAccount } = useNotificationAccount();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const reassignment = useReassignmentPrompt();
   const feed = useNotificationFeed(role, {
@@ -17,9 +30,16 @@ export function NotificationBell({ role }: { role?: AppRole }) {
   });
 
   const openNotification = async (item: Parameters<typeof getNotificationTarget>[0]) => {
-    await feed.markAsRead(item);
+    if (!isCurrentAccount() || !isNotificationForUser(item, accountId)) return;
+    const latest = await feed.markAsRead(item);
+    if (!isCurrentAccount() || !latest) return;
+    const unavailableReason = getNotificationUnavailableReason(latest);
+    if (unavailableReason) {
+      addToast(unavailableReason, "info");
+      return;
+    }
     feed.setOpen(false);
-    const target = getNotificationTarget(item, role);
+    const target = getNotificationTarget(latest, role);
     if (target) navigate(target);
   };
 

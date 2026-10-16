@@ -178,6 +178,7 @@ export interface Order {
     verified?: boolean;
   } | null;
   serviceId: Service;
+  preferredProviderId?: string | null;
   selectedOptionIds: string[];
   selectedOptionsSnapshot?: Array<{
     optionId: string | null;
@@ -218,6 +219,7 @@ export interface Order {
   inspectionRequired?: boolean;
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
+  currentQuotationId?: string | null;
   quotationFinalAmount?: number;
   pricing: OrderPricing;
   promotionSnapshot?: OrderDiscountSnapshot | null;
