@@ -751,6 +751,7 @@ export const AssignmentService = {
     quotationId: string,
     customerUserId: string,
     rejectionReason?: string,
+    expected?: { revision: number; paidAmount: number; refundAmount: number; cancellationFee: number; providerCompensation: number },
   ): Promise<InstanceType<typeof RepairQuotation>> {
     const quotation = await RepairQuotation.findById(quotationId);
     if (!quotation) throw new AppError("Báo giá không tồn tại.", 404);
@@ -774,14 +775,13 @@ export const AssignmentService = {
       reason:
         "Từ chối báo giá sửa chữa: " +
         (rejectionReason ?? "không có lý do"),
+      confirmedExpectation: expected,
+      quotationRejection: { quotationId, revision: expected?.revision ?? quotation.revision ?? 0, reason: rejectionReason },
     });
 
-    quotation.status = "rejected";
-    quotation.rejectedAt = new Date();
-    quotation.rejectionReason = rejectionReason ?? null;
-    await quotation.save();
-
-    return quotation as any;
+    const rejected = await RepairQuotation.findById(quotationId);
+    if (!rejected) throw new AppError("Không tìm thấy báo giá sau khi từ chối.", 500);
+    return rejected;
   },
 
   /**

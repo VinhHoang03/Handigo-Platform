@@ -51,6 +51,8 @@ export function agentContext(session: AgentSession) {
       earlierRequests: session.conversation.slice(0, session.conversation.length - conversation.length)
         .filter((message) => message.role === "user").slice(-8).map((message) => message.content.slice(0, 500)),
       bookingDraft: session.bookingDraft,
+      viewedOrder: session.viewedOrder,
+      rebookProposal: session.rebookProposal ? { awaitingDecision: true } : undefined,
       actions: session.actions.slice(-20).map((action) => ({ tool: action.tool, status: action.status,
         taskVersion: action.taskVersion, result: action.result && typeof action.result === "object"
           ? Object.fromEntries(Object.entries(action.result).filter(([key]) => ["id", "orderId", "orderCode", "status",

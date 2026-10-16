@@ -1,4 +1,6 @@
 export interface ChatbotMessage {
+  bookingSearch?: import("./agent.types").AgentBookingSearch;
+  customerAttachments?: string[];
   confirmation?: import("./agent.types").AgentConfirmation;
   choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>;
   _id: string;

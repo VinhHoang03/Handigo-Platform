@@ -60,6 +60,23 @@ class AiChatController extends ChangeNotifier {
       confirmation == null &&
       !needsReconciliation &&
       _pendingRequest == null;
+  bool get canCheckPayment =>
+      !busy &&
+      error == null &&
+      _pendingRequest == null &&
+      confirmation == null &&
+      payment != null &&
+      (!needsNewSession || needsReconciliation);
+  bool get canReconcileBooking =>
+      !busy &&
+      error == null &&
+      _pendingRequest == null &&
+      needsReconciliation &&
+      messages.any((message) {
+        final action = message['confirmation'] as Map<String, dynamic>?;
+        return action?['tool'] == 'create_booking' &&
+            ['UNKNOWN', 'EXECUTING'].contains(action?['status']);
+      });
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -128,11 +145,21 @@ class AiChatController extends ChangeNotifier {
   }
 
   Future<void> checkPayment() async {
-    if (!canSend || payment == null) return;
+    if (!canCheckPayment) return;
     _pendingRequest = {
       'sessionId': _sessionId,
       'requestId': _newId(),
       'paymentStatus': {'orderId': payment!['orderId']},
+    };
+    await _submit();
+  }
+
+  Future<void> checkBooking() async {
+    if (!canReconcileBooking) return;
+    _pendingRequest = {
+      'sessionId': _sessionId,
+      'requestId': _newId(),
+      'message': 'Kiểm tra kết quả tạo đơn đã xác nhận; không tạo lại đơn.',
     };
     await _submit();
   }

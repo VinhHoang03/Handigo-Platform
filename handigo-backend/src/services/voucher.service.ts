@@ -127,7 +127,7 @@ const assertVoucherOrderType = (promotion: IPromotion, inspectionRequired?: bool
     (applicableOrderType === "variable_price") !== inspectionRequired)) {
     throw new AppError(applicableOrderType === "variable_price"
       ? "Mã giảm phí cọc chỉ áp dụng cho đơn báo giá."
-      : "Mã đổi điểm này chỉ áp dụng cho đơn giá cố định.", 400);
+      : "Mã giảm giá này chỉ áp dụng cho đơn giá cố định.", 400);
   }
 };
 

@@ -215,7 +215,7 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
         ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
         : shouldShowSchedulePicker
-          ? 'Chưa có chuyên gia phù hợp và còn trống trong thời gian đã chọn.'
+          ? 'Chưa có thợ đang nhận đơn phù hợp với dịch vụ, địa chỉ và lịch đã chọn.'
           : 'Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.';
     }
 
