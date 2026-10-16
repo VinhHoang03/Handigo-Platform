@@ -5,6 +5,7 @@ import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { Payment } from "../models/payment.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
+import { OrderStatus } from "../models/orderStatus.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
 import { AuditLog } from "../models/auditLog.model";
@@ -41,7 +42,7 @@ const { AssignmentService } = require("../services/assignment.service") as typeo
 // Query giả vẫn hỗ trợ await, select và session như Mongoose.
 function query(value: unknown): any {
   return { then: (resolve: (value: unknown) => unknown) => Promise.resolve(value).then(resolve),
-    session: () => query(value), select: () => query(value), lean: () => query(value) };
+    session: () => query(value), select: () => query(value), sort: () => query(value), lean: () => query(value) };
 }
 
 async function testCancellation(method: string, fee = 0, invalid?: string,
@@ -63,6 +64,7 @@ async function testCancellation(method: string, fee = 0, invalid?: string,
   const session = { withTransaction: async (callback: () => Promise<void>) => callback(), endSession: async () => {} };
   mock.method(mongoose, "startSession", async () => session);
   mock.method(Order, "findById", () => query(order));
+  mock.method(OrderStatus, "findOne", () => query({ createdAt: new Date(Date.now() - 60000) }));
   mock.method(Order, "findOneAndUpdate", (_filter: any, update: any, options: any) => {
     assert.equal(options.session, session);
     Object.assign(order, update.$set); return query(order);
@@ -73,7 +75,8 @@ async function testCancellation(method: string, fee = 0, invalid?: string,
   mock.method(Provider, "findById", () => query(provider));
   mock.method(Provider, "updateOne", async () => ({}));
   mock.method(RepairQuotation, "findOne", () => query(invalid === "quotation" ? null : { _id: order.currentQuotationId }));
-  const matches = (filter: any) => (!filter.method || filter.method === payment.method) &&
+  const matches = (filter: any) => (!filter.method || (typeof filter.method === "string"
+    ? filter.method === payment.method : filter.method.$in.includes(payment.method))) &&
     (!filter.status || (typeof filter.status === "string" ? filter.status === payment.status : filter.status.$in.includes(payment.status))) &&
     (!("compensatedToProviderId" in filter) || payment.compensatedToProviderId === filter.compensatedToProviderId);
   mock.method(Payment, "find", (filter: any) => query(matches(filter) ? [payment] : []));
@@ -103,9 +106,9 @@ async function testCancellation(method: string, fee = 0, invalid?: string,
   } else {
     await cancel();
     assert.equal(order.status, "cancelled");
-    const expectedCompensation = ["unpaid", "unassigned"].includes(invalid ?? "") ? 0 : 40000 + fee;
+    const expectedCompensation = actor === "customer" || ["unpaid", "unassigned"].includes(invalid ?? "") ? 0 : 40000 + fee;
     assert.equal(wallet.balance, 100000 + expectedCompensation);
-    assert.equal(customerWallet.balance, invalid === "unassigned" ? 40000 + fee : 0);
+    assert.equal(customerWallet.balance, actor === "customer" ? 40000 + fee : 0);
     assert.equal(order.cancellation.refundPolicy.providerCompensation, expectedCompensation);
     assert.equal(order.cancellation.refundPolicy.platformRetainedAmount, 0);
     assert.equal(entries.filter((entry) => entry.type === "provider_earning").length, expectedCompensation ? 1 : 0);

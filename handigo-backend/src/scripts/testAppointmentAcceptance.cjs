@@ -47,7 +47,7 @@ const Order = {
   find: query => ({ session: async () => {
     assert.equal(active, true);
     if (query.recurringGroupId) return orders.filter(order => String(order.recurringGroupId) === String(query.recurringGroupId) && order.status === 'created' && !order.providerId);
-    return orders.filter(order => String(order.providerId) === String(provider._id) && ['accepted', 'in_progress'].includes(order.status)
+    return orders.filter(order => String(order.providerId) === String(provider._id) && query.status.$in.includes(order.status)
       && !query._id.$nin.some(id => String(id) === String(order._id)));
   } }),
   updateMany: async (query, update, options) => {
@@ -111,6 +111,15 @@ function reset() { orders = []; assignments = []; lockCount = 0; claims = 0; not
   const overlap = makeOrder('11:30', '12:30');
   await assert.rejects(offer(overlap)(), error => error.statusCode === 409);
   assert.equal(claims, 0); assert.equal(overlap.status, 'created'); assert.equal(lockCount, 1);
+
+  reset();
+  makeOrder('10:00', '11:00', { providerId: provider._id, status: 'completed',
+    schedule: { durationMinutes: 60, bufferMinutes: 15, travelMinutes: 30,
+      expectedStartAt: new Date('2030-01-09T08:00:00+07:00'),
+      expectedEndAt: new Date('2030-01-09T09:00:00+07:00') } });
+  const completedOverlap = makeOrder('10:00', '11:00');
+  await assert.rejects(offer(completedOverlap)(), error => error.statusCode === 409);
+  assert.equal(claims, 0); assert.equal(completedOverlap.status, 'created');
 
   reset();
   makeOrder('09:00', '10:00', { providerId: provider._id, status: 'accepted',

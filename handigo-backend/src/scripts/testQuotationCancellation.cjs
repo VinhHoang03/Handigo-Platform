@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require('typescript');
-const { calculateRefundPolicy, QUOTATION_DEPOSIT_POLICY_VERSION, isQuotationDeclinedReason } = require('../services/refundPolicy.service');
+const { calculateRefundPolicy, QUOTATION_DEPOSIT_POLICY_VERSION, isQuotationDeclinedReason,
+  CUSTOMER_CANCELLATION_POLICY_VERSION, CUSTOMER_CANCELLATION_WINDOW_MS } = require('../services/refundPolicy.service');
 const { DEFAULT_REFUND_POLICY } = require('../validations/refundPolicy.validator');
 let currentRefundPolicy = DEFAULT_REFUND_POLICY;
 
@@ -37,10 +38,11 @@ for (const hasRepairQuotation of [false, true]) {
 for (const orderType of ['normal', 'urgent', 'scheduled', 'recurring']) {
   for (const hasRepairQuotation of [false, true]) {
     const accepted = calculateRefundPolicy({ ...base, role: 'customer', orderType, hasRepairQuotation,
+      providerAcceptedAt: new Date(Date.now() - 60000),
       scheduledAt: new Date(Date.now() - 1000) });
     assert.equal(accepted.canCancel, true);
-    assert.equal(accepted.providerCompensation, 100000);
-    assert.equal(accepted.refundAmount, 0);
+    assert.equal(accepted.providerCompensation, 0);
+    assert.equal(accepted.refundAmount, 100000);
     const unassigned = calculateRefundPolicy({ ...base, role: 'customer', orderType, hasRepairQuotation: false,
       orderStatus: 'created', hasAssignedProvider: false });
     assert.equal(unassigned.refundAmount, 100000);
@@ -64,7 +66,12 @@ const modules = {
   '../utils/appError': { AppError: class extends Error {} },
   '../configs/payos.config': {},
   '../services/refundPolicy.service': { calculateRefundPolicy, QUOTATION_DEPOSIT_POLICY_VERSION },
-  './refundPolicy.service': { calculateRefundPolicy, QUOTATION_DEPOSIT_POLICY_VERSION, isQuotationDeclinedReason },
+  './refundPolicy.service': { calculateRefundPolicy, QUOTATION_DEPOSIT_POLICY_VERSION, isQuotationDeclinedReason,
+    CUSTOMER_CANCELLATION_POLICY_VERSION, CUSTOMER_CANCELLATION_WINDOW_MS },
+  '../models/orderStatus.model': { OrderStatus: { findOne: () => ({
+    sort() { return this; }, select() { return this; }, session() { return this; },
+    lean: async () => ({ createdAt: new Date(Date.now() - 60000) }),
+  }) } },
   '../models/provider.model': { Provider: { findOne: () => ({ select: () => sessionResult({ _id: 'provider', userId: 'worker' }) }) } },
   '../models/payment.model': { Payment: {
     find: (query) => sessionResult(payments.filter(p => !p.compensatedToProviderId
@@ -121,8 +128,8 @@ assert.equal(helpers.getPaymentRefundAmount(order, payments[1]), 300000);
   const customOrder = { ...order, cancellation: { refundPolicy: { policyVersion: 'HANDIGO_REFUND_V1', refundRate: 60, providerCompensationRate: 35 } } };
   currentRefundPolicy = { ...DEFAULT_REFUND_POLICY, normalRefundPercent: 60, providerCompensationPercent: 35 };
   const calculated = await helpers.calculateOrderRefundPolicy({ ...customOrder, status: 'accepted', orderType: 'normal' }, 'customer', 100000);
-  assert.equal(calculated.refundAmount, 60000);
-  assert.equal(calculated.providerCompensation, 14000);
+  assert.equal(calculated.refundAmount, 100000);
+  assert.equal(calculated.providerCompensation, 0);
   currentRefundPolicy = { ...DEFAULT_REFUND_POLICY, normalRefundPercent: 10, providerCompensationPercent: 95 };
   await helpers.compensateProviderPayments(customOrder, {});
   await helpers.compensateProviderPayments(customOrder, {});
@@ -131,15 +138,15 @@ assert.equal(helpers.getPaymentRefundAmount(order, payments[1]), 300000);
   assert.equal(transactions[1].amount, 14000);
   assert.equal(payments[0].metadata.cancellationCompensation.rate, 35);
   // Tiền cọc được xác nhận sau khi hủy vẫn dùng người nhận đã chốt theo lần hủy.
-  const latePolicy = calculateRefundPolicy({ ...base, role: 'customer', paidAmount: 0, paidInspectionDeposit: 0, hasRepairQuotation: false });
-  assert.equal(latePolicy.policyVersion, QUOTATION_DEPOSIT_POLICY_VERSION);
+  const latePolicy = calculateRefundPolicy({ ...base, role: 'customer', paidAmount: 0, paidInspectionDeposit: 0,
+    hasRepairQuotation: false, providerAcceptedAt: new Date(Date.now() - 60000) });
+  assert.equal(latePolicy.policyVersion, CUSTOMER_CANCELLATION_POLICY_VERSION);
   payments.splice(0, payments.length, { _id: 'late', paymentType: 'inspection_deposit', amount: 40000, status: 'paid', compensatedToProviderId: null });
   const lateOrder = { ...order, cancellation: { refundPolicy: latePolicy } };
-  assert.equal(helpers.getPaymentRefundAmount(lateOrder, payments[0]), 0);
+  assert.equal(helpers.getPaymentRefundAmount(lateOrder, payments[0]), 40000);
   await helpers.compensateProviderPayments(lateOrder, {});
   await helpers.compensateProviderPayments(lateOrder, {});
-  assert.equal(wallet.balance, 204000);
-  assert.equal(transactions.length, 3);
-  assert.equal(transactions[2].amount, 40000);
+  assert.equal(wallet.balance, 164000);
+  assert.equal(transactions.length, 2);
   console.log('Đạt: cọc vào ví thợ đúng một lần, hoàn khoản trả thêm, giữ chính sách cũ và không hoàn PayOS số tiền 0.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

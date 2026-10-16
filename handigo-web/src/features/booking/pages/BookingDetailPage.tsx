@@ -172,6 +172,7 @@ const BookingDetailPage = () => {
             busy={busy}
             pendingAction={cancellationFlow.pendingAction}
             cancellationPreview={cancellationFlow.cancellationPreview}
+            cancellationLocked={cancellationFlow.cancellationLocked}
             onCancelOrder={() => void cancellationFlow.handleCancelOrder()}
             onCancelSeries={() => void cancellationFlow.handleCancelSeries()}
             onCloseDialog={cancellationFlow.closeActionDialog}

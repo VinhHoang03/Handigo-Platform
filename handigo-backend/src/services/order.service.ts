@@ -28,6 +28,7 @@ import {
   cancelOrderWithSettlement,
   cancelOrdersWithSettlement,
   getCancellationPreview,
+  getCustomerCancellationDeadline,
   type CancellationExpectation,
 } from "./orderCancellation.service";
 import { Payment } from "../models/payment.model";
@@ -968,7 +969,8 @@ export const OrderService = {
     const statusHistory = await OrderStatus.find({ orderId: order._id, isDeleted: false })
       .select("status previousStatus statusVersion changedByRole note createdAt")
       .sort({ createdAt: 1, statusVersion: 1 }).lean();
-    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory };
+    const customerCancellationDeadline = await getCustomerCancellationDeadline(order, undefined, statusHistory);
+    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {
@@ -1018,8 +1020,15 @@ export const OrderService = {
         }
         if (await Order.exists({ providerId: provider._id, _id: { $ne: order._id }, status: "in_progress", isDeleted: false }).session(session)) throw new AppError("Bạn đang thực hiện một đơn khác.", 409);
         const now = new Date();
+        const isEarlyFixedAppointment = order.orderType === "scheduled"
+          && !order.inspectionRequired
+          && order.scheduledAt != null
+          && order.scheduledAt.getTime() > now.getTime();
         order.schedule = { durationMinutes: duration, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes, expectedStartAt: now, expectedEndAt: new Date(now.getTime() + duration * 60000) };
-        await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy);
+        // Lịch hẹn đã xác nhận cho phép thợ chủ động bắt đầu sớm ngoài khung lịch dự kiến.
+        if (!isEarlyFixedAppointment) {
+          await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy);
+        }
         order.status = "in_progress";
         provider.availabilityStatus = "busy";
         await provider.save({ session });
@@ -1027,6 +1036,7 @@ export const OrderService = {
         return order;
       });
       if (!result) throw new AppError("Không thể bắt đầu đơn.", 409);
+      emitToUser(result.customerId.toString(), "order:updated", { orderId: result._id.toString() });
       return result;
     } finally { await session.endSession(); }
   },
@@ -1300,7 +1310,7 @@ export const OrderService = {
       recurringGroupId: anchorOrder.recurringGroupId,
       customerId: anchorOrder.customerId,
       scheduledAt: { $gte: anchorOrder.scheduledAt },
-      status: { $in: ["created", "accepted"] },
+      status: { $in: ["created", "accepted", "in_progress"] },
       isDeleted: false,
     })
       .select("_id")
@@ -1359,17 +1369,26 @@ export const OrderService = {
       throw new AppError("Đơn hàng không thuộc lịch định kỳ.", 400);
     }
 
+    const anchorPreview = await getCancellationPreview({ orderId, actorId: customerId, role: "customer" });
+    if (!anchorPreview.canCancel) throw new AppError(anchorPreview.policyReason, 409);
+
     const cancellableOrders = await Order.find({
       recurringGroupId: anchorOrder.recurringGroupId,
       customerId: anchorOrder.customerId,
       scheduledAt: { $gte: anchorOrder.scheduledAt },
-      status: { $in: ["created", "accepted"] },
+      status: { $in: ["created", "accepted", "in_progress"] },
       isDeleted: false,
     }).sort({ scheduledAt: 1 });
 
     if (cancellableOrders.length === 0) {
       throw new AppError("Không còn buổi nào có thể hủy trong chuỗi lịch này.", 409);
     }
+
+    const previews = await Promise.all(cancellableOrders.map((order) => getCancellationPreview({
+      orderId: order._id.toString(), actorId: customerId, role: "customer",
+    })));
+    const blocked = previews.find((preview) => !preview.canCancel);
+    if (blocked) throw new AppError(blocked.policyReason, 409);
 
     const expectations = new Map(confirmedExpectations?.map((item) => [item.orderId, item]));
     if (confirmedExpectations && (

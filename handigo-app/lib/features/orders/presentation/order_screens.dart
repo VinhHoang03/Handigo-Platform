@@ -224,8 +224,12 @@ class OrderDetailScreen extends ConsumerWidget {
           ],
           if (order.problemDescription?.isNotEmpty == true) _InfoTile(icon: Icons.notes_outlined, title: 'Mô tả', value: order.problemDescription!),
           const SizedBox(height: 8),
-          if (order.status != 'cancelled' && order.status != 'completed') FilledButton.icon(
-            onPressed: () => _cancel(context, ref), icon: const Icon(Icons.cancel_outlined), label: const Text('Hủy đơn')),
+          if (order.status != 'cancelled' && order.status != 'completed') StreamBuilder<int>(
+            stream: Stream<int>.periodic(const Duration(seconds: 1), (index) => index),
+            builder: (context, snapshot) => FilledButton.icon(
+              onPressed: order.canCancelAt(DateTime.now()) ? () => _cancel(context, ref, order) : null,
+              icon: const Icon(Icons.cancel_outlined), label: const Text('Hủy đơn')),
+          ),
           if (order.providerName != null && ['accepted', 'in_progress', 'completed'].contains(order.status)) OutlinedButton.icon(
             onPressed: () => context.push('/customer/chat/order/${order.id}'), icon: const Icon(Icons.chat_outlined), label: const Text('Nhắn tin với nhà cung cấp')),
           if (order.status == 'accepted' || order.status == 'in_progress') OutlinedButton.icon(
@@ -237,15 +241,21 @@ class OrderDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _cancel(BuildContext context, WidgetRef ref) async {
+  Future<void> _cancel(BuildContext context, WidgetRef ref, OrderDetail order) async {
     final reason = await _reasonDialog(context);
     if (reason == null) return;
     try {
       final preview = await ref.read(orderRepositoryProvider).cancellationPreview(orderId);
       if (!context.mounted) return;
+      if (!preview.canCancel) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(preview.policyReason ?? 'Đã hết thời hạn hủy đơn.')));
+        return;
+      }
       final approved = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
         title: const Text('Xác nhận hủy đơn'), content: Text('Số tiền hoàn dự kiến: ${_money(preview.refundAmount)}\nPhí hủy: ${_money(preview.cancellationFee)}\n${preview.policyReason ?? ''}'),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Quay lại')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xác nhận'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Quay lại')),
+          StreamBuilder<int>(stream: Stream<int>.periodic(const Duration(seconds: 1), (index) => index),
+            builder: (context, snapshot) => FilledButton(onPressed: order.canCancelAt(DateTime.now()) ? () => Navigator.pop(context, true) : null, child: const Text('Xác nhận')))],
       ));
       if (approved != true) return;
       await ref.read(orderRepositoryProvider).cancel(orderId, reason);

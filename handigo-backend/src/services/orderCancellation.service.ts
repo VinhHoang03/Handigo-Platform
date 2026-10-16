@@ -4,6 +4,7 @@ import type { Payout } from "@payos/node";
 import { payos, payoutPayos } from "../configs/payos.config";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
+import { OrderStatus } from "../models/orderStatus.model";
 import { Payment, IPayment } from "../models/payment.model";
 import { Promotion } from "../models/promotion.model";
 import { Voucher } from "../models/voucher.model";
@@ -24,7 +25,10 @@ import { createNotificationRecord } from "./notification.service";
 import { emitToUser } from "../sockets/socketServer";
 import {
   calculateRefundPolicy,
+  CUSTOMER_CANCELLATION_POLICY_VERSION,
+  CUSTOMER_CANCELLATION_WINDOW_MS,
   QUOTATION_DEPOSIT_POLICY_VERSION,
+  isQuotationDeclinedReason,
   type RefundPolicyResult,
 } from "./refundPolicy.service";
 import { getRefundRetryDecision } from "./refundProcessing";
@@ -160,6 +164,28 @@ const getPaidOrderAmount = async (
   return payments.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0);
 };
 
+export const getCustomerCancellationDeadline = async (
+  order: { _id: Types.ObjectId; status: string; providerId?: unknown },
+  session?: ClientSession,
+  history?: Array<{ status: string; createdAt: Date }>,
+): Promise<Date | null> => {
+  if (order.status !== "accepted" || !order.providerId) return null;
+  const accepted = history
+    ? [...history].reverse().find((event) => event.status === "accepted")
+    : await OrderStatus.findOne({ orderId: order._id, status: "accepted", isDeleted: false })
+      .sort({ createdAt: -1, _id: -1 }).select("createdAt").session(session ?? null).lean();
+  let acceptedAt = accepted?.createdAt;
+  if (!acceptedAt) {
+    // Tương thích đơn cũ chưa có lịch sử trạng thái; không dùng updatedAt để tính thời hạn.
+    const assignment = await OrderAssignment.findOne({
+      orderId: order._id, providerId: order.providerId, status: "accepted", isDeleted: false,
+    }).sort({ respondedAt: -1 }).select("respondedAt").session(session ?? null).lean();
+    acceptedAt = assignment?.respondedAt ?? undefined;
+  }
+  return acceptedAt && Number.isFinite(acceptedAt.getTime())
+    ? new Date(acceptedAt.getTime() + CUSTOMER_CANCELLATION_WINDOW_MS) : null;
+};
+
 const calculateOrderRefundPolicy = async (
   order: IOrder,
   role: CancellationRole,
@@ -168,11 +194,16 @@ const calculateOrderRefundPolicy = async (
   session?: ClientSession,
   cancellationReason?: string,
 ) => {
+  const quotationDeclined = role === "provider" && isQuotationDeclinedReason(cancellationReason);
   const hasRepairQuotation = Boolean(order.currentQuotationId);
-  const deposits = order.inspectionRequired && order.providerId && order.status === "accepted"
+  const deadline = role === "customer" ? await getCustomerCancellationDeadline(order, session) : null;
+  if (quotationDeclined && (!order.inspectionRequired || order.status !== "accepted")) {
+    throw new AppError("Chỉ được hủy do khách không đồng ý báo giá khi đơn sửa chữa đã được nhận và chưa bắt đầu thực hiện.", 409);
+  }
+  const deposits = role === "provider" && order.inspectionRequired && order.status === "accepted"
     ? await Payment.find({ orderId: order._id, paymentType: "inspection_deposit", status: "paid", isDeleted: false }).session(session || null)
     : [];
-  const policy = order.inspectionRequired ? undefined : await getRefundPolicy(session);
+  const policy = role === "customer" || order.inspectionRequired ? undefined : await getRefundPolicy(session);
   return calculateRefundPolicy({
     role,
     orderType: order.orderType,
@@ -185,11 +216,17 @@ const calculateOrderRefundPolicy = async (
     inspectionRequired: order.inspectionRequired,
     cancellationReason,
     paidInspectionDeposit: deposits.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0),
+    providerAcceptedAt: deadline ? new Date(deadline.getTime() - CUSTOMER_CANCELLATION_WINDOW_MS) : null,
   }, policy);
 };
 
 const isQuotationDepositPolicy = (order: IOrder) =>
   order.cancellation?.refundPolicy?.policyVersion === QUOTATION_DEPOSIT_POLICY_VERSION;
+
+const shouldRefundQrToWallet = (order: IOrder) =>
+  (order.reassignment?.automatic && order.reassignment.status === "failed")
+  || (order.cancellation?.cancelledByRole === "customer"
+    && order.cancellation.refundPolicy?.policyVersion === CUSTOMER_CANCELLATION_POLICY_VERSION);
 
 // Lưu tỷ lệ theo lần hủy để cấu hình mới không đổi các khoản đang xử lý.
 const getStoredCompensationRate = (order: IOrder) => {
@@ -260,7 +297,7 @@ const refundWalletPayments = async (
   session: ClientSession,
 ) => {
   const refunded: WalletRefundResult[] = [];
-  const refundQrToWallet = order.reassignment?.automatic && order.reassignment.status === "failed";
+  const refundQrToWallet = shouldRefundQrToWallet(order);
   const payments = await Payment.find({
     orderId: order._id,
     method: refundQrToWallet ? { $in: ["wallet", "payos"] } : "wallet",
@@ -869,6 +906,10 @@ const refundPayosPaymentToWallet = async (
 ) => {
   const session = await mongoose.startSession();
   let walletRefund: WalletRefundResult | null = null;
+  const refundOrigin = order.cancellation?.refundPolicy?.policyVersion === CUSTOMER_CANCELLATION_POLICY_VERSION
+    ? "customer_cancellation_window"
+    : order.reassignment?.automatic && order.reassignment.status === "failed"
+      ? "replacement_unavailable" : "source_account_unavailable";
 
   try {
     await session.withTransaction(async () => {
@@ -940,7 +981,7 @@ const refundPayosPaymentToWallet = async (
                 sourceMethod: "payos",
                 destination: "handigo_wallet",
                 referenceId: "REFUND" + payment._id.toString(),
-                fallbackReason: order.reassignment?.automatic ? "replacement_unavailable" : "source_account_unavailable",
+                fallbackReason: refundOrigin,
                 amount: refundAmount,
                 completedAt: now,
               },
@@ -993,7 +1034,7 @@ const refundPayosPaymentToWallet = async (
               orderCode: order.orderCode,
               reason,
               sourceMethod: "payos",
-              fallbackReason: order.reassignment?.automatic ? "replacement_unavailable" : "source_account_unavailable",
+              fallbackReason: refundOrigin,
             },
           },
         ],
@@ -1068,7 +1109,7 @@ const requestPayosRefund = async (
   if (!refund) return;
 
   try {
-    if (order.reassignment?.automatic && order.reassignment.status === "failed" && !refund.payoutId) {
+    if (shouldRefundQrToWallet(order) && !refund.payoutId) {
       await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
       return;
     }
@@ -1418,6 +1459,10 @@ export const cancelOrdersWithSettlement = async (
           continue;
         }
 
+        if (input.role === "customer" && order.status === "in_progress") {
+          throw new AppError("Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng.", 409);
+        }
+
         if (!CANCELLABLE_STATUSES.includes(order.status as any)) {
           throw new AppError(
             'Không thể hủy đơn hàng ở trạng thái "' + order.status + '".',
@@ -1474,6 +1519,7 @@ export const cancelOrdersWithSettlement = async (
 
       const replacementFailed = input.system && input.systemCancellationType === "provider_unavailable"
         && order.reassignment?.automatic && order.reassignment.status === "matching" && !order.inspectionRequired;
+      const wasInProgress = order.status === "in_progress";
 
       const claimedOrder = await Order.findOneAndUpdate(
         {
@@ -1570,7 +1616,7 @@ export const cancelOrdersWithSettlement = async (
         );
         await compensateProviderPayments(claimedOrder, session);
 
-        if (claimedOrder.providerId && claimedOrder.orderType === "normal") {
+        if (claimedOrder.providerId && (wasInProgress || ["normal", "urgent"].includes(claimedOrder.orderType))) {
           await Provider.updateOne(
             { _id: claimedOrder.providerId },
             { $set: { availabilityStatus: "online" } },

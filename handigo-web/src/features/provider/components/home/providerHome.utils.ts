@@ -78,7 +78,7 @@ export function getRevenueChart(
 }
 
 export const getOrderDate = (order: Order) =>
-  new Date(order.scheduledAt || order.createdAt);
+  new Date(order.scheduledAt || order.schedule?.expectedStartAt || order.createdAt);
 
 export function getCustomer(order: Order): OrderCustomer | null {
   return typeof order.customerId === "object" ? order.customerId : null;

@@ -128,7 +128,8 @@ test('Hủy chuỗi lịch gửi số tiền đã xem của từng buổi và kh
   });
   const render = () => {
     runtime.reset();
-    return useBookingCancellationFlow({ _id: 'chuoi', orderType: 'recurring', status: 'accepted' }, null, false, () => {}, async () => {});
+    return useBookingCancellationFlow({ _id: 'chuoi', orderType: 'recurring', status: 'accepted',
+      customerCancellationDeadline: new Date(Date.now() + 300000).toISOString() }, null, false, () => {}, async () => {});
   };
   await render().handleCancelSeries();
   render().updateActionReason('Thay đổi lịch');
@@ -166,10 +167,10 @@ test('Modal có đủ chính sách hai loại dịch vụ, lịch hẹn và dùn
   const text = textContent(BookingPolicyContent({ policies: customerPolicies, depositAmount: 40000, payableDeposit: 20000 }));
   for (const phrase of ['giá cố định', 'khảo sát và báo giá', 'đặt ngay', 'hẹn giờ', 'định kỳ',
     'giữ nguyên cọc', 'Khách hủy khi chưa có thợ nhận', 'Khách hủy khi thợ đã nhận đơn',
-    'Khách hoặc thợ hủy sau khi đã báo giá', 'đã bắt đầu thực hiện', 'sau ưu đãi']) assert.ok(text.includes(phrase), phrase);
-  assert.match(text, /60.*%/);
-  assert.match(text, /48.*giờ/);
-  assert.match(text, /95.*%/);
+    'Thợ hủy sau khi đã báo giá', 'đã bắt đầu thực hiện', 'sau ưu đãi']) assert.ok(text.includes(phrase), phrase);
+  assert.match(text, /5 phút/);
+  assert.match(text, /100% khoản đã thanh toán về ví Handigo/);
+  assert.doesNotMatch(text, /60%|95%|48 giờ/);
   assert.match(text, /7.*km/);
   assert.match(text, /15.*km/);
   assert.match(text, /40\.000đ/);
@@ -239,7 +240,7 @@ test('Xác nhận đặt đơn chặn mọi phương thức thanh toán nếu ch
   assert.deepEqual(calls, ['create', 'CASH', 'create', 'WALLET', 'create', 'PAYOS']);
 });
 
-test('Hủy đơn báo giá không hiện khung chính sách, thông báo đúng người nhận cọc', () => {
+test('Khung hoàn tiền ẩn với tiền mặt; đơn đang thực hiện không còn nút hoặc form hủy', () => {
   const { BookingRefundPanel } = load('features/booking/components/detail/BookingRefundPanel.tsx', {
     '@/components/common/Modal': { Modal: 'modal' },
     './bookingDetailConstants': { getActionDialogConfig: () => ({ title: 'Hủy', message: 'Xác nhận', tone: 'danger' }) },
@@ -247,18 +248,23 @@ test('Hủy đơn báo giá không hiện khung chính sách, thông báo đúng
     './BookingCancellationReasonForm': { BookingCancellationReasonForm: 'reason-form' },
     './bookingDetailFormatters': { formatCurrency: (amount) => `${amount}đ` },
   });
-  const render = (inspectionRequired, accepted) => BookingRefundPanel({
-    order: { inspectionRequired, status: accepted ? 'accepted' : 'created', providerId: accepted ? 'tho' : null },
+  const render = (inspectionRequired, accepted, overrides = {}) => BookingRefundPanel({
+    order: { inspectionRequired, status: accepted ? 'accepted' : 'created', providerId: accepted ? 'tho' : null,
+      paymentMethod: 'bank', ...overrides },
     busy: false, pendingAction: { type: 'cancelOrder', reason: '' },
-    cancellationPreview: { canCancel: true, providerCompensation: accepted ? 40000 : 0, refundAmount: accepted ? 0 : 40000 },
+    cancellationPreview: { canCancel: true, providerCompensation: 0, refundAmount: 40000 },
   });
   const awaiting = render(true, false);
-  assert.equal(find(awaiting, (node) => node.type === 'refund-policy'), undefined);
+  assert.ok(find(awaiting, (node) => node.type === 'refund-policy'));
   assert.match(textContent(awaiting), /hoàn lại cho bạn \(100%\)/);
   const accepted = render(true, true);
-  assert.equal(find(accepted, (node) => node.type === 'refund-policy'), undefined);
-  assert.match(textContent(accepted), /40000đ được chuyển vào ví thợ/);
+  assert.ok(find(accepted, (node) => node.type === 'refund-policy'));
+  assert.doesNotMatch(textContent(accepted), /Khi chưa có thợ nhận|chuyển vào ví thợ/);
   assert.ok(find(render(false, true), (node) => node.type === 'refund-policy'));
+  assert.equal(find(render(false, true, { paymentMethod: 'cash' }), (node) => node.type === 'refund-policy'), undefined);
+  const started = render(false, true, { status: 'in_progress' });
+  assert.equal(find(started, (node) => node.type === 'modal'), undefined);
+  assert.doesNotMatch(textContent(started), /Hủy yêu cầu/);
 });
 
 test('Form hủy của thợ chỉ xác nhận hủy nhận đơn và lý do hủy', () => {

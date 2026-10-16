@@ -9,13 +9,7 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
   depositAmount?: number;
   payableDeposit?: number;
 }) {
-  const { fixedPriceRefund: refund, matching } = policies;
-  const tiers = [
-    [`Từ ${number(refund.earlyHours)} giờ trở lên`, refund.earlyRefundPercent],
-    [`Từ ${number(refund.middleHours)} đến dưới ${number(refund.earlyHours)} giờ`, refund.middleRefundPercent],
-    [`Từ ${number(refund.lateHours)} đến dưới ${number(refund.middleHours)} giờ`, refund.lateRefundPercent],
-    [`Dưới ${number(refund.lateHours)} giờ, chưa đến giờ hẹn`, refund.lastMinuteRefundPercent],
-  ] as const;
+  const { matching } = policies;
 
   return <div className="space-y-6">
     <p className="text-sm leading-6 text-on-surface-variant">Các điều khoản dưới đây áp dụng cho đặt ngay, hẹn giờ và lịch định kỳ. Mức phí, tiền cọc và ưu đãi cụ thể của đơn được hiển thị trong phần tóm tắt trước khi xác nhận.</p>
@@ -36,15 +30,8 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
       <ul className={listClass}>
         <li>Giá được tính theo dịch vụ, tùy chọn và số lượng đã chọn. Đơn giá cố định không thu cọc khảo sát riêng. Khách thanh toán số tiền của đơn bằng ví Handigo, chuyển khoản qua PayOS hoặc tiền mặt nếu phương thức đó khả dụng.</li>
         <li>Khách hủy khi chưa có thợ nhận: hoàn 100% khoản đã thanh toán.</li>
-        <li>Khách hủy đơn đặt ngay/đơn gấp sau khi thợ đã nhận: hoàn {number(refund.normalRefundPercent)}% khoản đã thanh toán; phần còn lại là phí hủy.</li>
-        <li>Với lịch hẹn hoặc định kỳ đã có thợ nhận, tỷ lệ hoàn phụ thuộc thời điểm hủy trước giờ thực hiện của từng buổi:</li>
-      </ul>
-      <table className="w-full table-fixed border-collapse text-sm leading-6">
-        <thead><tr className="bg-surface-container-low text-left"><th scope="col" className="w-3/4 p-3 font-semibold">Thời gian trước giờ hẹn</th><th scope="col" className="p-3 font-semibold">Hoàn lại</th></tr></thead>
-        <tbody>{tiers.map(([label, rate]) => <tr key={label} className="border-b border-outline-variant/30"><td className="p-3 text-on-surface-variant">{label}</td><td className="p-3 font-semibold tabular-nums">{number(rate)}%</td></tr>)}</tbody>
-      </table>
-      <ul className={listClass}>
-        <li>Lịch hẹn đã đến hoặc quá giờ thực hiện không thể tự hủy theo luồng thông thường; khách cần liên hệ hỗ trợ. Nếu lịch cũ thiếu giờ bắt đầu, mức hoàn là {number(refund.missingScheduleRefundPercent)}%.</li>
+        <li>Khách được hủy trong vòng 5 phút kể từ khi thợ nhận đơn nếu thợ chưa bắt đầu làm việc. Hoàn 100% khoản đã thanh toán về ví Handigo, không thu phí hủy. Quy tắc này áp dụng cho cả đặt ngay, hẹn giờ và lịch định kỳ.</li>
+        <li>Hết 5 phút hoặc thợ đã bắt đầu làm việc thì khách không thể hủy đơn. Với tiền mặt chưa thanh toán, không phát sinh khoản hoàn tiền.</li>
         <li>Khi thợ hủy đơn đặt ngay/đơn gấp trước khi làm, khách có thể chọn tìm thợ thay thế hoặc hủy để được hoàn tiền. Đơn do hệ thống hoặc quản trị viên hủy trước khi làm được hoàn toàn bộ khoản đã thanh toán.</li>
       </ul>
     </section>
@@ -56,9 +43,9 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
         <li>Tiền cọc được hiển thị theo từng dịch vụ trước khi đặt đơn, thanh toán bằng ví Handigo hoặc PayOS; cọc không hỗ trợ tiền mặt. Thợ khảo sát và lưu báo giá sửa chữa. Chi phí sửa chữa còn lại được thanh toán trực tiếp cho thợ, có khấu trừ phần cọc thực trả.</li>
         <li><strong>Khách hủy khi chưa có thợ nhận:</strong> hoàn 100% tiền cọc thực trả.</li>
         <li><strong>Thợ hủy trước khi báo giá:</strong> Handigo tự điều phối thợ khác, giữ nguyên cọc; thợ vừa hủy không nhận cọc. Nếu không có thợ khác nhận trong vòng tìm kiếm, khách được hoàn 100% cọc.</li>
-        <li><strong>Khách hủy khi thợ đã nhận đơn:</strong> toàn bộ cọc thực trả được tự động cộng vào ví thợ, kể cả khi chưa có báo giá.</li>
-        <li><strong>Khách hoặc thợ hủy sau khi đã báo giá:</strong> toàn bộ cọc thực trả được tự động cộng vào ví thợ, không phụ thuộc lý do hủy. Khoản thanh toán thêm được hệ thống ghi nhận sẽ được hoàn cho khách.</li>
-        <li>Quy tắc xử lý cọc trên áp dụng cho cả đặt ngay và lịch hẹn/định kỳ; các tỷ lệ hoàn theo giờ của dịch vụ giá cố định không áp dụng cho đơn báo giá.</li>
+        <li><strong>Khách hủy khi thợ đã nhận đơn:</strong> được hủy trong vòng 5 phút kể từ khi thợ nhận nếu thợ chưa bắt đầu làm việc, kể cả khi đã có báo giá. Hoàn 100% khoản đã thanh toán về ví Handigo, bao gồm cọc thực trả.</li>
+        <li><strong>Thợ hủy sau khi đã báo giá:</strong> toàn bộ cọc thực trả được tự động cộng vào ví thợ, không phụ thuộc lý do hủy. Khoản thanh toán thêm được hệ thống ghi nhận sẽ được hoàn cho khách.</li>
+        <li>Thời hạn hủy của khách áp dụng cho cả đặt ngay, hẹn giờ và lịch định kỳ. Hết 5 phút hoặc thợ đã bắt đầu làm việc thì khách không được hủy.</li>
       </ul>
     </section>
 

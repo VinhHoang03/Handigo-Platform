@@ -57,7 +57,7 @@ export const supportFaqs: SupportFaqItem[] = [
     group: "Thanh toán",
     question: "Huỷ đơn thì được hoàn lại bao nhiêu?",
     answer:
-      "Đơn chưa có thợ nhận thì hoàn toàn bộ. Với dịch vụ báo giá, khách hủy sau khi thợ nhận hoặc khách/thợ hủy sau báo giá thì cọc thực trả chuyển vào ví thợ. Thợ hủy trước báo giá sẽ tự tìm thợ khác; nếu không có thợ nhận thì khách được hoàn 100% cọc. Đơn giá cố định áp dụng mức hoàn theo thời điểm hủy và chính sách hiện hành; lịch hẹn giá cố định đã tới giờ thực hiện cần gửi yêu cầu hỗ trợ.",
+      "Đơn chưa có thợ nhận thì hoàn toàn bộ khoản đã thanh toán. Sau khi thợ nhận, khách được hủy trong vòng 5 phút nếu thợ chưa bắt đầu làm việc và được hoàn 100% khoản đã thanh toán về ví Handigo, bao gồm cọc thực trả của dịch vụ báo giá. Hết 5 phút hoặc thợ đã bắt đầu thì khách không thể hủy. Tiền mặt chưa thanh toán không phát sinh hoàn tiền.",
   },
   {
     group: "Thanh toán",

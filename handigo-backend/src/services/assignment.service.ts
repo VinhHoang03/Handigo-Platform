@@ -329,140 +329,6 @@ export const AssignmentService = {
     await assertProviderWalletEligible(provider.userId);
 
     const isAppointment = assignment.assignmentType === "appointment";
-    if (isAppointment) {
-      if (!assignedOrder || !assignedOrder.scheduledAt || assignedOrder.status !== "created") {
-        throw new AppError("Lịch hẹn không còn khả dụng.", 409);
-      }
-      const hasInitialPayment = ["paid", "partially_paid"].includes(assignedOrder.paymentStatus)
-        || (assignedOrder.paymentMethod === "cash" && await Payment.exists({
-          orderId: assignedOrder._id, method: "cash", status: "pending", isDeleted: false,
-        }));
-      if (!hasInitialPayment && !(assignedOrder.reassignment?.automatic && assignedOrder.bookingStatus === "reserved")) {
-        throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
-      }
-
-      const appointmentOrders = assignedOrder.recurringGroupId && !assignedOrder.reassignment?.automatic
-        ? await Order.find({
-            recurringGroupId: assignedOrder.recurringGroupId,
-            status: "created",
-            isDeleted: false,
-          }).select("scheduledAt")
-        : [assignedOrder];
-      for (const appointmentOrder of appointmentOrders) {
-        if (!appointmentOrder.scheduledAt) continue;
-        const conflictStart = new Date(
-          appointmentOrder.scheduledAt.getTime() - 60 * 60 * 1000,
-        );
-        const slotEnd = new Date(
-          appointmentOrder.scheduledAt.getTime() + 60 * 60 * 1000,
-        );
-        const hasConflict = await Order.exists({
-          _id: { $nin: appointmentOrders.map((item) => item._id) },
-          providerId: provider._id,
-          status: { $in: ["accepted", "in_progress"] },
-          scheduledAt: { $gt: conflictStart, $lt: slotEnd },
-          isDeleted: false,
-        });
-        if (hasConflict) {
-          throw new AppError(
-            `Bạn đã có lịch vào ${appointmentOrder.scheduledAt.toLocaleString("vi-VN")}.`,
-            409,
-          );
-        }
-      }
-
-      const respondedAt = new Date();
-      const claimedAssignment = await OrderAssignment.findOneAndUpdate(
-        {
-          _id: assignment._id,
-          providerId: provider._id,
-          status: "pending",
-          responseDeadline: { $gt: respondedAt },
-          isDeleted: false,
-        },
-        { $set: { status: "accepted", respondedAt } },
-        { returnDocument: "after", runValidators: true },
-      );
-      if (!claimedAssignment) {
-        throw new AppError("Yêu cầu lịch hẹn không còn khả dụng.", 409);
-      }
-
-      const order = await Order.findOneAndUpdate(
-        { _id: assignment.orderId, status: "created", providerId: null },
-        {
-          $set: {
-            providerId: provider._id,
-            status: "accepted",
-            bookingStatus: assignedOrder.bookingStatus === "reserved" ? "reserved" : "confirmed",
-            ...(assignedOrder.reassignment?.status === "matching" ? { "reassignment.status": "matched" } : {}),
-            paymentDueAt: null,
-            readyForMatching: false,
-          },
-        },
-        { returnDocument: "after", runValidators: true },
-      );
-      if (!order) {
-        await OrderAssignment.findByIdAndUpdate(claimedAssignment._id, {
-          $set: { status: "cancelled" },
-        });
-        emitToUser(providerUserId, "assignment:closed", {
-          assignmentId: assignment._id.toString(),
-          reason: "accepted_by_other",
-        });
-        throw new AppError("Lịch hẹn vừa được xử lý bởi yêu cầu khác.", 409);
-      }
-
-      if (assignedOrder.recurringGroupId && !assignedOrder.reassignment?.automatic) {
-        await Order.updateMany(
-          {
-            _id: { $ne: order._id },
-            recurringGroupId: assignedOrder.recurringGroupId,
-            status: "created",
-            providerId: null,
-          },
-          {
-            $set: {
-              providerId: provider._id,
-              status: "accepted",
-              bookingStatus: "reserved",
-              paymentDueAt: null,
-              readyForMatching: false,
-            },
-          },
-          { runValidators: true },
-        );
-      }
-
-      emitToUser(order.customerId.toString(), "order:updated", {
-        orderId: order._id.toString(),
-        recurringGroupId: order.recurringGroupId?.toString(),
-      });
-
-      await closeCompetingAssignments(
-        assignment.orderId,
-        claimedAssignment._id as Types.ObjectId,
-      );
-
-      emitToUser(providerUserId, "assignment:closed", {
-        assignmentId: assignment._id.toString(),
-        reason: "accepted",
-      });
-      await createNotificationRecord({
-        userId: order.customerId,
-        type: "ORDER",
-        title: assignedOrder.recurringGroupId
-          ? "Chuyên gia đã nhận chuỗi lịch"
-          : "Chuyên gia đã nhận lịch",
-        content: `Chuyên gia đã nhận đơn ${order.orderCode} và sẽ thực hiện theo lịch hẹn.`,
-        data: { orderId: order._id },
-      });
-
-      return {
-        assignment: claimedAssignment,
-        order,
-      };
-    }
-
     const policy = await getBookingPolicy();
     const session = await mongoose.startSession();
     let result: AcceptAssignmentResult | null = null;
@@ -485,7 +351,9 @@ export const AssignmentService = {
           || (order.paymentMethod === "cash" && await Payment.exists({
             orderId: order._id, method: "cash", status: "pending", isDeleted: false,
           }).session(session));
-        if (!hasInitialPayment) throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
+        if (!hasInitialPayment && !(isAppointment && order.reassignment?.automatic && order.bookingStatus === "reserved")) {
+          throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
+        }
 
         const durationMinutes = order.schedule?.durationMinutes
           ?? calculateDuration(order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot, policy);
@@ -528,7 +396,7 @@ export const AssignmentService = {
         if (order.reassignment?.status === "matching") order.reassignment.status = "matched";
         order.readyForMatching = false;
         if (isAppointment) {
-          order.bookingStatus = "confirmed";
+          order.bookingStatus = order.bookingStatus === "reserved" ? "reserved" : "confirmed";
           order.paymentDueAt = null;
           if (order.recurringGroupId && !isReplacement) {
             await Order.updateMany(
@@ -899,11 +767,6 @@ export const AssignmentService = {
       throw new AppError("Bạn không có quyền từ chối báo giá này.", 403);
     }
 
-    quotation.status = "rejected";
-    quotation.rejectedAt = new Date();
-    quotation.rejectionReason = rejectionReason ?? null;
-    await quotation.save();
-
     await cancelOrderWithSettlement({
       orderId: order._id.toString(),
       actorId: customerUserId,
@@ -912,6 +775,11 @@ export const AssignmentService = {
         "Từ chối báo giá sửa chữa: " +
         (rejectionReason ?? "không có lý do"),
     });
+
+    quotation.status = "rejected";
+    quotation.rejectedAt = new Date();
+    quotation.rejectionReason = rejectionReason ?? null;
+    await quotation.save();
 
     return quotation as any;
   },

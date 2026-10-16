@@ -71,22 +71,23 @@ async function run() {
     await assert.rejects(updateConfig(admin, payload.key, { value: custom, isPublic: true }), /nội bộ/);
     const now = new Date("2026-10-15T03:00:00Z");
     const input: RefundPolicyInput = { role: "customer", orderType: "scheduled", orderStatus: "accepted",
-      paidAmount: 100000, hasAssignedProvider: true, now };
+      paidAmount: 100000, hasAssignedProvider: true, providerAcceptedAt: now, now };
     for (const orderType of ["scheduled", "recurring"] as const) {
-      for (const [hours, rate, allowed] of [[49, 95, true], [48, 95, true], [47, 75, true],
-        [12, 75, true], [11, 45, true], [3, 45, true], [2, 10, true], [0, 0, false], [-1, 0, false]] as const) {
+      for (const hours of [49, 48, 47, 12, 11, 3, 2, 0, -1]) {
         const result = calculateRefundPolicy({ ...input, orderType, scheduledAt: new Date(now.getTime() + hours * 3600000) }, await getRefundPolicy());
-        assert.equal(result.refundRate, rate);
-        assert.equal(result.canCancel, allowed);
-        assert.equal(result.refundAmount, 100000 * rate / 100);
-        assert.equal(result.providerCompensation, Math.round(result.cancellationFee * 0.35));
+        assert.equal(result.refundRate, 100);
+        assert.equal(result.canCancel, true);
+        assert.equal(result.refundAmount, 100000);
+        assert.equal(result.providerCompensation, 0);
         assert.equal(result.providerCompensation + result.platformRetainedAmount, result.cancellationFee);
       }
     }
     for (const orderType of ["normal", "urgent"] as const) {
-      assert.equal(calculateRefundPolicy({ ...input, orderType }, custom).refundRate, 60);
+      assert.equal(calculateRefundPolicy({ ...input, orderType }, custom).refundRate, 100);
     }
-    assert.equal(calculateRefundPolicy(input, custom).refundRate, 40);
+    assert.equal(calculateRefundPolicy(input, custom).refundRate, 100);
+    assert.equal(calculateRefundPolicy({ ...input, now: new Date(now.getTime() + 300001) }, custom).canCancel, false);
+    assert.equal(calculateRefundPolicy({ ...input, orderStatus: "in_progress" }, custom).canCancel, false);
     assert.equal(calculateRefundPolicy({ ...input, hasAssignedProvider: false }, custom).refundRate, 100);
     assert.equal(calculateRefundPolicy({ ...input, role: "admin" }, custom).refundRate, 100);
     const deposit = calculateRefundPolicy({ ...input, role: "provider", inspectionRequired: true,
@@ -94,7 +95,7 @@ async function run() {
     assert.equal(deposit.policyVersion, QUOTATION_DEPOSIT_POLICY_VERSION);
     assert.equal(deposit.providerCompensation, 30000);
     assert.equal(deposit.providerCompensationRate, 100);
-    assert.equal(calculateRefundPolicy({ ...input, orderType: "normal" }).refundRate, 70);
+    assert.equal(calculateRefundPolicy({ ...input, orderType: "normal" }).refundRate, 100);
 
     const reward = { key: "REWARD_POLICY", type: "JSON" as const, value: DEFAULT_REWARD_POLICY, isPublic: false };
     await createConfig(admin, reward);

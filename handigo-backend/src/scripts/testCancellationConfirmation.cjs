@@ -40,10 +40,11 @@ const context = {
   mongoose: { startSession: async () => session }, CANCELLABLE_STATUSES: ['created', 'accepted'],
   assertObjectId: value => assert.equal(Types.ObjectId.isValid(value), true),
   assertCancellationAccess: async order => assert.equal(String(order.customerId), actorId),
-  getPaidOrderAmount: async () => 40000,
+  getPaidOrderAmount: async id => orders.find(order => String(order._id) === String(id)).paidAmount,
   calculateOrderRefundPolicy: async (order, role, paidAmount) => calculateRefundPolicy({
     role, orderType: order.orderType, orderStatus: order.status, hasAssignedProvider: Boolean(order.providerId),
     paidAmount, paidInspectionDeposit: paidAmount, inspectionRequired: true, hasRepairQuotation: false,
+    providerAcceptedAt: new Date(Date.now() - 60000),
   }),
   Order: {
     findById: id => {
@@ -71,9 +72,10 @@ vm.runInNewContext(ts.transpileModule(declarations.join('\n'), {
 }).outputText, context);
 const { cancelOrdersWithSettlement, cancelOrderWithSettlement } = context.exports;
 const makeOrder = assigned => ({ _id: new Types.ObjectId(), customerId: actorId, status: assigned ? 'accepted' : 'created',
-  providerId: assigned ? new Types.ObjectId() : null, orderType: 'normal', inspectionRequired: true });
+  providerId: assigned ? new Types.ObjectId() : null, orderType: 'normal', inspectionRequired: true,
+  paidAmount: assigned ? 50000 : 40000 });
 const fullRefund = { paidAmount: 40000, refundAmount: 40000, cancellationFee: 0, providerCompensation: 0 };
-const providerCredit = { paidAmount: 40000, refundAmount: 0, cancellationFee: 40000, providerCompensation: 40000 };
+const updatedRefund = { paidAmount: 50000, refundAmount: 50000, cancellationFee: 0, providerCompensation: 0 };
 const input = (order, confirmedExpectation) => ({ orderId: String(order._id), actorId, role: 'customer', reason: 'Thay đổi lịch', confirmedExpectation });
 
 (async () => {
@@ -84,9 +86,9 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
   await assert.rejects(cancelOrderWithSettlement(input(orders[0], fullRefund)), error => error instanceof ActionPreconditionError);
   assert.equal(orders[0].status, 'accepted');
   assert.equal(ledger.length, 0); assert.equal(settled.length, 0); assert.equal(notified.length, 0);
-  await cancelOrderWithSettlement(input(orders[0], providerCredit));
+  await cancelOrderWithSettlement(input(orders[0], updatedRefund));
   assert.equal(orders[0].status, 'cancelled');
-  assert.equal(ledger.find(item => item.compensation !== undefined).compensation, 40000);
+  assert.equal(ledger.find(item => item.compensation !== undefined).compensation, 0);
   assert.equal(settled.length, 1);
 
   orders = [makeOrder(false), makeOrder(true)]; ledger = []; settled = []; notified = [];
@@ -94,7 +96,7 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
   assert.equal(orders[0].status, 'created', 'Hoàn tác cả buổi đã xử lý khi buổi sau đổi tiền hoàn');
   assert.equal(orders[1].status, 'accepted');
   assert.equal(ledger.length, 0); assert.equal(settled.length, 0); assert.equal(notified.length, 0);
-  const result = await cancelOrdersWithSettlement([input(orders[0], fullRefund), input(orders[1], providerCredit)]);
+  const result = await cancelOrdersWithSettlement([input(orders[0], fullRefund), input(orders[1], updatedRefund)]);
   assert.equal(result.length, 2); assert.equal(result.every(order => order.status === 'cancelled'), true);
   assert.equal(settled.length, 2); assert.equal(notified.length, 2);
   orders = [makeOrder(false)]; ledger = []; settled = []; notified = [];

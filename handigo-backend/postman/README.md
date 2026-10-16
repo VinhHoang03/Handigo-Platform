@@ -2,6 +2,15 @@
 
 Import all `*.postman_collection.json` files in this directory.
 
+## Khách hàng hủy đơn sau khi thợ nhận
+
+- Áp dụng cho dịch vụ giá cố định và báo giá, gồm đặt ngay, lịch hẹn và định kỳ.
+- Trong vòng 5 phút kể từ lần nhận đơn hiện tại, khách được hủy và hoàn toàn bộ khoản ví/QR đã thanh toán về ví Handigo; tiền mặt chưa thu không phát sinh hoàn tiền. Quy tắc vẫn áp dụng nếu đơn đã chuyển sang đang thực hiện trong khoảng này.
+- Sau 5 phút, API hủy từ chối với lỗi 409; API xem trước trả `canCancel: false`. Không cấp voucher cho trường hợp khách tự hủy.
+- `GET /orders/:orderId` bổ sung `customerCancellationDeadline` (thời điểm ISO hoặc `null`) để web/app khóa nút hủy đúng hạn. Backend luôn tự kiểm tra lại khi thực hiện hủy.
+- Mốc tính lấy từ lịch sử nhận đơn gần nhất, dự phòng bằng `respondedAt` của assignment đã nhận. Không dùng thời gian tạo/cập nhật đơn; đơn cũ thiếu cả hai mốc không tự mở quyền hủy.
+- Kiểm thử độc lập, không gọi cổng thanh toán thật: `node --test tests/provider-replacement.test.cjs` trong thư mục backend.
+
 ## Required data
 
 - The API is running at `http://localhost:5000`, or update `baseUrl`.

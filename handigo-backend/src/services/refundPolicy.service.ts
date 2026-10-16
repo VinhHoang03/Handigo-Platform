@@ -1,6 +1,8 @@
 import { DEFAULT_REFUND_POLICY, type RefundPolicy } from "../validations/refundPolicy.validator";
 
 export const REFUND_POLICY_VERSION = "HANDIGO_REFUND_V1";
+export const CUSTOMER_CANCELLATION_POLICY_VERSION = "HANDIGO_CUSTOMER_CANCEL_5M_V1";
+export const CUSTOMER_CANCELLATION_WINDOW_MS = 5 * 60 * 1000;
 export const QUOTATION_DEPOSIT_POLICY_VERSION = "HANDIGO_QUOTATION_DEPOSIT_V1";
 export const QUOTATION_DECLINED_REASON = "Khách hàng không đồng ý báo giá";
 export const isQuotationDeclinedReason = (reason = "") =>
@@ -25,6 +27,7 @@ export interface RefundPolicyInput {
   inspectionRequired?: boolean;
   paidInspectionDeposit?: number;
   cancellationReason?: string;
+  providerAcceptedAt?: Date | null;
 }
 
 export interface RefundPolicyResult {
@@ -55,8 +58,7 @@ export const calculateRefundPolicy = (
 
   const canCancel = ["created", "accepted"].includes(input.orderStatus);
   if (canCancel && input.inspectionRequired && input.orderStatus === "accepted"
-    && input.hasAssignedProvider && (input.role === "customer"
-      || (input.role === "provider" && input.hasRepairQuotation))) {
+    && input.hasAssignedProvider && input.role === "provider" && input.hasRepairQuotation) {
     const deposit = Math.min(paidAmount, roundMoney(input.paidInspectionDeposit || 0));
     const refundAmount = paidAmount - deposit;
     return {
@@ -66,25 +68,37 @@ export const calculateRefundPolicy = (
       paidAmount, refundAmount, cancellationFee: deposit,
       providerCompensation: deposit, providerCompensationRate: 100, platformRetainedAmount: 0,
       hoursBeforeStart,
-      policyReason: input.hasRepairQuotation
-        ? "Hủy sau khi thợ đã báo giá: tiền cọc thực trả được chuyển vào ví thợ; khoản thanh toán thêm được hoàn cho khách."
-        : "Khách hủy sau khi thợ đã nhận đơn: tiền cọc thực trả được chuyển vào ví thợ; khoản thanh toán thêm được hoàn cho khách.",
+      policyReason: "Thợ hủy sau khi đã báo giá: tiền cọc thực trả được chuyển vào ví thợ; khoản thanh toán thêm được hoàn cho khách.",
     };
   }
 
-  if (input.inspectionRequired && ["customer", "provider"].includes(input.role)) {
+  if (input.role === "customer" && input.orderStatus === "in_progress") {
     return {
-      policyVersion: REFUND_POLICY_VERSION, canCancel, refundRate: canCancel ? 100 : 0,
-      paidAmount, refundAmount: canCancel ? paidAmount : 0, cancellationFee: canCancel ? 0 : paidAmount,
-      providerCompensation: 0, providerCompensationRate: 0,
-      platformRetainedAmount: canCancel ? 0 : paidAmount, hoursBeforeStart,
-      policyReason: canCancel
-        ? "Đơn báo giá chưa có thợ nhận hoặc đang tìm thợ thay thế: hoàn toàn bộ tiền đã thanh toán cho khách."
-        : "Không thể hủy đơn đã bắt đầu thực hiện hoặc đã kết thúc.",
+      policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
+      canCancel: false, refundRate: 0, paidAmount, refundAmount: 0,
+      cancellationFee: 0, providerCompensation: 0, providerCompensationRate: 0, platformRetainedAmount: 0,
+      hoursBeforeStart,
+      policyReason: "Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng.",
     };
   }
 
-  let allowed = canCancel;
+  if (input.role === "customer" && input.hasAssignedProvider
+    && input.orderStatus === "accepted") {
+    const acceptedAt = input.providerAcceptedAt?.getTime();
+    const elapsed = acceptedAt === undefined ? NaN : now.getTime() - acceptedAt;
+    const canCancel = Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= CUSTOMER_CANCELLATION_WINDOW_MS;
+    return {
+      policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
+      canCancel, refundRate: canCancel ? 100 : 0, paidAmount,
+      refundAmount: canCancel ? paidAmount : 0,
+      cancellationFee: 0, providerCompensation: 0, providerCompensationRate: 0, platformRetainedAmount: 0,
+      hoursBeforeStart,
+      policyReason: canCancel
+        ? "Hủy trong vòng 5 phút kể từ khi thợ nhận đơn, hoàn toàn bộ khoản đã thanh toán về ví Handigo."
+        : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn hoặc chưa xác minh được thời điểm nhận đơn.",
+    };
+  }
+
   let refundRate = 100;
   let policyReason = "Hoàn toàn bộ tiền đã thanh toán.";
 
@@ -92,31 +106,9 @@ export const calculateRefundPolicy = (
     policyReason = "Provider, quản trị viên hoặc hệ thống hủy đơn.";
   } else if (!input.hasAssignedProvider || input.orderStatus === "created") {
     policyReason = "Đơn chưa có provider nhận.";
-  } else if (["normal", "urgent"].includes(input.orderType)) {
-    refundRate = policy.normalRefundPercent;
-    policyReason = "Khách hàng hủy đơn sau khi provider đã nhận.";
-  } else if (hoursBeforeStart === null) {
-    refundRate = policy.missingScheduleRefundPercent;
-    policyReason = `Lịch hẹn thiếu thời gian bắt đầu; áp dụng mức hoàn ${refundRate}%.`;
-  } else if (hoursBeforeStart >= policy.earlyHours) {
-    refundRate = policy.earlyRefundPercent;
-    policyReason = `Hủy trước lịch ít nhất ${policy.earlyHours} giờ.`;
-  } else if (hoursBeforeStart >= policy.middleHours) {
-    refundRate = policy.middleRefundPercent;
-    policyReason = `Hủy trong khoảng từ ${policy.middleHours} đến dưới ${policy.earlyHours} giờ trước lịch.`;
-  } else if (hoursBeforeStart >= policy.lateHours) {
-    refundRate = policy.lateRefundPercent;
-    policyReason = `Hủy trong khoảng từ ${policy.lateHours} đến dưới ${policy.middleHours} giờ trước lịch.`;
-  } else if (hoursBeforeStart > 0) {
-    refundRate = policy.lastMinuteRefundPercent;
-    policyReason = `Hủy dưới ${policy.lateHours} giờ trước lịch.`;
-  } else {
-    allowed = false;
-    refundRate = 0;
-    policyReason = "Lịch đã đến giờ thực hiện; vui lòng gửi yêu cầu hỗ trợ.";
   }
 
-  if (!allowed) {
+  if (!canCancel) {
     refundRate = 0;
   }
 
@@ -129,7 +121,7 @@ export const calculateRefundPolicy = (
 
   return {
     policyVersion: REFUND_POLICY_VERSION,
-    canCancel: allowed,
+    canCancel,
     refundRate,
     paidAmount,
     refundAmount,

@@ -170,6 +170,7 @@ test('Hook của model hoãn thông báo xét duyệt, thông báo thông thư�
   });
   const service = loadSource('../src/services/notification.service.ts', {
     mongoose: { Types }, '../models/notification.model': model,
+    '../models/order.model': { Order: {} }, '../models/provider.model': { Provider: {} },
     '../models/user.model': { __esModule: true, default: {} },
     '../utils/appError': { AppError: Error }, '../utils/mongo': { toObjectId: (id) => id },
     '../sockets/socketServer': socket,
