@@ -54,9 +54,11 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
           {booking?.meta || 'Đang cập nhật'}
         </span>
       </div>
-      <p className={`font-bold text-primary font-body-lg text-body-lg ${booking?.statusTone === 'cancelled' ? 'line-through opacity-50' : ''}`}>
-        {booking?.price || '0đ'}
-      </p>
+      {booking.status !== 'cancelled' && booking.statusTone !== 'cancelled' && (
+        <p className="font-bold text-primary font-body-lg text-body-lg">
+          {booking?.price || '0đ'}
+        </p>
+      )}
     </div>
 
     <div className="flex w-full shrink-0 flex-col gap-sm sm:w-auto sm:min-w-52 sm:items-end sm:self-stretch sm:justify-between">
