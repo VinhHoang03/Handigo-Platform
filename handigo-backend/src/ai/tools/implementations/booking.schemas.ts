@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createOrderSchema, cancelOrderSchema, orderIdParamSchema } from "../../../validations/order.validator";
-import { getEarliestScheduledAt } from "../../../utils/bookingPolicy";
+import { getEarliestScheduledAt, isWithinAppointmentHours } from "../../../utils/bookingPolicy";
+import { bookingAttachmentsSchema } from "../../agent/booking-attachments";
 
 export const idSchema = createOrderSchema.shape.serviceId;
 export const priceSchema = z.object({
@@ -13,6 +14,7 @@ export const bookingSchema = priceSchema.extend({
   orderType: z.enum(["normal", "scheduled"]),
   scheduledAt: createOrderSchema.shape.scheduledAt,
   problemDescription: createOrderSchema.shape.problemDescription,
+  customerAttachments: bookingAttachmentsSchema.optional(),
   paymentMethod: createOrderSchema.shape.paymentMethod,
   voucherCode: createOrderSchema.shape.voucherCode,
   preferredProviderId: createOrderSchema.shape.preferredProviderId,
@@ -23,9 +25,13 @@ export const bookingSchema = priceSchema.extend({
   if (value.orderType === "normal" && value.scheduledAt) {
     ctx.addIssue({ code: "custom", path: ["orderType"], message: "Có giờ hẹn thì phải chọn loại scheduled." });
   }
+  if (value.scheduledAt && !isWithinAppointmentHours(new Date(value.scheduledAt))) {
+    ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn từ 08:00 đến 21:00." });
+  }
 });
-export const availabilitySchema = z.object({
-  serviceId: idSchema, addressId: idSchema,
+export const availabilitySchema = priceSchema.extend({
+  addressId: idSchema,
+  preferredProviderId: idSchema.optional(),
   times: z.array(z.string().datetime({ offset: true })).min(1).max(8),
 }).strict();
 export const cancelSchema = orderIdParamSchema.extend({ reason: cancelOrderSchema.shape.reason }).strict();

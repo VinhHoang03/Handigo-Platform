@@ -23,6 +23,8 @@ let ledger = [];
 let settled = [];
 let notified = [];
 let active = false;
+let conflictOrderId = null;
+let conflictsRemaining = 0;
 const actorId = String(new Types.ObjectId());
 const session = {
   withTransaction: async callback => {
@@ -37,6 +39,7 @@ const session = {
 };
 const context = {
   exports: {}, Types, Date, AppError: require('../utils/appError').AppError, ActionPreconditionError,
+  withTransactionRetry: require('../utils/transaction').withTransactionRetry,
   mongoose: { startSession: async () => session }, CANCELLABLE_STATUSES: ['created', 'accepted'],
   assertObjectId: value => assert.equal(Types.ObjectId.isValid(value), true),
   assertCancellationAccess: async order => assert.equal(String(order.customerId), actorId),
@@ -53,6 +56,9 @@ const context = {
     },
     findOneAndUpdate: async (query, update, options) => {
       assert.equal(active, true); assert.equal(options.session, session);
+      if (String(query._id) === conflictOrderId && conflictsRemaining-- > 0) {
+        throw Object.assign(new Error('Xung đột ghi giả lập'), { code: 112, codeName: 'WriteConflict' });
+      }
       const order = orders.find(item => String(item._id) === String(query._id) && item.status === query.status);
       return order ? Object.assign(order, update.$set) : null;
     },
@@ -111,5 +117,12 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
   await cancelOrderWithSettlement({ ...timeoutInput, orderId: String(orders[0]._id) });
   assert.equal(orders[0].status, 'accepted', 'Thợ mới đã nhận thì không hủy bởi tác vụ hết hạn tìm kiếm.');
   assert.equal(ledger.length, 0);
+  orders = [makeOrder(false), makeOrder(false)]; ledger = []; settled = []; notified = [];
+  conflictOrderId = String(orders[1]._id); conflictsRemaining = 2;
+  await cancelOrdersWithSettlement(orders.map(order => input(order, fullRefund)));
+  assert.equal(orders.every(order => order.status === 'cancelled'), true);
+  assert.equal(ledger.filter(entry => entry.refund !== undefined).length, 2, 'Thử lại toàn bộ transaction không hoàn ví trùng');
+  assert.equal(settled.length, 2, 'Chỉ quyết toán sau transaction thành công');
+  assert.equal(notified.length, 2, 'Không gửi thông báo trong các lượt rollback');
   console.log('Đã kiểm tra xác nhận tiền hoàn, chặn dữ liệu cũ, xác nhận lại và hoàn tác cả chuỗi lịch.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

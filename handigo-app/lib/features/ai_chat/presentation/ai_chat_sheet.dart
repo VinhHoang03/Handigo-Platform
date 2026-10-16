@@ -222,8 +222,14 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                             TextButton(
                               onPressed: controller.busy
                                   ? null
+                                  : controller.canReconcileBooking
+                                  ? controller.checkBooking
                                   : controller.load,
-                              child: const Text('Tải lại trạng thái'),
+                              child: Text(
+                                controller.canReconcileBooking
+                                    ? 'Kiểm tra kết quả tạo đơn'
+                                    : 'Tải lại trạng thái',
+                              ),
                             ),
                           ],
                         ),
@@ -246,6 +252,7 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                     _PaymentCard(
                       payment: payment,
                       enabled: controller.canSend,
+                      canCheck: controller.canCheckPayment,
                       onCheck: controller.checkPayment,
                     ),
                 ],
@@ -294,6 +301,16 @@ const _previewLabels = {
   'schedule': 'Thời gian',
   'unitPrice': 'Đơn giá',
   'quantity': 'Số lượng',
+  'originalAmount': 'Giá trước giảm',
+  'voucherCode': 'Voucher',
+  'discountAmount': 'Giảm giá',
+  'providerName': 'Chuyên gia ưu tiên',
+  'previousAddress': 'Địa chỉ trước khi sửa',
+  'recipientName': 'Người nhận',
+  'recipientPhone': 'Số điện thoại người nhận',
+  'defaultAddress': 'Địa chỉ mặc định',
+  'addressNote': 'Ghi chú địa chỉ',
+  'responseDeadline': 'Hạn phản hồi',
   'paymentMethod': 'Thanh toán',
   'amount': 'Số tiền',
   'description': 'Mô tả',
@@ -407,10 +424,12 @@ class _PaymentCard extends StatelessWidget {
   const _PaymentCard({
     required this.payment,
     required this.enabled,
+    required this.canCheck,
     required this.onCheck,
   });
   final Map<String, dynamic> payment;
   final bool enabled;
+  final bool canCheck;
   final Future<void> Function() onCheck;
 
   @override
@@ -463,7 +482,7 @@ class _PaymentCard extends StatelessWidget {
                 child: const Text('Mở PayOS để thanh toán'),
               ),
             TextButton(
-              onPressed: enabled ? onCheck : null,
+              onPressed: canCheck ? onCheck : null,
               child: const Text('Kiểm tra thanh toán'),
             ),
           ],

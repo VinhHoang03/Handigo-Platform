@@ -63,28 +63,39 @@ export function createAgentPaymentService(deps = dependencies) {
     if (payment?.status === "paid") return { ...base,
       status: payment.paymentType === "inspection_deposit" ? "deposit_paid" : "paid",
       message: payment.paymentType === "inspection_deposit"
-        ? "Đã xác minh thanh toán tiền cọc. Chi phí báo giá sau khảo sát được thanh toán trực tiếp với nhà cung cấp."
-        : "Đã xác minh thanh toán thành công cho đơn hàng." };
+        ? "Đã thanh toán tiền cọc. Chi phí sau khảo sát trả trực tiếp cho thợ."
+        : "Đã thanh toán thành công." };
     if (payment?.status === "refunded") return { ...base, status: "refunded", message: "Giao dịch đã được hoàn tiền. Xem chi tiết trong đơn hàng." };
     if (order.status === "cancelled" || order.status === "completed") return { ...base, status: "blocked",
-      message: "Đơn đã kết thúc hoặc bị hủy. Không tạo thanh toán mới; kiểm tra chi tiết đơn nếu cần đối soát." };
+      message: "Đơn đã kết thúc hoặc bị hủy, không thể thanh toán thêm. Bạn có thể xem chi tiết đơn." };
     if (payment?.status === "pending") {
-      if (payment.method === "cash") return { ...base, status: "cash_pending", message: "Đã ghi nhận thanh toán tiền mặt. Bạn thanh toán trực tiếp cho nhà cung cấp; đơn chưa được đánh dấu đã thanh toán." };
+      if (payment.method === "cash") return { ...base, status: "cash_pending", message: "Đã chọn tiền mặt, chưa thanh toán. Bạn trả trực tiếp cho thợ." };
       const link = payment.gatewayResponse?.paymentLink as { checkoutUrl?: unknown } | undefined;
       return { ...base, status: "pending", checkoutUrl: safePayosUrl(link?.checkoutUrl),
-        message: "Giao dịch đang chờ thanh toán. Quét mã QR trong khung thanh toán ngay tại đây. Hệ thống sẽ xác minh kết quả thanh toán cho bạn." };
+        message: "Đang chờ thanh toán. Bạn quét mã QR bên dưới để thanh toán." };
     }
     if (["scheduled", "recurring"].includes(order.orderType)
       && !(order.status === "created" && !order.providerId && order.bookingStatus !== "reserved")
       && (order.status !== "accepted" || order.bookingStatus !== "awaiting_payment" || !order.providerId)) {
-      return { ...base, status: "blocked", message: "Lịch hẹn đang chờ chuyên gia xác nhận. Chỉ thanh toán khi đơn chuyển sang chờ thanh toán." };
+      return { ...base, status: "blocked", message: "Lịch hẹn đang chờ thợ xác nhận, chưa đến bước thanh toán." };
     }
     return { ...base, status: payment?.status === "failed" ? "failed" : "unpaid",
-      message: payment?.status === "failed" ? "Giao dịch cũ đã hủy, hết hạn hoặc thất bại. Bạn có thể chọn phương thức thanh toán lại trên cùng đơn."
-        : "Đơn chưa có giao dịch thanh toán. Bạn có thể chọn chuyển khoản, ví hoặc tiền mặt nếu dịch vụ cho phép." };
+      message: payment?.status === "failed" ? "Giao dịch cũ không thành công. Bạn có thể chọn phương thức để thanh toán lại."
+        : "Đơn chưa thanh toán. Vui lòng chọn phương thức phù hợp." };
   };
   return {
     status,
+    async failureConfirmed(user: RequestUser, result: AgentPaymentResult, startedAt: string) {
+      if (!result.paymentId || !["failed", "refunded"].includes(result.status)) return false;
+      await ownedOrder(user, result.orderId);
+      const payments = await deps.payments(result.orderId);
+      const payment = payments.find((item) => String(item._id) === result.paymentId);
+      // Không dùng giao dịch thất bại của lượt cũ để mở khóa một thao tác vẫn chưa rõ kết quả.
+      return Boolean(payment && payment.status === result.status && payment.amount === result.amount
+        && payment.method === result.method && payment.paymentType === result.paymentType
+        && payment.createdAt && payment.createdAt.getTime() >= Date.parse(startedAt)
+        && !payments.some((item) => item.status === "pending" || item.status === "paid"));
+    },
     async preview(user: RequestUser, args: AgentPaymentArguments) {
       await ownedOrder(user, args.orderId);
       return deps.preview(user, args);

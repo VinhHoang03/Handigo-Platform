@@ -27,10 +27,14 @@ import { getCancellationPreviewTool } from "./implementations/get-cancellation-p
 import { updateBookingDraftTool } from "./implementations/update-booking-draft.tool";
 import { getBookingVouchersTool, searchBookingProvidersTool, saveBookingAddressTool } from "./implementations/booking-extras.tools";
 import { getOrderProviderOptionsTool, selectOrderProviderTool, respondProviderReassignmentTool } from "./implementations/order-provider.tools";
+import { searchMyBookingsTool, rebookBookingTool, getPreviousProvidersTool, getBookingRefundsTool } from "./implementations/booking-history.tools";
+import { getBookingQuotationTool, rejectBookingQuotationTool } from "./implementations/quotation.tools";
 
 export function registerTools(policies: Record<string, ToolPolicy>) {
   return new ToolRegistry(policies, true)
     .register(updateBookingDraftTool)
+    .register(searchMyBookingsTool).register(rebookBookingTool).register(getPreviousProvidersTool).register(getBookingRefundsTool)
+    .register(getBookingQuotationTool).register(rejectBookingQuotationTool)
     .register(getOrderProviderOptionsTool).register(selectOrderProviderTool).register(respondProviderReassignmentTool)
     .register(getBookingVouchersTool).register(searchBookingProvidersTool).register(saveBookingAddressTool)
     .register(createSupportTicketTool).register(getMySupportTicketsTool).register(getSupportTicketTool)

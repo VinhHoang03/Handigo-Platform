@@ -7,12 +7,12 @@ import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
-import { Address } from "../models/address.model";
+import { Address, type IAddress } from "../models/address.model";
 import { recordOrderStatus } from "../utils/orderHistory";
 import { resolveAutomaticPromotion, claimPromotion, releaseOrderPromotion } from "./promotion.service";
 import { withOrderAddress } from "../utils/orderAddress";
 import { OrderStatus } from "../models/orderStatus.model";
-import { ensureAddressCoordinates } from "./address.service";
+import { ensureAddressCoordinates, createAddress } from "./address.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
@@ -198,7 +198,7 @@ export const OrderService = {
    *  3. Persist order with status = "created".
    *  4. Hand off to DispatchService to find & assign the nearest provider.
    */
-  async createOrder(payload: CreateOrderPayload): Promise<IOrder> {
+  async createOrder(payload: CreateOrderPayload, confirmedOrderId?: Types.ObjectId, draftAddress?: IAddress): Promise<IOrder> {
     if (!payload.paymentMethod || !["wallet", "bank", "cash"].includes(payload.paymentMethod)) {
       throw new AppError("Phương thức thanh toán không hợp lệ.", 400);
     }
@@ -281,7 +281,10 @@ export const OrderService = {
     if (!Types.ObjectId.isValid(payload.addressId)) {
       throw new AppError("Địa chỉ không hợp lệ.", 400);
     }
-    const selectedAddress = await Address.findOne({
+    if (draftAddress && (String(draftAddress._id) !== payload.addressId || String(draftAddress.userId) !== payload.customerId)) {
+      throw new AppError("Địa chỉ không thuộc tài khoản của bạn.", 403);
+    }
+    const selectedAddress = draftAddress ?? await Address.findOne({
       _id: payload.addressId,
       userId: payload.customerId,
       isDeleted: { $ne: true },
@@ -289,7 +292,13 @@ export const OrderService = {
     if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
-    const address = await ensureAddressCoordinates(selectedAddress);
+    if (draftAddress) {
+      await draftAddress.validate();
+      if (!Number.isFinite(draftAddress.latitude) || !Number.isFinite(draftAddress.longitude)) {
+        throw new AppError("Chưa xác định được vị trí của địa chỉ mới. Vui lòng kiểm tra lại trước khi đặt đơn.", 422);
+      }
+    }
+    const address = draftAddress ?? await ensureAddressCoordinates(selectedAddress);
     if (payload.confirmedExpectation && address.updatedAt.toISOString() !== payload.confirmedExpectation.addressVersion) {
       throw new ActionPreconditionError();
     }
@@ -428,7 +437,7 @@ export const OrderService = {
         inspectionRequired,
       );
       return {
-      _id: new Types.ObjectId(),
+      _id: index === 0 && confirmedOrderId ? confirmedOrderId : new Types.ObjectId(),
       orderCode: generateOrderCode(),
       customerId: new Types.ObjectId(payload.customerId),
       preferredProviderId: payload.preferredProviderId
@@ -491,6 +500,14 @@ export const OrderService = {
           || String(currentVoucher.snapshot.voucherId) !== String(voucherResult.snapshot.voucherId)) throw new ActionPreconditionError();
       }
       if (automaticPromotion) await claimPromotion(automaticPromotion.promotion, orderDocuments.length, session);
+      if (draftAddress) {
+        // Địa chỉ mới và đơn cùng giao dịch: tạo đơn thất bại thì không lưu địa chỉ vào sổ.
+        const savedAddress = await createAddress(payload.customerId, draftAddress.toObject(), {
+          session, addressId: draftAddress._id as Types.ObjectId, reuseExisting: true,
+        });
+        if (!savedAddress) throw new ActionPreconditionError();
+        for (const document of orderDocuments) document.addressId = savedAddress._id as Types.ObjectId;
+      }
       const documents = await Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
       if (voucherResult) {
         await reservePersonalVoucher(voucherResult.snapshot.voucherId, payload.customerId,

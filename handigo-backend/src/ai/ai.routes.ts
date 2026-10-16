@@ -4,19 +4,27 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { chatbotRateLimit } from "../middlewares/rateLimit.middleware";
 import { validate } from "../middlewares/validate.middleware";
-import { deleteSession, getLatestSession, getSession, listSessions, getSessionProgress, resetSession, sendMessage } from "./ai.controller";
+import { deleteSession, getLatestSession, getSession, listSessions, getSessionProgress, resetSession, sendMessage, uploadAttachment } from "./ai.controller";
+import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
+import { bookingAttachmentsSchema } from "./agent/booking-attachments";
+import { bookingActionSchema } from "./agent/booking-actions";
 
 export const agentRequestSchema = z.union([
   z.object({ sessionId: z.string().uuid(), requestId: z.string().uuid(), paymentStatus: z.object({
     orderId: z.string().regex(/^[a-f\d]{24}$/i, "ID đơn hàng không hợp lệ."),
   }).strict() }).strict(),
-  z.object({ sessionId: z.string().uuid(), requestId: z.string().uuid(), message: z.string().trim().min(1).max(4000) }).strict(),
+  z.object({ sessionId: z.string().uuid(), requestId: z.string().uuid(), message: z.string().trim().min(1).max(4000),
+    customerAttachments: bookingAttachmentsSchema.optional(), bookingAction: bookingActionSchema.optional() }).strict(),
   z.object({ sessionId: z.string().uuid(), requestId: z.string().uuid(), confirmation: z.object({
     actionId: z.string().uuid(), decision: z.enum(["CONFIRM", "REJECT"]),
+    policyConsent: z.object({ accepted: z.literal(true), version: z.string().regex(/^[a-f\d]{64}$/, "Phiên bản chính sách không hợp lệ.") }).strict().optional(),
   }).strict() }).strict(),
 ]);
 const router = Router();
 router.use(authMiddleware, roleMiddleware("CUSTOMER"));
+router.post("/sessions/:sessionId/attachments", chatbotRateLimit, validate(z.object({
+  sessionId: z.string().uuid("Mã cuộc trò chuyện không hợp lệ."),
+}), "params"), uploadOrderAttachmentImage, uploadAttachment);
 router.get("/sessions/latest", getLatestSession);
 router.delete("/sessions/:sessionId", validate(z.object({
   sessionId: z.string().uuid("Mã cuộc trò chuyện không hợp lệ."),

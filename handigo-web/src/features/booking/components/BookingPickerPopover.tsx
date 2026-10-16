@@ -8,10 +8,11 @@ interface BookingPickerPopoverProps {
   anchorRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   children: ReactNode;
+  zIndex?: number;
 }
 
 /** Bảng chọn nổi bám theo nút mở và luôn nằm trong vùng màn hình nhìn thấy. */
-export const BookingPickerPopover = ({ id, title, anchorRef, onClose, children }: BookingPickerPopoverProps) => {
+export const BookingPickerPopover = ({ id, title, anchorRef, onClose, children, zIndex = 100 }: BookingPickerPopoverProps) => {
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef(onClose);
 
@@ -79,7 +80,7 @@ export const BookingPickerPopover = ({ id, title, anchorRef, onClose, children }
 
   return createPortal(
     <section ref={panelRef} id={id} role="dialog" aria-modal="false" aria-labelledby={`${id}-title`}
-      className="fixed z-[100] overflow-y-auto overscroll-contain rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-xl">
+      style={{ zIndex }} className="fixed overflow-y-auto overscroll-contain rounded-2xl border border-outline-variant bg-surface-container-lowest p-3 shadow-xl">
       <header className="mb-sm flex items-center justify-between gap-sm">
         <h4 id={`${id}-title`} className="text-sm font-bold text-on-surface">{title}</h4>
         <button type="button" aria-label="Đóng" onClick={onClose}

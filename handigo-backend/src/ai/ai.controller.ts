@@ -6,8 +6,16 @@ import { AgentService, sessionView } from "./agent/agent.service";
 import { AgentLoop } from "./agent/agent-loop.service";
 import { SessionService } from "./session/session.service";
 import { registerTools } from "./tools/register-tools";
+import { withOrderActions } from "./agent/order-actions";
 
 const sessions = new SessionService();
+export async function uploadAttachment(req: Request, res: Response) {
+  try {
+    const data = await sessions.registerAttachment(String(req.params.sessionId), requireRequestUser(req).id, String(res.locals.imageUrl));
+    return res.json({ success: true, data, message: "Đã tải ảnh hiện trạng cho cuộc trò chuyện." });
+  } catch (error) { return sendControllerError(res, error); }
+}
+
 export async function deleteSession(req: Request, res: Response) {
   try {
     await sessions.delete(String(req.params.sessionId), requireRequestUser(req).id);
@@ -25,7 +33,7 @@ export async function listSessions(req: Request, res: Response) {
 export async function getSession(req: Request, res: Response) {
   try {
     const session = await sessions.get(String(req.params.sessionId), requireRequestUser(req).id);
-    return res.json({ success: true, data: sessionView(session), message: "Đã tải cuộc trò chuyện." });
+    return res.json({ success: true, data: await withOrderActions(sessionView(session), requireRequestUser(req).id), message: "Đã tải cuộc trò chuyện." });
   } catch (error) { return sendControllerError(res, error); }
 }
 export async function getSessionProgress(req: Request, res: Response) {
@@ -44,7 +52,7 @@ export async function resetSession(req: Request, res: Response) {
 export async function getLatestSession(req: Request, res: Response) {
   try {
     const session = await sessions.latest(requireRequestUser(req).id);
-    return res.json({ success: true, data: session ? sessionView(session) : null, message: "Đã tải phiên trợ lý." });
+    return res.json({ success: true, data: session ? await withOrderActions(sessionView(session), requireRequestUser(req).id) : null, message: "Đã tải phiên trợ lý." });
   } catch (error) { return sendControllerError(res, error); }
 }
 
@@ -54,6 +62,6 @@ export async function sendMessage(req: Request, res: Response) {
     const service = new AgentService(sessions, new AgentLoop(config.createProvider(), registerTools(config.tools), config));
     const { sessionId, ...input } = req.body;
     const result = await service.send(requireRequestUser(req), sessionId, input);
-    return res.json({ success: true, data: result, message: "Đã xử lý lượt trợ lý." });
+    return res.json({ success: true, data: await withOrderActions(result, requireRequestUser(req).id), message: "Đã xử lý lượt trợ lý." });
   } catch (error) { return sendControllerError(res, error); }
 }
