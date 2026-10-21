@@ -143,8 +143,8 @@ void main() {
 
       router.go('/register/otp?email=flutter-test@example.invalid');
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField), '123456');
-      await tester.tap(find.widgetWithText(FilledButton, 'Xác thực'));
+      await tester.enterText(find.byType(TextField).first, '123456');
+      await tester.tap(find.widgetWithText(FilledButton, 'Xác thực mã OTP'));
       await tester.pumpAndSettle();
       expect(repository.submittedOtp, '123456');
       expect(find.text('Mã OTP không đúng.'), findsOneWidget);

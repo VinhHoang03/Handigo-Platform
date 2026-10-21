@@ -216,8 +216,19 @@ class _ServiceReviewsScreenState extends ConsumerState<ServiceReviewsScreen> {
                     ),
                     FilterChip(
                       label: const Text('Có hình ảnh'),
-                      avatar: const Icon(Icons.photo_outlined, size: 18),
+                      avatar: Icon(
+                        Icons.photo_outlined,
+                        size: 18,
+                        color: _hasImages
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       selected: _hasImages,
+                      labelStyle: TextStyle(
+                        fontWeight: _hasImages
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
                       onSelected: (value) => setState(() {
                         _hasImages = value;
                         _page = 1;

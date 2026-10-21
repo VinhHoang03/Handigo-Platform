@@ -108,6 +108,27 @@ abstract final class AppTheme {
       ),
       scaffoldBackgroundColor: scheme.surface,
       colorScheme: scheme,
+      chipTheme: ChipThemeData(
+        backgroundColor: scheme.surfaceContainer,
+        selectedColor: scheme.primaryContainer,
+        secondarySelectedColor: scheme.primaryContainer,
+        showCheckmark: false,
+        side: BorderSide.none,
+        shape: const StadiumBorder(),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        labelStyle: TextStyle(
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? scheme.onPrimary
+                : scheme.onSurfaceVariant,
+          ),
+          fontWeight: FontWeight.w500,
+        ),
+        secondaryLabelStyle: TextStyle(
+          color: scheme.onPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLowest,
         elevation: 0,

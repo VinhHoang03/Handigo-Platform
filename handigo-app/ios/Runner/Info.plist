@@ -28,6 +28,12 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Handigo cần vị trí hiện tại để hiển thị khu vực và khoảng cách đến thợ phù hợp.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Khi bạn bật nhận việc, Handigo cập nhật vị trí cả khi chuyển sang ứng dụng khác để tìm đơn gần bạn. Tắt nhận việc để dừng.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

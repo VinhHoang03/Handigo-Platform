@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../../../core/network/realtime_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
@@ -11,9 +13,9 @@ final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(ref.watch(apiClientProvider)),
 );
 final conversationListProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(chatRepositoryProvider).conversations(
-    currentUserId: ref.watch(authControllerProvider).user?.id,
-  ),
+  (ref) => ref
+      .watch(chatRepositoryProvider)
+      .conversations(currentUserId: ref.watch(authControllerProvider).user?.id),
 );
 
 class ConversationListScreen extends ConsumerStatefulWidget {
@@ -66,11 +68,13 @@ class _ConversationListScreenState
         ),
         data: (page) {
           final filtered = page.items.where((item) {
-            final matchesFilter = _selectedFilter == 'ALL' ||
+            final matchesFilter =
+                _selectedFilter == 'ALL' ||
                 (_selectedFilter == 'ORDER' && item.orderCode.isNotEmpty) ||
                 (_selectedFilter == 'SUPPORT' && item.orderCode.isEmpty);
             final query = _query.trim().toLowerCase();
-            final matchesQuery = query.isEmpty ||
+            final matchesQuery =
+                query.isEmpty ||
                 item.title.toLowerCase().contains(query) ||
                 item.orderCode.toLowerCase().contains(query) ||
                 (item.lastMessage ?? '').toLowerCase().contains(query);
@@ -87,18 +91,35 @@ class _ConversationListScreenState
                   decoration: InputDecoration(
                     hintText: 'Tìm tên thợ, mã đơn, dịch vụ...',
                     prefixIcon: const Icon(Icons.search, size: 19),
-                    suffixIcon: Icon(Icons.tune, color: scheme.onSurfaceVariant),
+                    suffixIcon: Icon(
+                      Icons.tune,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
-                SizedBox(
-                  height: 38,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      _ChatFilterChip(label: 'Tất cả', value: 'ALL', selected: _selectedFilter, onSelected: _selectFilter),
-                      _ChatFilterChip(label: 'Đơn hàng', value: 'ORDER', selected: _selectedFilter, onSelected: _selectFilter),
-                      _ChatFilterChip(label: 'Hỗ trợ', value: 'SUPPORT', selected: _selectedFilter, onSelected: _selectFilter),
+                      _ChatFilterChip(
+                        label: 'Tất cả',
+                        value: 'ALL',
+                        selected: _selectedFilter,
+                        onSelected: _selectFilter,
+                      ),
+                      _ChatFilterChip(
+                        label: 'Đơn hàng',
+                        value: 'ORDER',
+                        selected: _selectedFilter,
+                        onSelected: _selectFilter,
+                      ),
+                      _ChatFilterChip(
+                        label: 'Hỗ trợ',
+                        value: 'SUPPORT',
+                        selected: _selectedFilter,
+                        onSelected: _selectFilter,
+                      ),
                     ],
                   ),
                 ),
@@ -106,30 +127,39 @@ class _ConversationListScreenState
                 if (page.items.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 36),
-                    child: Center(child: Text('Bạn chưa có cuộc trò chuyện nào.')),
+                    child: Center(
+                      child: Text('Bạn chưa có cuộc trò chuyện nào.'),
+                    ),
                   )
                 else if (filtered.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 36),
-                    child: Center(child: Text('Không tìm thấy cuộc trò chuyện phù hợp.')),
+                    child: Center(
+                      child: Text('Không tìm thấy cuộc trò chuyện phù hợp.'),
+                    ),
                   )
                 else
-                  ...filtered.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _ConversationCard(
-                      item: item,
-                      currentUserId: ref.read(authControllerProvider).user?.id,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            conversationId: item.id,
-                            title: item.title,
+                  ...filtered.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _ConversationCard(
+                        item: item,
+                        currentUserId: ref
+                            .read(authControllerProvider)
+                            .user
+                            ?.id,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              conversationId: item.id,
+                              title: item.title,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  )),
+                  ),
               ],
             ),
           );
@@ -142,7 +172,12 @@ class _ConversationListScreenState
 }
 
 class _ChatFilterChip extends StatelessWidget {
-  const _ChatFilterChip({required this.label, required this.value, required this.selected, required this.onSelected});
+  const _ChatFilterChip({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onSelected,
+  });
   final String label, value, selected;
   final ValueChanged<String> onSelected;
   @override
@@ -157,7 +192,11 @@ class _ChatFilterChip extends StatelessWidget {
 }
 
 class _ConversationCard extends StatelessWidget {
-  const _ConversationCard({required this.item, required this.currentUserId, required this.onTap});
+  const _ConversationCard({
+    required this.item,
+    required this.currentUserId,
+    required this.onTap,
+  });
   final Conversation item;
   final String? currentUserId;
   final VoidCallback onTap;
@@ -166,9 +205,12 @@ class _ConversationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final avatarUrl = usableMediaUrl(item.avatar);
-    final isUnread = item.lastMessage != null && item.lastMessageSenderId != currentUserId;
+    final isUnread =
+        item.lastMessage != null && item.lastMessageSenderId != currentUserId;
     return Card(
-      color: isUnread ? theme.colorScheme.surfaceContainerLow : theme.colorScheme.surfaceContainerLowest,
+      color: isUnread
+          ? theme.colorScheme.surfaceContainerLow
+          : theme.colorScheme.surfaceContainerLowest,
       margin: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
@@ -216,13 +258,32 @@ class _ConversationCard extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                         if (isUnread)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(999)),
-                            child: Text('1', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSecondaryContainer, fontWeight: FontWeight.w800)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '1',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSecondaryContainer,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -230,16 +291,43 @@ class _ConversationCard extends StatelessWidget {
                     Row(
                       children: [
                         if (item.orderCode.isNotEmpty) ...[
-                          Icon(Icons.verified, size: 14, color: theme.colorScheme.primary),
+                          Icon(
+                            Icons.verified,
+                            size: 14,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: 4),
-                          Expanded(child: Text('#${item.orderCode}', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+                          Expanded(
+                            child: Text(
+                              '#${item.orderCode}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
                         ] else
                           const Spacer(),
-                        Text(_chatTime(item.lastMessageAt ?? item.updatedAt), style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
+                        Text(
+                          _chatTime(item.lastMessageAt ?? item.updatedAt),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(item.lastMessage ?? 'Chưa có tin nhắn', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(fontWeight: isUnread ? FontWeight.w600 : FontWeight.w400)),
+                    Text(
+                      item.lastMessage ?? 'Chưa có tin nhắn',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: isUnread
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -292,16 +380,34 @@ class ChatByOrderScreen extends ConsumerWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final input = TextEditingController();
   bool sending = false;
+  StreamSubscription<dynamic>? realtime;
   @override
   void initState() {
     super.initState();
     _seen();
+    Future.microtask(() {
+      final connection = ref.read(realtimeConnectionProvider);
+      void join() => connection?.emit('conversation:join', {
+        'conversationId': widget.conversationId,
+      });
+      join();
+      realtime = connection?.events.listen((event) {
+        if (event.name == 'connect') join();
+        if (event.name == 'message:new' || event.name == 'message:seen') {
+          if (mounted) {
+            setState(() {});
+            ref.invalidate(conversationListProvider);
+          }
+        }
+      });
+    });
   }
 
   Future<void> _seen() =>
       ref.read(chatRepositoryProvider).seen(widget.conversationId);
   @override
   void dispose() {
+    realtime?.cancel();
     input.dispose();
     super.dispose();
   }

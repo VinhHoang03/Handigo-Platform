@@ -24,6 +24,10 @@ dependencies:
   geocoding: ^4.0.0
   speech_to_text: ^7.0.0
   flutter_svg: ^2.3.0
+  socket_io_client: ^3.1.6
+  flutter_map: ^8.3.2
+  latlong2: ^0.9.1
+  audioplayers: ^6.7.1
 
 dev_dependencies:
   flutter_test:
@@ -35,7 +39,8 @@ flutter:
   assets:
     - assets/brand/handigo-logo.png
     - assets/payments/payos-logo.png
-      - assets/icons/account/
+    - assets/icons/account/
+    - assets/audio/assignment-alert.wav
   fonts:
     - family: Inter
       fonts:

@@ -533,12 +533,22 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
             FilterChip(
               label: const Text('Tất cả'),
               selected: _selectedCategory == null,
+              labelStyle: TextStyle(
+                fontWeight: _selectedCategory == null
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+              ),
               onSelected: (_) => setState(() => _selectedCategory = null),
             ),
             ...widget.categories.map(
               (category) => FilterChip(
                 label: Text(category.name),
                 selected: _selectedCategory == category.id,
+                labelStyle: TextStyle(
+                  fontWeight: _selectedCategory == category.id
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
                 onSelected: (_) =>
                     setState(() => _selectedCategory = category.id),
               ),
@@ -555,6 +565,11 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
               (item) => InputChip(
                 label: Text(item),
                 selected: _searchQuery == item,
+                labelStyle: TextStyle(
+                  fontWeight: _searchQuery == item
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
                 onPressed: () => setState(() => _searchQuery = item),
               ),
             )
