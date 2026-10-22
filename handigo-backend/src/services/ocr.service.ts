@@ -1,7 +1,7 @@
-import vision from "@google-cloud/vision";
+import type { ImageAnnotatorClient } from "@google-cloud/vision";
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { PDFDocument } from "pdf-lib";
+import type { PDFDocument } from "pdf-lib";
 
 export type OcrDocumentKind =
   | "cccd_front"
@@ -33,7 +33,7 @@ export interface OcrResult {
 }
 
 // Vision client tự tìm thông tin xác thực theo chuẩn Application Default Credentials.
-let visionClient: InstanceType<typeof vision.ImageAnnotatorClient> | null = null;
+let visionClientPromise: Promise<ImageAnnotatorClient> | null = null;
 
 const hasMissingExplicitCredentials = () => {
   const credentialPath = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
@@ -56,10 +56,15 @@ const getOcrUnavailableSuggestion = (): OcrSuggestion => ({
 });
 
 const getVisionClient = () => {
-  if (!visionClient) {
-    visionClient = new vision.ImageAnnotatorClient();
+  if (!visionClientPromise) {
+    visionClientPromise = import("@google-cloud/vision")
+      .then(({ default: vision }) => new vision.ImageAnnotatorClient())
+      .catch((error: unknown) => {
+        visionClientPromise = null;
+        throw error;
+      });
   }
-  return visionClient;
+  return visionClientPromise;
 };
 
 const removeDiacritics = (value: string) =>
@@ -186,10 +191,11 @@ export const extractText = async (
   buffer: Buffer,
   mimeType: string,
 ): Promise<OcrResult> => {
-  const client = getVisionClient();
+  const client = await getVisionClient();
   let annotationResponses: any[];
 
   if (mimeType === "application/pdf") {
+    const { PDFDocument } = await import("pdf-lib");
     let pdf: PDFDocument;
     try {
       pdf = await PDFDocument.load(buffer, { updateMetadata: false });

@@ -10,7 +10,7 @@ import "@fontsource/be-vietnam-pro/700.css";
 import "@fontsource-variable/hanken-grotesk";
 import "./index.css";
 import App from "./App.tsx";
-import api, { refreshAccessToken } from "@/api/client";
+import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 
 const googleClientId = import.meta.env.DEV
@@ -28,18 +28,9 @@ const renderApp = () => {
   );
 };
 
-// Initialize auth by attempting to refresh access token using HttpOnly refresh cookie.
-// If successful, fetch user profile and set auth state. Always render the app afterwards.
-(async () => {
-  try {
-    const token = await refreshAccessToken();
-    const res = await api.get("/auth/me");
-    const remember = localStorage.getItem("handigo:remember-login") !== "false";
-    useAuthStore.getState().setAuth(res.data.user, token, remember);
-  } catch {
-    // If refresh fails, mark initialization finished so UI can show logged-out state
+// Khôi phục phiên một lần trước khi render để các route đọc trạng thái đã xác định.
+void authService.restoreSession()
+  .catch(() => {
     useAuthStore.getState().finishInitialization();
-  } finally {
-    renderApp();
-  }
-})();
+  })
+  .finally(renderApp);

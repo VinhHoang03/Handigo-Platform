@@ -18,6 +18,7 @@ import type {
   VerifyRegisterOtpRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
+  User,
 } from '../types/auth.types';
 import { useAuthStore } from '../store/auth.store';
 import axios from 'axios';
@@ -26,31 +27,33 @@ const isNetworkError = (error: unknown) => {
   return axios.isAxiosError(error) && !error.response;
 };
 
+let restorePromise: Promise<User | null> | null = null;
+
+const restoreUserSession = async (): Promise<User | null> => {
+  try {
+    if (!useAuthStore.getState().token) await refreshAccessToken();
+    const user = await getMeApi();
+    useAuthStore.getState().setUser(user);
+    return user;
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    if (isNetworkError(error) || status === 429 || (status !== undefined && status >= 500)) {
+      useAuthStore.getState().finishInitialization();
+      return useAuthStore.getState().user;
+    }
+
+    useAuthStore.getState().logout();
+    return null;
+  }
+};
+
 export const authService = {
-  restoreSession: async () => {
-    const store = useAuthStore.getState();
-    if (!store.token) {
-      try {
-        await refreshAccessToken();
-      } catch {
-        store.finishInitialization();
-        return null;
-      }
+  restoreSession: () => {
+    // Các lời gọi đồng thời dùng chung một lần khôi phục phiên.
+    if (!restorePromise) {
+      restorePromise = restoreUserSession().finally(() => { restorePromise = null; });
     }
-
-    try {
-      const user = await getMeApi();
-      useAuthStore.getState().setUser(user);
-      return user;
-    } catch (error) {
-      if (isNetworkError(error)) {
-        useAuthStore.getState().finishInitialization();
-        return store.user;
-      }
-
-      useAuthStore.getState().logout();
-      return null;
-    }
+    return restorePromise;
   },
 
   login: async (credentials: LoginRequest, remember = true) => {

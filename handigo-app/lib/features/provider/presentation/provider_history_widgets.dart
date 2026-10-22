@@ -25,10 +25,6 @@ class ProviderHistoryFilter extends StatelessWidget {
     return ChoiceChip(
       selected: selected,
       showCheckmark: false,
-      backgroundColor: scheme.surfaceContainer,
-      selectedColor: scheme.primaryContainer,
-      side: BorderSide.none,
-      shape: const StadiumBorder(),
       labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -55,10 +51,6 @@ class ProviderHistoryFilter extends StatelessWidget {
             ),
           ],
         ],
-      ),
-      labelStyle: TextStyle(
-        color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
       ),
       onSelected: (_) => onSelected(),
       materialTapTargetSize: MaterialTapTargetSize.padded,

@@ -1,3 +1,4 @@
+import { catalogStatus, catalogStatusFilter } from "../utils/catalogStatus";
 import { QueryFilter, Types } from "mongoose";
 import { randomInt } from "node:crypto";
 import { Category, ICategory } from "../models/category.model";
@@ -80,10 +81,10 @@ const rethrowCategoryWriteError = (error: unknown): never => {
   throw error;
 };
 
-export const listCategories = async (query: ListCategoriesQuery) => {
+export const listCategories = async (query: ListCategoriesQuery, admin = false) => {
   const page = Math.max(Number(query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
-  const filter: QueryFilter<ICategory> = { isDeleted: false };
+  const filter: QueryFilter<ICategory> = admin ? { $and: [catalogStatusFilter(query.isActive)] } : { isDeleted: false, isActive: true };
 
   if (query.search?.trim()) {
     const search = query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -92,35 +93,32 @@ export const listCategories = async (query: ListCategoriesQuery) => {
       { slug: { $regex: search, $options: "i" } },
     ];
   }
-  if (query.isActive === "true" || query.isActive === "false") {
-    filter.isActive = query.isActive === "true";
-  }
 
   const [items, total] = await Promise.all([
     Category.find(filter)
-      .sort({ createdAt: -1 })
+      .sort(admin ? { isDeleted: 1, isActive: -1, createdAt: -1 } : { createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
     Category.countDocuments(filter),
   ]);
 
   return {
-    items,
+    items: admin ? items.map(item => catalogStatus(item.toObject())) : items,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 };
 
-export const getCategoryById = async (id: string) => {
+export const getCategoryById = async (id: string, admin = false) => {
   ensureValidId(id);
-  const category = await Category.findOne({ _id: id, isDeleted: false });
+  const category = await Category.findOne({ _id: id, ...(admin ? {} : { isDeleted: false, isActive: true }) });
   if (!category) throw new AppError("Không tìm thấy danh mục", 404);
 
   const services = await Service.find({
     categoryId: category._id,
-    isDeleted: false,
+    ...(admin ? {} : { isDeleted: false, isActive: true }),
   }).sort({ createdAt: -1 });
 
-  return { ...category.toObject(), services };
+  return { ...catalogStatus(category.toObject()), services: services.map(item => catalogStatus(item.toObject())) };
 };
 
 export const createCategory = async (data: CategoryInput) => {
@@ -139,7 +137,7 @@ export const createCategory = async (data: CategoryInput) => {
 export const updateCategory = async (id: string, data: CategoryInput) => {
   ensureValidId(id);
   await Category.init();
-  const category = await Category.findOne({ _id: id, isDeleted: false });
+  const category = await Category.findOne({ _id: id });
   if (!category) throw new AppError("Không tìm thấy danh mục", 404);
 
   const slug = data.slug || (data.name ? slugify(data.name) : undefined);
@@ -152,7 +150,7 @@ export const updateCategory = async (id: string, data: CategoryInput) => {
     data.iconColor === undefined ? category.iconColor : data.iconColor,
     id,
   );
-  Object.assign(category, data, { iconColor });
+  Object.assign(category, { isActive: category.isActive && !category.isDeleted }, data, { iconColor, isDeleted: false, deletedAt: null });
   try {
     return await category.save();
   } catch (error) {
@@ -162,22 +160,9 @@ export const updateCategory = async (id: string, data: CategoryInput) => {
 
 export const deleteCategory = async (id: string) => {
   ensureValidId(id);
-  const category = await Category.findOne({ _id: id, isDeleted: false });
+  const category = await Category.findOne({ _id: id });
   if (!category) throw new AppError("Không tìm thấy danh mục", 404);
 
-  const hasServices = await Service.exists({
-    categoryId: id,
-    isDeleted: false,
-  });
-  if (hasServices) {
-    throw new AppError(
-      "Không thể xóa danh mục vẫn còn dịch vụ",
-      409,
-    );
-  }
-
-  category.isDeleted = true;
-  category.deletedAt = new Date();
   category.isActive = false;
   await category.save();
 };
@@ -230,7 +215,9 @@ export const getActiveCategoriesWithServices = async () => {
 export const getCategories = async (query: CategoryQuery = {}) => {
   const page = Math.max(query.page || 1, 1);
   const limit = Math.min(Math.max(query.limit || 20, 1), 100);
-  const filter: QueryFilter<ICategory> = { isDeleted: false };
+  const filter: QueryFilter<ICategory> = {
+    $and: [catalogStatusFilter(query.isActive === undefined ? undefined : String(query.isActive))],
+  };
 
   if (query.keyword?.trim()) {
     const keyword = query.keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -241,23 +228,16 @@ export const getCategories = async (query: CategoryQuery = {}) => {
     ];
   }
 
-  if (query.isActive !== undefined) {
-    filter.isActive =
-      typeof query.isActive === "string"
-        ? query.isActive === "true"
-        : query.isActive;
-  }
-
   const [items, total] = await Promise.all([
     Category.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ isDeleted: 1, isActive: -1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
     Category.countDocuments(filter),
   ]);
 
   return {
-    items,
+    items: items.map(item => catalogStatus(item.toObject())),
     pagination: {
       page,
       limit,

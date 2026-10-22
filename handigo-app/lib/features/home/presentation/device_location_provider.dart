@@ -1,3 +1,4 @@
+import '../../../shared/utils/address_format.dart';
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,14 +63,19 @@ Future<DeviceLocationData> _loadDeviceLocation() async {
           if (city != null && city.isNotEmpty) city,
         ];
         return DeviceLocationData(
-          label: parts.isEmpty ? _coordinates(position) : parts.join(', '),
+          label: parts.isEmpty
+              ? _coordinates(position)
+              : formatAddress(parts.join(', ')),
           position: position,
         );
       }
     } catch (_) {
       // Vẫn giữ tọa độ GPS nếu reverse-geocoding không khả dụng trên nền tảng.
     }
-    return DeviceLocationData(label: _coordinates(position), position: position);
+    return DeviceLocationData(
+      label: _coordinates(position),
+      position: position,
+    );
   } catch (_) {
     return const DeviceLocationData(label: 'Không xác định vị trí');
   }

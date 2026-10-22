@@ -1,6 +1,9 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +24,11 @@ class _AiRepository extends AiChatRepository {
   @override
   Future<Map<String, dynamic>?> latest() async => null;
   @override
+  Future<Map<String, dynamic>> reset(String sessionId) async => {
+    'sessionId': sessionId,
+    'messages': <Map<String, dynamic>>[],
+  };
+  @override
   Future<Map<String, dynamic>> send(Map<String, dynamic> request) async {
     requests.add(Map.of(request));
     if (failNext) {
@@ -38,6 +46,95 @@ class _AiRepository extends AiChatRepository {
 }
 
 void main() {
+  for (final theme in [AppTheme.light, AppTheme.dark]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'Chat giống web: gợi ý và tác vụ mới, ${theme.brightness.name}, chữ $scale',
+        (tester) async {
+          FlutterSecureStorage.setMockInitialValues({});
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+          final repository = _AiRepository();
+          final previewKey = GlobalKey();
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                aiChatControllerProvider.overrideWith(
+                  (ref) => AiChatController(repository),
+                ),
+              ],
+              child: RepaintBoundary(
+                key: previewKey,
+                child: MaterialApp(
+                  theme: theme,
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(textScaler: TextScaler.linear(scale)),
+                    child: child!,
+                  ),
+                  home: Scaffold(
+                    body: Builder(
+                      builder: (context) => TextButton(
+                        onPressed: () => showAiChatSheet(context),
+                        child: const Text('Mở AI'),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('Mở AI'));
+          await tester.pumpAndSettle();
+          expect(find.text('Bạn cần giúp gì cho ngôi nhà?'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          Future<void> save(String name) async {
+            if (!const bool.fromEnvironment('AI_CHAT_PREVIEW') ||
+                scale != 1 ||
+                theme.brightness != Brightness.light) {
+              return;
+            }
+            final boundary =
+                previewKey.currentContext!.findRenderObject()!
+                    as RenderRepaintBoundary;
+            boundary.markNeedsPaint();
+            await tester.pump();
+            await tester.runAsync(() async {
+              final image = await boundary.toImage(pixelRatio: 2);
+              final bytes = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              await File(
+                '.dart_tool/ai-chat-$name.png',
+              ).writeAsBytes(bytes!.buffer.asUint8List());
+              image.dispose();
+            });
+          }
+
+          await save('welcome');
+          await tester.ensureVisible(find.text('Tìm dịch vụ phù hợp'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Tìm dịch vụ phù hợp'));
+          await tester.pumpAndSettle();
+          expect(
+            repository.requests.single['message'],
+            'Giúp tôi chọn dịch vụ tại nhà.',
+          );
+          expect(find.text('Tôi có thể giúp bạn tìm dịch vụ.'), findsOneWidget);
+          expect(find.text('Bạn'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await save('conversation');
+          await tester.tap(find.byTooltip('Tác vụ mới'));
+          await tester.pumpAndSettle();
+          expect(find.text('Bạn cần giúp gì cho ngôi nhà?'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
   testWidgets('Icon trang chủ dùng màu danh mục từ API', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
     final category = ServiceCategory.fromJson({
@@ -128,9 +225,10 @@ void main() {
         );
         await tester.tap(find.text('Mở AI'));
         await tester.pumpAndSettle();
-        expect(find.text('Trợ lý AI Handigo'), findsOneWidget);
+        expect(find.text('Trợ lý Handigo'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.enterText(find.byType(TextField), 'Tìm dịch vụ vệ sinh');
+        await tester.pump();
         await tester.tap(find.byTooltip('Gửi tin nhắn'));
         await tester.pumpAndSettle();
         expect(find.text('Tôi có thể giúp bạn tìm dịch vụ.'), findsOneWidget);

@@ -1,10 +1,17 @@
+import '../../../shared/widgets/app_search_field.dart';
 import '../../../shared/widgets/service_images.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../account/presentation/account_screens.dart';
+import '../../../app/providers/app_providers.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'add_booking_address_sheet.dart';
+import '../../orders/presentation/order_screens.dart';
+import '../../booking/data/pending_booking_store.dart';
+import '../../booking/presentation/booking_provider_selector.dart';
+import '../../booking/presentation/booking_policy_panel.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../booking/domain/booking_models.dart';
 import '../../booking/presentation/booking_provider.dart';
@@ -20,6 +27,8 @@ import 'service_reviews_screen.dart';
 import 'service_option_selector.dart';
 import 'booking_schedule_selector.dart';
 import 'booking_note_input.dart';
+import 'booking_address_selector.dart';
+import 'booking_voucher_selector.dart';
 
 enum _CatalogSort {
   popular('Phổ biến nhất'),
@@ -201,38 +210,21 @@ class _ServiceCatalogScreenState extends ConsumerState<ServiceCatalogScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: TextField(
+                            child: AppSearchField(
                               controller: _searchController,
                               onChanged: (value) =>
                                   setState(() => _search = value),
-                              textInputAction: TextInputAction.search,
-                              style: theme.textTheme.bodyMedium,
-                              decoration: InputDecoration(
-                                hintText: 'Tìm dịch vụ: máy lạnh, ống nước...',
-                                hintStyle: theme.textTheme.bodySmall?.copyWith(
-                                  color: scheme.outline,
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.search,
-                                  size: 20,
-                                  color: scheme.outline,
-                                ),
-                                fillColor: scheme.surfaceContainerLowest,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 14,
-                                ),
-                                suffixIcon: _search.isEmpty
-                                    ? null
-                                    : IconButton(
-                                        tooltip: 'Xóa tìm kiếm',
-                                        icon: const Icon(Icons.close, size: 20),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => _search = '');
-                                        },
-                                      ),
-                              ),
+                              hintText: 'Tìm dịch vụ: máy lạnh, ống nước...',
+                              suffixIcon: _search.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Xóa tìm kiếm',
+                                      icon: const Icon(Icons.close, size: 20),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _search = '');
+                                      },
+                                    ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -492,7 +484,6 @@ class _CategoryChips extends StatelessWidget {
           label: 'Tất cả',
           selected: selectedId == null,
           onPressed: () => onSelected(null),
-          category: true,
         ),
         ...categories.map(
           (category) => Padding(
@@ -501,7 +492,6 @@ class _CategoryChips extends StatelessWidget {
               label: category.name,
               selected: selectedId == category.id,
               onPressed: () => onSelected(category.id),
-              category: true,
             ),
           ),
         ),
@@ -539,38 +529,17 @@ class _CatalogChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onPressed,
-    this.category = false,
   });
   final String label;
-  final bool selected, category;
+  final bool selected;
   final VoidCallback onPressed;
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      showCheckmark: !category,
       onSelected: (_) => onPressed(),
-      selectedColor: category ? scheme.primaryContainer : scheme.primaryFixed,
-      backgroundColor: category
-          ? scheme.surfaceContainer
-          : scheme.surfaceContainerLowest,
-      checkmarkColor: scheme.primary,
-      labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-        color: selected
-            ? (category ? scheme.onPrimary : scheme.primary)
-            : scheme.onSurfaceVariant,
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-      ),
-      side: category || selected
-          ? BorderSide.none
-          : BorderSide(color: scheme.outlineVariant.withValues(alpha: .35)),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(category ? 12 : 8),
-      ),
       materialTapTargetSize: MaterialTapTargetSize.padded,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
     );
   }
 }
@@ -1188,6 +1157,19 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   List<Address> _addresses = const [];
   final _descriptionController = TextEditingController();
   final _voucherController = TextEditingController();
+  bool _policyAccepted = false;
+  Map<String, dynamic>? _policies;
+  String? _pendingOrderId;
+  bool _uncertainCreate = false;
+  bool _uploading = false;
+  bool get _inspection => widget.detail.service.serviceType == 'variable_price';
+  bool get _uniformQuantity =>
+      widget.detail.options.isEmpty &&
+      (widget.detail.service.slug == 've-sinh-dieu-hoa' ||
+          (widget.detail.service.slug == null &&
+              widget.detail.service.name.toLowerCase().trim() ==
+                  'vệ sinh điều hòa')) &&
+      widget.detail.service.serviceType == 'fixed_price';
 
   @override
   void initState() {
@@ -1195,16 +1177,76 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     final draft = ref.read(bookingDraftProvider);
     _descriptionController.text = draft.problemDescription;
     _voucherController.text = draft.voucherCode ?? '';
+    if (_inspection && draft.paymentMethod == PaymentMethod.cash)
+      Future.microtask(
+        () => ref
+            .read(bookingDraftProvider.notifier)
+            .setPaymentMethod(PaymentMethod.bank),
+      );
     Future<void>.microtask(() async {
-      try {
-        final addresses = await ref
-            .read(serviceCatalogRepositoryProvider)
-            .addresses();
-        if (mounted) setState(() => _addresses = addresses);
-      } catch (_) {
-        if (mounted) AppToast.show(context, 'Không thể tải sổ địa chỉ.', type: AppToastType.error);
-      }
+      await Future.wait([
+        _loadAddresses(),
+        _reloadPolicies(),
+        _restorePending(),
+      ]);
     });
+  }
+
+  Future<void> _loadAddresses() async {
+    try {
+      final addresses = await ref
+          .read(serviceCatalogRepositoryProvider)
+          .addresses();
+      if (mounted) {
+        final selectedId = ref.read(bookingDraftProvider).addressId;
+        if (addresses.isNotEmpty &&
+            !addresses.any((address) => address.id == selectedId)) {
+          final address =
+              addresses.where((address) => address.isDefault).firstOrNull ??
+              addresses.first;
+          ref.read(bookingDraftProvider.notifier).setAddress(address.id);
+        }
+        setState(() => _addresses = addresses);
+      }
+    } catch (_) {
+      if (mounted)
+        AppToast.show(
+          context,
+          'Không thể tải sổ địa chỉ. Vui lòng thử lại.',
+          type: AppToastType.error,
+        );
+    }
+  }
+
+  Future<void> _restorePending() async {
+    final userId = ref.read(authControllerProvider).user?.id;
+    if (userId == null) return;
+    try {
+      var pending = await const PendingBookingStore().read(userId);
+      if (!mounted) return;
+      if (pending != null) {
+        try {
+          final current = await ref
+              .read(orderRepositoryProvider)
+              .detail(pending);
+          if (current.paymentStatus != 'unpaid' ||
+              current.depositPaidAt != null ||
+              current.paymentMethod == 'cash' ||
+              ['completed', 'cancelled'].contains(current.status)) {
+            await const PendingBookingStore().clear(userId);
+            pending = null;
+          }
+        } on ApiException catch (error) {
+          if (error.statusCode == 404) {
+            await const PendingBookingStore().clear(userId);
+            pending = null;
+          }
+        }
+      }
+      if (mounted) setState(() => _pendingOrderId = pending);
+    } catch (_) {
+      /* Sổ địa chỉ và chính sách vẫn tải độc lập khi chưa đọc được đơn chờ. */
+    }
   }
 
   @override
@@ -1222,8 +1264,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         title: Text(_step == 0 ? 'Đặt dịch vụ' : 'Xác nhận & Thanh toán'),
         leading: IconButton(
           tooltip: 'Quay lại',
-          onPressed: () =>
-              _step == 0 ? Navigator.of(context).pop() : setState(() => _step = 0),
+          onPressed: () => _step == 0
+              ? Navigator.of(context).pop()
+              : setState(() => _step = 0),
           icon: const Icon(Icons.arrow_back_rounded),
         ),
       ),
@@ -1241,6 +1284,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     descriptionController: _descriptionController,
                     voucherController: _voucherController,
                     onAddAddress: _addAddress,
+                    onUploadingChanged: (value) {
+                      if (mounted) setState(() => _uploading = value);
+                    },
                   )
                 else
                   _BookingReview(
@@ -1248,25 +1294,127 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     draft: draft,
                     preview: _preview,
                   ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: () => _step == 0 ? _loadPreview() : _submitOrder(),
-                  icon: Icon(
-                    _step == 0
-                        ? Icons.arrow_forward_rounded
-                        : Icons.lock_outline_rounded,
+                if (_addresses.isEmpty && _step == 0)
+                  OutlinedButton(
+                    onPressed: _loadAddresses,
+                    child: const Text('Tải lại sổ địa chỉ'),
                   ),
-                  label: Text(
-                    _step == 0 ? 'Tiếp tục sang Thanh toán' : 'Thanh toán ngay',
+                if (_pendingOrderId != null)
+                  Card(
+                    child: ListTile(
+                      title: const Text('Bạn có đơn đang cần kiểm tra'),
+                      trailing: const Icon(Icons.arrow_forward),
+                      onTap: () =>
+                          context.push('/customer/orders/$_pendingOrderId'),
+                    ),
                   ),
-                ),
+                if (_step == 0 && _uniformQuantity)
+                  Row(
+                    children: [
+                      const Expanded(child: Text('Số lượng máy')),
+                      IconButton(
+                        onPressed: () => ref
+                            .read(bookingDraftProvider.notifier)
+                            .setUniformQuantity(draft.uniformQuantity - 1),
+                        icon: const Icon(Icons.remove),
+                      ),
+                      Text('${draft.uniformQuantity}'),
+                      IconButton(
+                        onPressed: () => ref
+                            .read(bookingDraftProvider.notifier)
+                            .setUniformQuantity(draft.uniformQuantity + 1),
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
+                if (_step == 1) ...[
+                  if (_policies == null)
+                    OutlinedButton(
+                      onPressed: _reloadPolicies,
+                      child: const Text('Tải lại chính sách đặt dịch vụ'),
+                    )
+                  else
+                    BookingPolicyPanel(policies: _policies!),
+                  CheckboxListTile(
+                    value: _policyAccepted,
+                    onChanged: _policies == null
+                        ? null
+                        : (value) =>
+                              setState(() => _policyAccepted = value == true),
+                    title: const Text(
+                      'Tôi đã đọc và đồng ý với chính sách Handigo',
+                    ),
+                  ),
+                  for (final address in _addresses.where(
+                    (item) => item.id == draft.addressId,
+                  ))
+                    ListTile(
+                      title: Text(
+                        '${address.recipientName} · ${address.recipientPhone}',
+                      ),
+                      subtitle: Text(address.displayAddress),
+                    ),
+                  for (final option in widget.detail.options.where(
+                    (item) => draft.selectedOptionIds.contains(item.id),
+                  ))
+                    ListTile(
+                      title: Text(option.name),
+                      trailing: Text('× ${draft.quantities[option.id] ?? 1}'),
+                    ),
+                ],
               ],
             ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton(
+            onPressed: _busy || _uploading
+                ? null
+                : () => _step == 0 ? _loadPreview() : _submitOrder(),
+            child: Text(
+              _busy
+                  ? 'Đang xử lý...'
+                  : _step == 0
+                  ? 'Tiếp tục'
+                  : _inspection
+                  ? 'Thanh toán tiền cọc'
+                  : draft.paymentMethod == PaymentMethod.cash
+                  ? 'Xác nhận đặt dịch vụ'
+                  : 'Thanh toán ngay',
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  Future<void> _reloadPolicies() async {
+    try {
+      final policies = await ref
+          .read(serviceCatalogRepositoryProvider)
+          .bookingPolicies();
+      if (mounted) setState(() => _policies = policies);
+    } catch (_) {
+      if (mounted)
+        AppToast.show(
+          context,
+          'Chưa thể tải chính sách. Vui lòng thử lại.',
+          type: AppToastType.error,
+        );
+    }
+  }
+
+  String? _validateDraft(BookingDraft draft) {
+    final timeError = bookingTimeError(draft, DateTime.now());
+    if (timeError != null) return timeError;
+    if (_inspection && draft.paymentMethod == PaymentMethod.cash)
+      return 'Tiền cọc khảo sát cần thanh toán qua PayOS hoặc ví Handigo.';
+    return null;
   }
 
   Future<void> _loadPreview() async {
     final draft = ref.read(bookingDraftProvider);
+    if (_busy) return;
     final selectionError = widget.detail.selectionError(
       draft.selectedOptionIds,
     );
@@ -1275,24 +1423,47 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       return;
     }
     if (draft.addressId == null) {
-      AppToast.show(context, 'Vui lòng chọn địa chỉ thực hiện.', type: AppToastType.warning);
+      AppToast.show(
+        context,
+        'Vui lòng chọn địa chỉ thực hiện.',
+        type: AppToastType.warning,
+      );
+      return;
+    }
+    final validation = _validateDraft(draft);
+    if (validation != null) {
+      AppToast.show(context, validation, type: AppToastType.warning);
       return;
     }
     if ((draft.type == BookingType.scheduled ||
             draft.type == BookingType.recurring) &&
         draft.scheduledAt == null) {
-      AppToast.show(context, 'Vui lòng chọn lịch thực hiện.', type: AppToastType.warning);
-      return;
-    }
-    if (draft.type == BookingType.recurring &&
-        (draft.recurrenceUnit == null || draft.recurrenceCount == null)) {
-      AppToast.show(context, 'Vui lòng chọn chu kỳ và số buổi định kỳ.', type: AppToastType.warning);
+      AppToast.show(
+        context,
+        'Vui lòng chọn lịch thực hiện.',
+        type: AppToastType.warning,
+      );
       return;
     }
     setState(() {
       _busy = true;
     });
     try {
+      final providerQuery = bookingProviderQuery(draft);
+      if (providerQuery == null)
+        throw const ApiException('Vui lòng chọn địa chỉ và lịch thực hiện.');
+      final providers = await ref.read(
+        bookingNearbyProviders(providerQuery).future,
+      );
+      if (providers.isEmpty)
+        throw const ApiException(
+          'Chưa có chuyên gia phù hợp. Vui lòng đổi lịch hoặc địa chỉ.',
+        );
+      if (draft.preferredProviderId != null &&
+          !providers.any((item) => item['id'] == draft.preferredProviderId))
+        throw const ApiException(
+          'Chuyên gia đã chọn không còn phù hợp. Vui lòng chọn lại.',
+        );
       final preview = await ref
           .read(serviceCatalogRepositoryProvider)
           .preview(
@@ -1300,6 +1471,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             type: draft.type,
             selectedOptions: _selectedOptions(draft),
             voucherCode: draft.voucherCode,
+            uniformQuantity: _uniformQuantity ? draft.uniformQuantity : null,
           );
       if (mounted)
         setState(() {
@@ -1308,7 +1480,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         });
     } catch (error) {
       if (mounted) {
-        AppToast.show(context, error is ApiException ? error.message : 'Không thể tính tổng tiền. Vui lòng thử lại.', type: AppToastType.error);
+        AppToast.show(
+          context,
+          error is ApiException
+              ? error.message
+              : 'Không thể tính tổng tiền. Vui lòng thử lại.',
+          type: AppToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1316,60 +1494,106 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   }
 
   Future<void> _submitOrder() async {
+    if (_busy) return;
     final draft = ref.read(bookingDraftProvider);
-    CreatedOrder? createdOrder;
-    setState(() {
-      _busy = true;
-    });
+    final validation = _validateDraft(draft);
+    if (validation != null ||
+        !_policyAccepted ||
+        _policies == null ||
+        _preview == null) {
+      AppToast.show(
+        context,
+        validation ?? 'Vui lòng đọc và đồng ý chính sách trước khi đặt đơn.',
+        type: AppToastType.warning,
+      );
+      return;
+    }
+    if (_uncertainCreate) {
+      AppToast.show(
+        context,
+        'Chưa xác định kết quả tạo đơn. Vui lòng kiểm tra lịch sử đơn trước khi đặt lại.',
+        type: AppToastType.warning,
+      );
+      context.push('/customer/orders');
+      return;
+    }
+    if (_pendingOrderId != null) {
+      context.push('/customer/orders/$_pendingOrderId');
+      return;
+    }
+    setState(() => _busy = true);
+    CreatedOrder? created;
+    final userId = ref.read(authControllerProvider).user!.id;
     try {
-      final order = await ref
-          .read(serviceCatalogRepositoryProvider)
-          .createOrder(
-            serviceId: widget.detail.service.id,
-            selectedOptions: _selectedOptions(draft),
-            addressId: draft.addressId!,
-            type: draft.type,
-            paymentMethod: draft.paymentMethod,
-            scheduledAt: draft.scheduledAt,
-            recurrenceUnit: draft.recurrenceUnit,
-            recurrenceCount: draft.recurrenceCount,
-            problemDescription: _descriptionController.text,
-            attachments: draft.attachments,
-            voucherCode: draft.voucherCode,
-          );
-      createdOrder = order;
-      final payment = await ref
-          .read(serviceCatalogRepositoryProvider)
-          .createPayment(orderId: order.id, method: draft.paymentMethod);
+      final repository = ref.read(serviceCatalogRepositoryProvider);
+      created = await repository.createOrder(
+        serviceId: widget.detail.service.id,
+        selectedOptions: _selectedOptions(draft),
+        addressId: draft.addressId!,
+        type: draft.type,
+        paymentMethod: draft.paymentMethod,
+        scheduledAt: draft.scheduledAt,
+        recurrenceUnit: draft.recurrenceUnit,
+        recurrenceCount: draft.recurrenceCount,
+        problemDescription: _descriptionController.text,
+        attachments: draft.attachments,
+        voucherCode: draft.voucherCode,
+        preferredProviderId: draft.preferredProviderId,
+        uniformQuantity: _uniformQuantity ? draft.uniformQuantity : null,
+        expectedBookingAmount: _preview!.bookingAmount,
+        expectedFinalAmount: _preview!.discountedAmount,
+      );
+      _pendingOrderId = created.id;
+      await const PendingBookingStore().save(userId, created.id);
+      final payment = await repository.createPayment(
+        orderId: created.id,
+        method: draft.paymentMethod,
+        inspectionRequired: _inspection,
+        expectedAmount: _preview!.discountedAmount,
+      );
       if (!mounted) return;
       ref.read(bookingDraftProvider.notifier).reset();
-      final router = GoRouter.of(context);
-      if (widget.isSheet) Navigator.of(context).pop();
-      router.go(
-        '/customer/bookings/success',
-        extra: {
-          'orderId': order.id,
-          'orderCode': order.orderCode,
-          'paymentStatus': payment.status,
-          'checkoutUrl': payment.checkoutUrl,
-        },
-      );
-    } catch (_) {
+      ref.invalidate(orderListProvider);
+      ref.invalidate(orderPageProvider);
+      ref.invalidate(pendingOrderProvider);
+      context.go('/customer/bookings/success?orderId=${created.id}');
+      if (payment.checkoutUrl != null && payment.status != 'paid') {
+        final uri = Uri.tryParse(payment.checkoutUrl!);
+        if (uri != null && ['http', 'https'].contains(uri.scheme))
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (failure) {
       if (!mounted) return;
-      if (createdOrder != null) {
-        ref.read(bookingDraftProvider.notifier).reset();
-        final router = GoRouter.of(context);
-        if (widget.isSheet) Navigator.of(context).pop();
-        router.go(
-          '/customer/bookings/success',
-          extra: {
-            'orderId': createdOrder.id,
-            'orderCode': createdOrder.orderCode,
-            'paymentStatus': 'pending',
-          },
+      if (created != null) {
+        ref.invalidate(orderListProvider);
+        AppToast.show(
+          context,
+          failure is ApiException
+              ? failure.message
+              : 'Đơn đã tạo. Vui lòng tiếp tục thanh toán từ chi tiết đơn.',
+          type: AppToastType.warning,
         );
+        context.go('/customer/orders/${created.id}');
       } else {
-        AppToast.show(context, 'Không thể tạo đơn. Dữ liệu đặt dịch vụ vẫn còn để bạn thử lại.', type: AppToastType.error);
+        _uncertainCreate =
+            failure is! ApiException ||
+            failure.statusCode == null ||
+            failure.statusCode! >= 500;
+        if (failure is ApiException && failure.statusCode == 409)
+          setState(() {
+            _step = 0;
+            _preview = null;
+            _policyAccepted = false;
+          });
+        AppToast.show(
+          context,
+          _uncertainCreate
+              ? 'Chưa xác định kết quả tạo đơn. Kiểm tra lịch sử đơn trước khi đặt lại.'
+              : failure is ApiException
+              ? failure.message
+              : 'Không thể tạo đơn.',
+          type: AppToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1382,27 +1606,62 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       .toList();
 
   Future<void> _addAddress() async {
-    final result = await showDialog<Map<String, String>>(
+    final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
-      builder: (context) => const _AddAddressDialog(),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) => const AddBookingAddressSheet(),
     );
     if (result == null || !mounted) return;
     try {
+      final selected = _addresses
+          .where((item) => item.id == ref.read(bookingDraftProvider).addressId)
+          .firstOrNull;
+      final contact =
+          selected ?? _addresses.where((item) => item.isDefault).firstOrNull;
+      String name = contact?.recipientName.trim() ?? '';
+      String phone = contact?.recipientPhone.trim() ?? '';
+      if (name.isEmpty || phone.isEmpty) {
+        final profile = await ref.read(accountProfileProvider.future);
+        if (name.isEmpty) name = '${profile['fullName'] ?? ''}'.trim();
+        if (phone.isEmpty) phone = '${profile['phone'] ?? ''}'.trim();
+      }
+      if (!mounted) return;
+      if (name.isEmpty || phone.isEmpty) {
+        throw const ApiException(
+          'Vui lòng cập nhật họ tên và số điện thoại trong tài khoản trước khi thêm địa chỉ.',
+        );
+      }
       final address = await ref
           .read(serviceCatalogRepositoryProvider)
           .createAddress(
-            recipientName: result['recipientName']!,
-            recipientPhone: result['recipientPhone']!,
+            recipientName: name,
+            recipientPhone: phone,
             fullAddress: result['fullAddress']!,
             province: result['province']!,
             ward: result['ward']!,
+            latitude: double.tryParse(result['latitude'] ?? ''),
+            longitude: double.tryParse(result['longitude'] ?? ''),
           );
       if (!mounted) return;
       setState(() => _addresses = [..._addresses, address]);
       ref.read(bookingDraftProvider.notifier).setAddress(address.id);
       AppToast.show(context, 'Đã thêm địa chỉ.', type: AppToastType.success);
-    } catch (_) {
-      if (mounted) AppToast.show(context, 'Không thể thêm địa chỉ. Vui lòng kiểm tra thông tin.', type: AppToastType.error);
+    } catch (error) {
+      if (mounted)
+        AppToast.show(
+          context,
+          error is ApiException
+              ? error.message
+              : 'Không thể thêm địa chỉ. Vui lòng thử lại.',
+          type: AppToastType.error,
+        );
     }
   }
 }
@@ -1414,12 +1673,14 @@ class _BookingForm extends ConsumerWidget {
     required this.descriptionController,
     required this.voucherController,
     required this.onAddAddress,
+    required this.onUploadingChanged,
   });
   final ServiceDetail detail;
   final List<Address> addresses;
   final TextEditingController descriptionController;
   final TextEditingController voucherController;
   final VoidCallback onAddAddress;
+  final ValueChanged<bool> onUploadingChanged;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final draft = ref.watch(bookingDraftProvider);
@@ -1428,6 +1689,30 @@ class _BookingForm extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Icon(
+              Icons.location_on_outlined,
+              size: 19,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Địa chỉ làm việc',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        BookingAddressSelector(
+          addresses: addresses,
+          onAddAddress: onAddAddress,
+        ),
+        const SizedBox(height: 12),
         if (detail.options.isNotEmpty) ...[
           Text('Chọn gói dịch vụ', style: theme.textTheme.titleMedium),
           ServiceOptionSelector(detail: detail),
@@ -1440,166 +1725,25 @@ class _BookingForm extends ConsumerWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _TypeChip(
-              label: 'Đặt lịch hẹn',
-              type: BookingType.scheduled,
-              selected: draft.type,
-              onSelected: controller.setType,
-            )),
-            const SizedBox(width: 12),
-            Expanded(child: _TypeChip(
-              label: 'Đặt định kỳ',
-              type: BookingType.recurring,
-              selected: draft.type,
-              onSelected: controller.setType,
-            )),
-          ],
-        ),
+        const SizedBox(height: 6),
+        const BookingScheduleButton(),
         const SizedBox(height: 12),
         const Divider(height: 1),
-        if (draft.type == BookingType.scheduled ||
-            draft.type == BookingType.recurring) ...[
-          const SizedBox(height: 12),
-          _SectionLabel(
-            title: 'Chọn lịch hẹn & thời gian',
-            icon: Icons.calendar_month_outlined,
-          ),
-          const BookingScheduleSelector(),
-        ],
-        if (draft.type == BookingType.recurring) ...[
-          DropdownButtonFormField<String>(
-            value: draft.recurrenceUnit,
-            decoration: const InputDecoration(labelText: 'Chu kỳ'),
-            items: const [
-              DropdownMenuItem(value: 'weekly', child: Text('Hàng tuần')),
-              DropdownMenuItem(value: 'monthly', child: Text('Hàng tháng')),
-            ],
-            onChanged: (value) {
-              if (value != null)
-                controller.setRecurrence(value, value == 'weekly' ? 1 : 4);
-            },
-          ),
-          DropdownButtonFormField<int>(
-            value: draft.recurrenceCount,
-            decoration: const InputDecoration(labelText: 'Số buổi'),
-            items:
-                (draft.recurrenceUnit == 'monthly'
-                        ? const [4, 8, 12]
-                        : const [1, 2, 3, 4])
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text('$value buổi'),
-                      ),
-                    )
-                    .toList(),
-            onChanged: (value) {
-              if (value != null && draft.recurrenceUnit != null)
-                controller.setRecurrence(draft.recurrenceUnit!, value);
-            },
-          ),
-        ],
         const SizedBox(height: 16),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Icon(Icons.location_on_outlined, size: 19, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Địa chỉ làm việc',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
-            IconButton.filled(
-              tooltip: 'Thêm địa chỉ',
-              onPressed: onAddAddress,
-              icon: const Icon(Icons.add, size: 18),
-              style: IconButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                shape: CircleBorder(side: BorderSide(color: theme.colorScheme.primary)),
-                fixedSize: const Size(32, 32),
-                minimumSize: const Size(32, 32),
-                padding: const EdgeInsets.all(4),
-                tapTargetSize: MaterialTapTargetSize.padded,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (addresses.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Bạn chưa có địa chỉ.'),
-          ),
-        ...addresses.map(
-          (address) => Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: draft.addressId == address.id
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant,
-              ),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () => controller.setAddress(address.id),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(address.recipientName,
-                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 2),
-                            Text(address.recipientPhone, style: theme.textTheme.bodySmall),
-                          ],
-                        )),
-                        Radio<String>(
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          value: address.id,
-                          groupValue: draft.addressId,
-                          activeColor: theme.colorScheme.primary,
-                          onChanged: (value) {
-                            if (value != null) controller.setAddress(value);
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(address.fullAddress, style: theme.textTheme.bodySmall),
-                    if (address.isDefault)
-                      const Chip(label: Text('Mặc định'), visualDensity: VisualDensity.compact),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
         _SectionLabel(
           title: 'Ghi chú cho thợ',
           icon: Icons.sticky_note_2_outlined,
         ),
-        BookingNoteInput(controller: descriptionController),
+        BookingNoteInput(
+          controller: descriptionController,
+          onUploadingChanged: onUploadingChanged,
+        ),
+        const SizedBox(height: 16),
+        const BookingProviderSelector(),
         const SizedBox(height: 8),
-        TextField(
+        BookingVoucherSelector(
           controller: voucherController,
-          textCapitalization: TextCapitalization.characters,
-          onChanged: ref.read(bookingDraftProvider.notifier).setVoucherCode,
-          decoration: const InputDecoration(
-            labelText: 'Mã voucher (không bắt buộc)',
-            prefixIcon: Icon(Icons.discount_outlined),
-          ),
+          inspectionRequired: detail.service.serviceType == 'variable_price',
         ),
         const SizedBox(height: 8),
         const SizedBox(height: 12),
@@ -1607,126 +1751,75 @@ class _BookingForm extends ConsumerWidget {
           title: 'Phương thức thanh toán',
           icon: Icons.payments_outlined,
         ),
-        ...PaymentMethod.values.map(
-          (method) => Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: draft.paymentMethod == method ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
-                width: draft.paymentMethod == method ? 2 : 1,
-              ),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () => controller.setPaymentMethod(method),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                child: Row(children: [
-                  _PaymentArtwork(method: method),
-                  const SizedBox(width: 8),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(_paymentLabel(method), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 3),
-                    Text(_paymentHint(method), style: theme.textTheme.bodySmall),
-                  ])),
-                  Radio<PaymentMethod>(
-                    value: method,
-                    groupValue: draft.paymentMethod,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                    activeColor: theme.colorScheme.primary,
-                    onChanged: (value) {
-                      if (value != null) controller.setPaymentMethod(value);
-                    },
+        ...PaymentMethod.values
+            .where(
+              (method) =>
+                  detail.service.serviceType != 'variable_price' ||
+                  method != PaymentMethod.cash,
+            )
+            .map(
+              (method) => Card(
+                margin: const EdgeInsets.only(bottom: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: draft.paymentMethod == method
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outlineVariant,
+                    width: draft.paymentMethod == method ? 2 : 1,
                   ),
-                ]),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => controller.setPaymentMethod(method),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        _PaymentArtwork(method: method),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _paymentLabel(method),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _paymentHint(method),
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Radio<PaymentMethod>(
+                          value: method,
+                          groupValue: draft.paymentMethod,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          activeColor: theme.colorScheme.primary,
+                          onChanged: (value) {
+                            if (value != null)
+                              controller.setPaymentMethod(value);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
       ],
     );
   }
-
-}
-
-class _AddAddressDialog extends StatefulWidget {
-  const _AddAddressDialog();
-  @override
-  State<_AddAddressDialog> createState() => _AddAddressDialogState();
-}
-
-class _AddAddressDialogState extends State<_AddAddressDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _phone = TextEditingController();
-  final _address = TextEditingController();
-  final _province = TextEditingController();
-  final _ward = TextEditingController();
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _phone.dispose();
-    _address.dispose();
-    _province.dispose();
-    _ward.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Thêm địa chỉ'),
-    content: Form(
-      key: _formKey,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            _field(_name, 'Họ tên người nhận'),
-            _field(_phone, 'Số điện thoại', keyboardType: TextInputType.phone),
-            _field(_address, 'Địa chỉ đầy đủ'),
-            _field(_province, 'Tỉnh/thành phố'),
-            _field(_ward, 'Phường/xã'),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Hủy'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (_formKey.currentState!.validate())
-            Navigator.pop(context, {
-              'recipientName': _name.text.trim(),
-              'recipientPhone': _phone.text.trim(),
-              'fullAddress': _address.text.trim(),
-              'province': _province.text.trim(),
-              'ward': _ward.text.trim(),
-            });
-        },
-        child: const Text('Lưu'),
-      ),
-    ],
-  );
-
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    TextInputType? keyboardType,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label),
-      validator: (value) =>
-          value == null || value.trim().isEmpty ? 'Vui lòng nhập $label' : null,
-    ),
-  );
 }
 
 class _BookingReview extends StatelessWidget {
@@ -1779,9 +1872,15 @@ class _BookingReview extends StatelessWidget {
               children: [
                 _PriceRow(label: 'Phí dịch vụ', value: preview!.baseAmount),
                 if (preview!.promotionDiscountAmount > 0)
-                  _PriceRow(label: preview!.promotionName ?? 'Ưu đãi tự động', value: -preview!.promotionDiscountAmount),
+                  _PriceRow(
+                    label: preview!.promotionName ?? 'Ưu đãi tự động',
+                    value: -preview!.promotionDiscountAmount,
+                  ),
                 if (preview!.voucherDiscountAmount > 0)
-                  _PriceRow(label: 'Giảm giá từ voucher', value: -preview!.voucherDiscountAmount),
+                  _PriceRow(
+                    label: 'Giảm giá từ voucher',
+                    value: -preview!.voucherDiscountAmount,
+                  ),
                 if (preview!.immediateFee > 0)
                   _PriceRow(label: 'Phụ phí', value: preview!.immediateFee),
                 if (draft.voucherCode != null)
@@ -1809,7 +1908,7 @@ class _BookingReview extends StatelessWidget {
         ),
       const SizedBox(height: 8),
       const Text(
-        'Tổng tiền và phí được xác nhận từ backend. Không tự tính lại trên thiết bị.',
+        'Vui lòng kiểm tra thông tin và số tiền trước khi xác nhận đặt dịch vụ.',
       ),
     ],
   );
@@ -1833,137 +1932,20 @@ class BookingSuccessScreen extends ConsumerStatefulWidget {
 }
 
 class _BookingSuccessScreenState extends ConsumerState<BookingSuccessScreen> {
-  bool checking = false;
-  String? status;
-
-  Future<void> _reconcile() async {
-    if (widget.orderId == null) return;
-    setState(() => checking = true);
-    try {
-      final result = await ref
-          .read(serviceCatalogRepositoryProvider)
-          .reconcilePayment(widget.orderId!);
-      if (mounted) setState(() => status = result.status);
-    } catch (_) {
-      if (mounted)
-        AppToast.show(context, 'Chưa thể kiểm tra trạng thái thanh toán.', type: AppToastType.error);
-    } finally {
-      if (mounted) setState(() => checking = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                (status ?? widget.paymentStatus) == 'paid'
-                    ? Icons.check_circle
-                    : Icons.schedule,
-                size: 72,
-                color: (status ?? widget.paymentStatus) == 'paid'
-                    ? AppTheme.successGreen
-                    : Theme.of(context).colorScheme.tertiary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                (status ?? widget.paymentStatus) == 'paid'
-                    ? 'Đặt dịch vụ thành công'
-                    : 'Đơn đã được tạo, đang chờ thanh toán',
-                style: Theme.of(context).textTheme.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text('Mã đơn: ${widget.orderCode ?? 'đang cập nhật'}'),
-              if (widget.checkoutUrl != null)
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: Text(
-                    'Vui lòng tiếp tục thanh toán theo liên kết do hệ thống cung cấp.',
-                  ),
-                ),
-              if (widget.checkoutUrl != null) ...[
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: () async {
-                    final uri = Uri.tryParse(widget.checkoutUrl!);
-                    if (uri != null && await canLaunchUrl(uri))
-                      await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      );
-                  },
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Mở trang thanh toán'),
-                ),
-                if (widget.orderId != null)
-                  OutlinedButton.icon(
-                    onPressed: checking ? null : _reconcile,
-                    icon: checking
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator.adaptive(),
-                          )
-                        : const Icon(Icons.refresh),
-                    label: const Text('Kiểm tra trạng thái thanh toán'),
-                  ),
-              ],
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => context.go('/customer'),
-                child: const Text('Về trang chủ'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _TypeChip extends StatelessWidget {
-  const _TypeChip({
-    required this.label,
-    required this.type,
-    required this.selected,
-    required this.onSelected,
-  });
-  final String label;
-  final BookingType type, selected;
-  final ValueChanged<BookingType> onSelected;
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isSelected = type == selected;
-    return Semantics(
-      selected: isSelected,
-      child: OutlinedButton(
-        onPressed: () => onSelected(type),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: isSelected ? theme.colorScheme.primary : theme.colorScheme.surface,
-          foregroundColor: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
-          side: BorderSide(color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          minimumSize: const Size(0, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+    final id = widget.orderId;
+    if (id == null)
+      return Scaffold(
+        appBar: AppBar(title: const Text('Kết quả đặt dịch vụ')),
+        body: Center(
+          child: FilledButton(
+            onPressed: () => context.go('/customer/orders'),
+            child: const Text('Xem lịch sử đơn'),
+          ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(type == BookingType.scheduled ? Icons.calendar_month_outlined : Icons.repeat_rounded, size: 18),
-            const SizedBox(width: 6),
-            Flexible(child: Text(label, textAlign: TextAlign.center,
-              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700,
-                color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface))),
-          ],
-        ),
-      ),
-    );
+      );
+    return OrderDetailScreen(orderId: id);
   }
 }
 
@@ -2085,28 +2067,43 @@ String _paymentLabel(PaymentMethod value) => switch (value) {
   PaymentMethod.bank => 'Chuyển khoản/PayOS',
   PaymentMethod.cash => 'Tiền mặt',
 };
+
 class _PaymentArtwork extends StatelessWidget {
   const _PaymentArtwork({required this.method});
   final PaymentMethod method;
 
   @override
   Widget build(BuildContext context) {
-    final color = method == PaymentMethod.cash ? const Color(0xFF16864B) : Theme.of(context).colorScheme.primary;
+    final color = method == PaymentMethod.cash
+        ? const Color(0xFF16864B)
+        : Theme.of(context).colorScheme.primary;
     return Container(
       width: 44,
       height: 40,
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: method == PaymentMethod.bank ? Colors.white : color.withValues(alpha: .1),
+        color: method == PaymentMethod.bank
+            ? Colors.white
+            : color.withValues(alpha: .1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: method == PaymentMethod.bank
-          ? Image.asset('assets/payments/payos-logo.png', fit: BoxFit.contain, semanticLabel: 'payOS')
-          : Icon(method == PaymentMethod.wallet ? Icons.account_balance_wallet_rounded : Icons.payments_rounded,
-              color: color, size: 26),
+          ? Image.asset(
+              'assets/payments/payos-logo.png',
+              fit: BoxFit.contain,
+              semanticLabel: 'payOS',
+            )
+          : Icon(
+              method == PaymentMethod.wallet
+                  ? Icons.account_balance_wallet_rounded
+                  : Icons.payments_rounded,
+              color: color,
+              size: 26,
+            ),
     );
   }
 }
+
 String _paymentHint(PaymentMethod value) => switch (value) {
   PaymentMethod.wallet => 'Thanh toán nhanh bằng số dư ví Handigo',
   PaymentMethod.bank => 'Thanh toán qua cổng PayOS',

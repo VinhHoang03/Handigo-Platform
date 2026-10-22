@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
+import 'quotation_editor_screen.dart';
+import 'completion_screen.dart';
+import 'provider_order_feedback_panel.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/service_images.dart';
@@ -22,9 +25,40 @@ class _ProviderOrderDetailScreenState
     extends ConsumerState<ProviderOrderDetailScreen> {
   String get orderId => widget.orderId;
   bool busy = false;
+  RepairQuotation? quotation;
+  bool quotationLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadQuotation);
+  }
+
+  Future<void> _loadQuotation() async {
+    try {
+      final value = await ref.refresh(orderQuotationProvider(orderId).future);
+      if (mounted)
+        setState(() {
+          quotation = value;
+          quotationLoaded = true;
+        });
+    } catch (_) {
+      if (mounted) setState(() => quotationLoaded = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(orderQuotationProvider(orderId), (_, next) {
+      next.whenData((value) {
+        if (mounted)
+          setState(() {
+            quotation = value;
+            quotationLoaded = true;
+          });
+      });
+    });
+    ref.watch(orderQuotationProvider(orderId));
     final state = ref.watch(orderDetailProvider(orderId));
     final order = state.asData?.value;
     final scheme = Theme.of(context).colorScheme;
@@ -45,7 +79,10 @@ class _ProviderOrderDetailScreenState
             tooltip: 'Tải lại đơn',
             onPressed: busy
                 ? null
-                : () => ref.invalidate(orderDetailProvider(orderId)),
+                : () {
+                    ref.invalidate(orderDetailProvider(orderId));
+                    _loadQuotation();
+                  },
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -54,7 +91,10 @@ class _ProviderOrderDetailScreenState
         loading: () => const AppLoading(),
         error: (error, _) => AppMessage(
           message: _message(error),
-          onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
+          onRetry: () {
+            ref.invalidate(orderDetailProvider(orderId));
+            _loadQuotation();
+          },
         ),
         data: (order) => ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -198,6 +238,31 @@ class _ProviderOrderDetailScreenState
                 ],
               ),
             ),
+            if (order.status == 'completed')
+              ProviderOrderFeedbackPanel(orderId: orderId),
+            if (order.customerAttachments.isNotEmpty)
+              _images('Ảnh sự cố', order.customerAttachments),
+            if (order.completionEvidenceImages.isNotEmpty)
+              _images('Ảnh nghiệm thu', order.completionEvidenceImages),
+            if (order.completionNote != null) Text(order.completionNote!),
+            if (order.inspectionRequired) _quotationSummary(order),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/provider/chat/order/$orderId'),
+              icon: const Icon(Icons.chat_outlined),
+              label: const Text('Nhắn tin với khách hàng'),
+            ),
+            if (order.canTrack)
+              OutlinedButton.icon(
+                onPressed: () =>
+                    context.push('/provider/orders/$orderId/tracking'),
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Theo dõi và chia sẻ vị trí'),
+              ),
+            if (order.status == 'accepted')
+              TextButton(
+                onPressed: busy ? null : () => _cancelOrder(order),
+                child: const Text('Hủy nhận đơn'),
+              ),
             _DetailSection(
               title: 'Tiến độ công việc',
               icon: Icons.timeline_outlined,
@@ -235,7 +300,9 @@ class _ProviderOrderDetailScreenState
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (order.status == 'in_progress') ...[
+                      if (order.canEditQuotation &&
+                          quotationLoaded &&
+                          (quotation == null || quotation!.usable)) ...[
                         OutlinedButton.icon(
                           onPressed: busy
                               ? null
@@ -244,12 +311,25 @@ class _ProviderOrderDetailScreenState
                             Icons.request_quote_outlined,
                             size: 20,
                           ),
-                          label: const Text('Gửi báo giá vật tư'),
+                          label: Text(
+                            quotation == null
+                                ? 'Lập báo giá sửa chữa'
+                                : 'Chỉnh sửa báo giá',
+                          ),
                         ),
                         const SizedBox(height: 8),
                       ],
                       FilledButton.icon(
-                        onPressed: busy
+                        onPressed:
+                            busy ||
+                                (order.inspectionRequired &&
+                                    (!quotationLoaded ||
+                                        (order.status == 'in_progress' &&
+                                            quotation?.usable != true))) ||
+                                (order.status == 'accepted' &&
+                                    (!order.canStart(quotation) ||
+                                        (order.inspectionRequired &&
+                                            !quotationLoaded)))
                             ? null
                             : () {
                                 if (order.status == 'accepted') {
@@ -307,7 +387,9 @@ class _ProviderOrderDetailScreenState
       await action();
       ref.invalidate(orderDetailProvider(orderId));
       ref.invalidate(providerOrdersProvider);
+      ref.invalidate(providerOrderPageProvider);
       ref.invalidate(providerOverviewProvider);
+      await _loadQuotation();
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
@@ -351,153 +433,174 @@ class _ProviderOrderDetailScreenState
   }
 
   Future<void> _quotation(BuildContext context, WidgetRef ref) async {
-    final title = TextEditingController();
-    final price = TextEditingController();
-    final quantity = TextEditingController(text: '1');
-    final note = TextEditingController();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Báo giá vật tư'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: title,
-                decoration: const InputDecoration(labelText: 'Tên vật tư'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: quantity,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Số lượng'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: price,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Đơn giá'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: note,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Ghi chú khảo sát',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Gửi'),
-          ),
-        ],
+    final order = ref.read(orderDetailProvider(orderId)).asData?.value;
+    if (order == null || !order.canEditQuotation) return;
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            QuotationEditorScreen(order: order, quotation: quotation),
       ),
     );
-    if (result == true) {
-      final parsedPrice = double.tryParse(price.text.trim());
-      final parsedQuantity = int.tryParse(quantity.text.trim());
-      if (title.text.trim().isEmpty ||
-          parsedPrice == null ||
-          parsedQuantity == null ||
-          parsedQuantity < 1 ||
-          parsedPrice < 0) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Vui lòng nhập vật tư, số lượng và đơn giá hợp lệ.',
-              ),
-            ),
-          );
-        }
-      } else if (context.mounted) {
-        await _run(
-          context,
-          ref,
-          () => ref.read(providerRepositoryProvider).createQuotation(orderId, [
-            {
-              'title': title.text.trim(),
-              'itemType': 'material',
-              'quantity': parsedQuantity,
-              'unitPrice': parsedPrice,
-            },
-          ], note: note.text),
-          'Đã gửi báo giá cho khách hàng.',
-        );
-      }
-    }
-    title.dispose();
-    price.dispose();
-    quantity.dispose();
-    note.dispose();
+    if (!mounted) return;
+    if (saved == true) ref.invalidate(orderDetailProvider(orderId));
+    ref.invalidate(orderQuotationProvider(orderId));
+    await _loadQuotation();
   }
 
   Future<void> _complete(BuildContext context, WidgetRef ref) async {
-    final file = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (file == null || !context.mounted) return;
-    final note = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            CompletionScreen(orderId: orderId, quotation: quotation),
+      ),
+    );
+    if (result == true) {
+      ref.invalidate(orderDetailProvider(orderId));
+      ref.invalidate(providerOrdersProvider);
+      ref.invalidate(providerOrderPageProvider);
+      ref.invalidate(providerOverviewProvider);
+      await _loadQuotation();
+    }
+  }
+
+  Widget _images(String title, List<String> urls) => _DetailSection(
+    title: title,
+    icon: Icons.image_outlined,
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: urls
+          .map(
+            (url) => SizedBox(
+              width: 100,
+              height: 100,
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                cacheWidth: 300,
+                errorBuilder: (_, error, stack) =>
+                    const Icon(Icons.broken_image_outlined),
+              ),
+            ),
+          )
+          .toList(),
+    ),
+  );
+
+  Widget _quotationSummary(OrderDetail order) => _DetailSection(
+    title: 'Báo giá sửa chữa',
+    icon: Icons.request_quote_outlined,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!quotationLoaded)
+          OutlinedButton(
+            onPressed: _loadQuotation,
+            child: const Text('Tải lại báo giá'),
+          ),
+        if (quotationLoaded && quotation == null)
+          const Text('Cần lưu báo giá trước khi bắt đầu thực hiện.'),
+        if (!order.appointmentConfirmed)
+          const Text('Đang chờ thanh toán và xác nhận lịch hẹn.'),
+        if (order.depositPaidAt == null)
+          const Text('Chưa ghi nhận thanh toán tiền cọc.'),
+        if (quotation != null) ...[
+          for (final item in quotation!.items)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(item.title),
+              subtitle: Text('${item.quantity} × ${_money(item.unitPrice)}'),
+            ),
+          Text('Tổng báo giá: ${_money(quotation!.finalAmount)}'),
+          Text('Cọc đã áp dụng: ${_money(order.appliedDeposit)}'),
+          Text(
+            'Thu trực tiếp: ${_money((quotation!.finalAmount - order.appliedDeposit).clamp(0, double.infinity))}',
+          ),
+          if (order.status == 'completed' && quotation!.usable) ...[
+            if (quotation!.directPaymentConfirmedAt != null &&
+                order.paymentStatus == 'paid')
+              const Text('Đã xác nhận nhận tiền trực tiếp')
+            else
+              FilledButton(
+                onPressed: busy ? null : () => _confirmPayment(order),
+                child: const Text('Xác nhận đã nhận tiền trực tiếp'),
+              ),
+          ],
+        ],
+      ],
+    ),
+  );
+
+  Future<void> _confirmPayment(OrderDetail order) async {
+    final current = quotation;
+    if (current == null) return;
+    final accepted = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Hoàn tất đơn'),
-        content: TextField(
-          controller: note,
-          maxLines: 3,
-          decoration: const InputDecoration(labelText: 'Ghi chú nghiệm thu'),
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận tiền đã nhận'),
+        content: Text(
+          'Bạn đã nhận đủ ${_money((current.finalAmount - order.appliedDeposit).clamp(0, double.infinity))} theo báo giá phiên bản ${current.revision}?',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Quay lại'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Gửi nghiệm thu'),
+            child: const Text('Đã nhận đủ'),
           ),
         ],
       ),
     );
-    if (confirmed == true) {
-      if (!mounted || busy) {
-        note.dispose();
-        return;
-      }
-      setState(() => busy = true);
-      try {
-        final url = await ref
+    if (accepted == true && mounted)
+      await _run(
+        context,
+        ref,
+        () => ref
             .read(providerRepositoryProvider)
-            .uploadEvidence(file);
-        await ref.read(providerRepositoryProvider).completeOrder(orderId, [
-          url,
-        ], note.text);
-        ref.invalidate(orderDetailProvider(orderId));
-        ref.invalidate(providerOrdersProvider);
-        ref.invalidate(providerOverviewProvider);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Đã gửi yêu cầu hoàn tất đơn.')),
-          );
-        }
-      } catch (error) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(_message(error))));
-        }
-      } finally {
-        if (mounted) setState(() => busy = false);
-      }
-    }
-    note.dispose();
+            .confirmQuotationPayment(orderId, current),
+        'Đã xác nhận thanh toán báo giá.',
+      );
+  }
+
+  Future<void> _cancelOrder(OrderDetail order) async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hủy nhận đơn'),
+        content: TextField(
+          controller: controller,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(labelText: 'Lý do hủy'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Quay lại'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty)
+                Navigator.pop(context, controller.text.trim());
+            },
+            child: const Text('Xác nhận hủy'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (reason != null && mounted)
+      await _run(
+        context,
+        ref,
+        () => ref.read(orderRepositoryProvider).cancel(order.id, reason),
+        'Đã hủy nhận đơn.',
+      );
   }
 }
 

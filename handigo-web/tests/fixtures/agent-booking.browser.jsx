@@ -294,6 +294,28 @@ async function run() {
     } else if (visual === 'welcome') {
       await wait(() => document.body.textContent.includes('Bạn cần giúp gì cho ngôi nhà?'), 'hiển thị lời chào');
       assert(document.querySelector('aside h3').getBoundingClientRect().width > 250, 'lời chào dùng đủ chiều rộng khung chat');
+      const input = document.querySelector('textarea[name="message"]');
+      const send = document.querySelector('[aria-label="Gửi tin nhắn"]');
+      const task = document.querySelector('[aria-label="Bắt đầu tác vụ mới"]');
+      const history = document.querySelector('[aria-label="Mở lịch sử trò chuyện"]');
+      const centerY = (element) => { const rect = element.getBoundingClientRect(); return rect.top + rect.height / 2; };
+      assert(task.closest('header') && Math.abs(centerY(task) - centerY(history)) < 1, 'nút dấu cộng nằm ngang nút lịch sử');
+      assert(!document.querySelector('form [aria-label="Bắt đầu tác vụ mới"]'), 'bỏ nút tác vụ khỏi ô nhập');
+      assert(Math.abs(centerY(input) - centerY(send)) < 1, 'các nút ban đầu nằm ngang ô nhập');
+      input.focus();
+      await wait(() => send.getBoundingClientRect().top >= input.getBoundingClientRect().bottom,
+        'focus chuyển nút xuống dưới ô nhập').catch((error) => {
+          throw Error(error.message + ': ' + JSON.stringify({connected: input.isConnected, active: document.activeElement?.tagName,
+            grid: input.parentElement.className, columns: getComputedStyle(input.parentElement).gridTemplateColumns,
+            input: input.getBoundingClientRect().toJSON(), send: send.getBoundingClientRect().toJSON()}));
+        });
+      assert(document.activeElement === input, 'giữ focus sau khi đổi bố cục');
+      document.querySelector('[aria-label="Đính kèm ảnh hiện trạng"]').focus();
+      await pause();
+      assert(send.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'không thu gọn giữa lúc bấm nút trong ô nhập');
+      task.focus();
+      await wait(() => Math.abs(centerY(input) - centerY(send)) < 1, 'rời ô nhập đưa các nút về cùng hàng');
+      task.blur();
     } else {
       await wait(() => document.querySelector('[aria-label="Nội dung cuộc trò chuyện"]'), 'mở giao diện để kiểm tra');
     }

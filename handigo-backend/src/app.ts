@@ -2,7 +2,7 @@ import express, { Application, NextFunction, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
-import { ZodError } from "zod";
+import { sendControllerError } from "./utils/controllerError";
 import authRoutes from "./routes/auth.routes";
 import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.routes";
@@ -94,6 +94,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     return res.status(400).json({
       success: false,
       message: "JSON không hợp lệ",
+      code: "INVALID_JSON",
     });
   }
   next(err);
@@ -163,6 +164,7 @@ app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: "Không tìm thấy route",
+    code: "HTTP_404",
   });
 });
 
@@ -177,26 +179,8 @@ app.use(
       method: req.method,
       path: req.path,
     });
-    if (err instanceof ZodError) {
-      return res.status(400).json({
-        success: false,
-        message: "Dữ liệu yêu cầu không hợp lệ",
-        errors: err.issues,
-      });
-    }
-
-    const statusCode =
-      err.statusCode && err.statusCode >= 400 && err.statusCode <= 599
-        ? err.statusCode
-        : 500;
-    const message =
-      statusCode >= 500
-        ? "Lỗi máy chủ nội bộ"
-        : err.message || "Yêu cầu không thể xử lý";
-
-    res.status(statusCode).json({
-      success: false,
-      message,
+    return sendControllerError(res, err, {
+      invalidDataMessage: "Dữ liệu yêu cầu không hợp lệ",
     });
   },
 );

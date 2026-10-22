@@ -50,10 +50,18 @@ export const categoryServiceApi = {
 
   // ── Services ────────────────────────────────────────────────────────────────
   listServices: async (query: ServiceQuery) =>
-    unwrap<ListResult<Service>>(await api.get('/services', { params: query })),
+    unwrap<ListResult<Service>>(await api.get('/admin/services', { params: query })),
+
+  listAllServices: async () => {
+    const first = await categoryServiceApi.listServices({ page: 1, limit: 100 });
+    const rest = await Promise.all(Array.from({ length: Math.max(0, first.pagination.totalPages - 1) }, (_, index) =>
+      categoryServiceApi.listServices({ page: index + 2, limit: 100 }),
+    ));
+    return [first, ...rest].flatMap(result => result.items);
+  },
 
   getService: async (id: string) =>
-    unwrap<Service>(await api.get(`/services/${id}`)),
+    unwrap<Service>(await api.get(`/admin/services/${id}`)),
 
   createService: async (payload: ServicePayload) =>
     unwrap<Service>(await api.post('/services', payload)),
@@ -81,7 +89,9 @@ export const categoryServiceApi = {
   uploadServiceImage: async (file: File) => {
     const form = new FormData();
     form.append('image', file);
-    return unwrap<UploadedImage>(await api.post('/admin/assets/service-images', form));
+    return unwrap<UploadedImage>(await api.post('/admin/assets/service-images', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }));
   },
   uploadImage: async (file: File) => {
     const form = new FormData();

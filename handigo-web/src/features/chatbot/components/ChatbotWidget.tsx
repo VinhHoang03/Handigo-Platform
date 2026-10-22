@@ -259,6 +259,7 @@ export function ChatbotWidget({
     try {
       const session = await agentApi.reset(sessionId.current);
       applySession(session);
+      setShowHistory(false);
       setHasLoaded(true);
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Chưa tạo được phiên mới. Chọn Thử lại để tải trạng thái đã lưu."));

@@ -113,6 +113,7 @@ try {
   });
   const [width, height] = viewport.split(',').map(Number);
   await invoke('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  await invoke('Emulation.setFocusEmulationEnabled', { enabled: true });
   await invoke('Page.navigate', { url: `http://127.0.0.1:${port}/agent-check${visual ? `?visual=${encodeURIComponent(visual)}` : historyActions ? '?history-actions=true' : scroll ? '?scroll=true' : business ? '?business=true' : ''}` });
   let output = '';
   const deadline = Date.now() + 45000;
