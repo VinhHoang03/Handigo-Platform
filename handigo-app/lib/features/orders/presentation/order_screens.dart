@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import '../../../shared/widgets/service_images.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,6 +58,18 @@ String orderStatusLabel(String value) =>
     }[value] ??
     value;
 
+String customerOrderStatusLabel(OrderSummary order) =>
+    switch (order.customerDisplayStatus) {
+      'awaiting_payment' => 'Chờ thanh toán',
+      'finding_provider' => 'Đang tìm thợ',
+      'awaiting_confirmation' => 'Chờ xác nhận',
+      'accepted' => 'Chờ xử lý',
+      'in_progress' => 'Đang xử lý',
+      'completed' => 'Hoàn thành',
+      'cancelled' => 'Đã hủy',
+      _ => orderStatusLabel(order.status),
+    };
+
 class OrderListScreen extends ConsumerStatefulWidget {
   const OrderListScreen({super.key});
   @override
@@ -72,19 +85,43 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     final state = ref.watch(orderPageProvider(query));
     final pending = ref.watch(pendingOrderProvider).asData?.value;
     return Scaffold(
-      appBar: AppBar(title: const Text('Lịch sử đơn hàng')),
+      appBar: AppBar(
+        toolbarHeight: 72 * MediaQuery.textScalerOf(context).scale(1),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryFixed,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Lịch sử đơn hàng',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: TextField(
+            child: AppSearchField(
               maxLength: 100,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                labelText: 'Tìm đơn hàng',
-                prefixIcon: Icon(Icons.search),
-                counterText: '',
-              ),
+              hintText: 'Tìm đơn hàng',
               onSubmitted: (value) => setState(() {
                 search = value.trim();
                 page = 1;
@@ -98,9 +135,9 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
               children: [
                 for (final entry in const {
                   'all': 'Tất cả',
-                  'created': 'Chờ xác nhận',
-                  'accepted': 'Đã nhận',
-                  'in_progress': 'Đang thực hiện',
+                  'created': 'Đang chờ',
+                  'accepted': 'Chờ xử lý',
+                  'in_progress': 'Đang xử lý',
                   'completed': 'Hoàn thành',
                   'cancelled': 'Đã hủy',
                 }.entries)
@@ -182,7 +219,7 @@ class OrderSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusColor = _statusColor(theme, order.status);
+    final statusColor = _statusColor(theme, order.customerDisplayStatus);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -196,66 +233,72 @@ class OrderSummaryCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Đơn ${order.code}',
+                      'Mã đơn ${order.code}',
                       style: theme.textTheme.labelMedium,
                     ),
                   ),
                   _StatusBadge(
-                    label: orderStatusLabel(order.status),
+                    label: customerOrderStatusLabel(order),
                     color: statusColor,
                   ),
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Stack(
                 children: [
-                  SizedBox(
-                    width: 88,
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 96,
                     child: ServiceCoverImage(
                       url: order.serviceImage,
                       name: order.serviceName,
+                      fit: BoxFit.cover,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          order.serviceName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (order.scheduledAt != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 106),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 72),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Dự kiến: ${DateFormat('HH:mm, dd/MM/yyyy').format(order.scheduledAt!.toLocal())}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        if (order.addressLabel != null) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            order.addressLabel!,
-                            maxLines: 1,
+                            order.serviceName,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                        if (order.totalAmount != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _money(order.totalAmount!),
                             style: theme.textTheme.titleSmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          if (order.scheduledAt != null)
+                            Text(
+                              'Dự kiến: ${DateFormat('HH:mm, dd/MM/yyyy').format(order.scheduledAt!.toLocal())}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          if (order.addressLabel != null) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              order.addressLabel!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                          if (order.totalAmount != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              _money(order.totalAmount!),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -346,6 +389,8 @@ Color _statusColor(ThemeData theme, String status) => switch (status) {
   'completed' => theme.colorScheme.secondary,
   'cancelled' => theme.colorScheme.error,
   'in_progress' || 'accepted' => theme.colorScheme.primary,
+  'awaiting_payment' => theme.colorScheme.tertiary,
+  'finding_provider' || 'awaiting_confirmation' => theme.colorScheme.primary,
   _ => theme.colorScheme.secondary,
 };
 

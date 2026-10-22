@@ -38,6 +38,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/handigo-logo.png
+    - assets/brand/ai-assistant.svg
     - assets/payments/payos-logo.png
     - assets/icons/account/
     - assets/audio/assignment-alert.wav

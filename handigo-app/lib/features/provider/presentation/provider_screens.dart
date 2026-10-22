@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
@@ -1159,14 +1160,9 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: TextField(
+            child: AppSearchField(
               maxLength: 100,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                labelText: 'Tìm đơn hàng',
-                prefixIcon: Icon(Icons.search),
-                counterText: '',
-              ),
+              hintText: 'Tìm đơn hàng',
               onSubmitted: (value) => setState(() {
                 search = value.trim();
                 pageIndex = 1;

@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'dart:async';
 import '../../../core/network/realtime_connection.dart';
 import 'package:flutter/material.dart';
@@ -85,17 +86,11 @@ class _ConversationListScreenState
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
               children: [
-                TextField(
+                AppSearchField(
                   controller: _searchController,
                   onChanged: (value) => setState(() => _query = value),
-                  decoration: InputDecoration(
-                    hintText: 'Tìm tên thợ, mã đơn, dịch vụ...',
-                    prefixIcon: const Icon(Icons.search, size: 19),
-                    suffixIcon: Icon(
-                      Icons.tune,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
+                  hintText: 'Tìm tên thợ, mã đơn, dịch vụ...',
+                  suffixIcon: const Icon(Icons.tune),
                 ),
                 const SizedBox(height: 10),
                 SingleChildScrollView(
@@ -207,93 +202,91 @@ class _ConversationCard extends StatelessWidget {
     final avatarUrl = usableMediaUrl(item.avatar);
     final isUnread =
         item.lastMessage != null && item.lastMessageSenderId != currentUserId;
+    final isMine =
+        currentUserId != null && item.lastMessageSenderId == currentUserId;
+    final preview = item.lastMessage == null
+        ? 'Chưa có tin nhắn'
+        : isMine
+        ? 'Bạn: ${item.lastMessage}'
+        : item.lastMessage!;
     return Card(
-      color: isUnread
-          ? theme.colorScheme.surfaceContainerLow
-          : theme.colorScheme.surfaceContainerLowest,
+      color: theme.colorScheme.surfaceContainerLowest,
       margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: theme.brightness == Brightness.light
+              ? const Color(0xFFDDDCE5)
+              : theme.colorScheme.outlineVariant,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: avatarUrl == null
-                    ? Container(
-                        width: 44,
-                        height: 44,
-                        color: theme.colorScheme.primaryContainer,
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.person_outline,
-                          color: theme.colorScheme.onPrimaryContainer,
-                        ),
-                      )
-                    : Image.network(
-                        avatarUrl,
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 44,
-                          height: 44,
+              SizedBox.square(
+                dimension: 48,
+                child: ClipOval(
+                  child: avatarUrl == null
+                      ? ColoredBox(
                           color: theme.colorScheme.primaryContainer,
-                          alignment: Alignment.center,
                           child: Icon(
                             Icons.person_outline,
                             color: theme.colorScheme.onPrimaryContainer,
                           ),
+                        )
+                      : Image.network(
+                          avatarUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => ColoredBox(
+                            color: theme.colorScheme.primaryContainer,
+                            child: Icon(
+                              Icons.person_outline,
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
                         ),
-                      ),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (isUnread)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.secondaryContainer,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              '1',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSecondaryContainer,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                      ],
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
                     ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        if (item.orderCode.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        height: 1.2,
+                        fontWeight: isUnread
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                    if (item.orderCode.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
                           Icon(
                             Icons.verified,
-                            size: 14,
+                            size: 12,
                             color: theme.colorScheme.primary,
                           ),
                           const SizedBox(width: 4),
@@ -304,28 +297,48 @@ class _ConversationCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
+                                height: 1.2,
                               ),
                             ),
                           ),
-                        ] else
-                          const Spacer(),
-                        Text(
-                          _chatTime(item.lastMessageAt ?? item.updatedAt),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (isUnread) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '1',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.primary,
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                     Text(
-                      item.lastMessage ?? 'Chưa có tin nhắn',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: isUnread
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                      _chatTime(item.lastMessageAt ?? item.updatedAt),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        height: 1.2,
                       ),
                     ),
                   ],

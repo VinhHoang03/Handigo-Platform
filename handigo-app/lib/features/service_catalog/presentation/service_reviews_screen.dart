@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -174,22 +175,18 @@ class _ServiceReviewsScreenState extends ConsumerState<ServiceReviewsScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    TextField(
+                    AppSearchField(
                       controller: _search,
                       maxLength: 100,
                       onChanged: _searchChanged,
-                      decoration: InputDecoration(
-                        hintText: 'Tìm trong nội dung đánh giá',
-                        counterText: '',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: IconButton(
-                          tooltip: 'Xóa tìm kiếm',
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            _search.clear();
-                            _searchChanged('');
-                          },
-                        ),
+                      hintText: 'Tìm trong nội dung đánh giá',
+                      suffixIcon: IconButton(
+                        tooltip: 'Xóa tìm kiếm',
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _search.clear();
+                          _searchChanged('');
+                        },
                       ),
                     ),
                     const SizedBox(height: 12),

@@ -14,6 +14,11 @@ class OrderSummary {
     this.customerName,
     this.customerAvatar,
     this.totalAmount,
+    this.paymentStatus,
+    this.bookingStatus,
+    this.readyForMatching = false,
+    this.hasPendingAssignment = false,
+    this.depositPaidAt,
   });
   factory OrderSummary.fromJson(Map<String, dynamic> json) {
     final service = json['serviceId'];
@@ -29,6 +34,11 @@ class OrderSummary {
           ? service['name'] as String? ?? 'Dịch vụ'
           : 'Dịch vụ',
       status: json['status'] as String? ?? 'created',
+      paymentStatus: json['paymentStatus'] as String?,
+      bookingStatus: json['bookingStatus'] as String?,
+      readyForMatching: json['readyForMatching'] == true,
+      hasPendingAssignment: json['hasPendingAssignment'] == true,
+      depositPaidAt: _date(json['depositPaidAt']),
       scheduledAt: _date(json['scheduledAt']),
       addressLabel: json['addressId'] is Map<String, dynamic>
           ? formatAddressData(json['addressId'] as Map<String, dynamic>)
@@ -70,6 +80,22 @@ class OrderSummary {
   final String? customerName;
   final String? customerAvatar;
   final double? totalAmount;
+  final String? paymentStatus, bookingStatus;
+  final bool readyForMatching, hasPendingAssignment;
+  final DateTime? depositPaidAt;
+
+  String get customerDisplayStatus {
+    if (status != 'created') return status;
+    if (bookingStatus == 'awaiting_payment') return 'awaiting_payment';
+    if (hasPendingAssignment) return 'awaiting_confirmation';
+    if (readyForMatching ||
+        paymentStatus == 'paid' ||
+        paymentStatus == 'partially_paid' ||
+        depositPaidAt != null) {
+      return 'finding_provider';
+    }
+    return 'awaiting_payment';
+  }
 }
 
 class OrderDetail {

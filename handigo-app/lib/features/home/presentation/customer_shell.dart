@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
 import '../../../shared/widgets/service_images.dart';
 
@@ -466,33 +467,30 @@ class _HomeSearchFieldBodyState extends State<_HomeSearchFieldBody> {
   }
 
   @override
-  Widget build(BuildContext context) => TextField(
+  Widget build(BuildContext context) => AppSearchField(
     readOnly: true,
     onTap: () => context.push('/customer/services'),
-    decoration: InputDecoration(
-      hintText: _isListening
-          ? 'Đang nghe, hãy nói tên dịch vụ...'
-          : 'Tìm dịch vụ sửa chữa, dọn dẹp...',
-      prefixIcon: const Icon(Icons.search),
-      suffixIcon: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            tooltip: _isListening
-                ? 'Dừng tìm kiếm bằng giọng nói'
-                : 'Tìm kiếm bằng giọng nói',
-            onPressed: _startVoiceSearch,
-            icon: Icon(
-              _isListening ? Icons.stop_circle_outlined : Icons.mic_none,
-            ),
+    hintText: _isListening
+        ? 'Đang nghe, hãy nói tên dịch vụ...'
+        : 'Tìm dịch vụ sửa chữa, dọn dẹp...',
+    suffixIcon: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: _isListening
+              ? 'Dừng tìm kiếm bằng giọng nói'
+              : 'Tìm kiếm bằng giọng nói',
+          onPressed: _startVoiceSearch,
+          icon: Icon(
+            _isListening ? Icons.stop_circle_outlined : Icons.mic_none,
           ),
-          IconButton(
-            tooltip: 'Lọc dịch vụ',
-            onPressed: _showFilters,
-            icon: const Icon(Icons.tune),
-          ),
-        ],
-      ),
+        ),
+        IconButton(
+          tooltip: 'Lọc dịch vụ',
+          onPressed: _showFilters,
+          icon: const Icon(Icons.tune),
+        ),
+      ],
     ),
   );
 }

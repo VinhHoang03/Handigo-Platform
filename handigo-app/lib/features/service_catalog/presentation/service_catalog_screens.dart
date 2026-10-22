@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import '../../../shared/widgets/service_images.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,7 +7,7 @@ import 'package:intl/intl.dart';
 import '../../account/presentation/account_screens.dart';
 import '../../../app/providers/app_providers.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geolocator/geolocator.dart';
+import 'add_booking_address_sheet.dart';
 import '../../orders/presentation/order_screens.dart';
 import '../../booking/data/pending_booking_store.dart';
 import '../../booking/presentation/booking_provider_selector.dart';
@@ -209,38 +210,21 @@ class _ServiceCatalogScreenState extends ConsumerState<ServiceCatalogScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: TextField(
+                            child: AppSearchField(
                               controller: _searchController,
                               onChanged: (value) =>
                                   setState(() => _search = value),
-                              textInputAction: TextInputAction.search,
-                              style: theme.textTheme.bodyMedium,
-                              decoration: InputDecoration(
-                                hintText: 'Tìm dịch vụ: máy lạnh, ống nước...',
-                                hintStyle: theme.textTheme.bodySmall?.copyWith(
-                                  color: scheme.outline,
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.search,
-                                  size: 20,
-                                  color: scheme.outline,
-                                ),
-                                fillColor: scheme.surfaceContainerLowest,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 14,
-                                ),
-                                suffixIcon: _search.isEmpty
-                                    ? null
-                                    : IconButton(
-                                        tooltip: 'Xóa tìm kiếm',
-                                        icon: const Icon(Icons.close, size: 20),
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          setState(() => _search = '');
-                                        },
-                                      ),
-                              ),
+                              hintText: 'Tìm dịch vụ: máy lạnh, ống nước...',
+                              suffixIcon: _search.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Xóa tìm kiếm',
+                                      icon: const Icon(Icons.close, size: 20),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _search = '');
+                                      },
+                                    ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -1622,17 +1606,43 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       .toList();
 
   Future<void> _addAddress() async {
-    final result = await showDialog<Map<String, String>>(
+    final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
-      builder: (context) => const _AddAddressDialog(),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) => const AddBookingAddressSheet(),
     );
     if (result == null || !mounted) return;
     try {
+      final selected = _addresses
+          .where((item) => item.id == ref.read(bookingDraftProvider).addressId)
+          .firstOrNull;
+      final contact =
+          selected ?? _addresses.where((item) => item.isDefault).firstOrNull;
+      String name = contact?.recipientName.trim() ?? '';
+      String phone = contact?.recipientPhone.trim() ?? '';
+      if (name.isEmpty || phone.isEmpty) {
+        final profile = await ref.read(accountProfileProvider.future);
+        if (name.isEmpty) name = '${profile['fullName'] ?? ''}'.trim();
+        if (phone.isEmpty) phone = '${profile['phone'] ?? ''}'.trim();
+      }
+      if (!mounted) return;
+      if (name.isEmpty || phone.isEmpty) {
+        throw const ApiException(
+          'Vui lòng cập nhật họ tên và số điện thoại trong tài khoản trước khi thêm địa chỉ.',
+        );
+      }
       final address = await ref
           .read(serviceCatalogRepositoryProvider)
           .createAddress(
-            recipientName: result['recipientName']!,
-            recipientPhone: result['recipientPhone']!,
+            recipientName: name,
+            recipientPhone: phone,
             fullAddress: result['fullAddress']!,
             province: result['province']!,
             ward: result['ward']!,
@@ -1643,11 +1653,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       setState(() => _addresses = [..._addresses, address]);
       ref.read(bookingDraftProvider.notifier).setAddress(address.id);
       AppToast.show(context, 'Đã thêm địa chỉ.', type: AppToastType.success);
-    } catch (_) {
+    } catch (error) {
       if (mounted)
         AppToast.show(
           context,
-          'Không thể thêm địa chỉ. Vui lòng kiểm tra thông tin.',
+          error is ApiException
+              ? error.message
+              : 'Không thể thêm địa chỉ. Vui lòng thử lại.',
           type: AppToastType.error,
         );
     }
@@ -1808,160 +1820,6 @@ class _BookingForm extends ConsumerWidget {
       ],
     );
   }
-}
-
-class _AddAddressDialog extends ConsumerStatefulWidget {
-  const _AddAddressDialog();
-  @override
-  ConsumerState<_AddAddressDialog> createState() => _AddAddressDialogState();
-}
-
-class _AddAddressDialogState extends ConsumerState<_AddAddressDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _phone = TextEditingController();
-  final _address = TextEditingController();
-  final _province = TextEditingController();
-  final _ward = TextEditingController();
-
-  double? latitude, longitude;
-  bool locating = false;
-  String? locationError;
-  Future<void> locate() async {
-    if (locating) return;
-    setState(() {
-      locating = true;
-      locationError = null;
-    });
-    try {
-      if (!await Geolocator.isLocationServiceEnabled())
-        throw const ApiException('Vui lòng bật vị trí thiết bị.');
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied)
-        permission = await Geolocator.requestPermission();
-      if ([
-        LocationPermission.denied,
-        LocationPermission.deniedForever,
-      ].contains(permission))
-        throw const ApiException(
-          'Chưa cấp quyền vị trí. Bạn có thể nhập địa chỉ thủ công.',
-        );
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      ).timeout(const Duration(seconds: 15));
-      final response = await ref
-          .read(apiClientProvider)
-          .request(
-            '/locations/reverse-geocode',
-            query: {
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-            },
-            authenticated: true,
-          );
-      if (!mounted) return;
-      final data = response['data'] as Map;
-      setState(() {
-        latitude = position.latitude;
-        longitude = position.longitude;
-        _address.text = '${data['fullAddress'] ?? ''}';
-        _province.text = '${data['province'] ?? ''}';
-        _ward.text = '${data['ward'] ?? ''}';
-      });
-    } catch (failure) {
-      if (mounted)
-        setState(
-          () => locationError = failure is ApiException
-              ? failure.message
-              : 'Chưa xác định được vị trí. Vui lòng thử lại.',
-        );
-    } finally {
-      if (mounted) setState(() => locating = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _phone.dispose();
-    _address.dispose();
-    _province.dispose();
-    _ward.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Thêm địa chỉ'),
-    content: Form(
-      key: _formKey,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            OutlinedButton.icon(
-              onPressed: locating ? null : locate,
-              icon: const Icon(Icons.my_location),
-              label: Text(
-                locating ? 'Đang xác định vị trí...' : 'Dùng vị trí hiện tại',
-              ),
-            ),
-            if (locationError != null) Text(locationError!),
-            _field(_name, 'Họ tên người nhận'),
-            _field(_phone, 'Số điện thoại', keyboardType: TextInputType.phone),
-            _field(_address, 'Địa chỉ đầy đủ'),
-            _field(_province, 'Tỉnh/thành phố'),
-            _field(_ward, 'Phường/xã'),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Hủy'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (_formKey.currentState!.validate())
-            Navigator.pop(context, {
-              'recipientName': _name.text.trim(),
-              'recipientPhone': _phone.text.trim(),
-              'fullAddress': _address.text.trim(),
-              'province': _province.text.trim(),
-              'ward': _ward.text.trim(),
-              if (latitude != null) 'latitude': '$latitude',
-              if (longitude != null) 'longitude': '$longitude',
-            });
-        },
-        child: const Text('Lưu'),
-      ),
-    ],
-  );
-
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    TextInputType? keyboardType,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
-      controller: controller,
-      onChanged: (_) {
-        if (controller == _address ||
-            controller == _province ||
-            controller == _ward) {
-          latitude = null;
-          longitude = null;
-        }
-      },
-      keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label),
-      validator: (value) =>
-          value == null || value.trim().isEmpty ? 'Vui lòng nhập $label' : null,
-    ),
-  );
 }
 
 class _BookingReview extends StatelessWidget {

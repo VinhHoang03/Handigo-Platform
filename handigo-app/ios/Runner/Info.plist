@@ -26,6 +26,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Handigo sử dụng micro khi bạn chọn nhập yêu cầu cho trợ lý AI bằng giọng nói.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Handigo chuyển lời nói thành nội dung để bạn kiểm tra trước khi gửi cho trợ lý AI.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Handigo cần truy cập ảnh bạn chọn để đính kèm hiện trạng dịch vụ cho trợ lý AI.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Handigo cần vị trí hiện tại để hiển thị khu vực và khoảng cách đến thợ phù hợp.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

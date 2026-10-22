@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { ImagePlus, LoaderCircle, Mic, RotateCcw, Send, Square, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { ImagePlus, LoaderCircle, Mic, Send, Square, X } from "lucide-react";
 import { useVoiceInput } from "../hooks/useVoiceInput";
 import { getErrorMessage } from "@/utils/apiError";
 
@@ -8,8 +8,7 @@ const MAX_MESSAGE_LENGTH = 1000;
 export function ChatbotComposer({
   disabled,
   onSend,
-  onNewSession,
-  resetDisabled = false,
+  onActivityChange,
   voiceEnabled = false,
   onUploadAttachment,
   attachmentUrls = [],
@@ -20,24 +19,28 @@ export function ChatbotComposer({
   onUploadAttachment?: (file: File) => Promise<string>;
   attachmentUrls?: string[];
   onAttachmentChange?: (dirty: boolean) => void;
-  onNewSession?: () => void;
-  resetDisabled?: boolean;
+  onActivityChange?: (busy: boolean) => void;
   voiceEnabled?: boolean;
 }) {
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<string[] | undefined>();
   const [uploading, setUploading] = useState(false);
   const [attachmentError, setAttachmentError] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const selected = attachments ?? attachmentUrls;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const voice = useVoiceInput(disabled || !voiceEnabled, MAX_MESSAGE_LENGTH, setContent);
+  useEffect(() => {
+    onActivityChange?.(uploading || voice.listening);
+    return () => onActivityChange?.(false);
+  }, [onActivityChange, uploading, voice.listening]);
   useLayoutEffect(() => {
     const input = inputRef.current;
     if (!input) return;
     input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, 128)}px`;
-  }, [content]);
+    input.style.height = expanded ? `${Math.min(input.scrollHeight, 128)}px` : "44px";
+  }, [content, expanded]);
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -83,6 +86,9 @@ export function ChatbotComposer({
   return (
     <form
       onSubmit={submit}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setExpanded(false);
+      }}
       className="shrink-0 border-t border-outline-variant/30 bg-surface-container-lowest p-3 sm:px-4"
     >
       <div className="rounded-2xl border border-outline-variant/60 bg-surface-container-low/50 p-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:bg-surface-container-lowest focus-within:ring-2 focus-within:ring-primary/10">
@@ -93,11 +99,13 @@ export function ChatbotComposer({
               aria-label={`Bỏ ảnh hiện trạng ${index + 1}`} className="absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-bl-xl bg-surface-container-lowest/90 text-on-surface focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"><X size={16} aria-hidden="true" /></button>
           </div>)}
         </div>}
+        <div className={`grid items-center gap-x-1 ${expanded ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_auto]"}`}>
         <textarea
           ref={inputRef}
           value={content}
           onChange={(event) => setContent(event.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => setExpanded(true)}
           maxLength={MAX_MESSAGE_LENGTH}
           rows={1}
           disabled={disabled}
@@ -108,20 +116,7 @@ export function ChatbotComposer({
           placeholder={disabled ? "Vui lòng chờ để tiếp tục…" : "Nhắn yêu cầu của bạn…"}
           className="block max-h-32 min-h-11 w-full resize-none border-0 bg-transparent px-2 py-2.5 text-base leading-6 text-on-surface outline-none placeholder:text-on-surface-variant focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed sm:text-sm"
         />
-        <div className="mt-1 flex items-center gap-1">
-        {onNewSession && (
-          <button
-            type="button"
-            onClick={() => { voice.cancel(); setContent(""); setAttachments(undefined); setAttachmentError(""); onNewSession(); }}
-            disabled={resetDisabled || uploading}
-            aria-label="Bắt đầu tác vụ mới"
-            title="Bắt đầu tác vụ mới"
-            className="flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-xs font-medium text-on-surface-variant transition-colors hover:bg-primary/5 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <RotateCcw aria-hidden="true" size={15} /><span>Tác vụ mới</span>
-          </button>
-        )}
-        <span className="flex-1" />
+        <div className={`flex items-center justify-end gap-1 ${expanded ? "mt-1" : ""}`}>
         {content.length > MAX_MESSAGE_LENGTH - 100 && <span className="text-[11px] tabular-nums text-on-surface-variant">{content.length}/{MAX_MESSAGE_LENGTH}</span>}
         {onUploadAttachment && <>
           <input ref={fileRef} type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label="Chọn ảnh hiện trạng" className="hidden"
@@ -153,6 +148,7 @@ export function ChatbotComposer({
         >
           <Send aria-hidden="true" size={20} />
         </button>
+        </div>
         </div>
       </div>
       {attachmentError && <p role="alert" className="mt-2 px-1 text-xs text-error">{attachmentError}</p>}
