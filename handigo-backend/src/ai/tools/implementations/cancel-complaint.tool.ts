@@ -13,5 +13,6 @@ export const cancelComplaintTool: AgentTool<z.infer<typeof complaintIdSchema>> =
   requiresConfirmation: true,
   preview: (context, args) => care.previewCancelComplaint(context.user.id, args.complaintId),
   execute: (context, args) => care.cancelComplaint(context.user.id, args.complaintId),
+  reconcile: (context, args) => care.reconcileCancellation(context.user.id, args.complaintId, "complaint"),
   reply: receipt("Đã hủy khiếu nại."),
 };

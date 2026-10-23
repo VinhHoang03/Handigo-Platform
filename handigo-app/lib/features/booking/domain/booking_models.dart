@@ -1,3 +1,5 @@
+import '../../../shared/utils/address_format.dart';
+
 enum BookingType { normal, urgent, scheduled, recurring }
 
 enum PaymentMethod { wallet, bank, cash }
@@ -14,20 +16,22 @@ class Address {
     this.latitude,
     this.longitude,
     this.note,
+    this.placeId,
   });
 
   factory Address.fromJson(Map<String, dynamic> json) => Address(
-        id: (json['_id'] ?? json['id']) as String,
-        recipientName: json['recipientName'] as String? ?? '',
-        recipientPhone: json['recipientPhone'] as String? ?? '',
-        fullAddress: json['fullAddress'] as String? ?? '',
-        province: json['province'] as String? ?? '',
-        ward: json['ward'] as String? ?? '',
-        isDefault: json['isDefault'] as bool? ?? false,
-        latitude: (json['latitude'] as num?)?.toDouble(),
-        longitude: (json['longitude'] as num?)?.toDouble(),
-        note: json['note'] as String?,
-      );
+    id: (json['_id'] ?? json['id']) as String,
+    recipientName: json['recipientName'] as String? ?? '',
+    recipientPhone: json['recipientPhone'] as String? ?? '',
+    fullAddress: json['fullAddress'] as String? ?? '',
+    province: json['province'] as String? ?? '',
+    ward: json['ward'] as String? ?? '',
+    isDefault: json['isDefault'] as bool? ?? false,
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
+    note: json['note'] as String?,
+    placeId: json['placeId'] as String?,
+  );
 
   final String id;
   final String recipientName;
@@ -39,6 +43,14 @@ class Address {
   final double? latitude;
   final double? longitude;
   final String? note;
+  final String? placeId;
+
+  String get displayAddress => formatAddress(
+    fullAddress,
+    ward: ward,
+    province: province,
+    fromMap: isMapAddress(placeId),
+  );
 }
 
 class BookingPreview {
@@ -55,16 +67,21 @@ class BookingPreview {
   });
 
   factory BookingPreview.fromJson(Map<String, dynamic> json) => BookingPreview(
-        baseAmount: (json['baseAmount'] as num?)?.toDouble() ?? 0,
-        bookingAmount: (json['bookingAmount'] as num?)?.toDouble() ?? 0,
-        immediateFee: (json['immediateFee'] as num?)?.toDouble() ?? 0,
-        depositAmount: (json['depositAmount'] as num?)?.toDouble() ?? 0,
-        minAdvanceMinutes: (json['minAdvanceMinutes'] as num?)?.toInt() ?? 0,
-        promotionDiscountAmount: (json['promotionDiscountAmount'] as num?)?.toDouble() ?? 0,
-        voucherDiscountAmount: (json['voucherDiscountAmount'] as num?)?.toDouble() ?? 0,
-        discountedAmount: (json['discountedAmount'] as num?)?.toDouble() ?? (json['bookingAmount'] as num?)?.toDouble() ?? 0,
-        promotionName: (json['promotionSnapshot'] as Map?)?['name'] as String?,
-      );
+    baseAmount: (json['baseAmount'] as num?)?.toDouble() ?? 0,
+    bookingAmount: (json['bookingAmount'] as num?)?.toDouble() ?? 0,
+    immediateFee: (json['immediateFee'] as num?)?.toDouble() ?? 0,
+    depositAmount: (json['depositAmount'] as num?)?.toDouble() ?? 0,
+    minAdvanceMinutes: (json['minAdvanceMinutes'] as num?)?.toInt() ?? 0,
+    promotionDiscountAmount:
+        (json['promotionDiscountAmount'] as num?)?.toDouble() ?? 0,
+    voucherDiscountAmount:
+        (json['voucherDiscountAmount'] as num?)?.toDouble() ?? 0,
+    discountedAmount:
+        (json['discountedAmount'] as num?)?.toDouble() ??
+        (json['bookingAmount'] as num?)?.toDouble() ??
+        0,
+    promotionName: (json['promotionSnapshot'] as Map?)?['name'] as String?,
+  );
 
   final double baseAmount;
   final double bookingAmount;
@@ -79,10 +96,10 @@ class CreatedOrder {
   const CreatedOrder({required this.id, required this.orderCode, this.status});
 
   factory CreatedOrder.fromJson(Map<String, dynamic> json) => CreatedOrder(
-        id: (json['_id'] ?? json['id']) as String,
-        orderCode: json['orderCode'] as String? ?? '',
-        status: json['status'] as String?,
-      );
+    id: (json['_id'] ?? json['id']) as String,
+    orderCode: json['orderCode'] as String? ?? '',
+    status: json['status'] as String?,
+  );
 
   final String id;
   final String orderCode;

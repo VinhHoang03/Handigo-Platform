@@ -1,316 +1,361 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../app/providers/app_providers.dart';
-import '../../../shared/widgets/app_states.dart';
+import '../../../core/network/realtime_connection.dart';
+import '../../../core/network/api_exception.dart';
+import '../../auth/domain/app_user.dart';
+import 'order_screens.dart';
 
-class OrderTrackingScreen extends ConsumerWidget {
+class OrderTrackingScreen extends ConsumerStatefulWidget {
   const OrderTrackingScreen({required this.orderId, super.key});
   final String orderId;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Theo dõi đơn hàng'),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Center(
-            child: Text(
-              '#${orderId.length > 8 ? orderId.substring(0, 8) : orderId}',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-          ),
-        ),
-      ],
-    ),
-    body: FutureBuilder<Map<String, dynamic>>(
-      future: ref.watch(orderTrackingProvider(orderId).future),
-      builder: (_, snapshot) {
-        if (!snapshot.hasData)
-          return snapshot.hasError
-              ? const AppMessage(message: 'Chưa thể tải vị trí theo dõi.')
-              : const AppLoading();
-        final raw = snapshot.data!['data'];
-        final data = raw is Map<String, dynamic> ? raw : <String, dynamic>{};
-        final status =
-            '${data['status'] ?? data['orderStatus'] ?? 'in_progress'}';
-        final progress = _progress(status);
-        return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(orderTrackingProvider(orderId)),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-            children: [
-              _TrackingStatusCard(
-                status: status,
-                progress: progress,
-                data: data,
-              ),
-              const SizedBox(height: 14),
-              _TrackingMapCard(data: data),
-              const SizedBox(height: 14),
-              _TrackingTimeline(status: status),
-            ],
-          ),
-        );
-      },
-    ),
-  );
+  ConsumerState<OrderTrackingScreen> createState() =>
+      _OrderTrackingScreenState();
 }
 
-final orderTrackingProvider = FutureProvider.autoDispose
-    .family<Map<String, dynamic>, String>(
-      (ref, id) => ref
-          .read(apiClientProvider)
-          .request('/orders/$id/tracking-route', authenticated: true),
+class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
+    with WidgetsBindingObserver {
+  StreamSubscription<dynamic>? events;
+  StreamSubscription<Position>? positions;
+  Timer? timer;
+  Map<String, dynamic>? coordinates;
+  Map<String, dynamic>? route;
+  String? error;
+  DateTime? updatedAt, sentAt;
+  bool loading = false, active = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    Future.microtask(() {
+      final connection = ref.read(realtimeConnectionProvider);
+      events = connection?.events.listen((event) {
+        if (event.name == 'connect') join();
+        if (event.name == 'order:location' &&
+            event.data is Map &&
+            event.data['orderId'] == widget.orderId)
+          join();
+      });
+      join();
+      timer = Timer.periodic(const Duration(seconds: 20), (_) {
+        if (active) join();
+      });
+    });
+  }
+
+  void join() {
+    final order = ref.read(orderDetailProvider(widget.orderId)).asData?.value;
+    if (order != null && !order.canTrack) return;
+    final connection = ref.read(realtimeConnectionProvider);
+    if (connection?.connected != true) {
+      loadRoute();
+      return;
+    }
+    connection!.emit(
+      'order:tracking:join',
+      {'orderId': widget.orderId},
+      ack: (response) {
+        if (!mounted || response is! Map) return;
+        if (response['success'] == true && response['data'] is Map) {
+          setState(() {
+            coordinates = Map<String, dynamic>.from(response['data'] as Map);
+            updatedAt = DateTime.now();
+          });
+          loadRoute();
+        } else {
+          setState(
+            () => error = '${response['message'] ?? 'Chưa có dữ liệu vị trí.'}',
+          );
+        }
+      },
     );
+  }
 
-double _progress(String status) => switch (status) {
-  'completed' => 1,
-  'accepted' => .45,
-  'in_progress' => .7,
-  'cancelled' => 0,
-  _ => .2,
-};
+  Future<void> loadRoute() async {
+    if (loading || !mounted || !active) return;
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final response = await ref
+          .read(apiClientProvider)
+          .request(
+            '/orders/${widget.orderId}/tracking-route',
+            authenticated: true,
+          );
+      final data = response['data'];
+      if (data is! Map ||
+          data['geometry'] is! Map ||
+          data['distanceMeters'] is! num ||
+          data['durationSeconds'] is! num)
+        throw const FormatException();
+      final points = ((data['geometry'] as Map)['coordinates'] as List?) ?? [];
+      if (points.length < 2 ||
+          points.any(
+            (point) =>
+                point is! List ||
+                point.length < 2 ||
+                point[0] is! num ||
+                point[1] is! num ||
+                !(point[0] as num).isFinite ||
+                !(point[1] as num).isFinite ||
+                (point[0] as num).abs() > 180 ||
+                (point[1] as num).abs() > 90,
+          ))
+        throw const FormatException();
+      if (mounted)
+        setState(() {
+          route = Map<String, dynamic>.from(data);
+          updatedAt = DateTime.now();
+        });
+    } catch (failure) {
+      if (mounted)
+        setState(
+          () => error = failure is ApiException
+              ? failure.message
+              : 'Chưa thể tải tuyến đường. Vui lòng thử lại.',
+        );
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
 
-class _TrackingStatusCard extends StatelessWidget {
-  const _TrackingStatusCard({
-    required this.status,
-    required this.progress,
-    required this.data,
-  });
-  final String status;
-  final double progress;
-  final Map<String, dynamic> data;
+  Future<void> shareLocation() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled())
+        throw const ApiException('Vui lòng bật vị trí trên thiết bị.');
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied)
+        permission = await Geolocator.requestPermission();
+      if ([
+        LocationPermission.denied,
+        LocationPermission.deniedForever,
+      ].contains(permission))
+        throw const ApiException(
+          'Chưa được cấp quyền vị trí. Bạn vẫn có thể xem thông tin đơn hàng.',
+        );
+      await positions?.cancel();
+      positions =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 20,
+            ),
+          ).listen(
+            (position) {
+              final order = ref
+                  .read(orderDetailProvider(widget.orderId))
+                  .asData
+                  ?.value;
+              if (!active ||
+                  order?.canTrack != true ||
+                  (sentAt != null &&
+                      DateTime.now().difference(sentAt!).inSeconds < 5))
+                return;
+              sentAt = DateTime.now();
+              ref
+                  .read(realtimeConnectionProvider)
+                  ?.emit(
+                    'order:location:update',
+                    {
+                      'orderId': widget.orderId,
+                      'latitude': position.latitude,
+                      'longitude': position.longitude,
+                    },
+                    ack: (response) {
+                      if (mounted &&
+                          response is Map &&
+                          response['success'] != true)
+                        setState(() => error = '${response['message']}');
+                    },
+                  );
+            },
+            onError: (_) {
+              if (mounted)
+                setState(
+                  () => error = 'Mất tín hiệu vị trí. Vui lòng thử lại.',
+                );
+            },
+          );
+      if (mounted) setState(() {});
+    } catch (failure) {
+      if (mounted)
+        setState(
+          () => error = failure is ApiException
+              ? failure.message
+              : 'Chưa thể chia sẻ vị trí.',
+        );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    active = state == AppLifecycleState.resumed;
+    if (active)
+      join();
+    else {
+      positions?.cancel();
+      positions = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    timer?.cancel();
+    events?.cancel();
+    positions?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final title = status == 'completed'
-        ? 'Đã hoàn thành'
-        : status == 'cancelled'
-        ? 'Đã hủy'
-        : status == 'accepted'
-        ? 'Thợ đã nhận đơn'
-        : 'Đang thực hiện';
-    return Card(
-      color: scheme.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: scheme.surfaceContainerLowest,
-                  foregroundColor: scheme.primary,
-                  child: Icon(
-                    status == 'completed'
-                        ? Icons.check
-                        : Icons.home_repair_service_outlined,
+    final order = ref.watch(orderDetailProvider(widget.orderId)).asData?.value;
+    if (order != null && !order.canTrack && positions != null) {
+      positions?.cancel();
+      positions = null;
+    }
+    final points = route == null
+        ? <LatLng>[]
+        : ((route!['geometry'] as Map)['coordinates'] as List)
+              .map(
+                (point) => LatLng(
+                  (point[1] as num).toDouble(),
+                  (point[0] as num).toDouble(),
+                ),
+              )
+              .toList();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Theo dõi đơn hàng')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            order == null
+                ? 'Đang tải thông tin đơn...'
+                : 'Đơn ${order.code} · ${orderStatusLabel(order.status)}',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          if (order?.addressLabel != null) Text(order!.addressLabel!),
+          if (order != null && !order.canTrack)
+            const Text(
+              'Đơn chưa có thợ hoặc đã kết thúc. Không có theo dõi vị trí trực tiếp.',
+            ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ),
+          if (loading) const LinearProgressIndicator(),
+          if (points.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 320,
+              child: FlutterMap(
+                key: ValueKey(widget.orderId),
+                options: MapOptions(
+                  initialCameraFit: CameraFit.bounds(
+                    bounds: LatLngBounds.fromPoints(points),
+                    padding: const EdgeInsets.all(32),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${(progress * 100).round()}% tiến trình',
-                        style: Theme.of(context).textTheme.bodySmall,
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.handigo.handigo_app',
+                  ),
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: points,
+                        color: Theme.of(context).colorScheme.primary,
+                        strokeWidth: 5,
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 9,
-                backgroundColor: scheme.surface.withValues(alpha: .7),
-                color: scheme.primary,
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: points.first,
+                        child: const Tooltip(
+                          message: 'Vị trí chuyên gia',
+                          child: Icon(
+                            Icons.handyman,
+                            size: 36,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ),
+                      Marker(
+                        point: points.last,
+                        child: const Tooltip(
+                          message: 'Địa chỉ dịch vụ',
+                          child: Icon(
+                            Icons.location_on,
+                            size: 36,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  RichAttributionWidget(
+                    attributions: [
+                      TextSourceAttribution(
+                        'OpenStreetMap contributors',
+                        onTap: () => launchUrl(
+                          Uri.parse('https://www.openstreetmap.org/copyright'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            if (data['estimatedMinutes'] != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  'Dự kiến còn ${data['estimatedMinutes']} phút',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TrackingMapCard extends StatelessWidget {
-  const _TrackingMapCard({required this.data});
-  final Map<String, dynamic> data;
-  @override
-  Widget build(BuildContext context) => Card(
-    clipBehavior: Clip.antiAlias,
-    child: Container(
-      height: 168,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-      ),
-      child: Stack(
-        children: [
-          Center(
-            child: Icon(
-              Icons.map_outlined,
-              size: 58,
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: .45),
-            ),
-          ),
-          Positioned(
-            left: 14,
-            top: 14,
-            child: _MapLabel(
-              icon: Icons.my_location,
-              text: data['providerLocation'] == null
-                  ? 'Đang chờ vị trí thợ'
-                  : 'Vị trí thợ',
-            ),
-          ),
-          Positioned(
-            right: 14,
-            bottom: 14,
-            child: _MapLabel(
-              icon: Icons.location_on,
-              text: data['destination'] == null
-                  ? 'Địa chỉ dịch vụ'
-                  : '${data['destination']}',
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _MapLabel extends StatelessWidget {
-  const _MapLabel({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface.withValues(alpha: .9),
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 5),
-          Text(text, style: Theme.of(context).textTheme.labelSmall),
-        ],
-      ),
-    ),
-  );
-}
-
-class _TrackingTimeline extends StatelessWidget {
-  const _TrackingTimeline({required this.status});
-  final String status;
-  @override
-  Widget build(BuildContext context) {
-    final current = status == 'completed'
-        ? 2
-        : status == 'in_progress'
-        ? 1
-        : 0;
-    const steps = [
-      ('Đã tạo đơn', Icons.receipt_long_outlined),
-      ('Thợ đang thực hiện', Icons.handyman_outlined),
-      ('Hoàn tất dịch vụ', Icons.check_circle_outline),
-    ];
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
             Text(
-              'Tiến trình dịch vụ',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              'Quãng đường: ${((route!['distanceMeters'] as num) / 1000).toStringAsFixed(1)} km · Dự kiến di chuyển: ${((route!['durationSeconds'] as num) / 60).ceil()} phút',
             ),
-            const SizedBox(height: 12),
-            for (var i = 0; i < steps.length; i++)
-              _TimelineStep(
-                title: steps[i].$1,
-                icon: steps[i].$2,
-                active: i <= current,
-                last: i == steps.length - 1,
-              ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TimelineStep extends StatelessWidget {
-  const _TimelineStep({
-    required this.title,
-    required this.icon,
-    required this.active,
-    required this.last,
-  });
-  final String title;
-  final IconData icon;
-  final bool active, last;
-  @override
-  Widget build(BuildContext context) {
-    final color = active
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.outline;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Icon(icon, size: 21, color: color),
-            if (!last)
-              Container(
-                width: 2,
-                height: 29,
-                color: color.withValues(alpha: .35),
-              ),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-              color: active
-                  ? null
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
+          if (updatedAt != null)
+            Text(
+              'Tải dữ liệu lúc ${TimeOfDay.fromDateTime(updatedAt!).format(context)}. Tuyến đường không thể hiện phần trăm hoàn thành công việc.',
             ),
+          OutlinedButton(
+            onPressed: loading ? null : join,
+            child: const Text('Cập nhật vị trí và tuyến đường'),
           ),
-        ),
-      ],
+          if (ref.watch(authControllerProvider).user?.role ==
+                  UserRole.provider &&
+              order?.canTrack == true)
+            FilledButton(
+              onPressed: positions == null ? shareLocation : null,
+              child: Text(
+                positions == null
+                    ? 'Chia sẻ vị trí khi mở màn này'
+                    : 'Đang chia sẻ vị trí',
+              ),
+            ),
+          if (order != null)
+            for (final event in order.statusHistory)
+              ListTile(
+                leading: const Icon(Icons.history),
+                title: Text(orderStatusLabel(event.status)),
+                subtitle: Text(event.createdAt?.toLocal().toString() ?? ''),
+              ),
+        ],
+      ),
     );
   }
 }

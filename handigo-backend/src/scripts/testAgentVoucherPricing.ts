@@ -3,6 +3,7 @@ import { mock } from "node:test";
 import { z } from "zod";
 import { Types } from "mongoose";
 import { Service } from "../models/service.model";
+import { Category } from "../models/category.model";
 import { ServiceOption } from "../models/serviceOption.model";
 import { Address } from "../models/address.model";
 import { Order } from "../models/order.model";
@@ -48,6 +49,7 @@ async function run() {
     session: () => query(value), select: () => query(value), lean: () => query(value), sort: () => query(value),
   });
   mock.method(Service, "findOne", () => query(service));
+  mock.method(Category, "exists", async () => ({ _id: new Types.ObjectId() }));
   mock.method(ServiceOption, "find", () => query([]));
   mock.method(Address, "findOne", (filter: any) => { assert.equal(filter.userId, user.id); return query(address); });
   mock.method(Voucher, "findOne", (filter: any) => query(filter.code && filter.code !== voucher.code ? null : voucher));

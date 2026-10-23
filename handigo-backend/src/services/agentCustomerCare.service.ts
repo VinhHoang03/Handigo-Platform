@@ -7,6 +7,8 @@ import { safelyTrackAgentCase } from "./agentOrderProgress.service";
 import { createSupportTicketSchema, addSupportTicketResponseSchema } from "../validations/supportTicket.validator";
 import { createComplaintSchema } from "../validations/complaint.validator";
 import { bookingAttachmentsSchema } from "../ai/agent/booking-attachments";
+import { agentActionResourceId } from "../utils/agentActionResourceId";
+import { isDeepStrictEqual } from "node:util";
 
 // Công cụ chỉ nhận ảnh đã được xác thực tại phiên chat, không nhận cấu trúc tệp do LLM tự tạo.
 export const agentTicketSchema = createSupportTicketSchema.omit({ attachments: true }).extend({ customerAttachments: bookingAttachmentsSchema.optional() }).strict();
@@ -64,9 +66,10 @@ export const AgentCustomerCareService = {
       customerAttachments: args.customerAttachments ?? [],
       note: "Yêu cầu được gửi tới bộ phận hỗ trợ. Đây chưa phải kết quả xử lý." };
   },
-  async createTicket(userId: string, args: z.infer<typeof agentTicketSchema>, sessionId?: string) {
+  async createTicket(userId: string, args: z.infer<typeof agentTicketSchema>, sessionId?: string, actionId?: string) {
     const { customerAttachments, ...payload } = args;
-    const result = customerCaseView(await tickets.createSupportTicket(userId, "CUSTOMER", { ...payload, attachments: imageFiles(customerAttachments) }), true);
+    const result = customerCaseView(await tickets.createSupportTicket(userId, "CUSTOMER", { ...payload, attachments: imageFiles(customerAttachments) },
+      sessionId && actionId ? agentActionResourceId(userId, sessionId, actionId) : undefined), true);
     if (sessionId) void safelyTrackAgentCase(userId, sessionId, result.id, "ticket");
     return result;
   },
@@ -99,9 +102,10 @@ export const AgentCustomerCareService = {
     return { title: "Gửi khiếu nại dịch vụ", subject: args.title, description: args.description,
       orderCode: order.orderCode, customerAttachments: args.customerAttachments ?? [], note: "Khiếu nại và ảnh đính kèm sẽ được xem xét, chưa có quyết định hoàn tiền." };
   },
-  async createComplaint(userId: string, args: z.infer<typeof agentComplaintSchema>, sessionId?: string) {
+  async createComplaint(userId: string, args: z.infer<typeof agentComplaintSchema>, sessionId?: string, actionId?: string) {
     const { customerAttachments, ...payload } = args;
-    const result = customerCaseView(await complaints.createComplaint(userId, "CUSTOMER", { ...payload, evidenceImages: customerAttachments }), true);
+    const result = customerCaseView(await complaints.createComplaint(userId, "CUSTOMER", { ...payload, evidenceImages: customerAttachments },
+      sessionId && actionId ? agentActionResourceId(userId, sessionId, actionId) : undefined), true);
     if (sessionId) void safelyTrackAgentCase(userId, sessionId, result.id, "complaint");
     return result;
   },
@@ -130,5 +134,38 @@ export const AgentCustomerCareService = {
   },
   async addEvidence(userId: string, complaintId: string, customerAttachments: string[], note?: string) {
     return customerCaseView(await complaints.addComplaintEvidence(userId, "CUSTOMER", complaintId, { files: imageFiles(customerAttachments), note }), true);
+  },
+  async reconcileCreated(userId: string, sessionId: string, actionId: string, kind: "ticket" | "complaint") {
+    const id = String(agentActionResourceId(userId, sessionId, actionId));
+    try {
+      const item = kind === "ticket" ? await tickets.getSupportTicketForUser(userId, id)
+        : await complaints.getComplaintForUser(userId, id);
+      if (sessionId) void safelyTrackAgentCase(userId, sessionId, id, kind);
+      return customerCaseView(item, true);
+    } catch (error) {
+      if (error instanceof AppError && error.statusCode === 404) return null;
+      throw error;
+    }
+  },
+  async reconcileResponse(userId: string, ticketId: string, message: string, images: string[], createdAt: string) {
+    const ticket = await tickets.getSupportTicketForUser(userId, ticketId);
+    const matched = ticket.responses.some((response) => String(response.responderId) === userId
+      && response.responderRole === "USER" && response.respondedAt.getTime() >= Date.parse(createdAt)
+      && response.message === message && isDeepStrictEqual(response.attachments.map((file) => file.url), images));
+    return matched ? customerCaseView(ticket) : null;
+  },
+  async reconcileCancellation(userId: string, caseId: string, kind: "ticket" | "complaint") {
+    const item = kind === "ticket" ? await tickets.getSupportTicketForUser(userId, caseId)
+      : await complaints.getComplaintForUser(userId, caseId);
+    return item.status === "cancelled" ? customerCaseView(item) : null;
+  },
+  async reconcileEvidence(userId: string, complaintId: string, images: string[], note: string | undefined, createdAt: string) {
+    const item = await complaints.getComplaintForUser(userId, complaintId);
+    const evidence = z.object({ evidence: z.array(z.object({ uploadedBy: z.unknown(), url: z.string(),
+      fileType: z.string(), note: z.string().nullable().optional(), createdAt: z.date() })) }).parse(plain(item)).evidence;
+    const matched = images.length > 0 && images.every((url) => evidence.some((file) => String((file.uploadedBy as { _id?: unknown } | null)?._id ?? file.uploadedBy) === userId
+      && file.fileType === "image" && file.url === url && (file.note ?? "") === (note ?? "")
+      && file.createdAt.getTime() >= Date.parse(createdAt)));
+    return matched ? customerCaseView(item, true) : null;
   },
 };

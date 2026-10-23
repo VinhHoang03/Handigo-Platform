@@ -471,6 +471,24 @@ async function verifyFlowExtensions() {
   assert(document.body.textContent.includes('Ảnh đính kèm yêu cầu') && session.pendingConfirmation.preview.customerAttachments.length === 1, 'xác nhận có ảnh đúng tác vụ');
   assert(session.bookingDraft.status === 'booked' && !values.customerAttachments?.length, 'không sửa ảnh đơn đã tạo');
   await click('Xác nhận'); assert(fixture.careWrites === 1, 'gửi hỗ trợ kèm ảnh sau xác nhận');
+  session.requiresReconciliation = true; session.state = 'FAILED'; session.payment = null;
+  session.pendingConfirmation = null; session.interruptedRequest = null;
+  render('ho-tro-can-doi-soat');
+  await wait(() => document.querySelector('[aria-label="Mở Trợ lý Handigo"]'), 'mở lại phiên cần đối soát');
+  document.querySelector('[aria-label="Mở Trợ lý Handigo"]').click();
+  await wait(() => button('Kiểm tra kết quả thao tác'), 'có nút đối soát cho hỗ trợ ngoài đặt đơn');
+  const lookupComposer = document.querySelector('[aria-label="Nội dung gửi cho Trợ lý Handigo"]');
+  assert(!lookupComposer.disabled, 'đang đối soát vẫn nhập được yêu cầu tra cứu');
+  assert(!document.querySelector('input[type="file"]'), 'chưa mở thao tác tải ảnh trong lúc đối soát');
+  assert(document.querySelector('[aria-label="Bắt đầu tác vụ mới"]').disabled, 'không bỏ hành động chưa rõ bằng reset');
+  change(lookupComposer, 'Tra cứu hỗ trợ của tôi'); await pause();
+  assert(!document.querySelector('[aria-label="Gửi tin nhắn"]').disabled, 'gửi được câu tra cứu khi chưa có lỗi mạng');
+  document.querySelector('[aria-label="Gửi tin nhắn"]').click();
+  await wait(() => lastSend().message === 'Tra cứu hỗ trợ của tôi', 'request tra cứu được gửi khi phiên cần đối soát');
+  await wait(() => button('Kiểm tra kết quả thao tác') && !button('Kiểm tra kết quả thao tác').disabled, 'có thể kiểm tra lại sau lượt tra cứu');
+  await click('Kiểm tra kết quả thao tác');
+  assert(lastSend().message === 'Tiếp tục yêu cầu.', 'nút đối soát hỗ trợ dùng đúng luồng kiểm tra lại');
+  session.requiresReconciliation = false;
   const panel = document.querySelector('aside').getBoundingClientRect();
   assert(panel.left >= 0 && panel.right <= innerWidth + 1, 'giao diện nằm trong màn hình');
   document.body.dataset.agentBookingPassed = 'true';
@@ -492,6 +510,28 @@ async function run() {
     } else if (visual === 'welcome') {
       await wait(() => document.body.textContent.includes('Bạn cần giúp gì cho ngôi nhà?'), 'hiển thị lời chào');
       assert(document.querySelector('aside h3').getBoundingClientRect().width > 250, 'lời chào dùng đủ chiều rộng khung chat');
+      const input = document.querySelector('textarea[name="message"]');
+      const send = document.querySelector('[aria-label="Gửi tin nhắn"]');
+      const task = document.querySelector('[aria-label="Bắt đầu tác vụ mới"]');
+      const history = document.querySelector('[aria-label="Mở lịch sử trò chuyện"]');
+      const centerY = (element) => { const rect = element.getBoundingClientRect(); return rect.top + rect.height / 2; };
+      assert(task.closest('header') && Math.abs(centerY(task) - centerY(history)) < 1, 'nút dấu cộng nằm ngang nút lịch sử');
+      assert(!document.querySelector('form [aria-label="Bắt đầu tác vụ mới"]'), 'bỏ nút tác vụ khỏi ô nhập');
+      assert(Math.abs(centerY(input) - centerY(send)) < 1, 'các nút ban đầu nằm ngang ô nhập');
+      input.focus();
+      await wait(() => send.getBoundingClientRect().top >= input.getBoundingClientRect().bottom,
+        'focus chuyển nút xuống dưới ô nhập').catch((error) => {
+          throw Error(error.message + ': ' + JSON.stringify({connected: input.isConnected, active: document.activeElement?.tagName,
+            grid: input.parentElement.className, columns: getComputedStyle(input.parentElement).gridTemplateColumns,
+            input: input.getBoundingClientRect().toJSON(), send: send.getBoundingClientRect().toJSON()}));
+        });
+      assert(document.activeElement === input, 'giữ focus sau khi đổi bố cục');
+      document.querySelector('[aria-label="Đính kèm ảnh hiện trạng"]').focus();
+      await pause();
+      assert(send.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'không thu gọn giữa lúc bấm nút trong ô nhập');
+      task.focus();
+      await wait(() => Math.abs(centerY(input) - centerY(send)) < 1, 'rời ô nhập đưa các nút về cùng hàng');
+      task.blur();
     } else {
       await wait(() => document.querySelector('[aria-label="Nội dung cuộc trò chuyện"]'), 'mở giao diện để kiểm tra');
     }

@@ -81,7 +81,7 @@ export const recalculateProviderRating = async (providerId: Types.ObjectId | str
   });
 };
 
-export const createFeedback = async (userId: string, payload: FeedbackPayload) => {
+export const createFeedback = async (userId: string, payload: FeedbackPayload, resourceId?: Types.ObjectId) => {
   assertObjectId(userId, "người dùng");
   assertObjectId(payload.orderId, "đơn hàng");
 
@@ -116,6 +116,7 @@ export const createFeedback = async (userId: string, payload: FeedbackPayload) =
   }
 
   const feedback = await Feedback.create({
+    ...(resourceId ? { _id: resourceId } : {}),
     orderId: order._id,
     customerId: order.customerId,
     providerId: order.providerId,
@@ -134,9 +135,21 @@ export const updateMyFeedback = async (
   userId: string,
   feedbackId: string,
   payload: UpdateFeedbackPayload,
+  expectedVersion?: string,
 ) => {
   assertObjectId(userId, "người dùng");
   assertObjectId(feedbackId, "đánh giá");
+
+  if (expectedVersion !== undefined) {
+    const version = new Date(expectedVersion);
+    if (!Number.isFinite(version.getTime())) throw new AppError("Phiên bản đánh giá không hợp lệ.", 400);
+    const changes = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+    const updated = await Feedback.findOneAndUpdate({ _id: feedbackId, customerId: userId,
+      isDeleted: false, updatedAt: version }, { $set: changes }, { new: true, runValidators: true });
+    if (!updated) throw new AppError("Đánh giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại.", 409);
+    await recalculateProviderRating(updated.providerId);
+    return updated;
+  }
 
   const feedback = await Feedback.findOne({
     _id: feedbackId,

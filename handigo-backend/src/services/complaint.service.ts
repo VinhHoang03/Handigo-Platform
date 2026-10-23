@@ -153,10 +153,12 @@ export const createComplaint = async (
     description: string;
     evidenceImages?: string[];
   },
+  resourceId?: Types.ObjectId,
 ) => {
   const { order, complainantRole, targetUserId } = await getComplaintCreationContext(userId, role, payload.orderId);
 
   const complaint = await Complaint.create({
+    ...(resourceId ? { _id: resourceId } : {}),
     orderId: order._id,
     complainantId: userId,
     complainantRole,

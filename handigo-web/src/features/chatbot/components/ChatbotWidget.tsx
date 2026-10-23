@@ -259,6 +259,7 @@ export function ChatbotWidget({
     try {
       const session = await agentApi.reset(sessionId.current);
       applySession(session);
+      setShowHistory(false);
       setHasLoaded(true);
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Chưa tạo được phiên mới. Chọn Thử lại để tải trạng thái đã lưu."));
@@ -341,13 +342,13 @@ export function ChatbotWidget({
             disabled={isLoading || isReplying} onSelect={(id) => void selectSession(id)} onDelete={deleteSession} /> : undefined}
           onContinue={usesAgent && (agentSession?.state === "FAILED" || agentSession?.retryableStep) && !requiresNewSession && !error
             && ((!agentSession.requiresReconciliation && !agentSession.interruptedRequest)
-              || agentSession.messages.some((message) => message.confirmation?.tool === "create_booking"
+              || agentSession.requiresReconciliation || agentSession.messages.some((message) => message.confirmation?.tool === "create_booking"
                 && ["UNKNOWN", "EXECUTING"].includes(message.confirmation.status ?? "")))
             ? () => void sendMessage("Tiếp tục yêu cầu.").catch(() => undefined) : undefined}
           onClose={() => setIsOpen(false)}
           onRetry={() => void retry()}
           onSend={sendMessage}
-          onUploadAttachment={usesAgent ? uploadAttachment : undefined}
+          onUploadAttachment={usesAgent && !agentSession?.requiresReconciliation ? uploadAttachment : undefined}
           agentSession={usesAgent ? agentSession : undefined}
           userId={userId}
           walletResume={walletResume}

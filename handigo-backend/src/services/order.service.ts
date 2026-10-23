@@ -773,7 +773,10 @@ export const OrderService = {
     limit = 10,
     filters: { status?: string; search?: string } = {},
   ): Promise<{
-    items: IOrder[];
+    items: Array<Omit<IOrder, keyof mongoose.Document> & {
+      _id: Types.ObjectId;
+      hasPendingAssignment: boolean;
+    }>;
     pagination: {
       page: number;
       limit: number;
@@ -822,8 +825,20 @@ export const OrderService = {
       Order.countDocuments(query),
     ]);
 
+    const pendingAssignments = data.length === 0 ? [] : await OrderAssignment.find({
+      orderId: { $in: data.filter((order) => order.status === "created").map((order) => order._id) },
+      status: "pending",
+      isDeleted: false,
+      responseDeadline: { $gt: new Date() },
+    }).select("orderId").lean();
+    const pendingOrderIds = new Set(pendingAssignments.map((assignment) => assignment.orderId.toString()));
+    const items = await attachQuotationFinalAmounts(data);
+
     return {
-      items: await attachQuotationFinalAmounts(data) as IOrder[],
+      items: items.map((order) => ({
+        ...order,
+        hasPendingAssignment: pendingOrderIds.has(order._id.toString()),
+      })),
       pagination: {
         page,
         limit,

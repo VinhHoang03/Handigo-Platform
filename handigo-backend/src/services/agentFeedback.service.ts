@@ -5,6 +5,7 @@ import { bookingAttachmentsSchema } from "../ai/agent/booking-attachments";
 import { createFeedbackSchema } from "../validations/feedback.validator";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { agentActionResourceId } from "../utils/agentActionResourceId";
 
 export const agentFeedbackSchema = createFeedbackSchema.omit({ images: true }).extend({
   mode: z.enum(["create", "update"]).default("create"), customerAttachments: bookingAttachmentsSchema.optional(),
@@ -29,7 +30,7 @@ export const AgentFeedbackService = {
       feedbackVersion: current.feedback?.updatedAt ?? null,
       note: "Chỉ gửi đánh giá sau khi bạn xác nhận. Đánh giá không tạo yêu cầu khiếu nại hoặc hoàn tiền." };
   },
-  async submit(userId: string, args: Arguments, expected: unknown) {
+  async submit(userId: string, args: Arguments, expected: unknown, sessionId?: string, actionId?: string) {
     let current;
     try { current = await this.preview(userId, args); }
     catch (error) {
@@ -41,8 +42,11 @@ export const AgentFeedbackService = {
     let result;
     try {
       result = args.mode === "update" && current.feedbackId
-        ? await updateMyFeedback(userId, current.feedbackId, payload)
-        : await createFeedback(userId, { ...payload, orderId: args.orderId });
+        ? await updateMyFeedback(userId, current.feedbackId, { rating: args.rating,
+          ...(args.comment !== undefined ? { comment: current.description } : {}),
+          ...(args.customerAttachments !== undefined ? { images: args.customerAttachments } : {}) }, current.feedbackVersion!)
+        : await createFeedback(userId, { ...payload, orderId: args.orderId },
+          sessionId && actionId ? agentActionResourceId(userId, sessionId, actionId) : undefined);
     } catch (error) {
       if (error instanceof AppError && error.statusCode < 500) throw new ActionPreconditionError(error.message);
       if (args.mode === "create" && error && typeof error === "object" && "code" in error && error.code === 11000) {
@@ -52,5 +56,17 @@ export const AgentFeedbackService = {
     }
     return { orderId: args.orderId, orderCode: current.orderCode, feedbackId: String(result._id), rating: result.rating,
       message: args.mode === "update" ? "Đã cập nhật đánh giá dịch vụ." : "Đã gửi đánh giá dịch vụ." };
+  },
+  async reconcile(userId: string, args: Arguments, expected: unknown, sessionId: string, actionId: string, createdAt: string) {
+    const current = await this.get(userId, args.orderId);
+    const preview = z.object({ rating: z.number(), description: z.string(), customerAttachments: z.array(z.string()),
+      feedbackId: z.string().nullable() }).parse(expected);
+    const feedback = current.feedback;
+    const expectedId = args.mode === "update" ? preview.feedbackId : String(agentActionResourceId(userId, sessionId, actionId));
+    if (!feedback || feedback.id !== expectedId || feedback.rating !== preview.rating
+      || (feedback.comment ?? "") !== preview.description || !isDeepStrictEqual(feedback.images, preview.customerAttachments)
+      || Date.parse(feedback.updatedAt) < Date.parse(createdAt)) return null;
+    return { orderId: args.orderId, orderCode: current.orderCode, feedbackId: feedback.id, rating: feedback.rating,
+      message: "Đã kiểm tra và xác nhận đánh giá đã được lưu đúng nội dung." };
   },
 };

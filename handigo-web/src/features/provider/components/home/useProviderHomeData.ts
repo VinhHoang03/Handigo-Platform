@@ -1,6 +1,9 @@
 import { useProviderOrdersSchedule } from "./useProviderOrdersSchedule";
 import { useProviderRevenue } from "./useProviderRevenue";
 import { useProviderWorkingAreas } from "./useProviderWorkingAreas";
+import { useEffect, useState } from "react";
+import { useToastFeedback } from "@/components/common/Toast";
+import { providerDashboardApi } from "../../api/providerDashboard.api";
 
 /**
  * Gộp state + effect tải dữ liệu cho trang chủ thợ. Tách khỏi component để
@@ -12,18 +15,28 @@ export function useProviderHomeData() {
   const revenue = useProviderRevenue();
   const areas = useProviderWorkingAreas();
 
-  const activeOrders = ordersSchedule.recentOrders.filter((order) =>
-    ["created", "accepted", "in_progress"].includes(order.status),
-  ).length;
-  const todayIncome = ordersSchedule.recentOrders
-    .filter((order) => order.status !== "cancelled")
-    .reduce((sum, order) => sum + order.pricing.providerEarningAmount, 0);
+  const [monthlyIncome, setMonthlyIncome] = useState<number | null>(null);
+  const [isLoadingIncome, setIsLoadingIncome] = useState(true);
+  const [incomeError, setIncomeError] = useToastFeedback<string | null>(null, "error");
+
+  useEffect(() => {
+    let cancelled = false;
+    providerDashboardApi.overview().then((overview) => {
+      if (!cancelled) setMonthlyIncome(overview.monthlyEarnings);
+    }).catch(() => {
+      if (!cancelled) setIncomeError("Không thể tải thu nhập tháng này.");
+    }).finally(() => {
+      if (!cancelled) setIsLoadingIncome(false);
+    });
+    return () => { cancelled = true; };
+  }, [setIncomeError]);
 
   return {
     ...ordersSchedule,
     ...revenue,
     ...areas,
-    activeOrders,
-    todayIncome,
+    monthlyIncome,
+    isLoadingIncome,
+    incomeError,
   };
 }

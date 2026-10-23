@@ -1,7 +1,6 @@
 import { AddressBookManager } from '@/features/profile/components/AddressBookManager';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import type { UserAddress } from '@/features/profile/types/profile.types';
-import { MIN_DESCRIPTION_LENGTH } from './step2Helpers';
 import { ImagePlus, Loader2, X } from "lucide-react";
 
 interface Step2ExecutionInfoSectionProps {
@@ -67,9 +66,6 @@ export const Step2ExecutionInfoSection = ({
           {problemDescriptionError && (
             <p className="mt-xs text-xs font-medium text-error">{problemDescriptionError}</p>
           )}
-          <p className="mt-xs text-[10px] text-on-surface-variant italic">
-            Mô tả tối thiểu {MIN_DESCRIPTION_LENGTH} ký tự để provider nắm rõ tình trạng.
-          </p>
         </div>
       </div>
       <div className="mt-md pt-md border-t border-outline-variant/30">

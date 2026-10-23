@@ -143,12 +143,23 @@ export class AgentService {
         session.requiresReconciliation = true;
       }
       if (session.requiresReconciliation) {
-        if (await this.reconcileBooking(session, context, checkpoint)) {
+        if (await this.reconcileBooking(session, context, checkpoint) || await this.reconcileAction(session, context, checkpoint)) {
           session.receipts.push({ requestId: input.requestId, digest, message: session.conversation[session.conversation.length - 1]?.content ?? "" });
           await checkpoint();
           return sessionView(session);
         }
-        this.loop.reply(session, "FAILED", "Thao tác trước cần được đối soát. Vui lòng kiểm tra đơn hoặc yêu cầu trong Hỗ trợ của tôi; hệ thống sẽ không tự thực hiện lại.");
+        if ("message" in input) {
+          const interrupted = session.activeRequest;
+          session.activeRequest = { requestId: input.requestId, digest, input };
+          new MessageRepository().append(session, "user", input.message);
+          try { await this.loop.run(session, { ...context, readOnly: true }, checkpoint); }
+          finally { session.activeRequest = interrupted; }
+          session.state = "FAILED";
+          new MessageRepository().append(session, "assistant", "Thao tác trước vẫn cần đối soát. Bạn có thể tiếp tục tra cứu hoặc chọn Tiếp tục yêu cầu để kiểm tra lại; chưa thực hiện thêm thao tác ghi.");
+        } else {
+          this.loop.reply(session, "FAILED", "Thao tác trước cần đối soát. Bạn vẫn có thể tra cứu đơn, hỗ trợ, khiếu nại hoặc đánh giá; hệ thống không tự thực hiện lại thao tác ghi.");
+        }
+        session.receipts.push({ requestId: input.requestId, digest, message: session.conversation[session.conversation.length - 1]?.content ?? "" });
         await checkpoint();
         return sessionView(session);
       }
@@ -226,6 +237,31 @@ export class AgentService {
     } finally {
       await this.sessions.release(sessionId, lockId);
     }
+  }
+
+  private async reconcileAction(session: AgentSession, context: ToolContext, checkpoint: () => Promise<void>) {
+    const action = session.pendingAction ?? [...session.actions].reverse().find((item) => item.status === "UNKNOWN");
+    if (!action || !["UNKNOWN", "EXECUTING"].includes(action.status) || action.tool === "create_booking") return false;
+    try {
+      const tool = this.loop.tools.get(action.tool, context);
+      if (!tool.reconcile) return false;
+      const result = await withAgentTimeout(tool.reconcile({ ...context, actionId: action.id,
+        actionCreatedAt: action.executionStartedAt ?? action.createdAt, confirmedPreview: action.preview }, tool.inputSchema.parse(action.arguments)), context.signal, 20000);
+      if (result === null || result === undefined) return false;
+      action.status = "SUCCEEDED";
+      action.result = result;
+      if (session.pendingAction === action) { session.actions.push({ ...action }); session.pendingAction = null; }
+      session.requiresReconciliation = false;
+      session.activeRequest = null;
+      new MessageRepository().append(session, "tool", JSON.stringify(result), action.tool);
+      const reply = tool.reply?.(result);
+      this.loop.reply(session, reply?.state ?? "WAITING_USER_INPUT", reply?.message ?? "Đã kiểm tra kết quả thao tác. Bạn có thể tiếp tục yêu cầu.");
+    } catch {
+      // Nguồn tra cứu lỗi không phải bằng chứng để mở khóa thao tác ghi.
+      return false;
+    }
+    await checkpoint();
+    return true;
   }
 
   private async reconcileBooking(session: AgentSession, context: ToolContext, checkpoint: () => Promise<void>) {

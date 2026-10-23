@@ -11,5 +11,7 @@ export const addComplaintEvidenceTool: AgentTool<z.infer<typeof schema>> = {
   inputSchema: schema, mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
   preview: (context, args) => care.previewEvidence(context.user.id, args.complaintId, agentRequestAttachments(context.session, args.customerAttachments), args.note),
   execute: (context, args) => care.addEvidence(context.user.id, args.complaintId, agentRequestAttachments(context.session, args.customerAttachments), args.note),
+  reconcile: (context, args) => context.actionCreatedAt
+    ? care.reconcileEvidence(context.user.id, args.complaintId, args.customerAttachments ?? [], args.note, context.actionCreatedAt) : Promise.resolve(null),
   reply: receipt("Đã bổ sung ảnh bằng chứng cho khiếu nại."),
 };

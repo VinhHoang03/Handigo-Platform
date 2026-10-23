@@ -4,6 +4,7 @@ class Service {
     required this.name,
     required this.description,
     required this.serviceType,
+    this.slug,
     this.fixedPrice,
     this.minOptionPrice,
     this.coverImage,
@@ -15,16 +16,22 @@ class Service {
     this.processSteps = const [],
     List<ServiceOptionGroup>? optionGroups,
     bool? requiresOptionSelection,
-  }) : _optionGroups = optionGroups, _requiresOptionSelection = requiresOptionSelection;
+  }) : _optionGroups = optionGroups,
+       _requiresOptionSelection = requiresOptionSelection;
   factory Service.fromJson(Map<String, dynamic> json) {
     final category = json['categoryId'];
     return Service(
-      optionGroups: (json['optionGroups'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().map(ServiceOptionGroup.fromJson).toList(growable: false),
-      requiresOptionSelection: json['requiresOptionSelection'] as bool? ?? false,
+      optionGroups: (json['optionGroups'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ServiceOptionGroup.fromJson)
+          .toList(growable: false),
+      requiresOptionSelection:
+          json['requiresOptionSelection'] as bool? ?? false,
       id: json['_id'] as String,
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
       serviceType: json['serviceType'] as String,
+      slug: json['slug'] as String?,
       fixedPrice: (json['fixedPrice'] as num?)?.toDouble(),
       minOptionPrice: (json['minOptionPrice'] as num?)?.toDouble(),
       coverImage:
@@ -51,6 +58,7 @@ class Service {
   final String name;
   final String description;
   final String serviceType;
+  final String? slug;
   final double? fixedPrice;
   final double? minOptionPrice;
   final String? coverImage;
@@ -67,11 +75,19 @@ class Service {
 }
 
 class ServiceOptionGroup {
-  const ServiceOptionGroup({required this.id, required this.name, required this.selectionMode, required this.isRequired});
-  factory ServiceOptionGroup.fromJson(Map<String, dynamic> json) => ServiceOptionGroup(
-    id: json['_id'] as String, name: json['name'] as String,
-    selectionMode: json['selectionMode'] as String, isRequired: json['isRequired'] as bool? ?? false,
-  );
+  const ServiceOptionGroup({
+    required this.id,
+    required this.name,
+    required this.selectionMode,
+    required this.isRequired,
+  });
+  factory ServiceOptionGroup.fromJson(Map<String, dynamic> json) =>
+      ServiceOptionGroup(
+        id: json['_id'] as String,
+        name: json['name'] as String,
+        selectionMode: json['selectionMode'] as String,
+        isRequired: json['isRequired'] as bool? ?? false,
+      );
   final String id, name, selectionMode;
   final bool isRequired;
 }

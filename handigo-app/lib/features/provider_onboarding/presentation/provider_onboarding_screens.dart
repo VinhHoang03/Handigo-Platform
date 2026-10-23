@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -524,10 +525,10 @@ class _ProviderOnboardingScreenState
           ),
         ),
         const SizedBox(height: 12),
-        TextField(
+        AppSearchField(
           controller: serviceSearch,
           onChanged: (value) => setState(() => serviceQuery = value.trim()),
-          decoration: _input(hint: 'Tìm dịch vụ', icon: Icons.search_rounded),
+          hintText: 'Tìm dịch vụ',
         ),
         const SizedBox(height: 18),
         _services(),
@@ -785,10 +786,10 @@ class _ProviderOnboardingScreenState
         ),
       ],
       const SizedBox(height: 10),
-      TextField(
+      AppSearchField(
         controller: wardSearch,
         onChanged: (value) => setState(() => wardQuery = value.trim()),
-        decoration: _input(hint: 'Tìm phường / xã', icon: Icons.search_rounded),
+        hintText: 'Tìm phường / xã',
       ),
       const SizedBox(height: 10),
       wardContent,

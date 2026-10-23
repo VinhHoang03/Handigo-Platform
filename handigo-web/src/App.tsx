@@ -1,6 +1,5 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthBootstrap } from "./components/auth/AuthBootstrap";
 import { RouteGuard } from "./components/common/RouteGuard";
 import { ToastProvider, ToastContainer } from "./components/common/Toast";
 import { SystemAlertProvider } from "./components/common/SystemAlert";
@@ -62,7 +61,6 @@ function App() {
     <ToastProvider>
       <SystemAlertProvider>
         <Router>
-          <AuthBootstrap>
           {/* Cho người dùng bàn phím nhảy thẳng tới nội dung, bỏ qua thanh điều
               hướng. Ẩn cho tới khi được focus. */}
           <a
@@ -100,7 +98,6 @@ function App() {
           <Suspense fallback={null}>
             <ChatbotGate />
           </Suspense>
-          </AuthBootstrap>
         </Router>
       </SystemAlertProvider>
       <ToastContainer />

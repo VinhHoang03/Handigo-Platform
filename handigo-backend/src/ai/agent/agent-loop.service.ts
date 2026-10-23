@@ -61,7 +61,7 @@ export class AgentLoop {
         : tool.name.includes("payment") ? "Đang kiểm tra thanh toán"
           : ["get_service", "search_services", "get_service_catalog"].includes(tool.name) ? "Đang tìm dịch vụ phù hợp"
             : tool.name === "get_addresses" ? "Đang kiểm tra địa chỉ đã lưu" : "Đang xử lý yêu cầu của bạn");
-    if (action) action.status = "EXECUTING";
+    if (action) { action.status = "EXECUTING"; action.executionStartedAt = new Date().toISOString(); }
     // Ghi nhận ý định trước khi gọi service: request sau tuyệt đối không tự gọi lại khi mất kết quả.
     await checkpoint();
     const signal = AbortSignal.any([context.signal, AbortSignal.timeout(this.config.timeoutMs)]);
@@ -225,7 +225,7 @@ export class AgentLoop {
         if (tool.name === "rebook_booking" || tool.name === "update_booking_draft") return await this.prepareBookingDraft(session, context, checkpoint)
           ?? this.reply(session, "WAITING_USER_INPUT", session.bookingDraft?.status === "paused" ? "Đã tạm dừng bản nháp."
             : session.bookingDraft?.status === "discarded" ? "Đã bỏ bản nháp." : "Vui lòng chọn lịch mới để đặt lại.");
-        if (session.bookingDraft?.status === "active") session.bookingDraft.status = "paused";
+        if (!context.readOnly && session.bookingDraft?.status === "active") session.bookingDraft.status = "paused";
       } catch (error) { return this.reply(session, "WAITING_USER_INPUT", toolError(error)); }
     }
     const voucherRequest = parseBookingVoucherRequest(latestMessage);
@@ -266,7 +266,8 @@ export class AgentLoop {
       const availableTools = this.tools.forIntent(context, intent);
       try {
         response = llmResponseSchema.parse(await withAgentTimeout(this.provider.generate({
-          system: this.config.systemPrompt + (this.tools.routeByIntent ? TOOL_ROUTING_PROMPT : ""), ...agentContext(session),
+          system: this.config.systemPrompt + (this.tools.routeByIntent ? TOOL_ROUTING_PROMPT : "")
+            + (context.readOnly ? "\nPhiên đang đối soát thao tác trước. Chỉ được tra cứu, giải thích dữ liệu hiện tại; không sửa bản nháp, chuẩn bị xác nhận hoặc thực hiện thao tác ghi. Không khẳng định thao tác trước thành công nếu chưa có bằng chứng." : ""), ...agentContext(session),
           tools: availableTools, signal: generationSignal,
         }), generationSignal, this.config.timeoutMs));
         consecutiveProviderErrors = 0;
@@ -339,7 +340,7 @@ export class AgentLoop {
         this.messages.append(session, "tool", JSON.stringify({ event: "TOOL_CALL", arguments: response.arguments }), response.tool);
         tool = this.tools.get(response.tool, context);
         args = tool.inputSchema.parse(response.arguments);
-        if (session.bookingDraft?.status === "active" && !["update_booking_draft", "create_booking", "get_service",
+        if (!context.readOnly && session.bookingDraft?.status === "active" && !["update_booking_draft", "create_booking", "get_service",
           "search_services", "get_addresses", "get_price", "get_available_times", "get_booking_vouchers",
           "search_booking_providers", "save_booking_address", "rebook_booking", "get_previous_providers", "search_my_bookings", "get_my_bookings", "get_booking"].includes(tool.name)) {
           session.bookingDraft.status = "paused";

@@ -13,5 +13,6 @@ export const cancelSupportTicketTool: AgentTool<z.infer<typeof ticketIdSchema>> 
   requiresConfirmation: true,
   preview: (context, args) => care.previewTicketAction(context.user.id, args.ticketId),
   execute: (context, args) => care.cancelTicket(context.user.id, args.ticketId),
+  reconcile: (context, args) => care.reconcileCancellation(context.user.id, args.ticketId, "ticket"),
   reply: receipt("Đã hủy yêu cầu hỗ trợ."),
 };

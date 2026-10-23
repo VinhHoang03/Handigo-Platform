@@ -3,7 +3,7 @@ import type { ChatbotAudience, ChatbotMessage } from "../types/chatbot.types";
 import { ChatbotComposer } from "./ChatbotComposer";
 import { ChatbotMessageList } from "./ChatbotMessageList";
 import { ChatbotAvatar } from "./ChatbotAvatar";
-import { ArrowLeft, History, LoaderCircle, X } from "lucide-react";
+import { ArrowLeft, History, LoaderCircle, Plus, X } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import type { AgentConfirmation, AgentPayment, AgentSession, AgentSend, AgentPolicyConsent } from "../types/agent.types";
 import { AgentPaymentCard } from "./AgentPaymentCard";
@@ -83,6 +83,7 @@ export function ChatbotPanel({
   const toolsAnchorRef = useRef<HTMLDivElement>(null);
   const [bookingTool, setBookingTool] = useState<{ tool: AgentBookingTool; fingerprint: string } | null>(null);
   const [attachmentEdit, setAttachmentEdit] = useState<string | null>(null);
+  const [composerBusy, setComposerBusy] = useState(false);
   const fingerprint = `${agentSession?.sessionId}:${agentSession?.bookingDraft?.revision}:${pendingConfirmation?.actionId ?? ""}`;
   const attachmentsDirty = attachmentEdit === fingerprint;
   const controlsDisabled = isLoading || isReplying || taskBlocked || Boolean(error) || Boolean(availabilityMessage);
@@ -116,8 +117,14 @@ export function ChatbotPanel({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {onNewSession && <button type="button" onClick={onNewSession}
+              disabled={isLoading || isReplying || Boolean(pendingConfirmation) || taskBlocked || composerBusy}
+              aria-label="Bắt đầu tác vụ mới" title="Bắt đầu tác vụ mới"
+              className="grid h-11 w-11 place-items-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40">
+              <Plus aria-hidden="true" size={20} />
+            </button>}
             {onToggleHistory && <button type="button" onClick={onToggleHistory}
-              disabled={isLoading || isReplying} aria-label={history ? "Quay lại cuộc trò chuyện" : "Mở lịch sử trò chuyện"}
+              disabled={isLoading || isReplying || composerBusy} aria-label={history ? "Quay lại cuộc trò chuyện" : "Mở lịch sử trò chuyện"}
               aria-pressed={Boolean(history)} title={history ? "Quay lại cuộc trò chuyện" : "Lịch sử trò chuyện"}
               className={`grid h-11 w-11 place-items-center rounded-xl transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40 ${history ? "bg-primary/10 text-primary" : "text-on-surface-variant"}`}>
               {history ? <ArrowLeft aria-hidden="true" size={19} /> : <History aria-hidden="true" size={19} />}
@@ -185,7 +192,7 @@ export function ChatbotPanel({
       ))}
 
       {!history && onContinue && !pendingConfirmation && (
-        <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{taskBlocked ? "Kiểm tra kết quả tạo đơn" : "Tiếp tục yêu cầu"}</button>
+        <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{taskBlocked ? "Kiểm tra kết quả thao tác" : "Tiếp tục yêu cầu"}</button>
       )}
       <div ref={toolsAnchorRef} className="shrink-0">
         {!history && audience === "CUSTOMER" && <div className="border-t border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 sm:px-4 [&_button]:shrink-0 [&_a]:shrink-0">
@@ -218,14 +225,14 @@ export function ChatbotPanel({
       )}
       {!history && <ChatbotComposer
         key={agentSession?.sessionId ?? "new"}
-        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking") || taskBlocked}
+        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking")
+          || taskBlocked && (!agentSession?.requiresReconciliation || Boolean(error))}
         onSend={onSend}
         onUploadAttachment={onUploadAttachment}
         attachmentUrls={agentSession?.bookingDraft?.status === "active" ? agentSession.bookingDraft.values?.customerAttachments : undefined}
         attachmentPurpose={agentSession?.bookingDraft?.status === "active" ? "booking" : "general"}
         onAttachmentChange={(dirty) => setAttachmentEdit(dirty ? fingerprint : null)}
-        onNewSession={onNewSession}
-        resetDisabled={isLoading || isReplying || Boolean(pendingConfirmation) || taskBlocked}
+        onActivityChange={setComposerBusy}
         voiceEnabled={audience === "CUSTOMER"}
       />}
       {!history && bookingTool?.fingerprint === fingerprint && agentSession && userId && <AgentBookingTools

@@ -32,9 +32,13 @@ function StatCard({
 }
 
 interface ProviderHomeStatsProps {
-  totalOrders: number;
-  activeOrders: number;
-  todayIncome: number;
+  totalOrders: number | null;
+  activeOrders: number | null;
+  monthlyIncome: number | null;
+  isLoadingIncome: boolean;
+  incomeError: string | null;
+  isLoadingOrders: boolean;
+  isLoadingActiveOrders: boolean;
   /** `null` khi chưa tải xong hồ sơ. */
   rating: { average: number; total: number } | null;
 }
@@ -53,7 +57,11 @@ const ratingValue = (rating: { average: number; total: number } | null) => {
 export function ProviderHomeStats({
   totalOrders,
   activeOrders,
-  todayIncome,
+  monthlyIncome,
+  isLoadingIncome,
+  incomeError,
+  isLoadingOrders,
+  isLoadingActiveOrders,
   rating,
 }: ProviderHomeStatsProps) {
   return (
@@ -61,19 +69,19 @@ export function ProviderHomeStats({
       <StatCard
         icon={Package}
         label="Tổng số đơn"
-        value={String(totalOrders)}
+        value={totalOrders !== null ? String(totalOrders) : isLoadingOrders ? "Đang tải…" : "Chưa tải được"}
         tone="bg-primary-container/20 text-primary"
       />
       <StatCard
         icon={ClipboardClock}
         label="Đang thực hiện"
-        value={String(activeOrders)}
+        value={activeOrders !== null ? String(activeOrders) : isLoadingActiveOrders ? "Đang tải…" : "Chưa tải được"}
         tone="bg-secondary-container/30 text-secondary"
       />
       <StatCard
         icon={CircleDollarSign}
-        label="Thu nhập gần đây"
-        value={formatMoney(todayIncome)}
+        label="Thu nhập tháng này"
+        value={isLoadingIncome ? "Đang tải…" : incomeError || monthlyIncome === null ? "Chưa tải được" : formatMoney(monthlyIncome)}
         tone="bg-secondary/10 text-secondary"
       />
       <StatCard

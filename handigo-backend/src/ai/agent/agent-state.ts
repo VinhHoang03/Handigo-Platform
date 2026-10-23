@@ -20,6 +20,7 @@ export interface PendingAction {
   preview: unknown;
   createdAt: string;
   expiresAt: string;
+  executionStartedAt?: string;
   status: "WAITING_CONFIRMATION" | "EXECUTING" | "SUCCEEDED" | "REJECTED" | "EXPIRED" | "UNKNOWN";
   result?: unknown;
   policyConsent?: { version: string; acceptedAt: string; actionId: string };

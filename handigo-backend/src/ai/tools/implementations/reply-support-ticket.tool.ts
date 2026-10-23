@@ -14,5 +14,7 @@ export const replySupportTicketTool: AgentTool<z.infer<typeof responseSchema>> =
   requiresConfirmation: true,
   preview: (context, args) => care.previewTicketAction(context.user.id, args.ticketId, args.message, agentRequestAttachments(context.session, args.customerAttachments)),
   execute: (context, args) => care.respond(context.user.id, args.ticketId, args.message, agentRequestAttachments(context.session, args.customerAttachments)),
+  reconcile: (context, args) => context.actionCreatedAt
+    ? care.reconcileResponse(context.user.id, args.ticketId, args.message, args.customerAttachments ?? [], context.actionCreatedAt) : Promise.resolve(null),
   reply: receipt("Đã gửi phản hồi hỗ trợ."),
 };

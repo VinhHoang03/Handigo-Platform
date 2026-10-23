@@ -201,6 +201,7 @@ export const createSupportTicket = async (
     description: string;
     attachments?: AttachmentPayload[];
   },
+  resourceId?: Types.ObjectId,
 ) => {
   assertObjectId(requesterId, "User id");
   if (!["CUSTOMER", "PROVIDER"].includes(role)) {
@@ -209,6 +210,7 @@ export const createSupportTicket = async (
 
   const orderId = await assertOrderVisibleToRequester(requesterId, role, payload.orderId);
   const ticket = await SupportTicket.create({
+    ...(resourceId ? { _id: resourceId } : {}),
     requesterId,
     orderId,
     category: payload.category,

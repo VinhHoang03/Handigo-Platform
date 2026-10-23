@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as adminController from "../controllers/admin.controller";
+import * as serviceController from "../controllers/service.controller";
 import * as categoryController from "../controllers/category.controller";
 import * as complaintController from "../controllers/complaint.controller";
 import * as reportController from "../controllers/report.controller";
@@ -50,6 +51,9 @@ import { feedbackListQuerySchema } from "../validations/feedback.validator";
 const router = Router();
 
 router.use(authMiddleware, roleMiddleware("ADMIN"));
+
+router.get("/services", serviceController.listServices);
+router.get("/services/:id", serviceController.getServiceById);
 
 router.get(
   "/users",

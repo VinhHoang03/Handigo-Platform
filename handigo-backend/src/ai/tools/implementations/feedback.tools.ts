@@ -19,6 +19,8 @@ export const submitBookingFeedbackTool: AgentTool<z.infer<typeof agentFeedbackSc
   name: "submit_booking_feedback", description: "Tạo đánh giá hoặc sửa đánh giá khi khách yêu cầu rõ. rating phải là số sao khách chọn (1–5), không suy đoán. mode update chỉ khi khách yêu cầu sửa đánh giá cũ; create không ghi đè đánh giá đã có. Có thể đính kèm ảnh đã tải trong chat. Luôn xác nhận trước khi gửi.",
   inputSchema: agentFeedbackSchema, mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
   preview: (context, args) => AgentFeedbackService.preview(context.user.id, { ...args, customerAttachments: feedbackAttachments(context, args) }),
-  execute: (context, args) => AgentFeedbackService.submit(context.user.id, { ...args, customerAttachments: feedbackAttachments(context, args) }, context.confirmedPreview),
+  execute: (context, args) => AgentFeedbackService.submit(context.user.id, { ...args, customerAttachments: feedbackAttachments(context, args) }, context.confirmedPreview, context.sessionId, context.actionId),
+  reconcile: (context, args) => context.actionId && context.actionCreatedAt
+    ? AgentFeedbackService.reconcile(context.user.id, args, context.confirmedPreview, context.sessionId, context.actionId, context.actionCreatedAt) : Promise.resolve(null),
   reply: (result) => ({ state: "COMPLETED", message: (result as { message: string }).message }),
 };
