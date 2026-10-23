@@ -198,7 +198,7 @@ export const OrderService = {
    *  3. Persist order with status = "created".
    *  4. Hand off to DispatchService to find & assign the nearest provider.
    */
-  async createOrder(payload: CreateOrderPayload, confirmedOrderId?: Types.ObjectId, draftAddress?: IAddress): Promise<IOrder> {
+  async createOrder(payload: CreateOrderPayload, confirmedOrderId?: Types.ObjectId, draftAddress?: IAddress, saveAddressToBook = true): Promise<IOrder> {
     if (!payload.paymentMethod || !["wallet", "bank", "cash"].includes(payload.paymentMethod)) {
       throw new AppError("Phương thức thanh toán không hợp lệ.", 400);
     }
@@ -447,7 +447,7 @@ export const OrderService = {
       servicePackageId: null,
       selectedOptionIds: pricingSnapshot.optionIds,
       selectedOptionsSnapshot: pricingSnapshot.selectedOptionsSnapshot,
-      addressId: new Types.ObjectId(payload.addressId),
+      addressId: draftAddress && !saveAddressToBook ? null : new Types.ObjectId(payload.addressId),
       addressSnapshot: {
         recipientName: address.recipientName, recipientPhone: address.recipientPhone,
         fullAddress: address.fullAddress, province: address.province, ward: address.ward,
@@ -500,7 +500,7 @@ export const OrderService = {
           || String(currentVoucher.snapshot.voucherId) !== String(voucherResult.snapshot.voucherId)) throw new ActionPreconditionError();
       }
       if (automaticPromotion) await claimPromotion(automaticPromotion.promotion, orderDocuments.length, session);
-      if (draftAddress) {
+      if (draftAddress && saveAddressToBook) {
         // Địa chỉ mới và đơn cùng giao dịch: tạo đơn thất bại thì không lưu địa chỉ vào sổ.
         const savedAddress = await createAddress(payload.customerId, draftAddress.toObject(), {
           session, addressId: draftAddress._id as Types.ObjectId, reuseExisting: true,

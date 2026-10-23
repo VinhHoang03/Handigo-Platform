@@ -20,6 +20,7 @@ export const bookingDraftPatchSchema = z.object({
   quantity: z.number().int().min(1).max(99).optional(),
   optionPreference: z.string().trim().max(300).nullable().optional(),
   addressId: idSchema.nullable().optional(),
+  saveAddressToBook: z.boolean().optional(),
   addressPreference: z.string().trim().max(300).nullable().optional(),
   voucherCode: z.string().trim().min(1).max(50).nullable().optional(),
   voucherPreference: z.enum(["best", "choose"]).nullable().optional(),
@@ -193,6 +194,10 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   draft.availableVouchers = []; draft.providerCandidates = [];
   draft.voucherFeedback = undefined;
   const values = draft.values;
+  const addressStorageRequest = customerMessage ? normalizeAddress(customerMessage) : "";
+  const oneTimeAddress = /(?:khong|dung) (?:can )?luu dia chi|(?:khong|dung) (?:can )?luu (?:vao )?so dia chi|chi dung dia chi(?: nay)? (?:mot|1) lan|dia chi(?: nay)? (?:chi )?dung (?:mot|1) lan/.test(addressStorageRequest);
+  if (oneTimeAddress) values.saveAddressToBook = false;
+  else if (input.saveAddressToBook !== undefined) values.saveAddressToBook = input.saveAddressToBook;
   if (draft.draftAddress && ((input.addressId !== undefined && input.addressId !== draft.draftAddress.id)
     || input.addressPreference)) draft.draftAddress = undefined;
   if (input.selectedOptions !== undefined || input.quantity !== undefined || input.serviceId && input.serviceId !== values.serviceId) {
@@ -507,6 +512,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   }
   const address = addresses.find((item) => item.id === values.addressId);
   if (address) draft.summary.push(`Địa chỉ: ${bookingAddressLabel(address)}`);
+  if (values.saveAddressToBook === false) draft.summary.push("Địa chỉ chỉ dùng cho đơn này, không thêm vào sổ địa chỉ.");
   if (draft.rebookNeedsOptionReview) {
     draft.missing.push("Gói cũ đã thay đổi. Vui lòng chọn lại gói và số lượng trước khi đặt lại");
   }
@@ -592,6 +598,9 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
           draft.summary.push(`Voucher ${selected.code}: giảm ${selected.discountAmount.toLocaleString("vi-VN")} đ; còn ${selected.finalAmount.toLocaleString("vi-VN")} đ.`);
         }
         if ((!draft.voucherDecision && draft.availableVouchers.length) || (values.voucherCode && !selected)) {
+          if (!draft.voucherDecision) {
+            draft.voucherFeedback = `Có ${draft.availableVouchers.length} mã giảm giá dùng được cho đơn này. Bạn có thể chọn mã bên dưới trước khi xác nhận.`;
+          }
           draft.choiceGroups.push({ label: "Voucher có thể sử dụng", multiple: false,
             options: [...draft.availableVouchers.slice(0, 10).map((voucher) => `${voucher.code} — giảm ${voucher.discountAmount.toLocaleString("vi-VN")} đ`), "Không dùng voucher"] });
         }

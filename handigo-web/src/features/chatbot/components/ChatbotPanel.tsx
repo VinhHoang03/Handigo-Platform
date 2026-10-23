@@ -12,6 +12,7 @@ import { AgentBookingConfirmation } from "./AgentBookingConfirmation";
 import { AgentBookingTools, type AgentBookingTool } from "./AgentBookingTools";
 import { AgentBookingActions } from "./AgentBookingActions";
 import { AgentWalletResumeCard } from "./AgentWalletResumeCard";
+import { AgentAssignedProviderCard } from "./AgentAssignedProviderCard";
 import type { AgentWalletResume } from "../utils/agentWalletResume";
 
 const getAudienceLabel = (audience: ChatbotAudience) => {
@@ -40,6 +41,7 @@ export function ChatbotPanel({
   paymentMessageId,
   onCheckPayment,
   onChangePaymentMethod,
+  onCancelPayment,
   onContinue,
   history,
   onToggleHistory,
@@ -68,6 +70,7 @@ export function ChatbotPanel({
   paymentMessageId?: string;
   onCheckPayment?: (orderId: string) => void;
   onChangePaymentMethod?: (orderId: string) => void;
+  onCancelPayment?: (orderId: string, paymentId: string) => void;
   onContinue?: () => void;
   history?: ReactNode;
   onToggleHistory?: () => void;
@@ -152,6 +155,7 @@ export function ChatbotPanel({
         <ChatbotMessageList
           onSend={onSend}
           choicesDisabled={attachmentsDirty || taskBlocked || Boolean(pendingConfirmation) || Boolean(availabilityMessage) || Boolean(error)}
+          bookingVoucherChoicesEnabled={audience === "CUSTOMER" && pendingConfirmation?.tool === "create_booking" && !attachmentsDirty && !controlsDisabled}
           messages={messages}
           isReplying={isReplying}
           activity={activity}
@@ -161,20 +165,22 @@ export function ChatbotPanel({
           onDecision={onDecision}
           renderConfirmation={renderConfirmation}
           renderAfterMessage={(message) => payment && onCheckPayment && message._id === paymentMessageId
-            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
+            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} onCancel={taskBlocked || availabilityMessage ? undefined : onCancelPayment} />
             : null}
         >
           {pendingConfirmation && onDecision && !messages.some((message) => message.confirmation?.actionId === pendingConfirmation.actionId) && (
             renderConfirmation(pendingConfirmation, false)
           )}
           {payment && onCheckPayment && !messages.some((message) => message._id === paymentMessageId) && (
-            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
+            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} onCancel={taskBlocked || availabilityMessage ? undefined : onCancelPayment} />
           )}
           {walletResume && walletResume.sessionId === agentSession?.sessionId && onResumeWallet && onDismissWallet && (
             <AgentWalletResumeCard key={walletResume.depositOrderCode} context={walletResume}
               disabled={controlsDisabled || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking")}
               onContinue={onResumeWallet} onDismiss={onDismissWallet} />
           )}
+          {agentSession?.assignedProvider && <AgentAssignedProviderCard key={`${agentSession.assignedProvider.orderId}:${agentSession.assignedProvider.checkedAt}`}
+            value={agentSession.assignedProvider} disabled={controlsDisabled || Boolean(pendingConfirmation) || attachmentsDirty} onSend={onSend} />}
         </ChatbotMessageList>
       ))}
 
@@ -214,8 +220,9 @@ export function ChatbotPanel({
         key={agentSession?.sessionId ?? "new"}
         disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking") || taskBlocked}
         onSend={onSend}
-        onUploadAttachment={agentSession?.bookingDraft?.status === "booked" ? undefined : onUploadAttachment}
-        attachmentUrls={agentSession?.bookingDraft?.values?.customerAttachments}
+        onUploadAttachment={onUploadAttachment}
+        attachmentUrls={agentSession?.bookingDraft?.status === "active" ? agentSession.bookingDraft.values?.customerAttachments : undefined}
+        attachmentPurpose={agentSession?.bookingDraft?.status === "active" ? "booking" : "general"}
         onAttachmentChange={(dirty) => setAttachmentEdit(dirty ? fingerprint : null)}
         onNewSession={onNewSession}
         resetDisabled={isLoading || isReplying || Boolean(pendingConfirmation) || taskBlocked}

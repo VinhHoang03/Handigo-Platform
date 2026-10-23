@@ -342,7 +342,9 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
       await deliver(subscription, `order-event:refund:${doc._id}:succeeded`, `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date());
       return;
     }
-    if (fields.status === "failed") lines = ["Giao dịch thanh toán đã thất bại hoặc hết hạn. Vui lòng kiểm tra thanh toán trong chi tiết đơn hàng."];
+    if (fields.status === "failed") lines = [doc.metadata?.customerCancelledQr === true
+      ? "Đã hủy giao dịch QR thanh toán. Đơn hàng được giữ theo thời hạn hiện tại; bạn có thể chọn thanh toán lại."
+      : "Giao dịch thanh toán đã thất bại hoặc hết hạn. Vui lòng kiểm tra thanh toán trong chi tiết đơn hàng."];
     if (change.operationType === "insert" && doc.status === "pending") {
       const message = doc.method === "cash" ? "Đã chọn tiền mặt, chưa thanh toán. Bạn trả trực tiếp cho thợ." : "Đang chờ thanh toán.";
       if (await updateBookingPayment(subscription, String(orderId), message)) return;

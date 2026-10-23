@@ -11,6 +11,7 @@ export const priceSchema = z.object({
 }).strict();
 export const bookingSchema = priceSchema.extend({
   addressId: createOrderSchema.shape.addressId,
+  saveAddressToBook: z.boolean().optional(),
   orderType: z.enum(["normal", "scheduled"]),
   scheduledAt: createOrderSchema.shape.scheduledAt,
   problemDescription: createOrderSchema.shape.problemDescription,

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AgentTool } from "../tool.interface";
 import { AgentCustomerCareService as care, agentComplaintSchema } from "../../../services/agentCustomerCare.service";
 import { receipt } from "./customer-care.reply";
+import { agentRequestAttachments } from "../../agent/booking-attachments";
 
 export const createComplaintTool: AgentTool<z.infer<typeof agentComplaintSchema>> = {
   name: "create_complaint",
@@ -10,7 +11,7 @@ export const createComplaintTool: AgentTool<z.infer<typeof agentComplaintSchema>
   roles: ["CUSTOMER"],
   mutates: true,
   requiresConfirmation: true,
-  preview: (context, args) => care.previewComplaint(context.user.id, args),
-  execute: (context, args) => care.createComplaint(context.user.id, args, context.sessionId),
+  preview: (context, args) => care.previewComplaint(context.user.id, { ...args, customerAttachments: agentRequestAttachments(context.session, args.customerAttachments) }),
+  execute: (context, args) => care.createComplaint(context.user.id, { ...args, customerAttachments: agentRequestAttachments(context.session, args.customerAttachments) }, context.sessionId),
   reply: receipt("Đã gửi khiếu nại, đang chờ xem xét. Đây chưa phải quyết định hoàn tiền."),
 };

@@ -21,3 +21,17 @@ export const getPaymentStatusTool: AgentTool<{ orderId: string }> = {
   mutates: false, requiresConfirmation: false, roles: ["CUSTOMER"],
   execute: (context, args) => AgentPaymentService.status(context.user, args.orderId), reply: paymentReply,
 };
+export const cancelPaymentTool: AgentTool<{ orderId: string; paymentId?: string }> = {
+  name: "cancel_payment", description: "Hủy riêng giao dịch QR PayOS đang chờ, giữ đơn theo thời hạn hiện tại. Không hủy đơn, không hoàn tiền, không đổi phương thức và không tự tạo QR mới. Dùng khi khách muốn hủy QR/hủy thanh toán nhưng giữ đơn; cần xác định đúng đơn và xác nhận riêng. paymentId dùng để gắn đúng QR từ giao diện. Đã trả tiền hoặc PayOS đang xử lý phải kiểm tra trạng thái, không báo hủy thành công.",
+  inputSchema: z.object({ orderId: idSchema, paymentId: idSchema.optional() }).strict(),
+  mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
+  preview: (context, args) => AgentPaymentService.previewCancellation(context.user, args.orderId, args.paymentId),
+  execute: (context, args) => {
+    if (!context.actionId) throw new Error("Thiếu hành động xác nhận hủy QR.");
+    return AgentPaymentService.cancel(context.user, args.orderId, context.confirmedPreview, context.actionId, context.signal);
+  },
+  reply: (result) => {
+    const payment = agentPaymentResultSchema.parse(result);
+    return { state: "WAITING_USER_INPUT", message: payment.message, retryable: ["pending", "blocked"].includes(payment.status) };
+  },
+};

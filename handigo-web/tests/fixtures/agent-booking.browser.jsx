@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ChatbotWidget } from '../../src/features/chatbot/components/ChatbotWidget';
 import { AgentConfirmationCard } from '../../src/features/chatbot/components/AgentConfirmationCard';
 import { ChatbotMessageList } from '../../src/features/chatbot/components/ChatbotMessageList';
+import { ChatbotPanel } from '../../src/features/chatbot/components/ChatbotPanel';
 import { saveAgentWalletResume, readAgentWalletResume, clearAgentWalletResume } from '../../src/features/chatbot/utils/agentWalletResume';
 
 // Dữ liệu giả lập cho kiểm tra tương tác bằng trình duyệt; không đăng nhập hoặc gọi API thật.
@@ -18,6 +19,8 @@ const visual = new URLSearchParams(location.search).get('visual');
 const business = new URLSearchParams(location.search).has('business');
 const scroll = new URLSearchParams(location.search).has('scroll');
 const historyActions = new URLSearchParams(location.search).has('history-actions');
+const paymentCancellation = new URLSearchParams(location.search).has('payment-cancellation');
+const flowExtensions = new URLSearchParams(location.search).has('flow-extensions');
 const calls = JSON.parse(sessionStorage.getItem('test:agent-calls') || '[]');
 const log = (value) => { calls.push(value); sessionStorage.setItem('test:agent-calls', JSON.stringify(calls)); };
 const fixture = window.__agentFixture = {
@@ -58,7 +61,8 @@ function confirmation(tool = 'create_booking') {
       policyVersion: fixture.policies.version,
       quantity: values.uniformQuantity, unitPrice: 200000, address: values.addressId === ids.address ? '12 Lê Lợi, Phường A, Hà Nội' : '34 Nguyễn Trãi, Phường B, Hà Nội',
       schedule: values.scheduledAt || 'Đặt ngay', paymentMethod: values.paymentMethod, amount: 200000 * values.uniformQuantity,
-      customerAttachments: values.customerAttachments ?? [], providerName: values.preferredProviderId ? 'Nguyễn Minh' : undefined } : { title: 'Xác nhận trừ tiền ví', orderId: ids.order, orderCode: 'ORD-KIEM-THU', amount: 600000, paymentMethod: 'wallet' } };
+      customerAttachments: values.customerAttachments ?? [], addressStorage: values.saveAddressToBook === false ? 'Chỉ dùng cho đơn này, không lưu vào sổ địa chỉ' : undefined,
+      providerName: values.preferredProviderId ? 'Nguyễn Minh' : undefined } : { title: 'Xác nhận trừ tiền ví', orderId: ids.order, orderCode: 'ORD-KIEM-THU', amount: 600000, paymentMethod: 'wallet' } };
   session.messages.push({ _id: crypto.randomUUID(), sender: 'assistant', content: '', createdAt: new Date().toISOString(),
     confirmation: { ...session.pendingConfirmation, status: 'WAITING_CONFIRMATION' } });
 }
@@ -129,11 +133,93 @@ if (visual) {
   }
 }
 if (returned) book();
+if (flowExtensions) {
+  fixture.policiesRead = 1; fixture.mapReads = 0; fixture.feedbackWrites = 0; fixture.careWrites = 0;
+  session.bookingDraft.hasDraftAddress = true;
+  fixture.feedbackContext = { order: { _id: ids.order, orderCode: 'ORD-KIEM-THU', status: 'completed' }, feedback: null, canReview: true };
+  fixture.orderDetail = { _id: ids.order, status: 'accepted', providerId: { _id: ids.provider },
+    addressId: { _id: null, fullAddress: '12 Lê Lợi', ward: 'Phường A', province: 'Hà Nội', latitude: 21.02, longitude: 105.84 },
+    addressSnapshot: { fullAddress: '12 Lê Lợi', ward: 'Phường A', province: 'Hà Nội', latitude: 21.02, longitude: 105.84 }, createdAt: new Date().toISOString() };
+}
+if (paymentCancellation) {
+  book();
+  fixture.policiesRead = 1;
+  fixture.cancelMode = 'ok';
+  fixture.paymentRecord = { _id: '909090909090909090909090', orderId: ids.order, amount: 200000,
+    paymentType: 'full', method: 'payos', status: 'pending' };
+  session.payment = { ...fixture.paymentRecord, paymentId: fixture.paymentRecord._id, orderCode: 'ORD-KIEM-THU',
+    message: 'Đang chờ thanh toán.', checkoutUrl: 'https://pay.payos.vn/web/qr-kiem-thu' };
+}
 fixture.get = async (id) => { log({ type: 'get', sessionId: id }); if (id !== ids.session) throw Error('Sai phiên'); return structuredClone(session); };
 fixture.send = async (request) => {
   log({ type: 'send', request });
   if (fixture.waitForSend) await fixture.waitForSend;
   if (fixture.failNext) { fixture.failNext = false; throw Error('Mất kết nối giả lập'); }
+  if (flowExtensions) {
+    const reply = (content) => session.messages.push({ _id: crypto.randomUUID(), sender: 'assistant', content, createdAt: new Date().toISOString() });
+    const prepare = (tool, preview) => {
+      session.pendingConfirmation = { actionId: crypto.randomUUID(), tool, preview, expiresAt: new Date(Date.now() + 600000).toISOString() };
+      session.messages.push({ _id: crypto.randomUUID(), sender: 'assistant', content: '', createdAt: new Date().toISOString(), confirmation: { ...session.pendingConfirmation, status: 'WAITING_CONFIRMATION' } });
+    };
+    if (request.bookingAction?.type === 'update') {
+      Object.assign(values, request.bookingAction.patch); session.bookingDraft.revision++; confirmation();
+    } else if (request.bookingAction?.type === 'provider') {
+      session.assignedProvider = { orderId: ids.order, orderCode: 'ORD-KIEM-THU', status: 'accepted', checkedAt: new Date().toISOString(),
+        provider: fixture.providerMissing ? null : { id: ids.provider, name: 'Thợ thực tế', phone: '0912345678', averageRating: 4.8, totalCompletedOrders: 30 },
+        canContact: !fixture.providerMissing, canTrack: !fixture.providerMissing, location: null,
+        trackingMessage: 'Thợ chưa chia sẻ vị trí.', message: 'Đơn hiện chưa có thông tin thợ thực hiện.' };
+    } else if (request.bookingAction?.type === 'feedback') {
+      const feedback = request.bookingAction.feedback;
+      assert(feedback.orderId === ids.order, 'đánh giá đúng đơn');
+      prepare('submit_booking_feedback', { title: feedback.mode === 'update' ? 'Sửa đánh giá dịch vụ' : 'Đánh giá dịch vụ', orderId: ids.order,
+        orderCode: 'ORD-KIEM-THU', rating: feedback.rating, description: feedback.comment, customerAttachments: [] });
+    } else if (request.confirmation) {
+      const action = session.pendingConfirmation;
+      const message = session.messages.find((item) => item.confirmation?.actionId === action.actionId);
+      message.confirmation.status = request.confirmation.decision === 'REJECT' ? 'REJECTED' : 'SUCCEEDED';
+      session.pendingConfirmation = null;
+      if (request.confirmation.decision === 'CONFIRM') {
+        if (action.tool === 'create_booking') {
+          book(); session.payment = null; session.orderActions.provider = true; session.orderActions.feedback = true;
+        } else if (action.tool === 'submit_booking_feedback') {
+          fixture.feedbackWrites++; fixture.feedbackContext.feedback = { _id: 'danh-gia', rating: action.preview.rating, comment: action.preview.description, images: [] };
+          reply('Đã gửi đánh giá dịch vụ.');
+        } else { fixture.careWrites++; reply('Đã gửi yêu cầu và ảnh đính kèm.'); }
+      } else reply('Đã bỏ yêu cầu, chưa gửi dữ liệu.');
+    } else if (request.customerAttachments) {
+      prepare('create_support_ticket', { title: 'Gửi yêu cầu hỗ trợ', subject: 'Bổ sung ảnh dịch vụ', description: request.message, customerAttachments: request.customerAttachments });
+    }
+    return structuredClone(session);
+  }
+  if (paymentCancellation) {
+    const reply = (content) => session.messages.push({ _id: crypto.randomUUID(), sender: 'assistant', content, createdAt: new Date().toISOString() });
+    if (request.confirmation) {
+      const action = session.pendingConfirmation;
+      assert(action?.tool === 'cancel_payment' && request.confirmation.actionId === action.actionId, 'xác nhận đúng hành động hủy QR');
+      const message = session.messages.find((item) => item.confirmation?.actionId === action.actionId);
+      session.pendingConfirmation = null;
+      message.confirmation.status = request.confirmation.decision === 'REJECT' ? 'REJECTED' : fixture.cancelMode === 'error' ? 'EXPIRED' : 'SUCCEEDED';
+      if (request.confirmation.decision === 'REJECT') reply('Đã bỏ yêu cầu hủy QR.');
+      else if (fixture.cancelMode === 'error') reply('Chưa xác minh được việc hủy QR. Vui lòng kiểm tra thanh toán.');
+      else {
+        fixture.paymentRecord.status = fixture.cancelMode === 'paid' ? 'paid' : 'failed';
+        session.payment = { ...session.payment, status: fixture.paymentRecord.status, checkoutUrl: undefined,
+          message: fixture.cancelMode === 'paid' ? 'Đã thanh toán thành công.' : 'Đã hủy giao dịch QR thanh toán. Đơn hàng được giữ theo thời hạn hiện tại.' };
+        reply(session.payment.message);
+      }
+    } else if (request.paymentStatus) {
+      session.payment = { ...session.payment, status: fixture.paymentRecord.status,
+        ...(fixture.paymentRecord.status !== 'pending' ? { checkoutUrl: undefined } : {}) };
+    } else if (request.message.startsWith('Hủy QR') || request.message === 'Hủy thanh toán') {
+      assert(!request.message.startsWith('Hủy QR') || request.message.includes(fixture.paymentRecord._id), 'nút hủy gửi đúng giao dịch QR');
+      session.pendingConfirmation = { actionId: crypto.randomUUID(), tool: 'cancel_payment', expiresAt: new Date(Date.now() + 600000).toISOString(),
+        preview: { title: 'Hủy giao dịch QR thanh toán', orderId: ids.order, orderCode: 'ORD-KIEM-THU', paymentId: fixture.paymentRecord._id,
+          amount: fixture.paymentRecord.amount, note: 'Đơn hàng được giữ theo thời hạn thanh toán hiện tại.' } };
+      session.messages.push({ _id: crypto.randomUUID(), sender: 'assistant', content: 'Vui lòng kiểm tra trước khi xác nhận.',
+        createdAt: new Date().toISOString(), confirmation: { ...session.pendingConfirmation, status: 'WAITING_CONFIRMATION' } });
+    } else reply('Vui lòng chọn phương thức thanh toán.');
+    return structuredClone(session);
+  }
   if (request.confirmation) {
     if (session.pendingConfirmation?.tool === 'create_booking' && request.confirmation.decision === 'CONFIRM') {
       assert(request.confirmation.policyConsent?.accepted === true && request.confirmation.policyConsent.version === fixture.policies.version, 'gửi bằng chứng đồng ý đúng chính sách');
@@ -279,11 +365,123 @@ async function verifyWalletReturn() {
     assert(!document.querySelector('[aria-label="Hành động với bản nháp đặt lịch"]'), 'không cho sửa bản nháp của đơn đã tạo');
     document.body.dataset.agentBookingPassed = 'true';
 }
+async function verifyPaymentCancellation() {
+  const qr = () => document.querySelector('img[alt^="Mã QR PayOS"]');
+  await wait(() => qr() && button('Hủy QR'), 'hiển thị QR và thao tác hủy');
+  const initialOrder = session.bookingDraft.orderId;
+  const before = calls.filter((item) => item.type === 'send').length;
+  button('Hủy QR').click(); button('Hủy QR').click(); await pause();
+  await wait(() => button('Xác nhận'), 'bản xác nhận hủy QR');
+  assert(calls.filter((item) => item.type === 'send').length === before + 1, 'không gửi lặp khi bấm nhanh');
+  assert(lastSend().message.includes(fixture.paymentRecord._id) && lastSend().message.includes(ids.order), 'gắn đúng đơn và QR');
+  assert(qr() && fixture.paymentRecord.status === 'pending', 'chưa hủy hoặc ẩn QR trước xác nhận');
+  assert(button('Hủy QR').disabled, 'khóa thao tác khi đang chờ xác nhận');
+  await click('Từ chối');
+  await wait(() => button('Hủy QR') && !button('Hủy QR').disabled, 'từ chối vẫn giữ QR');
+  assert(qr() && fixture.paymentRecord.status === 'pending', 'từ chối chỉ bỏ yêu cầu hủy');
+  const composer = document.querySelector('[aria-label="Nội dung gửi cho Trợ lý Handigo"]');
+  change(composer, 'Hủy thanh toán'); await pause();
+  document.querySelector('[aria-label="Gửi tin nhắn"]').click();
+  await wait(() => button('Xác nhận'), 'hủy qua câu chat');
+  fixture.cancelMode = 'error';
+  await click('Xác nhận');
+  await wait(() => button('Hủy QR') && !button('Hủy QR').disabled, 'cho kiểm tra lại sau lỗi hủy');
+  assert(qr() && fixture.paymentRecord.status === 'pending', 'lỗi hủy chưa được ẩn QR hoặc báo thành công');
+  fixture.cancelMode = 'ok';
+  await click('Hủy QR'); await click('Xác nhận');
+  await wait(() => !qr() && button('Chọn phương thức thanh toán'), 'hủy đã xác minh thì ẩn QR và cho chọn thanh toán lại');
+  assert(session.bookingDraft.orderId === initialOrder && session.bookingDraft.status === 'booked', 'hủy QR vẫn giữ đúng đơn');
+  assert(!button('Hủy QR') && session.payment.status === 'failed', 'QR đã hủy không có thao tác hủy lại');
+  await click('Chọn phương thức thanh toán');
+  assert(lastSend().message.includes(initialOrder), 'chọn phương thức mới trên cùng đơn');
+  fixture.paymentRecord.status = 'pending';
+  session.payment = { ...session.payment, status: 'pending', checkoutUrl: 'https://pay.payos.vn/web/qr-kiem-thu' };
+  session.messages = []; session.pendingConfirmation = null;
+  render('qr-nhan-tien-dong-thoi');
+  await wait(() => document.querySelector('[aria-label="Mở Trợ lý Handigo"]'), 'mở kịch bản nhận tiền đồng thời');
+  document.querySelector('[aria-label="Mở Trợ lý Handigo"]').click();
+  await wait(() => qr() && button('Hủy QR'), 'QR đang chờ của kịch bản tiếp');
+  fixture.cancelMode = 'paid';
+  await click('Hủy QR'); await click('Xác nhận');
+  await wait(() => !qr() && session.payment.status === 'paid', 'nhận tiền đồng thời thì ẩn QR và hiển thị đã thanh toán');
+  assert(document.body.textContent.includes('Đã thanh toán thành công.'), 'không báo hủy thành công khi đã nhận tiền');
+  assert(!button('Chọn phương thức thanh toán') && !button('Hủy QR'), 'không thu lại hoặc hủy khoản đã trả');
+  document.body.dataset.agentBookingPassed = 'true';
+}
+async function verifyFlowExtensions() {
+  await click('Dùng địa chỉ một lần');
+  await wait(() => values.saveAddressToBook === false && button('Cho phép lưu địa chỉ'), 'chọn không lưu địa chỉ');
+  assert(lastSend().bookingAction.patch.saveAddressToBook === false, 'gửi lựa chọn không lưu bằng dữ liệu cấu trúc');
+  assert(document.body.textContent.includes('Chỉ dùng cho đơn này, không lưu vào sổ địa chỉ'), 'xác nhận hiển thị cách lưu địa chỉ');
+  await click('Cho phép lưu địa chỉ');
+  await wait(() => values.saveAddressToBook === true, 'cho phép lưu lại khi khách đổi ý');
+  await click('Dùng địa chỉ một lần');
+  await acceptPolicy(); await click('Xác nhận');
+  await wait(() => button('Thợ thực hiện') && !button('Thợ thực hiện').disabled, 'thao tác cho đơn đã tạo');
+  assert(document.querySelector('input[type="file"]'), 'vẫn đính kèm ảnh được sau khi tạo đơn');
+  await click('Thợ thực hiện');
+  const providerCard = () => document.querySelector('[aria-label="Thợ thực hiện đơn đang xem"]');
+  await wait(() => providerCard()?.textContent.includes('Thợ thực tế'), 'hiển thị thợ thực hiện');
+  assert(lastSend().bookingAction.orderId === ids.order && lastSend().bookingAction.type === 'provider', 'tra đúng đơn bằng thao tác cấu trúc');
+  assert(providerCard().querySelector('a[href="tel:0912345678"]'), 'liên hệ đúng số thợ');
+  assert(providerCard().textContent.includes('Thợ chưa chia sẻ vị trí.'), 'không bịa vị trí hoặc thời gian đến');
+  await click('Nhắn tin', providerCard());
+  await wait(() => fixture.chatOrderId === ids.order, 'mở trò chuyện đúng đơn');
+  const closeChat = document.querySelector('[aria-label="Đóng trò chuyện"]');
+  if (closeChat) closeChat.click();
+  await click('Xem vị trí thợ', providerCard());
+  await wait(() => providerCard()?.querySelector('[role="alert"]'), 'xử lý lỗi tải bản đồ');
+  await click('Xem vị trí thợ', providerCard());
+  await wait(() => providerCard()?.querySelector('.leaflet-container'), 'thử lại và mở bản đồ thật');
+  assert(fixture.mapOrderId === ids.order, 'bản đồ lấy đúng đơn');
+  fixture.providerMissing = true; await click('Làm mới', providerCard());
+  await wait(() => providerCard() && !button('Nhắn tin', providerCard()), 'chưa có thợ thì bỏ liên hệ cũ');
+  fixture.feedbackError = true;
+  await click('Đánh giá dịch vụ');
+  const form = () => document.querySelector('[aria-label="Đánh giá dịch vụ qua trợ lý"]');
+  await wait(() => button('Thử lại', form()), 'xử lý lỗi kiểm tra đánh giá');
+  await click('Thử lại', form());
+  await wait(() => form()?.querySelector('select'), 'thử lại lấy điều kiện đánh giá');
+  assert(form().querySelector('select').value === '', 'không tự chọn số sao');
+  assert(button('Xem trước đánh giá', form()).disabled, 'chưa chọn số sao thì không gửi');
+  change(form().querySelector('select'), '5', 'change');
+  change(form().querySelector('textarea'), 'Thợ làm cẩn thận'); await pause();
+  await click('Xem trước đánh giá', form());
+  await wait(() => session.pendingConfirmation?.tool === 'submit_booking_feedback', 'xem trước đánh giá');
+  assert(lastSend().bookingAction.feedback.rating === 5 && fixture.feedbackWrites === 0, 'xem trước chưa ghi đánh giá');
+  assert(document.body.textContent.includes('Số sao') && !document.body.textContent.includes('5 đ'), 'hiển thị số sao không định dạng tiền');
+  await click('Từ chối'); assert(fixture.feedbackWrites === 0, 'từ chối không gửi đánh giá');
+  await click('Đánh giá dịch vụ'); await wait(() => form()?.querySelector('select'), 'mở lại đánh giá');
+  change(form().querySelector('select'), '4', 'change'); change(form().querySelector('textarea'), 'Dịch vụ tốt'); await pause();
+  await click('Xem trước đánh giá', form()); await click('Xác nhận');
+  assert(fixture.feedbackWrites === 1, 'chỉ gửi sau xác nhận');
+  await click('Đánh giá dịch vụ'); await wait(() => form()?.querySelector('select')?.value === '4', 'đọc lại đánh giá có sẵn');
+  change(form().querySelector('select'), '3', 'change'); await pause();
+  await click('Xem trước đánh giá', form());
+  assert(lastSend().bookingAction.feedback.mode === 'update', 'sửa đúng đánh giá cũ');
+  await click('Xác nhận'); assert(fixture.feedbackWrites === 2, 'xác nhận sửa đánh giá');
+  const fileInput = document.querySelector('input[type="file"]');
+  const files = new DataTransfer(); files.items.add(new File(['anh-gia-lap'], 'bang-chung.png', { type: 'image/png' }));
+  fileInput.files = files.files; fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+  await wait(() => calls.some((entry) => entry.type === 'upload') && document.querySelector('img[alt="Ảnh hiện trạng 1"]'), 'tải ảnh hỗ trợ sau khi đặt đơn');
+  const composer = document.querySelector('[aria-label="Nội dung gửi cho Trợ lý Handigo"]');
+  change(composer, 'Gửi ảnh bằng chứng cho yêu cầu hỗ trợ'); await pause();
+  document.querySelector('[aria-label="Gửi tin nhắn"]').click();
+  await wait(() => session.pendingConfirmation?.tool === 'create_support_ticket' && document.body.textContent.includes('Ảnh đính kèm yêu cầu'), 'xác nhận gửi ảnh hỗ trợ');
+  assert(document.body.textContent.includes('Ảnh đính kèm yêu cầu') && session.pendingConfirmation.preview.customerAttachments.length === 1, 'xác nhận có ảnh đúng tác vụ');
+  assert(session.bookingDraft.status === 'booked' && !values.customerAttachments?.length, 'không sửa ảnh đơn đã tạo');
+  await click('Xác nhận'); assert(fixture.careWrites === 1, 'gửi hỗ trợ kèm ảnh sau xác nhận');
+  const panel = document.querySelector('aside').getBoundingClientRect();
+  assert(panel.left >= 0 && panel.right <= innerWidth + 1, 'giao diện nằm trong màn hình');
+  document.body.dataset.agentBookingPassed = 'true';
+}
 async function run() {
   if (returned) return verifyWalletReturn();
   await wait(() => document.querySelector('[aria-label="Mở Trợ lý Handigo"]'), 'hiển thị widget');
   document.querySelector('[aria-label="Mở Trợ lý Handigo"]').click();
+  if (flowExtensions) return verifyFlowExtensions();
   if (historyActions) return verifyHistoryActions();
+  if (paymentCancellation) return verifyPaymentCancellation();
   if (scroll) return verifyChatScroll();
   if (business) return verifyBusiness();
   if (visual) {
@@ -598,7 +796,8 @@ async function verifyBusiness() {
   await click('Xác nhận');
   await wait(() => button('Kiểm tra thanh toán'), 'hành động nghiệp vụ cho đơn đã tạo');
   assert(!button('Xem báo giá') && !button('Tra hoàn tiền') && !button('Đặt lại đơn này'), 'đơn giá cố định đang chờ tiền không gợi ý báo giá, hoàn tiền hoặc đặt lại');
-  assert(!document.querySelector('[aria-label="Đính kèm ảnh hiện trạng"]'), 'không thêm ảnh vào đơn đã tạo');
+  assert(document.querySelector('[aria-label="Đính kèm ảnh yêu cầu"]'), 'đơn đã tạo vẫn gửi ảnh cho yêu cầu hỗ trợ được');
+  assert(!document.querySelector('aside form img[alt^="Ảnh hiện trạng"]'), 'không tự đưa ảnh đơn đã tạo vào yêu cầu mới');
   session.orderActions = { orderId: ids.order, orderCode: 'ORD-KIEM-THU', quotation: true, refunds: true, rebook: true, payment: false };
   render('don-bao-gia-da-huy');
   await wait(() => document.querySelector('[aria-label="Mở Trợ lý Handigo"]'), 'tải lại trạng thái đơn đã hủy');
@@ -639,14 +838,19 @@ async function verifyVoucherOrder() {
   const container = document.createElement('div');
   document.body.append(container);
   const previewRoot = createRoot(container);
-  const action = { actionId: 'xac-nhan-voucher', tool: 'create_booking', preview: { title: 'Đặt dịch vụ', amount: 40000 },
+  let action = { actionId: 'xac-nhan-voucher', tool: 'create_booking', preview: { title: 'Đặt dịch vụ', amount: 40000 },
     expiresAt: new Date(Date.now() + 600000).toISOString() };
   const message = { _id: 'voucher-sau-form', sender: 'assistant', content: 'Bạn có thể chọn mã giảm giá bên dưới.',
     createdAt: new Date().toISOString(), confirmation: action,
     choiceGroups: [{ label: 'Voucher có thể sử dụng', multiple: false, options: ['GIAM10 — giảm 10.000 đ', 'Không dùng voucher'] }] };
-  const show = async (pendingActionId) => {
-    previewRoot.render(<ChatbotMessageList audience="CUSTOMER" messages={[message]} isReplying={false}
-      pendingActionId={pendingActionId} onSend={async () => {}} />);
+  const sent = [];
+  const show = async (pendingActionId, overrides = {}) => {
+    const pendingConfirmation = pendingActionId ? { ...action, actionId: pendingActionId } : null;
+    previewRoot.render(<BrowserRouter><ChatbotPanel audience="CUSTOMER" messages={[message]} isReplying={false}
+      isLoading={false} error="" availabilityMessage="" userId={ids.user}
+      agentSession={{ ...session, bookingDraft: { status: 'active', revision: 1, values, summary: [], missing: [] } }}
+      pendingConfirmation={pendingConfirmation} onClose={() => {}} onRetry={() => {}} onDecision={() => {}}
+      onSend={async (content) => { sent.push(content); }} {...overrides} /></BrowserRouter>);
     await pause();
   };
   try {
@@ -656,6 +860,34 @@ async function verifyVoucherOrder() {
     const feedback = [...container.querySelectorAll('p')].find((node) => node.textContent === message.content);
     assert(form && vouchers && Boolean(form.compareDocumentPosition(vouchers) & Node.DOCUMENT_POSITION_FOLLOWING), 'form xác nhận hiển thị trước lựa chọn voucher');
     assert(feedback && Boolean(form.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING), 'phản hồi voucher nằm sau form');
+    assert(!vouchers.disabled, 'chọn được voucher khi form đặt đơn đang chờ xác nhận');
+    for (const overrides of [{ isReplying: true }, { isLoading: true }, { taskBlocked: true }, { error: 'Chưa xử lý được' },
+      { availabilityMessage: 'Cần bắt đầu phiên mới' }, { pendingConfirmation: { ...action, tool: 'create_payment' } }]) {
+      await show(action.actionId, overrides);
+      const choices = container.querySelector('fieldset');
+      assert(!choices || choices.disabled, 'khóa chọn mã khi bận, lỗi, đối soát hoặc chờ hành động khác');
+    }
+    await show(action.actionId);
+    container.querySelector('input[type="radio"]').click(); await pause();
+    await click('Tiếp tục', container);
+    assert(sent.at(-1) === 'Voucher có thể sử dụng: GIAM10 — giảm 10.000 đ', 'gửi đúng mã đã chọn qua luồng voucher hiện có');
+    assert(!sent.some((content) => content.includes('Xác nhận')), 'chọn mã chưa tạo đơn hoặc thanh toán');
+    action = { ...action, actionId: 'xac-nhan-sau-giam', preview: { ...action.preview, voucherCode: 'GIAM10', discountAmount: 10000, amount: 30000 } };
+    message.confirmation = action;
+    message._id = 'form-sau-giam';
+    await show(action.actionId);
+    assert(container.querySelector('[aria-label="Xác nhận thao tác"]').textContent.includes('30.000 đ'), 'hiển thị số tiền sau giảm trong form mới');
+    assert(button('Xác nhận', container).disabled, 'form sau giảm vẫn cần đồng ý chính sách trước khi xác nhận');
+    const choices = container.querySelectorAll('input[type="radio"]');
+    choices[1].click(); await pause();
+    await click('Tiếp tục', container);
+    assert(sent.at(-1) === 'Voucher có thể sử dụng: Không dùng voucher', 'gửi được lựa chọn bỏ mã');
+    message.choiceGroups = [{ label: 'Chuyên gia đang phù hợp', multiple: false, options: ['Thợ kiểm thử'] }];
+    await show(action.actionId);
+    assert(container.querySelector('fieldset').disabled, 'không mở khóa nhóm lựa chọn khác khi đang xác nhận');
+    message.choiceGroups = [{ label: 'Kiểm tra voucher', multiple: false, options: ['Kiểm tra lại voucher', 'Không dùng voucher'] }];
+    await show(action.actionId);
+    assert(!container.querySelector('fieldset').disabled, 'cho thử lại tra mã khi form đặt đơn đang chờ');
     await show(undefined);
     assert(!container.querySelector('fieldset'), 'không dùng được lựa chọn voucher của bản xác nhận cũ');
   } finally { previewRoot.unmount(); container.remove(); }

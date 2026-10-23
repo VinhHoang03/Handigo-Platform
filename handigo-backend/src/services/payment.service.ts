@@ -27,6 +27,12 @@ export interface ConfirmedPaymentExpectation {
   previousPaymentMethod?: "cash" | "payos";
 }
 
+export interface ConfirmedPaymentCancellation {
+  paymentId: string;
+  amount: number;
+  paymentType: "full" | "inspection_deposit";
+}
+
 const isFixedPriceWorkPayment = (order: InstanceType<typeof Order>) =>
   !order.inspectionRequired && order.status === "in_progress" && order.paymentStatus === "unpaid";
 
@@ -595,15 +601,15 @@ export const previewOrderPayment = async (user: RequestUser, orderId: string, me
 // Hủy và kiểm tra lại trên PayOS trước khi giải phóng giao dịch đang chờ.
 const cancelPendingPayosPayment = async (
   payment: InstanceType<typeof Payment>, user: RequestUser,
-  reason: string, signal?: AbortSignal,
+  reason: string, signal?: AbortSignal, cancellationActionId?: string,
 ) => {
   const gatewayOrderCode = Number(payment.gatewayOrderCode);
   if (!Number.isSafeInteger(gatewayOrderCode) || gatewayOrderCode <= 0) {
-    throw new ActionPreconditionError("Giao dịch thiếu mã đối soát hợp lệ. Hãy kiểm tra thanh toán trước khi đổi phương thức.");
+    throw new ActionPreconditionError("Giao dịch thiếu mã đối soát hợp lệ. Hãy kiểm tra thanh toán trước khi tiếp tục.");
   }
   const checkLink = async () => {
     const link = await payos.paymentRequests.get(gatewayOrderCode).catch(() => {
-      throw new ActionPreconditionError("Không thể kiểm tra PayOS. Chưa tạo thanh toán mới; hãy kiểm tra thanh toán rồi thử lại.");
+      throw new ActionPreconditionError("Không thể kiểm tra PayOS. Hãy kiểm tra thanh toán rồi thử lại.");
     });
     if ((payment.gatewayPaymentLinkId && link.id !== payment.gatewayPaymentLinkId)
       || link.orderCode !== gatewayOrderCode || link.amount !== payment.amount) {
@@ -617,7 +623,7 @@ const cancelPendingPayosPayment = async (
     return "paid" as const;
   }
   if (!Number.isFinite(link.amountPaid) || link.amountPaid !== 0 || link.status === "PROCESSING") {
-    throw new ActionPreconditionError("PayOS đang xử lý hoặc đã nhận tiền. Hãy kiểm tra thanh toán; chưa thể đổi phương thức.");
+    throw new ActionPreconditionError("PayOS đang xử lý hoặc đã nhận tiền. Hãy kiểm tra thanh toán; chưa thể hủy QR hoặc đổi phương thức.");
   }
   if (link.status === "PENDING") {
     signal?.throwIfAborted();
@@ -638,13 +644,48 @@ const cancelPendingPayosPayment = async (
   }
   signal?.throwIfAborted();
   const transition = await Payment.updateOne({ _id: payment._id, status: "pending", isDeleted: false }, {
-    $set: { status: "failed", failedAt: new Date(), failureReason: "Đã hủy PayOS để đổi phương thức thanh toán",
+    $set: { status: "failed", failedAt: new Date(), failureReason: cancellationActionId
+      ? "Khách hàng đã hủy giao dịch QR thanh toán" : "Đã hủy PayOS để đổi phương thức thanh toán",
+      ...(cancellationActionId ? { "metadata.customerCancelledQr": true, "metadata.agentCancellationActionId": cancellationActionId } : {}),
       "gatewayResponse.statusCheck": { status: link.status, checkedAt: new Date(), amountPaid: link.amountPaid } },
   }, { runValidators: true });
   if (transition.modifiedCount !== 1) throw new ActionPreconditionError();
   publishPaymentStatus({ _id: payment._id, orderId: payment.orderId, customerId: payment.customerId,
     method: payment.method, status: "failed" });
   return "failed" as const;
+};
+
+export const previewAgentPaymentCancellation = async (user: RequestUser, orderId: string, paymentId?: string) => {
+  if (user.role !== "CUSTOMER") throw new AppError("Hủy QR qua trợ lý chỉ dành cho khách hàng.", 403);
+  const order = await Order.findOne({ _id: orderId, customerId: user.id, isDeleted: false });
+  if (!order) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+  if (order.paymentStatus !== "unpaid") throw new AppError("Đơn đã ghi nhận thanh toán. Vui lòng kiểm tra thanh toán, không hủy QR cũ.", 409);
+  if (!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) throw new AppError("Đơn không còn ở trạng thái có thể hủy QR qua trợ lý.", 409);
+  const payment = await Payment.findOne({ orderId, customerId: user.id, method: "payos", status: "pending", isDeleted: false,
+    ...(paymentId ? { _id: paymentId } : {}) });
+  if (!payment || !["full", "inspection_deposit"].includes(payment.paymentType)) {
+    throw new AppError("Không có giao dịch QR đang chờ phù hợp. Vui lòng kiểm tra thanh toán của đơn.", 409);
+  }
+  return { title: "Hủy giao dịch QR thanh toán", orderId, orderCode: order.orderCode,
+    paymentId: String(payment._id), amount: payment.amount, paymentType: payment.paymentType,
+    note: "Xác nhận sẽ hủy mã QR đang chờ. Đơn hàng được giữ theo thời hạn thanh toán hiện tại. Sau khi hủy, bạn có thể chọn thanh toán lại hoặc phương thức khác; chưa hủy đơn và chưa tạo giao dịch mới." };
+};
+
+export const cancelAgentPendingPayment = async (user: RequestUser, orderId: string, expected: ConfirmedPaymentCancellation,
+  actionId: string, signal?: AbortSignal) => {
+  signal?.throwIfAborted();
+  if (user.role !== "CUSTOMER") throw new AppError("Hủy QR qua trợ lý chỉ dành cho khách hàng.", 403);
+  const order = await Order.findOne({ _id: orderId, customerId: user.id, isDeleted: false });
+  if (!order) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
+  const payment = await Payment.findOne({ _id: expected.paymentId, orderId, customerId: user.id,
+    method: "payos", amount: expected.amount, paymentType: expected.paymentType, isDeleted: false });
+  if (!payment) throw new ActionPreconditionError("Giao dịch QR đã thay đổi. Vui lòng kiểm tra thanh toán trước khi chọn lại.");
+  if (payment.status === "paid") return;
+  if (payment.status === "failed" && payment.metadata?.agentCancellationActionId === actionId) return;
+  if ((!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) || order.paymentStatus !== "unpaid" || payment.status !== "pending") {
+    throw new ActionPreconditionError("Trạng thái đơn hoặc giao dịch đã thay đổi. Vui lòng kiểm tra thanh toán.");
+  }
+  await cancelPendingPayosPayment(payment, user, "Khách hàng hủy QR thanh toán qua trợ lý", signal, actionId);
 };
 
 export const cancelPendingPayosPaymentForOrder = async (orderId: string, user: RequestUser) => {

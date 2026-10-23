@@ -74,7 +74,7 @@ export class AgentLoop {
         && (result as { revision?: number })?.revision === session.bookingDraft.revision && session.activeRequest) {
         session.lastDraftRequest = { requestId: session.activeRequest.requestId, revision: session.bookingDraft.revision, taskVersion: session.taskVersion };
       }
-      if (["get_booking", "get_booking_quotation", "get_booking_refunds", "create_booking", "get_payment_status", "create_payment"].includes(tool.name)) {
+      if (["get_booking", "get_booking_provider", "get_booking_feedback", "submit_booking_feedback", "get_booking_quotation", "get_booking_refunds", "create_booking", "get_payment_status", "create_payment", "cancel_payment"].includes(tool.name)) {
         const order = result as { orderId?: string; orderCode?: string } | null;
         if (order?.orderId && order.orderCode) session.viewedOrder = { orderId: order.orderId, orderCode: order.orderCode };
       }
@@ -130,7 +130,7 @@ export class AgentLoop {
     if (!historyRequest && !(input && "message" in input && input.bookingAction) && session.viewedOrder
       && session.bookingDraft && ["active", "paused", "booked"].includes(session.bookingDraft.status)
       && session.bookingDraft.orderId !== session.viewedOrder.orderId
-      && /đơn (?:này|đó)/i.test(latestMessage) && /(?:báo giá|hoàn tiền|thanh toán|hủy đơn)/i.test(latestMessage)
+      && /đơn (?:này|đó)/i.test(latestMessage) && /(?:báo giá|hoàn tiền|thanh toán|hủy đơn|thợ|vị trí|đánh giá|liên hệ|nhắn tin|gọi)/i.test(latestMessage)
       && !/bản nháp|[a-f\d]{24}/i.test(latestMessage)) {
       return this.reply(session, "WAITING_USER_INPUT", `Bạn muốn xử lý đơn ${session.viewedOrder.orderCode} hay ${session.bookingDraft.orderId ? "đơn đã đặt trước đó" : "bản nháp đang soạn"}?`);
     }
@@ -156,6 +156,9 @@ export class AgentLoop {
         }
         context.replaceBookingDraft = true;
         historyRequest = { tool: "rebook_booking", args: proposal.arguments };
+      } else if (action.type === "provider" || action.type === "feedback") {
+        historyRequest = action.type === "provider" ? { tool: "get_booking_provider", args: { orderId: action.orderId } }
+          : { tool: "submit_booking_feedback", args: action.feedback };
       } else {
         const backup = session.draftBackup;
         if (!backup || backup.id !== action.backupId || session.bookingDraft?.orderId || session.bookingDraft?.status === "booked") {
@@ -345,7 +348,7 @@ export class AgentLoop {
         applyAddressToDraft = tool.name === "save_booking_address" && !addressArgs.addressId && addressArgs.useForBooking === true
           && Boolean(session.bookingDraft && ["active", "paused"].includes(session.bookingDraft.status) && !session.bookingDraft.orderId);
         if (this.tools.needsConfirmation(tool) && !applyAddressToDraft) {
-          const completed = tool.name !== "create_payment" && session.actions.find((action) => action.taskVersion === session.taskVersion
+          const completed = !["create_payment", "cancel_payment", "submit_booking_feedback"].includes(tool.name) && session.actions.find((action) => action.taskVersion === session.taskVersion
             && action.tool === tool.name && action.status === "SUCCEEDED" && isDeepStrictEqual(action.arguments, args));
           if (completed) {
             this.record(session, tool.name, { alreadyExecuted: true, result: completed.result }, true);
@@ -362,7 +365,7 @@ export class AgentLoop {
       } catch (error) {
         this.record(session, response.tool, { error: toolError(error) }, false);
         const failureKey = JSON.stringify([response.tool, response.arguments, toolError(error)]);
-        if (response.tool === "create_payment" || failedCalls.has(failureKey)) {
+        if (["create_payment", "cancel_payment"].includes(response.tool) || failedCalls.has(failureKey)) {
           return this.reply(session, "WAITING_USER_INPUT", toolError(error));
         }
         failedCalls.add(failureKey);
@@ -459,7 +462,7 @@ export class AgentLoop {
         ...(draft.voucherFeedback ? [draft.voucherFeedback] : []),
         missing.length ? `Cần bổ sung: ${missing.join("; ")}.` : "Chọn thông tin còn thiếu bên dưới để tiếp tục.",
       ].join("\n"));
-      session.conversation[session.conversation.length - 1].choiceGroups = draft.choiceGroups;
+      session.conversation[session.conversation.length - 1].choiceGroups = draft.choiceGroups.length ? draft.choiceGroups : undefined;
       return message;
     }
     try {
@@ -479,7 +482,7 @@ export class AgentLoop {
       session.recovery = undefined;
       session.pendingAction.taskVersion = session.taskVersion;
       const message = this.reply(session, "WAITING_CONFIRMATION", draft.voucherFeedback ?? "");
-      session.conversation[session.conversation.length - 1].choiceGroups = draft.choiceGroups;
+      session.conversation[session.conversation.length - 1].choiceGroups = draft.choiceGroups.length ? draft.choiceGroups : undefined;
       return message;
     } catch (error) {
       this.record(session, "create_booking", { error: toolError(error) }, false);
@@ -503,7 +506,8 @@ export class AgentLoop {
       draft.addressPreference = undefined;
       draft.status = "active";
       this.record(session, tool.name, { addressId: staged.addressId, saved: false,
-        message: "Đã chọn địa chỉ cho bản nháp. Địa chỉ mới chỉ được lưu khi đặt đơn thành công." }, true);
+        message: draft.values.saveAddressToBook === false ? "Đã chọn địa chỉ dùng một lần cho bản nháp, không thêm vào sổ địa chỉ."
+          : "Đã chọn địa chỉ cho bản nháp. Địa chỉ mới chỉ được lưu khi đặt đơn thành công." }, true);
     } catch (error) {
       this.record(session, tool.name, { error: toolError(error, tool.name) }, false);
       session.recovery = { tool: tool.name, arguments: args, taskVersion: session.taskVersion, revision: session.bookingDraft?.revision, stage: "address" };

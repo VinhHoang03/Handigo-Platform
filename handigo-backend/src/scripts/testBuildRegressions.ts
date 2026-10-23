@@ -193,6 +193,24 @@ async function testAssignments() {
   assert.equal(appointment.order.status, "accepted");
   assert.equal(appointment.order.bookingStatus, "confirmed");
   assert.equal(relatedUpdated, true);
+  // Đơn dùng địa chỉ một lần vẫn nhận việc được khi không có mục trong sổ địa chỉ.
+  order.addressId = null;
+  order.addressSnapshot = { fullAddress: "Địa chỉ dùng một lần", ward: "Phường kiểm thử", province: "Tỉnh kiểm thử",
+    latitude: 21, longitude: 105, recipientName: "Khách kiểm thử", recipientPhone: "0912345678" };
+  order.recurringGroupId = null; order.status = "created"; order.scheduledAt = null;
+  assignment.assignmentType = "dispatch"; provider.availabilityStatus = "online";
+  mock.method(Address, "findById", () => { throw Error("Đơn có bản chụp không được đọc địa chỉ đã lưu."); });
+  const oneTime = await AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString());
+  assert.equal(oneTime.order.status, "accepted"); assert.equal(oneTime.order.addressId, null);
+  let assignedView: unknown;
+  mock.method(OrderAssignment, "find", () => ({ populate: (options: { select: string; transform: (value: unknown) => unknown }) => {
+    assert(options.select.includes("addressSnapshot")); assignedView = options.transform(order.toObject());
+    return { sort: () => ({ lean: async () => [{ orderId: assignedView }] }) };
+  } }));
+  await AssignmentService.getPendingAssignmentForProvider(provider.userId.toString());
+  assert.equal((assignedView as { addressId: { ward: string } }).addressId.ward, "Phường kiểm thử");
+  assert(!JSON.stringify(assignedView).includes("0912345678"), "Đề nghị chưa nhận không lộ số điện thoại từ bản chụp địa chỉ.");
+  assert(!JSON.stringify(assignedView).includes("Địa chỉ dùng một lần"), "Đề nghị chưa nhận vẫn chỉ hiển thị khu vực như trước.");
   mock.restoreAll();
 }
 

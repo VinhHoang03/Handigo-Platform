@@ -63,7 +63,7 @@ export function NearbyProviderSelector({
     );
   };
 
-  const canSearch = enabled && serviceId && addressId && (!requireSelection || scheduledAt);
+  const canSearch = enabled && serviceId && (addressId || orderId) && (!requireSelection || scheduledAt);
 
   return (
     <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">

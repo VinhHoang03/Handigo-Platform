@@ -188,7 +188,7 @@ export interface Order {
     quantity?: number;
     subtotal?: number;
   }>;
-  addressId: Address;
+  addressId: (Omit<Address, "_id"> & { _id: string | null }) | null;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string | null;
   bookingStatus?:

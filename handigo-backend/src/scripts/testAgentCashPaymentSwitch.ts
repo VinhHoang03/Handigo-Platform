@@ -120,9 +120,11 @@ async function run() {
     reset(); transactionFails = true; await assert.rejects(execute, /Lỗi ghi lịch sử/);
     assert.equal(payment.method, "cash"); assert.equal(order.paymentMethod, "cash"); assert.equal(balance, amount);
     reset(); paymentChanges = true; await assert.rejects(execute); assert.equal(debitCalls, 0);
-    for (const status of ["in_progress", "completed", "cancelled"]) {
+    for (const status of ["completed", "cancelled"]) {
       reset(); order.status = status; await assert.rejects(execute); assert.equal(debitCalls, 0);
     }
+    reset(); order.status = "in_progress";
+    await execute(); assert.equal(debitCalls, 1, "Đơn giá cố định đang thực hiện vẫn được thanh toán theo nghiệp vụ hiện có.");
     reset(); order.pricing.totalPaidAmount++; await assert.rejects(execute); assert.equal(debitCalls, 0);
     reset(); await assert.rejects(() => payments.createAgentOrderPayment({ ...user, id: new Types.ObjectId().toString() }, args, expected));
     assert.equal(debitCalls, 0);

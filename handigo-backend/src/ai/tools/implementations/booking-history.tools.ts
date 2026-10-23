@@ -61,6 +61,7 @@ export const rebookBookingTool: AgentTool<z.infer<typeof rebookSchema>> = {
     const providerId = args.useSameProvider && order.status === "completed" && order.providerId ? String(order.providerId) : undefined;
     const draft = await updateBookingDraft(undefined, {
       mode: "update", serviceId: String(order.serviceId),
+      ...(!order.addressId && oldAddress ? { saveAddressToBook: false } : {}),
       ...(uniform !== undefined ? { quantity: uniform } : canReuseOptions ? { selectedOptions: options } : { optionPreference: "Chọn lại gói vì tùy chọn cũ đã thay đổi hoặc ngừng hoạt động" }),
       ...(sameAddress ? { addressId: address.id } : { addressPreference: oldAddress
         ? bookingAddressLabel({ id: String(order.addressId), isDefault: false, ...oldAddress }) : "Cần chọn lại địa chỉ của đơn cũ" }),

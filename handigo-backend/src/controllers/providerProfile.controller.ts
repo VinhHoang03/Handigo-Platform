@@ -65,7 +65,7 @@ export const getNearbyProviders = async (
       ? String(req.query.orderId)
       : undefined;
 
-    if (!serviceId || !addressId) {
+    if (!serviceId || (!addressId && !orderId)) {
       throw new AppError("Vui lòng chọn dịch vụ và địa chỉ.", 400);
     }
 

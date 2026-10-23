@@ -58,7 +58,7 @@ export function ChatbotWidget({
     setPaymentAnchor((previous) => {
       if (previous?.key === key && session.messages.some((message) => message._id === previous.messageId)) return previous;
       const related = [...session.messages].reverse().find((message) => message.confirmation?.booking?.orderId === session.payment?.orderId
-        || (message.confirmation?.tool === "create_payment" && message.confirmation.preview.orderId === session.payment?.orderId));
+        || (["create_payment", "cancel_payment"].includes(message.confirmation?.tool ?? "") && message.confirmation?.preview.orderId === session.payment?.orderId));
       const message = related ?? [...session.messages].reverse().find((message) => message.sender === "assistant") ?? session.messages.at(-1);
       return message ? { key, messageId: message._id } : null;
     });
@@ -364,7 +364,13 @@ export function ChatbotWidget({
             void sendMessage("").catch(() => undefined);
           }}
           onChangePaymentMethod={(orderId) => {
-            void sendMessage(`Đổi phương thức thanh toán cho đơn ${orderId}.`).catch(() => undefined);
+            const payment = agentSession?.payment;
+            void sendMessage(payment?.orderId === orderId && ["unpaid", "failed"].includes(payment.status)
+              ? `Tôi muốn thanh toán lại đơn ${orderId}. Cho tôi chọn phương thức thanh toán phù hợp.`
+              : `Đổi phương thức thanh toán cho đơn ${orderId}.`).catch(() => undefined);
+          }}
+          onCancelPayment={(orderId, paymentId) => {
+            void sendMessage(`Hủy QR thanh toán đơn ${orderId}, giao dịch ${paymentId}.`).catch(() => undefined);
           }}
           onDecision={(decision, policyConsent) => void decide(decision, policyConsent)}
           taskBlocked={agentSession?.requiresReconciliation || (usesAgent && Boolean(error))}

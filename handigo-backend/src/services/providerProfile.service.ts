@@ -337,8 +337,15 @@ export const getNearbyProvidersForCustomer = async (
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(serviceId, "service id");
-  assertObjectId(addressId, "address id");
+  if (addressId) assertObjectId(addressId, "address id");
   if (orderIdValue) assertObjectId(orderIdValue, "order id");
+
+  // Đơn dùng địa chỉ một lần lấy vị trí từ bản chụp đã xác thực của chính khách.
+  const ownedOrder = orderIdValue ? await Order.findOne({ _id: orderIdValue,
+    customerId: new Types.ObjectId(userId), isDeleted: false }).lean() : null;
+  if (orderIdValue && (!ownedOrder || String(ownedOrder.serviceId) !== serviceId)) {
+    throw new AppError("Không tìm thấy đơn hàng phù hợp của bạn.", 404);
+  }
 
   const [service, address] = await Promise.all([
     Service.findOne({
@@ -346,7 +353,7 @@ export const getNearbyProvidersForCustomer = async (
       isActive: true,
       isDeleted: false,
     }),
-    Address.findOne({
+    ownedOrder?.addressSnapshot ?? Address.findOne({
       _id: addressId,
       userId: new Types.ObjectId(userId),
     }).lean(),
@@ -400,12 +407,7 @@ export const getNearbyProvidersForCustomer = async (
   let excludeProviderIds: Types.ObjectId[] = [];
   let savedIntervals: ScheduleInterval[] | undefined;
   if (orderIdValue) {
-    const order = await Order.findOne({
-      _id: orderIdValue,
-      customerId: new Types.ObjectId(userId),
-      isDeleted: false,
-    })
-      .lean();
+    const order = ownedOrder;
     if (!order) {
       throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
     }

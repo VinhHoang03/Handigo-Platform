@@ -316,10 +316,10 @@ export const AssignmentService = {
     }
 
     const assignedOrder = await Order.findById(assignment.orderId).select(
-      "addressId customerId orderCode orderType scheduledAt status bookingStatus recurringGroupId occurrenceNumber paymentStatus paymentMethod reassignment",
+      "addressId addressSnapshot customerId orderCode orderType scheduledAt status bookingStatus recurringGroupId occurrenceNumber paymentStatus paymentMethod reassignment",
     );
     const assignedAddress = assignedOrder
-      ? await Address.findById(assignedOrder.addressId).select("ward province")
+      ? assignedOrder.addressSnapshot ?? await Address.findById(assignedOrder.addressId).select("ward province")
       : null;
     // Phạm vi địa lý đã được kiểm tra khi gửi đề nghị; không chặn lại theo phường/xã.
     if (!assignedAddress) {
@@ -855,6 +855,7 @@ export const AssignmentService = {
           "orderCode",
           "serviceId",
           "addressId",
+          "addressSnapshot",
           "orderType",
           "scheduledAt",
           "recurringGroupId",
@@ -869,6 +870,13 @@ export const AssignmentService = {
           { path: "serviceId", select: "name image coverImage serviceType depositAmount fixedPrice", transform: serviceImageResponse },
           { path: "addressId", select: "ward province" },
         ],
+        transform: (order) => {
+          if (!order?.addressSnapshot) return order;
+          // Đề nghị chưa nhận chỉ hiển thị khu vực như địa chỉ đã lưu, không lộ người nhận hoặc vị trí cụ thể.
+          const { addressSnapshot, ...value } = order;
+          return { ...value, addressId: { _id: order.addressId?._id ?? null,
+            ward: addressSnapshot.ward, province: addressSnapshot.province } };
+        },
       })
       .sort({ assignedAt: -1 })
       .lean();
