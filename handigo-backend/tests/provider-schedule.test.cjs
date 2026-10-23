@@ -49,7 +49,7 @@ function setup(overrides = {}) {
   return { order, providerId, ...service };
 }
 
-for (const status of ['accepted', 'in_progress', 'completed']) {
+for (const status of ['accepted', 'in_progress']) {
   test(`${status}: giữ khung giờ hẹn gốc khi công việc bắt đầu sớm ngày hôm trước`, async () => {
     const context = setup({ status });
     const available = await context.getAvailableProviderIds([context.providerId], [interval('17', '10:00')]);
@@ -57,13 +57,13 @@ for (const status of ['accepted', 'in_progress', 'completed']) {
   });
 }
 
-test('Thợ không thể nhận một lịch mới trùng lịch hẹn đã hoàn thành sớm', async () => {
+test('Thợ có thể nhận lịch mới tại khung giờ hẹn gốc của đơn đã hoàn thành sớm', async () => {
   const context = setup();
   const next = { _id: new Types.ObjectId(), serviceId: context.order.serviceId,
     status: 'created', scheduledAt: at('17', '10:00'), inspectionRequired: false,
     selectedOptionsSnapshot: [], schedule: { durationMinutes: 60, bufferMinutes: 15, travelMinutes: 30 } };
   next.toObject = () => ({ ...next });
-  await assert.rejects(context.assertProviderSchedule(context.providerId, [next], {}, policy), /Lịch làm việc không đủ thời gian/);
+  await context.assertProviderSchedule(context.providerId, [next], {}, policy);
 });
 
 test('Vẫn chặn trùng giờ thực hiện thực tế của đơn hoàn thành', async () => {
@@ -79,7 +79,7 @@ test('Không khóa khoảng trống giữa giờ thực hiện sớm và lịch 
 });
 
 test('Giữ dự phòng và di chuyển sau khung giờ đã đặt, mở lại đúng ranh giới', async () => {
-  const context = setup();
+  const context = setup({ status: 'accepted' });
   assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('17', '11:30')])).size, 0);
   assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('17', '11:45')])).size, 1);
 });
@@ -92,8 +92,41 @@ for (const overrides of [{ status: 'cancelled' }, { isDeleted: true }, { provide
 }
 
 test('Bỏ qua chính đơn đang kiểm tra và hỗ trợ lịch cũ chưa có snapshot thời lượng', async () => {
-  const context = setup({ schedule: null });
+  const context = setup({ schedule: null, status: 'accepted' });
   assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('17', '10:00')])).size, 0);
   assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('17', '10:00')],
     { excludeOrderIds: [context.order._id] })).size, 1);
 });
+
+test('Đơn từ tuần trước bắt đầu và hoàn thành hôm nay giải phóng giờ dự kiến còn lại sau khoảng đệm', async () => {
+  const context = setup({
+    createdAt: at('09', '10:00'), scheduledAt: at('09', '10:00'),
+    confirmation: { providerConfirmedAt: at('16', '08:05') },
+  });
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '08:49')])).size, 0);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '08:50')])).size, 1);
+});
+
+test('Hoàn thành sớm giải phóng khung giờ hẹn gốc ở tương lai', async () => {
+  const context = setup({ confirmation: { providerConfirmedAt: at('16', '08:05') } });
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('17', '10:00')])).size, 1);
+});
+
+test('Hoàn thành trễ vẫn giữ lịch đến giờ hoàn thành thực tế và hết khoảng đệm', async () => {
+  const context = setup({ confirmation: { providerConfirmedAt: at('16', '10:00') } });
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '10:44')])).size, 0);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '10:45')])).size, 1);
+});
+
+test('Đơn hoàn thành cũ thiếu giờ xác nhận dùng giờ kết thúc dự kiến', async () => {
+  const context = setup({ confirmation: { providerConfirmedAt: null } });
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '09:44')])).size, 0);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '09:45')])).size, 1);
+});
+
+for (const status of ['accepted', 'in_progress']) {
+  test(`${status}: đơn quá hạn vẫn chặn lịch đến khi hoàn thành`, () => {
+    const context = setup({ status, confirmation: { providerConfirmedAt: at('16', '08:05') } });
+    assert.equal(schedule.getOrderInterval(context.order, policy, +at('18', '10:00')).end, Infinity);
+  });
+}

@@ -29,8 +29,8 @@ export const getAvailableProviderIds = async (
       if (order.providerId?.toString() !== id.toString()) return false;
       const actualInterval = getOrderInterval(order, policy);
       const scheduledStart = order.scheduledAt?.getTime();
-      // Làm sớm hoặc hoàn thành không giải phóng khung giờ khách đã đặt.
-      const reservedInterval = scheduledStart === undefined ? actualInterval : {
+      // Chỉ giữ khung giờ hẹn gốc khi công việc chưa hoàn thành.
+      const reservedInterval = scheduledStart === undefined || order.status === "completed" ? actualInterval : {
         ...actualInterval,
         start: scheduledStart,
         end: scheduledStart + (order.schedule?.durationMinutes ?? calculateDuration(
