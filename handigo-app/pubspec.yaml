@@ -35,7 +35,7 @@ flutter:
   assets:
     - assets/brand/handigo-logo.png
     - assets/payments/payos-logo.png
-      - assets/icons/account/
+    - assets/icons/account/
   fonts:
     - family: Inter
       fonts:
