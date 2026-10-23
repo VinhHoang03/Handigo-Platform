@@ -1,3 +1,4 @@
+import { CatalogStatusPill } from "./CatalogStatusPill";
 import { CategoryIcon } from "@/components/common/CategoryIcon";
 import type { DataTableColumn } from "@/components/common/dashboard/DataTable";
 import type { Category } from "../../types/categoryService.types";
@@ -9,13 +10,13 @@ import {
   Pencil,
   Pin,
   Plus,
-  Trash2,
 } from "lucide-react";
 
 interface CategoryTableContext {
   serviceCounts: Record<string, number>;
   onEdit: (category: Category) => void;
-  onDelete: (category: Category) => void;
+  onToggleStatus: (category: Category) => void;
+  statusBusy: string[];
   pinnedIds: string[];
   onTogglePin: (id: string) => void;
   onCreateService: (category: Category) => void;
@@ -23,11 +24,12 @@ interface CategoryTableContext {
   onToggleExpand: (id: string) => void;
 }
 
-/** Cột bảng danh mục, gồm cả cột "Thao tác" (sửa/xóa). */
+/** Cột bảng danh mục, gồm cả cột "Thao tác" và bật/tắt trạng thái. */
 export function buildCategoryTableColumns({
   serviceCounts,
   onEdit,
-  onDelete,
+  onToggleStatus,
+  statusBusy,
   pinnedIds,
   onTogglePin,
   onCreateService,
@@ -74,17 +76,9 @@ export function buildCategoryTableColumns({
     },
     {
       key: "status",
-      header: "Trạng thái",
-      render: (category) =>
-        category.isActive ? (
-          <div className="flex items-center gap-2 text-label-md font-bold text-success">
-            <span className="h-2 w-2 rounded-full bg-success" /> Hoạt động
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-label-md font-bold text-error">
-            <span className="h-2 w-2 rounded-full bg-error" /> Tạm ngưng
-          </div>
-        ),
+      header: "Trạng thái hoạt động",
+      className: "text-center",
+      render: (category) => <CatalogStatusPill name={category.name} active={category.isActive} busy={statusBusy.includes(`category:${category._id}`)} onToggle={() => onToggleStatus(category)} />,
     },
     {
       key: "createdAt",
@@ -161,17 +155,7 @@ export function buildCategoryTableColumns({
           >
             <Pencil aria-hidden="true" size={24} />
           </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(category);
-            }}
-            className="rounded-lg p-2 transition-colors hover:bg-error-container/20 hover:text-error"
-            aria-label="Xóa"
-          >
-            <Trash2 aria-hidden="true" size={24} />
-          </button>
+
         </div>
       ),
     },

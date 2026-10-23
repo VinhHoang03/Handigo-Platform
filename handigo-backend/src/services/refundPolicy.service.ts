@@ -1,4 +1,8 @@
+import { DEFAULT_REFUND_POLICY, type RefundPolicy } from "../validations/refundPolicy.validator";
+
 export const REFUND_POLICY_VERSION = "HANDIGO_REFUND_V1";
+export const CUSTOMER_CANCELLATION_POLICY_VERSION = "HANDIGO_CUSTOMER_CANCEL_5M_V1";
+export const CUSTOMER_CANCELLATION_WINDOW_MS = 5 * 60 * 1000;
 export const QUOTATION_DEPOSIT_POLICY_VERSION = "HANDIGO_QUOTATION_DEPOSIT_V1";
 export const QUOTATION_DECLINED_REASON = "Khách hàng không đồng ý báo giá";
 export const isQuotationDeclinedReason = (reason = "") =>
@@ -23,6 +27,7 @@ export interface RefundPolicyInput {
   inspectionRequired?: boolean;
   paidInspectionDeposit?: number;
   cancellationReason?: string;
+  providerAcceptedAt?: Date | null;
 }
 
 export interface RefundPolicyResult {
@@ -33,6 +38,7 @@ export interface RefundPolicyResult {
   refundAmount: number;
   cancellationFee: number;
   providerCompensation: number;
+  providerCompensationRate: number;
   platformRetainedAmount: number;
   hoursBeforeStart: number | null;
   policyReason: string;
@@ -42,6 +48,7 @@ const roundMoney = (amount: number) => Math.max(0, Math.round(amount));
 
 export const calculateRefundPolicy = (
   input: RefundPolicyInput,
+  policy: RefundPolicy = DEFAULT_REFUND_POLICY,
 ): RefundPolicyResult => {
   const paidAmount = roundMoney(input.paidAmount);
   const now = input.now || new Date();
@@ -49,9 +56,9 @@ export const calculateRefundPolicy = (
     ? (input.scheduledAt.getTime() - now.getTime()) / 3_600_000
     : null;
 
-  if (input.role === "provider" && input.orderStatus === "accepted"
-    && input.hasAssignedProvider && input.inspectionRequired
-    && (!input.hasRepairQuotation || isQuotationDeclinedReason(input.cancellationReason))) {
+  const canCancel = ["created", "accepted"].includes(input.orderStatus);
+  if (canCancel && input.inspectionRequired && input.orderStatus === "accepted"
+    && input.hasAssignedProvider && input.role === "provider" && input.hasRepairQuotation) {
     const deposit = Math.min(paidAmount, roundMoney(input.paidInspectionDeposit || 0));
     const refundAmount = paidAmount - deposit;
     return {
@@ -59,13 +66,39 @@ export const calculateRefundPolicy = (
       canCancel: true,
       refundRate: paidAmount ? refundAmount / paidAmount * 100 : 100,
       paidAmount, refundAmount, cancellationFee: deposit,
-      providerCompensation: deposit, platformRetainedAmount: 0,
+      providerCompensation: deposit, providerCompensationRate: 100, platformRetainedAmount: 0,
       hoursBeforeStart,
-      policyReason: "Thợ hủy tại giai đoạn trao đổi báo giá: tiền cọc được chuyển cho thợ; tiền sửa chữa đã thanh toán thêm được hoàn cho khách.",
+      policyReason: "Thợ hủy sau khi đã báo giá: tiền cọc thực trả được chuyển vào ví thợ; khoản thanh toán thêm được hoàn cho khách.",
     };
   }
 
-  let canCancel = ["created", "accepted"].includes(input.orderStatus);
+  if (input.role === "customer" && input.orderStatus === "in_progress") {
+    return {
+      policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
+      canCancel: false, refundRate: 0, paidAmount, refundAmount: 0,
+      cancellationFee: 0, providerCompensation: 0, providerCompensationRate: 0, platformRetainedAmount: 0,
+      hoursBeforeStart,
+      policyReason: "Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng.",
+    };
+  }
+
+  if (input.role === "customer" && input.hasAssignedProvider
+    && input.orderStatus === "accepted") {
+    const acceptedAt = input.providerAcceptedAt?.getTime();
+    const elapsed = acceptedAt === undefined ? NaN : now.getTime() - acceptedAt;
+    const canCancel = Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= CUSTOMER_CANCELLATION_WINDOW_MS;
+    return {
+      policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
+      canCancel, refundRate: canCancel ? 100 : 0, paidAmount,
+      refundAmount: canCancel ? paidAmount : 0,
+      cancellationFee: 0, providerCompensation: 0, providerCompensationRate: 0, platformRetainedAmount: 0,
+      hoursBeforeStart,
+      policyReason: canCancel
+        ? "Hủy trong vòng 5 phút kể từ khi thợ nhận đơn, hoàn toàn bộ khoản đã thanh toán về ví Handigo."
+        : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn hoặc chưa xác minh được thời điểm nhận đơn.",
+    };
+  }
+
   let refundRate = 100;
   let policyReason = "Hoàn toàn bộ tiền đã thanh toán.";
 
@@ -73,27 +106,6 @@ export const calculateRefundPolicy = (
     policyReason = "Provider, quản trị viên hoặc hệ thống hủy đơn.";
   } else if (!input.hasAssignedProvider || input.orderStatus === "created") {
     policyReason = "Đơn chưa có provider nhận.";
-  } else if (["normal", "urgent"].includes(input.orderType)) {
-    refundRate = 70;
-    policyReason = "Khách hàng hủy đơn sau khi provider đã nhận.";
-  } else if (hoursBeforeStart === null) {
-    refundRate = 70;
-    policyReason = "Lịch hẹn thiếu thời gian bắt đầu; áp dụng mức hoàn an toàn 70%.";
-  } else if (hoursBeforeStart >= 24) {
-    policyReason = "Hủy trước lịch ít nhất 24 giờ.";
-  } else if (hoursBeforeStart >= 6) {
-    refundRate = 80;
-    policyReason = "Hủy trong khoảng từ 6 đến dưới 24 giờ trước lịch.";
-  } else if (hoursBeforeStart >= 2) {
-    refundRate = 50;
-    policyReason = "Hủy trong khoảng từ 2 đến dưới 6 giờ trước lịch.";
-  } else if (hoursBeforeStart > 0) {
-    refundRate = 20;
-    policyReason = "Hủy dưới 2 giờ trước lịch.";
-  } else {
-    canCancel = false;
-    refundRate = 0;
-    policyReason = "Lịch đã đến giờ thực hiện; vui lòng gửi yêu cầu hỗ trợ.";
   }
 
   if (!canCancel) {
@@ -102,10 +114,9 @@ export const calculateRefundPolicy = (
 
   const refundAmount = roundMoney((paidAmount * refundRate) / 100);
   const cancellationFee = paidAmount - refundAmount;
-  const providerCompensation =
-    input.role === "customer" && input.hasAssignedProvider
-      ? roundMoney(cancellationFee * 0.8)
-      : 0;
+  const providerCompensationRate = input.role === "customer" && input.hasAssignedProvider
+    ? policy.providerCompensationPercent : 0;
+  const providerCompensation = roundMoney(cancellationFee * providerCompensationRate / 100);
   const platformRetainedAmount = cancellationFee - providerCompensation;
 
   return {
@@ -116,6 +127,7 @@ export const calculateRefundPolicy = (
     refundAmount,
     cancellationFee,
     providerCompensation,
+    providerCompensationRate,
     platformRetainedAmount,
     hoursBeforeStart,
     policyReason,

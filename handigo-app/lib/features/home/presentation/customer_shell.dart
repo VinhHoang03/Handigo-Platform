@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
 import '../../../shared/widgets/service_images.dart';
 
@@ -466,33 +467,30 @@ class _HomeSearchFieldBodyState extends State<_HomeSearchFieldBody> {
   }
 
   @override
-  Widget build(BuildContext context) => TextField(
+  Widget build(BuildContext context) => AppSearchField(
     readOnly: true,
     onTap: () => context.push('/customer/services'),
-    decoration: InputDecoration(
-      hintText: _isListening
-          ? 'Đang nghe, hãy nói tên dịch vụ...'
-          : 'Tìm dịch vụ sửa chữa, dọn dẹp...',
-      prefixIcon: const Icon(Icons.search),
-      suffixIcon: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            tooltip: _isListening
-                ? 'Dừng tìm kiếm bằng giọng nói'
-                : 'Tìm kiếm bằng giọng nói',
-            onPressed: _startVoiceSearch,
-            icon: Icon(
-              _isListening ? Icons.stop_circle_outlined : Icons.mic_none,
-            ),
+    hintText: _isListening
+        ? 'Đang nghe, hãy nói tên dịch vụ...'
+        : 'Tìm dịch vụ sửa chữa, dọn dẹp...',
+    suffixIcon: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: _isListening
+              ? 'Dừng tìm kiếm bằng giọng nói'
+              : 'Tìm kiếm bằng giọng nói',
+          onPressed: _startVoiceSearch,
+          icon: Icon(
+            _isListening ? Icons.stop_circle_outlined : Icons.mic_none,
           ),
-          IconButton(
-            tooltip: 'Lọc dịch vụ',
-            onPressed: _showFilters,
-            icon: const Icon(Icons.tune),
-          ),
-        ],
-      ),
+        ),
+        IconButton(
+          tooltip: 'Lọc dịch vụ',
+          onPressed: _showFilters,
+          icon: const Icon(Icons.tune),
+        ),
+      ],
     ),
   );
 }
@@ -533,12 +531,22 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
             FilterChip(
               label: const Text('Tất cả'),
               selected: _selectedCategory == null,
+              labelStyle: TextStyle(
+                fontWeight: _selectedCategory == null
+                    ? FontWeight.w700
+                    : FontWeight.w500,
+              ),
               onSelected: (_) => setState(() => _selectedCategory = null),
             ),
             ...widget.categories.map(
               (category) => FilterChip(
                 label: Text(category.name),
                 selected: _selectedCategory == category.id,
+                labelStyle: TextStyle(
+                  fontWeight: _selectedCategory == category.id
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
                 onSelected: (_) =>
                     setState(() => _selectedCategory = category.id),
               ),
@@ -555,6 +563,11 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
               (item) => InputChip(
                 label: Text(item),
                 selected: _searchQuery == item,
+                labelStyle: TextStyle(
+                  fontWeight: _searchQuery == item
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                ),
                 onPressed: () => setState(() => _searchQuery = item),
               ),
             )

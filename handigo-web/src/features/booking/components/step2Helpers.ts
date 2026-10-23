@@ -6,7 +6,6 @@ export const timeSlots = Array.from({ length: 14 }, (_, index) => {
   const startHour = 8 + index;
   return `${String(startHour).padStart(2, '0')}:00`;
 });
-export const MIN_DESCRIPTION_LENGTH = 10;
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 export const MIN_IMAGE_WIDTH = 320;
 export const MIN_IMAGE_HEIGHT = 240;

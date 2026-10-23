@@ -18,6 +18,7 @@ export const OrderSummaryCard: React.FC<{
   actionTo?: string;
   onAction?: () => void;
   isLoading?: boolean;
+  actionDisabled?: boolean;
   summaryContent?: React.ReactNode;
   scheduleContent?: React.ReactNode;
   providerContent?: React.ReactNode;
@@ -31,6 +32,7 @@ export const OrderSummaryCard: React.FC<{
   actionTo,
   onAction,
   isLoading,
+  actionDisabled = false,
   summaryContent,
   scheduleContent,
   providerContent,
@@ -155,7 +157,7 @@ export const OrderSummaryCard: React.FC<{
           orderType={orderType}
           actionLabel={actionLabel}
           isLoading={isLoading}
-          disableAction={Boolean(isLoading || priceLoading || priceError || !effectivePreview || (step === 1 && !serviceId))}
+          disableAction={Boolean(actionDisabled || isLoading || priceLoading || priceError || !effectivePreview || (step === 1 && !serviceId))}
           onBack={() => navigate(-1)}
           onAction={handleAction}
         />

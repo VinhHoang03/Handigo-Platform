@@ -22,5 +22,6 @@ export const REWARD_POLICY = {
   ] as RewardOffer[],
 };
 
-export const calculateRewardPoints = (amount: number) =>
-  Number.isFinite(amount) ? Math.max(0, Math.floor(amount / REWARD_POLICY.amountPerPoint)) : 0;
+export const calculateRewardPoints = (amount: number, amountPerPoint = REWARD_POLICY.amountPerPoint) =>
+  Number.isFinite(amount) && Number.isFinite(amountPerPoint) && amountPerPoint > 0
+    ? Math.max(0, Math.floor(amount / amountPerPoint)) : 0;

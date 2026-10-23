@@ -7,6 +7,7 @@ import { ConfirmPaymentServiceDetails } from '../components/ConfirmPaymentServic
 import { ConfirmPaymentMethodSelector } from '../components/ConfirmPaymentMethodSelector';
 import { ConfirmPaymentVoucherPanel } from '../components/ConfirmPaymentVoucherPanel';
 import { useConfirmPaymentFlow } from '../components/useConfirmPaymentFlow';
+import { BookingPolicyConsent } from '../components/BookingPolicyConsent';
 
 const ConfirmPaymentPage = () => {
   const {
@@ -20,6 +21,7 @@ const ConfirmPaymentPage = () => {
     selectedOptionQuantities, uniformQuantity,
     previewVoucherCode, promotionName, previewError,
     pendingError, retryPendingOrder,
+    bookingPolicies, policyDepositAmount, policyPayableDeposit,
   } = useConfirmPaymentFlow();
 
   return (
@@ -56,6 +58,7 @@ const ConfirmPaymentPage = () => {
             actionLabel="Xác nhận & Thanh toán"
             onAction={handleConfirm}
             isLoading={isSubmitting}
+            actionDisabled={!bookingPolicies.accepted}
             summaryContent={
               <>
               {promotionName && <p className="mb-3 rounded-xl bg-primary/10 p-3 text-primary">Ưu đãi tự động: {promotionName}</p>}
@@ -82,6 +85,17 @@ const ConfirmPaymentPage = () => {
                 }}
                 voucherError={voucherError}
                 isSubmitting={isSubmitting}
+              />
+              <BookingPolicyConsent
+                policies={bookingPolicies.policies}
+                loading={bookingPolicies.loading}
+                error={bookingPolicies.error}
+                accepted={bookingPolicies.accepted}
+                disabled={isSubmitting}
+                onChange={bookingPolicies.setAccepted}
+                onRetry={bookingPolicies.retry}
+                depositAmount={policyDepositAmount}
+                payableDeposit={policyPayableDeposit}
               />
               </>
             }

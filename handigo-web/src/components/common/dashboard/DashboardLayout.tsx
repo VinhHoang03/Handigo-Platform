@@ -57,7 +57,7 @@ export function DashboardLayout({
   );
 
   return (
-    <div className={`min-h-dvh overflow-x-hidden bg-background font-body-md text-body-md ${isProvider ? "relative isolate" : ""}`}>
+    <div className={`min-h-dvh ${isAdmin ? "overflow-x-clip" : "overflow-x-hidden"} bg-background font-body-md text-body-md ${isProvider ? "relative isolate" : ""}`}>
       {isProvider && <AnimatedBackground />}
       {isProvider ? (
         <ProviderTopbar

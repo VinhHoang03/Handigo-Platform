@@ -7,12 +7,12 @@ import { OrderAssignment } from "../models/orderAssignment.model";
 import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
-import { Address } from "../models/address.model";
+import { Address, type IAddress } from "../models/address.model";
 import { recordOrderStatus } from "../utils/orderHistory";
 import { resolveAutomaticPromotion, claimPromotion, releaseOrderPromotion } from "./promotion.service";
 import { withOrderAddress } from "../utils/orderAddress";
 import { OrderStatus } from "../models/orderStatus.model";
-import { ensureAddressCoordinates } from "./address.service";
+import { ensureAddressCoordinates, createAddress } from "./address.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
@@ -20,13 +20,16 @@ import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "
 import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, isWithinAppointmentHours } from "../utils/bookingPolicy";
 import { buildServicePricingSnapshot } from "./servicePricing.service";
 import {
-  DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+  getProviderResponseTimeoutMs,
   DispatchService,
   getMaxMatchingDurationSeconds,
 } from "./dispatch.service";
 import {
   cancelOrderWithSettlement,
+  cancelOrdersWithSettlement,
   getCancellationPreview,
+  getCustomerCancellationDeadline,
+  type CancellationExpectation,
 } from "./orderCancellation.service";
 import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
@@ -195,7 +198,7 @@ export const OrderService = {
    *  3. Persist order with status = "created".
    *  4. Hand off to DispatchService to find & assign the nearest provider.
    */
-  async createOrder(payload: CreateOrderPayload): Promise<IOrder> {
+  async createOrder(payload: CreateOrderPayload, confirmedOrderId?: Types.ObjectId, draftAddress?: IAddress): Promise<IOrder> {
     if (!payload.paymentMethod || !["wallet", "bank", "cash"].includes(payload.paymentMethod)) {
       throw new AppError("Phương thức thanh toán không hợp lệ.", 400);
     }
@@ -278,7 +281,10 @@ export const OrderService = {
     if (!Types.ObjectId.isValid(payload.addressId)) {
       throw new AppError("Địa chỉ không hợp lệ.", 400);
     }
-    const selectedAddress = await Address.findOne({
+    if (draftAddress && (String(draftAddress._id) !== payload.addressId || String(draftAddress.userId) !== payload.customerId)) {
+      throw new AppError("Địa chỉ không thuộc tài khoản của bạn.", 403);
+    }
+    const selectedAddress = draftAddress ?? await Address.findOne({
       _id: payload.addressId,
       userId: payload.customerId,
       isDeleted: { $ne: true },
@@ -286,7 +292,13 @@ export const OrderService = {
     if (!selectedAddress) {
       throw new AppError("Địa chỉ không hợp lệ.", 404);
     }
-    const address = await ensureAddressCoordinates(selectedAddress);
+    if (draftAddress) {
+      await draftAddress.validate();
+      if (!Number.isFinite(draftAddress.latitude) || !Number.isFinite(draftAddress.longitude)) {
+        throw new AppError("Chưa xác định được vị trí của địa chỉ mới. Vui lòng kiểm tra lại trước khi đặt đơn.", 422);
+      }
+    }
+    const address = draftAddress ?? await ensureAddressCoordinates(selectedAddress);
     if (payload.confirmedExpectation && address.updatedAt.toISOString() !== payload.confirmedExpectation.addressVersion) {
       throw new ActionPreconditionError();
     }
@@ -425,7 +437,7 @@ export const OrderService = {
         inspectionRequired,
       );
       return {
-      _id: new Types.ObjectId(),
+      _id: index === 0 && confirmedOrderId ? confirmedOrderId : new Types.ObjectId(),
       orderCode: generateOrderCode(),
       customerId: new Types.ObjectId(payload.customerId),
       preferredProviderId: payload.preferredProviderId
@@ -488,6 +500,14 @@ export const OrderService = {
           || String(currentVoucher.snapshot.voucherId) !== String(voucherResult.snapshot.voucherId)) throw new ActionPreconditionError();
       }
       if (automaticPromotion) await claimPromotion(automaticPromotion.promotion, orderDocuments.length, session);
+      if (draftAddress) {
+        // Địa chỉ mới và đơn cùng giao dịch: tạo đơn thất bại thì không lưu địa chỉ vào sổ.
+        const savedAddress = await createAddress(payload.customerId, draftAddress.toObject(), {
+          session, addressId: draftAddress._id as Types.ObjectId, reuseExisting: true,
+        });
+        if (!savedAddress) throw new ActionPreconditionError();
+        for (const document of orderDocuments) document.addressId = savedAddress._id as Types.ObjectId;
+      }
       const documents = await Order.insertMany(orderDocuments as Array<Partial<IOrder>>, { session });
       if (voucherResult) {
         await reservePersonalVoucher(voucherResult.snapshot.voucherId, payload.customerId,
@@ -657,7 +677,7 @@ export const OrderService = {
     if (!candidate) throw unavailable("Chuyên gia không còn phù hợp hoặc không đủ thời gian trống.");
 
     const responseDeadline = new Date(
-      Date.now() + DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS,
+      Date.now() + await getProviderResponseTimeoutMs(),
     );
     const claimedOrder = await Order.findOneAndUpdate(
       { _id: order._id, customerId, status: "created", providerId: null, isDeleted: false,
@@ -753,7 +773,10 @@ export const OrderService = {
     limit = 10,
     filters: { status?: string; search?: string } = {},
   ): Promise<{
-    items: IOrder[];
+    items: Array<Omit<IOrder, keyof mongoose.Document> & {
+      _id: Types.ObjectId;
+      hasPendingAssignment: boolean;
+    }>;
     pagination: {
       page: number;
       limit: number;
@@ -802,8 +825,20 @@ export const OrderService = {
       Order.countDocuments(query),
     ]);
 
+    const pendingAssignments = data.length === 0 ? [] : await OrderAssignment.find({
+      orderId: { $in: data.filter((order) => order.status === "created").map((order) => order._id) },
+      status: "pending",
+      isDeleted: false,
+      responseDeadline: { $gt: new Date() },
+    }).select("orderId").lean();
+    const pendingOrderIds = new Set(pendingAssignments.map((assignment) => assignment.orderId.toString()));
+    const items = await attachQuotationFinalAmounts(data);
+
     return {
-      items: data as IOrder[],
+      items: items.map((order) => ({
+        ...order,
+        hasPendingAssignment: pendingOrderIds.has(order._id.toString()),
+      })),
       pagination: {
         page,
         limit,
@@ -953,16 +988,21 @@ export const OrderService = {
 
     const matchingSearch = order.matchingStartedAt && !order.preferredProviderId
       ? order.matchingSearch : null;
+    const directAssignment = order.matchingStartedAt && order.preferredProviderId
+      ? await OrderAssignment.findOne({ orderId: order._id, assignmentType: { $in: ["direct_request", "appointment"] }, isDeleted: false })
+        .select("responseDeadline").sort({ assignedAt: -1 }).lean()
+      : null;
     const matchingExpiresAt = order.matchingStartedAt
-      ? matchingSearch?.expiresAt ?? new Date(order.matchingStartedAt.getTime()
-        + (order.preferredProviderId ? DIRECT_PROVIDER_RESPONSE_TIMEOUT_MS
+      ? matchingSearch?.expiresAt ?? directAssignment?.responseDeadline ?? new Date(order.matchingStartedAt.getTime()
+        + (order.preferredProviderId ? await getProviderResponseTimeoutMs()
           : (await getMaxMatchingDurationSeconds()) * 1000))
       : null;
 
     const statusHistory = await OrderStatus.find({ orderId: order._id, isDeleted: false })
       .select("status previousStatus statusVersion changedByRole note createdAt")
       .sort({ createdAt: 1, statusVersion: 1 }).lean();
-    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory };
+    const customerCancellationDeadline = await getCustomerCancellationDeadline(order, undefined, statusHistory);
+    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline };
   },
 
   async getRecurringSeries(orderId: string, customerId: string): Promise<IOrder[]> {
@@ -1012,8 +1052,15 @@ export const OrderService = {
         }
         if (await Order.exists({ providerId: provider._id, _id: { $ne: order._id }, status: "in_progress", isDeleted: false }).session(session)) throw new AppError("Bạn đang thực hiện một đơn khác.", 409);
         const now = new Date();
+        const isEarlyFixedAppointment = order.orderType === "scheduled"
+          && !order.inspectionRequired
+          && order.scheduledAt != null
+          && order.scheduledAt.getTime() > now.getTime();
         order.schedule = { durationMinutes: duration, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes, expectedStartAt: now, expectedEndAt: new Date(now.getTime() + duration * 60000) };
-        await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy);
+        // Lịch hẹn đã xác nhận cho phép thợ chủ động bắt đầu sớm ngoài khung lịch dự kiến.
+        if (!isEarlyFixedAppointment) {
+          await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy);
+        }
         order.status = "in_progress";
         provider.availabilityStatus = "busy";
         await provider.save({ session });
@@ -1021,6 +1068,7 @@ export const OrderService = {
         return order;
       });
       if (!result) throw new AppError("Không thể bắt đầu đơn.", 409);
+      emitToUser(result.customerId.toString(), "order:updated", { orderId: result._id.toString() });
       return result;
     } finally { await session.endSession(); }
   },
@@ -1224,14 +1272,13 @@ export const OrderService = {
     userId: string,
     role: "customer" | "provider" | "admin",
     reason: string,
-    confirmedExpectation?: { paidAmount: number; refundAmount: number; cancellationFee: number },
+    confirmedExpectation?: CancellationExpectation,
   ): Promise<IOrder> {
     if (role === "provider") {
-      const order = await Order.findById(orderId).select("status currentQuotationId inspectionRequired reassignment");
+      const order = await Order.findById(orderId).select("status currentQuotationId reassignment");
       if (
         order && (order.status === "accepted" || order.reassignment?.automatic) &&
-        !order.currentQuotationId &&
-        !order.inspectionRequired
+        !order.currentQuotationId
       ) {
         return requestProviderReassignment(orderId, userId, reason);
       }
@@ -1295,7 +1342,7 @@ export const OrderService = {
       recurringGroupId: anchorOrder.recurringGroupId,
       customerId: anchorOrder.customerId,
       scheduledAt: { $gte: anchorOrder.scheduledAt },
-      status: { $in: ["created", "accepted"] },
+      status: { $in: ["created", "accepted", "in_progress"] },
       isDeleted: false,
     })
       .select("_id")
@@ -1339,6 +1386,7 @@ export const OrderService = {
     orderId: string,
     customerId: string,
     reason: string,
+    confirmedExpectations?: Array<CancellationExpectation & { orderId: string }>,
   ): Promise<{ cancelledCount: number; orders: IOrder[] }> {
     const anchorOrder = await Order.findById(orderId).lean();
     if (!anchorOrder) throw new AppError("Đơn hàng không tồn tại.", 404);
@@ -1353,11 +1401,14 @@ export const OrderService = {
       throw new AppError("Đơn hàng không thuộc lịch định kỳ.", 400);
     }
 
+    const anchorPreview = await getCancellationPreview({ orderId, actorId: customerId, role: "customer" });
+    if (!anchorPreview.canCancel) throw new AppError(anchorPreview.policyReason, 409);
+
     const cancellableOrders = await Order.find({
       recurringGroupId: anchorOrder.recurringGroupId,
       customerId: anchorOrder.customerId,
       scheduledAt: { $gte: anchorOrder.scheduledAt },
-      status: { $in: ["created", "accepted"] },
+      status: { $in: ["created", "accepted", "in_progress"] },
       isDeleted: false,
     }).sort({ scheduledAt: 1 });
 
@@ -1365,16 +1416,27 @@ export const OrderService = {
       throw new AppError("Không còn buổi nào có thể hủy trong chuỗi lịch này.", 409);
     }
 
-    const cancelledOrders: IOrder[] = [];
-    for (const recurringOrder of cancellableOrders) {
-      const cancelledOrder = await cancelOrderWithSettlement({
-        orderId: recurringOrder._id.toString(),
-        actorId: customerId,
-        role: "customer",
-        reason,
-      });
-      cancelledOrders.push(cancelledOrder);
+    const previews = await Promise.all(cancellableOrders.map((order) => getCancellationPreview({
+      orderId: order._id.toString(), actorId: customerId, role: "customer",
+    })));
+    const blocked = previews.find((preview) => !preview.canCancel);
+    if (blocked) throw new AppError(blocked.policyReason, 409);
+
+    const expectations = new Map(confirmedExpectations?.map((item) => [item.orderId, item]));
+    if (confirmedExpectations && (
+      expectations.size !== confirmedExpectations.length
+      || expectations.size !== cancellableOrders.length
+      || cancellableOrders.some((order) => !expectations.has(order._id.toString()))
+    )) {
+      throw new ActionPreconditionError("Chuỗi lịch đã thay đổi. Vui lòng kiểm tra và xác nhận lại trước khi hủy.");
     }
+    const cancelledOrders = await cancelOrdersWithSettlement(cancellableOrders.map((recurringOrder) => ({
+      orderId: recurringOrder._id.toString(),
+      actorId: customerId,
+      role: "customer" as const,
+      reason,
+      confirmedExpectation: expectations.get(recurringOrder._id.toString()),
+    })));
 
     return {
       cancelledCount: cancelledOrders.length,

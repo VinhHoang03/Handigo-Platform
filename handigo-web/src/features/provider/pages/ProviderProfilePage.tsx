@@ -66,7 +66,7 @@ function ProviderProfileContent() {
     );
   }
 
-  if (data.error || !data.profile || !data.profileView) {
+  if (!data.profile || !data.profileView) {
     return (
       <DashboardShell role="PROVIDER">
         <div className="rounded-xl border border-error/20 bg-error/10 p-8 text-center text-error">

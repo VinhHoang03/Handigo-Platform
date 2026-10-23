@@ -7,10 +7,10 @@ import { providerOrderApi } from '../api/providerOrder.api';
 import { getOrderStatusMeta } from '@/utils/orderStatus';
 import { toneChipClasses } from '@/utils/statusTone';
 import { formatProviderOrderAmount, getCustomer } from '../utils/providerOrder.utils';
+import { getOrderDate as orderDate } from '../components/home/providerHome.utils';
 import { CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
 
 const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-const orderDate = (order: Order) => new Date(order.schedule?.expectedStartAt || order.scheduledAt || order.createdAt);
 
 const formatAddress = (order: Order) => {
   const address = order.addressId;

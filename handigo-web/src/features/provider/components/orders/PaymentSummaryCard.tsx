@@ -30,20 +30,18 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
     <section className="order-3 h-full rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg md:col-span-2 lg:order-2 lg:col-span-1">
       <CardTitle icon={Wallet} title="Thanh toán đơn hàng" />
       <dl className="mt-md space-y-3 text-sm">
-        <FinancialRow label={isQuotationOrder ? 'Trạng thái tiền cọc' : 'Trạng thái thanh toán'} value={displayedPaymentStatus} />
+        {displayedPaymentStatus && <FinancialRow label={isQuotationOrder ? 'Trạng thái tiền cọc' : 'Trạng thái thanh toán'} value={displayedPaymentStatus} />}
         {isQuotationOrder && (
           <>
             <FinancialRow label="Tiền cọc đã thanh toán" value={formatMoney(appliedDepositAmount)} />
             <FinancialRow label="Giá trị đơn hàng" value={quotationAmount === undefined ? '' : formatMoney(quotationAmount)} total />
             {quotationAmount !== undefined && !isCancelled && (
               <>
-                <FinancialRow label="Cọc được khấu trừ" value={`-${formatMoney(appliedDepositAmount)}`} />
                 <FinancialRow
                   label={repairQuotation?.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách' : 'Còn cần thu trực tiếp'}
                   value={formatMoney(directRepairAmount)}
                   total
                 />
-                <FinancialRow label="Thanh toán tiền sửa chữa" value={repairQuotation?.directPaymentConfirmedAt ? 'Đã xác nhận nhận tiền' : 'Chưa xác nhận nhận tiền'} />
               </>
             )}
           </>

@@ -17,6 +17,7 @@ interface NearbyProviderCardProps {
   requireSelection: boolean;
   onSelect: (provider: NearbyProvider) => void;
   onViewProfile?: (provider: NearbyProvider) => void;
+  showAutoAssignNote?: boolean;
 }
 
 /** Thẻ hiển thị một thợ phù hợp, kèm nút chọn/ưu tiên thợ. */
@@ -28,6 +29,7 @@ export function NearbyProviderCard({
   requireSelection,
   onSelect,
   onViewProfile,
+  showAutoAssignNote = true,
 }: NearbyProviderCardProps) {
   const statusLabel = provider.availabilityStatus === 'online' ? 'Đang hoạt động' : provider.availabilityStatus === 'busy' ? 'Đang bận' : 'Ngoại tuyến';
   const statusClass = provider.availabilityStatus === 'online' ? 'bg-success' : provider.availabilityStatus === 'busy' ? 'bg-tertiary' : 'bg-on-surface-variant/50';
@@ -121,7 +123,7 @@ export function NearbyProviderCard({
                 : "Ưu tiên thợ này"}
             {isSelected ? <CheckCircle2 aria-hidden="true" size={18} /> : <PlusCircle aria-hidden="true" size={18} />}
           </button>
-          {isSelected && !requireSelection && (
+          {isSelected && !requireSelection && showAutoAssignNote && (
             <p className="mt-2 text-xs leading-5 text-on-surface-variant">
               Nếu thợ không thể nhận, Handigo sẽ tự tìm người phù hợp khác.
             </p>

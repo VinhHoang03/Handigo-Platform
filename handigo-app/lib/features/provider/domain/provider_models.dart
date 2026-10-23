@@ -1,3 +1,5 @@
+import '../../../shared/utils/address_format.dart';
+
 class ProviderOverview {
   const ProviderOverview({
     required this.walletBalance,
@@ -58,10 +60,7 @@ class ProviderAssignment {
           : 'Dịch vụ',
       scheduledAt: _date(order['scheduledAt']),
       addressLabel: address is Map<String, dynamic>
-          ? [
-              address['ward'],
-              address['province'],
-            ].whereType<String>().where((item) => item.isNotEmpty).join(', ')
+          ? formatAddressData(address)
           : null,
       responseDeadline: _date(json['responseDeadline']),
       serviceImage: service is Map<String, dynamic>
@@ -89,6 +88,10 @@ class ProviderAssignment {
 }
 
 String _id(Map<String, dynamic> json) => (json['_id'] ?? json['id']).toString();
+
+String formatAssignmentAddress(String address, {bool fromMap = false}) =>
+    formatAddress(address, fromMap: fromMap);
+
 DateTime? _date(dynamic value) =>
     value is String ? DateTime.tryParse(value) : null;
 double _number(dynamic value) => (value as num?)?.toDouble() ?? 0;

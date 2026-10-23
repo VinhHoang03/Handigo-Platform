@@ -12,6 +12,7 @@ import { useToast } from '@/components/common/Toast';
 import { useConfirmPaymentVoucher } from './useConfirmPaymentVoucher';
 import { useBookingPreview } from '../hooks/useBookingPreview';
 import { runConfirmPaymentSubmit } from './confirmPaymentSubmit';
+import { useBookingPolicies } from '../hooks/useBookingPolicies';
 import { PENDING_ORDER_ID_KEY, PENDING_ORDER_FINGERPRINT_KEY, PENDING_ORDER_VOUCHER_KEY,
   clearPendingBooking, recoverPendingBooking } from './pendingBookingRecovery';
 
@@ -48,6 +49,7 @@ export const useConfirmPaymentFlow = () => {
   });
 
   const [service, setService] = useState<Service | null>(null);
+  const bookingPolicies = useBookingPolicies(bookingFingerprint);
   const [address, setAddress] = useState<Address | null>(null);
   const [options, setOptions] = useState<ServiceOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -155,6 +157,7 @@ export const useConfirmPaymentFlow = () => {
     if (needsRecovery) { setPaymentError(pendingError || 'Vui lòng chờ kiểm tra thanh toán QR trước khi tiếp tục.'); return; }
     if (!preview) { setPaymentError(previewError ?? 'Vui lòng chờ cập nhật giá.'); retryPreview(); return; }
     return runConfirmPaymentSubmit({
+      policyAccepted: bookingPolicies.accepted,
       expectedBookingAmount: preview.bookingAmount,
       expectedFinalAmount: preview.discountedAmount,
       expectedVoucherCode: appliedVoucher?.code ?? null,
@@ -193,6 +196,9 @@ export const useConfirmPaymentFlow = () => {
 
   return {
     service, address, selectedOptions,
+    bookingPolicies,
+    policyDepositAmount: service?.serviceType === 'variable_price' ? preview?.depositAmount : undefined,
+    policyPayableDeposit: service?.serviceType === 'variable_price' ? preview?.discountedAmount : undefined,
     effectivePaymentMethod, isAppointment,
     isSubmitting: isSubmitting || pendingOrderLoading, paymentError,
     pendingError, retryPendingOrder: () => setPendingRetry((value) => value + 1),

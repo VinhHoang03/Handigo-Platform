@@ -31,16 +31,54 @@ class ProviderRepository {
     return ProviderOverview.fromJson({..._overviewJson(current), ...data});
   }
 
-  Future<PagedResult<OrderSummary>> orders({String? status}) async {
+  Future<PagedResult<OrderSummary>> orders({
+    String? status,
+    int page = 1,
+    String? search,
+  }) async {
     final response = await _api.request(
       '/orders/provider',
-      query: {'page': 1, 'limit': 50, 'status': ?status},
+      query: {
+        'page': page,
+        'limit': 50,
+        'status': ?status,
+        if (search != null && search.isNotEmpty) 'search': search,
+      },
       authenticated: true,
     );
     return PagedResult.fromJson(
       response['data'] as Map<String, dynamic>,
       OrderSummary.fromJson,
     );
+  }
+
+  Future<List<OrderSummary>> recentOrders() async {
+    final response = await _api.request(
+      '/orders/provider/recent',
+      query: {'limit': 20},
+      authenticated: true,
+    );
+    final items = (response['data'] as Map<String, dynamic>)['items'] as List;
+    return items.whereType<Map<String, dynamic>>().map((order) {
+      final address = order['addressId'];
+      if (address is! Map<String, dynamic>) return OrderSummary.fromJson(order);
+      final fullAddress = address['addressLine'] ?? address['fullAddress'];
+      if (fullAddress is! String) return OrderSummary.fromJson(order);
+      final placeId = address['placeId'];
+      return OrderSummary.fromJson({
+        ...order,
+        'addressId': {
+          ...address,
+          'addressLine': formatAssignmentAddress(
+            fullAddress,
+            fromMap:
+                placeId is String &&
+                placeId.isNotEmpty &&
+                !placeId.startsWith('agent-area:'),
+          ),
+        },
+      });
+    }).toList();
   }
 
   Future<List<ProviderAssignment>> pendingAssignments() async {
@@ -71,13 +109,16 @@ class ProviderRepository {
   Future<void> completeOrder(
     String id,
     List<String> evidence,
-    String note,
-  ) async => _api.request(
+    String note, {
+    RepairQuotation? quotation,
+  }) async => _api.request(
     '/orders/$id/complete',
     method: 'POST',
     data: {
       'completionEvidenceImages': evidence,
       if (note.trim().isNotEmpty) 'completionNote': note.trim(),
+      if (quotation != null) 'expectedQuotationId': quotation.id,
+      if (quotation != null) 'expectedQuotationRevision': quotation.revision,
     },
     authenticated: true,
   );
@@ -103,6 +144,55 @@ class ProviderRepository {
     authenticated: true,
   );
   Future<String> uploadEvidence(XFile file) => _api.uploadOrderAttachment(file);
+
+  Future<List<QuotationItem>> scanQuotation(String orderId, XFile file) async {
+    final data = await _api.uploadImages(
+      '/orders/quotation-items/scan-image',
+      [file],
+      field: 'image',
+      data: {'orderId': orderId},
+    );
+    if (data is! Map || data['items'] is! List)
+      throw const FormatException('Kết quả đọc ảnh báo giá không hợp lệ.');
+    return (data['items'] as List)
+        .whereType<Map<String, dynamic>>()
+        .map(QuotationItem.fromJson)
+        .toList();
+  }
+
+  Future<void> saveQuotation(
+    String orderId,
+    Map<String, dynamic> payload, {
+    RepairQuotation? current,
+  }) async {
+    await _api.request(
+      current == null
+          ? '/orders/$orderId/quotations'
+          : '/orders/$orderId/quotation',
+      method: current == null ? 'POST' : 'PATCH',
+      authenticated: true,
+      data: {
+        ...payload,
+        if (current != null) 'quotationId': current.id,
+        if (current != null) 'expectedRevision': current.revision,
+      },
+    );
+  }
+
+  Future<void> confirmQuotationPayment(
+    String orderId,
+    RepairQuotation quotation,
+  ) async {
+    await _api.request(
+      '/orders/$orderId/quotation/payment/confirm',
+      method: 'POST',
+      authenticated: true,
+      data: {
+        'quotationId': quotation.id,
+        'expectedRevision': quotation.revision,
+      },
+    );
+  }
 
   Future<Map<String, dynamic>> profile() async =>
       (await _api.request('/providers/me', authenticated: true))['data']

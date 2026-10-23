@@ -10,7 +10,7 @@ export function GroupSidebar({
   onChange: (group: ConfigGroupKey | "all") => void;
 }) {
   return (
-    <aside className="space-y-2">
+    <aside className="space-y-2 xl:sticky xl:top-28 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto">
       {groupOptions.map((group) => {
         const count =
           group.key === "all"

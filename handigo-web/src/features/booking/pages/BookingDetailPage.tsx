@@ -154,7 +154,7 @@ const BookingDetailPage = () => {
             orderId={order._id}
             orderStatus={order.status}
             hasSuccessfulPayment={hasSuccessfulPayment}
-            providerUnavailable={order.status === "cancelled" && /^Không (?:tìm thấy thợ nhận đơn|có provider nhận đơn)/u.test(order.cancellation?.reason || "")}
+            providerUnavailable={order.status === "cancelled" && /^Không (?:tìm thấy thợ (?:nhận đơn|phù hợp)|có provider nhận đơn)/u.test(order.cancellation?.reason || "")}
           />
 
           <BookingStatusTimeline
@@ -172,6 +172,7 @@ const BookingDetailPage = () => {
             busy={busy}
             pendingAction={cancellationFlow.pendingAction}
             cancellationPreview={cancellationFlow.cancellationPreview}
+            cancellationLocked={cancellationFlow.cancellationLocked}
             onCancelOrder={() => void cancellationFlow.handleCancelOrder()}
             onCancelSeries={() => void cancellationFlow.handleCancelSeries()}
             onCloseDialog={cancellationFlow.closeActionDialog}

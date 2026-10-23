@@ -24,6 +24,12 @@ class ApiClient {
 
   void setToken(String token) => _token = token;
 
+  Future<String?> socketAccessToken({bool renew = false}) async {
+    if (_loggingOut) return null;
+    if (renew || _token == null) await refresh();
+    return _token;
+  }
+
   Future<bool> hasSession() async {
     // Cookie HttpOnly không thể đọc từ Web, nhưng sẽ được gửi tự động khi
     // request bật withCredentials.
@@ -143,11 +149,14 @@ class ApiClient {
     );
   }
 
-  Future<String> uploadOrderAttachment(XFile file) async {
+  Future<String> uploadOrderAttachment(XFile file, {String? purpose}) async {
     Future<String> send() async {
       final response = await _dio.post<Map<String, dynamic>>(
         '/orders/attachments',
-        data: FormData.fromMap({'image': await _imagePart(file)}),
+        data: FormData.fromMap({
+          'image': await _imagePart(file),
+          if (purpose != null) 'purpose': purpose,
+        }),
         options: Options(
           headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
         ),
@@ -232,6 +241,41 @@ class ApiClient {
       rethrow;
     } on Exception catch (error) {
       throw ApiException(error.toString());
+    }
+  }
+
+  Future<dynamic> uploadImages(
+    String path,
+    List<XFile> files, {
+    String field = 'images',
+    Map<String, String> data = const {},
+  }) async {
+    if (_loggingOut) throw const ApiException('Phiên làm việc đang kết thúc.');
+    Future<dynamic> send() async {
+      final form = FormData.fromMap(data);
+      for (final file in files) {
+        form.files.add(MapEntry(field, await _imagePart(file)));
+      }
+      final response = await _dio.post<Map<String, dynamic>>(
+        path,
+        data: form,
+        options: Options(
+          headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
+        ),
+      );
+      return response.data?['data'];
+    }
+
+    try {
+      return await send();
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 401) throw ApiException.fromDio(error);
+      await refresh();
+      try {
+        return await send();
+      } on DioException catch (retry) {
+        throw ApiException.fromDio(retry);
+      }
     }
   }
 

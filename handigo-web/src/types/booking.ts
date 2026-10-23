@@ -148,6 +148,7 @@ export interface OrderReassignment {
 }
 
 export interface Order {
+  customerCancellationDeadline?: string | null;
   statusHistory?: Array<{ _id: string; status: string; previousStatus?: string | null; changedByRole: string; note?: string | null; createdAt: string }>;
   schedule?: { durationMinutes: number; bufferMinutes: number; travelMinutes: number; expectedStartAt?: string | null; expectedEndAt?: string | null } | null;
   _id: string;
@@ -177,6 +178,7 @@ export interface Order {
     verified?: boolean;
   } | null;
   serviceId: Service;
+  preferredProviderId?: string | null;
   selectedOptionIds: string[];
   selectedOptionsSnapshot?: Array<{
     optionId: string | null;
@@ -217,6 +219,7 @@ export interface Order {
   inspectionRequired?: boolean;
   depositAmount?: number;
   hasAdditionalQuotation?: boolean;
+  currentQuotationId?: string | null;
   quotationFinalAmount?: number;
   pricing: OrderPricing;
   promotionSnapshot?: OrderDiscountSnapshot | null;

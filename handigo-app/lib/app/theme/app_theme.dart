@@ -108,6 +108,42 @@ abstract final class AppTheme {
       ),
       scaffoldBackgroundColor: scheme.surface,
       colorScheme: scheme,
+      chipTheme: ChipThemeData(
+        backgroundColor: scheme.surfaceContainerLowest,
+        selectedColor: scheme.primary,
+        secondarySelectedColor: scheme.primary,
+        checkmarkColor: scheme.onPrimary,
+        elevation: 0,
+        pressElevation: 0,
+        showCheckmark: false,
+        side: WidgetStateBorderSide.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : brightness == Brightness.light
+                ? const Color(0xFFDDDCE5)
+                : scheme.outlineVariant,
+          ),
+        ),
+        shape: const StadiumBorder(),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        labelStyle: TextStyle(
+          fontFamily: 'Inter',
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? scheme.onPrimary
+                : brightness == Brightness.light
+                ? const Color(0xFF595665)
+                : scheme.onSurfaceVariant,
+          ),
+          fontWeight: FontWeight.w500,
+        ),
+        secondaryLabelStyle: TextStyle(
+          fontFamily: 'Inter',
+          color: scheme.onPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLowest,
         elevation: 0,

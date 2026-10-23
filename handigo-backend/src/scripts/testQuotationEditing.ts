@@ -230,6 +230,26 @@ async function run() {
   assert.equal(quotation!.finalAmount, 200000);
   assert.equal(order.status, "in_progress");
 
+  // Cho phép bắt đầu trước giờ hẹn để hỗ trợ kiểm thử luồng dịch vụ báo giá.
+  for (const orderType of ["scheduled", "recurring"] as const) {
+    reset();
+    const scheduledAt = new Date(Date.now() + 24 * 60 * 60000);
+    order.orderType = orderType;
+    order.bookingStatus = "confirmed";
+    order.scheduledAt = scheduledAt;
+    order.schedule = { durationMinutes: 60, bufferMinutes: 15, travelMinutes: 30,
+      expectedStartAt: scheduledAt, expectedEndAt: new Date(scheduledAt.getTime() + 60 * 60000) };
+    await save();
+    const beforeStart = Date.now();
+    await OrderService.startOrder(order.id, provider.userId.toString());
+    assert.equal(order.status, "in_progress");
+    assert.equal(order.scheduledAt?.getTime(), scheduledAt.getTime());
+    assert.ok(order.schedule!.expectedStartAt!.getTime() >= beforeStart);
+    assert.ok(order.schedule!.expectedStartAt!.getTime() < scheduledAt.getTime());
+    assert.equal(order.schedule!.expectedEndAt!.getTime(), order.schedule!.expectedStartAt!.getTime() + 60 * 60000);
+    assert.equal(scheduleChecks, 1);
+  }
+
   reset();
   for (const amount of [39999, 40000]) {
     await assert.rejects(AssignmentService.createRepairQuotation({ ...payload(),

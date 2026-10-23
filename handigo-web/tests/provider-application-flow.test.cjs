@@ -39,6 +39,7 @@ function hook(service, applicationId) {
   };
   const { useProviderApplication } = load('hooks/useProviderApplication.ts', {
     react, '../services/providerApplication.service': { providerApplicationService: service },
+    '@/components/common/Toast': { useToastFeedback: (initial) => react.useState(initial) },
   });
   return () => { cursor = 0; return useProviderApplication(applicationId); };
 }
@@ -200,7 +201,10 @@ test('Thông báo duyệt ban đầu giải thích và kết thúc phiên, bổ 
   const { useNotificationFeed } = load('../../components/common/notification-bell/useNotificationFeed.ts', {
     react,
     '@/features/notification/api/notification.api': { notificationApi: {} },
-    './notificationBell.utils': { getNotificationPath: () => '#', getErrorMessage: () => '' },
+    './notificationBell.utils': { getNotificationPath: () => '#', getErrorMessage: () => '', isNotificationForUser: () => true },
+    '@/features/notification/hooks/useNotificationAccount': { useNotificationAccount: () => ({
+      accountId: 'nguoi-dung', isCurrentAccount: () => true,
+    }) },
     './useNotificationReadActions': { useNotificationReadActions: () => ({}) },
     './useNotificationSocket': { useNotificationSocket: (_enabled, callback) => { receive = callback; } },
     '../Toast': { useToast: () => ({ addToast: (...args) => toasts.push(args) }) },

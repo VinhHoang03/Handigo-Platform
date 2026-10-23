@@ -10,6 +10,7 @@ import type {
   Payment,
 } from "@/types/booking";
 import type { WalletTransaction } from "@/features/wallet/types/wallet.types";
+import type { BookingPolicies } from "../types/bookingPolicy.types";
 
 export interface OrderPaymentsResult {
   payments: Payment[];
@@ -59,6 +60,10 @@ interface ReverseGeocodedAddress {
 }
 
 export const bookingApi = {
+  getBookingPolicies: async () => {
+    const response = await api.get<{ success: boolean; data: BookingPolicies }>("/orders/booking-policies");
+    return response.data.data;
+  },
   preview: async (payload: Pick<CreateOrderPayload, 'serviceId' | 'orderType' | 'selectedOptions' | 'uniformQuantity' | 'voucherCode'>) => {
     const response = await api.post<{ success: boolean; data: BookingPreview }>('/orders/preview', payload);
     return response.data.data;
@@ -218,10 +223,14 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  cancelOrder: async (orderId: string, reason: string) => {
+  cancelOrder: async (
+    orderId: string,
+    reason: string,
+    confirmedExpectation?: Pick<CancellationPreview, "paidAmount" | "refundAmount" | "cancellationFee" | "providerCompensation">,
+  ) => {
     const response = await api.patch<{ success: boolean; data: Order }>(
       `/orders/${orderId}/cancel`,
-      { reason },
+      { reason, confirmedExpectation },
     );
     return response.data.data;
   },
@@ -248,11 +257,15 @@ export const bookingApi = {
     return response.data.data;
   },
 
-  cancelRecurringSeries: async (orderId: string, reason: string) => {
+  cancelRecurringSeries: async (
+    orderId: string,
+    reason: string,
+    confirmedExpectations?: CancellationPreview["items"],
+  ) => {
     const response = await api.patch<{
       success: boolean;
       data: { cancelledCount: number; orders: Order[] };
-    }>(`/orders/${orderId}/cancel-series`, { reason });
+    }>(`/orders/${orderId}/cancel-series`, { reason, confirmedExpectations });
     return response.data.data;
   },
 

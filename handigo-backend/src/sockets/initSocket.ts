@@ -12,10 +12,10 @@ import {
 } from "../validations/chat.validator";
 import { currentLocationSchema } from "../validations/location.validator";
 import { orderIdParamSchema } from "../validations/order.validator";
-import { markProviderOffline } from "../services/providerPresence.service";
+import { markProviderOffline, restoreProviderAfterReconnect } from "../services/providerPresence.service";
 import { createLogger } from "../utils/logger";
 
-const PROVIDER_OFFLINE_GRACE_MS = 5_000;
+const PROVIDER_OFFLINE_GRACE_MS = 30_000;
 const socketLogger = createLogger("SocketServer");
 
 const getAccessSecret = (): string => {
@@ -40,6 +40,7 @@ type AuthedSocket = Socket & {
 
 export const initSocket = (server: HttpServer) => {
   const providerOfflineTimers = new Map<string, NodeJS.Timeout>();
+  const disconnectedProviders = new Map<string, Promise<Date | null>>();
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
@@ -106,21 +107,51 @@ export const initSocket = (server: HttpServer) => {
         clearTimeout(pendingOfflineTimer);
         providerOfflineTimers.delete(socketUser.id);
       }
+      const offlineChange = disconnectedProviders.get(socketUser.id);
+      if (offlineChange) {
+        disconnectedProviders.delete(socketUser.id);
+        void offlineChange.then(async (disconnectedAt) => {
+          if (!disconnectedAt) return;
+          const activeSockets = await io.in(userRoom).fetchSockets();
+          if (!activeSockets.length) {
+            if (!disconnectedProviders.has(socketUser.id)) disconnectedProviders.set(socketUser.id, offlineChange);
+            return;
+          }
+          if (await restoreProviderAfterReconnect(socketUser.id, disconnectedAt)) {
+            io.to(userRoom).emit("provider:availability", { availabilityStatus: "online" });
+            socketLogger.info("Đã khôi phục nhận việc sau khi provider kết nối lại.", { userId: socketUser.id });
+          }
+        }).catch((error) => {
+          socketLogger.error("Không thể khôi phục trạng thái nhận việc sau khi kết nối lại.", error, { userId: socketUser.id });
+        });
+      }
     }
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       if (socketUser.role !== "PROVIDER") return;
 
       const existingTimer = providerOfflineTimers.get(socketUser.id);
       if (existingTimer) clearTimeout(existingTimer);
 
       const timer = setTimeout(async () => {
-        providerOfflineTimers.delete(socketUser.id);
-
         try {
           const activeSockets = await io.in(userRoom).fetchSockets();
-          if (activeSockets.length === 0) {
-            await markProviderOffline(socketUser.id);
+          if (activeSockets.length === 0 && providerOfflineTimers.get(socketUser.id) === timer) {
+            const offlineChange = markProviderOffline(socketUser.id, true);
+            disconnectedProviders.set(socketUser.id, offlineChange);
+            try {
+              const disconnectedAt = await offlineChange;
+              if (disconnectedAt) {
+                socketLogger.info("Tạm ngừng nhận việc vì provider mất toàn bộ kết nối quá thời gian chờ.", {
+                  userId: socketUser.id, reason, graceMs: PROVIDER_OFFLINE_GRACE_MS,
+                });
+              } else if (disconnectedProviders.get(socketUser.id) === offlineChange) {
+                disconnectedProviders.delete(socketUser.id);
+              }
+            } catch (error) {
+              if (disconnectedProviders.get(socketUser.id) === offlineChange) disconnectedProviders.delete(socketUser.id);
+              throw error;
+            }
           }
         } catch (error) {
           socketLogger.error(
@@ -128,6 +159,8 @@ export const initSocket = (server: HttpServer) => {
             error,
             { userId: socketUser.id },
           );
+        } finally {
+          if (providerOfflineTimers.get(socketUser.id) === timer) providerOfflineTimers.delete(socketUser.id);
         }
       }, PROVIDER_OFFLINE_GRACE_MS);
 

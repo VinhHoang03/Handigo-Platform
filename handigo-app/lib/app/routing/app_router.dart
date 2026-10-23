@@ -19,6 +19,7 @@ import '../providers/app_providers.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authControllerProvider.notifier);
+  String? pendingLocation;
   final router = GoRouter(
     initialLocation: '/splash',
     refreshListenable: auth,
@@ -36,6 +37,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         '/forgot-password/new-password',
       }.contains(location);
       if (!auth.isAuthenticated && !isAuthRoute) {
+        if (location != '/splash') pendingLocation = state.uri.toString();
         return '/login';
       }
       if (location == '/forgot-password/new-password' &&
@@ -54,7 +56,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           location != '/customer/provider-onboarding') {
         return '/provider';
       }
+      if (auth.isAuthenticated &&
+          auth.user?.role == UserRole.customer &&
+          location.startsWith('/provider'))
+        return '/customer';
       if (auth.isAuthenticated && (isAuthRoute || location == '/splash')) {
+        final destination = pendingLocation;
+        pendingLocation = null;
+        final prefix = auth.user!.role == UserRole.provider
+            ? '/provider'
+            : '/customer';
+        if (destination != null && destination.startsWith('$prefix/'))
+          return destination;
         return auth.user!.role == UserRole.provider ? '/provider' : '/customer';
       }
       return null;
@@ -136,6 +149,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const WalletScreen(),
       ),
       GoRoute(
+        path: '/customer/wallet/history',
+        builder: (_, __) => const CustomerPaymentHistoryScreen(),
+      ),
+      GoRoute(
         path: '/customer/vouchers',
         builder: (_, __) => const VoucherScreen(),
       ),
@@ -173,7 +190,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/customer/services/:id/reviews',
-        builder: (_, state) => ServiceReviewsScreen(serviceId: state.pathParameters['id']!),
+        builder: (_, state) =>
+            ServiceReviewsScreen(serviceId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/customer/bookings/new/:serviceId',
@@ -187,7 +205,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ? state.extra! as Map
               : const <String, dynamic>{};
           return BookingSuccessScreen(
-            orderId: data['orderId'] as String?,
+            orderId:
+                state.uri.queryParameters['orderId'] ??
+                data['orderId'] as String?,
             orderCode: data['orderCode'] as String?,
             paymentStatus: data['paymentStatus'] as String?,
             checkoutUrl: data['checkoutUrl'] as String?,
@@ -195,6 +215,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(path: '/provider', builder: (_, __) => const ProviderShell()),
+      GoRoute(
+        path: '/provider/chat/order/:id',
+        builder: (_, state) =>
+            ChatByOrderScreen(orderId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/provider/orders/:id/tracking',
+        builder: (_, state) =>
+            OrderTrackingScreen(orderId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/provider/chat',
+        builder: (_, state) => const ConversationListScreen(),
+      ),
       GoRoute(
         path: '/provider/orders/:id',
         builder: (_, state) =>

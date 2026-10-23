@@ -1,3 +1,26 @@
+## Chạy toàn bộ hệ thống bằng một lệnh trên Windows
+
+Tại thư mục gốc, chạy:
+
+```powershell
+node dev.mjs
+```
+
+Lệnh chạy backend, web và app Flutter cùng lúc. App tự mở trong cả Edge và
+Chrome tại `http://localhost:8081`, dùng hai phiên đăng nhập riêng. Web chạy
+tại `https://localhost:5173` và có thể mở riêng khi cần. Backend dùng cấu hình
+hiện có; app kết nối API tại `http://localhost:5000`.
+
+Cần có Node.js, Flutter trên PATH, Edge, Chrome và đã cài thư viện cho từng
+ứng dụng (`npm install` trong backend/web, `flutter pub get` trong app).
+Dừng các phiên cũ để giải phóng cổng `5000`, `5173`, `8081` trước khi chạy.
+Có thể kiểm tra các điều kiện khởi chạy bằng `node dev.mjs --check`.
+
+Lưu file Dart để tự reload; nhập `r` / `R` rồi Enter để reload / restart.
+Với chế độ Flutter `web-server`, nếu trình duyệt chưa cập nhật thì tải lại
+trang. Nhập `q` rồi Enter hoặc `Ctrl+C` để dừng toàn bộ tiến trình do lệnh
+khởi chạy; các cửa sổ trình duyệt vẫn mở.
+
 ## Phát triển ứng dụng Flutter bằng Codex và terminal
 
 Mở emulator Android trước. Chạy backend trong terminal riêng:

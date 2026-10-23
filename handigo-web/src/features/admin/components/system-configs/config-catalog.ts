@@ -1,6 +1,7 @@
 import type { SystemConfigType } from "../../types/systemConfig.types";
 import type { ConfigDefinition, ConfigGroupKey } from "./config-types";
 import { defaultBookingPolicy } from './booking-policy';
+import { defaultRefundPolicy, defaultRewardPolicy } from './business-policies';
 import { Bell, Braces, ClipboardList, Globe, LayoutDashboard, ShieldUser, Tag, ToggleRight, Type, Wallet, type LucideIcon } from "lucide-react";
 export const groupOptions: Array<{
   key: ConfigGroupKey | "all";
@@ -10,6 +11,7 @@ export const groupOptions: Array<{
   { key: "all", label: "Tất cả cấu hình", icon: LayoutDashboard },
   { key: "operation", label: "Vận hành", icon: ShieldUser },
   { key: "booking", label: "Đơn hàng", icon: ClipboardList },
+  { key: "policy", label: "Chính sách", icon: ShieldUser },
   { key: "payment", label: "Thanh toán và ví", icon: Wallet },
   { key: "display", label: "Hiển thị công khai", icon: Globe },
   { key: "notification", label: "Thông báo", icon: Bell },
@@ -17,10 +19,22 @@ export const groupOptions: Array<{
 
 export const configDefinitions: ConfigDefinition[] = [
   {
-    key: 'BOOKING_POLICY', label: 'Giá và thời lượng đặt dịch vụ', group: 'booking', type: 'JSON',
+    key: 'BOOKING_POLICY', label: 'Chính sách đặt lịch và thời lượng', group: 'policy', type: 'JSON',
     defaultValue: defaultBookingPolicy, isPublic: false, isEffective: true,
-    description: 'Thời gian đặt trước, thời lượng dịch vụ, dự phòng, di chuyển và ca làm việc.',
-    effect: 'Giá và thời lượng được lưu theo đơn mới. Lịch làm việc được kiểm tra lại lúc nhận đơn. Voucher không giảm phụ phí.',
+    description: 'Thời lượng dịch vụ, giữ lịch chờ thanh toán, dự phòng, di chuyển và ca làm việc.',
+    effect: 'Thời lượng được lưu theo đơn mới. Lịch làm việc được kiểm tra lại lúc nhận đơn và bắt đầu thực hiện.',
+  },
+  {
+    key: 'REFUND_POLICY', label: 'Chính sách hủy đơn và hoàn tiền', group: 'policy', type: 'JSON',
+    defaultValue: defaultRefundPolicy, isPublic: false, isEffective: true,
+    description: 'Mốc thời gian, tỷ lệ hoàn và bồi thường khi khách hủy đơn giá cố định. Đơn báo giá áp dụng quy tắc xử lý cọc riêng.',
+    effect: 'Áp dụng khi xem phí và xác nhận hủy mới. Đơn đã hủy giữ mức hoàn và bồi thường đã lưu, kể cả khoản thanh toán được phát hiện sau đó.',
+  },
+  {
+    key: 'REWARD_POLICY', label: 'Chính sách tích điểm và hạn dùng mã', group: 'policy', type: 'JSON',
+    defaultValue: defaultRewardPolicy, isPublic: false, isEffective: true,
+    description: 'Mức chi tiêu được tích một điểm và số ngày hiệu lực của mã đổi điểm.',
+    effect: 'Áp dụng cho lần cộng điểm và đổi mã mới. Không tính lại điểm đã cộng; mã đã cấp giữ hạn dùng cũ. Gói đổi điểm được quản lý tại Khuyến mãi.',
   },
   {
     key: "PLATFORM_FEE_PERCENT",
@@ -68,13 +82,13 @@ export const configDefinitions: ConfigDefinition[] = [
     label: "Thời gian chờ provider nhận đơn",
     group: "booking",
     type: "NUMBER",
-    defaultValue: 90,
+    defaultValue: 60,
     unit: "giây",
     isPublic: false,
     description:
       "Số giây hệ thống chờ nhóm provider hiện tại phản hồi trước khi mở nhóm tiếp theo.",
-    effect: "Thời gian phản hồi được cố định 90 giây cho đơn thường và lịch hẹn; giá trị cấu hình này không thay đổi thời hạn nhận đơn.",
-    isEffective: false,
+    effect: "Áp dụng cho đề nghị mới, gồm đơn thường, lịch hẹn, chọn thợ và tìm thợ thay thế. Thời hạn tối đa bằng thời gian trước khi mở rộng tìm kiếm; ví dụ mở rộng sau 1 phút thì mỗi đề nghị tối đa 60 giây, kể cả ở vòng mở rộng. Đề nghị đang chờ giữ thời hạn đã lưu.",
+    isEffective: true,
   },
   {
     key: "MATCHING_BATCH_SIZE",
@@ -118,11 +132,11 @@ export const configDefinitions: ConfigDefinition[] = [
     label: "Thời gian trước khi mở rộng tìm kiếm",
     group: "booking",
     type: "NUMBER",
-    defaultValue: 3,
+    defaultValue: 1,
     unit: "phút",
     isPublic: false,
     description: "Nếu chưa có thợ nhận đơn sau khoảng thời gian này, mở rộng bán kính.",
-    effect: "Áp dụng cho vòng tìm thợ mới; đơn đang tìm giữ cấu hình đã lưu.",
+    effect: "Áp dụng cho vòng tìm thợ mới sau khi lưu; đơn đang tìm giữ mốc đã lưu. Mặc định 1 phút khi chưa có cấu hình.",
     isEffective: true,
   },
   {

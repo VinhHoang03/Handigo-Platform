@@ -7,7 +7,6 @@ import type { UserAddress } from '@/features/profile/types/profile.types';
 import type { ProviderAvailabilityStatus } from '@/features/customer-service/components/NearbyProviderSelector';
 import {
   type Step2FormErrors,
-  MIN_DESCRIPTION_LENGTH,
   getEarliestScheduledAt,
   getDefaultScheduledAt,
   getInitialScheduledAt,
@@ -175,7 +174,6 @@ export const useCreateBookingStep2Form = () => {
   );
 
   const validateStep = () => {
-    const description = (problemDescription || '').trim();
     const scheduleDate = scheduledAt ? scheduledAt.split('T')[0] : '';
     const nextErrors: Step2FormErrors = {};
 
@@ -183,9 +181,6 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.addressId = 'Vui lòng chọn địa chỉ thực hiện dịch vụ.';
     }
 
-    if (description.length < MIN_DESCRIPTION_LENGTH) {
-      nextErrors.problemDescription = 'Vui lòng mô tả tình trạng tối thiểu ' + MIN_DESCRIPTION_LENGTH + ' ký tự.';
-    }
 
     if (orderType === 'normal' && !isWithinImmediateBookingHours(new Date())) {
       nextErrors.scheduledAt = 'Đặt ngay chỉ khả dụng từ 08:00 đến 21:00. Vui lòng chọn Hẹn giờ.';
@@ -215,7 +210,7 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
         ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
         : shouldShowSchedulePicker
-          ? 'Chưa có chuyên gia phù hợp và còn trống trong thời gian đã chọn.'
+          ? 'Chưa có thợ đang nhận đơn phù hợp với dịch vụ, địa chỉ và lịch đã chọn.'
           : 'Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.';
     }
 

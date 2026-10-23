@@ -3,6 +3,7 @@ import type { SystemConfig, SystemConfigPayload, SystemConfigType } from "../../
 export type ConfigGroupKey =
   | "operation"
   | "booking"
+  | "policy"
   | "payment"
   | "display"
   | "notification";

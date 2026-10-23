@@ -83,12 +83,29 @@ export const createOrderSchema = z.object({
   }
 });
 
+const cancellationAmountSchema = z.number({ error: "Số tiền xác nhận phải là số hợp lệ." })
+  .finite("Số tiền xác nhận phải là số hữu hạn.")
+  .nonnegative("Số tiền xác nhận không được âm.");
+
+const cancellationExpectationSchema = z.object({
+  paidAmount: cancellationAmountSchema,
+  refundAmount: cancellationAmountSchema,
+  cancellationFee: cancellationAmountSchema,
+  providerCompensation: cancellationAmountSchema.optional(),
+});
+
 export const cancelOrderSchema = z.object({
   reason: z
     .string()
     .trim()
     .min(3, "Lý do hủy phải có ít nhất 3 ký tự")
     .max(500, "Lý do hủy không được vượt quá 500 ký tự"),
+  confirmedExpectation: cancellationExpectationSchema.optional(),
+});
+
+export const cancelRecurringSeriesSchema = cancelOrderSchema.omit({ confirmedExpectation: true }).extend({
+  confirmedExpectations: z.array(cancellationExpectationSchema.extend({ orderId: objectIdSchema }))
+    .min(1, "Cần xác nhận số tiền của ít nhất một buổi trong chuỗi lịch.").optional(),
 });
 
 export const previewBookingSchema = z.object({
