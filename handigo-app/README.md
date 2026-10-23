@@ -8,6 +8,9 @@ API. Backend được tái sử dụng từ `../handigo-backend`.
 ## Chạy local
 
 ```bash
+flutter emulators --launch Pixel_6a
+flutter devices
+flutter run -d emulator-5554
 flutter pub get
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000
 ```
