@@ -2,7 +2,7 @@ import { InitialsAvatar } from '@/components/common/InitialsAvatar';
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { normalizeImageUrl } from '@/utils/imageUrl';
 import type { Order } from '@/types/booking';
-import { formatDateTime, getCustomer } from '../../utils/providerOrder.utils';
+import { formatDateTime, getCustomer, getOrderRecipient } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
 import { CalendarDays, MapPin, Phone, Ticket, User, Wrench } from "lucide-react";
 interface CustomerInformationCardProps {
@@ -18,8 +18,10 @@ export function CustomerInformationCard({
   addressLine,
   orderType,
 }: CustomerInformationCardProps) {
+  const recipient = getOrderRecipient(order);
   const details = [
-    { icon: Phone, label: 'Số điện thoại', value: customer?.phone || 'Chưa cập nhật' },
+    { icon: User, label: 'Người liên hệ tại địa điểm', value: recipient.fullName },
+    { icon: Phone, label: 'Số điện thoại liên hệ', value: recipient.phone || 'Chưa cập nhật' },
     { icon: MapPin, label: 'Địa chỉ thực hiện', value: addressLine || 'Chưa cập nhật' },
     { icon: Wrench, label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
     { icon: CalendarDays, label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },
@@ -37,7 +39,7 @@ export function CustomerInformationCard({
           rounded="rounded-2xl"
         />
         <div className="min-w-0">
-          <p className="text-xs font-medium text-on-surface-variant">Khách hàng</p>
+          <p className="text-xs font-medium text-on-surface-variant">Người đặt dịch vụ</p>
           <p className="truncate text-lg font-bold text-on-surface">{customer?.fullName || 'Khách hàng'}</p>
           <span className="mt-1 inline-flex rounded-full bg-surface-container-lowest px-2 py-0.5 text-[11px] font-semibold text-primary">{orderType}</span>
         </div>

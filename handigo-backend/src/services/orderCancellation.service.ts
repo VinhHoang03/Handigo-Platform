@@ -1634,7 +1634,7 @@ export const cancelOrdersWithSettlement = async (
         );
         await compensateProviderPayments(claimedOrder, session);
 
-        if (claimedOrder.providerId && (wasInProgress || ["normal", "urgent"].includes(claimedOrder.orderType))) {
+        if (claimedOrder.providerId && (wasInProgress || claimedOrder.orderType === "normal")) {
           await Provider.updateOne(
             { _id: claimedOrder.providerId },
             { $set: { availabilityStatus: "online" } },

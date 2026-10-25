@@ -2,6 +2,7 @@ import api from "@/api/client";
 import { unwrap } from "@/api/response";
 
 export interface RewardOffer {
+  termsVersion: string;
   id: string; name: string; points: number; discountValue: number; minOrderAmount: number;
   discountType?: "AMOUNT" | "PERCENT";
   applicableOrderType?: "fixed_price" | "variable_price";
@@ -28,6 +29,6 @@ export const rewardsApi = {
   overview: async () => unwrap<RewardOverview>(await api.get("/rewards/me")),
   vouchers: async (page = 1) => unwrap<RewardPage<RewardVoucher>>(await api.get("/rewards/vouchers", { params: { page } })),
   history: async (page = 1) => unwrap<RewardPage<RewardEntry>>(await api.get("/rewards/history", { params: { page } })),
-  redeem: async (offerId: string, requestId: string) =>
-    unwrap<RewardVoucher>(await api.post("/rewards/redeem", { offerId, requestId })),
+  redeem: async (offerId: string, requestId: string, termsVersion: string) =>
+    unwrap<RewardVoucher>(await api.post("/rewards/redeem", { offerId, requestId, termsVersion })),
 };

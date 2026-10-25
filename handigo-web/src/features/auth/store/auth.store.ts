@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { tokenStorage } from "@/api/tokenStorage";
 import type { User } from "../types/auth.types";
+import { resetBookingSession } from "@/features/booking/hooks/useBookingStore";
 
 const USER_STORAGE_KEY = "handigo:user";
 
@@ -41,12 +42,13 @@ interface AuthState {
 const initialToken = tokenStorage.get();
 const initialUser = getStoredUser();
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: initialUser,
   token: initialToken,
   isAuthenticated: !!initialToken && !!initialUser,
   isInitializing: true,
   setAuth: (user, token, remember = true) => {
+    if ((get().user?.id ?? get().user?._id) !== (user.id || user._id)) resetBookingSession();
     localStorage.setItem('handigo:remember-login', String(remember));
     tokenStorage.set(token, remember);
     setStoredUser(user, remember);
@@ -57,6 +59,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token, isAuthenticated: true });
   },
   setUser: (user) => {
+    if ((get().user?.id ?? get().user?._id) !== (user.id || user._id)) resetBookingSession();
     setStoredUser(user);
     set({ user, isAuthenticated: true, isInitializing: false });
   },
@@ -64,6 +67,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isInitializing: false });
   },
   logout: () => {
+    resetBookingSession();
     tokenStorage.clear();
     clearStoredUser();
     set({ user: null, token: null, isAuthenticated: false, isInitializing: false });

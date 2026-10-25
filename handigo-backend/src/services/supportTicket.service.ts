@@ -8,7 +8,20 @@ import {
   SupportTicketCategory,
   SupportTicketPriority,
   SupportTicketStatus,
+  ISupportTicket,
 } from "../models/supportTicket.model";
+
+const saveTicketChange = async (ticket: ISupportTicket) => {
+  ticket.$where = { isDeleted: false, __v: ticket.get("__v") ?? { $exists: false } };
+  ticket.increment();
+  try { await ticket.save(); }
+  catch (error) {
+    if ((error as Error).name === "VersionError" || (error as Error).name === "DocumentNotFoundError") {
+      throw new AppError("Yêu cầu hỗ trợ đã thay đổi. Vui lòng tải lại và thử lại.", 409);
+    }
+    throw error;
+  }
+};
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
@@ -292,7 +305,7 @@ export const addSupportTicketResponse = async (
     ticket.status = "in_progress";
   }
 
-  await ticket.save();
+  await saveTicketChange(ticket);
   return SupportTicket.findById(ticket._id).populate(populateTicket());
 };
 
@@ -311,7 +324,7 @@ export const cancelSupportTicket = async (requesterId: string, ticketId: string)
 
   ticket.status = "cancelled";
   ticket.resolvedAt = new Date();
-  await ticket.save();
+  await saveTicketChange(ticket);
   return getSupportTicketForUser(requesterId, ticketId);
 };
 
@@ -394,7 +407,7 @@ export const updateSupportTicketStatus = async (
       ticket.resolutionNote = null;
     }
   }
-  await ticket.save();
+  await saveTicketChange(ticket);
   return getAdminSupportTicketById(ticketId);
 };
 
@@ -421,21 +434,23 @@ export const assignSupportTicket = async (
   const existingTicket = await SupportTicket.findOne({
     _id: ticketId,
     isDeleted: false,
-  }).select("status");
+  }).select("status __v");
   if (!existingTicket) throw new AppError("Không tìm thấy yêu cầu hỗ trợ", 404);
   if (TERMINAL_STATUSES.includes(existingTicket.status)) {
     throw new AppError("Yêu cầu hỗ trợ đã kết thúc, không thể phân công", 400);
   }
 
   const ticket = await SupportTicket.findOneAndUpdate(
-    { _id: ticketId, isDeleted: false },
+    { _id: ticketId, isDeleted: false, status: existingTicket.status,
+      __v: existingTicket.__v ?? { $exists: false } },
     {
+      $inc: { __v: 1 },
       assignedAdminId: new Types.ObjectId(targetAdminId),
       status: existingTicket.status === "open" ? "in_progress" : existingTicket.status,
     },
     { new: true, runValidators: true },
   ).populate(populateTicket());
 
-  if (!ticket) throw new AppError("Không tìm thấy yêu cầu hỗ trợ", 404);
+  if (!ticket) throw new AppError("Yêu cầu hỗ trợ đã thay đổi. Vui lòng tải lại và thử lại.", 409);
   return ticket;
 };

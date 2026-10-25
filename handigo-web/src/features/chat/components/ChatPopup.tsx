@@ -20,7 +20,14 @@ const sortMessages = (items: ChatMessage[]) => [...items].sort((a, b) => {
   return timeDifference || a._id.localeCompare(b._id);
 });
 
-export function ChatPopup({ orderId, conversation: initialConversation, open, onClose }: { orderId?: string; conversation?: Conversation; open: boolean; onClose: () => void }) {
+type ChatPopupProps = { orderId?: string; conversation?: Conversation; open: boolean; onClose: () => void };
+
+export function ChatPopup(props: ChatPopupProps) {
+  const accountId = useAuthStore((state) => state.user?.id || state.user?._id);
+  return <ChatPopupContent key={`${accountId}:${props.conversation?._id ?? props.orderId}:${props.open}`} {...props} />;
+}
+
+function ChatPopupContent({ orderId, conversation: initialConversation, open, onClose }: ChatPopupProps) {
   const { addToast } = useToast();
   const currentUser = useAuthStore((state) => state.user);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -36,8 +43,9 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
   const unregisterOpenPopup = useChatUiStore((state) => state.unregisterOpenPopup);
   const menuRef = useRef<HTMLDivElement>(null);
   const addMessage = useCallback((message: ChatMessage) => {
+    if (message.conversationId !== conversationId) return;
     setMessages((items) => items.some((item) => item._id === message._id) ? items : sortMessages([...items, message]));
-  }, []);
+  }, [conversationId]);
   const updateMessage = useCallback((message: ChatMessage) => {
     setMessages((items) => sortMessages(items.map((item) => item._id === message._id ? message : item)));
   }, []);
@@ -55,7 +63,8 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
 
   useEffect(() => {
     if (!open) return;
-    queueMicrotask(() => { setLoading(true); setError(''); });
+    let active = true;
+    queueMicrotask(() => { if (active) { setLoading(true); setError(''); } });
     const conversationRequest = initialConversation
       ? Promise.resolve(initialConversation)
       : orderId
@@ -63,6 +72,7 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
         : Promise.reject(new Error('Không tìm thấy cuộc trò chuyện.'));
     conversationRequest
       .then(async (conversation) => {
+        if (!active) return;
         setConversationId(conversation._id);
         const role = currentUser?.role.toUpperCase();
         const customer = typeof conversation.customerId === 'object' ? conversation.customerId : null;
@@ -72,14 +82,18 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
         const otherUser = role === 'PROVIDER' ? customer : providerUser;
         setPartner(otherUser ? { fullName: otherUser.fullName || 'Người dùng Handigo', avatar: otherUser.avatar } : null);
         const page = await chatApi.messages(conversation._id);
+        if (!active) return;
         setMessages((current) => {
-          const merged = new Map([...page.items, ...current].map((message) => [message._id, message]));
+          const merged = new Map([...page.items, ...current]
+            .filter((message) => message.conversationId === conversation._id)
+            .map((message) => [message._id, message]));
           return sortMessages([...merged.values()]);
         });
         await chatApi.seen(conversation._id);
       })
-      .catch(() => setError('Đơn dịch vụ chưa sẵn sàng để trò chuyện.'))
-      .finally(() => setLoading(false));
+      .catch(() => { if (active) setError('Đơn dịch vụ chưa sẵn sàng để trò chuyện.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [open, orderId, initialConversation, currentUser?.role, setError]);
 
   const currentUserId = currentUser?.id || currentUser?._id || '';

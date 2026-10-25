@@ -123,7 +123,7 @@ function reset(orderType, distances) {
     paymentMethod: 'wallet', paymentStatus: 'partially_paid', depositPaidAt: new Date(), depositAmount: 40000,
     bookingStatus: orderType === 'normal' ? 'not_required' : 'confirmed',
     scheduledAt: orderType === 'normal' ? null : new Date(Date.now() + 86400000),
-    recurringGroupId: orderType === 'recurring' ? new Types.ObjectId() : null,
+    
     matchingStartedAt: new Date(Date.now() - 900000),
     matchingSearch: { initialRadiusKm: 5, expandedRadiusKm: 10,
       expandsAt: new Date(Date.now() - 840000), expiresAt: new Date(Date.now() - 660000) },
@@ -178,7 +178,7 @@ async function run() {
     }
     const assignment = new OrderAssignment(data); assignments.push(assignment); return assignment;
   });
-  for (const type of ['normal', 'scheduled', 'recurring']) {
+  for (const type of ['normal', 'scheduled']) {
     const order = reset(type, [0.5, 2, 1, 7]);
     // Đề nghị cũ đã đóng không được cản trở vòng tìm lại của chính đơn đó.
     assignments.push(new OrderAssignment({ orderId: order._id, providerId: providers[2]._id, status: 'cancelled',
@@ -225,7 +225,7 @@ async function run() {
     await accept(order, providers[2]);
   }
   console.log('Đạt luồng nối tiếp: thợ cũ hủy → tìm lại 5 km theo khoảng cách → mở rộng 10 km sau 60 giây → thợ mới nhận.');
-  console.log('Đạt: giữ cọc, loại thợ cũ/thợ vừa từ chối hoặc hết hạn, tái sử dụng đề nghị đã đóng, bản đồ đồng bộ và lịch hẹn/định kỳ.');
+  console.log('Đạt: giữ cọc, loại thợ cũ/thợ vừa từ chối hoặc hết hạn, tái sử dụng đề nghị đã đóng, bản đồ đồng bộ và lịch hẹn.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; })
   .finally(() => { mock.restoreAll(); mock.timers.reset(); });

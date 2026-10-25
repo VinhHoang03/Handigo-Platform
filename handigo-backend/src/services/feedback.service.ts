@@ -1,5 +1,6 @@
 import { serviceImageResponse } from "../utils/serviceImageResponse";
-import { Types } from "mongoose";
+import mongoose, { ClientSession, Types } from "mongoose";
+import { withTransactionRetry } from "../utils/transaction";
 import { AppError } from "../utils/appError";
 import { Feedback } from "../models/feedback.model";
 import { Order } from "../models/order.model";
@@ -47,13 +48,26 @@ const getPagination = (query: PaginationQuery) => {
   };
 };
 
-export const recalculateProviderRating = async (providerId: Types.ObjectId | string) => {
+const withRatingTransaction = async <T>(operation: (session: ClientSession) => Promise<T>) => {
+  const session = await mongoose.startSession();
+  try { return await withTransactionRetry(session, operation); }
+  finally { await session.endSession(); }
+};
+
+export const recalculateProviderRating = async (providerId: Types.ObjectId | string, session?: ClientSession): Promise<void> => {
+  if (!session) return withRatingTransaction((activeSession) => recalculateProviderRating(providerId, activeSession));
+  // Cùng ghi hồ sơ thợ trong giao dịch để lượt thống kê cũ không ghi đè lượt mới.
+  const provider = await Provider.findOneAndUpdate(
+    { _id: providerId, isDeleted: false }, { $inc: { __v: 1 } },
+    { session, new: true, runValidators: true },
+  );
+  if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   const providerObjectId =
     typeof providerId === "string" ? new Types.ObjectId(providerId) : providerId;
   const orderIds = await Order.find({
     providerId: providerObjectId,
     isDeleted: false,
-  }).distinct("_id");
+  }).session(session).distinct("_id");
 
   const [stats] = await Feedback.aggregate<{
     averageRating: number;
@@ -73,63 +87,66 @@ export const recalculateProviderRating = async (providerId: Types.ObjectId | str
         totalFeedbacks: { $sum: 1 },
       },
     },
-  ]);
+  ]).session(session);
 
   await Provider.findByIdAndUpdate(providerObjectId, {
     averageRating: stats ? Number(stats.averageRating.toFixed(1)) : 0,
     totalFeedbacks: stats?.totalFeedbacks || 0,
-  });
+  }, { session, runValidators: true });
 };
 
 export const createFeedback = async (userId: string, payload: FeedbackPayload, resourceId?: Types.ObjectId) => {
-  assertObjectId(userId, "người dùng");
-  assertObjectId(payload.orderId, "đơn hàng");
+  return withRatingTransaction(async (session) => {
+    assertObjectId(userId, "người dùng");
+    assertObjectId(payload.orderId, "đơn hàng");
 
-  const order = await Order.findOne({
-    _id: payload.orderId,
-    isDeleted: false,
+    const order = await Order.findOne({
+      _id: payload.orderId,
+      isDeleted: false,
+    }).session(session);
+
+    if (!order) {
+      throw new AppError("Không tìm thấy đơn dịch vụ", 404);
+    }
+
+    if (order.customerId.toString() !== userId) {
+      throw new AppError("Bạn chỉ có thể đánh giá đơn dịch vụ của mình", 403);
+    }
+
+    if (order.status !== "completed") {
+      throw new AppError("Chỉ có thể đánh giá đơn dịch vụ đã hoàn thành", 400);
+    }
+
+    if (!order.providerId) {
+      throw new AppError("Đơn dịch vụ chưa có thợ thực hiện", 400);
+    }
+
+    const existingFeedback = await Feedback.findOne({
+      orderId: order._id,
+      isDeleted: false,
+    }).session(session);
+
+    if (existingFeedback) {
+      throw new AppError("Đơn dịch vụ này đã được đánh giá", 400);
+    }
+
+    const [feedback] = await Feedback.create([{
+      ...(resourceId ? { _id: resourceId } : {}),
+      orderId: order._id,
+      customerId: order.customerId,
+      providerId: order.providerId,
+      serviceId: order.serviceId,
+      rating: payload.rating,
+      comment: payload.comment ?? null,
+      images: payload.images ?? [],
+    }], { session });
+
+    await recalculateProviderRating(order.providerId, session);
+
+    return feedback;
   });
-
-  if (!order) {
-    throw new AppError("Không tìm thấy đơn dịch vụ", 404);
-  }
-
-  if (order.customerId.toString() !== userId) {
-    throw new AppError("Bạn chỉ có thể đánh giá đơn dịch vụ của mình", 403);
-  }
-
-  if (order.status !== "completed") {
-    throw new AppError("Chỉ có thể đánh giá đơn dịch vụ đã hoàn thành", 400);
-  }
-
-  if (!order.providerId) {
-    throw new AppError("Đơn dịch vụ chưa có thợ thực hiện", 400);
-  }
-
-  const existingFeedback = await Feedback.findOne({
-    orderId: order._id,
-    isDeleted: false,
-  });
-
-  if (existingFeedback) {
-    throw new AppError("Đơn dịch vụ này đã được đánh giá", 400);
-  }
-
-  const feedback = await Feedback.create({
-    ...(resourceId ? { _id: resourceId } : {}),
-    orderId: order._id,
-    customerId: order.customerId,
-    providerId: order.providerId,
-    serviceId: order.serviceId,
-    rating: payload.rating,
-    comment: payload.comment ?? null,
-    images: payload.images ?? [],
-  });
-
-  await recalculateProviderRating(order.providerId);
-
-  return feedback;
 };
+
 
 export const updateMyFeedback = async (
   userId: string,
@@ -137,47 +154,50 @@ export const updateMyFeedback = async (
   payload: UpdateFeedbackPayload,
   expectedVersion?: string,
 ) => {
-  assertObjectId(userId, "người dùng");
-  assertObjectId(feedbackId, "đánh giá");
+  return withRatingTransaction(async (session) => {
+    assertObjectId(userId, "người dùng");
+    assertObjectId(feedbackId, "đánh giá");
 
-  if (expectedVersion !== undefined) {
-    const version = new Date(expectedVersion);
-    if (!Number.isFinite(version.getTime())) throw new AppError("Phiên bản đánh giá không hợp lệ.", 400);
-    const changes = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
-    const updated = await Feedback.findOneAndUpdate({ _id: feedbackId, customerId: userId,
-      isDeleted: false, updatedAt: version }, { $set: changes }, { new: true, runValidators: true });
-    if (!updated) throw new AppError("Đánh giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại.", 409);
-    await recalculateProviderRating(updated.providerId);
-    return updated;
-  }
+    if (expectedVersion !== undefined) {
+      const version = new Date(expectedVersion);
+      if (!Number.isFinite(version.getTime())) throw new AppError("Phiên bản đánh giá không hợp lệ.", 400);
+      const changes = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+      const updated = await Feedback.findOneAndUpdate({ _id: feedbackId, customerId: userId,
+        isDeleted: false, updatedAt: version }, { $set: changes }, { new: true, runValidators: true, session });
+      if (!updated) throw new AppError("Đánh giá đã thay đổi. Vui lòng kiểm tra và xác nhận lại.", 409);
+      await recalculateProviderRating(updated.providerId, session);
+      return updated;
+    }
 
-  const feedback = await Feedback.findOne({
-    _id: feedbackId,
-    customerId: userId,
-    isDeleted: false,
+    const feedback = await Feedback.findOne({
+      _id: feedbackId,
+      customerId: userId,
+      isDeleted: false,
+    }).session(session);
+
+    if (!feedback) {
+      throw new AppError("Không tìm thấy đánh giá", 404);
+    }
+
+    if (payload.rating !== undefined) {
+      feedback.rating = payload.rating;
+    }
+
+    if (payload.comment !== undefined) {
+      feedback.comment = payload.comment;
+    }
+
+    if (payload.images !== undefined) {
+      feedback.images = payload.images;
+    }
+
+    await feedback.save({ session });
+    await recalculateProviderRating(feedback.providerId, session);
+
+    return feedback;
   });
-
-  if (!feedback) {
-    throw new AppError("Không tìm thấy đánh giá", 404);
-  }
-
-  if (payload.rating !== undefined) {
-    feedback.rating = payload.rating;
-  }
-
-  if (payload.comment !== undefined) {
-    feedback.comment = payload.comment;
-  }
-
-  if (payload.images !== undefined) {
-    feedback.images = payload.images;
-  }
-
-  await feedback.save();
-  await recalculateProviderRating(feedback.providerId);
-
-  return feedback;
 };
+
 
 export const getMyFeedbacks = async (userId: string) => {
   assertObjectId(userId, "người dùng");
@@ -525,25 +545,28 @@ export const setFeedbackVisibility = async (
   feedbackId: string,
   isVisible: boolean,
 ) => {
-  assertObjectId(feedbackId, "đánh giá");
+  return withRatingTransaction(async (session) => {
+    assertObjectId(feedbackId, "đánh giá");
 
-  const feedback = await Feedback.findOneAndUpdate(
-    {
-      _id: feedbackId,
-      isDeleted: false,
-    },
-    { isVisible },
-    { new: true },
-  );
+    const feedback = await Feedback.findOneAndUpdate(
+      {
+        _id: feedbackId,
+        isDeleted: false,
+      },
+      { isVisible },
+      { new: true, runValidators: true, session },
+    );
 
-  if (!feedback) {
-    throw new AppError("Không tìm thấy đánh giá", 404);
-  }
+    if (!feedback) {
+      throw new AppError("Không tìm thấy đánh giá", 404);
+    }
 
-  await recalculateProviderRating(feedback.providerId);
+    await recalculateProviderRating(feedback.providerId, session);
 
-  return feedback;
+    return feedback;
+  });
 };
+
 
 export const upsertProviderReply = async (
   userId: string,

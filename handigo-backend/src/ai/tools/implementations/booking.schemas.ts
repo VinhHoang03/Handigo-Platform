@@ -20,6 +20,9 @@ export const bookingSchema = priceSchema.extend({
   voucherCode: createOrderSchema.shape.voucherCode,
   preferredProviderId: createOrderSchema.shape.preferredProviderId,
 }).strict().superRefine((value, ctx) => {
+  if (value.orderType === "normal" && !isWithinAppointmentHours(new Date())) {
+    ctx.addIssue({ code: "custom", path: ["orderType"], message: "Đặt ngay chỉ khả dụng từ 08:00 đến 21:00 theo giờ Việt Nam. Vui lòng chọn Hẹn giờ." });
+  }
   if (value.orderType === "scheduled" && (!value.scheduledAt || Date.parse(value.scheduledAt) < getEarliestScheduledAt().getTime())) {
     ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn trong tương lai." });
   }

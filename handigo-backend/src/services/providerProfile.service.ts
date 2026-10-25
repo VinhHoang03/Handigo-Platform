@@ -330,8 +330,6 @@ export const getNearbyProvidersForCustomer = async (
   serviceId: string,
   addressId: string,
   scheduledAtValue?: string,
-  recurrenceUnitValue?: string,
-  recurrenceCountValue?: number,
   orderIdValue?: string,
   selectedOptions?: unknown,
 ) => {
@@ -371,38 +369,7 @@ export const getNearbyProvidersForCustomer = async (
   if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt < getEarliestScheduledAt() || !isWithinAppointmentHours(scheduledAt))) {
     throw new AppError("Thời gian lịch hẹn không hợp lệ.", 400);
   }
-  const recurrenceUnit = ["weekly", "monthly"].includes(recurrenceUnitValue || "")
-    ? (recurrenceUnitValue as "weekly" | "monthly")
-    : undefined;
-  const validRecurrenceCounts = recurrenceUnit === "weekly"
-    ? [1, 2, 3, 4]
-    : recurrenceUnit === "monthly"
-      ? [4, 8, 12]
-      : [];
-  const recurrenceCount = validRecurrenceCounts.includes(recurrenceCountValue || 0)
-    ? recurrenceCountValue
-    : undefined;
-  const occurrenceDates = scheduledAt
-    ? recurrenceUnit && recurrenceCount
-      ? Array.from({ length: recurrenceCount }, (_, index) => {
-          const occurrence = new Date(scheduledAt);
-          if (recurrenceUnit === "weekly") {
-            occurrence.setDate(scheduledAt.getDate() + index * 7);
-          } else {
-            const targetDay = scheduledAt.getDate();
-            occurrence.setDate(1);
-            occurrence.setMonth(scheduledAt.getMonth() + index);
-            const lastDay = new Date(
-              occurrence.getFullYear(),
-              occurrence.getMonth() + 1,
-              0,
-            ).getDate();
-            occurrence.setDate(Math.min(targetDay, lastDay));
-          }
-          return occurrence;
-        })
-      : [scheduledAt]
-    : [];
+  const occurrenceDates = scheduledAt ? [scheduledAt] : [];
 
   let excludeProviderIds: Types.ObjectId[] = [];
   let savedIntervals: ScheduleInterval[] | undefined;
@@ -412,24 +379,15 @@ export const getNearbyProvidersForCustomer = async (
       throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
     }
 
-    const relatedOrders = order.recurringGroupId
-      ? await Order.find({
-          recurringGroupId: order.recurringGroupId,
-          customerId: new Types.ObjectId(userId),
-          status: "created",
-          isDeleted: false,
-        }).lean()
-      : [order];
     const policy = await getBookingPolicy();
-    savedIntervals = relatedOrders.map((item) => {
+    savedIntervals = [order].map((item) => {
       const interval = getOrderInterval(item, policy);
       if (item.scheduledAt) return interval;
       const start = Date.now() + interval.travelMinutes * 60000;
       return { ...interval, start, end: start + (interval.end - interval.start) };
     });
-    const relatedOrderIds = relatedOrders.map((item) => item._id);
     excludeProviderIds = await OrderAssignment.find({
-      orderId: { $in: relatedOrderIds },
+      orderId: order._id,
       status: { $in: ["rejected", "timeout"] },
       isDeleted: false,
     }).distinct("providerId");

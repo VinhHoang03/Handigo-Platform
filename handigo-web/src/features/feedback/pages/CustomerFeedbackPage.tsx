@@ -11,6 +11,10 @@ import { useOrderFeedback } from '../hooks/useFeedback';
 
 export default function CustomerFeedbackPage() {
   const { orderId = '' } = useParams();
+  return <CustomerFeedbackContent key={orderId} orderId={orderId} />;
+}
+
+function CustomerFeedbackContent({ orderId }: { orderId: string }) {
   const navigate = useNavigate();
   const { context, feedback, loading, saving, error, load, save } = useOrderFeedback(orderId);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);

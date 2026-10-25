@@ -66,7 +66,8 @@ export function describeOrderProgress(fields: Record<string, unknown>) {
   }
   if (fields["confirmation.providerConfirmedAt"]) lines.push("Nhà cung cấp đã xác nhận hoàn thành dịch vụ.");
   if (fields["confirmation.customerConfirmedAt"]) lines.push("Bạn đã xác nhận hoàn thành dịch vụ.");
-  if (fields["overdueReview.escalatedAt"]) lines.push("Đơn hàng quá thời gian dự kiến và đang cần xác nhận tiến độ.");
+  const overdueReview = fields.overdueReview as { escalatedAt?: unknown } | null | undefined;
+  if (fields["overdueReview.escalatedAt"] || overdueReview?.escalatedAt) lines.push("Đơn hàng quá thời gian dự kiến và đang cần xác nhận tiến độ.");
   label("reassignment.status", reassignmentLabels);
   const confirmation = fields.confirmation as Record<string, unknown> | undefined;
   if (confirmation?.providerConfirmedAt) lines.push("Nhà cung cấp đã xác nhận hoàn thành dịch vụ.");
@@ -342,6 +343,8 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
       await deliver(subscription, `order-event:refund:${doc._id}:succeeded`, `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date());
       return;
     }
+    if (fields.status === "failed" && doc.metadata?.customerCancelledQr !== true
+      && doc.failureReason === "Đã hủy PayOS để đổi phương thức thanh toán") return;
     if (fields.status === "failed") lines = [doc.metadata?.customerCancelledQr === true
       ? "Đã hủy giao dịch QR thanh toán. Đơn hàng được giữ theo thời hạn hiện tại; bạn có thể chọn thanh toán lại."
       : "Giao dịch thanh toán đã thất bại hoặc hết hạn. Vui lòng kiểm tra thanh toán trong chi tiết đơn hàng."];

@@ -109,6 +109,7 @@ export interface IOrder extends Document, IBaseDocument {
   selectedOptionIds: Types.ObjectId[];
   selectedOptionsSnapshot: ISelectedOptionSnapshot[];
   addressId: Types.ObjectId | null;
+  // Giữ kiểu dữ liệu lịch sử; API và service tạo đơn chỉ nhận normal/scheduled.
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | null;
   bookingStatus:

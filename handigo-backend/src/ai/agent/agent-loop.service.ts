@@ -361,6 +361,11 @@ export class AgentLoop {
           }
           session.pendingAction = await this.confirmation.prepare(tool, context, args);
           session.pendingAction.taskVersion = session.taskVersion;
+          if (tool.name === "create_payment" && (session.pendingAction.preview as { previousPaymentId?: string })?.previousPaymentId) {
+            const finished = await this.execute(session, context, tool, args, checkpoint, session.pendingAction);
+            if (!finished) return this.reply(session, "WAITING_USER_INPUT", "Thông tin thanh toán đã thay đổi. Vui lòng kiểm tra thanh toán rồi chọn lại phương thức.");
+            return session.conversation[session.conversation.length - 1].content;
+          }
           return this.reply(session, "WAITING_CONFIRMATION", "Vui lòng kiểm tra thông tin bên dưới và chọn Xác nhận hoặc Từ chối.");
         }
       } catch (error) {

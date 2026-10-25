@@ -85,9 +85,9 @@ export function createAgentPaymentService(deps = dependencies, cancellation = ca
       return { ...base, status: "pending", checkoutUrl: safePayosUrl(link?.checkoutUrl),
         message: "Đang chờ thanh toán. Bạn quét mã QR bên dưới để thanh toán." };
     }
-    if (["scheduled", "recurring"].includes(order.orderType)
+    if (order.orderType === "scheduled"
       && !(order.status === "in_progress" && !order.inspectionRequired && order.paymentStatus === "unpaid")
-      && !(order.status === "created" && !order.providerId && order.bookingStatus !== "reserved")
+      && !(order.status === "created" && !order.providerId)
       && (order.status !== "accepted" || order.bookingStatus !== "awaiting_payment" || !order.providerId)) {
       return { ...base, status: "blocked", message: "Lịch hẹn đang chờ thợ xác nhận, chưa đến bước thanh toán." };
     }

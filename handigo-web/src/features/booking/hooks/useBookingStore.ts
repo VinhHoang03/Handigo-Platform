@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { BookingState } from '../../../types/booking';
 import { toggleServiceOption } from '../utils/serviceOptionSelection';
+import { invalidateBookingSession } from '../utils/bookingSessionStorage';
 
 export const useBookingStore = create<BookingState>()(persist((set) => ({
   categoryId: undefined,
@@ -134,3 +135,9 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   name: 'handigo:booking-session',
   storage: createJSONStorage(() => sessionStorage),
 }));
+
+export const resetBookingSession = () => {
+  invalidateBookingSession();
+  useBookingStore.getState().reset();
+  useBookingStore.persist.clearStorage();
+};

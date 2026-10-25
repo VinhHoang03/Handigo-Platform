@@ -18,6 +18,7 @@ export type ProviderOnboardingStatus =
 export interface IUser extends Document {
   email: string;
   passwordHash: string | null;
+  tokenVersion?: number;
   googleId?: string | null;
   facebookId?: string | null;
   fullName: string;
@@ -58,6 +59,7 @@ const UserSchema = new Schema<IUser>(
       type: String,
       default: null,
     },
+    tokenVersion: { type: Number, default: 0, min: 0 },
 
     googleId: {
       type: String,

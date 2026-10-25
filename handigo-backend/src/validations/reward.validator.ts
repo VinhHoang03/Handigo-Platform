@@ -11,6 +11,7 @@ export const rewardPageSchema = z.object({ page: z.coerce.number().int().min(1).
 export const redeemRewardSchema = z.object({
   offerId: z.string().trim().min(1).max(40),
   requestId: z.uuid("Mã yêu cầu không hợp lệ."),
+  termsVersion: z.string().regex(/^[a-f0-9]{64}$/, "Phiên bản ưu đãi không hợp lệ.").optional(),
 }).strict();
 
 export const rewardOfferSchema = z.object({

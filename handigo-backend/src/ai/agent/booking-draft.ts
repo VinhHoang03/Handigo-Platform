@@ -480,6 +480,9 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       draft.summary.push(`${option.name} × ${item.quantity}`);
     }
   }
+  if (values.orderType === "normal" && !isWithinAppointmentHours(new Date())) {
+    draft.missing.push("Đặt ngay chỉ khả dụng từ 08:00 đến 21:00 theo giờ Việt Nam. Vui lòng chọn Hẹn giờ.");
+  }
   if (values.orderType === "scheduled") {
     const outsideHours = values.scheduledAt && !isWithinAppointmentHours(new Date(values.scheduledAt));
     if (!values.scheduledAt || Date.parse(values.scheduledAt) <= Date.now()

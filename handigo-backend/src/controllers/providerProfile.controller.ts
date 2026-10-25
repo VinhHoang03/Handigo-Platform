@@ -55,12 +55,6 @@ export const getNearbyProviders = async (
     const scheduledAt = req.query.scheduledAt
       ? String(req.query.scheduledAt)
       : undefined;
-    const recurrenceUnit = req.query.recurrenceUnit
-      ? String(req.query.recurrenceUnit)
-      : undefined;
-    const recurrenceCount = req.query.recurrenceCount
-      ? Number(req.query.recurrenceCount)
-      : undefined;
     const orderId = req.query.orderId
       ? String(req.query.orderId)
       : undefined;
@@ -79,8 +73,6 @@ export const getNearbyProviders = async (
       serviceId,
       addressId,
       scheduledAt,
-      recurrenceUnit,
-      recurrenceCount,
       orderId,
       selectedOptions,
     );

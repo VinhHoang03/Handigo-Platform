@@ -183,6 +183,7 @@ export const createViolation = async (adminId: string, payload: CreateViolationP
     await Complaint.findByIdAndUpdate(
       payload.sourceId,
       {
+        $inc: { __v: 1 },
         status: "resolved",
         reviewedBy: adminId,
         reviewedAt: now,
@@ -197,6 +198,7 @@ export const createViolation = async (adminId: string, payload: CreateViolationP
     await SupportTicket.findByIdAndUpdate(
       payload.sourceId,
       {
+        $inc: { __v: 1 },
         status: "resolved",
         assignedAdminId: adminId,
         resolvedBy: adminId,

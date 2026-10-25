@@ -64,7 +64,8 @@ async function run() {
     assert.equal(customerPolicies.matching.initialRadiusKm, 7);
     assert.equal(customerPolicies.matching.expandedRadiusKm, 15);
     assert.equal(customerPolicies.matching.expandAfterMinutes, 2);
-    assert.deepEqual(Object.keys(customerPolicies).sort(), ["fixedPriceRefund", "matching", "paymentHoldMinutes"]);
+    assert.deepEqual(Object.keys(customerPolicies).sort(), ["fixedPriceRefund", "matching", "paymentHoldMinutes", "version"]);
+    assert.match(customerPolicies.version, /^[a-f\d]{64}$/);
     assert.equal(JSON.stringify(customerPolicies).includes(admin.id), false, "Không công khai lịch riêng hoặc mã hồ sơ thợ.");
     assert.equal("providerCompensationPercent" in customerPolicies.fixedPriceRefund, false);
     await assert.rejects(updateConfig(customer, payload.key, { value: custom }), /quản trị viên/);
@@ -72,7 +73,7 @@ async function run() {
     const now = new Date("2026-10-15T03:00:00Z");
     const input: RefundPolicyInput = { role: "customer", orderType: "scheduled", orderStatus: "accepted",
       paidAmount: 100000, hasAssignedProvider: true, providerAcceptedAt: now, now };
-    for (const orderType of ["scheduled", "recurring"] as const) {
+    for (const orderType of ["scheduled"] as const) {
       for (const hours of [49, 48, 47, 12, 11, 3, 2, 0, -1]) {
         const result = calculateRefundPolicy({ ...input, orderType, scheduledAt: new Date(now.getTime() + hours * 3600000) }, await getRefundPolicy());
         assert.equal(result.refundRate, 100);
@@ -82,7 +83,7 @@ async function run() {
         assert.equal(result.providerCompensation + result.platformRetainedAmount, result.cancellationFee);
       }
     }
-    for (const orderType of ["normal", "urgent"] as const) {
+    for (const orderType of ["normal"] as const) {
       assert.equal(calculateRefundPolicy({ ...input, orderType }, custom).refundRate, 100);
     }
     assert.equal(calculateRefundPolicy(input, custom).refundRate, 100);

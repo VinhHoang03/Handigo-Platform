@@ -35,7 +35,7 @@ for (const hasRepairQuotation of [false, true]) {
     assert.equal(result.refundAmount, transferDeposit ? 0 : 100000);
   }
 }
-for (const orderType of ['normal', 'urgent', 'scheduled', 'recurring']) {
+for (const orderType of ['normal', 'scheduled']) {
   for (const hasRepairQuotation of [false, true]) {
     const accepted = calculateRefundPolicy({ ...base, role: 'customer', orderType, hasRepairQuotation,
       providerAcceptedAt: new Date(Date.now() - 60000),

@@ -43,7 +43,8 @@ export const isWithinImmediateBookingHours = (now = new Date()) => {
   const hour = Number(parts.find((part) => part.type === 'hour')?.value);
   const minute = Number(parts.find((part) => part.type === 'minute')?.value);
 
-  return hour >= 8 && (hour < 21 || (hour === 21 && minute === 0));
+  return hour >= 8 && (hour < 21 || (hour === 21 && minute === 0
+    && now.getUTCSeconds() === 0 && now.getUTCMilliseconds() === 0));
 };
 
 export const getTodayInputValue = (now = new Date()) => {
