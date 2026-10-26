@@ -18,6 +18,7 @@ import { reconcilePayosPaymentForExpiration } from "./payment.service";
 import { getOrderInterval } from "./providerSchedule.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { ScheduleInterval } from "../utils/bookingPolicy";
+import { findOverdueOrders } from "./orderOverdue.service";
 
 async function createMatchingSearch(startedAt: Date) {
   const [initial, expanded, delay, duration] = await Promise.all([
@@ -109,25 +110,12 @@ export async function getMaxMatchingDurationSeconds(): Promise<number> {
 }
 
 async function cancelUnmatchedOrder(orderId: string, reason: string) {
-  const order = await Order.findById(orderId).select("status recurringGroupId reassignment");
+  const order = await Order.findById(orderId).select("status");
   if (!order || order.status !== "created") {
     return false;
   }
 
-  const orderIds = order.recurringGroupId && !order.reassignment?.automatic
-    ? await Order.find({
-      recurringGroupId: order.recurringGroupId,
-      status: "created",
-      isDeleted: false,
-    }).distinct("_id")
-    : [order._id];
-  for (const currentOrderId of orderIds) {
-    await cancelSystemOrderWithSettlement(
-      currentOrderId.toString(),
-      reason,
-      "provider_unavailable",
-    );
-  }
+  await cancelSystemOrderWithSettlement(orderId, reason, "provider_unavailable");
   return true;
 }
 
@@ -142,21 +130,7 @@ async function getDispatchContext(
   );
   if (!address) return null;
 
-  const scheduledDates = order.recurringGroupId && !order.reassignment?.automatic
-    ? (await Order.find({
-      recurringGroupId: order.recurringGroupId,
-      status: "created",
-      isDeleted: false,
-    })
-      .select("scheduledAt")
-      .sort({ occurrenceNumber: 1 })
-      .lean())
-      .map((item) => item.scheduledAt)
-      .filter((date): date is Date => date instanceof Date)
-    : order.scheduledAt
-      ? [order.scheduledAt]
-      : [];
-
+  const scheduledDates = order.scheduledAt ? [order.scheduledAt] : [];
   const policy = await getBookingPolicy();
   const interval = getOrderInterval(order, policy);
   const duration = interval.end - interval.start;
@@ -621,18 +595,7 @@ export const DispatchService = {
 
     if (assignment.assignmentType === "appointment") {
       const isPreferredProviderRequest = Boolean(order.preferredProviderId);
-      if (isPreferredProviderRequest && order.recurringGroupId) {
-        await Order.updateMany(
-          { recurringGroupId: order.recurringGroupId, status: "created" },
-          {
-            $set: {
-              bookingStatus: "rejected",
-              preferredProviderId: null,
-            },
-          },
-          { runValidators: true },
-        );
-      } else if (isPreferredProviderRequest) {
+      if (isPreferredProviderRequest) {
         order.bookingStatus = "rejected";
         order.preferredProviderId = null;
         await order.save();
@@ -697,16 +660,11 @@ export const DispatchService = {
     const scanOnce = async (recoverStalledOrders = false) => {
       const now = new Date();
       const overdueHours = Math.max(await getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24), 1);
-      const overdueOrders = await Order.find({
-        status: "in_progress",
-        isDeleted: false,
-        "overdueReview.escalatedAt": null,
-        createdAt: { $lte: new Date(now.getTime() - overdueHours * 60 * 60 * 1000) },
-      }).select("_id orderCode customerId providerId").limit(100);
+      const overdueOrders = await findOverdueOrders(now, overdueHours);
       for (const order of overdueOrders) {
         const claimed = await Order.findOneAndUpdate(
-          { _id: order._id, status: "in_progress", "overdueReview.escalatedAt": null },
-          { $set: { "overdueReview.escalatedAt": now } },
+          { _id: order._id, status: "in_progress", isDeleted: false, updatedAt: order.updatedAt, "overdueReview.escalatedAt": null },
+          { $set: { overdueReview: { escalatedAt: now } } },
           { returnDocument: "after", runValidators: true },
         );
         if (!claimed || !order.providerId) continue;
@@ -718,44 +676,12 @@ export const DispatchService = {
         const admins = await User.find({ role: "ADMIN", isDeleted: false, status: "active" }).select("_id").lean();
         await Promise.all(admins.map((admin) => createNotificationRecord({ userId: admin._id, type: "ORDER", title: "Đơn quá hạn cần quản trị xử lý", content: message, data: { orderId: order._id, overdueReview: true } }, { emitRealtime: true })));
       }
-      const recurringPaymentsToOpen = await Order.find({
-        orderType: "recurring",
-        status: { $in: ["created", "accepted"] },
-        bookingStatus: "reserved",
-        scheduledAt: { $lte: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
-      })
-        .select("_id customerId orderCode scheduledAt")
-        .limit(100);
-
-      for (const recurringOrder of recurringPaymentsToOpen) {
-        if (!recurringOrder.scheduledAt) continue;
-        const paymentDueAt = new Date(
-          Math.min(
-            now.getTime() + 12 * 60 * 60 * 1000,
-            recurringOrder.scheduledAt.getTime(),
-          ),
-        );
-        const openedOrder = await Order.findOneAndUpdate(
-          { _id: recurringOrder._id, bookingStatus: "reserved" },
-          { $set: { bookingStatus: "awaiting_payment", paymentDueAt } },
-          { returnDocument: "after", runValidators: true },
-        );
-        if (!openedOrder) continue;
-        await createNotificationRecord({
-          userId: openedOrder.customerId,
-          type: "PAYMENT",
-          title: "Đến hạn thanh toán buổi định kỳ",
-          content: `Vui lòng thanh toán đơn ${openedOrder.orderCode} để giữ lịch sắp tới.`,
-          data: { orderId: openedOrder._id, paymentDueAt },
-        });
-      }
-
       const expiredPaymentOrders = await Order.find({
         status: { $in: ["created", "accepted"] },
         bookingStatus: "awaiting_payment",
         paymentDueAt: { $lte: now },
       })
-        .select("_id recurringGroupId occurrenceNumber")
+        .select("_id")
         .limit(100)
         .lean();
 
@@ -790,12 +716,7 @@ export const DispatchService = {
           "Đã hết thời hạn thanh toán giữ lịch.",
           "payment_timeout",
         );
-        if (order.recurringGroupId && order.occurrenceNumber === 1) {
-          const reservations = await Order.find({ recurringGroupId: order.recurringGroupId, status: "accepted", bookingStatus: "reserved", paymentStatus: "unpaid", isDeleted: false }).select("_id");
-          for (const reservation of reservations) {
-            await cancelSystemOrderWithSettlement(reservation._id.toString(), "Giải phóng lịch định kỳ vì buổi đầu hết hạn thanh toán.", "payment_timeout");
-          }
-        }
+
       }
 
       const expiredAssignments = await OrderAssignment.find({

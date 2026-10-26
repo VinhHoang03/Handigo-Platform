@@ -8,6 +8,8 @@ export interface ToolContext {
   signal: AbortSignal;
   confirmedPreview?: unknown;
   actionId?: string;
+  actionCreatedAt?: string;
+  readOnly?: boolean;
   replaceBookingDraft?: boolean;
   bookingAddressLookup?: { value?: Promise<import("../agent/booking-draft").DraftAddress[]> };
 }

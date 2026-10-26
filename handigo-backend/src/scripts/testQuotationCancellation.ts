@@ -153,7 +153,7 @@ async function run() {
   await testCancellation("wallet", 0, "unassigned", "customer", false);
   for (const invalid of ["unpaid", "completed", "ownership", "in_progress"]) await testCancellation("wallet", 0, invalid);
   await testQuotationAmount();
-  for (const orderType of ["normal", "urgent", "scheduled", "recurring"]) {
+  for (const orderType of ["normal", "scheduled"]) {
     const order = new Order({ status: "accepted", orderType, inspectionRequired: true });
     mock.method(Order, "findById", () => query(order));
     const before = reassignmentRequests;

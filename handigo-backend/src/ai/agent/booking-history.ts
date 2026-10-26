@@ -1,6 +1,7 @@
 import { bookingSearchSchema, type AgentBookingHistoryService } from "../../services/agentBookingHistory.service";
 import type { AgentSession } from "./agent-state";
 import { isContinueRequest } from "./booking-actions";
+import { agentPaymentResultSchema } from "../../services/agentPayment.service";
 
 export type AgentBookingSearch = Awaited<ReturnType<typeof AgentBookingHistoryService.search>> & {
   query: import("../../services/agentBookingHistory.service").BookingSearch;
@@ -18,6 +19,19 @@ export function bookingSearchResult(session: AgentSession, args: unknown, tool =
 
 export function parseBookingHistoryRequest(message: string, session: AgentSession):
   { tool: string; args: unknown } | { error: string } | undefined {
+  const cancelQr = /^Hủy QR thanh toán đơn ([a-f\d]{24}), giao dịch ([a-f\d]{24})\.$/i.exec(message.trim());
+  const cancelCurrentQr = /^(?:(?:tôi|mình) (?:muốn|cần) )?hủy (?:thanh toán|(?:mã )?qr|giao dịch(?: thanh toán)?)(?: payos)?(?: (?:đơn này|nhưng giữ (?:nguyên )?đơn(?: hàng)?))?[.!]?$/i.test(message.trim());
+  if (cancelQr || cancelCurrentQr) {
+    const latest = [...session.conversation].reverse().find((item) => item.role === "tool"
+      && ["create_payment", "get_payment_status", "cancel_payment"].includes(item.tool ?? "")
+      && (() => { try { return agentPaymentResultSchema.safeParse(JSON.parse(item.content)).success; } catch { return false; } })());
+    const payment = latest ? agentPaymentResultSchema.parse(JSON.parse(latest.content)) : undefined;
+    const knownOrders = [session.viewedOrder?.orderId, session.bookingDraft?.orderId, payment?.orderId].filter((id): id is string => Boolean(id));
+    const orderId = cancelQr?.[1] ?? (new Set(knownOrders).size === 1 ? knownOrders[0] : undefined);
+    if (!orderId || !knownOrders.includes(orderId)) return { error: "Bạn muốn hủy QR của đơn nào? Hãy mở đúng đơn hoặc chọn Hủy QR trên thẻ thanh toán; đơn hàng chưa bị hủy." };
+    return { tool: "cancel_payment", args: { orderId,
+      ...(cancelQr ? { paymentId: cancelQr[2] } : payment?.orderId === orderId && payment.paymentId ? { paymentId: payment.paymentId } : {}) } };
+  }
   const quotation = /^Xem báo giá đơn ([a-f\d]{24})\.$/i.exec(message.trim())
     ?? /^Đọc và giải thích báo giá hiện tại của đơn ([a-f\d]{24}): từng hạng mục, tiền cọc đã trả và số tiền còn thanh toán trực tiếp\.$/i.exec(message.trim());
   const refund = /^Tra hoàn tiền đơn ([a-f\d]{24})\.$/i.exec(message.trim())

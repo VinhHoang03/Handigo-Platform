@@ -25,6 +25,9 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
     ? order.paymentStatus === 'paid' ? 'Đã thu tiền mặt' : 'Chưa thu tiền'
     : paymentStatus;
   const paymentMethod = order.paymentMethod === 'bank' ? 'QR PayOS' : getPaymentMethodLabel(order.paymentMethod);
+  const isCompletedQuotationOrder = isQuotationOrder && order.status === 'completed';
+  const quotationPaymentMethod = directRepairAmount === undefined ? 'Chưa có thông tin báo giá'
+    : directRepairAmount === 0 ? 'Không phát sinh thanh toán thêm' : 'Thanh toán trực tiếp với thợ';
 
   return (
     <section className="order-3 h-full rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg md:col-span-2 lg:order-2 lg:col-span-1">
@@ -54,8 +57,8 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
           </>
         )}
         <FinancialRow
-          label={isQuotationOrder ? 'Phương thức thanh toán tiền cọc' : 'Phương thức'}
-          value={paymentMethod}
+          label={isCompletedQuotationOrder ? 'Phương thức thanh toán' : isQuotationOrder ? 'Phương thức thanh toán tiền cọc' : 'Phương thức'}
+          value={isCompletedQuotationOrder ? quotationPaymentMethod : paymentMethod}
         />
       </dl>
       {!isQuotationOrder && !isCancelled && !isCash && order.paymentStatus === 'paid' && (

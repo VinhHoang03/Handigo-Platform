@@ -53,10 +53,10 @@ export const createOrder = async (
   next: NextFunction,
 ) => {
   try {
-    const order = await OrderService.createOrder({
+    const order = await OrderService.createOrderOnce({
       customerId: uid(req),
       ...req.body,
-    });
+    }, req.get("Idempotency-Key"));
     return ok(res, order, 201);
   } catch (error) {
     return next(error);
@@ -127,22 +127,6 @@ export const getOrderById = async (
   try {
     const order = await OrderService.getOrderById(param(req, "orderId"), uid(req));
     return ok(res, order);
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const getRecurringSeries = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const orders = await OrderService.getRecurringSeries(
-      param(req, "orderId"),
-      uid(req),
-    );
-    return ok(res, { items: orders });
   } catch (error) {
     return next(error);
   }
@@ -231,33 +215,12 @@ export const previewCancellation = async (
 ) => {
   try {
     const role = toOrderActorRole(requireRequestUser(req).role);
-    const scope = req.query.scope === "series" ? "series" : "single";
     const preview = await OrderService.previewCancellation(
       param(req, "orderId"),
       uid(req),
       role,
-      scope,
     );
     return ok(res, preview);
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const cancelRecurringSeries = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { reason } = req.body;
-    const result = await OrderService.cancelRecurringSeries(
-      param(req, "orderId"),
-      uid(req),
-      reason,
-      req.body.confirmedExpectations,
-    );
-    return ok(res, result);
   } catch (error) {
     return next(error);
   }

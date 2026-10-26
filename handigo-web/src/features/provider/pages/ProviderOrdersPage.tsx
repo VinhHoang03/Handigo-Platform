@@ -1,5 +1,8 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { isAxiosError } from 'axios';
+import { bookingApi } from '@/features/booking/api/booking.api';
 import { DashboardShell } from '@/components/common/DashboardShell';
 import { Pagination } from '@/components/common/Pagination';
 import { providerOrderApi } from '../api/providerOrder.api';
@@ -20,6 +23,10 @@ const filters = [
 const ORDERS_PER_PAGE = 5;
 
 export default function ProviderOrdersPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const requestedAssignment = searchParams.get('assignmentId');
+  const requestedOrder = searchParams.get('orderId');
   const { addToast } = useToast();
   const [assignments, setAssignments] = useState<OrderAssignment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -31,6 +38,10 @@ export default function ProviderOrdersPage() {
     totalPages: 0,
   });
   const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [notificationMessage, setNotificationMessage] = useState<{ assignmentId: string; text: string } | null>(null);
+  const [loadedAssignment, setLoadedAssignment] = useState<string | null | undefined>(undefined);
+  const assignmentRevision = useRef(0);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,16 +58,39 @@ export default function ProviderOrdersPage() {
   }, [searchTerm]);
 
   const loadAssignments = useCallback(async () => {
+    const revision = ++assignmentRevision.current;
     setLoadingAssignments(true);
     try {
       const data = await providerOrderApi.getPendingAssignments();
+      if (revision !== assignmentRevision.current) return;
       setAssignments(data);
+      setAssignmentError(null);
     } catch {
+      if (revision !== assignmentRevision.current) return;
       setAssignments([]);
+      setAssignmentError('Không thể tải đề nghị nhận việc. Vui lòng thử lại.');
     } finally {
-      setLoadingAssignments(false);
+      if (revision === assignmentRevision.current) {
+        setLoadedAssignment(requestedAssignment);
+        setLoadingAssignments(false);
+      }
     }
-  }, []);
+  }, [requestedAssignment]);
+
+  useEffect(() => {
+    if (!requestedAssignment || !requestedOrder || loadingAssignments || loadedAssignment !== requestedAssignment || assignmentError) return;
+    if (assignments.some(item => item._id === requestedAssignment)) return;
+    let active = true;
+    void bookingApi.getOrderById(requestedOrder).then(() => {
+      if (active) navigate(`/provider/orders/${encodeURIComponent(requestedOrder)}`, { replace: true });
+    }).catch((error: unknown) => {
+      const unavailable = isAxiosError(error) && [403, 404].includes(error.response?.status ?? 0);
+      if (active) setNotificationMessage({ assignmentId: requestedAssignment, text: unavailable
+        ? 'Đề nghị nhận việc đã hết hạn hoặc không còn khả dụng.'
+        : 'Không thể kiểm tra trạng thái đề nghị. Vui lòng bấm Làm mới để thử lại.' });
+    });
+    return () => { active = false; };
+  }, [requestedAssignment, requestedOrder, loadingAssignments, loadedAssignment, assignmentError, assignments, navigate]);
 
   const loadOrders = useCallback(async () => {
     setLoadingOrders(true);
@@ -81,7 +115,10 @@ export default function ProviderOrdersPage() {
   }, [activeFilter, debouncedSearch, page, setError]);
 
   useEffect(() => {
-    void Promise.resolve().then(loadAssignments);
+    let active = true;
+    const revisions = assignmentRevision;
+    void Promise.resolve().then(() => { if (active) return loadAssignments(); });
+    return () => { active = false; revisions.current++; };
   }, [loadAssignments]);
 
   useEffect(() => {
@@ -148,13 +185,19 @@ export default function ProviderOrdersPage() {
         )}
 
         <PendingAssignmentsSection
-          assignments={assignments}
-          loading={loadingAssignments}
+          visible={Boolean(requestedAssignment)}
+          assignments={requestedAssignment ? assignments.filter(item => item._id === requestedAssignment) : assignments}
+          loading={loadingAssignments || loadedAssignment !== requestedAssignment}
           busy={actionBusy}
           onRefresh={loadAssignments}
           onAccept={handleAccept}
           onReject={handleReject}
         />
+        {requestedAssignment && (assignmentError || notificationMessage?.assignmentId === requestedAssignment) && (
+          <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant" role="status">
+            {assignmentError || notificationMessage?.text}
+          </div>
+        )}
 
         <section className="space-y-md">
           <div className="flex justify-start">

@@ -54,7 +54,9 @@ export const searchCatalog = async ({ q, limit }: SearchQuery) => {
       .lean(),
   ]);
 
-  const activeServiceIds = new Set(services.map((service) => service._id.toString()));
+  const activeCategoryIds = new Set(categories.map((category) => category._id.toString()));
+  const availableServices = services.filter((service) => activeCategoryIds.has(service.categoryId.toString()));
+  const activeServiceIds = new Set(availableServices.map((service) => service._id.toString()));
   const candidates: SearchCandidate[] = [
     ...categories.map((category) => ({
       id: category._id.toString(),
@@ -62,7 +64,7 @@ export const searchCatalog = async ({ q, limit }: SearchQuery) => {
       name: category.name,
       description: category.description,
     })),
-    ...services.map((service) => ({
+    ...availableServices.map((service) => ({
       id: service._id.toString(),
       type: "service" as const,
       name: service.name,

@@ -11,3 +11,11 @@ export function requireBookingAttachments(session: AgentSession | undefined, url
     throw new AppError("Ảnh chưa được tải lên trong cuộc trò chuyện này. Vui lòng chọn và tải ảnh lại.", 400);
   }
 }
+
+// Chỉ tái sử dụng ảnh của yêu cầu gần nhất, không lấy toàn bộ ảnh từng tải trong phiên.
+export function agentRequestAttachments(session: AgentSession | undefined, urls?: string[]) {
+  const latest = session?.conversation.slice().reverse().find((message) => message.role === "user");
+  const images = bookingAttachmentsSchema.parse(urls ?? latest?.customerAttachments ?? []);
+  requireBookingAttachments(session, images);
+  return images;
+}

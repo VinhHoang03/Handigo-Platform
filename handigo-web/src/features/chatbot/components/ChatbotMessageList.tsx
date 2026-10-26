@@ -41,6 +41,7 @@ export function ChatbotMessageList({
   children,
   onSend,
   choicesDisabled = false,
+  bookingVoucherChoicesEnabled = false,
   pendingActionId,
   confirmationsDisabled = false,
   onDecision,
@@ -54,6 +55,7 @@ export function ChatbotMessageList({
   children?: ReactNode;
   onSend?: (content: string) => Promise<void>;
   choicesDisabled?: boolean;
+  bookingVoucherChoicesEnabled?: boolean;
   pendingActionId?: string;
   confirmationsDisabled?: boolean;
   onDecision?: (decision: "CONFIRM" | "REJECT") => void;
@@ -142,6 +144,9 @@ export function ChatbotMessageList({
         </div> : null;
         const showChoices = !isUser && (message._id === latestDialogue?._id || message._id === messages.at(-1)?._id)
           && (!message.confirmation || message.confirmation.actionId === pendingActionId) && Boolean(message.choiceGroups?.length) && onSend;
+        const canChooseBookingVouchers = bookingVoucherChoicesEnabled && isBookingConfirmation
+          && message.confirmation?.actionId === pendingActionId
+          && message.choiceGroups?.every((group) => ["Voucher có thể sử dụng", "Kiểm tra voucher"].includes(group.label));
         return (
           <Fragment key={message._id}>
           <div ref={isUser && message._id === latestUserMessage?._id ? latestUserRef : undefined}
@@ -169,7 +174,7 @@ export function ChatbotMessageList({
               </div>}
               {showChoices && (
                 <AgentChoiceGroups key={message._id} groups={message.choiceGroups!}
-                  disabled={isReplying || choicesDisabled} onSend={onSend!} />
+                  disabled={isReplying || (choicesDisabled && !canChooseBookingVouchers)} onSend={onSend!} />
               )}
               </div>}
               {!isUser && message.bookingSearch && onSend && <AgentBookingSearchResults result={message.bookingSearch}

@@ -2,6 +2,7 @@ import { PendingAssignmentCard } from '../PendingAssignmentCard';
 import type { OrderAssignment } from '../../types/providerOrder.types';
 
 interface PendingAssignmentsSectionProps {
+  visible?: boolean;
   assignments: OrderAssignment[];
   loading: boolean;
   busy: boolean;
@@ -10,8 +11,9 @@ interface PendingAssignmentsSectionProps {
   onReject: (assignmentId: string) => Promise<void>;
 }
 
-/** Đơn chờ phản hồi — hiện ẩn theo thiết kế hiện tại (giữ nguyên `hidden` để không đổi hành vi). */
+/** Hiển thị đề nghị được mở từ thông báo. */
 export function PendingAssignmentsSection({
+  visible = false,
   assignments,
   loading,
   busy,
@@ -20,7 +22,7 @@ export function PendingAssignmentsSection({
   onReject,
 }: PendingAssignmentsSectionProps) {
   return (
-    <section className="hidden">
+    <section className={visible ? 'space-y-md' : 'hidden'}>
       <div className="flex items-center justify-between gap-md">
         <h2 className="font-headline-md text-on-surface">Đơn chờ phản hồi</h2>
         <button type="button" onClick={onRefresh} className="text-sm font-medium text-primary hover:underline">

@@ -44,8 +44,13 @@ stubModule("../services/matching.service", {
   MatchingService: { findNearestProviders: async () => [{ providerId: provider._id, userId: provider.userId }] },
 });
 stubModule("../services/voucher.service", {
-  resolveVoucherForAmount: async () => ({ discountAmount: 10000, snapshot: null, promotion: { ownerId: null } }),
+  resolveVoucherForAmount: async () => ({ discountAmount: 10000,
+    snapshot: { voucherId: new Types.ObjectId('507f1f77bcf86cd799439011'), code: 'KIEM-THU', discountType: 'fixed', discountValue: 10000, discountAmount: 10000 },
+    promotion: { ownerId: null } }),
+  reservePersonalVoucher: async () => {},
 });
+stubModule("../services/promotion.service", { resolveAutomaticPromotion: async () => null });
+stubModule("../utils/orderHistory", { installOrderHistory: () => {}, recordOrderStatus: async () => {} });
 
 const { buildServicePricingSnapshot, previewServiceBooking } = require("../services/servicePricing.service") as typeof import("../services/servicePricing.service");
 const { AssignmentService } = require("../services/assignment.service") as typeof import("../services/assignment.service");
@@ -58,15 +63,17 @@ const option = new ServiceOption({
 });
 
 async function testPricing() {
-  mock.method(ServiceOption, "find", () => ({ sort: async () => [option] }));
+  let availableOptions = [option];
+  mock.method(ServiceOption, "find", () => ({ sort: async () => availableOptions }));
   mock.method(Service, "findOne", async () => service);
+  mock.method(Category, "exists", async () => ({ _id: new Types.ObjectId() }));
   const selectedOptions = [{ optionId: option._id.toString(), quantity: 2 }];
   const immediate = await buildServicePricingSnapshot(service, [], selectedOptions);
   assert.equal(immediate.baseAmount, 200000);
   assert.equal(immediate.bookingAmount, 200000);
   assert.equal('immediateFee' in immediate, false);
   assert.equal(immediate.selectedOptionsSnapshot[0].quantity, 2);
-  for (const orderType of ["normal", "urgent", "scheduled", "recurring"]) {
+  for (const orderType of ["normal", "scheduled"]) {
     const booked = await buildServicePricingSnapshot(service, [], selectedOptions, undefined, orderType);
     const preview = await previewServiceBooking({ serviceId: service._id.toString(), selectedOptions, orderType });
     assert.equal(booked.bookingAmount, 200000);
@@ -78,6 +85,7 @@ async function testPricing() {
   await assert.rejects(buildServicePricingSnapshot(service, [], [{ ...selectedOptions[0], quantity: 0 }]));
 
   const cleaning = new Service({ name: "Vệ sinh điều hòa", slug: "ve-sinh-dieu-hoa", serviceType: "fixed_price", fixedPrice: 100000 });
+  availableOptions = [];
   const uniform = await buildServicePricingSnapshot(cleaning, [], [], 3, "scheduled");
   assert.equal(uniform.bookingAmount, 300000);
   assert.equal(uniform.baseAmount, 300000);
@@ -90,6 +98,7 @@ async function testPricing() {
   await assert.rejects(buildServicePricingSnapshot(cleaning, [], [], 0));
 
   const repair = new Service({ name: "Sửa chữa", serviceType: "variable_price", depositAmount: 40000 });
+  availableOptions = [option];
   const deposit = await buildServicePricingSnapshot(repair, [], selectedOptions);
   assert.equal(deposit.depositAmount, 40000);
   assert.equal(deposit.baseAmount, 40000);
@@ -169,22 +178,20 @@ async function testAssignments() {
   assert.equal(claimed, claimsBeforeConflict);
   assert.equal(ended, 4);
 
-  // Nhánh lịch hẹn và chuỗi lịch vẫn cập nhật đơn chính và các buổi còn lại.
+  // Nhận lịch hẹn chỉ cập nhật đơn đang thao tác, kể cả khi còn mã nhóm lịch sử.
   assignment.assignmentType = "appointment";
   order.status = "created";
   order.paymentStatus = "paid";
   order.scheduledAt = new Date(Date.now() + 2 * 86400000);
   order.recurringGroupId = new Types.ObjectId();
-  let relatedUpdated = false;
   mock.method(Order, "find", () => ({ session: async () => [order] }));
   mock.method(Order, "exists", async () => null);
   mock.method(Order, "findOneAndUpdate", async (_filter: unknown, update: { $set: object }) => {
     Object.assign(order, update.$set);
     return order;
   });
-  mock.method(Order, "updateMany", async (_filter: unknown, update: { $set: { bookingStatus: string } }) => {
-    assert.equal(update.$set.bookingStatus, "reserved");
-    relatedUpdated = true;
+  const relatedUpdates = mock.method(Order, "updateMany", async () => {
+    assert.fail("Không được cập nhật các đơn khác khi nhận một lịch hẹn.");
   });
   await assert.rejects(AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString()), /Trùng lịch/);
   assert.equal(claimed, claimsBeforeConflict, "Lịch hẹn cũng phải chặn trùng lịch trước khi nhận");
@@ -192,11 +199,32 @@ async function testAssignments() {
   const appointment = await AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString());
   assert.equal(appointment.order.status, "accepted");
   assert.equal(appointment.order.bookingStatus, "confirmed");
-  assert.equal(relatedUpdated, true);
+  assert.equal(relatedUpdates.mock.callCount(), 0);
+  // Đơn dùng địa chỉ một lần vẫn nhận việc được khi không có mục trong sổ địa chỉ.
+  order.addressId = null;
+  order.addressSnapshot = { fullAddress: "Địa chỉ dùng một lần", ward: "Phường kiểm thử", province: "Tỉnh kiểm thử",
+    latitude: 21, longitude: 105, recipientName: "Khách kiểm thử", recipientPhone: "0912345678" };
+  order.recurringGroupId = null; order.status = "created"; order.scheduledAt = null;
+  assignment.assignmentType = "dispatch"; provider.availabilityStatus = "online";
+  mock.method(Address, "findById", () => { throw Error("Đơn có bản chụp không được đọc địa chỉ đã lưu."); });
+  const oneTime = await AssignmentService.acceptAssignment(assignment._id.toString(), provider.userId.toString());
+  assert.equal(oneTime.order.status, "accepted"); assert.equal(oneTime.order.addressId, null);
+  let assignedView: unknown;
+  mock.method(OrderAssignment, "find", () => ({ populate: (options: { select: string; transform: (value: unknown) => unknown }) => {
+    assert(options.select.includes("addressSnapshot")); assignedView = options.transform(order.toObject());
+    return { sort: () => ({ lean: async () => [{ orderId: assignedView }] }) };
+  } }));
+  await AssignmentService.getPendingAssignmentForProvider(provider.userId.toString());
+  assert.equal((assignedView as { addressId: { ward: string } }).addressId.ward, "Phường kiểm thử");
+  assert(!JSON.stringify(assignedView).includes("0912345678"), "Đề nghị chưa nhận không lộ số điện thoại từ bản chụp địa chỉ.");
+  assert(!JSON.stringify(assignedView).includes("Địa chỉ dùng một lần"), "Đề nghị chưa nhận vẫn chỉ hiển thị khu vực như trước.");
   mock.restoreAll();
 }
 
 async function testOrderCreation() {
+  mock.method(mongoose, "startSession", async () => ({
+    withTransaction: async (fn: () => Promise<unknown>) => fn(), endSession: async () => {},
+  }));
   const address = new Address({ _id: new Types.ObjectId(), latitude: 10, longitude: 106 });
   const payload = {
     customerId: new Types.ObjectId().toString(), serviceId: service._id.toString(),
@@ -228,18 +256,13 @@ async function testOrderCreation() {
   assert.equal(discounted.pricing.platformCommissionAmount + discounted.pricing.providerEarningAmount, 190000);
 
   const scheduledAt = new Date(Date.now() + 2 * 86400000);
+  scheduledAt.setHours(10, 0, 0, 0);
   await OrderService.createOrder({
-    ...payload, orderType: "recurring", scheduledAt,
-    recurrenceUnit: "weekly", recurrenceCount: 3, voucherCode: "KIEM-THU",
+    ...payload, orderType: "scheduled", scheduledAt, voucherCode: "KIEM-THU",
   });
-  assert.equal(created.length, 3);
-  assert.equal(created[0].pricing.bookingAmount, 200000);
+  assert.equal(created.length, 1);
   assert.equal(created[0].pricing.totalPaidAmount, 190000);
-  assert.equal(created[1].pricing.totalPaidAmount, 200000);
-  assert.equal(created[1].bookingStatus, "reserved");
-  assert.equal(created[2].recurringGroupId?.toString(), created[0].recurringGroupId?.toString());
-  assert.equal(created[0].pricing.immediateFee, undefined);
-  assert.equal(created[0].pricing.platformCommissionAmount + created[0].pricing.providerEarningAmount, 190000);
+  assert.equal(created[0].bookingStatus, "not_required");
 
   provider.autoAcceptScheduledBookings = true;
   provider.autoAcceptScheduledBookingHorizonDays = 7;
@@ -255,16 +278,6 @@ async function testOrderCreation() {
   assert.equal(reserved.providerId, null);
   assert.equal(reserved.paymentDueAt, null);
   assert.equal(reserved.preferredProviderId?.toString(), provider._id.toString());
-  await OrderService.createOrder({
-    ...payload, orderType: "recurring", scheduledAt, preferredProviderId: provider._id.toString(),
-    recurrenceUnit: "weekly", recurrenceCount: 3,
-  });
-  assert.equal(created.length, 3);
-  for (const order of created) {
-    assert.equal(order.status, "created");
-    assert.equal(order.providerId, null);
-    assert.equal(order.paymentDueAt, null);
-  }
   provider.autoAcceptScheduledBookings = false;
   const pending = await OrderService.createOrder({
     ...payload, orderType: "scheduled", scheduledAt, preferredProviderId: provider._id.toString(),
@@ -276,7 +289,7 @@ async function testOrderCreation() {
 async function run() {
   if (process.argv.includes("--assignments-only")) {
     await testAssignments();
-    console.log("Đã kiểm tra nhận đơn thường và lịch hẹn: quyền, thanh toán, giao dịch, xung đột lịch và giữ chuỗi lịch.");
+    console.log("Đã kiểm tra nhận đơn thường và lịch hẹn: quyền, thanh toán, giao dịch, xung đột lịch và tính độc lập của lịch hẹn.");
     return;
   }
   assert.deepEqual(updateProviderProfileSchema.parse({

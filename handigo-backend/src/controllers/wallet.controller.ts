@@ -80,7 +80,9 @@ export const cancelMyWalletDeposit = async (req: Request, res: Response) => {
     return res.json({
       success: true,
       data: result,
-      message: "Đã hủy giao dịch nạp ví",
+      message: result?.status === "success"
+        ? "Giao dịch nạp ví đã thanh toán thành công, số dư đã được cập nhật"
+        : "Đã đối soát và đóng giao dịch nạp ví",
     });
   } catch (error: unknown) {
     return sendControllerError(res, error, { includeCode: true });

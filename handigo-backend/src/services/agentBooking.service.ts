@@ -35,6 +35,7 @@ function bookingView(order: Pick<IOrder, "_id" | "orderCode" | "status" | "booki
 type PriceArguments = Pick<CreateOrderPayload, "serviceId" | "selectedOptions" | "uniformQuantity">;
 type BookingArguments = PriceArguments & Pick<CreateOrderPayload, "addressId" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId"> & {
   orderType: "normal" | "scheduled";
+  saveAddressToBook?: boolean;
   scheduledAt?: string;
 };
 type AvailabilityArguments = PriceArguments & { addressId: string; times: string[]; preferredProviderId?: string };
@@ -229,7 +230,7 @@ export const AgentBookingService = {
     const times = [];
     for (const time of args.times) {
       if (Date.parse(time) < getEarliestScheduledAt().getTime() || !isWithinAppointmentHours(new Date(time))) {
-        throw new AppError("Vui lòng chọn giờ hẹn từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.", 400);
+        throw new AppError("Vui lòng chọn giờ hẹn hợp lệ và không sớm hơn phút hiện tại.", 400);
       }
       const candidates = await MatchingService.findNearestProviders({
         serviceId: args.serviceId, latitude: address.latitude, longitude: address.longitude,
@@ -274,12 +275,15 @@ export const AgentBookingService = {
       address: bookingAddressLabel(address),
       ...(draft?.id === args.addressId ? { recipientName: address.recipientName, recipientPhone: address.recipientPhone, addressNote: address.note } : {}),
       addressVersion: address.updatedAt.toISOString(),
+      addressStorage: draft?.id === args.addressId
+        ? args.saveAddressToBook === false ? "Chỉ dùng cho đơn này, không lưu vào sổ địa chỉ" : "Lưu vào sổ địa chỉ khi đặt đơn thành công"
+        : "Dùng địa chỉ đã lưu; không tạo thêm địa chỉ",
       schedule: args.scheduledAt ?? "Đặt ngay", orderType: args.orderType,
       paymentMethod: args.paymentMethod, originalAmount: price.amount, discountAmount,
       voucherCode: args.voucherCode, providerName,
       amount: Math.max(price.amount - discountAmount, 0), currency: price.currency,
       description: args.problemDescription ?? "", customerAttachments: args.customerAttachments ?? [], serviceType: price.serviceType, paymentOnConfirmation,
-      note: [paymentNote, draft?.id === args.addressId ? "Địa chỉ mới chỉ được lưu vào sổ địa chỉ khi đặt đơn thành công." : "",
+      note: [paymentNote, draft?.id === args.addressId ? args.saveAddressToBook === false ? "Địa chỉ mới chỉ dùng cho đơn này, không lưu vào sổ địa chỉ." : "Địa chỉ mới chỉ được lưu vào sổ địa chỉ khi đặt đơn thành công." : "",
         address.placeId?.startsWith(AGENT_AREA_PLACE_PREFIX) ? AGENT_AREA_LOCATION_NOTE : "",
         price.promotionName ? `Đã áp dụng ưu đãi tự động: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
         quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ")
@@ -292,7 +296,7 @@ export const AgentBookingService = {
     let order: IOrder;
     try {
       order = await OrderService.createOrder({ ...args, customerId: userId, confirmedExpectation }, orderId,
-        draftAddressDocument(userId, args.addressId, draft));
+        draftAddressDocument(userId, args.addressId, draft), args.saveAddressToBook !== false);
     } catch (error) {
       // Lỗi nghiệp vụ của createOrder xảy ra trước ghi hoặc sau khi transaction đã rollback.
       if (error instanceof AppError && error.statusCode < 500) throw new ActionPreconditionError(error.message);

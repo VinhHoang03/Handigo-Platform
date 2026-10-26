@@ -11,6 +11,7 @@ export const priceSchema = z.object({
 }).strict();
 export const bookingSchema = priceSchema.extend({
   addressId: createOrderSchema.shape.addressId,
+  saveAddressToBook: z.boolean().optional(),
   orderType: z.enum(["normal", "scheduled"]),
   scheduledAt: createOrderSchema.shape.scheduledAt,
   problemDescription: createOrderSchema.shape.problemDescription,
@@ -19,6 +20,9 @@ export const bookingSchema = priceSchema.extend({
   voucherCode: createOrderSchema.shape.voucherCode,
   preferredProviderId: createOrderSchema.shape.preferredProviderId,
 }).strict().superRefine((value, ctx) => {
+  if (value.orderType === "normal" && !isWithinAppointmentHours(new Date())) {
+    ctx.addIssue({ code: "custom", path: ["orderType"], message: "Đặt ngay chỉ khả dụng từ 08:00 đến 21:00 theo giờ Việt Nam. Vui lòng chọn Hẹn giờ." });
+  }
   if (value.orderType === "scheduled" && (!value.scheduledAt || Date.parse(value.scheduledAt) < getEarliestScheduledAt().getTime())) {
     ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn trong tương lai." });
   }
@@ -26,7 +30,7 @@ export const bookingSchema = priceSchema.extend({
     ctx.addIssue({ code: "custom", path: ["orderType"], message: "Có giờ hẹn thì phải chọn loại scheduled." });
   }
   if (value.scheduledAt && !isWithinAppointmentHours(new Date(value.scheduledAt))) {
-    ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn từ 08:00 đến 21:00." });
+    ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn hợp lệ." });
   }
 });
 export const availabilitySchema = priceSchema.extend({

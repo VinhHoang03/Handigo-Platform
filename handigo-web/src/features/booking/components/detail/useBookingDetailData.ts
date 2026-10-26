@@ -1,11 +1,13 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import type { Order, OrderQuotation, Payment } from "@/types/booking";
 import { createAuthenticatedSocket } from '@/realtime/authenticatedSocket';
 
 /** Tải dữ liệu đơn hàng, chuỗi lịch định kỳ, lịch sử thanh toán và báo giá. */
 export const useBookingDetailData = (id: string | undefined) => {
+  const requestRevision = useRef(0);
+  const invalidateRequests = useCallback(() => { requestRevision.current++; }, []);
   const [order, setOrder] = useState<Order | null>(null);
   const [recurringOrders, setRecurringOrders] = useState<Order[]>([]);
   const [quotation, setQuotation] = useState<OrderQuotation | null>(null);
@@ -15,12 +17,15 @@ export const useBookingDetailData = (id: string | undefined) => {
   const [reassignmentModalOpen, setReassignmentModalOpen] = useState(false);
 
   const updateOrder = useCallback((latest: Order) => {
+    if (latest._id !== id) return;
     setOrder((previous) => previous?._id === latest._id
       && new Date(previous.updatedAt).getTime() > new Date(latest.updatedAt).getTime()
       ? previous : latest);
-  }, []);
+  }, [id]);
 
   const loadData = useCallback(async () => {
+    const revision = ++requestRevision.current;
+    const isCurrent = () => requestRevision.current === revision;
     if (!id) {
       setApiError("Mã đơn hàng không hợp lệ.");
       setLoading(false);
@@ -30,6 +35,7 @@ export const useBookingDetailData = (id: string | undefined) => {
     setLoading(true);
     try {
       let data = await bookingApi.getOrderById(id);
+      if (!isCurrent()) return;
       const shouldReconcilePayos =
         data?.paymentMethod === "bank" &&
         (["unpaid", "partially_paid"].includes(data.paymentStatus) ||
@@ -37,11 +43,14 @@ export const useBookingDetailData = (id: string | undefined) => {
       if (shouldReconcilePayos) {
         try {
           await bookingApi.reconcilePayosPayment(id);
+          if (!isCurrent()) return;
           data = await bookingApi.getOrderById(id);
         } catch (error) {
+          if (!isCurrent()) return;
           console.error("Không thể đối soát thanh toán PayOS:", error);
         }
       }
+      if (!isCurrent()) return;
       if (!data) {
         setApiError("Không tìm thấy thông tin đơn hàng.");
       } else {
@@ -52,8 +61,11 @@ export const useBookingDetailData = (id: string | undefined) => {
 
         if (data.orderType === "recurring") {
           try {
-            setRecurringOrders(await bookingApi.getRecurringSeries(id));
+            const series = await bookingApi.getRecurringSeries(id);
+            if (!isCurrent()) return;
+            setRecurringOrders(series);
           } catch (error) {
+            if (!isCurrent()) return;
             console.error("Không thể tải các buổi trong lịch định kỳ:", error);
             setRecurringOrders([]);
           }
@@ -63,14 +75,17 @@ export const useBookingDetailData = (id: string | undefined) => {
 
         try {
           const paymentResult = await bookingApi.getPaymentsByOrder(id);
+          if (!isCurrent()) return;
           setPayments(paymentResult.payments);
         } catch (error) {
+          if (!isCurrent()) return;
           console.error("Không thể tải lịch sử thanh toán:", error);
           setPayments([]);
         }
 
         try {
           const quo = await bookingApi.getQuotation(id);
+          if (!isCurrent()) return;
           if (quo && quo.quotation) {
             setQuotation((previous) => previous?.quotation._id === quo.quotation._id
               && (previous.quotation.revision ?? 0) > (quo.quotation.revision ?? 0) ? previous : quo);
@@ -78,22 +93,26 @@ export const useBookingDetailData = (id: string | undefined) => {
             setQuotation(null);
           }
         } catch (e) {
+          if (!isCurrent()) return;
           console.error("Chưa tìm thấy báo giá hoặc có lỗi:", e);
           setQuotation(null);
         }
         setApiError(null);
       }
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       console.error("Lỗi khi tải đơn hàng:", err);
       setApiError("Đã có lỗi xảy ra khi tải thông tin đơn hàng.");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [id, setApiError, updateOrder]);
 
   useEffect(() => {
-    void Promise.resolve().then(loadData);
-  }, [loadData]);
+    let active = true;
+    void Promise.resolve().then(() => { if (active) return loadData(); });
+    return () => { active = false; invalidateRequests(); };
+  }, [invalidateRequests, loadData]);
 
   const recurringGroupId = order?.recurringGroupId;
   useEffect(() => {

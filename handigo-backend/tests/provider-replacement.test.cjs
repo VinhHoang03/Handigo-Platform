@@ -26,6 +26,7 @@ function loadService(name, modules, internals = []) {
       if (name === '../utils/logger') return { createLogger: () => ({ info() {}, warn() {}, error() {}, debug() {} }) };
       if (name === '../validations/refundPolicy.validator') return { DEFAULT_REFUND_POLICY: { providerCompensationPercent: 80 } };
       if (name === './systemConfig.service') return { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }) };
+      if (name === './penaltyPolicy.service') return { assertFeatureAllowed: async () => {} };
       // Chỉ nạp các module được giả lập, không chạm cấu hình hoặc database thật.
       return {};
     },
@@ -176,7 +177,7 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
     './voucher.service': { async releaseVoucherReservation() {} },
     './promotion.service': { async releaseOrderPromotion() {} },
     './refundPolicy.service': loadService('refundPolicy.service', {}),
-    '../utils/transaction': { buildTransactionCode: () => 'REFUND-THU-NGHIEM' },
+    '../utils/transaction': { buildTransactionCode: () => 'REFUND-THU-NGHIEM', withTransactionRetry: (session, work) => session.withTransaction(work) },
     './notification.service': { async createNotificationRecord(value) { notifications.push(value); } },
     '../sockets/socketServer': { emitToUser() {} },
     '../configs/payos.config': {

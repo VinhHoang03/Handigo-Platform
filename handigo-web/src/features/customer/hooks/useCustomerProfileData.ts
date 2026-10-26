@@ -1,5 +1,5 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { providerApplicationApi } from "@/features/provider-application/api/providerApplication.api";
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
@@ -23,6 +23,11 @@ import {
 /** Tải hồ sơ khách hàng + đơn đăng ký provider, và các thao tác lưu hồ sơ/avatar. */
 export function useCustomerProfileData() {
   const { addToast } = useToast();
+  const sessionRevision = useAuthStore((state) => state.sessionRevision);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const isCurrent = useCallback(() => mounted.current
+    && useAuthStore.getState().sessionRevision === sessionRevision, [sessionRevision]);
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [providerApplication, setProviderApplication] =
     useState<ProviderApplication | null>(null);
@@ -36,7 +41,7 @@ export function useCustomerProfileData() {
 
   const syncAuthUser = useCallback((nextProfile: UserProfileData) => {
     const { user, setUser } = useAuthStore.getState();
-    if (!user) return;
+    if (!isCurrent() || !user || nextProfile.id !== (user.id || user._id)) return;
 
     const nextUser = {
       ...user,
@@ -55,7 +60,7 @@ export function useCustomerProfileData() {
       (user.gender ?? null) !== (nextUser.gender ?? null);
 
     if (hasChanged) setUser(nextUser);
-  }, []);
+  }, [isCurrent]);
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
@@ -63,6 +68,7 @@ export function useCustomerProfileData() {
 
     try {
       const nextProfile = await getUserProfile();
+      if (!isCurrent()) return;
       try {
         const dismissedMode = window.localStorage.getItem(
           getProviderBannerStorageKey(nextProfile.id),
@@ -76,21 +82,22 @@ export function useCustomerProfileData() {
       setProfile(nextProfile);
       syncAuthUser(nextProfile);
     } catch {
-      setErrorMsg("Không tải được hồ sơ. Vui lòng thử lại.");
+      if (isCurrent()) setErrorMsg("Không tải được hồ sơ. Vui lòng thử lại.");
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
-  }, [setErrorMsg, syncAuthUser]);
+  }, [isCurrent, setErrorMsg, syncAuthUser]);
 
   const loadProviderApplication = useCallback(async () => {
     try {
-      setProviderApplication(await providerApplicationApi.mine());
+      const application = await providerApplicationApi.mine();
+      if (isCurrent()) setProviderApplication(application);
     } catch {
-      setProviderApplication(null);
+      if (isCurrent()) setProviderApplication(null);
     } finally {
-      setIsProviderApplicationLoading(false);
+      if (isCurrent()) setIsProviderApplicationLoading(false);
     }
-  }, []);
+  }, [isCurrent]);
 
   useEffect(() => {
     // Initial remote loads are intentionally started from this effect.
@@ -100,34 +107,40 @@ export function useCustomerProfileData() {
   }, [loadProfile, loadProviderApplication]);
 
   const handleSaveProfile = async (payload: UserProfileFormValue) => {
+    if (!isCurrent()) return;
     setIsSaving(true);
     setErrorMsg("");
 
     try {
       const nextProfile = await updateUserProfile(payload);
+      if (!isCurrent()) return;
       setProfile(nextProfile);
       syncAuthUser(nextProfile);
       addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (error) {
+      if (!isCurrent()) return;
       setErrorMsg(
         getErrorMessage(error, "Cập nhật hồ sơ thất bại. Vui lòng thử lại."),
       );
       throw error;
     } finally {
-      setIsSaving(false);
+      if (isCurrent()) setIsSaving(false);
     }
   };
 
   const handleSaveAvatar = async (url: string) => {
+    if (!isCurrent()) return;
     setIsSaving(true);
     setErrorMsg("");
 
     try {
       const nextProfile = await updateUserAvatar(url);
+      if (!isCurrent()) return;
       setProfile(nextProfile);
       syncAuthUser(nextProfile);
       addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (error) {
+      if (!isCurrent()) return;
       setErrorMsg(
         getErrorMessage(
           error,
@@ -136,7 +149,7 @@ export function useCustomerProfileData() {
       );
       throw error;
     } finally {
-      setIsSaving(false);
+      if (isCurrent()) setIsSaving(false);
     }
   };
 

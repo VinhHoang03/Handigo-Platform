@@ -23,7 +23,11 @@ stubModule("../services/notification.service", { createNotificationRecord: async
 stubModule("../services/dispatch.service", { DispatchService: { dispatchReadyOrder: async () => { dispatches++; } } });
 const { createPayment } = require("../services/payment.service") as typeof import("../services/payment.service");
 const { resolveVoucherForAmount, reservePersonalVoucher, releaseVoucherReservation, getAvailableVouchers } = require("../services/voucher.service") as typeof import("../services/voucher.service");
-const { redeemReward } = require("../services/reward.service") as typeof import("../services/reward.service");
+const { redeemReward: redeemRewardService, rewardTermsVersion } = require("../services/reward.service") as typeof import("../services/reward.service");
+
+const redeemReward = (userId: string, offerId: string, requestId: string) => redeemRewardService(
+  userId, offerId, requestId, rewardTermsVersion({ ...REWARD_POLICY.offers.find((offer) => offer.id === offerId)!, isActive: true } as never, DEFAULT_REWARD_POLICY.validityDays),
+);
 
 async function run() {
   const user = { id: new Types.ObjectId().toString(), role: "CUSTOMER" as const };

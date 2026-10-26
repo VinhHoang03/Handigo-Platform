@@ -5,7 +5,7 @@ const ts = require('typescript');
 const { Types } = require('mongoose');
 const { calculateRefundPolicy } = require('../services/refundPolicy.service');
 const { ActionPreconditionError } = require('../utils/actionPreconditionError');
-const { cancelOrderSchema, cancelRecurringSeriesSchema } = require('../validations/order.validator');
+const { cancelOrderSchema } = require('../validations/order.validator');
 
 // Chạy nguyên hàm giao dịch hủy với database và dịch vụ tiền được cô lập.
 const source = fs.readFileSync(require.resolve('../services/orderCancellation.service'), 'utf8');
@@ -87,7 +87,6 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
 (async () => {
   assert.equal(cancelOrderSchema.parse({ reason: 'Thay đổi lịch', confirmedExpectation: fullRefund }).confirmedExpectation.refundAmount, 40000);
   assert.equal(cancelOrderSchema.safeParse({ reason: 'Thay đổi lịch', confirmedExpectation: { ...fullRefund, refundAmount: -1 } }).success, false);
-  assert.equal(cancelRecurringSeriesSchema.safeParse({ reason: 'Thay đổi lịch', confirmedExpectations: [{ orderId: String(new Types.ObjectId()), ...fullRefund }] }).success, true);
   orders = [makeOrder(true)];
   await assert.rejects(cancelOrderWithSettlement(input(orders[0], fullRefund)), error => error instanceof ActionPreconditionError);
   assert.equal(orders[0].status, 'accepted');
@@ -124,5 +123,5 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
   assert.equal(ledger.filter(entry => entry.refund !== undefined).length, 2, 'Thử lại toàn bộ transaction không hoàn ví trùng');
   assert.equal(settled.length, 2, 'Chỉ quyết toán sau transaction thành công');
   assert.equal(notified.length, 2, 'Không gửi thông báo trong các lượt rollback');
-  console.log('Đã kiểm tra xác nhận tiền hoàn, chặn dữ liệu cũ, xác nhận lại và hoàn tác cả chuỗi lịch.');
+  console.log('Đã kiểm tra xác nhận tiền hoàn, chặn dữ liệu cũ, xác nhận lại và hoàn tác giao dịch nhiều đơn.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

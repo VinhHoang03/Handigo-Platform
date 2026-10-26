@@ -5,6 +5,7 @@ import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
 import { Address } from "../models/address.model";
+import { DEFAULT_BOOKING_POLICY } from "../validations/bookingPolicy.validator";
 
 // Cô lập thanh toán, điều phối và socket; không đọc bí mật hoặc kết nối database.
 const stub = (path: string, exports: object) => {
@@ -28,11 +29,16 @@ stub("../services/providerWalletEligibility.service", { assertProviderWalletElig
 for (const name of ["wallet", "address", "matching", "voucher", "systemConfig", "servicePricing", "providerSchedule", "reward", "promotion"]) {
   stub(`../services/${name}.service`, {});
 }
+stub("../services/systemConfig.service", { getBookingPolicy: async () => DEFAULT_BOOKING_POLICY });
+stub("../services/providerSchedule.service", {
+  lockProviderSchedule: async (_id: Types.ObjectId) => ({ _id }),
+  assertProviderSchedule: async () => {},
+});
 const { requestProviderReassignment } = require("../services/orderReassignment.service") as typeof import("../services/orderReassignment.service");
 const { OrderService } = require("../services/order.service") as typeof import("../services/order.service");
 const { AssignmentService } = require("../services/assignment.service") as typeof import("../services/assignment.service");
 
-async function scenario(orderType: "normal" | "urgent" | "scheduled" | "recurring", inspectionRequired: boolean) {
+async function scenario(orderType: "normal" | "scheduled", inspectionRequired: boolean) {
   const provider = new Provider({ userId: new Types.ObjectId(), verified: true });
   const previousProvider = new Types.ObjectId();
   const order = new Order({ customerId: new Types.ObjectId(), providerId: provider._id,
@@ -113,27 +119,32 @@ async function scenario(orderType: "normal" | "urgent" | "scheduled" | "recurrin
 }
 
 async function run() {
-  for (const type of ["normal", "urgent", "scheduled", "recurring"] as const) await scenario(type, true);
+  for (const type of ["normal", "scheduled"] as const) await scenario(type, true);
   await scenario("normal", false);
-  for (const reserved of [false, true]) await acceptReplacement(reserved);
+  await acceptReplacement();
   failDispatch = true;
   await scenario("scheduled", true);
-  console.log("Đạt: tự điều phối trước báo giá, giữ cọc, loại toàn bộ thợ đã hủy, lịch hẹn/định kỳ, phân quyền và khôi phục khi điều phối lỗi.");
+  console.log("Đạt: tự điều phối trước báo giá, giữ cọc, loại toàn bộ thợ đã hủy, lịch hẹn, phân quyền và khôi phục khi điều phối lỗi.");
 }
 
-async function acceptReplacement(reserved: boolean) {
+async function acceptReplacement() {
   const provider = new Provider({ userId: new Types.ObjectId(), verified: true, availabilityStatus: "online" });
   const order = new Order({ customerId: new Types.ObjectId(), serviceId: new Types.ObjectId(),
-    addressId: new Types.ObjectId(), orderType: "recurring", recurringGroupId: new Types.ObjectId(),
+    addressId: new Types.ObjectId(), orderType: "scheduled",
     status: "created", scheduledAt: new Date(Date.now() + 86400000), inspectionRequired: true,
-    bookingStatus: reserved ? "reserved" : "not_required", paymentMethod: "wallet",
-    paymentStatus: reserved ? "unpaid" : "partially_paid", depositAmount: 40000,
+    bookingStatus: "not_required", paymentMethod: "wallet",
+    paymentStatus: "partially_paid", depositAmount: 40000,
     readyForMatching: true, reassignment: { automatic: true, status: "matching" },
   });
   const assignment = new OrderAssignment({ orderId: order._id, providerId: provider._id,
     assignmentType: "appointment", responseDeadline: new Date(Date.now() + 60000) });
   const query = (value: unknown): any => ({ then: (resolve: any) => Promise.resolve(value).then(resolve),
-    select: () => query(value), lean: () => query(value) });
+    select: () => query(value), lean: () => query(value), session: () => query(value) });
+  mock.method(mongoose, "startSession", async () => ({
+    withTransaction: async (fn: () => Promise<unknown>) => fn(), endSession: async () => {},
+  }) as never);
+  mock.method(Order, "findOne", () => query(order));
+  mock.method(order, "save", async () => order);
   mock.method(Provider, "findOne", () => query(provider));
   mock.method(Address, "findById", () => query({ ward: "Phường kiểm thử", province: "Tỉnh kiểm thử" }));
   mock.method(OrderAssignment, "findOne", () => query(assignment));
@@ -158,8 +169,8 @@ async function acceptReplacement(reserved: boolean) {
     assert.equal(result.order.status, "accepted");
     assert.equal(String(result.order.providerId), provider.id);
     assert.equal(result.order.reassignment?.status, "matched");
-    assert.equal(result.order.bookingStatus, reserved ? "reserved" : "confirmed");
-    assert.equal(result.order.paymentStatus, reserved ? "unpaid" : "partially_paid");
+    assert.equal(result.order.bookingStatus, "confirmed");
+    assert.equal(result.order.paymentStatus, "partially_paid");
     assert.equal(result.order.readyForMatching, false);
   } finally { mock.restoreAll(); }
 }

@@ -95,3 +95,31 @@ test('Đơn báo giá: để trống khi chưa có giá, tách tiền cọc kh�
   assert.doesNotMatch(quoted, /Thu nhập của thợ|Thu nhập dự kiến/);
   assert.doesNotMatch(quoted, />Phí nền tảng</);
 });
+
+test('Đơn báo giá hoàn thành hiển thị phương thức thanh toán trực tiếp, không lấy phương thức cọc', () => {
+  for (const paymentMethod of ['wallet', 'bank']) {
+    const order = makeOrder({ status: 'completed', inspectionRequired: true, paymentMethod,
+      serviceId: { serviceType: 'variable_price' }, depositPaidAt: '2026-10-15T01:00:00Z' });
+    order.pricing.totalPaidAmount = 30000;
+    const html = render(order, { quotation: { finalAmount: 150000, status: 'saved', directPaymentConfirmedAt: '2026-10-15T02:00:00Z' } });
+    assert.equal(value(html, 'Phương thức thanh toán'), 'Thanhtoántrựctiếpvớithợ');
+    assert.doesNotMatch(html, /Phương thức thanh toán tiền cọc|QR PayOS/);
+    assert.equal(value(html, 'Đã thu trực tiếp từ khách'), '120.000₫');
+  }
+});
+
+test('Đơn báo giá chưa hoàn thành vẫn hiển thị phương thức trả cọc', () => {
+  const order = makeOrder({ status: 'in_progress', inspectionRequired: true, paymentMethod: 'bank' });
+  const html = render(order, { quotation: { finalAmount: 150000, status: 'saved' } });
+  assert.equal(value(html, 'Phương thức thanh toán tiền cọc'), 'QRPayOS');
+});
+
+test('Đơn báo giá hoàn thành không cần thu thêm hoặc thiếu báo giá không dùng phương thức cọc thay thế', () => {
+  const order = makeOrder({ status: 'completed', inspectionRequired: true, paymentMethod: 'bank', depositPaidAt: '2026-10-15T01:00:00Z' });
+  order.pricing.totalPaidAmount = 30000;
+  const covered = render(order, { quotation: { finalAmount: 30000, status: 'saved' } });
+  assert.equal(value(covered, 'Phương thức thanh toán'), 'Khôngphátsinhthanhtoánthêm');
+  const missing = render(order);
+  assert.equal(value(missing, 'Phương thức thanh toán'), 'Chưacóthôngtinbáogiá');
+  assert.doesNotMatch(missing, /QR PayOS|Phương thức thanh toán tiền cọc/);
+});

@@ -15,6 +15,111 @@ const deferred = () => {
   return { promise, resolve };
 };
 
+for (const status of [200, 401]) {
+  test(`KH-40: phản hồi ${status} của A không được áp dụng hoặc gửi lại bằng phiên B`, async () => {
+    const entered = deferred(); const pending = deferred();
+    const runtime = setup({ transport: async (config, { response, fail }) => {
+      if (config.url === '/users/profile') {
+        entered.resolve(); await pending.promise;
+        if (status === 401) fail(config, status);
+        return response(config, { fullName: 'Hồ sơ A' });
+      }
+    } });
+    runtime.store.getState().setAuth({ ...user, id: 'A' }, token());
+    const api = runtime.load('api/client.ts').default;
+    const result = assert.rejects(api.put('/users/profile', { fullName: 'Hồ sơ A' }), axios.isCancel);
+    await entered.promise;
+    runtime.store.getState().logout();
+    const nextToken = token(7200);
+    runtime.store.getState().setAuth({ ...user, id: 'B' }, nextToken);
+    pending.resolve(); await result;
+    assert.deepEqual(runtime.calls.map(call => call.url), ['/users/profile']);
+    assert.equal(runtime.store.getState().user.id, 'B');
+    assert.equal(runtime.store.getState().token, nextToken);
+  });
+}
+
+for (const status of [200, 403]) {
+  test(`KH-40: refresh A trả ${status} sau khi đăng nhập B không đổi token hoặc đăng xuất B`, async () => {
+    const entered = deferred(); const pending = deferred();
+    const runtime = setup({ transport: async (config, { fail }) => {
+      if (config.url === '/auth/refresh-token') {
+        entered.resolve(); await pending.promise;
+        if (status === 403) fail(config, status);
+      }
+    } });
+    runtime.store.getState().setAuth({ ...user, id: 'A' }, token());
+    const result = assert.rejects(runtime.load('api/client.ts').refreshAccessToken(), axios.isCancel);
+    await entered.promise;
+    const nextToken = token(7200);
+    runtime.store.getState().setAuth({ ...user, id: 'B' }, nextToken);
+    pending.resolve(); await result;
+    assert.equal(runtime.store.getState().user.id, 'B');
+    assert.equal(runtime.store.getState().token, nextToken);
+  });
+}
+
+test('KH-40: đăng nhập lại cùng tài khoản cũng vô hiệu hóa request của phiên cũ', async () => {
+  const entered = deferred(); const pending = deferred();
+  const runtime = setup({ transport: async config => { entered.resolve(); await pending.promise; } });
+  runtime.store.getState().setAuth(user, token());
+  const result = assert.rejects(runtime.load('api/client.ts').default.get('/users/profile'), axios.isCancel);
+  await entered.promise;
+  runtime.store.getState().setAuth(user, token(7200));
+  pending.resolve(); await result;
+});
+
+test('KH-40: phiên mới refresh độc lập, phiên cũ kết thúc không xóa lượt refresh đang chạy', async () => {
+  const entered = deferred(); const first = deferred(); const second = deferred();
+  let count = 0;
+  const runtime = setup({ transport: async config => {
+    if (config.url === '/auth/refresh-token') {
+      count++;
+      if (count === 1) { entered.resolve(); await first.promise; }
+      else await second.promise;
+    }
+  } });
+  runtime.store.getState().setAuth({ ...user, id: 'A' }, token());
+  const client = runtime.load('api/client.ts');
+  const old = assert.rejects(client.refreshAccessToken(), axios.isCancel);
+  await entered.promise;
+  runtime.store.getState().setAuth({ ...user, id: 'B' }, token(7200));
+  const current = client.refreshAccessToken();
+  await new Promise(setImmediate);
+  first.resolve(); await old;
+  const concurrent = client.refreshAccessToken();
+  second.resolve(); await Promise.all([current, concurrent]);
+  assert.equal(count, 2);
+  assert.equal(runtime.store.getState().user.id, 'B');
+});
+
+test('KH-40: khôi phục phiên chậm không ghi đè tài khoản vừa đăng nhập', async () => {
+  const entered = deferred(); const pending = deferred();
+  const runtime = setup({ initialToken: token(), transport: async config => {
+    if (config.url === '/auth/me') { entered.resolve(); await pending.promise; }
+  } });
+  const restore = runtime.auth.restoreSession();
+  await entered.promise;
+  runtime.store.getState().setAuth({ ...user, id: 'B' }, token(7200));
+  pending.resolve();
+  assert.equal(await restore, null);
+  assert.equal(runtime.store.getState().user.id, 'B');
+});
+
+test('KH-40: đăng xuất vô hiệu hóa phiên ngay và phản hồi muộn không đăng xuất tài khoản mới', async () => {
+  const entered = deferred(); const pending = deferred();
+  const runtime = setup({ transport: async config => {
+    if (config.url === '/auth/logout') { entered.resolve(); await pending.promise; }
+  } });
+  runtime.store.getState().setAuth(user, token());
+  const logout = runtime.auth.logout();
+  assert.equal(runtime.store.getState().user, null);
+  await entered.promise;
+  runtime.store.getState().setAuth({ ...user, id: 'B' }, token(7200));
+  pending.resolve(); await logout;
+  assert.equal(runtime.store.getState().user.id, 'B');
+});
+
 function setup({ initialToken, rememberedUser, remember = true, transport } = {}) {
   const memoryStorage = entries => {
     const values = new Map(entries);
