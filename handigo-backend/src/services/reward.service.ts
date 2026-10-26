@@ -7,6 +7,7 @@ import { IOrder, Order } from "../models/order.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { REWARD_POLICY, calculateRewardPoints } from "../configs/rewards";
 import { AppError } from "../utils/appError";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 import type { RequestUser } from "../middlewares/authContext";
 import { createConfig, getConfigByKey, getRewardOffers, getRewardPolicy, updateConfig } from "./systemConfig.service";
 import { rewardOfferSchema, type AdminRewardOfferInput } from "../validations/reward.validator";
@@ -103,6 +104,7 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
       if (previous.offerId !== offerId) throw new AppError("Yêu cầu này đã được dùng cho ưu đãi khác.", 409);
       return findStoredVoucher({ _id: previous.voucherId ?? previous.promotionId }, session);
     }
+    await assertFeatureAllowed(userId, "voucher", session);
     const offer = (await getRewardOffers(session)).find((item) => item.id === offerId && item.isActive);
     if (!offer) throw new AppError("Ưu đãi đổi điểm không tồn tại hoặc đã ngừng áp dụng.", 404);
     const policy = await getRewardPolicy(session);

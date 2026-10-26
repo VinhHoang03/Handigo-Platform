@@ -1,4 +1,5 @@
 import { serviceImageResponse } from "../utils/serviceImageResponse";
+import { withAssignmentArea } from "../utils/orderAddress";
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { Order } from "../models/order.model";
@@ -823,13 +824,7 @@ export const AssignmentService = {
           { path: "serviceId", select: "name image coverImage serviceType depositAmount fixedPrice", transform: serviceImageResponse },
           { path: "addressId", select: "ward province" },
         ],
-        transform: (order) => {
-          if (!order?.addressSnapshot) return order;
-          // Đề nghị chưa nhận chỉ hiển thị khu vực như địa chỉ đã lưu, không lộ người nhận hoặc vị trí cụ thể.
-          const { addressSnapshot, ...value } = order;
-          return { ...value, addressId: { _id: order.addressId?._id ?? null,
-            ward: addressSnapshot.ward, province: addressSnapshot.province } };
-        },
+        transform: withAssignmentArea,
       })
       .sort({ assignedAt: -1 })
       .lean();

@@ -24,6 +24,7 @@ import {
 } from "../utils/profileValidation";
 import { markProviderOffline } from "./providerPresence.service";
 import { disconnectUserSockets } from "../sockets/socketServer";
+import { refreshAccountLock } from "./penaltyPolicy.service";
 
 const SALT_ROUNDS = 10;
 
@@ -348,6 +349,7 @@ export const login = async (
     throw new AppError("Email hoặc mật khẩu không đúng", 401);
   }
 
+  await refreshAccountLock(user);
   if (user.status === "locked") {
     throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
@@ -500,6 +502,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
     $or: [{ googleId }, { email: normalizedEmail }],
   });
 
+  if (user) await refreshAccountLock(user);
   if (user && user.status === "locked") {
     throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
@@ -577,6 +580,7 @@ export const facebookLogin = async (accessToken: string) => {
     $or: [{ facebookId: user_id }, { email: normalizedEmail }],
   });
 
+  if (existingUser) await refreshAccountLock(existingUser);
   if (existingUser && existingUser.status === "locked") {
     throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
@@ -722,6 +726,7 @@ export const refreshToken = async (
     throw new AppError("Phiên làm mới đăng nhập không hợp lệ hoặc đã hết hạn", 401);
   }
 
+  await refreshAccountLock(user);
   if (user.status === "locked") {
     await Session.findByIdAndUpdate(session._id, { revokedAt: new Date() });
     throw new AppError("Tài khoản không được phép đăng nhập", 403);

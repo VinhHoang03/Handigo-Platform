@@ -15,6 +15,7 @@ import { orderIdParamSchema } from "../validations/order.validator";
 import { markProviderOffline, restoreProviderAfterReconnect } from "../services/providerPresence.service";
 import { createLogger } from "../utils/logger";
 import { isTokenVersionCurrent } from "../utils/token";
+import { refreshAccountLock } from "../services/penaltyPolicy.service";
 
 const PROVIDER_OFFLINE_GRACE_MS = 30_000;
 const socketLogger = createLogger("SocketServer");
@@ -66,6 +67,7 @@ export const initSocket = (server: HttpServer) => {
 
       const decoded = jwt.verify(token, getAccessSecret()) as SocketUser;
       const user = await User.findOne({ _id: decoded.id, isDeleted: false });
+      if (user) await refreshAccountLock(user);
 
       if (!user || user.status === "locked") {
         return next(new Error("Người dùng không được phép kết nối socket"));

@@ -1,5 +1,5 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import { bookingApi } from '@/features/booking/api/booking.api';
 import type { Order } from '@/types/booking';
@@ -21,9 +21,18 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   const [cancelReason, setCancelReason] = useState('');
   const [cancelExplanation, setCancelExplanation] = useState('');
   const [cancelError, setCancelError] = useToastFeedback<string>('', "error");
+  const requestRevision = useRef(0);
+  const renderScope = useMemo(() => Symbol(orderId), [orderId]);
+  const scope = useRef<symbol | null>(renderScope);
+  const actionPending = useRef(false);
+  const currentOrder = order?._id === orderId ? order : null;
 
   const loadData = useCallback(async (showLoading = true) => {
     if (!orderId) return;
+    const context = renderScope;
+    if (scope.current !== context) return;
+    const revision = ++requestRevision.current;
+    const isCurrent = () => scope.current === context && revision === requestRevision.current;
 
     if (showLoading) setLoading(true);
     try {
@@ -32,13 +41,13 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
         providerOrderApi.getPendingAssignments(),
       ]);
 
-      setOrder(orderData);
+      if (!isCurrent()) return;
       const matchedAssignment = pendingAssignments.find((item) => {
         const relatedOrder =
           typeof item.orderId === 'object' ? item.orderId._id : item.orderId;
         return relatedOrder === orderId;
       });
-      setAssignment(matchedAssignment ?? null);
+      let nextQuotation: QuotationDetail | null = null;
 
       const isUnconfirmedAppointment =
         ['scheduled', 'recurring'].includes(orderData.orderType) &&
@@ -49,28 +58,39 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
         !isUnconfirmedAppointment
       ) {
         const quotationData = await providerOrderApi.getQuotation(orderId);
-        setQuotation(quotationData);
-      } else {
-        setQuotation(null);
+        nextQuotation = quotationData;
       }
-
+      if (!isCurrent()) return;
+      setOrder(orderData);
+      setAssignment(matchedAssignment ?? null);
+      setQuotation(nextQuotation);
       setError(null);
     } catch {
+      if (!isCurrent()) return;
       setError('Không thể tải chi tiết đơn dịch vụ.');
       if (showLoading) setOrder(null);
       else throw new Error('Không thể tải dữ liệu mới nhất. Vui lòng tải lại đơn hàng.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [orderId, setError]);
+  }, [orderId, setError, renderScope]);
 
   useEffect(() => {
-    void Promise.resolve().then(() => loadData());
-  }, [loadData]);
+    const context = renderScope;
+    scope.current = context;
+    requestRevision.current++;
+    actionPending.current = false;
+    let active = true;
+    void Promise.resolve().then(() => { if (active) return loadData(); });
+    return () => {
+      active = false;
+      if (scope.current === context) scope.current = null;
+    };
+  }, [loadData, renderScope]);
 
   // Cập nhật thanh toán trong lúc thợ chờ khách trả tiền, giữ nguyên ảnh và ghi chú đang nhập.
   useEffect(() => {
-    if (!orderId || busy || order?.inspectionRequired || order?.status !== 'in_progress' || order.paymentStatus !== 'unpaid') return;
+    if (!orderId || busy || currentOrder?.inspectionRequired || currentOrder?.status !== 'in_progress' || currentOrder.paymentStatus !== 'unpaid') return;
     let active = true;
     let pending = false;
     const refreshPayment = async () => {
@@ -78,7 +98,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       pending = true;
       try {
         const latest = await bookingApi.getOrderById(orderId);
-        if (active) setOrder((current) => current?._id === latest._id &&
+        if (active && latest._id === orderId) setOrder((current) => current?._id !== orderId ||
           new Date(current.updatedAt).getTime() > new Date(latest.updatedAt).getTime() ? current : latest);
       } catch (error) {
         console.error('Không thể cập nhật trạng thái thanh toán của đơn hàng.', error);
@@ -93,22 +113,28 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       window.clearInterval(timer);
       window.removeEventListener('focus', refreshPayment);
     };
-  }, [orderId, busy, order?.inspectionRequired, order?.status, order?.paymentStatus]);
+  }, [orderId, busy, currentOrder?.inspectionRequired, currentOrder?.status, currentOrder?.paymentStatus]);
 
   const runAction = async (
-    action: () => Promise<void>,
+    action: (isCurrent: () => boolean) => Promise<void>,
     fallbackMessage: string,
     reload = true,
     successMessage?: string,
   ) => {
+    const context = renderScope;
+    const isCurrent = () => scope.current === context;
+    if (!isCurrent() || !currentOrder || loading || actionPending.current) return false;
+    actionPending.current = true;
     try {
       setBusy(true);
       setError(null);
-      await action();
+      await action(isCurrent);
+      if (!isCurrent()) return false;
       if (successMessage) addToast(successMessage, "success");
       if (reload) await loadData(false);
-      return true;
+      return isCurrent();
     } catch (err: unknown) {
+      if (!isCurrent()) return false;
       const message =
         typeof err === 'object' &&
           err !== null &&
@@ -121,7 +147,8 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
       setError(message);
       return false;
     } finally {
-      setBusy(false);
+      if (scope.current === context) actionPending.current = false;
+      if (isCurrent()) setBusy(false);
     }
   };
 
@@ -149,10 +176,11 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
 
   const handleComplete = async (files: File[], completionNote: string) => {
     if (!order) return;
-    await runAction(async () => {
+    await runAction(async (isCurrent) => {
       const completionEvidenceImages = await Promise.all(
         files.map((file) => bookingApi.uploadOrderAttachment(file)),
       );
+      if (!isCurrent()) return;
       await providerOrderApi.completeOrder(order._id, {
         completionEvidenceImages,
         completionNote,
@@ -208,7 +236,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   };
 
   const handleCreateQuotation = async (payload: Parameters<typeof providerOrderApi.createQuotation>[1]) => {
-    if (!orderId) return false;
+    if (!orderId || !currentOrder) return false;
     const succeeded = await runAction(async () => {
       if (quotation) {
         await providerOrderApi.updateQuotation(orderId, quotation.quotation._id, quotation.quotation.revision ?? 0, payload);
@@ -221,7 +249,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   };
 
   return {
-    order,
+    order: currentOrder,
     assignment,
     quotation,
     loading,

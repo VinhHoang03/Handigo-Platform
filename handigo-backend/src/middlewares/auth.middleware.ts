@@ -4,6 +4,7 @@ import User from "../models/user.model";
 import type { AuthenticatedUser } from "./authContext";
 import { orderActorContext } from "../utils/orderActorContext";
 import { isTokenVersionCurrent } from "../utils/token";
+import { refreshAccountLock } from "../services/penaltyPolicy.service";
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -36,11 +37,12 @@ export const authMiddleware = (
   try {
     const decoded = jwt.verify(token, getAccessSecret()) as AuthenticatedUser;
     User.findOne({ _id: decoded.id, isDeleted: false })
-      .then((user) => {
+      .then(async (user) => {
         if (!user) {
           return res.status(401).json({ message: "Không tìm thấy người dùng hoặc người dùng đã bị xóa" });
         }
 
+        await refreshAccountLock(user);
         if (user.status === "locked") {
           return res.status(403).json({ message: "Tài khoản đã bị khóa" });
         }

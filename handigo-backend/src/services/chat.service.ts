@@ -6,6 +6,7 @@ import { Message } from "../models/message.model";
 import { Order, type IOrder } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { Report } from "../models/report.model";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 type SenderRole = "customer" | "provider";
@@ -256,6 +257,7 @@ export const sendMessage = async (
   conversationId: string,
   payload: SendMessagePayload,
 ) => {
+  await assertFeatureAllowed(userId, "chat");
   const { conversation, participant } = await getConversationForParticipant(
     userId,
     role,
@@ -330,6 +332,7 @@ export const updateMessage = async (
   messageId: string,
   content: string,
 ) => {
+  await assertFeatureAllowed(userId, "chat");
   assertObjectId(messageId, "message id");
   const message = await Message.findOne({ _id: messageId, isDeleted: false });
   if (!message) throw new AppError("Không tìm thấy tin nhắn.", 404);

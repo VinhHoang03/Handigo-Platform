@@ -9,6 +9,7 @@ import { Voucher } from "../models/voucher.model";
 import { VoucherUsage } from "../models/voucherUsage.model";
 import { findStoredVoucher, listStoredVouchers, updateStoredVoucher } from "./voucherStore.service";
 import { AppError } from "../utils/appError";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 import type {
   AdminVoucherQuery,
   ApplyVoucherInput,
@@ -80,6 +81,7 @@ export const resolveVoucherForAmount = async (
   inspectionRequired?: boolean,
 ) => {
   const normalizedCode = normalizeCode(code);
+  if (customerId) await assertFeatureAllowed(customerId, "voucher", session);
   const promotion = await findStoredVoucher({ code: normalizedCode }, session);
 
   if (!promotion) {

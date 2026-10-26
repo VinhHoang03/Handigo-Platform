@@ -1,5 +1,6 @@
 import { serviceImageResponse } from "../utils/serviceImageResponse";
 import { OrderAssignment } from "../models/orderAssignment.model";
+import { withAssignmentArea } from "../utils/orderAddress";
 
 export const getAssignmentRealtimePayload = async (assignmentId: string) => {
   return OrderAssignment.findById(assignmentId)
@@ -9,6 +10,7 @@ export const getAssignmentRealtimePayload = async (assignmentId: string) => {
         "orderCode",
         "serviceId",
         "addressId",
+        "addressSnapshot",
         "orderType",
         "scheduledAt",
         "pricing",
@@ -22,6 +24,7 @@ export const getAssignmentRealtimePayload = async (assignmentId: string) => {
         },
         { path: "addressId", select: "ward province" },
       ],
+      transform: withAssignmentArea,
     })
     .lean();
 };

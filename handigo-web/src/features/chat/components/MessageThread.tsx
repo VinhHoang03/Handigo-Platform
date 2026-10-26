@@ -16,6 +16,9 @@ interface MessageThreadProps {
   currentUserId: string;
   onEdit: (messageId: string, content: string) => Promise<void>;
   onDelete: (messageId: string) => Promise<void>;
+  hasMore?: boolean;
+  loadingOlder?: boolean;
+  onLoadOlder?: () => void;
 }
 
 export function MessageThread({
@@ -23,8 +26,14 @@ export function MessageThread({
   currentUserId,
   onEdit,
   onDelete,
+  hasMore,
+  loadingOlder,
+  onLoadOlder,
 }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollBeforeLoad = useRef<{ height: number; top: number } | null>(null);
+  const lastMessageId = messages.at(-1)?._id;
   const { addToast } = useToast();
   const [menuMessageId, setMenuMessageId] = useState("");
   const [editingMessageId, setEditingMessageId] = useState("");
@@ -35,8 +44,16 @@ export function MessageThread({
   const [, setActionError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
+    if (!scrollBeforeLoad.current) bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [lastMessageId]);
+
+  useEffect(() => {
+    const before = scrollBeforeLoad.current;
+    if (!loadingOlder && before && scrollRef.current) {
+      scrollRef.current.scrollTop = before.top + scrollRef.current.scrollHeight - before.height;
+      scrollBeforeLoad.current = null;
+    }
+  }, [loadingOlder, messages]);
 
   const submitEdit = async () => {
     const content = editingContent.trim();
@@ -80,7 +97,11 @@ export function MessageThread({
 
   return (
     <>
-      <div className="flex-1 space-y-3 overflow-y-auto bg-surface-container-low/40 p-4">
+      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-surface-container-low/40 p-4">
+        {hasMore && <button type="button" disabled={loadingOlder} className="w-full py-2 text-sm font-semibold text-primary" onClick={() => {
+          if (scrollRef.current) scrollBeforeLoad.current = { height: scrollRef.current.scrollHeight, top: scrollRef.current.scrollTop };
+          onLoadOlder?.();
+        }}>{loadingOlder ? "Đang tải..." : "Tải tin nhắn cũ hơn"}</button>}
         {messages.map((message) => {
           const isMine = getSenderId(message) === currentUserId;
           const isEditing = editingMessageId === message._id;

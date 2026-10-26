@@ -7,12 +7,14 @@ export function useChatSocket(
   onMessage: (message: ChatMessage) => void,
   onMessageUpdated: (message: ChatMessage) => void,
   onMessageDeleted: (messageId: string) => void,
+  onReconnect?: () => void,
 ) {
   useEffect(() => {
     if (!conversationId) return;
     const { socket, dispose } = createAuthenticatedSocket();
     const joinConversation = () => {
       socket.emit('conversation:join', { conversationId });
+      onReconnect?.();
     };
     const handleMessage = (message: ChatMessage) => {
       if (message.conversationId === conversationId) onMessage(message);
@@ -34,5 +36,5 @@ export function useChatSocket(
       socket.off('message:deleted', handleDeletedMessage);
       dispose();
     };
-  }, [conversationId, onMessage, onMessageDeleted, onMessageUpdated]);
+  }, [conversationId, onMessage, onMessageDeleted, onMessageUpdated, onReconnect]);
 }

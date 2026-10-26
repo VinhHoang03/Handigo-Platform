@@ -10,6 +10,7 @@ import { Category } from "../models/category.model";
 import { Address, type IAddress } from "../models/address.model";
 import { recordOrderStatus } from "../utils/orderHistory";
 import { resolveAutomaticPromotion, claimPromotion, releaseOrderPromotion } from "./promotion.service";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 import { withOrderAddress } from "../utils/orderAddress";
 import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates, createAddress } from "./address.service";
@@ -191,6 +192,7 @@ export const OrderService = {
    *  4. Hand off to DispatchService to find & assign the nearest provider.
    */
   async createOrder(payload: CreateOrderPayload, confirmedOrderId?: Types.ObjectId, draftAddress?: IAddress, saveAddressToBook = true): Promise<IOrder> {
+    await assertFeatureAllowed(payload.customerId, "booking");
     if (!payload.paymentMethod || !["wallet", "bank", "cash"].includes(payload.paymentMethod)) {
       throw new AppError("Phương thức thanh toán không hợp lệ.", 400);
     }

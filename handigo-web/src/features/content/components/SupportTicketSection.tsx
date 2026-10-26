@@ -16,7 +16,7 @@ export type { SupportRole };
 export function SupportTicketSection({ role }: { role: SupportRole }) {
   const [searchInput, setSearchInput] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const support = useSupportTickets(role);
+  const support = useSupportTickets();
 
   return (
     <>
@@ -101,7 +101,6 @@ export function SupportTicketSection({ role }: { role: SupportRole }) {
           open
           kind="ticket"
           role={role}
-          orders={support.orders}
           onClose={() => setCreateOpen(false)}
           onCreated={() => void support.loadTickets()}
         />

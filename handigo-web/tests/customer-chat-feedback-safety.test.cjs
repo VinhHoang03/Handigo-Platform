@@ -82,10 +82,17 @@ test('KH-21: đổi popup tạo lại trạng thái; phản hồi lịch sử c�
   const app = hooks(); const oldHistory = deferred(); const seen = [];
   function Thread() {}
   const toast = { useToast: () => ({ addToast() {} }), useToastFeedback: initial => app.react.useState(initial) };
+  const history = load('features/chat/hooks/useChatMessages.ts', {
+    react: app.react,
+    '../hooks/useChatSocket': { useChatSocket() {} },
+    './useChatSocket': { useChatSocket() {} },
+    '../api/chat.api': { chatApi: { messages: () => oldHistory.promise, seen: async id => { seen.push(id); } } },
+    '../utils/chatHistory': load('features/chat/utils/chatHistory.ts', {}),
+  }, { window: { setTimeout, clearTimeout } });
   const { ChatPopup } = load('features/chat/components/ChatPopup.tsx', {
     react: app.react, 'react-dom': { createPortal: node => node },
     '@/features/auth/store/auth.store': auth, '@/components/common/Toast': toast,
-    '../hooks/useChatSocket': { useChatSocket() {} },
+    '../hooks/useChatMessages': history,
     '../store/chatUi.store': { useChatUiStore: selector => selector({ registerOpenPopup() {}, unregisterOpenPopup() {} }) },
     './MessageThread': { MessageThread: Thread },
     '../api/chat.api': { chatApi: { messages: () => oldHistory.promise, seen: async id => { seen.push(id); } } },

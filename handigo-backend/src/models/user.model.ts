@@ -28,6 +28,7 @@ export interface IUser extends Document {
   gender?: "male" | "female" | "other" | null;
   role: UserRole;
   status: UserStatus;
+  temporaryLockId?: mongoose.Types.ObjectId;
   registrationIntent?: RegistrationIntent;
   providerOnboardingStatus?: ProviderOnboardingStatus | null;
   providerOnboardingStep?: 1 | 2 | 3 | null;
@@ -126,6 +127,7 @@ const UserSchema = new Schema<IUser>(
       enum: ["active", "locked"],
       default: "active",
     },
+    temporaryLockId: { type: Schema.Types.ObjectId, ref: "Violation", select: false },
 
     isEmailVerified: {
       type: Boolean,

@@ -17,6 +17,15 @@ const notification = (userId, extra = {}) => ({
 });
 const listResult = items => ({ items, pagination: { page: 1, totalPages: 1 } });
 
+test('KH-42: thông báo đề nghị nhận việc mở luồng phản hồi thay vì chi tiết chưa có quyền xem', () => {
+  const runtime = setup();
+  const utils = runtime.load('components/common/notification-bell/notificationBell.utils.ts');
+  const item = notification('A', { data: { assignmentId: 'de-nghi', orderId: 'don', actionUrl: '/provider/orders/don' } });
+  assert.equal(utils.getNotificationTarget(item, 'PROVIDER'), '/provider/orders?assignmentId=de-nghi&orderId=don');
+  assert.equal(utils.getNotificationTarget({ ...item, data: { ...item.data, orderUnavailable: true } }, 'PROVIDER'), null);
+  assert.equal(utils.getNotificationTarget(notification('A', { data: { orderId: 'don' } }), 'PROVIDER'), '/provider/orders/don');
+});
+
 function setup() {
   const slots = [];
   const effects = [];

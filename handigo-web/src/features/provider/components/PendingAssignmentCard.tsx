@@ -108,9 +108,7 @@ export function PendingAssignmentCard({
             Địa chỉ
           </p>
           <p className="mt-1 text-sm text-on-surface">
-            {(order.addressId as { fullAddress?: string; detailAddress?: string }).fullAddress ||
-              (order.addressId as { detailAddress?: string }).detailAddress ||
-              shortAddress(order)}
+            {shortAddress(order) || 'Chưa có thông tin khu vực'}
           </p>
         </div>
 
