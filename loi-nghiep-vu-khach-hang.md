@@ -1,4 +1,17 @@
-# KH-03 — Tạm hoãn: duyệt provider làm mất thao tác khách hàng với đơn đang có
+# Lỗi nghiệp vụ khách hàng cần xử lý
+
+## Bảng mô tả ngắn gọn
+
+Phạm vi: luồng khách hàng trên web và backend phục vụ web; chưa rà soát mobile.
+
+**Cập nhật triển khai ngày 26/10/2026:** tạm bỏ giới hạn booking 08:00–21:00 theo yêu cầu để kiểm thử ngoài giờ. Web mở bộ chọn đủ 24 giờ; backend và trợ lý dùng chung chính sách giờ tạm thời. Vẫn kiểm tra thời gian hợp lệ, không sớm hơn phút hiện tại khi tạo lịch mới và lịch trống/ca làm việc của thợ. Đây không phải thay đổi xử lý KH-33. Không sửa mã nguồn mobile.
+
+| Mã lỗi | Mức độ | Mô tả ngắn gọn | Trạng thái |
+|---|---|---|---|
+| KH-03 | Chưa phân loại | Khách được duyệt thành provider mất quyền thao tác trên các đơn đã đặt. | Tạm hoãn theo yêu cầu |
+| KH-33 | P2 | Vẫn cho tiếp tục thanh toán và điều phối lịch hẹn đã qua giờ thực hiện. | Tạm hoãn theo yêu cầu |
+
+## KH-03 — Tạm hoãn: duyệt provider làm mất thao tác khách hàng với đơn đang có
 
 **Trạng thái xử lý:** tạm giữ nghiệp vụ và mô tả hiện tại, để sửa sau theo yêu cầu người dùng ngày 25/10/2026. Không tự triển khai hoặc mở rộng quyền provider trong đợt rà soát bổ sung.
 
@@ -70,3 +83,25 @@ Ví dụ: A đặt đơn hẹn giờ và đã cọc, sau đó được duyệt l
 | Khách hàng chưa chuyển role và provider chỉ có công việc nhận làm | Các luồng hiện tại tiếp tục hoạt động; không mở quyền quản trị hoặc quyền thao tác tài nguyên người khác. |
 
 Chỉ coi KH-03 hoàn tất sau khi kiểm thử cả backend, giao diện và realtime của các nhánh bị ảnh hưởng; tại thời điểm cập nhật tài liệu này, lỗi vẫn nằm trong danh sách cần xử lý.
+
+## Rà soát bổ sung luồng booking ngày 26/10/2026
+
+**Phạm vi:** chọn dịch vụ/tùy chọn, địa chỉ và lịch thực hiện; tạo đơn, thanh toán và khôi phục sau lỗi; điều phối/chọn lại thợ; báo giá, hoàn thành, hủy và theo dõi đơn. Chỉ rà soát luồng khách hàng trên web và các xử lý backend phục vụ những luồng này; ứng dụng di động nằm ngoài phạm vi. Giữ nguyên KH-03 đang tạm hoãn; không sửa code, API hoặc dữ liệu trong đợt này.
+
+**Mức độ kiểm chứng:** KH-33 được xác định từ nhánh xử lý cụ thể trong code và đã tái hiện cô lập bằng mã hiện tại với phụ thuộc giả lập; chưa kiểm thử toàn trình trên MongoDB hoặc PayOS thật.
+
+## KH-33 — P2: có thể tiếp tục thanh toán và điều phối đơn hẹn giờ đã qua thời điểm thực hiện
+
+**Trạng thái:** tạm hoãn theo yêu cầu người dùng ngày 26/10/2026; chưa triển khai xử lý lịch hẹn hết hiệu lực khi tiếp tục thanh toán.
+
+**Luồng:** tạo đơn hẹn giờ hợp lệ → chưa hoàn tất thanh toán → qua giờ hẹn → mở chi tiết đơn và tiếp tục thanh toán.
+
+**Bằng chứng:** [payment.service.ts:182](handigo-backend/src/services/payment.service.ts#L182), `assertAppointmentPaymentReady` trả về ngay khi đơn `created` chưa có `providerId`, không so sánh `scheduledAt` với hiện tại. Đơn mới có `bookingStatus = not_required`, `paymentDueAt = null` tại [order.service.ts:418](handigo-backend/src/services/order.service.ts#L418), nên không thuộc nhánh quét hết hạn thanh toán ở [dispatch.service.ts:683](handigo-backend/src/services/dispatch.service.ts#L683). Điều kiện `canMakeInitialPayment` tại [useBookingDetail.ts:77](handigo-web/src/features/booking/components/detail/useBookingDetail.ts#L77) không kiểm tra giờ hẹn đã qua. Sau ghi nhận tiền, hệ thống bật điều phối và dùng lại `scheduledAt` cũ; kiểm tra lịch làm việc trong [providerSchedule.ts:16](handigo-backend/src/utils/providerSchedule.ts#L16) chỉ xét khung giờ/ngày nghỉ, không chặn khoảng thời gian trong quá khứ.
+
+**Kịch bản:** tạo đơn hẹn 10:00 nhưng chưa thanh toán; 10:10 mở lại chi tiết để trả tiền. Chọn thời lượng 60 phút và thợ phù hợp, không có lịch xung đột để loại trừ các nguyên nhân từ chối khác.
+
+**Thực tế và ảnh hưởng:** backend vẫn cho qua điều kiện thanh toán của đơn hẹn đã trễ; có thể thu tiền và gửi đề nghị nhận một khung giờ bắt đầu trong quá khứ. Điều này bỏ qua ràng buộc không đặt lịch trong quá khứ vốn được kiểm tra lúc tạo đơn. Tái hiện cô lập xác nhận guard thanh toán chấp nhận đơn `created` chưa có thợ với ngày hẹn đã qua; kiểm tra khung làm việc cũng trả `true` cho khoảng quá khứ hợp lệ trong ngày.
+
+**Mong đợi/hướng xử lý:** kiểm tra lại tính hợp lệ của giờ hẹn tại bước tiếp tục thanh toán/điều phối; lịch hết hiệu lực phải yêu cầu khách chọn lại hoặc xử lý hết hạn theo chính sách được chốt. Với QR đã phát hành và tiền đến muộn, cần đối soát rồi xử lý khoản tiền theo chính sách, không chỉ từ chối cập nhật giao dịch.
+
+**Kiểm thử cần bổ sung:** tạo trước giờ hẹn, chuyển đồng hồ qua giờ hẹn rồi thử ví, tiền mặt và PayOS; bao phủ cả QR cũ nhận tiền muộn. Không xác nhận/điều phối lịch quá khứ mà chưa xử lý lại lịch và khoản tiền.

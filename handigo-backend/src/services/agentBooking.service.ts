@@ -230,7 +230,7 @@ export const AgentBookingService = {
     const times = [];
     for (const time of args.times) {
       if (Date.parse(time) < getEarliestScheduledAt().getTime() || !isWithinAppointmentHours(new Date(time))) {
-        throw new AppError("Vui lòng chọn giờ hẹn từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.", 400);
+        throw new AppError("Vui lòng chọn giờ hẹn hợp lệ và không sớm hơn phút hiện tại.", 400);
       }
       const candidates = await MatchingService.findNearestProviders({
         serviceId: args.serviceId, latitude: address.latitude, longitude: address.longitude,

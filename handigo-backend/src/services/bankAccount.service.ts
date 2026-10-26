@@ -114,6 +114,28 @@ export const createMyBankAccount = async (
 
   try {
     return await mongoose.connection.transaction(async (session) => {
+      const existing = await BankAccount.findOne({
+        userId: user.id, bankCode: input.bankCode, accountNumber: input.accountNumber,
+      }).session(session);
+      if (existing && !existing.isDeleted) {
+        throw new AppError("Tài khoản ngân hàng này đã tồn tại", 409);
+      }
+      if (existing) {
+        // Khôi phục đúng bản ghi cũ để giữ nguyên liên kết với lịch sử rút tiền.
+        const account = await BankAccount.findOneAndUpdate(
+          { _id: existing._id, userId: user.id, isDeleted: true },
+          { $inc: { __v: 1 } },
+          { returnDocument: "after", session, runValidators: true },
+        );
+        if (!account) throw new AppError("Tài khoản ngân hàng này đã tồn tại", 409);
+        await assertWithdrawalBankAccountChanges(account, input, session);
+        const activeCount = await BankAccount.countDocuments({ userId: user.id, isDeleted: false }).session(session);
+        const shouldBeDefault = input.isDefault === true || activeCount === 0;
+        if (shouldBeDefault) await unsetOtherDefaults(user.id, undefined, session);
+        account.set({ ...input, isDeleted: false, deletedAt: null, isDefault: shouldBeDefault, status: "active" });
+        await account.save({ session });
+        return account;
+      }
       const activeCount = await BankAccount.countDocuments({ userId: user.id, isDeleted: false }).session(session);
       const shouldBeDefault = input.isDefault === true || activeCount === 0;
       if (shouldBeDefault) await unsetOtherDefaults(user.id, undefined, session);

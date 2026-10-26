@@ -489,7 +489,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       || Date.parse(values.scheduledAt) < getEarliestScheduledAt().getTime() || outsideHours) {
       // Giờ hẹn không hợp lệ phải được khách chọn lại, không tự đổi ngày.
       if (values.scheduledAt) { delete values.scheduledAt; delete draft.sources.scheduledAt; }
-      draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai, từ 08:00 đến 21:00${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
+      draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
       if (draft.scheduleDate) {
         const hours = draft.timeWindow === "morning" ? [8, 9, 10] : draft.timeWindow === "afternoon" ? [13, 14, 15]
           : draft.timeWindow === "evening" ? [18, 19, 20] : [9, 14, 18];

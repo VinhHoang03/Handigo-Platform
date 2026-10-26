@@ -196,8 +196,8 @@ async function testHours() {
   const { bookingSchema } = bookingSchemas;
   const payload = { serviceId: new Types.ObjectId().toString(), addressId: new Types.ObjectId().toString(),
     paymentMethod: 'wallet', orderType: 'normal' };
-  for (const [time, allowed] of [['07:59:59.999', false], ['08:00:00.000', true],
-    ['20:59:59.999', true], ['21:00:00.000', true], ['21:00:00.001', false], ['21:01:00.000', false], ['00:00:00.000', false]]) {
+  for (const [time, allowed] of [['07:59:59.999', true], ['08:00:00.000', true],
+    ['20:59:59.999', true], ['21:00:00.000', true], ['21:00:00.001', true], ['21:01:00.000', true], ['00:00:00.000', true]]) {
     now = Date.parse(`2026-10-25T${time}+07:00`);
     const before = databaseCalls;
     assert.equal(helpers.isWithinImmediateBookingHours(new ClockDate()), allowed);
@@ -206,14 +206,15 @@ async function testHours() {
       await assert.rejects(OrderService.createOrder({ ...payload, orderType }), allowed
         ? /Đã qua kiểm tra thời gian/ : error => error.statusCode === 400 && error.message.includes('Đặt ngay'));
     }
-    assert.equal(databaseCalls - before, allowed ? 2 : 0, 'Ngoài giờ phải chặn trước truy vấn hoặc ghi dữ liệu.');
+    assert.equal(databaseCalls - before, 2, 'Tạm cho đặt ngay cả ngày để kiểm thử.');
   }
   now = Date.parse('2026-10-25T23:00:00+07:00');
-  await assert.rejects(OrderService.createOrder({ ...payload, scheduledAt: '2026-10-26T10:00:00+07:00' }), /Đặt ngay/);
+  await assert.rejects(OrderService.createOrder({ ...payload, scheduledAt: '2026-10-26T10:00:00+07:00' }), /Đã qua kiểm tra thời gian/);
   const scheduled = { ...payload, orderType: 'scheduled', scheduledAt: '2026-10-26T10:00:00+07:00' };
   assert.equal(bookingSchema.safeParse(scheduled).success, true);
   await assert.rejects(OrderService.createOrder(scheduled), /Đã qua kiểm tra thời gian/);
-  await assert.rejects(OrderService.createOrder({ ...scheduled, scheduledAt: '2026-10-26T21:00:01+07:00' }), /Vui lòng chọn giờ/);
+  await assert.rejects(OrderService.createOrder({ ...scheduled, scheduledAt: '2026-10-26T21:00:01+07:00' }), /Đã qua kiểm tra thời gian/);
+  await assert.rejects(OrderService.createOrder({ ...scheduled, scheduledAt: '2026-10-24T22:00:00+07:00' }), /Vui lòng chọn giờ/);
   const draftModule = load('../ai/agent/booking-draft', {
     zod: require('zod'), '../../utils/appError': { AppError },
     '../tools/implementations/booking.schemas': bookingSchemas,
@@ -226,9 +227,9 @@ async function testHours() {
       serviceType: 'fixed_price', fixedPrice: 100000, options: [] }),
     addresses: async () => [{ id: payload.addressId, fullAddress: 'Địa chỉ thử', ward: 'Phường thử', province: 'TP.HCM' }],
   });
-  assert.ok(draft.missing.some(message => message.includes('Đặt ngay chỉ khả dụng')));
+  assert.ok(!draft.missing.some(message => message.includes('Đặt ngay chỉ khả dụng')));
   assert.equal(draft.values.orderType, 'normal', 'Trợ lý không tự đổi sang hẹn giờ thay khách.');
-  assert.equal(draftModule.readyBookingArguments(draft), null);
+  assert.ok(draftModule.readyBookingArguments(draft));
 }
 (async () => {
   await testTracking(); await testQuotations(); await testHours();

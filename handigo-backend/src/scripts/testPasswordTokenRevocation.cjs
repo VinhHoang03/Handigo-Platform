@@ -11,8 +11,13 @@ const otp = require('../utils/otp');
 
 // Dùng JWT, bcrypt và document Mongoose thật; không kết nối database hay dịch vụ ngoài.
 const testProcess = { env: { ACCESS_TOKEN_SECRET: 'kiem-thu-co-lap-khong-dung-secret-that' } };
+let clockOffset = 0;
+class RuntimeDate extends Date {
+  constructor(...args) { super(...(args.length ? args : [Date.now() + clockOffset])); }
+  static now() { return Date.now() + clockOffset; }
+}
 function load(file, resolve) {
-  const context = { exports: {}, require: resolve, process: testProcess, Date, Map, Set, setTimeout, clearTimeout };
+  const context = { exports: {}, require: resolve, process: testProcess, Date: RuntimeDate, Map, Set, setTimeout, clearTimeout };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(require.resolve(file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText, context);
@@ -54,7 +59,23 @@ function document() {
 const query = () => Object.assign(Promise.resolve(document()), {
   select: () => query(), lean: () => Promise.resolve({ ...stored }),
 });
-const users = { findOne: () => query(), findById: () => query() };
+const users = {
+  findOne: () => query(), findById: () => query(),
+  updateOne: async (filter, update, options) => {
+    if (failSave) throw new Error('Lỗi lưu giả lập');
+    assert.equal(options.runValidators, true);
+    assert.equal(update.$inc.tokenVersion, 1);
+    if (String(filter._id) !== String(stored._id)
+      || filter.passwordHash !== stored.passwordHash
+      || filter.resetPasswordOtp !== stored.resetPasswordOtp
+      || +filter.resetPasswordOtpExpire.$eq !== +stored.resetPasswordOtpExpire
+      || !(stored.resetPasswordOtpExpire > filter.resetPasswordOtpExpire.$gt)) return { matchedCount: 0 };
+    Object.assign(stored, update.$set);
+    stored.tokenVersion = (stored.tokenVersion ?? 0) + update.$inc.tokenVersion;
+    for (const field of Object.keys(update.$unset)) delete stored[field];
+    return { matchedCount: 1 };
+  },
+};
 const sessionModel = {
   updateOne: async (filter, update) => sessions.set(String(filter._id), { ...filter, ...update }),
   updateMany: async (_filter, update) => {
@@ -186,6 +207,42 @@ async function run() {
   connected(pending);
   await new Promise(setImmediate);
   assert.equal(pending.disconnected, true);
+  // Giữ lượt A ở bước băm; B dùng cùng OTP hoàn tất trước thì A phải bị từ chối.
+  const originalHash = bcrypt.hash;
+  let release, entered;
+  bcrypt.hash = async (password, rounds) => {
+    if (password === 'luot-reset-cham') {
+      entered();
+      await new Promise(resolve => { release = resolve; });
+    }
+    return originalHash(password, rounds);
+  };
+  try {
+    for (const scenario of ['consume', 'resend', 'expire', 'change']) {
+      const paused = new Promise(resolve => { entered = resolve; });
+      stored.resetPasswordOtp = otp.hashOtp('123456');
+      stored.resetPasswordOtpExpire = new Date(Date.now() + 60000);
+      const version = stored.tokenVersion;
+      const attempt = assert.rejects(auth.resetPassword(stored.email, '123456', 'luot-reset-cham'),
+        error => error.statusCode === 400);
+      await paused;
+      if (scenario === 'consume') {
+        await auth.resetPassword(stored.email, '123456', 'luot-reset-thang');
+        await assert.rejects(auth.resetPassword(stored.email, '123456', 'phat-lai-otp'), error => error.statusCode === 400);
+      }
+      if (scenario === 'resend') {
+        // Kể cả gửi lại trùng sáu số, thời điểm hết hạn mới cũng vô hiệu snapshot cũ.
+        stored.resetPasswordOtpExpire = new Date(+stored.resetPasswordOtpExpire + 1000);
+      }
+      if (scenario === 'expire') clockOffset = 120000;
+      if (scenario === 'change') await auth.changePassword(String(stored._id), 'luot-reset-thang', 'mat-khau-da-doi');
+      const winningHash = stored.passwordHash;
+      release(); await attempt;
+      clockOffset = 0;
+      assert.equal(stored.passwordHash, winningHash);
+      assert.equal(stored.tokenVersion, version + (['consume', 'change'].includes(scenario) ? 1 : 0));
+    }
+  } finally { bcrypt.hash = originalHash; clockOffset = 0; }
   console.log('Đạt: đổi/reset mật khẩu thu hồi access/refresh token nhiều phiên, token cũ và socket; đăng nhập mới vẫn hoạt động.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

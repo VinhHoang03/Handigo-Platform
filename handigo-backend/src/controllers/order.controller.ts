@@ -53,10 +53,10 @@ export const createOrder = async (
   next: NextFunction,
 ) => {
   try {
-    const order = await OrderService.createOrder({
+    const order = await OrderService.createOrderOnce({
       customerId: uid(req),
       ...req.body,
-    });
+    }, req.get("Idempotency-Key"));
     return ok(res, order, 201);
   } catch (error) {
     return next(error);

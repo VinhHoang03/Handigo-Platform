@@ -18,6 +18,7 @@ import { reconcilePayosPaymentForExpiration } from "./payment.service";
 import { getOrderInterval } from "./providerSchedule.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { ScheduleInterval } from "../utils/bookingPolicy";
+import { findOverdueOrders } from "./orderOverdue.service";
 
 async function createMatchingSearch(startedAt: Date) {
   const [initial, expanded, delay, duration] = await Promise.all([
@@ -659,15 +660,10 @@ export const DispatchService = {
     const scanOnce = async (recoverStalledOrders = false) => {
       const now = new Date();
       const overdueHours = Math.max(await getNumberConfigValue("OVERDUE_ORDER_ESCALATION_HOURS", 24), 1);
-      const overdueOrders = await Order.find({
-        status: "in_progress",
-        isDeleted: false,
-        "overdueReview.escalatedAt": null,
-        createdAt: { $lte: new Date(now.getTime() - overdueHours * 60 * 60 * 1000) },
-      }).select("_id orderCode customerId providerId").limit(100);
+      const overdueOrders = await findOverdueOrders(now, overdueHours);
       for (const order of overdueOrders) {
         const claimed = await Order.findOneAndUpdate(
-          { _id: order._id, status: "in_progress", isDeleted: false, "overdueReview.escalatedAt": null },
+          { _id: order._id, status: "in_progress", isDeleted: false, updatedAt: order.updatedAt, "overdueReview.escalatedAt": null },
           { $set: { overdueReview: { escalatedAt: now } } },
           { returnDocument: "after", runValidators: true },
         );

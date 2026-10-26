@@ -52,15 +52,8 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   }
   if (
     (orderType === 'scheduled' || orderType === 'recurring') &&
-    (!scheduledAt
-      || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime()
-      || new Date(scheduledAt).getHours() < 8
-      || new Date(scheduledAt).getHours() > 21
-      || (new Date(scheduledAt).getHours() === 21 && (
-        new Date(scheduledAt).getMinutes() > 0
-        || new Date(scheduledAt).getSeconds() > 0
-        || new Date(scheduledAt).getMilliseconds() > 0
-      )))
+    (!scheduledAt || !Number.isFinite(new Date(scheduledAt).getTime())
+      || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())
   ) {
     setPaymentError('Vui lòng chọn thời gian thực hiện trong tương lai.');
     return;
@@ -194,6 +187,13 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
     navigate('/customer/bookings/result', { state: { order: orderDetail } });
   } catch (error) {
     if (!isCurrentSession()) return;
+    const recoveredOrderId = (error as { createdOrderId?: string }).createdOrderId;
+    if (recoveredOrderId) {
+      clearPendingBooking();
+      setPendingOrderId('');
+      navigate(`/customer/bookings/${recoveredOrderId}`);
+      return;
+    }
     const message = getConfirmPaymentErrorMessage(error);
     if (orderId && (!isAppointment || service?.serviceType === 'variable_price')) {
       try {

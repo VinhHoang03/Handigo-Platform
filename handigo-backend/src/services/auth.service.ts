@@ -653,13 +653,26 @@ export const resetPassword = async (
 
   ensureOtpValid(otp, user.resetPasswordOtp, user.resetPasswordOtpExpire);
 
-  user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  user.$inc("tokenVersion", 1);
-  user.resetPasswordOtp = undefined;
-  user.resetPasswordOtpExpire = undefined;
-  user.resetPasswordTokenHash = undefined;
-  user.resetPasswordExpire = undefined;
-  await user.save();
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  // Chỉ một yêu cầu được dùng OTP; lượt gửi lại hoặc đổi mật khẩu làm mất hiệu lực snapshot cũ.
+  const result = await User.updateOne({
+    _id: user._id,
+    passwordHash: user.passwordHash,
+    resetPasswordOtp: user.resetPasswordOtp,
+    resetPasswordOtpExpire: { $eq: user.resetPasswordOtpExpire, $gt: new Date() },
+  }, {
+    $set: { passwordHash },
+    $inc: { tokenVersion: 1 },
+    $unset: {
+      resetPasswordOtp: 1,
+      resetPasswordOtpExpire: 1,
+      resetPasswordTokenHash: 1,
+      resetPasswordExpire: 1,
+    },
+  }, { runValidators: true });
+  if (result.matchedCount !== 1) {
+    throw new AppError("Mã OTP không hợp lệ hoặc đã hết hạn", 400);
+  }
   disconnectUserSockets(user._id.toString());
 
   await Session.updateMany(

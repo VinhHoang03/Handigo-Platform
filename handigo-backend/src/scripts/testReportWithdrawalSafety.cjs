@@ -50,6 +50,7 @@ function reset() {
 function document(name, row, session) {
   if (!row) return null;
   const value = copy(row);
+  Object.defineProperty(value, 'set', { enumerable: false, value: fields => Object.assign(value, fields) });
   Object.defineProperty(value, 'save', { enumerable: false, value: async options => {
     assert.equal(options?.session, session);
     const store = session ? session.snapshot : state;
@@ -280,6 +281,34 @@ async function testWithdrawals() {
   await banks.deleteMyBankAccount(customer, bankId);
   assert.equal(state.banks[0].isDeleted, true);
   assert.equal(state.banks[0].accountNumber, '123456789', 'Xóa mềm không làm mất thông tin nhận tiền lịch sử.');
+  const restoreInput = { bankName: 'Ngân hàng thử', bankCode: 'THU',
+    accountNumber: '123456789', accountHolderName: 'Khách thử' };
+  const beforeRestore = copy(state);
+  await assert.rejects(banks.createMyBankAccount(customer, { ...restoreInput, accountHolderName: 'Người khác' }), errorStatus(409));
+  assert.deepEqual(state, beforeRestore, 'Khôi phục thất bại không đổi thông tin lịch sử hoặc mặc định.');
+  const restored = await banks.createMyBankAccount(customer, restoreInput);
+  assert.equal(restored._id, bankId); assert.equal(restored.isDeleted, false);
+  assert.equal(restored.deletedAt, null); assert.equal(restored.status, 'active');
+  assert.equal(restored.isDefault, false, 'Giữ mặc định đang có nếu không yêu cầu đổi.');
+  assert.equal(state.withdrawals[0].bankAccountId, restored._id);
+  await assert.rejects(banks.createMyBankAccount(customer, restoreInput), errorStatus(409));
+  await banks.deleteMyBankAccount(customer, bankId);
+  const restoredDefault = await banks.createMyBankAccount(customer, { ...restoreInput, isDefault: true });
+  assert.equal(restoredDefault.isDefault, true);
+  assert.equal(state.banks.filter(row => row.userId === customer.id && row.isDefault).length, 1);
+
+  reset();
+  await banks.deleteMyBankAccount(customer, bankId);
+  const concurrent = await Promise.allSettled([
+    banks.createMyBankAccount(customer, restoreInput), banks.createMyBankAccount(customer, restoreInput),
+  ]);
+  assert.equal(concurrent.filter(result => result.status === 'fulfilled').length, 1);
+  assert.equal(concurrent.find(result => result.status === 'rejected').reason.statusCode, 409);
+  assert.equal(state.banks.filter(row => row.userId === customer.id && !row.isDeleted).length, 1);
+  assert.equal(state.banks[0].isDefault, true, 'Khôi phục tài khoản duy nhất phải đặt làm mặc định.');
+  // Cùng thông tin ngân hàng của tài khoản khác không được khôi phục nhầm chủ sở hữu.
+  const foreign = await banks.createMyBankAccount(outsider, restoreInput);
+  assert.notEqual(foreign._id, bankId); assert.equal(foreign.userId, outsider.id);
 
   for (const change of [{ status: 'inactive' }, { isDeleted: true }, { userId: outsider.id }]) {
     reset(); const pending = await deposit(); Object.assign(state.banks[0], change);

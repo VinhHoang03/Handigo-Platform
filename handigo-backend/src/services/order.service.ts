@@ -1,6 +1,6 @@
 import { serviceImageResponse } from "../utils/serviceImageResponse";
 import mongoose, { Types } from "mongoose";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { earnOrderRewards } from "./reward.service";
 import { Order, IOrder } from "../models/order.model";
 import { OrderAssignment } from "../models/orderAssignment.model";
@@ -161,6 +161,26 @@ export interface CreateOrderPayload {
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 export const OrderService = {
+  /** Gửi lại cùng lần xác nhận chỉ nhận lại đơn đã tạo của chính khách hàng. */
+  async createOrderOnce(payload: CreateOrderPayload, requestId?: string): Promise<IOrder> {
+    if (!requestId) return OrderService.createOrder(payload);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+      throw new AppError("Mã xác nhận đặt dịch vụ không hợp lệ.", 400);
+    }
+    const orderId = new Types.ObjectId(createHash("sha256")
+      .update(`booking:${payload.customerId}:${requestId}`).digest("hex").slice(0, 24));
+    const findCreatedOrder = () => Order.findOne({ _id: orderId, customerId: payload.customerId });
+    const previous = await findCreatedOrder();
+    if (previous) return previous;
+    try {
+      return await OrderService.createOrder(payload, orderId);
+    } catch (error) {
+      // Một lượt đồng thời có thể vừa lưu xong đơn và giữ voucher.
+      const created = await findCreatedOrder();
+      if (created) return created;
+      throw error;
+    }
+  },
   /**
    * Step 1 – Create a new booking order.
    *
@@ -197,7 +217,7 @@ export const OrderService = {
         || !isWithinAppointmentHours(scheduledAt))
     ) {
       throw new AppError(
-        "Vui lòng chọn giờ từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.",
+        "Vui lòng chọn giờ hợp lệ và không sớm hơn phút hiện tại.",
         400,
       );
     }
