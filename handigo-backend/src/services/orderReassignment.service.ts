@@ -67,6 +67,9 @@ export const requestProviderReassignment = async (
       if (order.status !== "accepted") {
         throw new AppError("Chỉ có thể yêu cầu đổi kỹ thuật viên khi đơn đã được nhận và chưa bắt đầu.", 409);
       }
+      if (order.customerNoShow?.status === "pending") {
+        throw new AppError("Báo cáo khách không có mặt đang chờ xử lý, chưa thể yêu cầu đổi thợ.", 409);
+      }
       if (order.currentQuotationId) {
         throw new AppError("Không thể tự động đổi kỹ thuật viên khi đơn đã phát sinh báo giá.", 409);
       }

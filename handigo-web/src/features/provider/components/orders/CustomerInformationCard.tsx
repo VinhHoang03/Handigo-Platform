@@ -18,8 +18,10 @@ export function CustomerInformationCard({
   addressLine,
   orderType,
 }: CustomerInformationCardProps) {
+  const contactPhone = customer?.phone?.trim()
+    || (order.addressSnapshot ? order.addressSnapshot.recipientPhone : order.addressId?.recipientPhone);
   const details = [
-    { icon: Phone, label: 'Số điện thoại', value: customer?.phone || 'Chưa cập nhật' },
+    { icon: Phone, label: 'Số điện thoại', value: contactPhone || 'Chưa cập nhật' },
     { icon: MapPin, label: 'Địa chỉ thực hiện', value: addressLine || 'Chưa cập nhật' },
     { icon: Wrench, label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
     { icon: CalendarDays, label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },

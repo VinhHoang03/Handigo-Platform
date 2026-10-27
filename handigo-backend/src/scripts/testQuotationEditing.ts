@@ -65,6 +65,7 @@ const query = (value: unknown): any => ({
 const reset = () => {
   order = new Order({
     customerId, providerId: provider._id, serviceId: new Types.ObjectId(),
+    arrival: { providerId: provider._id, arrivedAt: new Date(), latitude: 10.8, longitude: 106.7 },
     orderCode: "DON-KIEM-THU", status: "accepted", orderType: "normal",
     inspectionRequired: true, depositAmount: 40000, depositPaidAt: new Date(),
     paymentMethod: "bank", paymentStatus: "partially_paid",

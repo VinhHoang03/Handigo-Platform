@@ -11,6 +11,8 @@ import {
   ReportType,
 } from "../models/report.model";
 import User from "../models/user.model";
+import { reviewCustomerNoShowReport } from "./customerNoShow.service";
+import { getAdminNoShowDetails } from "./customerNoShowVerification.service";
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
@@ -297,6 +299,9 @@ export const getAdminReportById = async (reportId: string) => {
     populateReport(),
   );
   if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+  if (report.isCustomerNoShow) {
+    return { ...report.toObject(), noShowDetails: await getAdminNoShowDetails(report) };
+  }
   return report;
 };
 
@@ -314,6 +319,10 @@ export const reviewReport = async (
 
   const report = await Report.findOne({ _id: reportId, isDeleted: false });
   if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+  if (report.isCustomerNoShow) {
+    await reviewCustomerNoShowReport(reportId, adminId, payload);
+    return getAdminReportById(reportId);
+  }
   if (report.createdViolationId && payload.status !== "confirmed") {
     throw new AppError("Báo cáo đã có bản ghi vi phạm, không thể đổi sang trạng thái khác", 400);
   }

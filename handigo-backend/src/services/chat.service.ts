@@ -242,6 +242,11 @@ export const sendMessage = async (
     throw new AppError("Vui lòng nhập nội dung tin nhắn", 400);
   }
 
+  if (participant.senderRole === "customer") {
+    // Ghi trước khi nhận tin để tự duyệt cùng đơn phát hiện phản hồi đồng thời và thử lại giao dịch.
+    await Order.updateOne({ _id: conversation.orderId, status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
+      { $set: { "customerNoShow.customerRepliedAt": new Date() } }, { runValidators: true });
+  }
   const message = await Message.create({
     conversationId: conversation._id,
     senderId: userId,

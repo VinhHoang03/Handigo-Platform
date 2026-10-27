@@ -41,6 +41,7 @@ function setup(overrides = {}) {
     './systemConfig.service': { getBookingPolicy: async () => policy }, './notification.service': {},
     '../models/order.model': { Order: { find(filter) {
       const matches = filter.status.$in.includes(order.status) && !order.isDeleted
+        && !(filter.$nor && order.status === 'accepted' && order.customerNoShow?.status === 'pending')
         && filter.providerId.$in.some(id => String(id) === String(order.providerId))
         && !filter._id.$nin.some(id => String(id) === String(order._id));
       return { session: async () => matches ? [order] : [] };
@@ -56,6 +57,22 @@ for (const status of ['accepted', 'in_progress']) {
     assert.equal(available.has(String(context.providerId)), false);
   });
 }
+
+test('Báo cáo khách vắng mặt chờ duyệt giải phóng cả khung thực tế và khung hẹn để nhận đơn mới', async () => {
+  const ctx = setup({ status: 'accepted', customerNoShow: { status: 'pending', reportId: new Types.ObjectId() } });
+  assert.equal((await ctx.getAvailableProviderIds([ctx.providerId], [interval('16', '08:30')])).size, 1);
+  assert.equal((await ctx.getAvailableProviderIds([ctx.providerId], [interval('17', '10:00')])).size, 1);
+});
+
+test('Đơn đang thực hiện vẫn giữ lịch kể cả dữ liệu báo cáo còn pending', async () => {
+  const ctx = setup({ status: 'in_progress', customerNoShow: { status: 'pending' } });
+  assert.equal((await ctx.getAvailableProviderIds([ctx.providerId], [interval('17', '10:00')])).size, 0);
+});
+
+test('Báo cáo bị từ chối đưa đơn trở lại kiểm tra lịch trước khi tiếp tục', async () => {
+  const ctx = setup({ status: 'accepted', customerNoShow: { status: 'rejected' } });
+  assert.equal((await ctx.getAvailableProviderIds([ctx.providerId], [interval('17', '10:00')])).size, 0);
+});
 
 test('Thợ có thể nhận lịch mới tại khung giờ hẹn gốc của đơn đã hoàn thành sớm', async () => {
   const context = setup();

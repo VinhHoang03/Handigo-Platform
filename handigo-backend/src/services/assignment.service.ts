@@ -391,6 +391,10 @@ export const AssignmentService = {
         );
         if (!claimedAssignment) throw new AppError("Yêu cầu nhận đơn không còn khả dụng.", 409);
 
+        if (String(order.providerId) !== String(lockedProvider._id)) {
+          order.arrival = null;
+          order.customerNoShow = null;
+        }
         order.providerId = lockedProvider._id as Types.ObjectId;
         order.status = "accepted";
         if (order.reassignment?.status === "matching") order.reassignment.status = "matched";

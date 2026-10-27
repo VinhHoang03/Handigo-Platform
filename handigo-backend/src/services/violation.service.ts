@@ -60,6 +60,9 @@ const resolveSource = async (payload: CreateViolationPayload) => {
   if (payload.sourceType === "REPORT") {
     const report = await Report.findOne({ _id: payload.sourceId, isDeleted: false });
     if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+    if (report.isCustomerNoShow && report.status !== "confirmed") {
+      throw new AppError("Vui lòng chấp thuận báo cáo khách vắng mặt và xử lý hỗ trợ trước khi tạo vi phạm.", 409);
+    }
     if (report.createdViolationId) {
       throw new AppError("Báo cáo đã có bản ghi vi phạm", 400);
     }

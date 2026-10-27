@@ -176,7 +176,7 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
     './voucher.service': { async releaseVoucherReservation() {} },
     './promotion.service': { async releaseOrderPromotion() {} },
     './refundPolicy.service': loadService('refundPolicy.service', {}),
-    '../utils/transaction': { buildTransactionCode: () => 'REFUND-THU-NGHIEM' },
+    '../utils/transaction': { buildTransactionCode: () => 'REFUND-THU-NGHIEM', withTransactionRetry: (currentSession, operation) => currentSession.withTransaction(operation) },
     './notification.service': { async createNotificationRecord(value) { notifications.push(value); } },
     '../sockets/socketServer': { emitToUser() {} },
     '../configs/payos.config': {

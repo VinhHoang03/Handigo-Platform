@@ -21,6 +21,7 @@ export const getAvailableProviderIds = async (
     providerId: { $in: providerIds },
     _id: { $nin: options.excludeOrderIds ?? [] },
     status: { $in: ["accepted", "in_progress", "completed"] },
+    $nor: [{ status: "accepted", "customerNoShow.status": "pending" }],
     isDeleted: false,
   }).session(options.session ?? null);
   return new Set(providerIds.filter((id) => {
@@ -75,7 +76,8 @@ export const updateExpectedEnd = async (orderId: string, userId: string, expecte
       const interval = getOrderInterval(order, policy);
       order.schedule = { durationMinutes: order.schedule?.durationMinutes ?? policy.defaultDurationMinutes, bufferMinutes: interval.bufferMinutes, travelMinutes: interval.travelMinutes, expectedStartAt: new Date(interval.start), expectedEndAt };
       await order.save({ session });
-      const upcoming = await Order.find({ _id: { $ne: order._id }, providerId: identity._id, status: "accepted", isDeleted: false }).session(session);
+      const upcoming = await Order.find({ _id: { $ne: order._id }, providerId: identity._id, status: "accepted",
+        "customerNoShow.status": { $ne: "pending" }, isDeleted: false }).session(session);
       affected = upcoming.filter((other) => intervalsConflict(getOrderInterval(order, policy), getOrderInterval(other, policy)));
       return order;
     });

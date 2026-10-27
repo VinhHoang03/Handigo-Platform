@@ -129,6 +129,18 @@ export const orderIdParamSchema = z.object({
 
 export const updateExpectedEndSchema = z.object({ expectedEndAt: z.string().datetime({ offset: true }) });
 
+export const customerNoShowSchema = z.object({
+  description: z.string().trim().min(10, "Vui lòng mô tả việc liên hệ khách ít nhất 10 ký tự.").max(2000, "Mô tả không được vượt quá 2.000 ký tự."),
+  arrivalEvidenceIds: z.array(objectIdSchema, { error: "Vui lòng tải ảnh đã đến nơi trước khi gửi báo cáo." }).min(1, "Vui lòng gửi ít nhất một ảnh đã đến nơi.").max(4, "Mỗi loại tối đa 4 ảnh, tổng cộng không quá 5 ảnh."),
+  contactEvidenceIds: z.array(objectIdSchema, { error: "Vui lòng tải ảnh liên hệ khách trước khi gửi báo cáo." }).min(1, "Vui lòng gửi ít nhất một ảnh liên hệ khách.").max(4, "Mỗi loại tối đa 4 ảnh, tổng cộng không quá 5 ảnh."),
+  contactedCustomer: z.literal(true, { error: "Vui lòng xác nhận đã gọi hoặc nhắn tin cho khách." }),
+}).superRefine((value, context) => {
+  const ids = [...value.arrivalEvidenceIds, ...value.contactEvidenceIds];
+  if (ids.length > 5 || new Set(ids).size !== ids.length) context.addIssue({ code: "custom", message: "Chọn từ 2 đến 5 ảnh khác nhau, đủ cả ảnh đã đến nơi và ảnh liên hệ khách." });
+});
+
+export const customerNoShowEvidenceSchema = z.object({ kind: z.enum(["arrival", "contact"], { error: "Loại ảnh bằng chứng không hợp lệ." }) });
+
 export const quotationIdParamSchema = z.object({
   quotationId: objectIdSchema,
 });

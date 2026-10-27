@@ -6,6 +6,8 @@ import type { Order } from '@/types/booking';
 import { providerOrderApi } from '../api/providerOrder.api';
 import type { OrderAssignment, QuotationDetail } from '../types/providerOrder.types';
 import { useToast } from '@/components/common/Toast';
+import { getCurrentCoordinates } from './useProviderAvailability';
+import { providerDashboardApi } from '../api/providerDashboard.api';
 
 /** State, tải dữ liệu và các thao tác của trang chi tiết đơn dịch vụ (thợ). */
 export function useProviderOrderDetail(orderId: string | undefined, navigate: NavigateFunction) {
@@ -147,6 +149,36 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     }, 'Không thể bắt đầu đơn.', true, 'Đã bắt đầu thực hiện đơn dịch vụ.');
   };
 
+  const handleArrival = async () => {
+    if (!order) return;
+    await runAction(async () => {
+      const coordinates = await getCurrentCoordinates().catch(() => {
+        throw new Error('Vui lòng bật GPS và cấp quyền vị trí để xác nhận đã đến nơi.');
+      });
+      await providerDashboardApi.updateCurrentLocation(coordinates.latitude, coordinates.longitude);
+      await providerOrderApi.arrive(order._id);
+    }, 'Không thể xác nhận đã đến nơi. Vui lòng kiểm tra quyền vị trí và thử lại.', true, 'Đã xác nhận đến nơi và thông báo cho khách.');
+  };
+
+  const checkNoShow = async () => {
+    if (!order) return false;
+    return runAction(() => providerOrderApi.checkNoShow(order._id), 'Chưa thể báo khách không có mặt.', false);
+  };
+
+  const handleNoShow = async (description: string, arrivalFiles: File[], contactFiles: File[]) => {
+    if (!order) return false;
+    return runAction(async () => {
+      const { arrival, contact } = await providerOrderApi.uploadNoShowEvidenceBatch(order._id, arrivalFiles, contactFiles);
+      const coordinates = await getCurrentCoordinates().catch(() => null);
+      if (coordinates) await providerDashboardApi.updateCurrentLocation(coordinates.latitude, coordinates.longitude).catch(() => undefined);
+      const result = await providerOrderApi.reportNoShow(order._id, {
+        description, arrivalEvidenceIds: arrival.map((item) => item.id), contactEvidenceIds: contact.map((item) => item.id), contactedCustomer: true,
+      });
+      addToast(result.customerNoShow?.status === 'approved' ? 'Hệ thống đã xác minh, hủy đơn và cộng hỗ trợ 5.000đ vào ví.'
+        : 'Đã gửi báo cáo. Bằng chứng cần được quản trị viên xem xét thêm.', 'success');
+    }, 'Không thể gửi báo cáo.', true);
+  };
+
   const handleComplete = async (files: File[], completionNote: string) => {
     if (!order) return;
     await runAction(async () => {
@@ -240,6 +272,9 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     handleAccept,
     handleReject,
     handleStart,
+    handleArrival,
+    checkNoShow,
+    handleNoShow,
     handleComplete,
     handleConfirmQuotationPayment,
     requestCancelConfirmation,
