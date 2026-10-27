@@ -5,6 +5,8 @@ import { newsApi, type NewsArticleRecord } from "../api/news.api";
 import { PublicContentLayout } from "../components/PublicContentLayout";
 import { newsArticles, newsCategories } from "../data/content.data";
 import { mergeNewsArticles } from "../utils/newsView";
+import { Reveal } from "@/components/common/Reveal";
+import "../components/content-motion.css";
 
 export default function NewsPage() {
   const [category, setCategory] = useState("Tất cả");
@@ -57,9 +59,9 @@ export default function NewsPage() {
   return (
     <PublicContentLayout>
       {featuredArticle && (
-        <section className="mx-auto max-w-7xl px-6 py-10 lg:py-16">
-          <div className="grid overflow-hidden rounded-3xl bg-primary text-on-primary shadow-xl lg:grid-cols-2">
-            <div className="flex flex-col justify-center p-8 sm:p-12">
+        <section className="news-feature-hero mx-auto max-w-7xl px-6 py-10 lg:py-16">
+          <div className="news-feature-hero__card grid overflow-hidden rounded-3xl bg-primary text-on-primary shadow-xl lg:grid-cols-2">
+            <div className="news-feature-hero__copy flex flex-col justify-center p-8 sm:p-12">
               <span className="w-fit rounded-full bg-on-primary/15 px-4 py-2 text-xs font-bold uppercase tracking-wider">
                 Nổi bật
               </span>
@@ -87,12 +89,13 @@ export default function NewsPage() {
               width={1200}
               height={720}
               fetchPriority="high"
-              className="h-full min-h-72 w-full object-cover"
+              className="news-feature-hero__image h-full min-h-72 w-full object-cover"
             />
           </div>
         </section>
       )}
 
+      <Reveal>
       <section id="danh-sach" className="mx-auto max-w-7xl px-6 py-3 lg:py-0">
         <div className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
@@ -145,7 +148,7 @@ export default function NewsPage() {
               <Link
                 key={`${article.id}-${article.slug}`}
                 to={`/tin-tuc/${article.slug}`}
-                className="group overflow-hidden rounded-3xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm transition hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
+                className="news-card group overflow-hidden rounded-3xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm transition hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
               >
                 <div className="h-52 overflow-hidden">
                   <img
@@ -181,6 +184,7 @@ export default function NewsPage() {
           </div>
         )}
       </section>
+      </Reveal>
     </PublicContentLayout>
   );
 }
