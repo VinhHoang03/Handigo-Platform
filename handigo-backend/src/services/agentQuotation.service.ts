@@ -5,6 +5,9 @@ import { Payment } from "../models/payment.model";
 import { ownedBooking } from "./agentBookingHistory.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { RepairQuotation } from "../models/repairQuotation.model";
+import { happenedAfter } from "../ai/agent/reconciliation-evidence";
+import { AgentBookingService } from "./agentBooking.service";
 
 export const AgentQuotationService = {
   async get(userId: string, orderId: string) {
@@ -60,5 +63,16 @@ export const AgentQuotationService = {
     });
     return { orderId, orderCode: order.orderCode, quotationId: String(result._id), status: result.status,
       message: "Đã từ chối báo giá và hủy đơn. Khoản hoàn được xử lý theo chính sách; dùng get_booking_refunds để kiểm tra kết quả thực tế." };
+  },
+  async reconcileRejection(userId: string, orderId: string, reason: string, expected: unknown, startedAt?: string) {
+    const preview = z.object({ quotationId: z.string(), quotationRevision: z.number() }).safeParse(expected);
+    if (!preview.success) return null;
+    const quotation = await RepairQuotation.findOne({ _id: preview.data.quotationId, orderId, customerId: userId, isDeleted: false });
+    if (!quotation || quotation.status !== "rejected" || (quotation.revision ?? 0) !== preview.data.quotationRevision
+      || quotation.rejectionReason !== reason || !happenedAfter(quotation.rejectedAt, startedAt)) return null;
+    const order = await AgentBookingService.reconcileCancellation(userId, orderId, `Từ chối báo giá sửa chữa: ${reason}`, expected, startedAt);
+    if (!order) return null;
+    return { orderId, orderCode: order.orderCode, quotationId: String(quotation._id), status: quotation.status,
+      message: "Đã kiểm tra báo giá bị từ chối và đơn đã hủy. Hãy kiểm tra khoản hoàn để biết kết quả thực tế." };
   },
 };

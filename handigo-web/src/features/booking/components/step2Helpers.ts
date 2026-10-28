@@ -2,9 +2,8 @@ import axios from 'axios';
 
 /** Hằng số & hàm thuần cho CreateBookingStep2Page — tách ra để trang chính giữ dưới 200 dòng. */
 
-// Tạm mở toàn bộ giờ trong ngày để kiểm thử booking.
-export const timeSlots = Array.from({ length: 24 }, (_, index) => {
-  const startHour = index;
+export const timeSlots = Array.from({ length: 14 }, (_, index) => {
+  const startHour = index + 8;
   return `${String(startHour).padStart(2, '0')}:00`;
 });
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -34,8 +33,15 @@ export const getEarliestScheduledAt = (now = new Date()) => {
 };
 
 export const isWithinImmediateBookingHours = (now = new Date()) => {
-  return Number.isFinite(now.getTime());
+  if (!Number.isFinite(now.getTime())) return false;
+  const vietnamTime = new Date(now.getTime() + 7 * 60 * 60000);
+  const minute = vietnamTime.getUTCHours() * 60 + vietnamTime.getUTCMinutes();
+  return minute >= 8 * 60 && minute <= 21 * 60;
 };
+
+// Bộ chọn dùng ngày giờ trên mặt đồng hồ, không chuyển múi giờ tại đây.
+export const isWithinScheduledBookingHours = (time: string) =>
+  /^(?:0[89]|1\d|20):[0-5]\d$/.test(time) || time === '21:00';
 
 export const getTodayInputValue = (now = new Date()) => {
   const timezoneOffset = now.getTimezoneOffset() * 60000;
@@ -43,15 +49,21 @@ export const getTodayInputValue = (now = new Date()) => {
 };
 
 export const getDefaultScheduledAt = (now = new Date()) => {
-  const date = getTodayInputValue(now);
-  return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
+  const selected = new Date(now);
+  if (selected.getHours() < 8) selected.setHours(8, 0, 0, 0);
+  else if (selected.getHours() * 60 + selected.getMinutes() > 21 * 60) {
+    selected.setDate(selected.getDate() + 1);
+    selected.setHours(8, 0, 0, 0);
+  }
+  const date = getTodayInputValue(selected);
+  return `${date}T${String(selected.getHours()).padStart(2, '0')}:${String(selected.getMinutes()).padStart(2, '0')}:00`;
 };
 
 export const getInitialScheduledAt = (scheduledAt: string | undefined, now = new Date()) => {
   if (scheduledAt) {
     const hasSelectedTime = scheduledAt.includes('T');
     const selected = new Date(hasSelectedTime ? scheduledAt : `${scheduledAt}T${timeSlots[0]}:00`);
-    if (Number.isFinite(selected.getTime())
+    if (Number.isFinite(selected.getTime()) && isWithinScheduledBookingHours(`${String(selected.getHours()).padStart(2, '0')}:${String(selected.getMinutes()).padStart(2, '0')}`)
       && selected.getTime() >= getEarliestScheduledAt(now).getTime()) {
       if (hasSelectedTime) return scheduledAt;
       if (selected.getTime() > getEarliestScheduledAt(now).getTime()) return `${scheduledAt}T${timeSlots[0]}:00`;

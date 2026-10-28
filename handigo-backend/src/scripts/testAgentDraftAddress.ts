@@ -7,6 +7,7 @@ import { Service } from "../models/service.model";
 import { Category } from "../models/category.model";
 import User from "../models/user.model";
 import { OrderStatus } from "../models/orderStatus.model";
+import { Violation } from "../models/violation.model";
 import * as pricing from "../services/servicePricing.service";
 import * as promotions from "../services/promotion.service";
 import * as config from "../services/systemConfig.service";
@@ -44,6 +45,7 @@ async function run() {
     catch (error) { addresses = beforeAddresses; orders = beforeOrders; throw error; }
   } };
   mock.method(mongoose, "startSession", async () => transaction as never);
+  mock.method(Violation, "find", () => query([]));
   mock.method(User, "updateOne", async (_filter: unknown, _update: unknown, options: { session: unknown }) => {
     assert.equal(options.session, transaction); return { matchedCount: 1 } as never;
   });

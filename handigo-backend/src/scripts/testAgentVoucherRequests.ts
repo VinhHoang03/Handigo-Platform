@@ -11,7 +11,7 @@ import { updateBookingDraft, parseBookingVoucherRequest, type BookingDraftDepend
 // Chỉ dùng phiên, mã và giá giả lập; không gọi LLM, database hoặc thanh toán thật.
 async function run() {
   require.cache[require.resolve("../configs/payos.config")] = { exports: { payos: {}, payoutPayos: {} } } as NodeModule;
-  const { AgentService } = await import("../ai/agent/agent.service");
+  const { AgentService, sessionView } = await import("../ai/agent/agent.service");
   const user = { id: new Types.ObjectId().toString(), role: "CUSTOMER" as const };
   const serviceId = new Types.ObjectId().toString(), addressId = new Types.ObjectId().toString();
   let vouchers: NonNullable<AgentSession["bookingDraft"]>["availableVouchers"] = [];
@@ -43,7 +43,8 @@ async function run() {
   session.bookingDraft = await updateBookingDraft(undefined, { mode: "update", serviceId }, user.id, deps);
   await loop.prepareBookingDraft(session, { user, sessionId: session.id, session, signal: AbortSignal.timeout(5000) }, async () => {});
   assert.equal(pending()?.tool, "create_booking");
-  assert(session.conversation[session.conversation.length - 1].content.includes("Có 2 mã giảm giá dùng được"), "Chủ động nhắc mã phù hợp khi đặt dịch vụ, không cần khách hỏi.");
+  assert.equal(session.conversation[session.conversation.length - 1].content, "", "Không gửi thêm lời mời chọn mã bên ngoài form.");
+  assert.equal(sessionView(session).bookingDraft?.availableVouchers.length, 2, "Đưa mã hợp lệ vào dữ liệu form.");
   assert.equal(session.bookingDraft.values.voucherCode, undefined, "Không tự áp mã khi nhắc khách.");
   assert.equal((pending()?.preview as { amount: number }).amount, 40000);
   vouchers = [];
@@ -72,6 +73,7 @@ async function run() {
   assert.equal((pending()?.preview as { amount: number }).amount, 40000);
   const resumed = await updateBookingDraft(session.bookingDraft, { mode: "resume" }, user.id, deps);
   assert(!resumed.choiceGroups.some((group) => group.label === "Voucher có thể sử dụng"), "Không nhắc chọn lại khi khách đã bỏ mã.");
+  assert.equal(resumed.availableVouchers?.length, 1, "Giữ mã hợp lệ để khách mở lại trường chọn trong form.");
   await send("Chọn mã giảm giá giảm nhiều nhất");
   assert.equal(session.bookingDraft.values.voucherCode, "COC10");
   failLookup = true;
@@ -96,6 +98,40 @@ async function run() {
   assert.deepEqual(parseBookingVoucherRequest("Đổi lịch sang mai và áp mã COC10"), undefined, "Yêu cầu kết hợp vẫn cần xử lý đầy đủ bằng agent.");
   assert.deepEqual(parseBookingVoucherRequest("Tôi muốn áp mã giảm giá"), { voucherPreference: "choose" });
   assert.deepEqual(parseBookingVoucherRequest("Áp mã COC10 cho đơn này"), { voucherCode: "COC10" });
+  vouchers = [{ code: "GIAM10PT", name: "Giảm 10%", discountType: "PERCENT", discountValue: 10,
+    discountAmount: 4000, finalAmount: 36000 }];
+  const percentDraft = await updateBookingDraft(undefined, { mode: "update", serviceId }, user.id, deps);
+  assert(percentDraft.choiceGroups.some((group) => group.options.includes("GIAM10PT — giảm 10%")),
+    "Mã phần trăm phải hiển thị tỷ lệ gốc khi chọn mã.");
+  assert(!percentDraft.choiceGroups.some((group) => group.options.some((option) => option.includes("giảm 4.000 đ"))));
+  assert.deepEqual(parseBookingVoucherRequest("Voucher có thể sử dụng: GIAM10PT — giảm 10%"), { voucherCode: "GIAM10PT" });
+  const appliedPercent = await updateBookingDraft(percentDraft, { mode: "update", voucherCode: "GIAM10PT" }, user.id, deps);
+  assert(appliedPercent.summary.some((line) => line.includes("giảm 10%; còn 36.000 đ")));
+  vouchers[0].discountAmount = 1000; vouchers[0].finalAmount = 39000;
+  const cappedPercent = await updateBookingDraft(undefined, { mode: "update", serviceId }, user.id, deps);
+  assert(cappedPercent.choiceGroups.some((group) => group.options.includes("GIAM10PT — giảm 10%")),
+    "Mức giảm bị giới hạn không làm đổi nhãn phần trăm.");
+  vouchers = [{ code: "COC10", name: "Giảm cọc", discountType: "AMOUNT", discountValue: 10000,
+    discountAmount: 10000, finalAmount: 30000 }];
+  session.bookingDraft = await updateBookingDraft(undefined, { mode: "update", serviceId }, user.id, deps);
+  session.pendingAction = null;
+  const revision = session.bookingDraft.revision;
+  const applyInput = { requestId: randomUUID(), message: "Áp mã COC10.",
+    bookingAction: { type: "update" as const, revision, patch: { voucherCode: "COC10" } } };
+  await agent.send(user, session.id, applyInput);
+  assert.equal(session.bookingDraft.values.voucherCode, "COC10");
+  assert.equal((pending()?.preview as { amount: number }).amount, 30000, "Chọn mã trong form tính lại giá ở backend.");
+  const appliedRevision = session.bookingDraft.revision;
+  await agent.send(user, session.id, applyInput);
+  assert.equal(session.bookingDraft.revision, appliedRevision, "Gửi lại cùng request không áp mã lần hai.");
+  await agent.send(user, session.id, { requestId: randomUUID(), message: "Không dùng voucher.",
+    bookingAction: { type: "update", revision: appliedRevision, patch: { voucherCode: null } } });
+  assert.equal(session.bookingDraft.values.voucherCode, undefined);
+  assert.equal((pending()?.preview as { amount: number }).amount, 40000);
+  assert.equal(sessionView(session).bookingDraft?.availableVouchers.length, 1);
+  await agent.send(user, session.id, { requestId: randomUUID(), message: "Áp mã từ tab cũ.",
+    bookingAction: { type: "update", revision, patch: { voucherCode: "COC10" } } });
+  assert.equal(session.bookingDraft.values.voucherCode, undefined, "Không nhận chọn mã từ bản nháp cũ.");
   console.log("Đạt yêu cầu voucher: câu chat thật, không có mã, chọn/áp/bỏ mã, sai loại đơn, form mới, lỗi nguồn và chặn sửa đơn đã tạo.");
 }
 run().catch((error: unknown) => { console.error(error); process.exitCode = 1; });

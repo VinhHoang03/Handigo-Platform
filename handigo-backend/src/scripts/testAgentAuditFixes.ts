@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mock } from "node:test";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { z } from "zod";
 import { AgentService, sessionView } from "../ai/agent/agent.service";
 import { AgentLoop } from "../ai/agent/agent-loop.service";
@@ -142,8 +142,11 @@ async function run() {
   let current = { _id: feedbackId, rating: 4, comment: "Nhận xét cũ", images: [photo], updatedAt: new Date(Date.now() - 10000), providerId };
   let feedbackExists = true;
   mock.method(feedback, "getOrderFeedbackContext", async () => ({ order: { _id: orderId, orderCode: "HD-KIỂM-THỬ" }, feedback: feedbackExists ? current : null, canReview: true }) as never);
-  mock.method(Order, "find", () => ({ distinct: async () => [orderId] }) as never);
-  mock.method(Feedback, "aggregate", async () => [] as never);
+  mock.method(mongoose, "startSession", async () => ({ withTransaction: async (work: (session: unknown) => Promise<unknown>) => work({}),
+    endSession: async () => {} }) as never);
+  mock.method(Provider, "findOneAndUpdate", async () => ({ _id: providerId }) as never);
+  mock.method(Order, "find", () => ({ session: () => ({ distinct: async () => [orderId] }) }) as never);
+  mock.method(Feedback, "aggregate", () => ({ session: async () => [] }) as never);
   mock.method(Provider, "findByIdAndUpdate", async () => null as never);
   let race = false, updates = 0, lastChanges: Record<string, unknown> = {};
   mock.method(Feedback, "findOneAndUpdate", (filter: { customerId: string; updatedAt: Date }, update: { $set: Record<string, unknown> }, options: { runValidators: boolean }) => {

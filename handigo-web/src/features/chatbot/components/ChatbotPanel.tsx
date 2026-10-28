@@ -14,6 +14,7 @@ import { AgentBookingActions } from "./AgentBookingActions";
 import { AgentWalletResumeCard } from "./AgentWalletResumeCard";
 import { AgentAssignedProviderCard } from "./AgentAssignedProviderCard";
 import type { AgentWalletResume } from "../utils/agentWalletResume";
+import { getAgentConversationFlow } from "../utils/agentConversationFlow";
 
 const getAudienceLabel = (audience: ChatbotAudience) => {
   if (audience === "CUSTOMER") return "Hỗ trợ dành cho khách hàng";
@@ -28,6 +29,7 @@ export function ChatbotPanel({
   isReplying,
   activity,
   error,
+  recoverableError = false,
   availabilityMessage,
   onClose,
   onRetry,
@@ -57,6 +59,7 @@ export function ChatbotPanel({
   isReplying: boolean;
   activity?: string;
   error: string;
+  recoverableError?: boolean;
   availabilityMessage: string;
   onClose: () => void;
   onRetry: () => void;
@@ -84,18 +87,39 @@ export function ChatbotPanel({
   const [bookingTool, setBookingTool] = useState<{ tool: AgentBookingTool; fingerprint: string } | null>(null);
   const [attachmentEdit, setAttachmentEdit] = useState<string | null>(null);
   const [composerBusy, setComposerBusy] = useState(false);
-  const fingerprint = `${agentSession?.sessionId}:${agentSession?.bookingDraft?.revision}:${pendingConfirmation?.actionId ?? ""}`;
-  const attachmentsDirty = attachmentEdit === fingerprint;
-  const controlsDisabled = isLoading || isReplying || taskBlocked || Boolean(error) || Boolean(availabilityMessage);
-  const statusLabel = isLoading ? "Đang tải cuộc trò chuyện" : isReplying ? activity || "Đang xử lý yêu cầu"
-    : error ? "Cần thử lại yêu cầu" : taskBlocked ? "Cần kiểm tra kết quả"
-    : pendingConfirmation ? "Chờ bạn xác nhận" : "";
+  const latestDialogueId = agentSession?.messages.findLast((message) => !message._id.startsWith("order-event:") && !message._id.startsWith("booking:"))?._id ?? "";
+  const fingerprint = `${agentSession?.sessionId}:${agentSession?.bookingDraft?.revision}:${pendingConfirmation?.actionId ?? ""}:${latestDialogueId}`;
+  const attachmentsDirty = attachmentEdit !== null && attachmentEdit === (agentSession?.sessionId ?? "new");
+  const blockingError = Boolean(error) && !recoverableError;
+  const controlsDisabled = isLoading || isReplying || taskBlocked || blockingError || Boolean(availabilityMessage);
+  const flow = getAgentConversationFlow(agentSession);
+  const activeTool = bookingTool?.fingerprint === fingerprint ? bookingTool.tool : null;
+  const drafting = ["active", "paused"].includes(agentSession?.bookingDraft?.status ?? "");
+  const paymentRelevant = !activeTool && (flow === "payment" || !drafting && ["general", "booking"].includes(flow));
+  const providerRelevant = !activeTool && (flow === "provider" || !drafting && ["general", "booking"].includes(flow));
+  const visiblePayment = payment && (paymentRelevant || agentSession?.requiresReconciliation)
+    && (!agentSession?.viewedOrder || agentSession.viewedOrder.orderId === payment.orderId || agentSession.requiresReconciliation) ? payment : null;
+  const paymentActionsAllowed = !taskBlocked && !availabilityMessage
+    && (!agentSession?.orderActions || agentSession.orderActions.orderId !== payment?.orderId || agentSession.orderActions.payment);
   const openTool = (tool: AgentBookingTool) => {
     if (controlsDisabled || !agentSession || !userId || (pendingConfirmation && pendingConfirmation.tool !== "create_booking")) return;
     setBookingTool({ tool, fingerprint });
   };
+  const paymentCard = visiblePayment && onCheckPayment ? <AgentPaymentCard payment={visiblePayment}
+    disabled={isReplying || isLoading || Boolean(pendingConfirmation) || blockingError || attachmentsDirty}
+    onCheck={onCheckPayment} onChangeMethod={paymentActionsAllowed ? onChangePaymentMethod : undefined}
+    onTopUp={paymentActionsAllowed ? () => openTool("wallet") : undefined}
+    onCancel={paymentActionsAllowed ? onCancelPayment : undefined} /> : null;
+  const statusLabel = isLoading ? "Đang tải cuộc trò chuyện" : isReplying ? activity || "Đang xử lý yêu cầu"
+    : error ? recoverableError ? "Bạn có thể thử lại hoặc gửi yêu cầu khác" : "Cần thử lại yêu cầu" : taskBlocked ? "Cần kiểm tra kết quả"
+    : pendingConfirmation ? "Chờ bạn xác nhận" : "";
   const renderConfirmation = (action: AgentConfirmation, readOnly: boolean) => audience === "CUSTOMER" && action.tool === "create_booking" && !readOnly
     ? <AgentBookingConfirmation key={action.actionId} action={action} values={agentSession?.bookingDraft?.values}
+      vouchers={agentSession?.bookingDraft?.availableVouchers}
+      onVoucherChange={agentSession?.bookingDraft ? async (voucherCode) => {
+        await onSend(voucherCode ? `Áp mã ${voucherCode}.` : "Không dùng voucher.", undefined,
+          { type: "update", revision: agentSession.bookingDraft!.revision, patch: { voucherCode } });
+      } : undefined}
       disabled={isReplying || controlsDisabled || attachmentsDirty} onDecision={onDecision} onOpenTool={openTool} />
     : <AgentConfirmationCard action={action} readOnly={readOnly} disabled={isReplying || controlsDisabled || attachmentsDirty} onDecision={onDecision} />;
   return (
@@ -118,7 +142,7 @@ export function ChatbotPanel({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {onNewSession && <button type="button" onClick={onNewSession}
-              disabled={isLoading || isReplying || Boolean(pendingConfirmation) || taskBlocked || composerBusy}
+              disabled={isLoading || composerBusy}
               aria-label="Bắt đầu tác vụ mới" title="Bắt đầu tác vụ mới"
               className="grid h-11 w-11 place-items-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container-low focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-40">
               <Plus aria-hidden="true" size={20} />
@@ -161,32 +185,30 @@ export function ChatbotPanel({
       ) : (
         <ChatbotMessageList
           onSend={onSend}
-          choicesDisabled={attachmentsDirty || taskBlocked || Boolean(pendingConfirmation) || Boolean(availabilityMessage) || Boolean(error)}
+          choicesDisabled={attachmentsDirty || taskBlocked || Boolean(pendingConfirmation) || Boolean(availabilityMessage) || blockingError}
           bookingVoucherChoicesEnabled={audience === "CUSTOMER" && pendingConfirmation?.tool === "create_booking" && !attachmentsDirty && !controlsDisabled}
           messages={messages}
           isReplying={isReplying}
           activity={activity}
           audience={audience}
           pendingActionId={pendingConfirmation?.actionId}
-          confirmationsDisabled={isLoading || taskBlocked || Boolean(error) || Boolean(availabilityMessage)}
+          confirmationsDisabled={isLoading || taskBlocked || blockingError || Boolean(availabilityMessage)}
           onDecision={onDecision}
           renderConfirmation={renderConfirmation}
-          renderAfterMessage={(message) => payment && onCheckPayment && message._id === paymentMessageId
-            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} onCancel={taskBlocked || availabilityMessage ? undefined : onCancelPayment} />
+          renderAfterMessage={(message) => message._id === paymentMessageId
+            ? paymentCard
             : null}
         >
           {pendingConfirmation && onDecision && !messages.some((message) => message.confirmation?.actionId === pendingConfirmation.actionId) && (
             renderConfirmation(pendingConfirmation, false)
           )}
-          {payment && onCheckPayment && !messages.some((message) => message._id === paymentMessageId) && (
-            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} onCancel={taskBlocked || availabilityMessage ? undefined : onCancelPayment} />
-          )}
-          {walletResume && walletResume.sessionId === agentSession?.sessionId && onResumeWallet && onDismissWallet && (
+          {!messages.some((message) => message._id === paymentMessageId) && paymentCard}
+          {!activeTool && ["general", "booking", "payment"].includes(flow) && walletResume && walletResume.sessionId === agentSession?.sessionId && onResumeWallet && onDismissWallet && (
             <AgentWalletResumeCard key={walletResume.depositOrderCode} context={walletResume}
               disabled={controlsDisabled || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking")}
               onContinue={onResumeWallet} onDismiss={onDismissWallet} />
           )}
-          {agentSession?.assignedProvider && <AgentAssignedProviderCard key={`${agentSession.assignedProvider.orderId}:${agentSession.assignedProvider.checkedAt}`}
+          {providerRelevant && agentSession?.assignedProvider && <AgentAssignedProviderCard key={`${agentSession.assignedProvider.orderId}:${agentSession.assignedProvider.checkedAt}`}
             value={agentSession.assignedProvider} disabled={controlsDisabled || Boolean(pendingConfirmation) || attachmentsDirty} onSend={onSend} />}
         </ChatbotMessageList>
       ))}
@@ -195,10 +217,8 @@ export function ChatbotPanel({
         <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{taskBlocked ? "Kiểm tra kết quả thao tác" : "Tiếp tục yêu cầu"}</button>
       )}
       <div ref={toolsAnchorRef} className="shrink-0">
-        {!history && audience === "CUSTOMER" && <div className="border-t border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 sm:px-4 [&_button]:shrink-0 [&_a]:shrink-0">
-          <AgentBookingActions session={agentSession} disabled={attachmentsDirty || isLoading || isReplying || Boolean(error) || Boolean(availabilityMessage)}
-            onOpenTool={openTool} onSend={onSend} onCheckPayment={onCheckPayment} />
-        </div>}
+        {!history && !activeTool && audience === "CUSTOMER" && <AgentBookingActions key={fingerprint} session={agentSession} disabled={attachmentsDirty || controlsDisabled}
+          onOpenTool={openTool} onSend={onSend} onCheckPayment={onCheckPayment} />}
       </div>
       {availabilityMessage && (
         <div
@@ -231,7 +251,7 @@ export function ChatbotPanel({
         onUploadAttachment={onUploadAttachment}
         attachmentUrls={agentSession?.bookingDraft?.status === "active" ? agentSession.bookingDraft.values?.customerAttachments : undefined}
         attachmentPurpose={agentSession?.bookingDraft?.status === "active" ? "booking" : "general"}
-        onAttachmentChange={(dirty) => setAttachmentEdit(dirty ? fingerprint : null)}
+        onAttachmentChange={(dirty) => setAttachmentEdit(dirty ? agentSession?.sessionId ?? "new" : null)}
         onActivityChange={setComposerBusy}
         voiceEnabled={audience === "CUSTOMER"}
       />}

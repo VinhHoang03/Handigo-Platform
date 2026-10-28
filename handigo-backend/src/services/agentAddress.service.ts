@@ -12,6 +12,7 @@ import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { idSchema } from "../ai/tools/implementations/booking.schemas";
 import { Types } from "mongoose";
 import type { IAddress } from "../models/address.model";
+import { happenedAfter } from "../ai/agent/reconciliation-evidence";
 
 // Tọa độ và mã hành chính chỉ lấy từ hệ thống, không nhận từ LLM.
 const addressFields = createAddressSchema.pick({ recipientName: true, recipientPhone: true,
@@ -126,5 +127,23 @@ export const AgentAddressService = {
     if (!address) throw new ActionPreconditionError();
     return { addressId: String(address._id), fullAddress: address.fullAddress, ward: address.ward, province: address.province,
       reused: Boolean(preview.existingId), message: preview.existingId ? "Đã chọn địa chỉ có sẵn." : "Đã lưu địa chỉ vào sổ địa chỉ." };
+  },
+  async reconcile(userId: string, args: AgentAddressArguments, expected: unknown, startedAt?: string) {
+    const preview = z.object({ payload: addressFields.extend({ provinceCode: z.number().optional(), wardCode: z.number().optional() }),
+      coordinates: z.object({ latitude: z.number().optional(), longitude: z.number().optional(), placeId: z.string().optional() }),
+      existingId: idSchema.optional() }).safeParse(expected);
+    if (!preview.success || !Number.isFinite(Date.parse(startedAt ?? ""))) return null;
+    const payload = { ...preview.data.payload, ...preview.data.coordinates };
+    const addressId = args.addressId ?? preview.data.existingId;
+    const candidates = await Address.find({ userId, isDeleted: { $ne: true },
+      ...(addressId ? { _id: addressId } : { fullAddress: payload.fullAddress, ward: payload.ward, province: payload.province,
+        createdAt: { $gte: new Date(startedAt!) } }) }).limit(2);
+    const matches = candidates.filter((address) => Object.entries(payload).every(([key, value]) =>
+      value === undefined || (address.get(key) ?? (key === "note" ? "" : undefined)) === (key === "note" ? value ?? "" : value))
+      && (preview.data.existingId && !args.addressId || happenedAfter(address.updatedAt, startedAt)));
+    if (matches.length !== 1) return null;
+    const address = matches[0];
+    return { addressId: String(address._id), fullAddress: address.fullAddress, ward: address.ward, province: address.province,
+      reused: Boolean(preview.data.existingId), message: "Đã kiểm tra địa chỉ được lưu đúng thông tin xác nhận." };
   },
 };

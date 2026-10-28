@@ -141,7 +141,11 @@ async function run() {
   assert.throws(() => agentRequestAttachments(evidence.session, [photo, photo]));
   assert.throws(() => agentRequestAttachments(evidence.session, ["http://khong-hop-le.vn/a.png"]));
   const ratingArgs = agentFeedbackSchema.parse({ orderId, rating: 5, comment: "Thợ làm cẩn thận" });
-  for (const invalid of [0, 6, 1.5]) assert(!agentFeedbackSchema.safeParse({ orderId, rating: invalid }).success);
+  for (const valid of [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]) {
+    assert.equal(agentFeedbackSchema.parse({ orderId, rating: valid }).rating, valid);
+    assert(bookingActionSchema.safeParse({ type: "feedback", feedback: { orderId, rating: valid } }).success);
+  }
+  for (const invalid of [0, 0.5, 6, 1.2, 4.75, NaN, Infinity]) assert(!agentFeedbackSchema.safeParse({ orderId, rating: invalid }).success);
   assert(!agentFeedbackSchema.safeParse({ orderId }).success);
   status = "in_progress"; await assert.rejects(() => AgentFeedbackService.preview(user.id, ratingArgs), /đủ điều kiện/);
   status = "completed"; providerExists = false;

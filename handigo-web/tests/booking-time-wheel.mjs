@@ -58,8 +58,8 @@ try {
   });
   assert.match(defaults.currentMinute, /T16:37:00$/);
   assert.equal(defaults.restoredCurrentMinute, defaults.currentMinute);
-  assert.match(defaults.beforeOpening, /T07:59:00$/);
-  assert.match(defaults.afterClosing, /T22:00:00$/);
+  assert.match(defaults.beforeOpening, /T08:00:00$/);
+  assert.equal(defaults.afterClosing, '2030-10-05T08:00:00');
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const trigger = page.getByRole('button', { name: 'Chọn khung giờ', exact: true });
@@ -81,17 +81,18 @@ try {
   await page.mouse.wheel(0, 44);
   await expect(page.getByRole('button', { name: 'Chọn 17:00', exact: true })).toBeEnabled();
   // Cuộn tới giờ đã qua thì không cho xác nhận.
-  await hour.evaluate((element) => { element.scrollTop = 14 * 44; });
-  await expect(page.getByRole('button', { name: 'Chọn 08:00', exact: true })).toBeDisabled();
+  await expect(hour.getByRole('option', { name: '08', exact: true })).toHaveAttribute('aria-disabled', 'true');
   await hour.focus();
   await page.keyboard.press('End');
   await minute.focus();
   await page.keyboard.press('End');
-  await page.getByRole('button', { name: 'Chọn 23:59', exact: true }).click();
-  await expect(trigger).toHaveText('23:59');
+  await expect(minute.getByRole('option', { name: '59', exact: true })).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Home');
+  await page.getByRole('button', { name: 'Chọn 21:00', exact: true }).click();
+  await expect(trigger).toHaveText('21:00');
   await trigger.click();
-  await expect(minute.getByRole('option', { selected: true })).toHaveText('59');
-  await expect(hour.getByRole('option', { selected: true })).toHaveText('23');
+  await expect(minute.getByRole('option', { selected: true })).toHaveText('00');
+  await expect(hour.getByRole('option', { selected: true })).toHaveText('21');
   await page.keyboard.press('Escape');
   await expect(hour).toHaveCount(0);
   assert.deepEqual(errors, []);

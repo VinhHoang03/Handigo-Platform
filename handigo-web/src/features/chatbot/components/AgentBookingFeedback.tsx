@@ -43,7 +43,7 @@ export function AgentBookingFeedback({ orderId, disabled, onSend, onClose }: {
         <label className="block text-sm">Số sao
           <select aria-label="Số sao đánh giá" value={rating} onChange={(event) => setRating(event.target.value)} required disabled={disabled || saving}
             className="mt-1 min-h-11 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3">
-            <option value="">Chọn số sao</option>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} sao</option>)}
+            <option value="">Chọn số sao</option>{[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((value) => <option key={value} value={value}>{value.toLocaleString("vi-VN")} sao</option>)}
           </select>
         </label>
         <label className="block text-sm">Nhận xét

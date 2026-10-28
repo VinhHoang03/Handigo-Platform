@@ -1,6 +1,7 @@
 export type AgentState = "RUNNING" | "WAITING_USER_INPUT" | "WAITING_CONFIRMATION" | "EXECUTING_TOOL" | "COMPLETED" | "FAILED";
 
 export interface AgentMessage {
+  supersededRead?: boolean;
   bookingSearch?: import("./booking-history").AgentBookingSearch;
   customerAttachments?: string[];
   confirmationActionId?: string;
@@ -27,6 +28,7 @@ export interface PendingAction {
 }
 
 export interface AgentSession {
+  modelWorkflow?: import("./model-workflow").ModelWorkflowFrame;
   rebookProposal?: { id: string; arguments: { orderId: string; useSameProvider: boolean }; revision: number; taskVersion: number };
   draftBackup?: { id: string; draft: import("./booking-draft").BookingDraft };
   viewedOrder?: { orderId: string; orderCode: string };

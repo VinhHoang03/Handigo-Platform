@@ -232,6 +232,9 @@ const shouldRefundQrToWallet = (order: IOrder) =>
   || (order.cancellation?.cancelledByRole === "customer"
     && order.cancellation.refundPolicy?.policyVersion === CUSTOMER_CANCELLATION_POLICY_VERSION);
 
+const hasPayosPayoutAttempt = (refund?: { payoutId?: string | null; channel?: string | null; destination?: string | null } | null) =>
+  Boolean(refund?.payoutId || refund?.channel === "payos_payout" || refund?.destination === "source_account");
+
 // Lưu tỷ lệ theo lần hủy để cấu hình mới không đổi các khoản đang xử lý.
 const getStoredCompensationRate = (order: IOrder) => {
   if (isQuotationDepositPolicy(order)) return 1;
@@ -311,6 +314,12 @@ const refundWalletPayments = async (
   for (const payment of payments) {
     const refundAmount = getPaymentRefundAmount(order, payment);
     if (isQuotationDepositPolicy(order) && refundAmount === 0) continue;
+    if (payment.method === "payos") {
+      const previousRefund = await Refund.findOne({ paymentId: payment._id }).session(session);
+      const metadata = (payment.metadata as { refund?: LegacyRefundMetadata } | null)?.refund;
+      // Lệnh chi cũ phải đối soát qua worker, không cộng ví thêm trong giao dịch hủy.
+      if (hasPayosPayoutAttempt(previousRefund) || hasPayosPayoutAttempt(metadata)) continue;
+    }
     const existingRefund = await WalletTransaction.findOne({
       relatedPaymentId: payment._id,
       type: "refund",
@@ -913,10 +922,11 @@ const refundPayosPaymentToWallet = async (
   const refundOrigin = order.cancellation?.refundPolicy?.policyVersion === CUSTOMER_CANCELLATION_POLICY_VERSION
     ? "customer_cancellation_window"
     : order.reassignment?.automatic && order.reassignment.status === "failed"
-      ? "replacement_unavailable" : "source_account_unavailable";
+      ? "replacement_unavailable" : "wallet_refund_policy";
 
   try {
     await session.withTransaction(async () => {
+      walletRefund = null;
       const existingRefund = await WalletTransaction.findOne({
         relatedPaymentId: payment._id,
         type: "refund",
@@ -946,12 +956,12 @@ const refundPayosPaymentToWallet = async (
 
       const currentRefund = (
         transactionalPayment.metadata as {
-          refund?: { payoutId?: string; status?: string; reason?: string };
+          refund?: LegacyRefundMetadata & { reason?: string };
         } | null
       )?.refund;
-      if (currentRefund?.payoutId) {
+      if (hasPayosPayoutAttempt(currentRefund)) {
         throw new AppError(
-          "Không thể hoàn vào ví vì payment đã có lệnh payout PayOS",
+          "Khoản hoàn đã có dấu vết chi tiền PayOS; cần đối soát trước khi hoàn vào ví.",
           409,
         );
       }
@@ -970,7 +980,7 @@ const refundPayosPaymentToWallet = async (
         {
           _id: payment._id,
           status: "paid",
-          "metadata.refund.payoutId": { $exists: false },
+          "metadata.refund.payoutId": null,
         },
         {
           $set: {
@@ -995,8 +1005,7 @@ const refundPayosPaymentToWallet = async (
         { new: true, session, runValidators: true },
       );
       if (!claimedPayment) {
-        await refreshCancelledOrderPaymentStatus(order._id as Types.ObjectId, session);
-        return;
+        throw new AppError("Giao dịch đã thay đổi. Chưa cộng tiền vào ví; vui lòng đối soát lại.", 409);
       }
 
       let wallet = await Wallet.findOne({
@@ -1033,7 +1042,7 @@ const refundPayosPaymentToWallet = async (
             balanceAfter: wallet.balance,
             status: "success",
             transactionCode: buildTransactionCode("REFUND"),
-            description: "Hoàn tiền PayOS về ví Handigo",
+            description: "Hoàn tiền đơn hàng đã hủy",
             metadata: {
               orderCode: order.orderCode,
               reason,
@@ -1113,70 +1122,15 @@ const requestPayosRefund = async (
   if (!refund) return;
 
   try {
-    if (shouldRefundQrToWallet(order) && !refund.payoutId) {
-      await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
-      return;
-    }
     if (refund.payoutId) {
       await reconcilePayosRefund(payment, refund, reason, refund.payoutId);
       return;
     }
-
-    const payoutPage = await payoutPayos.payouts.list({
-      referenceId: refund.referenceId,
-      limit: 1,
-    });
-    const existingPayout = payoutPage.data[0];
-    if (existingPayout) {
-      refund.payoutId = existingPayout.id;
-      await refund.save();
-      await reconcilePayosRefund(payment, refund, reason, existingPayout.id);
-      return;
+    if (hasPayosPayoutAttempt(refund)) {
+      throw new AppError("Khoản hoàn PayOS cũ chưa rõ kết quả; cần đối soát trước khi hoàn vào ví.", 409);
     }
-
-    const paymentLink = await payos.paymentRequests.get(
-      Number(payment.gatewayOrderCode),
-    );
-    const sourceTransaction = paymentLink.transactions.find(
-      (item) =>
-        item.counterAccountBankId &&
-        item.counterAccountNumber &&
-        item.amount >= refundAmount,
-    );
-
-    if (!sourceTransaction) {
-      await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
-      return;
-    }
-
-    await storePayosRefundMetadata(payment._id as Types.ObjectId, {
-      status: "requesting",
-      referenceId: refund.referenceId,
-      sourceMethod: "payos",
-      destination: "source_account",
-      amount: refundAmount,
-      requestedAt: new Date(),
-    });
-    refund.channel = "payos_payout";
-    refund.destination = "source_account";
-    await refund.save();
-
-    const payout = await payoutPayos.payouts.create(
-      {
-        referenceId: refund.referenceId,
-        amount: refundAmount,
-        description: "Hoan tien Handigo",
-        toBin: sourceTransaction.counterAccountBankId as string,
-        toAccountNumber: sourceTransaction.counterAccountNumber as string,
-      },
-      refund.referenceId,
-    );
-
-    refund.payoutId = payout.id;
-    refund.approvalState = payout.approvalState;
-    refund.providerResponse = buildPayoutAuditSnapshot(payout);
-    await refund.save();
-    await reconcilePayosRefund(payment, refund, reason, payout.id);
+    // Chính sách hiện tại: hoàn QR vào ví, không tạo lệnh chi PayOS mới.
+    await refundPayosPaymentToWallet(payment, order, reason, refundAmount);
   } catch (error) {
     await recordRefundFailure(refund, error);
     throw error;

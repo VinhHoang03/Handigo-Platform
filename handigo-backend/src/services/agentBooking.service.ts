@@ -20,6 +20,7 @@ import type { IOrder } from "../models/order.model";
 import { AGENT_AREA_LOCATION_NOTE, AGENT_AREA_PLACE_PREFIX } from "./agentAddressResolver.service";
 import { draftAddressDocument, type DraftBookingAddress } from "./agentAddress.service";
 import { bookingAddressLabel } from "../ai/agent/booking-draft";
+import { happenedAfter } from "../ai/agent/reconciliation-evidence";
 
 function bookingView(order: Pick<IOrder, "_id" | "orderCode" | "status" | "bookingStatus" | "paymentStatus"
   | "orderType" | "paymentMethod" | "inspectionRequired" | "scheduledAt" | "depositAmount" | "pricing" | "voucherSnapshot" | "preferredProviderId">) {
@@ -110,6 +111,7 @@ export const AgentBookingService = {
     const options = await getOptionsByServiceId(serviceId);
     return {
       id: String(service._id), name: service.name, slug: service.slug, serviceType: service.serviceType,
+      description: service.description, processSteps: service.processSteps,
       fixedPrice: service.fixedPrice,
       optionGroups: service.optionGroups,
       requiresOptionSelection: service.requiresOptionSelection, options: options.map((option) => ({
@@ -146,6 +148,8 @@ export const AgentBookingService = {
       amountBeforeVoucher: Math.max(snapshot.baseAmount - promotionDiscountAmount, 0), inspectionRequired: service.serviceType === "variable_price",
     });
     return vouchers.map((voucher) => ({ code: voucher.code!, name: voucher.name,
+      discountType: voucher.discountType === "PERCENT" ? "PERCENT" as const : "AMOUNT" as const,
+      discountValue: voucher.discountValue,
       discountAmount: voucher.discountAmount ?? 0,
       finalAmount: Math.max(snapshot.bookingAmount - promotionDiscountAmount - (voucher.discountAmount ?? 0), 0),
       minOrderAmount: voucher.minOrderAmount, endAt: voucher.endAt.toISOString(), neverExpires: voucher.neverExpires ?? false,
@@ -262,12 +266,12 @@ export const AgentBookingService = {
     const quantityPrice = price.options.length === 1 && price.options[0].optionId === null
       ? price.options[0] : undefined;
     const paymentNote = snapshot.discountedAmount === 0
-      ? "Sau xác nhận, hệ thống ghi nhận khoản thanh toán 0đ; không cần chuyển khoản hoặc trừ tiền ví."
+      ? "Đơn 0đ, không cần chuyển khoản hoặc trừ tiền ví."
       : args.paymentMethod === "bank"
-      ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và liên kết PayOS để bạn chuyển khoản."
+      ? "Sau khi xác nhận đặt dịch vụ, bạn tiếp tục thanh toán trực tuyến."
       : args.paymentMethod === "wallet"
-        ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và trừ số tiền hiển thị ở trên từ ví Handigo."
-        : "Vui lòng kiểm tra thông tin của bạn và xác nhận để tạo đơn dịch vụ. Bạn thanh toán tiền mặt trực tiếp cho nhà cung cấp sau khi sử dụng dịch vụ.";
+        ? "Sau khi xác nhận đặt dịch vụ, số tiền trên sẽ được trừ từ ví Handigo."
+        : "Thanh toán tiền mặt cho thợ sau khi sử dụng dịch vụ.";
     return {
       title: "Tạo đơn dịch vụ", service: price.serviceName,
       ...(quantityPrice ? { unitPrice: quantityPrice.price, quantity: quantityPrice.quantity }
@@ -283,10 +287,9 @@ export const AgentBookingService = {
       voucherCode: args.voucherCode, providerName,
       amount: Math.max(price.amount - discountAmount, 0), currency: price.currency,
       description: args.problemDescription ?? "", customerAttachments: args.customerAttachments ?? [], serviceType: price.serviceType, paymentOnConfirmation,
-      note: [paymentNote, draft?.id === args.addressId ? args.saveAddressToBook === false ? "Địa chỉ mới chỉ dùng cho đơn này, không lưu vào sổ địa chỉ." : "Địa chỉ mới chỉ được lưu vào sổ địa chỉ khi đặt đơn thành công." : "",
+      note: [paymentNote,
         address.placeId?.startsWith(AGENT_AREA_PLACE_PREFIX) ? AGENT_AREA_LOCATION_NOTE : "",
-        price.promotionName ? `Đã áp dụng ưu đãi tự động: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
-        quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ")
+        price.promotionName ? `Đã áp dụng ưu đãi: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc; giá sửa chữa được báo sau khảo sát." : ""].filter(Boolean).join(" ")
     };
   },
   async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string; discountAmount?: number }, sessionId?: string, actionId?: string, draft?: DraftBookingAddress) {
@@ -334,5 +337,17 @@ export const AgentBookingService = {
     confirmedExpectation: { paidAmount: number; refundAmount: number; cancellationFee: number }) {
     await OrderService.cancelOrder(orderId, userId, "customer", reason, confirmedExpectation);
     return this.getBooking(userId, orderId);
+  },
+  async reconcileCancellation(userId: string, orderId: string, reason: string, expected: unknown, startedAt?: string) {
+    const order = await Order.findOne({ _id: orderId, customerId: userId, isDeleted: false });
+    const cancellation = order?.cancellation;
+    const policy = cancellation?.refundPolicy;
+    const preview = expected as { paidAmount?: number; refundAmount?: number; cancellationFee?: number } | null;
+    if (!order || order.status !== "cancelled" || cancellation?.cancelledByRole !== "customer"
+      || String(cancellation.cancelledBy) !== userId || cancellation.reason !== reason
+      || !happenedAfter(cancellation.cancelledAt, startedAt) || !preview || !policy
+      || policy.paidAmount !== preview.paidAmount || policy.refundAmount !== preview.refundAmount
+      || policy.cancellationFee !== preview.cancellationFee) return null;
+    return bookingView(order);
   },
 };

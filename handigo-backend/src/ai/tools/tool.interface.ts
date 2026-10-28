@@ -9,6 +9,7 @@ export interface ToolContext {
   confirmedPreview?: unknown;
   actionId?: string;
   actionCreatedAt?: string;
+  bookingPaymentActionId?: string;
   readOnly?: boolean;
   replaceBookingDraft?: boolean;
   bookingAddressLookup?: { value?: Promise<import("../agent/booking-draft").DraftAddress[]> };

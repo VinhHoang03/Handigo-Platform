@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { mock } from "node:test";
+import { randomUUID } from "node:crypto";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { Order } from "../models/order.model";
@@ -45,11 +46,11 @@ async function run() {
     };
     for (const hour of [7, 22]) {
       const scheduledAt = `${day}T${String(hour).padStart(2, "0")}:00:00+07:00`;
-      assert.equal(bookingSchema.safeParse({ ...args, orderType: "scheduled", scheduledAt }).success, true);
+      assert.equal(bookingSchema.safeParse({ ...args, orderType: "scheduled", scheduledAt }).success, false);
       const draft = await updateBookingDraft(undefined, { mode: "update", serviceId, scheduledAt, quantity: 2 }, user.id, draftDeps);
-      assert(readyBookingArguments(draft));
+      assert.equal(readyBookingArguments(draft), null);
       assert.equal(draft.values.uniformQuantity, 2, "Sửa lịch không làm mất số lượng.");
-      assert(!draft.missing.some((item) => item.includes("08:00 đến 21:00")));
+      assert(draft.missing.some((item) => item.includes("08:00 đến 21:00")));
     }
     assert(bookingSchema.safeParse({ ...args, orderType: "scheduled", scheduledAt: `${day}T21:00:00+07:00` }).success);
 
@@ -69,7 +70,7 @@ async function run() {
     const registry = new ToolRegistry().register({
       name: "create_booking", description: "Đặt đơn kiểm thử", inputSchema: bookingSchema,
       mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
-      preview: async () => ({ amount: 200000, addressVersion: "kiem-thu" }),
+      preview: async () => ({ amount: 200000, addressVersion: "kiem-thu", policyVersion: "a".repeat(64) }),
       execute: (toolContext, values) => AgentBookingService.create(user.id, values,
         { amount: 200000, addressVersion: "kiem-thu" }, toolContext.sessionId, toolContext.actionId),
       reconcile: (toolContext) => AgentBookingService.reconcileBooking(user.id, toolContext.sessionId, toolContext.actionId!),
@@ -78,7 +79,15 @@ async function run() {
       { maxIterations: 1, systemPrompt: "Kiểm thử", timeoutMs: 5000 });
     const session = newSession(context.sessionId, user.id);
     const tool = registry.get("create_booking", context);
+    const authorize = () => {
+      const action = session.pendingAction!;
+      action.policyConsent = { actionId: action.id, version: "a".repeat(64), acceptedAt: new Date().toISOString() };
+      const requestId = randomUUID();
+      session.activeRequest = { requestId, digest: "kiem-thu", input: { requestId,
+        confirmation: { actionId: action.id, decision: "CONFIRM" } } };
+    };
     session.pendingAction = await loop.confirmation.prepare(tool, context, args);
+    authorize();
     await loop.execute(session, context, tool, args, async () => {}, session.pendingAction);
     assert.equal(session.actions[0].status, "EXPIRED");
     assert.equal(session.requiresReconciliation, false, "Từ chối trước khi ghi không được khóa phiên.");
@@ -86,6 +95,7 @@ async function run() {
 
     rejectBeforeWrite = false;
     session.pendingAction = await loop.confirmation.prepare(tool, context, args);
+    authorize();
     const actionId = session.pendingAction.id;
     await loop.execute(session, context, tool, args, async () => {}, session.pendingAction);
     assert.equal(session.actions[1].status, "UNKNOWN");
@@ -156,9 +166,9 @@ async function run() {
       sources: {}, missing: [], summary: [], choiceGroups: [] };
     await getAvailableTimesTool.execute({ ...context, session: draft }, { serviceId, addressId, times: [`${day}T09:00:00+07:00`] });
     assert.equal(checked, 1);
-    await AgentBookingService.availableTimes(user.id, { serviceId, addressId, preferredProviderId: chosenProviderId,
-      selectedOptions: [{ optionId, quantity: 2 }], times: [`${day}T22:00:00+07:00`] });
-    assert.equal(checked, 2, "Tạm kiểm tra thợ cả ngoài khung 08–21 để kiểm thử.");
+    await assert.rejects(AgentBookingService.availableTimes(user.id, { serviceId, addressId, preferredProviderId: chosenProviderId,
+      selectedOptions: [{ optionId, quantity: 2 }], times: [`${day}T22:00:00+07:00`] }), /Vui lòng chọn giờ/);
+    assert.equal(checked, 1, "Không tìm thợ khi giờ hẹn ngoài khung 08:00–21:00.");
     console.log("Đạt: giờ hẹn, thời lượng tùy chọn, lỗi trước ghi, khôi phục đơn không tạo trùng và đối soát thất bại/hoàn tiền đúng lượt.");
   } finally {
     mock.restoreAll();

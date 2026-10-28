@@ -2,7 +2,7 @@ import { useMemo, useState, type RefObject } from 'react';
 import { Zap } from 'lucide-react';
 import { BookingPickerPopover } from './BookingPickerPopover';
 import { BookingTimeWheel } from './BookingTimeWheel';
-import { getEarliestScheduledAt, getInitialScheduledAt, timeSlots } from './step2Helpers';
+import { getEarliestScheduledAt, getInitialScheduledAt, isWithinScheduledBookingHours, timeSlots } from './step2Helpers';
 
 interface UpcomingDate {
   value: string;
@@ -30,7 +30,7 @@ const minutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(
 
 const isTimeUnavailable = (time: string, date: string, earliest: number) => {
   const timestamp = new Date(`${date}T${time}:00`).getTime();
-  return !Number.isFinite(timestamp) || timestamp < earliest;
+  return !isWithinScheduledBookingHours(time) || !Number.isFinite(timestamp) || timestamp < earliest;
 };
 
 const findFirstAvailableTime = (date: string, earliest: number) => {
@@ -117,7 +117,7 @@ export const BookingDateTimeDialog = ({
         {error && <p role="alert" className="mt-sm text-center text-sm font-medium text-error">{error}</p>}
 
         <div className="sticky bottom-0 mt-sm grid grid-cols-2 gap-xs bg-surface-container-lowest pt-sm">
-        <button type="button" onClick={onImmediate} disabled={disabled}
+        <button type="button" onClick={onImmediate} disabled={disabled || !isWithinScheduledBookingHours(`${String(new Date(currentTimestamp).getHours()).padStart(2, '0')}:${String(new Date(currentTimestamp).getMinutes()).padStart(2, '0')}`)}
           className="flex min-h-11 items-center justify-center gap-xs rounded-xl border border-primary/30 px-xs text-sm font-bold text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15">
           <Zap aria-hidden="true" size={18} />
           Đặt ngay

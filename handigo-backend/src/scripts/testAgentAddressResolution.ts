@@ -13,7 +13,7 @@ import User from "../models/user.model";
 import { Address } from "../models/address.model";
 import { newSession } from "../ai/agent/agent-state";
 import type { IAddress } from "../models/address.model";
-import type { BookingDraftDependencies } from "../ai/agent/booking-draft";
+import { bookingAddressLabel, type BookingDraftDependencies } from "../ai/agent/booking-draft";
 const createAddressWithStorage = addressService.createAddress;
 
 // Toàn bộ dữ liệu hành chính và vị trí dưới đây là fixture; không tra tọa độ hoặc ghi tài khoản thật.
@@ -73,6 +73,48 @@ async function run() {
   assert.equal(resolved.province, provinces[0].name); assert.equal(resolved.provinceCode, 48);
   assert.equal(resolved.ward, wards[0].name); assert.equal(resolved.wardCode, 101);
   assert.equal(resolved.latitude, school.latitude); assert.equal(resolved.precision, "place");
+  const changedAddress = "134 trần đại nghĩa phường ngũ hành sơn đà nẵng";
+  const duplicatedLabel = `${changedAddress}, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng`;
+  const canonicalLabel = "134 trần đại nghĩa, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng";
+  assert.equal(bookingAddressLabel({ fullAddress: changedAddress, ward: wards[0].name, province: provinces[0].name }), canonicalLabel);
+  assert.equal(bookingAddressLabel({ fullAddress: duplicatedLabel, ward: wards[0].name, province: provinces[0].name }), canonicalLabel);
+  for (const [addressText, street] of [
+    [changedAddress, "134 trần đại nghĩa"],
+    ["134 Trần Đại Nghĩa, phường Ngũ Hành Sơn, Đà Nẵng", "134 Trần Đại Nghĩa"],
+    ["134 Tran Dai Nghia P. Ngu Hanh Son TP. Da Nang", "134 Tran Dai Nghia"],
+    ["134 trần đại nghĩa phường ngũ hành sơn đà nẵng, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng", "134 trần đại nghĩa"],
+    ["134 Ngũ Hành Sơn, Phường Ngũ Hành Sơn, Đà Nẵng", "134 Ngũ Hành Sơn"],
+    ["134 Đà Nẵng phường Ngũ Hành Sơn Đà Nẵng", "134 Đà Nẵng"],
+    ["134 Đà Nẵng", "134 Đà Nẵng"],
+    ["134 Trần Đại Nghĩa, Đà Nẵng, Ngũ Hành Sơn", "134 Trần Đại Nghĩa"],
+    ["134 Trần Đại Nghĩa phường Ngũ Hành Sơn Đà Nẵng Đà Nẵng", "134 Trần Đại Nghĩa"],
+    ["134 Trần Đại Nghĩa, Phường Ngũ Hành Sơn, Đà Nẵng, cổng sau", "134 Trần Đại Nghĩa, cổng sau"],
+    ["Tòa nhà Đà Nẵng, cổng sau phường Ngũ Hành Sơn Đà Nẵng", "Tòa nhà Đà Nẵng, cổng sau"],
+  ]) {
+    const address = await resolveAgentAddress({ addressText, ward: wards[0].name, province: provinces[0].name });
+    assert.equal(address.fullAddress, street, `Tách địa chỉ: ${addressText}`);
+    assert.equal(bookingAddressLabel(address), `${street}, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng`);
+  }
+  assert.equal((await resolveAgentAddress({ fullAddress: changedAddress, ward: wards[0].name,
+    province: provinces[0].name })).fullAddress, "134 trần đại nghĩa");
+  for (const separator of [", ", "; ", "\n", " "]) {
+    for (const repetitions of [1, 2, 3, 4]) {
+      const addressText = "134 Trần Đại Nghĩa" + separator
+        + Array(repetitions).fill(`Phường Ngũ Hành Sơn${separator}Thành phố Đà Nẵng`).join(separator);
+      const address = await resolveAgentAddress({ addressText });
+      assert.equal(address.fullAddress, "134 Trần Đại Nghĩa", `Loại khu vực lặp: ${addressText}`);
+      assert.equal(bookingAddressLabel(address), "134 Trần Đại Nghĩa, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng");
+    }
+  }
+  const otherProvince = { code: 79, name: "Thành phố Hồ Chí Minh", codeName: "ho_chi_minh", divisionType: "thành phố" };
+  const otherWard = { code: 201, name: "Phường Sài Gòn", codeName: "sai_gon", divisionType: "phường" };
+  mock.method(administrative, "getProvinces", async () => [...provinces, otherProvince]);
+  mock.method(administrative, "getWardsByProvince", async (code: number) => code === 79 ? [otherWard] : wards);
+  const otherAddress = await resolveAgentAddress({ addressText: "12 Lê Lợi P. Sài Gòn TP.HCM, Phường Sài Gòn, Thành phố Hồ Chí Minh" });
+  assert.equal(otherAddress.fullAddress, "12 Lê Lợi");
+  assert.equal(bookingAddressLabel(otherAddress), "12 Lê Lợi, Phường Sài Gòn, Thành phố Hồ Chí Minh");
+  mock.method(administrative, "getProvinces", async () => provinces);
+  mock.method(administrative, "getWardsByProvince", async (code: number) => code === 48 ? wards : []);
   const withoutAccents = await resolveAgentAddress({ addressText: "DAI HOC FPT, NGU HANH SON, TP. DA NANG" });
   assert.equal(withoutAccents.wardCode, 101); assert.equal(withoutAccents.provinceCode, 48);
   const onlyArea = await resolveAgentAddress({ addressText: "Ngũ Hành Sơn, Đà Nẵng" });
@@ -134,7 +176,7 @@ async function run() {
   mock.method(Address, "findOne", async () => saved[0]);
   const args = agentAddressSchema.parse({ addressText: raw, useForBooking: true });
   const preview = await AgentAddressService.preview(userId, args);
-  assert.equal(preview.recipientPhone, "0912345678"); assert(preview.note.includes("vị trí tham chiếu"));
+  assert.equal(preview.recipientPhone, "0912345678"); assert(preview.note.includes("xác nhận vị trí cụ thể"));
   assert.equal(preview.address, "Đại học FPT, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng");
   const shortPreview = await AgentAddressService.preview(userId, agentAddressSchema.parse({ fullAddress: "FPT", ward: "Ngũ Hành Sơn", province: "Đà Nẵng" }));
   assert.equal(shortPreview.address, "FPT, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng");
@@ -170,7 +212,7 @@ async function run() {
 
   // Tích hợp: địa chỉ trong chat được đưa thẳng vào form đặt đơn, chưa tạo đơn hoặc thanh toán.
   require.cache[require.resolve("../configs/payos.config")] = { exports: { payos: {}, payoutPayos: {} } } as NodeModule;
-  const { AgentService } = require("../ai/agent/agent.service") as typeof import("../ai/agent/agent.service");
+  const { AgentService, sessionView } = require("../ai/agent/agent.service") as typeof import("../ai/agent/agent.service");
   const { AgentLoop } = require("../ai/agent/agent-loop.service") as typeof import("../ai/agent/agent-loop.service");
   const { ToolRegistry } = require("../ai/tools/tool-registry") as typeof import("../ai/tools/tool-registry");
   const { createUpdateBookingDraftTool } = require("../ai/tools/implementations/update-booking-draft.tool") as typeof import("../ai/tools/implementations/update-booking-draft.tool");
@@ -193,7 +235,7 @@ async function run() {
   const loop = new AgentLoop({ generate: async () => {
     if (++step === 1) return { type: "TOOL_CALL", tool: "update_booking_draft", arguments: {
       mode: "update", serviceId, quantity: 2, paymentMethod: "wallet", problemDescription: "Máy chảy nước", addressPreference: raw } };
-    if (step === 2) return { type: "TOOL_CALL", tool: "save_booking_address", arguments: { addressText: "Nhà gần bờ sông, Ngũ Hành Sơn, Đà Nẵng" } };
+    if (step === 2) return { type: "TOOL_CALL", tool: "save_booking_address", arguments: { addressText: changedAddress } };
     if (step === 3) return { type: "TOOL_CALL", tool: "save_booking_address", arguments: { addressText: raw, ward: "Phường không tồn tại" } };
     throw Error("Backend phải tự cập nhật địa chỉ và chuẩn bị form đặt đơn, không gọi thêm LLM.");
   } },
@@ -203,6 +245,14 @@ async function run() {
   const firstView = await agent.send({ id: userId, role: "CUSTOMER" }, session.id, input);
   assert.equal(session.pendingAction?.tool, "create_booking"); assert.equal(writes, 1);
   assert.equal((session.pendingAction?.preview as { address: string }).address, "Đại học FPT");
+  const oldSession = structuredClone(session);
+  oldSession.pendingAction!.preview = { title: "Tạo đơn dịch vụ", address: duplicatedLabel, amount: 400000 };
+  const oldView = sessionView(oldSession);
+  assert.equal((oldView.pendingConfirmation!.preview as { address: string }).address, canonicalLabel);
+  assert.equal((oldView.messages.find(message => message.confirmation?.actionId === oldSession.pendingAction!.id)!
+    .confirmation!.preview as { address: string }).address, canonicalLabel);
+  assert.equal((oldSession.pendingAction!.preview as { address: string }).address, duplicatedLabel,
+    "Chuẩn hóa hiển thị không sửa dữ liệu xác nhận đã lưu.");
   assert(!firstView.messages.some((message) => message.confirmation?.tool === "save_booking_address"), "Không hiển thị form lưu địa chỉ riêng.");
   assert(!session.actions.some((action) => action.tool === "save_booking_address"));
   assert.equal(session.bookingDraft?.values.addressId, session.bookingDraft?.draftAddress?.id);
@@ -215,9 +265,9 @@ async function run() {
   assert.equal(step, 1, "Backend nhận diện và tiếp tục đặt dịch vụ, không cần thêm lượt LLM.");
   const previousConfirmation = session.pendingAction!.id;
   const changedView = await agent.send({ id: userId, role: "CUSTOMER" }, session.id,
-    { requestId: randomUUID(), message: "Đổi địa chỉ sang Nhà gần bờ sông, Ngũ Hành Sơn, Đà Nẵng" });
+    { requestId: randomUUID(), message: `Đổi địa chỉ sang ${changedAddress}` });
   assert.equal(writes, 1); assert.equal(session.pendingAction?.tool, "create_booking");
-  assert.equal((session.pendingAction?.preview as { address: string }).address, "Nhà gần bờ sông");
+  assert.equal((session.pendingAction?.preview as { address: string }).address, "134 trần đại nghĩa");
   assert.notEqual(session.pendingAction!.id, previousConfirmation);
   assert.equal(session.actions.find((action) => action.id === previousConfirmation)?.status, "EXPIRED");
   assert(!changedView.messages.some((message) => message.confirmation?.tool === "save_booking_address"));

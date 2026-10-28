@@ -18,6 +18,7 @@ export const selectOrderProviderTool: AgentTool<z.infer<typeof selectionSchema>>
   inputSchema: selectionSchema,
   preview: (context, args) => AgentOrderProviderService.previewSelect(context.user.id, args.orderId, args.providerId),
   execute: (context, args) => AgentOrderProviderService.select(context.user.id, args.orderId, args.providerId, context.confirmedPreview),
+  reconcile: (context, args) => AgentOrderProviderService.reconcileSelection(context.user.id, args.orderId, args.providerId, context.actionCreatedAt),
 };
 export const respondProviderReassignmentTool: AgentTool<z.infer<typeof responseSchema>> = {
   name: "respond_provider_reassignment", roles: ["CUSTOMER"], mutates: true, requiresConfirmation: true,
@@ -25,4 +26,6 @@ export const respondProviderReassignmentTool: AgentTool<z.infer<typeof responseS
   inputSchema: responseSchema,
   preview: (context, args) => AgentOrderProviderService.previewResponse(context.user.id, args.orderId, args.decision),
   execute: (context, args) => AgentOrderProviderService.respond(context.user.id, args.orderId, args.decision, context.confirmedPreview),
+  reconcile: (context, args) => AgentOrderProviderService.reconcileResponse(context.user.id, args.orderId, args.decision,
+    context.confirmedPreview, context.actionCreatedAt),
 };

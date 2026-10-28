@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, Clock } from 'lucide-react';
-import { getEarliestScheduledAt, timeSlots } from './step2Helpers';
+import { getEarliestScheduledAt, isWithinScheduledBookingHours, timeSlots } from './step2Helpers';
 import { BookingTimeWheel } from './BookingTimeWheel';
 
 const hours = timeSlots.map((slot) => slot.slice(0, 2));
@@ -30,7 +30,7 @@ export const Step2TimeSlotFieldset = ({
   const earliest = getEarliestScheduledAt(new Date(currentTimestamp)).getTime();
   const isUnavailable = (slot: string) => {
     const timestamp = new Date(`${selectedDate}T${slot}:00`).getTime();
-    return !Number.isFinite(timestamp) || timestamp < earliest;
+    return !isWithinScheduledBookingHours(slot) || !Number.isFinite(timestamp) || timestamp < earliest;
   };
 
   const firstAvailableMinute = (hour: string) => minutes.find((minute) => !isUnavailable(`${hour}:${minute}`));
@@ -100,7 +100,7 @@ export const Step2TimeSlotFieldset = ({
       {open && (
         <div ref={popupRef} id={`${id}-slots`} role="group" aria-label="Khung giờ thực hiện"
           className={`absolute left-sm z-30 w-64 max-w-[calc(100%_-_16px)] rounded-xl border border-outline-variant bg-surface-container-lowest p-2 shadow-xl ${opensUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
-          <p className="text-center text-xs text-on-surface-variant">Giờ 08–21 · Phút 00–59</p>
+          <p className="text-center text-xs text-on-surface-variant">Giờ hẹn từ 08:00 đến 21:00</p>
           <div className="my-3 grid grid-cols-2 gap-3">
             <BookingTimeWheel label="Giờ" values={hours} value={pendingHour}
               isUnavailable={(hour) => firstAvailableMinute(hour) === undefined}
