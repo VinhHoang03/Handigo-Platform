@@ -37,7 +37,7 @@ async function run() {
     isActive: true, requiresOptionSelection: false });
   const address = { _id: new Types.ObjectId(), userId: user.id,
     fullAddress: "Đường Nguyễn Tạo, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng",
-    ward: "Phường Ngũ Hành Sơn", province: "Thành phố Đà Nẵng", updatedAt: new Date() };
+    ward: "Phường Ngũ Hành Sơn", province: "Thành phố Đà Nẵng", updatedAt: new Date(), placeId: undefined as string | undefined };
   const voucher = new Voucher({ code: "GIAM30", name: "Giảm 30.000đ", discountType: "AMOUNT", discountValue: 30000,
     startAt: new Date(Date.now() - 1000), endAt: new Date(Date.now() + 100000), createdAt: new Date() });
   const automatic = new Promotion({ name: "Ưu đãi tự động", applicationMode: "automatic", discountType: "AMOUNT",
@@ -71,12 +71,25 @@ async function run() {
     const publicPreview = await AgentBookingService.preview(user.id, args);
     assert.equal(publicPreview.address, address.fullAddress, "Bản xác nhận không ghép lặp phường/thành phố đã có trong địa chỉ đầy đủ.");
     const fullAddress = address.fullAddress;
+    address.fullAddress = "134 trần đại nghĩa phường ngũ hành sơn đà nẵng";
+    assert.equal((await AgentBookingService.preview(user.id, args)).address,
+      "134 trần đại nghĩa, Phường Ngũ Hành Sơn, Thành phố Đà Nẵng", "Địa chỉ đã lưu cũng phải được chuẩn hóa khi lên form.");
     address.fullAddress = "Đường Nguyễn Tạo";
     assert.equal((await AgentBookingService.preview(user.id, args)).address, fullAddress, "Địa chỉ chỉ có tên đường vẫn được bổ sung phường và thành phố.");
     address.fullAddress = fullAddress;
     assert.equal(publicPreview.originalAmount, 200000);
     assert.equal(publicPreview.discountAmount, 30000);
     assert.equal(publicPreview.amount, 170000, "Voucher chỉ được trừ một lần.");
+    assert.equal(publicPreview.note, "Sau khi xác nhận đặt dịch vụ, bạn tiếp tục thanh toán trực tuyến.");
+    assert.equal((await AgentBookingService.preview(user.id, { ...args, paymentMethod: "wallet" })).note,
+      "Sau khi xác nhận đặt dịch vụ, số tiền trên sẽ được trừ từ ví Handigo.");
+    assert.equal((await AgentBookingService.preview(user.id, { ...args, paymentMethod: "cash" })).note,
+      "Thanh toán tiền mặt cho thợ sau khi sử dụng dịch vụ.");
+    address.placeId = "agent-area:48:101";
+    const approximate = await AgentBookingService.preview(user.id, args);
+    assert(approximate.note.includes("Thợ sẽ liên hệ bạn để xác nhận vị trí cụ thể trước khi đến."));
+    assert(!approximate.note.includes("sổ địa chỉ"), "Thông tin lưu địa chỉ đã có trường riêng.");
+    address.placeId = undefined;
     voucher.ownerId = new Types.ObjectId(user.id); voucher.applicableOrderType = "fixed_price";
     assert.equal((await AgentBookingService.preview(user.id, args)).amount, 170000, "Mã riêng của đúng khách phải dùng được.");
     voucher.ownerId = new Types.ObjectId();
@@ -85,6 +98,7 @@ async function run() {
     voucher.discountType = "PERCENT"; voucher.discountValue = 10;
     promotionEnabled = true;
     const stacked = await AgentBookingService.preview(user.id, args);
+    assert(stacked.note.includes("Đã áp dụng ưu đãi: Ưu đãi tự động."));
     assert.equal(stacked.originalAmount, 180000);
     assert.equal(stacked.discountAmount, 18000);
     assert.equal(stacked.amount, 162000, "Tính phần trăm trên giá sau ưu đãi tự động.");
@@ -99,6 +113,8 @@ async function run() {
     voucher.applicableOrderType = "variable_price"; voucher.discountValue = 100; voucher.maxDiscountAmount = 30000;
     const capped = await AgentBookingService.preview(user.id, args);
     assert.equal(capped.discountAmount, 30000); assert.equal(capped.amount, 10000);
+    assert(capped.note.includes("tiền cọc"));
+    assert(!capped.note.includes("số lượng"));
     service.depositAmount = 20000;
     const free = await AgentBookingService.preview(user.id, args);
     assert.equal(free.amount, 0); assert.equal(free.discountAmount, 20000);

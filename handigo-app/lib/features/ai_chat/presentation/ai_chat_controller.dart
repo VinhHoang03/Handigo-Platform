@@ -63,6 +63,21 @@ class AiChatController extends ChangeNotifier {
       (session?['messages'] as List? ?? []).cast<Map<String, dynamic>>();
   Map<String, dynamic>? get confirmation =>
       session?['pendingConfirmation'] as Map<String, dynamic>?;
+  Map<String, dynamic>? get bookingPolicies {
+    final action = confirmation;
+    if (action?['tool'] != 'create_booking') return null;
+    final preview = action?['preview'] as Map?;
+    final version = preview?['policyVersion'];
+    final policies = preview?['bookingPolicies'];
+    if (version is! String ||
+        !RegExp(r'^[a-f\d]{64}$').hasMatch(version) ||
+        policies is! Map ||
+        policies['version'] != version) {
+      return null;
+    }
+    return Map<String, dynamic>.from(policies);
+  }
+
   Map<String, dynamic>? get payment =>
       session?['payment'] as Map<String, dynamic>?;
   bool get needsReconciliation => session?['requiresReconciliation'] == true;
@@ -148,18 +163,24 @@ class AiChatController extends ChangeNotifier {
     await _submit();
   }
 
-  Future<void> decide(String decision) async {
+  Future<void> decide(String decision, {bool policyAccepted = false}) async {
     if (!canSend ||
         confirmation == null ||
         !['CONFIRM', 'REJECT'].contains(decision)) {
       return;
     }
+    final needsConsent =
+        decision == 'CONFIRM' && confirmation!['tool'] == 'create_booking';
+    final policies = bookingPolicies;
+    if (needsConsent && (!policyAccepted || policies == null)) return;
     _pendingRequest = {
       'sessionId': _sessionId,
       'requestId': _newId(),
       'confirmation': {
         'actionId': confirmation!['actionId'],
         'decision': decision,
+        if (needsConsent)
+          'policyConsent': {'accepted': true, 'version': policies!['version']},
       },
     };
     await _submit();

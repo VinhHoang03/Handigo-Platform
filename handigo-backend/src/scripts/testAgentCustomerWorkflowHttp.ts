@@ -10,6 +10,7 @@ import type { SessionEngine } from "../ai/session/session.service";
 import { AppError } from "../utils/appError";
 import { FixtureActionLedger } from "./fixtures/action-ledger.fixture";
 import { AGENT_HTTP_TIMEOUT_MS } from "../ai/agent/runtime-limits";
+import { actionIdentity } from "../ai/runtime/action-ledger";
 
 async function run() {
   require.cache[require.resolve("../configs/payos.config")] = { exports: { payos: {}, payoutPayos: {} } } as NodeModule;
@@ -75,7 +76,8 @@ async function run() {
     execute: async (_context, args) => { writes++; assert.deepEqual(args.customerAttachments, [image]); return { id: "fixture-http", statusLabel: "Mới tiếp nhận" }; },
     reply: () => ({ state: "COMPLETED", message: "Đã gửi hỗ trợ fixture." }),
   });
-  const runtime = new CustomerWorkflowRuntime({ access, ledger: new FixtureActionLedger(), checkpointer: saver, registry,
+  const ledger = new FixtureActionLedger();
+  const runtime = new CustomerWorkflowRuntime({ access, ledger, checkpointer: saver, registry,
     assertWriteAccess: async () => {}, mergeMessages: async (session) => session,
     config: { maxIterations: 3, timeoutMs: 2000, systemPrompt: "Kiểm thử HTTP." },
     provider: { generate: async () => {
@@ -92,6 +94,7 @@ async function run() {
       return data ? structuredClone(data.session) : newSession(id, owner);
     },
     send: runtime.send.bind(runtime), requireAttachmentSupport: runtime.requireAttachmentSupport.bind(runtime), registerAttachment: runtime.registerAttachment.bind(runtime),
+    hasActionRecord: runtime.hasActionRecord.bind(runtime),
   }));
   mock.method(upload, "uploadOrderAttachmentImage", (_req: express.Request, res: express.Response, next: express.NextFunction) => {
     uploads++; res.locals.imageUrl = image; next();
@@ -131,8 +134,7 @@ async function run() {
     assert.equal(writes, 0); assert.equal(rows.get(id)?.engine, "langgraph-customer");
     assert.equal((await request(`/sessions/${id}/attachments`, "POST")).status, 409); assert.equal(uploads, 1);
     assert.equal((await request(`/sessions/${id}`, "GET", undefined, token(otherId))).status, 404);
-    assert.equal((await request(`/sessions/${id}`, "DELETE")).status, 409);
-    assert.equal((await request("/sessions/reset", "POST", { sessionId: id })).status, 409);
+    assert.equal((await request("/sessions/reset", "POST", { sessionId: id })).status, 200);
     assert.equal((await request("/messages", "POST", { ...message, engine: "legacy" })).status, 400);
     const confirmation = { sessionId: id, requestId: randomUUID(), confirmation: { actionId: preview.data.pendingConfirmation.actionId, decision: "CONFIRM" } };
     const confirmed = await request("/messages", "POST", confirmation); assert.equal(confirmed.status, 200);
@@ -158,10 +160,10 @@ async function run() {
     const paused = (await waiting.json()).data;
     assert.equal(paused.state, "FAILED");
     assert.deepEqual(paused.interruptedRequest, { requestId: retryInput.requestId, message: retryInput.message });
-    assert.equal((await request(`/sessions/${retryId}`, "DELETE")).status, 409);
-    assert.equal((await request("/sessions/reset", "POST", { sessionId: retryId })).status, 409);
-    assert.equal((await request(`/sessions/${retryId}/attachments`, "POST")).status, 409);
-    assert.equal((await request("/messages", "POST", { ...retryInput, requestId: randomUUID() })).status, 409);
+    assert.equal((await request(`/sessions/${retryId}`, "DELETE", undefined, token(otherId))).status, 404);
+    assert.equal((await request("/sessions/reset", "POST", { sessionId: retryId })).status, 200);
+    assert.equal((await request(`/sessions/${retryId}/attachments`, "POST")).status, 200);
+    assert.equal((await request("/messages", "POST", { ...retryInput, message: "Nội dung khác dùng trùng mã." })).status, 409);
     const waitingGet = await request(`/sessions/${retryId}`);
     assert.deepEqual((await waitingGet.json()).data.interruptedRequest, paused.interruptedRequest);
     retryMode = "done";
@@ -170,7 +172,28 @@ async function run() {
     const resumedView = (await resumed.json()).data;
     assert.equal(resumedView.interruptedRequest, null);
     assert.equal(resumedView.state, "COMPLETED");
-    assert.equal(writes, 1); assert.equal(uploads, 1);
+    assert.equal(writes, 1); assert.equal(uploads, 2);
+    retryMode = "none";
+    const discardId = randomUUID();
+    const discardView = (await (await request("/messages", "POST", { sessionId: discardId, requestId: randomUUID(), message: "Soạn yêu cầu rồi bỏ." })).json()).data;
+    assert.ok(discardView.pendingConfirmation);
+    assert.equal((await request(`/sessions/${discardId}`, "DELETE")).status, 200);
+    assert.equal((await request("/messages", "POST", { sessionId: discardId, requestId: randomUUID(), confirmation: {
+      actionId: discardView.pendingConfirmation.actionId, decision: "CONFIRM" } })).status, 404);
+    assert.equal(writes, 1, "Xác nhận từ phiên đã xóa không thực hiện service.");
+    const unknownId = randomUUID();
+    await request("/messages", "POST", { sessionId: unknownId, requestId: randomUUID(), message: "Kiểm thử ledger chưa đồng bộ." });
+    const stale = (await buildCustomerSessionGraph(saver).getState({ configurable: { thread_id: threads.get(unknownId)! } })).values.data.session as AgentSession;
+    await ledger.reserve(actionIdentity(userId, unknownId, "customer-care", stale.pendingAction!));
+    assert.equal((await request(`/sessions/${unknownId}`, "DELETE")).status, 409, "Ledger đã nhận thao tác dù checkpoint còn chờ xác nhận.");
+    assert.equal((await request("/sessions/reset", "POST", { sessionId: unknownId })).status, 200);
+    assert.equal((await request(`/sessions/${unknownId}`)).status, 200, "Tạo phiên mới giữ phiên đối soát cũ.");
+    const failedId = randomUUID();
+    retryMode = "timeout";
+    assert.equal((await request("/messages", "POST", { sessionId: failedId, requestId: randomUUID(), message: "Tra cứu để kiểm thử xóa sau lỗi AI." })).status, 200);
+    assert.equal((await request(`/sessions/${failedId}`, "DELETE")).status, 200);
+    assert.equal((await request(`/sessions/${failedId}`)).status, 404);
+    assert.equal(writes, 1, "Xóa cuộc trò chuyện lỗi AI không thực hiện thao tác nghiệp vụ.");
     console.log("Đạt HTTP engine nghiệp vụ: JWT thật bằng khóa test, role từ user fixture, router/controller/façade/runtime thật, upload, xác nhận, replay và lifecycle; model/database/service giả lập.");
   } finally {
     server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve())); mock.restoreAll();

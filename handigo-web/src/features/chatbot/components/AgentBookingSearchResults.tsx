@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, MapPin, Search, UserRound } from "lucide-react";
+import { ArrowUpRight, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, MapPin, Search, UserRound } from "lucide-react";
 import type { AgentBookingSearch } from "../types/agent.types";
 import { agentDisplayText } from "../utils/agentDisplayText";
 import { composeFullAddress } from "@/features/profile/utils/addressLineParsing.utils";
@@ -36,6 +36,10 @@ export function AgentBookingSearchResults({ result, disabled, paginationDisabled
     </div> : items.map((item) => {
       const canRebook = !previousProviders && Boolean(item.serviceId) && ["completed", "cancelled"].includes(item.status);
       const canKeepProvider = item.status === "completed" && Boolean(item.providerId);
+      const canChooseProvider = previousProviders && Boolean(item.providerId && item.serviceId);
+      const canReadQuotation = !previousProviders && (item.serviceType === "variable_price" || item.hasQuotation);
+      const canReadRefund = !previousProviders && (item.status === "cancelled" || item.paymentStatus === "refunded");
+      const detailLink = <Link to={`/customer/bookings/${item.orderId}`} className={`${buttonClass} flex items-center justify-center gap-1`}>Chi tiết đơn<ArrowUpRight size={13} aria-hidden="true" /></Link>;
       const address = item.address ? composeFullAddress(item.address.fullAddress, item.address.ward, item.address.province) : "Địa chỉ không còn khả dụng";
       return <article key={item.orderId} aria-label={`Đơn ${item.orderCode}`} className="min-w-0 overflow-hidden rounded-2xl border border-outline-variant/45 bg-surface-container-lowest p-4 shadow-[0_2px_8px_-4px_rgba(19,27,46,0.1)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -50,15 +54,21 @@ export function AgentBookingSearchResults({ result, disabled, paginationDisabled
           {!previousProviders && item.provider && <p className="flex gap-2"><UserRound size={14} aria-hidden="true" className="mt-0.5 shrink-0" /><span>{agentDisplayText(item.provider)}</span></p>}
           <p>{paymentLabels[item.paymentStatus]}</p>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Link to={`/customer/bookings/${item.orderId}`} className={`${buttonClass} flex items-center justify-center gap-1`}>Chi tiết đơn<ArrowUpRight size={13} aria-hidden="true" /></Link>
-          {previousProviders && item.providerId && item.serviceId && <button type="button" className={buttonClass} disabled={disabled} onClick={() => {
+        <div className="mt-3 grid grid-cols-2 items-start gap-2">
+          {!canChooseProvider && !canRebook && detailLink}
+          {canChooseProvider && <button type="button" className={buttonClass} disabled={disabled} onClick={() => {
             void onSend(`Chọn thợ từ đơn ${item.orderId} (${item.orderCode}).`).catch(() => undefined);
           }}>Chọn thợ này</button>}
           {canRebook && <button type="button" className={buttonClass} disabled={disabled} aria-expanded={canKeepProvider ? rebookId === item.orderId : undefined}
             onClick={() => canKeepProvider ? setRebookId(rebookId === item.orderId ? null : item.orderId) : send("Đặt lại", item)}>Đặt lại</button>}
-          {!previousProviders && (item.serviceType === "variable_price" || item.hasQuotation) && <button type="button" className={buttonClass} disabled={disabled} onClick={() => send("Xem báo giá", item)}>Xem báo giá</button>}
-          {!previousProviders && (item.status === "cancelled" || item.paymentStatus === "refunded") && <button type="button" className={buttonClass} disabled={disabled} onClick={() => send("Tra hoàn tiền", item)}>Tra hoàn tiền</button>}
+          {(canChooseProvider || canRebook || canReadQuotation || canReadRefund) && <details className="group min-w-0">
+            <summary className={`${buttonClass} flex cursor-pointer list-none items-center justify-center gap-2 [&::-webkit-details-marker]:hidden`}>Tùy chọn<ChevronDown size={14} aria-hidden="true" className="group-open:rotate-180" /></summary>
+            <div className="mt-2 grid gap-2">
+              {(canChooseProvider || canRebook) && detailLink}
+              {canReadQuotation && <button type="button" className={buttonClass} disabled={disabled} onClick={() => send("Xem báo giá", item)}>Xem báo giá</button>}
+              {canReadRefund && <button type="button" className={buttonClass} disabled={disabled} onClick={() => send("Tra hoàn tiền", item)}>Tra hoàn tiền</button>}
+            </div>
+          </details>}
         </div>
         {canRebook && canKeepProvider && rebookId === item.orderId && <div className="mt-3 rounded-xl bg-surface-container-low p-3">
           <p className="mb-2 text-xs leading-5 text-on-surface-variant">Bạn muốn giữ thợ cũ cho lần đặt lại? Hệ thống sẽ kiểm tra khả dụng sau khi bạn chọn lịch mới.</p>

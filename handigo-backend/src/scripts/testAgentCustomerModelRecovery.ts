@@ -50,10 +50,9 @@ async function run() {
       assert.deepEqual(sessionView(paused).interruptedRequest, input);
       const countAtPause = calls;
       await assert.rejects(runtime().send(user, id, { ...input, message: "Nội dung khác." }));
-      await assert.rejects(runtime().send(user, id, { ...input, requestId: randomUUID() }));
       await assert.rejects(runtime().send({ ...user, id: "9".repeat(24) }, id, input));
       await assert.rejects(runtime().send({ ...user, role: "PROVIDER" }, id, input));
-      await assert.rejects(runtime().registerAttachment(user, id, "https://example.invalid/anh.jpg"));
+      await runtime().registerAttachment(user, id, "https://example.invalid/anh.jpg");
       assert.equal(calls, countAtPause);
       fail = false;
       const done = await runtime().send(user, id, input);
@@ -65,6 +64,29 @@ async function run() {
       assert.equal(calls, countAtPause + 1);
       assert.equal(ledger.records.size, 0);
     }
+  }
+  // Sau 503, khách được đổi yêu cầu; replay lượt cũ không gọi lại model hoặc sửa bản nháp.
+  {
+    const access = new InProcessGraphPilotAccess(), saver = new MemorySaver();
+    let fail = true, calls = 0;
+    const runtime = () => new CustomerWorkflowRuntime({ registry: new ToolRegistry(), ledger: new FixtureActionLedger(), access,
+      checkpointer: saver, assertWriteAccess: async () => {}, mergeMessages: async (session) => session,
+      config: { maxIterations: 4, timeoutMs: 1000, systemPrompt: "Kiểm thử thay yêu cầu sau 503." },
+      provider: { generate: async (request) => {
+        calls++;
+        if (fail) throw new ProviderHttpError(503);
+        assert.equal(request.conversation.filter((message) => message.role === "user").slice(-1)[0]?.content, "Tôi muốn tìm dịch vụ khác.");
+        return { type: "FINAL" as const, message: "Đã xử lý yêu cầu mới." };
+      } } });
+    const id = randomUUID(), old = { requestId: randomUUID(), message: "Yêu cầu cũ." };
+    await runtime().send(user, id, old);
+    fail = false;
+    const done = await runtime().send(user, id, { requestId: randomUUID(), message: "Tôi muốn tìm dịch vụ khác." });
+    assert.equal(done.activeRequest, null);
+    assert.equal(done.receipts.length, 2);
+    assert.equal(done.conversation.filter((message) => message.role === "user").length, 2);
+    await runtime().send(user, id, old);
+    assert.equal(calls, 2, "Replay lượt đã được thay thế không thực hiện lại ý định cũ.");
   }
   for (const crash of ["before", "after"] as const) {
     const saver = new PauseCrashSaver(), access = new InProcessGraphPilotAccess();
@@ -144,6 +166,8 @@ async function run() {
     const paused = await runtime().send(user, id, confirm);
     assert.equal(writes, 1); assert.deepEqual(sessionView(paused).interruptedRequest, confirm);
     assert.equal(paused.modelWorkflow?.waitingForModelRetry, true);
+    await assert.rejects(runtime().send(user, id, { requestId: randomUUID(), message: "Đổi yêu cầu sau xác nhận." }));
+    await assert.rejects(runtime().registerAttachment(user, id, "https://example.invalid/anh.jpg"));
     const done = await runtime().send(user, id, confirm);
     assert.equal(writes, 1); assert.equal(calls, 3); assert.equal(done.activeRequest, null);
     assert.equal(done.actions.filter((item) => item.status === "SUCCEEDED").length, 1);

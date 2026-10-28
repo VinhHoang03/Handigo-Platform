@@ -16,10 +16,11 @@ import 'package:handigo_app/features/ai_chat/presentation/ai_chat_sheet.dart';
 
 class _Repository extends AiChatRepository {
   _Repository(super.api);
+  Map<String, dynamic>? initialSession;
   bool failSend = false, failHistory = false, pauseSend = false;
   final requests = <Map<String, dynamic>>[];
   @override
-  Future<Map<String, dynamic>?> latest() async => null;
+  Future<Map<String, dynamic>?> latest() async => initialSession;
   @override
   Future<Map<String, dynamic>> send(Map<String, dynamic> request) async {
     requests.add(request);
@@ -38,7 +39,10 @@ class _Repository extends AiChatRepository {
         },
         'messages': [
           {'sender': 'user', 'content': request['message']},
-          {'sender': 'assistant', 'content': 'Trợ lý phản hồi chậm. Chọn Thử lại.'},
+          {
+            'sender': 'assistant',
+            'content': 'Trợ lý phản hồi chậm. Chọn Thử lại.',
+          },
         ],
       };
     }
@@ -106,6 +110,126 @@ Future<void> _show(WidgetTester tester, _Repository repository) async {
 }
 
 void main() {
+  Map<String, dynamic> bookingSession() => {
+    'sessionId': 'phien-xac-nhan',
+    'messages': <Map<String, dynamic>>[
+      {'sender': 'assistant', 'content': 'Kiểm tra thông tin đặt đơn.'},
+    ],
+    'pendingConfirmation': {
+      'actionId': 'xac-nhan-dat-don',
+      'tool': 'create_booking',
+      'preview': <String, dynamic>{
+        'title': 'Tạo đơn dịch vụ',
+        'policyVersion': 'a' * 64,
+        'bookingPolicies': {'version': 'a' * 64, 'paymentHoldMinutes': 15},
+      },
+    },
+  };
+
+  test('Không gửi xác nhận đặt đơn khi chưa đồng ý chính sách', () async {
+    final repository = _repository()..initialSession = bookingSession();
+    final controller = AiChatController(repository);
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+    await controller.decide('CONFIRM');
+    expect(repository.requests, isEmpty);
+    await controller.decide('REJECT');
+    expect(repository.requests.single['confirmation'], {
+      'actionId': 'xac-nhan-dat-don',
+      'decision': 'REJECT',
+    });
+  });
+
+  test('Chặn chính sách thiếu hoặc sai phiên bản dù đã chọn đồng ý', () async {
+    for (final policies in [
+      null,
+      {'version': 'b' * 64},
+    ]) {
+      final initial = bookingSession();
+      final preview = (initial['pendingConfirmation'] as Map)['preview'] as Map;
+      preview['bookingPolicies'] = policies;
+      final repository = _repository()..initialSession = initial;
+      final controller = AiChatController(repository);
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      await controller.decide('CONFIRM', policyAccepted: true);
+      expect(repository.requests, isEmpty);
+      expect(controller.bookingPolicies, isNull);
+    }
+  });
+
+  testWidgets('Bản xác nhận mới cần đồng ý lại, thao tác khác không cần', (
+    tester,
+  ) async {
+    final repository = _repository()..initialSession = bookingSession();
+    await _show(tester, repository);
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    final controller = ProviderScope.containerOf(
+      tester.element(find.byType(AiChatSheet)),
+    ).read(aiChatControllerProvider);
+    repository.initialSession = bookingSession();
+    (repository.initialSession!['pendingConfirmation'] as Map)['actionId'] =
+        'xac-nhan-moi';
+    await controller.load();
+    await tester.pumpAndSettle();
+    expect(tester.widget<Checkbox>(find.byType(Checkbox)).value, isFalse);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Xác nhận'))
+          .onPressed,
+      isNull,
+    );
+    (repository.initialSession!['pendingConfirmation'] as Map)['tool'] =
+        'submit_booking_feedback';
+    final preview =
+        (repository.initialSession!['pendingConfirmation'] as Map)['preview']
+            as Map;
+    preview['rating'] = 4.5;
+    await controller.load();
+    await tester.pumpAndSettle();
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('Số sao: 4,5'), findsOneWidget);
+    await controller.decide('CONFIRM');
+    expect(repository.requests.single['confirmation'], {
+      'actionId': 'xac-nhan-moi',
+      'decision': 'CONFIRM',
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Đặt đơn cần đồng ý chính sách trên đúng form xác nhận', (
+    tester,
+  ) async {
+    final repository = _repository()..initialSession = bookingSession();
+    await _show(tester, repository);
+    final confirm = find.widgetWithText(FilledButton, 'Xác nhận');
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+    await tester.ensureVisible(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+    repository.failSend = true;
+    await tester.ensureVisible(confirm);
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(repository.requests.single['confirmation'], {
+      'actionId': 'xac-nhan-dat-don',
+      'decision': 'CONFIRM',
+      'policyConsent': {'accepted': true, 'version': 'a' * 64},
+    });
+    await tester.ensureVisible(find.text('Thử lại'));
+    await tester.tap(find.text('Thử lại'));
+    await tester.pumpAndSettle();
+    expect(repository.requests, hasLength(2));
+    expect(repository.requests.last, repository.requests.first);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Nút tác vụ ở tiêu đề, nút nhập chỉ xuống hàng khi focus và giữ nội dung',
     (tester) async {

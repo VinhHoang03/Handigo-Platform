@@ -55,7 +55,7 @@ Tài liệu đối chiếu với bản nháp, công cụ voucher, địa chỉ v
 | “Đặt cho mẹ” | Xác định địa chỉ, người nhận và điện thoại; không sửa hồ sơ của khách. |
 | “Đổi số điện thoại người nhận lần này” | Nêu rõ công cụ hiện sửa bản ghi trong sổ; không hứa thay tạm cho một lần. |
 | “Dùng địa chỉ khác” | Chọn/thêm địa chỉ mới; không sửa đè địa chỉ cũ nếu khách chưa yêu cầu. |
-| “Đừng lưu địa chỉ mới” | Giải thích luồng đặt hiện cần địa chỉ lưu; không tự lưu trái ý khách. |
+| “Đừng lưu địa chỉ mới” | Gửi `saveAddressToBook: false` vào bản nháp; địa chỉ chỉ gắn với đơn, không thêm vào sổ. Giữ lựa chọn qua các lần sửa; chỉ bật lưu lại khi khách yêu cầu. |
 | “Đặt tại vị trí hiện tại” hoặc gửi ảnh địa chỉ | Không tự lấy vị trí hoặc suy ra tọa độ từ ảnh; hướng dẫn chọn/ghim trong Hồ sơ. |
 | Khách nhập tên trường/tòa nhà hoặc chỉ phường/xã, tỉnh/thành phố | Gửi `addressText` cho `save_booking_address`; hệ thống tự xác thực khu vực, không yêu cầu số nhà/tên đường. Địa chỉ mới chỉ được giữ tạm cho bản nháp, chỉ hiện form xác nhận đơn hàng có địa chỉ mới. Lưu địa chỉ và đơn trong cùng giao dịch sau xác nhận; lỗi hoặc từ chối đặt thì không lưu địa chỉ mới. |
 | Đổi địa chỉ khi đang có form đặt đơn | Vô hiệu form cũ, giữ dịch vụ/số lượng/lịch/thanh toán/voucher/yêu cầu thợ; kiểm tra lại rồi gửi form đặt đơn mới. Không có bước xác nhận lưu địa chỉ riêng. |

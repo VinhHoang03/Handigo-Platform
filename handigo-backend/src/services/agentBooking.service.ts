@@ -266,12 +266,12 @@ export const AgentBookingService = {
     const quantityPrice = price.options.length === 1 && price.options[0].optionId === null
       ? price.options[0] : undefined;
     const paymentNote = snapshot.discountedAmount === 0
-      ? "Sau xác nhận, hệ thống ghi nhận khoản thanh toán 0đ; không cần chuyển khoản hoặc trừ tiền ví."
+      ? "Đơn 0đ, không cần chuyển khoản hoặc trừ tiền ví."
       : args.paymentMethod === "bank"
-      ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và liên kết PayOS để bạn chuyển khoản."
+      ? "Sau khi xác nhận đặt dịch vụ, bạn tiếp tục thanh toán trực tuyến."
       : args.paymentMethod === "wallet"
-        ? "Vui lòng kiểm tra thông tin của bạn và xác nhận để thanh toán dịch vụ. Sau xác nhận, hệ thống tạo đơn và trừ số tiền hiển thị ở trên từ ví Handigo."
-        : "Vui lòng kiểm tra thông tin của bạn và xác nhận để tạo đơn dịch vụ. Bạn thanh toán tiền mặt trực tiếp cho nhà cung cấp sau khi sử dụng dịch vụ.";
+        ? "Sau khi xác nhận đặt dịch vụ, số tiền trên sẽ được trừ từ ví Handigo."
+        : "Thanh toán tiền mặt cho thợ sau khi sử dụng dịch vụ.";
     return {
       title: "Tạo đơn dịch vụ", service: price.serviceName,
       ...(quantityPrice ? { unitPrice: quantityPrice.price, quantity: quantityPrice.quantity }
@@ -287,10 +287,9 @@ export const AgentBookingService = {
       voucherCode: args.voucherCode, providerName,
       amount: Math.max(price.amount - discountAmount, 0), currency: price.currency,
       description: args.problemDescription ?? "", customerAttachments: args.customerAttachments ?? [], serviceType: price.serviceType, paymentOnConfirmation,
-      note: [paymentNote, draft?.id === args.addressId ? args.saveAddressToBook === false ? "Địa chỉ mới chỉ dùng cho đơn này, không lưu vào sổ địa chỉ." : "Địa chỉ mới chỉ được lưu vào sổ địa chỉ khi đặt đơn thành công." : "",
+      note: [paymentNote,
         address.placeId?.startsWith(AGENT_AREA_PLACE_PREFIX) ? AGENT_AREA_LOCATION_NOTE : "",
-        price.promotionName ? `Đã áp dụng ưu đãi tự động: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc. Giá sửa chữa sẽ được báo sau khảo sát." : "",
-        quantityPrice ? "Tổng tiền được tính theo đơn giá và số lượng." : ""].filter(Boolean).join(" ")
+        price.promotionName ? `Đã áp dụng ưu đãi: ${price.promotionName}.` : "", price.serviceType === "variable_price" ? "Số tiền trên là tiền cọc; giá sửa chữa được báo sau khảo sát." : ""].filter(Boolean).join(" ")
     };
   },
   async create(userId: string, args: BookingArguments, confirmedExpectation: { amount: number; addressVersion: string; discountAmount?: number }, sessionId?: string, actionId?: string, draft?: DraftBookingAddress) {

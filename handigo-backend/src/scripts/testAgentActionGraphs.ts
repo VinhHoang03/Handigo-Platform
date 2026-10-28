@@ -15,6 +15,7 @@ import type { ToolContext } from "../ai/tools/tool.interface";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { AgentLoop } from "../ai/agent/agent-loop.service";
 import { ActionGraphDispatcher } from "../ai/runtime/action-graph-dispatcher";
+import { AppError } from "../utils/appError";
 
 // Chỉ là kho giả lập cho các ca kiểm thử; không dùng ở runtime phục vụ khách.
 class Ledger implements ActionLedger {
@@ -152,6 +153,66 @@ async function run() {
   const restored = await lostResult.build().invoke({ data: { session: lostResult.session, action: lostResult.action } });
   assert.equal(restored.data.action.status, "SUCCEEDED");
   assert.equal(lostResult.counters.writes, 1);
+
+  // Lịch chỉ giới hạn thao tác mới; kết quả đã ghi vẫn phải đọc/đối soát được sau giờ hẹn.
+  mock.timers.enable({ apis: ["Date"], now: new Date("2030-01-01T02:00:00Z") });
+  try {
+    for (const uncertain of [false, true]) {
+      const timed = fixture();
+      const tool = timed.deps.registry.get("create_booking", timed.deps.context);
+      tool.inputSchema = bookingSchema;
+      timed.action.arguments = { serviceId: "a".repeat(24), addressId: "b".repeat(24),
+        orderType: "scheduled", scheduledAt: "2030-01-01T10:00:00+07:00", paymentMethod: "bank" };
+      if (uncertain) timed.fail("unknown");
+      const before = await timed.build().invoke({ data: { session: timed.session, action: timed.action } });
+      assert.equal(before.data.action.status, uncertain ? "UNKNOWN" : "SUCCEEDED");
+      mock.timers.setTime(new Date("2030-01-02T02:00:00Z").getTime());
+      assert.equal(bookingSchema.safeParse(timed.action.arguments).success, false);
+      const after = await timed.build().invoke({ data: { session: before.data.session, action: timed.action } });
+      assert.equal(after.data.action.status, "SUCCEEDED");
+      assert.equal(after.data.session.requiresReconciliation, false);
+      assert.equal(timed.counters.writes, 1);
+      assert.equal(timed.counters.reads, uncertain ? 1 : 0);
+      const stale = fixture();
+      stale.deps.registry.get("create_booking", stale.deps.context).inputSchema = bookingSchema;
+      stale.action.arguments = timed.action.arguments;
+      await assert.rejects(stale.build().invoke({ data: { session: stale.session, action: stale.action } }));
+      assert.equal(stale.counters.writes, 0, "Lịch đã qua vẫn phải chặn thao tác mới chưa có ledger.");
+      assert.equal(stale.ledger.records.size, 0);
+      mock.timers.setTime(new Date("2030-01-01T02:00:00Z").getTime());
+    }
+  } finally { mock.timers.reset(); }
+
+  // Dữ liệu bị thu hồi sau reserve nhưng trước service ghi không được khóa đối soát vĩnh viễn.
+  for (const source of ["preview", "schema"] as const) {
+    const unavailableBeforeWrite = fixture();
+    const tool = unavailableBeforeWrite.deps.registry.get("create_booking", unavailableBeforeWrite.deps.context);
+    const originalPreview = tool.preview!;
+    tool.preview = async (context, args) => {
+      if (unavailableBeforeWrite.counters.previews === 1) throw new AppError("Dịch vụ đã ngừng hoạt động.", 404);
+      const result = await originalPreview(context, args);
+      if (source === "schema") tool.inputSchema = z.object({ orderId: z.literal("da-thay-doi") });
+      return result;
+    };
+    const stopped = await unavailableBeforeWrite.build().invoke({ data: {
+      session: unavailableBeforeWrite.session, action: unavailableBeforeWrite.action,
+    } });
+    assert.equal(stopped.data.action.status, "EXPIRED", source);
+    assert.equal(stopped.data.session.requiresReconciliation, false, source);
+    assert.equal(unavailableBeforeWrite.counters.writes, 0, source);
+  }
+
+  const invalidResult = fixture();
+  const invalidResultTool = invalidResult.deps.registry.get("create_booking", invalidResult.deps.context);
+  const executeBeforeInvalidResult = invalidResultTool.execute;
+  invalidResultTool.execute = async (context, args) => {
+    await executeBeforeInvalidResult(context, args);
+    return z.object({ result: z.string() }).parse({});
+  };
+  const invalidResultState = await invalidResult.build().invoke({ data: { session: invalidResult.session, action: invalidResult.action } });
+  assert.equal(invalidResultState.data.action.status, "UNKNOWN", "Lỗi sau khi đã gọi service vẫn cần đối soát.");
+  assert.equal(invalidResultState.data.session.requiresReconciliation, true);
+  assert.equal(invalidResult.counters.writes, 1);
 
   for (const mutate of [
     (v: ReturnType<typeof fixture>) => { v.change(); },

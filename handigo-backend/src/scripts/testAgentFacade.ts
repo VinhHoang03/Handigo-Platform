@@ -99,7 +99,7 @@ async function run() {
   assert.equal(item.title, "Nguồn chuẩn từ checkpoint"); assert.equal(item.needsAttention, true);
   assert.equal((await facade.latest(user))?.state, "RUNNING");
   await assert.rejects(facade.delete(user, graphId));
-  await assert.rejects(facade.reset(user, graphId));
+  assert.notEqual((await facade.reset(user, graphId)).id, graphId);
   assert.equal(rows.get(graphId)?.lock, undefined);
   waiting.activeRequest = null; waiting.state = "COMPLETED";
   const reset = await facade.reset(user, graphId);
@@ -135,6 +135,7 @@ async function run() {
   let rollout: "all" | "off" = "all";
   let customerLegacyCalls = 0;
   let customerUnavailable = false;
+  let actionRecorded = false;
   const customerFacade = new AgentFacade(directory, async () => { throw new Error("Không được chuyển phiên nghiệp vụ sang graph chỉ đọc."); },
     async (customer, id) => { customerLegacyCalls++; return sessionView(newSession(id, customer.id)); },
     (customer) => selectNewSessionEngine(customer, { AI_AGENT_CUSTOMER_ROLLOUT: rollout }), async () => ({
@@ -151,6 +152,7 @@ async function run() {
       },
       async requireAttachmentSupport(customer, id) { lookup(id, customer.id); },
       async registerAttachment(customer, id, url) { lookup(id, customer.id); customerAttachments++; return { url }; },
+      async hasActionRecord() { return actionRecorded; },
     }));
   const customerId = randomUUID();
   await customerFacade.send(user, customerId, { requestId: randomUUID(), confirmation: { actionId: randomUUID(), decision: "CONFIRM" } });
@@ -176,13 +178,45 @@ async function run() {
   const customerWaiting = canonical.get(customerId)!;
   customerWaiting.pendingAction = { id: randomUUID(), taskVersion: 0, tool: "create_payment", arguments: {}, preview: {},
     status: "WAITING_CONFIRMATION", createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString() };
-  await assert.rejects(customerFacade.delete(user, customerId));
-  await assert.rejects(customerFacade.reset(user, customerId));
+  assert.notEqual((await customerFacade.reset(user, customerId)).id, customerId);
+  actionRecorded = true;
+  await assert.rejects(customerFacade.delete(user, customerId), /Thao tác xác nhận đã được tiếp nhận/);
+  actionRecorded = false;
   assert.equal((await customerFacade.list(user, 1, 50)).items.find((item) => item.sessionId === customerId)?.needsAttention, true);
   customerWaiting.pendingAction = null;
+  customerWaiting.state = "FAILED";
+  customerWaiting.activeRequest = { requestId: input.requestId, digest: "loi-model", input };
+  customerWaiting.modelWorkflow = { version: "customer-model-v1", requestId: input.requestId, digest: "loi-model",
+    phase: "call_model", iteration: 1, consecutiveProviderErrors: 1, failedCalls: [], waitingForModelRetry: true };
+  // Lỗi model không phải giao dịch chưa rõ kết quả: tạo phiên mới và xóa đều được phép.
+  const afterModelFailure = await customerFacade.reset(user, customerId);
+  assert.notEqual(afterModelFailure.id, customerId);
+  assert.equal(customerWaiting.activeRequest.requestId, input.requestId, "Tạo phiên mới giữ lịch sử để có thể tiếp tục phiên cũ.");
+  customerWaiting.requiresReconciliation = true;
+  await assert.rejects(customerFacade.delete(user, customerId), /Kết quả thao tác trước chưa được xác định/);
+  assert.notEqual((await customerFacade.reset(user, customerId)).id, customerId);
+  customerWaiting.requiresReconciliation = false;
+  const transactionInput = { requestId: input.requestId, confirmation: { actionId: randomUUID(), decision: "CONFIRM" as const } };
+  customerWaiting.activeRequest.input = transactionInput;
+  await assert.rejects(customerFacade.delete(user, customerId), /Lượt trước chưa hoàn tất/);
+  assert.notEqual((await customerFacade.reset(user, customerId)).id, customerId);
+  customerWaiting.activeRequest.input = input;
+  customerWaiting.actions.push({ id: randomUUID(), taskVersion: 0, tool: "create_payment", arguments: {}, preview: {},
+    status: "UNKNOWN", createdAt: new Date().toISOString(), expiresAt: new Date().toISOString() });
+  await assert.rejects(customerFacade.delete(user, customerId), /Kết quả thao tác trước chưa được xác định/);
+  customerWaiting.actions = [];
   await customerFacade.delete(user, customerId);
   assert.equal(rows.get(customerId)?.deleted, true);
   assert.ok(canonical.has(customerId));
+  rollout = "all";
+  const discardId = randomUUID();
+  await customerFacade.send(user, discardId, input);
+  canonical.get(discardId)!.pendingAction = { id: randomUUID(), taskVersion: 0, tool: "create_payment", arguments: {}, preview: {},
+    status: "WAITING_CONFIRMATION", createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString() };
+  await customerFacade.delete(user, discardId);
+  assert.ok(rows.get(discardId)?.deleted, "Được xóa xác nhận chưa thực hiện.");
+  await assert.rejects(customerFacade.send(user, discardId, { requestId: randomUUID(), confirmation: {
+    actionId: canonical.get(discardId)!.pendingAction!.id, decision: "CONFIRM" } }), /Không tìm thấy phiên/);
   console.log("Đạt facade: ghim engine, phiên cũ, rollout, không fallback ghi, ownership, nguồn checkpoint, progress/list/latest/reset, ẩn phiên giữ checkpoint và chặn ảnh trước upload.");
 }
 void run().catch((error: unknown) => { console.error(error); process.exitCode = 1; });

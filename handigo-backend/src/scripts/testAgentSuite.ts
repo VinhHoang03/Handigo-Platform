@@ -5,7 +5,7 @@ import { join } from "node:path";
 // Chỉ chạy bản build và bộ giả lập; đánh giá model thật có lệnh riêng.
 async function run() {
   if (!__filename.endsWith(".js")) throw new Error("Hãy chạy npm run test:agent để build trước khi kiểm thử.");
-  const tests = ["CustomerReadiness", "ModelUsage", "TurnRouting", "ReadRefresh", "CustomerModelRecovery", "CustomerMetrics", "ModelWorkflow", "CustomerWorkflow", "CustomerWorkflowHttp", "CustomerActionMatrix", "ActionGraphs", "AddressResolution", "AuditFixes", "BookingExtras", "BookingHistory", "BookingP1", "BookingRecovery",
+  const tests = ["CustomerReadiness", "ModelUsage", "Context", "TurnRouting", "ReadRefresh", "CustomerModelRecovery", "CustomerMetrics", "ModelWorkflow", "CustomerWorkflow", "CustomerWorkflowHttp", "CustomerActionMatrix", "ActionGraphs", "AddressResolution", "AuditFixes", "BookingExtras", "BookingHistory", "BookingP1", "BookingRecovery",
     "BookingSearchActions", "BookingTracking", "BookingVoucher", "CashPaymentSwitch", "DraftAddress", "EmbeddedPayment",
     "ExecutionSafety", "FlowExtensions", "Facade", "FacadeHttp", "GraphCompatibility", "GraphPersistence", "ReadOnlyGraph", "ModelRecovery", "KnowledgeConversation", "KnowledgePipeline", "KnowledgeRetrieval", "OrderProgress", "OrderProvider", "PaymentCancellation", "WalletRefund",
     "PaymentSwitch", "PaymentSwitchFlow", "PreviousProviders", "Reconciliation", "RepairOptions", "VoucherPricing", "VoucherRequests", "VoucherRuntime"]

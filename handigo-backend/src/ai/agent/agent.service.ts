@@ -15,6 +15,17 @@ import { requireBookingAttachments } from "./booking-attachments";
 import { combineAgentBookingPayment } from "../../services/agentOrderProgress.service";
 import { agentAssignedProviderSchema } from "../../services/agentAssignedProvider.service";
 import { AGENT_REQUEST_TIMEOUT_MS } from "./runtime-limits";
+import { normalizeAgentAddressLabel } from "../../utils/agentAddressFormatting";
+
+function displayPreview(action: PendingAction) {
+  if (!["create_booking", "save_booking_address"].includes(action.tool)
+    || !action.preview || typeof action.preview !== "object" || Array.isArray(action.preview)) return action.preview;
+  const preview = { ...action.preview } as Record<string, unknown>;
+  for (const key of ["address", "previousAddress"]) {
+    if (typeof preview[key] === "string") preview[key] = normalizeAgentAddressLabel(preview[key]);
+  }
+  return preview;
+}
 
 export function sessionView(session: AgentSession) {
   const requiresReconciliation = session.requiresReconciliation
@@ -76,7 +87,7 @@ export function sessionView(session: AgentSession) {
         } } : {}),
         ...(item.customerAttachments?.length ? { customerAttachments: item.customerAttachments } : {}),
         ...(item.choiceGroups?.length ? { choiceGroups: item.choiceGroups } : {}),
-        ...(action ? { confirmation: { actionId: action.id, tool: action.tool, preview: action.preview,
+        ...(action ? { confirmation: { actionId: action.id, tool: action.tool, preview: displayPreview(action),
           expiresAt: action.expiresAt, status: action.status === "WAITING_CONFIRMATION" && Date.parse(action.expiresAt) <= Date.now()
             ? "EXPIRED" as const : action.status,
           ...(booking?.success ? { booking: booking.data } : {}),
@@ -84,7 +95,7 @@ export function sessionView(session: AgentSession) {
       };
     }), pendingConfirmation: session.pendingAction?.status === "WAITING_CONFIRMATION" ? {
       actionId: session.pendingAction.id, tool: session.pendingAction.tool,
-      preview: session.pendingAction.preview, expiresAt: session.pendingAction.expiresAt,
+      preview: displayPreview(session.pendingAction), expiresAt: session.pendingAction.expiresAt,
     } : null, requiresReconciliation,
     interruptedRequest: session.activeRequest?.input ?? null,
     requiresNewSession: !session.pendingAction && !session.activeRequest && sessionStorageFull(session) };

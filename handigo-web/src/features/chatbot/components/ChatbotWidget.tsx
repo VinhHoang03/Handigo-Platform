@@ -33,6 +33,7 @@ export function ChatbotWidget({
   const [messages, setMessages] = useState<ChatbotMessage[]>([]);
   const [error, setError] = useToastFeedback<string>("", "error");
   const [agentSession, setAgentSession] = useState<AgentSession | null>(null);
+  const [canSendNewRequest, setCanSendNewRequest] = useState(false);
   const [paymentAnchor, setPaymentAnchor] = useState<{ key: string; messageId: string } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const userId = useAuthStore((state) => state.user?.id ?? state.user?._id);
@@ -42,6 +43,7 @@ export function ChatbotWidget({
   const liveOrderMessages = useRef(new Map<string, ChatbotMessage>());
   const pendingRequest = useRef<AgentRequest | null>(null);
   const sending = useRef(false);
+  const operationVersion = useRef(0);
   const usesAgent = audience === "CUSTOMER";
   const requiresNewSession = agentSession?.requiresNewSession;
   const canChat = audience === "CUSTOMER" || audience === "PROVIDER";
@@ -83,7 +85,12 @@ export function ChatbotWidget({
     });
     pendingRequest.current = session.interruptedRequest && !session.requiresReconciliation
       ? { ...session.interruptedRequest, sessionId: session.sessionId } : null;
-    if (pendingRequest.current) setError("Lượt trước chưa hoàn tất. Chọn Thử lại để tiếp tục an toàn.");
+    const canReplace = session.state === "FAILED" && Boolean(session.interruptedRequest && "message" in session.interruptedRequest)
+      && !session.requiresReconciliation && !session.pendingConfirmation;
+    setCanSendNewRequest(canReplace);
+    if (pendingRequest.current) setError(canReplace
+      ? "Trợ lý tạm thời chưa thể trả lời. Bạn có thể thử lại hoặc gửi yêu cầu khác."
+      : "Lượt trước chưa hoàn tất. Chọn Thử lại để tiếp tục an toàn.");
     try { sessionStorage.setItem(storageKey, session.sessionId); } catch { /* Vẫn dùng được chat khi trình duyệt chặn lưu trữ. */ }
   };
 
@@ -176,7 +183,10 @@ export function ChatbotWidget({
 
   const sendMessage: AgentSend = async (content, customerAttachments, bookingAction) => {
     if (sending.current || isLoading) return;
+    if (usesAgent && content && canSendNewRequest) pendingRequest.current = null;
+    setCanSendNewRequest(false);
     sending.current = true;
+    const version = ++operationVersion.current;
     const optimisticId = `pending-${crypto.randomUUID()}`;
     if (content && (!usesAgent || !pendingRequest.current)) {
       setMessages((items) => [...items, {
@@ -192,6 +202,7 @@ export function ChatbotWidget({
           ...(bookingAction ? { bookingAction } : {}),
           ...(customerAttachments !== undefined ? { customerAttachments } : {}) };
         const session = await agentApi.send(pendingRequest.current);
+        if (version !== operationVersion.current) return;
         applySession(session);
         return;
       }
@@ -202,6 +213,11 @@ export function ChatbotWidget({
         reply.assistantMessage,
       ]);
     } catch (requestError) {
+      if (version !== operationVersion.current) return;
+      if (usesAgent && isAxiosError(requestError) && [400, 422].includes(requestError.response?.status ?? 0)) {
+        // Đầu vào đã bị từ chối: tải lại phiên để khách sửa thay vì gửi lặp yêu cầu sai.
+        pendingRequest.current = null;
+      }
       setError(
         getErrorMessage(
           requestError,
@@ -213,8 +229,10 @@ export function ChatbotWidget({
       }
       throw requestError;
     } finally {
-      sending.current = false;
-      setIsReplying(false);
+      if (version === operationVersion.current) {
+        sending.current = false;
+        setIsReplying(false);
+      }
     }
   };
 
@@ -252,8 +270,10 @@ export function ChatbotWidget({
   };
 
   const resetSession = async () => {
-    if (sending.current || isLoading || pendingRequest.current || agentSession?.pendingConfirmation || agentSession?.requiresReconciliation) return;
+    if (isLoading || isUploading) return;
+    ++operationVersion.current;
     sending.current = true;
+    setIsReplying(false);
     setIsLoading(true);
     setError("");
     try {
@@ -262,6 +282,8 @@ export function ChatbotWidget({
         liveOrderMessages.current.clear();
         sessionId.current = crypto.randomUUID();
         setMessages([]);
+        pendingRequest.current = null;
+        setCanSendNewRequest(false);
         setPaymentAnchor(null);
         setActivity("");
         setShowHistory(false);
@@ -282,7 +304,7 @@ export function ChatbotWidget({
   };
 
   const selectSession = async (id: string) => {
-    if (sending.current || isLoading || pendingRequest.current) return;
+    if (sending.current || isLoading) return;
     setIsLoading(true);
     setError("");
     try {
@@ -309,6 +331,7 @@ export function ChatbotWidget({
         liveOrderMessages.current.clear();
         sessionId.current = crypto.randomUUID();
         pendingRequest.current = null;
+        setCanSendNewRequest(false);
         setAgentSession(null);
         setMessages([]);
         setActivity("");
@@ -326,12 +349,12 @@ export function ChatbotWidget({
     setWalletResume(null);
   };
   const resumeWalletBooking = async () => {
-    if (!walletResume || sending.current || isLoading || pendingRequest.current) return;
+    if (!walletResume || sending.current || isLoading || pendingRequest.current && !canSendNewRequest) return;
     await sendMessage(walletResumeMessage(walletResume));
     dismissWalletResume();
   };
   const uploadAttachment = async (file: File) => {
-    if (sending.current || pendingRequest.current) throw new Error("Vui lòng hoàn tất lượt xử lý trước khi tải ảnh.");
+    if (sending.current || pendingRequest.current && !canSendNewRequest) throw new Error("Vui lòng hoàn tất lượt xử lý trước khi tải ảnh.");
     sending.current = true;
     setIsUploading(true);
     try { return (await agentApi.uploadAttachment(sessionId.current, file)).url; }
@@ -348,6 +371,7 @@ export function ChatbotWidget({
           isReplying={isReplying || isUploading}
           activity={isUploading ? "Đang tải ảnh hiện trạng" : activity}
           error={error}
+          recoverableError={canSendNewRequest}
           availabilityMessage={requiresNewSession ? "Cuộc trò chuyện đã đạt giới hạn lưu trữ. Bạn vẫn có thể xem lại trong lịch sử và bắt đầu cuộc trò chuyện mới." : availabilityMessage}
           onToggleHistory={usesAgent ? () => setShowHistory((value) => !value) : undefined}
           history={showHistory ? <AgentSessionHistory currentId={agentSession?.sessionId ?? ""}
@@ -372,7 +396,7 @@ export function ChatbotWidget({
             ? paymentAnchor.messageId : undefined}
           onCheckPayment={(orderId) => {
             if (sending.current) return;
-            if (agentSession?.requiresReconciliation) pendingRequest.current = null;
+            if (agentSession?.requiresReconciliation || canSendNewRequest) pendingRequest.current = null;
             pendingRequest.current ??= { sessionId: sessionId.current, requestId: crypto.randomUUID(), paymentStatus: { orderId } };
             void sendMessage("").catch(() => undefined);
           }}
@@ -386,7 +410,7 @@ export function ChatbotWidget({
             void sendMessage(`Hủy QR thanh toán đơn ${orderId}, giao dịch ${paymentId}.`).catch(() => undefined);
           }}
           onDecision={(decision, policyConsent) => void decide(decision, policyConsent)}
-          taskBlocked={agentSession?.requiresReconciliation || (usesAgent && Boolean(error))}
+          taskBlocked={agentSession?.requiresReconciliation || (usesAgent && Boolean(error) && !canSendNewRequest)}
           onNewSession={usesAgent ? () => void resetSession() : undefined}
         />
       )}

@@ -32,6 +32,7 @@ export function getCustomerGraphHost(): Promise<CustomerGraphHost> {
         exclusive: (user, id, run) => opened.access.exclusive(user, id, () => run()),
         get: async (id, userId) => mergeAgentOrderMessages(await opened.get(id, userId)),
         send: (user, id, input) => observeCustomerTurn(() => runtime().send(user, id, input)),
+        hasActionRecord: (session, action) => runtime().hasActionRecord(session, action),
         requireAttachmentSupport: (user, id) => runtime().requireAttachmentSupport(user, id),
         registerAttachment: (user, id, url) => runtime().registerAttachment(user, id, url),
       };

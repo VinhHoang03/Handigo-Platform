@@ -158,8 +158,8 @@ try {
     await writeFile(screenshot, Buffer.from(capture.data, 'base64'));
   }
   if (screenshot) console.log(`Ảnh kiểm tra giao diện: ${screenshot}`);
-  if (modelRecovery) console.log(`Đạt phục hồi model (${viewport}): phản hồi tạm dừng, thử lại cùng yêu cầu, không lặp tin nhắn khách.`);
-  if (newSession) console.log(`Đạt tạo phiên (${viewport}): dấu cộng khi chưa có phiên, gửi tin đầu tiên và đặt lại phiên đã lưu.`);
+  if (modelRecovery) console.log(`Đạt phục hồi model (${viewport}): không khóa ô nhập/lựa chọn, thử lại đúng lượt, đổi yêu cầu với mã mới và không lặp tin nhắn khách.`);
+  if (newSession) console.log(`Đạt tạo phiên (${viewport}): phiên trống, chờ xác nhận/đối soát, chuyển khi AI đang chạy, giữ trạng thái cũ và bỏ qua phản hồi/lỗi muộn.`);
   if (voucherForm) console.log(`Đạt voucher trong form (${viewport}): vị trí, mặc định, phần trăm, chọn/bỏ mã, giá backend, lỗi và khóa form cũ.`);
   if (flowExtensions) console.log(`Đạt mở rộng agent (${viewport}): địa chỉ một lần, thợ thực tế/gọi/chat/bản đồ, thử lại lỗi, đánh giá mới/sửa/từ chối và gửi ảnh hỗ trợ sau đặt đơn.`);
   if (paymentCancellation) console.log(`Đạt hủy QR (${viewport}): xác nhận/từ chối, giữ đơn, lỗi hủy giữ QR, ẩn QR sau xác minh và nhận tiền đồng thời.`);

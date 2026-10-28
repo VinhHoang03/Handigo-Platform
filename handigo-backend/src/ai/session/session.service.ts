@@ -120,7 +120,7 @@ export class SessionService implements SessionStore {
   async delete(id: string, userId: string) {
     const deleted = await SessionModel.findOneAndDelete({
       _id: id, userId, engine: { $in: [null, "legacy"] }, deletedAt: null, lockedUntil: { $lte: new Date() },
-      "data.pendingAction": null, "data.activeRequest": null,
+      $or: [{ "data.pendingAction": null }, { "data.pendingAction.status": "WAITING_CONFIRMATION" }], "data.activeRequest": null,
       "data.requiresReconciliation": { $ne: true },
       "data.actions.status": { $nin: ["UNKNOWN", "EXECUTING"] },
     }).lean();
@@ -135,18 +135,10 @@ export class SessionService implements SessionStore {
   }
 
   async reset(id: string, userId: string, engine: SessionEngine = "legacy") {
-    const { session, lockId } = await this.acquire(id, userId);
-    try {
-      if (session.pendingAction || session.activeRequest || session.requiresReconciliation
-        || session.actions.some((action) => action.status === "UNKNOWN")) {
-        throw new AppError("Vui lòng hoàn tất xác nhận hoặc đối soát thao tác đang chờ trước khi bắt đầu tác vụ mới.", 409);
-      }
-      const next = newSession(randomUUID(), userId);
-      await SessionModel.create({ _id: next.id, userId, data: next, engine });
-      return next;
-    } finally {
-      await this.release(id, lockId);
-    }
+    await this.get(id, userId);
+    const next = newSession(randomUUID(), userId);
+    await SessionModel.create({ _id: next.id, userId, data: next, engine });
+    return next;
   }
 
   async latest(userId: string) {

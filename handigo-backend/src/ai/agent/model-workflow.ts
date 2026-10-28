@@ -114,7 +114,7 @@ export class AgentModelWorkflow {
         break;
       }
       case "compact_context":
-        await compactAgentContext(session, host.provider, AbortSignal.any([context.signal, AbortSignal.timeout(20000)]));
+        compactAgentContext(session, context.signal);
         f.phase = "call_model";
         break;
       case "call_model": await this.callModel(); break;
@@ -236,7 +236,9 @@ export class AgentModelWorkflow {
           f.phase = "call_model";
           delete f.response;
           delete f.selected;
-          f.message = host.reply(session, "FAILED", "Trợ lý đang phản hồi chậm hoặc tạm thời không khả dụng. Chọn Thử lại để tiếp tục yêu cầu.");
+          f.message = host.reply(session, "FAILED", session.activeRequest && "message" in session.activeRequest.input
+            ? "Trợ lý tạm thời chưa thể trả lời. Bạn có thể thử lại hoặc gửi yêu cầu khác."
+            : "Trợ lý tạm thời chưa thể trả lời. Chọn Thử lại để kiểm tra và tiếp tục thao tác trước.");
         }
         return;
       }

@@ -9,6 +9,7 @@ import { AppError } from "../../utils/appError";
 import { ActionPreconditionError } from "../../utils/actionPreconditionError";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { ZodError } from "zod";
 import { actionIdentity, type ActionDomain, type ActionLedger, type ActionRecord } from "../runtime/action-ledger";
 
 export interface ConfirmedActionData {
@@ -59,7 +60,6 @@ export function buildConfirmedActionGraph(domain: ActionDomain, allowedTools: re
       // Quyền đọc/đối soát vẫn kiểm tra registry; cờ readOnly không được dùng để bắt đầu ghi.
       const tool = deps.registry.get(action.tool, { ...getContext(data), readOnly: false });
       if (!tool.mutates || !tool.preview) throw new AppError("Graph chỉ nhận thao tác ghi có bản xem trước.", 409);
-      tool.inputSchema.parse(action.arguments);
       data.record = await deps.ledger.find(identity(data)) ?? undefined;
       if (!data.record) {
         if (deps.context.readOnly || session.requiresReconciliation) throw new AppError("Cần đối soát thao tác trước khi ghi tiếp.", 409);
@@ -95,8 +95,16 @@ export function buildConfirmedActionGraph(domain: ActionDomain, allowedTools: re
         deps.context.signal.throwIfAborted();
         // Kiểm tra lại hạn xác nhận và preview sát lúc ghi, sau khi đã giành slot chống đồng thời.
         data.session.pendingAction = data.action;
-        const args = executor.authorize(data.session, context, tool, data.action.arguments, data.action);
-        if (!(await confirmation.unchanged(tool, context, data.action))) throw new ActionPreconditionError();
+        let args: unknown;
+        try {
+          args = executor.authorize(data.session, context, tool, data.action.arguments, data.action);
+          if (!(await confirmation.unchanged(tool, context, data.action))) throw new ActionPreconditionError();
+        } catch (error) {
+          // Chưa gọi service ghi: lỗi điều kiện tại đây không phải kết quả ghi chưa xác định.
+          if (error instanceof ZodError) throw new ActionPreconditionError("Thông tin chưa hợp lệ. Vui lòng kiểm tra và chọn lại.");
+          if (error instanceof AppError && error.statusCode < 500) throw new ActionPreconditionError(error.message);
+          throw error;
+        }
         await deps.assertWriteAccess();
         const signal = AbortSignal.any([deps.context.signal, AbortSignal.timeout(timeoutMs)]);
         result = await withAgentTimeout(tool.execute({ ...context, signal }, args), signal, timeoutMs);
@@ -122,7 +130,9 @@ export function buildConfirmedActionGraph(domain: ActionDomain, allowedTools: re
       let result: unknown;
       try {
         deps.context.signal.throwIfAborted();
-        result = await withAgentTimeout(reconcile(context, tool.inputSchema.parse(data.action.arguments)), deps.context.signal, timeoutMs);
+        // Ledger đã kiểm tra toàn bộ digest và đầu vào đã được xác thực trước reserve.
+        // Không áp lại điều kiện thời gian của thao tác mới khi chỉ đọc kết quả cũ.
+        result = await withAgentTimeout(reconcile(context, data.action.arguments), deps.context.signal, timeoutMs);
       } catch { return { data }; }
       // Không tìm thấy hoặc nguồn lỗi không chứng minh rằng thao tác chưa ghi.
       if (result !== null && result !== undefined) {

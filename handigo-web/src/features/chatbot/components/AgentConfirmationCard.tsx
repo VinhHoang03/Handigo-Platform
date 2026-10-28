@@ -10,7 +10,7 @@ const labels: Record<string, string> = {
   originalAmount: "Giá trước giảm", discountAmount: "Giảm giá", providerName: "Chuyên gia ưu tiên",
   previousAddress: "Địa chỉ trước khi sửa", recipientName: "Người nhận", recipientPhone: "Số điện thoại người nhận",
   addressNote: "Ghi chú địa chỉ",
-  addressStorage: "Lưu địa chỉ", rating: "Số sao",
+  rating: "Số sao",
   paymentMethod: "Thanh toán", amount: "Số tiền", description: "Mô tả",
   orderCode: "Mã đơn", reason: "Lý do hủy", paidAmount: "Đã thanh toán",
   refundAmount: "Dự kiến hoàn", cancellationFee: "Phí hủy", note: "Lưu ý",
@@ -75,7 +75,7 @@ export function AgentConfirmationCard({ action, disabled, onDecision, readOnly =
     </div>
     <dl className="px-4 py-2">
       {[...Object.entries(labels).filter(([key]) => key !== "amount"
-        && !(action.tool === "create_booking" && (key === "addressStorage" || key === "originalAmount" || key === "discountAmount" && !hasVoucherDiscount))), ["amount", labels.amount]].map(([key, label]) => {
+        && !(action.tool === "create_booking" && (key === "originalAmount" || key === "discountAmount" && !hasVoucherDiscount))), ["amount", labels.amount]].map(([key, label]) => {
         const value = key === "voucherCode" && voucherField ? voucherField : formatValue(key, action.preview[key], action.preview.serviceType);
         return value ? <div key={key} className={key === "amount" ? "my-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-primary/5 px-3 py-3" : "grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-outline-variant/20 py-2.5 last:border-0 sm:grid-cols-[100px_minmax(0,1fr)]"}>
           <dt className={`text-xs leading-5 text-on-surface-variant ${key === "amount" ? "font-medium" : ""}`}>{key === "voucherCode" && action.tool === "create_booking" ? "Mã giảm giá" : key === "amount" && action.preview.serviceType === "variable_price" ? "Tiền đặt cọc" : label}</dt>

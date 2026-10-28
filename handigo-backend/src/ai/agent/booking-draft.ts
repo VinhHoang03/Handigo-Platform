@@ -1,3 +1,4 @@
+import { formatAgentAddress } from "../../utils/agentAddressFormatting";
 import { z } from "zod";
 import { AppError } from "../../utils/appError";
 import { bookingSchema, idSchema } from "../tools/implementations/booking.schemas";
@@ -87,12 +88,7 @@ const normalizeAddress = (text: string) => text.toLocaleLowerCase("vi-VN").norma
   .replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[,.;\s]+/g, " ").trim();
 
 export function bookingAddressLabel<T extends Pick<DraftAddress, "fullAddress" | "ward" | "province">>(address: T) {
-  const parts = [address.fullAddress.trim(), address.ward.trim(), address.province.trim()].filter(Boolean);
-  if (normalizeAddress(address.fullAddress).endsWith(normalizeAddress(`${address.ward}, ${address.province}`))) return address.fullAddress.trim();
-  return parts.reduce<string[]>((result, part) => {
-    if (!normalizeAddress(result.join(", ")).endsWith(normalizeAddress(part))) result.push(part);
-    return result;
-  }, []).join(", ");
+  return formatAgentAddress(address);
 }
 
 export function uniqueBookingAddresses<T extends DraftAddress>(addresses: T[], selectedId?: string): T[] {

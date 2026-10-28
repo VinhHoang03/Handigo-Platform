@@ -5,7 +5,7 @@ import type { RequestUser } from "../../middlewares/authContext";
 import { AppError } from "../../utils/appError";
 import { AgentService } from "../agent/agent.service";
 import { AgentLoop } from "../agent/agent-loop.service";
-import { newSession, type AgentInput, type AgentSession } from "../agent/agent-state";
+import { newSession, type AgentInput, type AgentSession, type PendingAction } from "../agent/agent-state";
 import { AGENT_REQUEST_TIMEOUT_MS } from "../agent/runtime-limits";
 import { agentRequestSchema } from "../ai.validation";
 import type { LLMProvider } from "../llm/llm.interface";
@@ -36,6 +36,10 @@ interface Dependencies {
 
 export class CustomerWorkflowRuntime {
   constructor(private readonly deps: Dependencies) {}
+
+  hasActionRecord(session: AgentSession, action: PendingAction) {
+    return new ActionGraphDispatcher(this.deps.registry, this.deps.ledger, async () => {}).hasRecord(session, action);
+  }
 
   private async withSession<T>(user: RequestUser, id: string,
     run: (session: AgentSession, save: () => Promise<void>, threadId: string) => Promise<T>) {
@@ -85,7 +89,20 @@ export class CustomerWorkflowRuntime {
       }
       if (session.modelWorkflow?.waitingForModelRetry
         && (session.activeRequest?.requestId !== input.requestId || session.activeRequest.digest !== digest)) {
-        throw new AppError("Lượt model đang chờ thử lại. Hãy gửi lại đúng yêu cầu đang gián đoạn.", 409);
+        const previous = session.activeRequest;
+        // Chỉ thay lượt nhập liệu đang chờ model; xác nhận giao dịch vẫn phải phục hồi đúng request.
+        if (!previous || previous.requestId === input.requestId || !("message" in previous.input) || "confirmation" in input
+          || session.requiresReconciliation || session.pendingAction
+          || session.actions.some((action) => ["EXECUTING", "UNKNOWN"].includes(action.status))) {
+          throw new AppError("Lượt trước cần được tiếp tục an toàn. Hãy thử lại đúng yêu cầu đang gián đoạn.", 409);
+        }
+        session.receipts.push({ requestId: previous.requestId, digest: previous.digest,
+          message: "Khách đã chuyển sang yêu cầu mới; không tiếp tục lượt model cũ." });
+        session.activeRequest = null;
+        delete session.modelWorkflow;
+        session.recovery = undefined;
+        new MessageRepository().append(session, "tool", "Khách đã gửi yêu cầu mới thay cho lượt phản hồi bị gián đoạn. Ưu tiên yêu cầu mới nhất; không tự tiếp tục ý định cũ hoặc thực hiện lại thao tác đã hoàn tất.", "agent_protocol");
+        await checkpoint();
       }
       const dispatcher = new ActionGraphDispatcher(this.deps.registry, this.deps.ledger,
         () => this.deps.assertWriteAccess(threadId), this.deps.config.timeoutMs);
@@ -190,7 +207,9 @@ export class CustomerWorkflowRuntime {
   }
 
   private checkAttachment(session: AgentSession) {
-    if (session.requiresReconciliation || session.activeRequest || session.pendingAction && session.pendingAction.tool !== "create_booking") {
+    const waitingForModel = session.modelWorkflow?.waitingForModelRetry && session.activeRequest && "message" in session.activeRequest.input
+      && !session.pendingAction && !session.actions.some((action) => ["EXECUTING", "UNKNOWN"].includes(action.status));
+    if (session.requiresReconciliation || session.activeRequest && !waitingForModel || session.pendingAction && session.pendingAction.tool !== "create_booking") {
       throw new AppError("Vui lòng xử lý yêu cầu đang chờ trước khi tải ảnh.", 409);
     }
     if ((session.uploadedAttachments?.length ?? 0) >= 20) throw new AppError("Cuộc trò chuyện đã đạt giới hạn tải 20 ảnh. Vui lòng bắt đầu tác vụ mới.", 409);

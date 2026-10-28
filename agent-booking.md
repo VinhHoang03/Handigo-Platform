@@ -1,6 +1,8 @@
 ﻿# Agent Booking Handigo — trạng thái triển khai
 
-Cập nhật: **27/10/2026**.
+Cập nhật: **28/10/2026**.
+
+Rà soát nghiệp vụ ngày 28/10: đã sửa phục hồi sau giờ hẹn, phân loại lỗi trước ghi, xác nhận chính sách trên Flutter, hiển thị cách lưu địa chỉ trên web và số sao trên Flutter. Bộ backend đạt 46/46 tệp kiểm thử, web đạt 18/18 lượt trên hai kích thước, Flutter đạt 11/11 ca agent. Xem [báo cáo rà soát và giới hạn kiểm chứng](handigo-backend/docs/agent-booking-audit-2026-10-28.md). Kết quả này dùng nguồn dữ liệu/model/cổng thanh toán giả lập; không thay thế nghiệm thu tích hợp thật ở mục 6.
 
 **Cấu trúc agent mới đã được triển khai và bật cho phiên CUSTOMER mới trong môi trường local.** LangGraph điều phối hội thoại và nghiệp vụ; RAG dùng MongoDB Atlas; Gemini hoạt động với cấu hình hiện có. Kiểm chứng HTTP bằng tài khoản CUSTOMER được chủ dự án chỉ định đã đạt. Chưa nghiệm thu toàn bộ môi trường production: còn kiểm thử giao diện với tài khoản thật, giao dịch trong môi trường thử nghiệm và diễn tập vận hành. Kiểm tra tải để cuối theo yêu cầu.
 

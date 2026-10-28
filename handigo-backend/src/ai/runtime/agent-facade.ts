@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { RequestUser } from "../../middlewares/authContext";
 import { AppError } from "../../utils/appError";
 import { selectNewSessionEngine } from "./customer-rollout.config";
-import { newSession, type AgentInput, type AgentSession } from "../agent/agent-state";
+import { newSession, type AgentInput, type AgentSession, type PendingAction } from "../agent/agent-state";
 import { sessionView } from "../agent/agent.service";
 import type { SessionService, SessionEngine } from "../session/session.service";
 
@@ -12,6 +12,7 @@ export interface GraphSessionHost {
   get(id: string, userId: string): Promise<AgentSession>;
 }
 export interface CustomerGraphHost extends Omit<GraphSessionHost, "send"> {
+  hasActionRecord(session: AgentSession, action: PendingAction): Promise<boolean>;
   send(user: RequestUser, id: string, input: AgentInput): Promise<AgentSession>;
   requireAttachmentSupport(user: RequestUser, id: string): Promise<void>;
   registerAttachment(user: RequestUser, id: string, url: string): Promise<{ url: string }>;
@@ -114,9 +115,20 @@ export class AgentFacade {
       const graph = await this.host(engine);
       return await graph.exclusive(user, id, async () => {
         const session = await graph.get(id, user.id);
-        if (session.activeRequest || session.pendingAction || session.requiresReconciliation
-          || session.actions.some((item) => ["UNKNOWN", "EXECUTING"].includes(item.status))) {
-          throw new AppError("Vui lòng hoàn tất xác nhận hoặc đối soát trước khi xóa hoặc bắt đầu phiên mới.", 409);
+        const modelPaused = session.state === "FAILED" && session.modelWorkflow?.waitingForModelRetry
+          && session.activeRequest && "message" in session.activeRequest.input
+          && session.modelWorkflow.requestId === session.activeRequest.requestId
+          && session.modelWorkflow.digest === session.activeRequest.digest;
+        if (session.requiresReconciliation || [session.pendingAction, ...session.actions]
+          .some((item) => item && ["UNKNOWN", "EXECUTING"].includes(item.status))) {
+          throw new AppError("Kết quả thao tác trước chưa được xác định. Vui lòng mở cuộc trò chuyện và kiểm tra kết quả trước khi xóa.", 409);
+        }
+        if (session.pendingAction && engine === "langgraph-customer"
+          && await (graph as CustomerGraphHost).hasActionRecord(session, session.pendingAction)) {
+          throw new AppError("Thao tác xác nhận đã được tiếp nhận. Vui lòng kiểm tra kết quả trước khi xóa cuộc trò chuyện.", 409);
+        }
+        if (session.activeRequest && !modelPaused) {
+          throw new AppError("Lượt trước chưa hoàn tất. Vui lòng mở cuộc trò chuyện và tiếp tục yêu cầu trước khi xóa.", 409);
         }
         return action(lockId);
       });
@@ -127,11 +139,10 @@ export class AgentFacade {
     this.customer(user);
     const engine = await this.sessions.resolveEngine(id, user.id);
     if (engine === "legacy") return this.sessions.reset(id, user.id, this.selectEngine(user));
-    return this.manageGraph(user, id, engine, async () => {
-      const next = newSession(randomUUID(), user.id);
-      await this.sessions.resolveEngine(next.id, user.id, this.selectEngine(user));
-      return next;
-    });
+    // Tạo phiên độc lập, giữ nguyên khóa, xác nhận và tiến độ giao dịch của phiên cũ.
+    const next = newSession(randomUUID(), user.id);
+    await this.sessions.resolveEngine(next.id, user.id, this.selectEngine(user));
+    return next;
   }
 
   async requireAttachmentSupport(user: RequestUser, id: string) {

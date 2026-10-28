@@ -49,9 +49,9 @@ export function AgentBookingProviders({ values, anchorRef, disabled, onClose, on
       onClose={() => setViewingId(null)} onSelect={() => void choose(viewing.id, viewing.name)} />;
     return <BookingPickerPopover id="booking-provider-picker" title="Chọn chuyên gia" anchorRef={anchorRef} onClose={onClose} zIndex={180}>
       <p className="mb-3 text-xs text-on-surface-variant">Danh sách theo địa chỉ trong bản nháp; sẽ kiểm tra lại khi xác nhận đặt đơn.</p>
+      <button type="button" disabled={disabled || saving} onClick={() => void choose()} className="mb-2 min-h-11 w-full rounded-xl border border-outline-variant p-3 text-left text-sm disabled:opacity-50">Để hệ thống tự tìm chuyên gia</button>
       {!draftCandidates.length ? <p className="text-sm text-on-surface-variant">Chưa có danh sách thợ phù hợp. Bạn có thể nhắn trợ lý kiểm tra lại thợ cho địa chỉ này.</p>
         : <div className="max-h-[min(50dvh,360px)] space-y-2 overflow-y-auto">
-          <button type="button" disabled={disabled || saving} onClick={() => void choose()} className="min-h-11 w-full rounded-xl border border-outline-variant p-3 text-left text-sm disabled:opacity-50">Để hệ thống tự tìm chuyên gia</button>
           {draftCandidates.map((provider) => <div key={provider.id} className="rounded-xl border border-outline-variant p-3 text-sm">
             <p className="font-semibold">{provider.name}</p>
             <p className="mt-1 text-xs text-on-surface-variant">{[
@@ -71,5 +71,5 @@ export function AgentBookingProviders({ values, anchorRef, disabled, onClose, on
   return <BookingProviderPicker anchorRef={anchorRef} providers={providers} preferredProviderId={values.preferredProviderId}
     initialProviderId={values.preferredProviderId} canSearch={Boolean(values.serviceId && values.addressId)}
     requireSelection={values.orderType === "scheduled"} isLoading={loading || disabled || saving} loadError={error}
-    zIndex={180} showAutoAssignNote={false} onClose={onClose} onConfirm={(id, name) => void choose(id, name)} />;
+    zIndex={180} showAutoAssignNote={false} allowAutoAssignWhenEmpty onClose={onClose} onConfirm={(id, name) => void choose(id, name)} />;
 }
