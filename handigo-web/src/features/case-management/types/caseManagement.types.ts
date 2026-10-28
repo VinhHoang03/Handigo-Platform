@@ -158,6 +158,7 @@ export interface Report {
       callEvents?: Array<{
         phoneNumber: string | null; dateLabel: string | null; time: string | null;
         occurredAt: string | null; resolvedAt: string | null;
+        eligible?: boolean; failures?: string[]; timePrecision?: 'minute' | 'second';
         direction: 'outgoing' | 'incoming' | 'unknown'; outcome: 'no_answer' | 'answered' | 'unknown';
       }>;
       analysis: {

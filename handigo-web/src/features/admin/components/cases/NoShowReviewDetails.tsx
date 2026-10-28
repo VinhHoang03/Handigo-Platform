@@ -28,6 +28,9 @@ function EvidenceAnalysis({ item }: { item: Evidence }) {
               <p><b>Ngày giờ trên ảnh:</b> {[call.dateLabel, call.time].filter(Boolean).join(" · ") || "Chưa xác định"}</p>
               <p><b>Thời điểm quy đổi:</b> {formatDate(call.resolvedAt)}</p>
               <p><b>Kết quả:</b> {outcomeLabels[call.outcome]}</p>
+              {call.eligible !== undefined && <p className={call.eligible ? "text-primary" : "text-error"}><b>Đối chiếu theo quy tắc hiện tại:</b> {call.eligible ? "Cuộc gọi hợp lệ" : "Không được tính"}</p>}
+              {call.failures?.map((reason, reasonIndex) => <p key={reasonIndex} className="text-xs text-error">{reason}</p>)}
+              {call.timePrecision === 'minute' && <p className="text-xs text-on-surface-variant">Ảnh chỉ hiển thị đến phút; cuộc gọi cùng phút bắt đầu chờ được chấp nhận.</p>}
             </div>)}
           </div>
         ) : <>

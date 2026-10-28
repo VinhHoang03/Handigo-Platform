@@ -37,10 +37,10 @@ export function NoShowVerificationSummary({ report }: { report: Report }) {
       <div>
         <h3 className="text-lg font-bold">{title}</h3>
         <p className="mt-2 text-sm leading-6">{message}</p>
-        {verification && <p className="mt-2 text-xs text-on-surface-variant">Xác minh lúc {formatNoShowDate(verification.checkedAt)}</p>}
+        {verification && <p className="mt-2 text-xs text-on-surface-variant">Mốc thời gian đối chiếu: {formatNoShowDate(verification.checkedAt)}</p>}
       </div>
       <div>
-        <p className="mb-3 text-xs font-semibold text-on-surface-variant">Kết quả kiểm tra đã lưu khi gửi báo cáo</p>
+        <p className="mb-3 text-xs font-semibold text-on-surface-variant">Kết quả xác minh đã lưu trên báo cáo</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <CheckCard title="Vị trí" state={state(checks?.location.passed)} text={!checks ? "Chưa lưu chi tiết"
             : `${checks.location.passed ? `Trong ${checks.location.radiusMeters} m` : 'Vị trí chưa hợp lệ'}${distance === null || distance === undefined ? '' : ` · ${distance.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m`}`} />

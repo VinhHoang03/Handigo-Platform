@@ -49,6 +49,8 @@ export const adminCasesApi = {
     unwrap<CaseList<Report>>(await api.get("/admin/reports", { params: query })),
   report: async (id: string) =>
     unwrap<Report>(await api.get(`/admin/reports/${id}`)),
+  reverifyReport: async (id: string) =>
+    unwrap<Report>(await api.post(`/admin/reports/${id}/reverify`)),
   reviewReport: async (
     id: string,
     status: ReportStatus,

@@ -2,6 +2,16 @@ import { Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import * as reportService from "../services/report.service";
 import { sendControllerError } from "../utils/controllerError";
+import { reverifyCustomerNoShowCalls } from "../services/customerNoShowReverification.service";
+
+export const reverifyCustomerNoShow = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    await reverifyCustomerNoShowCalls(user.id, req.params.id as string);
+    const report = await reportService.getAdminReportById(req.params.id as string);
+    return res.json({ success: true, data: report, message: "Đã xác minh lại cuộc gọi và lưu lịch sử kiểm tra." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
 
 export const createReport = async (req: Request, res: Response) => {
   try {

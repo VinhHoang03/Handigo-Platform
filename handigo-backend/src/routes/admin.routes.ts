@@ -95,6 +95,11 @@ router.get(
   validate(reportIdSchema, "params"),
   reportController.getAdminReportById,
 );
+router.post(
+  "/reports/:id/reverify",
+  validate(reportIdSchema, "params"),
+  reportController.reverifyCustomerNoShow,
+);
 router.patch(
   "/reports/:id/review",
   validate(reportIdSchema, "params"),
