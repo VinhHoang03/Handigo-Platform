@@ -15,7 +15,8 @@ export function ChartA11yTable({ caption, columns, rows }: ChartA11yTableProps) 
   if (!rows.length) return null;
 
   return (
-    <table className="sr-only">
+    <div className="sr-only">
+    <table>
       <caption>{caption}</caption>
       <thead>
         <tr>
@@ -34,5 +35,6 @@ export function ChartA11yTable({ caption, columns, rows }: ChartA11yTableProps) 
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

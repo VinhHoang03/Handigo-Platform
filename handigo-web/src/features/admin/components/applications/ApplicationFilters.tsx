@@ -3,20 +3,18 @@ import { FormSelect } from '@/components/common/FormSelect';
 import type { Category } from '@/features/provider-application/types/providerApplication.types';
 import type { AdminQuery } from '../../types/admin.types';
 
-export function ApplicationFilters({
-  query,
-  categories,
-  onChange,
-}: {
+export function ApplicationFilters({ query, categories, onChange }: {
   query: AdminQuery;
   categories: Category[];
   onChange: (query: AdminQuery) => void;
 }) {
   return (
-    <div className="grid gap-3 border-y border-outline-variant/40 py-4 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_12rem_14rem_minmax(12rem,16rem)]">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <FloatingInput
         id="admin-application-keyword"
-        label="Tên hoặc email"
+        type="search"
+        label="Tìm theo tên hoặc email"
+        containerClassName="sm:col-span-2"
         value={query.keyword || ''}
         onValueChange={(value) => onChange({ ...query, keyword: value, page: 1 })}
       />
@@ -39,7 +37,7 @@ export function ApplicationFilters({
         onValueChange={(value) => onChange({ ...query, applicationType: value, page: 1 })}
       >
         <option value="">Tất cả loại đơn</option>
-        <option value="initial">Đăng ký provider</option>
+        <option value="initial">Đăng ký nhà cung cấp</option>
         <option value="service_addition">Bổ sung dịch vụ</option>
       </FormSelect>
       <FormSelect
@@ -50,11 +48,25 @@ export function ApplicationFilters({
       >
         <option value="">Tất cả lĩnh vực</option>
         {categories.map((category) => (
-          <option key={category._id} value={category._id}>
-            {category.name}
-          </option>
+          <option key={category._id} value={category._id}>{category.name}</option>
         ))}
       </FormSelect>
+      <FloatingInput
+        id="admin-application-from-date"
+        type="date"
+        label="Từ ngày tạo"
+        value={query.fromDate || ''}
+        max={query.toDate || undefined}
+        onValueChange={(value) => onChange({ ...query, fromDate: value || undefined, page: 1 })}
+      />
+      <FloatingInput
+        id="admin-application-to-date"
+        type="date"
+        label="Đến ngày tạo"
+        value={query.toDate || ''}
+        min={query.fromDate || undefined}
+        onValueChange={(value) => onChange({ ...query, toDate: value || undefined, page: 1 })}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   Cell,
   ComposedChart,
   Line,
+  LabelList,
   BarChart as RechartsBarChart,
   ResponsiveContainer,
   Tooltip,
@@ -70,6 +71,7 @@ interface BarChartProps {
   singleColor?: boolean;
   /** Nối các đỉnh cột đứng bằng đường cong mềm. */
   connectTops?: boolean;
+  showValues?: boolean;
 }
 
 export function BarChart({
@@ -82,6 +84,7 @@ export function BarChart({
   formatAxisValue,
   singleColor = false,
   connectTops = false,
+  showValues = false,
 }: BarChartProps) {
   const reducedMotion = usePrefersReducedMotion();
   const isHorizontal = orientation === "horizontal";
@@ -111,7 +114,7 @@ export function BarChart({
             data={data}
             barCategoryGap={barCategoryGap}
             layout={isHorizontal ? "vertical" : "horizontal"}
-            margin={{ top: 8, right: 16, bottom: 4, left: isHorizontal ? 8 : 4 }}
+            margin={{ top: showValues ? 26 : 8, right: showValues && isHorizontal ? 76 : 16, bottom: 4, left: isHorizontal ? 8 : 4 }}
           >
             <CartesianGrid
               stroke={chartGridStroke}
@@ -139,6 +142,8 @@ export function BarChart({
               <>
                 <XAxis
                   dataKey="label"
+                  tickFormatter={(value) => truncateLabel(String(value), 15)}
+                  minTickGap={16}
                   tick={{ fontSize: chartAxisStyle.fontSize, fill: chartAxisStyle.fill }}
                   stroke={chartAxisStyle.stroke}
                 />
@@ -163,6 +168,9 @@ export function BarChart({
               {data.map((datum, index) => (
                 <Cell key={datum.label} fill={barColor(datum, index)} />
               ))}
+              {showValues && data.length <= 8 && <LabelList dataKey="value" position={isHorizontal ? "right" : "top"}
+                fontSize={11} fill="var(--color-on-surface-variant)"
+                formatter={(value) => formatAxisValue ? formatAxisValue(Number(value)) : String(value)} />}
             </Bar>
             {showLine && (
               <Line

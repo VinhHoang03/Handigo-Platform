@@ -39,9 +39,9 @@ export function DashboardShell({
   );
   const switchConfig = roleSwitchConfig[role];
   const defaultSwitchLabel =
-    role === "PROVIDER" ? undefined : switchConfig.label;
+    role === "PROVIDER" || role === "ADMIN" ? undefined : switchConfig.label;
   const defaultOnSwitch =
-    role === "PROVIDER" ? undefined : () => navigate(switchConfig.path);
+    role === "PROVIDER" || role === "ADMIN" ? undefined : () => navigate(switchConfig.path);
   const defaultSwitchVariant =
     role === "PROVIDER" ? undefined : switchConfig.variant;
   // Thiếu ảnh thì để `InitialsAvatar` trong DashboardLayout tự lùi về chữ cái đầu,

@@ -26,6 +26,7 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
       return;
     }
     final source = await showModalBottomSheet<ImageSource>(
+      useRootNavigator: true,
       context: context,
       builder: (context) => SafeArea(
         child: Column(

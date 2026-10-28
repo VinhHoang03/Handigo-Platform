@@ -9,7 +9,7 @@ const { calculateDuration } = require('../utils/bookingPolicy');
 // Cô lập truy vấn vị trí và hồ sơ; không kết nối database hoặc đọc cấu hình bí mật.
 const userId = new Types.ObjectId();
 const providerId = new Types.ObjectId();
-const provider = { _id: providerId, userId, workingAreas: ['Phường kiểm thử, Tỉnh kiểm thử'] };
+const provider = { _id: providerId, userId };
 const location = { userId, coordinates: { coordinates: [106, 10] } };
 let nearby = [];
 let available = true;

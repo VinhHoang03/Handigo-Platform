@@ -3,8 +3,6 @@ import api from '@/api/client';
 export interface FeaturedProvider {
   id: string;
   user: { id: string; fullName: string; avatar?: string };
-  workingAreas: string[];
-  serviceArea?: { province?: string; ward?: string };
   services: Array<{ id: string; name: string }>;
   averageRating: number;
   totalFeedbacks: number;

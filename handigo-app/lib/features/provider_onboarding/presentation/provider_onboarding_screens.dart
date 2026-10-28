@@ -15,14 +15,6 @@ final providerApplicationRepositoryProvider = Provider(
 final providerApplicationProvider = FutureProvider<ProviderApplication?>(
   (ref) => ref.watch(providerApplicationRepositoryProvider).mine(),
 );
-final vietnamProvincesProvider = FutureProvider<List<AdministrativeArea>>(
-  (ref) => ref.watch(providerApplicationRepositoryProvider).provinces(),
-);
-final vietnamWardsProvider =
-    FutureProvider.family<List<AdministrativeArea>, int>(
-      (ref, provinceCode) =>
-          ref.watch(providerApplicationRepositoryProvider).wards(provinceCode),
-    );
 
 enum _IdentityProcess { idle, uploading, reading }
 
@@ -38,7 +30,6 @@ class _ProviderOnboardingScreenState
     extends ConsumerState<ProviderOnboardingScreen> {
   final description = TextEditingController();
   final experience = TextEditingController(text: '3');
-  final area = TextEditingController();
   final fullName = TextEditingController();
   final documentNumber = TextEditingController();
   final dateOfBirth = TextEditingController();
@@ -49,14 +40,12 @@ class _ProviderOnboardingScreenState
   final expiresAt = TextEditingController();
   final issuedPlace = TextEditingController();
   final serviceSearch = TextEditingController();
-  final wardSearch = TextEditingController();
   final certificateTitles = <TextEditingController>[];
   final certificateIssuers = <TextEditingController>[];
   final certificateIssuedAts = <TextEditingController>[];
   final certificateUrls = <String>[];
   final certificateNames = <String>[];
   final selectedServices = <String>{};
-  final selectedWards = <String>{};
   final fullNameFocus = FocusNode();
 
   int step = 1;
@@ -71,10 +60,7 @@ class _ProviderOnboardingScreenState
   String documentType = 'cccd';
   String? gender;
   String serviceQuery = '';
-  String wardQuery = '';
   String? expandedCategory;
-  int? selectedProvinceCode;
-  String? selectedProvinceName;
   _IdentityProcess identityProcess = _IdentityProcess.idle;
   double uploadProgress = 0;
   String? activeDocumentName;
@@ -101,7 +87,6 @@ class _ProviderOnboardingScreenState
   void dispose() {
     description.dispose();
     experience.dispose();
-    area.dispose();
     fullName.dispose();
     documentNumber.dispose();
     dateOfBirth.dispose();
@@ -119,7 +104,6 @@ class _ProviderOnboardingScreenState
       controller.dispose();
     }
     serviceSearch.dispose();
-    wardSearch.dispose();
     fullNameFocus
       ..removeListener(_refreshFocusState)
       ..dispose();
@@ -132,16 +116,9 @@ class _ProviderOnboardingScreenState
     current = item;
     if (item == null) return;
     started = true;
-    step = (item.onboardingStep ?? 1).clamp(1, 3);
+    step = (item.onboardingStep ?? 1).clamp(1, 2);
     description.text = item.description;
     experience.text = '${item.experienceYears}';
-    area.text = item.workingAreas.join('; ');
-    for (final workingArea in item.workingAreas) {
-      final parts = workingArea.split(',').map((part) => part.trim()).toList();
-      if (parts.length < 2) continue;
-      selectedWards.add(parts.first);
-      selectedProvinceName = parts.sublist(1).join(', ');
-    }
     selectedServices.addAll(item.serviceIds);
     final identity = item.identityDocument;
     if (identity != null) {
@@ -179,11 +156,6 @@ class _ProviderOnboardingScreenState
     'description': description.text.trim(),
     'experienceYears': int.tryParse(experience.text) ?? 0,
     'serviceIds': selectedServices.toList(),
-    'workingAreas': area.text
-        .split(';')
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toList(),
     'identityDocument': {
       'type': documentType,
       'documentNumber': documentNumber.text.trim(),
@@ -239,7 +211,6 @@ class _ProviderOnboardingScreenState
       (controller) => controller.text.trim().isNotEmpty,
     );
     if (selectedServices.isEmpty ||
-        area.text.trim().isEmpty ||
         description.text.trim().isEmpty ||
         fullName.text.trim().isEmpty ||
         documentNumber.text.trim().isEmpty ||
@@ -616,7 +587,7 @@ class _ProviderOnboardingScreenState
             _Benefit(
               Icons.location_on_outlined,
               'Việc gần bạn',
-              'Chọn khu vực bạn muốn nhận việc.',
+              'Nhận công việc gần vị trí hiện tại của bạn.',
             ),
             SizedBox(height: 14),
             _Benefit(
@@ -650,11 +621,7 @@ class _ProviderOnboardingScreenState
       Expanded(child: _animatedStepBody()),
       _ActionBar(
         label: _primaryActionLabel,
-        onPrimary:
-            (step == 1 && selectedServices.isEmpty) ||
-                (step == 2 && selectedWards.isEmpty)
-            ? null
-            : _continue,
+        onPrimary: (step == 1 && selectedServices.isEmpty) ? null : _continue,
         onSave: step == 1 ? _save : null,
         onSecondary: step > 1 || returnToSummary ? _back : null,
         saving: saving,
@@ -664,7 +631,6 @@ class _ProviderOnboardingScreenState
 
   String get _flowKey {
     if (step == 1) return 'services';
-    if (step == 2) return 'areas';
     if (profilePage == 0) return 'identity-$identityReviewPage';
     if (profilePage == 1) return 'experience';
     if (profilePage == 2) return 'certificates';
@@ -708,10 +674,10 @@ class _ProviderOnboardingScreenState
   }
 
   String get _primaryActionLabel {
-    if (returnToSummary && (step < 3 || profilePage == 1 || profilePage == 2)) {
+    if (returnToSummary && (step < 2 || profilePage == 1 || profilePage == 2)) {
       return 'Lưu thay đổi';
     }
-    if (step != 3) return 'Tiếp tục';
+    if (step != 2) return 'Tiếp tục';
     if (profilePage == 0 && identityReviewPage == 1) {
       return fullNameFocus.hasFocus ? 'Lưu và tiếp tục' : 'Tiếp tục kiểm tra';
     }
@@ -734,7 +700,7 @@ class _ProviderOnboardingScreenState
       } else if (returnToSummary) {
         setState(() {
           flowDirection = 1;
-          step = 3;
+          step = 2;
           profilePage = 3;
           returnToSummary = false;
         });
@@ -742,24 +708,6 @@ class _ProviderOnboardingScreenState
         setState(() {
           flowDirection = 1;
           step = 2;
-        });
-      }
-      return;
-    }
-    if (step == 2) {
-      if (area.text.trim().isEmpty) {
-        _message('Vui lòng nhập ít nhất một khu vực hoạt động.');
-      } else if (returnToSummary) {
-        setState(() {
-          flowDirection = 1;
-          step = 3;
-          profilePage = 3;
-          returnToSummary = false;
-        });
-      } else {
-        setState(() {
-          flowDirection = 1;
-          step = 3;
         });
       }
       return;
@@ -866,13 +814,13 @@ class _ProviderOnboardingScreenState
     flowDirection = -1;
     if (returnToSummary) {
       setState(() {
-        step = 3;
+        step = 2;
         profilePage = 3;
         returnToSummary = false;
       });
-    } else if (step == 3 && profilePage == 0 && identityReviewPage > 0) {
+    } else if (step == 2 && profilePage == 0 && identityReviewPage > 0) {
       setState(() => identityReviewPage--);
-    } else if (step == 3 && profilePage > 0) {
+    } else if (step == 2 && profilePage > 0) {
       setState(() => profilePage--);
     } else if (step > 1) {
       setState(() => step--);
@@ -885,7 +833,6 @@ class _ProviderOnboardingScreenState
 
   Widget _stepBody() {
     if (step == 1) return _serviceStep();
-    if (step == 2) return _areaStep();
     if (profilePage == 0) return _identityStep();
     if (profilePage == 1) return _experienceStep();
     if (profilePage == 2) return _certificateStep();
@@ -899,8 +846,8 @@ class _ProviderOnboardingScreenState
       subtitle: 'Chọn nhiều dịch vụ cụ thể bạn có thể làm.',
       children: [
         Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: _C.surface,
             borderRadius: BorderRadius.circular(12),
@@ -914,7 +861,7 @@ class _ProviderOnboardingScreenState
                   _initials(user?.fullName ?? ''),
                   style: const TextStyle(
                     color: _C.primary,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -931,7 +878,7 @@ class _ProviderOnboardingScreenState
                       style: const TextStyle(
                         color: _C.ink,
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
@@ -1043,7 +990,7 @@ class _ProviderOnboardingScreenState
           style: TextStyle(
             color: _C.ink,
             fontSize: 13,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 10),
@@ -1068,7 +1015,7 @@ class _ProviderOnboardingScreenState
                           style: TextStyle(
                             color: active ? Colors.white : _C.primary,
                             fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -1083,181 +1030,6 @@ class _ProviderOnboardingScreenState
         const Text('Chọn ít nhất 1 dịch vụ để tiếp tục.', style: _T.micro),
       ],
     );
-  }
-
-  Widget _areaStep() {
-    final provinces = ref.watch(vietnamProvincesProvider);
-    return provinces.when(
-      loading: () => _areaPage(
-        provinceControl: const _AreaSkeleton(lines: 1),
-        wardContent: const _WardLoading(),
-      ),
-      error: (error, stackTrace) => _areaPage(
-        provinceControl: const SizedBox.shrink(),
-        wardContent: _Empty(
-          Icons.cloud_off_outlined,
-          'Không thể tải khu vực',
-          'Vui lòng kiểm tra kết nối và thử lại.',
-          action: () => ref.invalidate(vietnamProvincesProvider),
-        ),
-      ),
-      data: (items) {
-        if (items.isEmpty) {
-          return _areaPage(
-            provinceControl: const SizedBox.shrink(),
-            wardContent: const _Empty(
-              Icons.location_off_outlined,
-              'Chưa có dữ liệu khu vực',
-              'Danh sách tỉnh/thành hiện chưa khả dụng.',
-            ),
-          );
-        }
-        if (selectedProvinceCode == null) {
-          var selected = items.first;
-          for (final item in items) {
-            final matchesSaved =
-                selectedProvinceName != null &&
-                item.name.toLowerCase() == selectedProvinceName!.toLowerCase();
-            if (matchesSaved ||
-                (selectedProvinceName == null &&
-                    item.name.toLowerCase().contains('hồ chí minh'))) {
-              selected = item;
-              break;
-            }
-          }
-          selectedProvinceCode = selected.code;
-          selectedProvinceName = selected.name;
-        }
-        final wards = ref.watch(vietnamWardsProvider(selectedProvinceCode!));
-        return _areaPage(
-          provinceControl: DropdownButtonFormField<int>(
-            key: ValueKey(selectedProvinceCode),
-            initialValue: selectedProvinceCode,
-            isExpanded: true,
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-            decoration: _input(),
-            items: items
-                .map(
-                  (item) => DropdownMenuItem(
-                    value: item.code,
-                    child: Text(
-                      item.name,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: (code) {
-              if (code == null || code == selectedProvinceCode) return;
-              final selected = items.firstWhere((item) => item.code == code);
-              setState(() {
-                selectedProvinceCode = selected.code;
-                selectedProvinceName = selected.name;
-                selectedWards.clear();
-                area.clear();
-                wardQuery = '';
-                wardSearch.clear();
-              });
-            },
-          ),
-          wardContent: wards.when(
-            loading: () => const _WardLoading(),
-            error: (error, stackTrace) => _WardError(
-              onRetry: () =>
-                  ref.invalidate(vietnamWardsProvider(selectedProvinceCode!)),
-            ),
-            data: _wardResults,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _areaPage({
-    required Widget provinceControl,
-    required Widget wardContent,
-  }) => _page(
-    title: 'Khu vực hoạt động',
-    subtitle: 'Chọn một tỉnh/thành và nhiều phường/xã bạn muốn nhận việc.',
-    children: [
-      _label('Tỉnh / thành phố'),
-      const SizedBox(height: 8),
-      provinceControl,
-      const SizedBox(height: 12),
-      _label('Phường / xã'),
-      const SizedBox(height: 3),
-      const Text(
-        'Tất cả khu vực phải cùng tỉnh/thành. Đổi tỉnh/thành sẽ yêu cầu chọn lại phường/xã.',
-        style: _T.micro,
-      ),
-      if (selectedWards.isNotEmpty) ...[
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: selectedWards
-              .map(
-                (ward) => _AreaChip(
-                  label: ward,
-                  onDeleted: () => setState(() {
-                    selectedWards.remove(ward);
-                    _syncWorkingAreas();
-                  }),
-                ),
-              )
-              .toList(),
-        ),
-      ],
-      const SizedBox(height: 10),
-      AppSearchField(
-        controller: wardSearch,
-        onChanged: (value) => setState(() => wardQuery = value.trim()),
-        hintText: 'Tìm phường / xã',
-      ),
-      const SizedBox(height: 10),
-      wardContent,
-    ],
-  );
-
-  Widget _wardResults(List<AdministrativeArea> wards) {
-    final query = wardQuery.toLowerCase();
-    final visible = wards
-        .where(
-          (ward) => query.isEmpty || ward.name.toLowerCase().contains(query),
-        )
-        .toList();
-    if (visible.isEmpty) {
-      return _WardEmpty(
-        query: wardQuery,
-        onClear: () => setState(() {
-          wardQuery = '';
-          wardSearch.clear();
-        }),
-      );
-    }
-    return Column(
-      children: visible
-          .map(
-            (ward) => _ServiceCheck(
-              label: ward.name,
-              selected: selectedWards.contains(ward.name),
-              onTap: () => setState(() {
-                if (!selectedWards.add(ward.name)) {
-                  selectedWards.remove(ward.name);
-                }
-                _syncWorkingAreas();
-              }),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  void _syncWorkingAreas() {
-    final province = selectedProvinceName;
-    area.text = province == null
-        ? ''
-        : selectedWards.map((ward) => '$ward, $province').join('; ');
   }
 
   void _openProfileSection(int targetPage) {
@@ -1753,15 +1525,6 @@ class _ProviderOnboardingScreenState
           }),
         ),
         _SummarySection(
-          title: 'Khu vực',
-          value: _areaSummary(),
-          onEdit: () => setState(() {
-            flowDirection = -1;
-            returnToSummary = true;
-            step = 2;
-          }),
-        ),
-        _SummarySection(
           title: 'Giấy tờ',
           value:
               '${documentType == 'passport' ? 'Hộ chiếu' : 'CCCD'} · $identityImages ảnh · Đã kiểm tra thông tin\n${fullName.text} · ${documentNumber.text}',
@@ -1795,22 +1558,6 @@ class _ProviderOnboardingScreenState
     if (years <= 2) return '1–2 năm';
     if (years <= 5) return '3–5 năm';
     return 'Trên 5 năm';
-  }
-
-  String _areaSummary() {
-    final entries = area.text
-        .split(';')
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toList();
-    if (entries.isEmpty) return '';
-    final firstParts = entries.first.split(',').map((value) => value.trim());
-    final province = firstParts.length > 1 ? firstParts.last : '';
-    final wards = entries
-        .map((entry) => entry.split(',').first.trim())
-        .where((value) => value.isNotEmpty)
-        .join(', ');
-    return province.isEmpty ? wards : '$province\n$wards';
   }
 
   Widget _profilePage({
@@ -1942,7 +1689,7 @@ class _ProviderOnboardingScreenState
 
   Widget _topBar(String title, {VoidCallback? onBack, bool help = false}) =>
       SizedBox(
-        height: 56,
+        height: 72 * MediaQuery.textScalerOf(context).scale(1),
         child: Row(
           children: [
             SizedBox(
@@ -1966,8 +1713,8 @@ class _ProviderOnboardingScreenState
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: _C.ink,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -2003,7 +1750,7 @@ class _ProviderOnboardingScreenState
     value,
     style: const TextStyle(
       color: _C.ink,
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: FontWeight.w600,
     ),
   );
@@ -2013,7 +1760,7 @@ class _ProviderOnboardingScreenState
         hintText: hint,
         suffixText: suffix,
         prefixIcon: icon == null ? null : Icon(icon, color: _C.muted, size: 21),
-        hintStyle: const TextStyle(color: _C.muted, fontSize: 14),
+        hintStyle: const TextStyle(color: _C.muted, fontSize: 16),
         filled: true,
         fillColor: _C.surface,
         contentPadding: const EdgeInsets.symmetric(
@@ -2043,16 +1790,16 @@ class _Progress extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('BƯỚC $step/3', style: _T.overline),
+            Text('BƯỚC $step/2', style: _T.overline),
             const Spacer(),
-            Text('${step == 3 ? 100 : step * 33}%', style: _T.overline),
+            Text('${step * 50}%', style: _T.overline),
           ],
         ),
         const SizedBox(height: 7),
         ClipRRect(
           borderRadius: BorderRadius.circular(99),
           child: LinearProgressIndicator(
-            value: step / 3,
+            value: step / 2,
             minHeight: 4,
             backgroundColor: _C.primarySoft,
             color: _C.primary,
@@ -2098,7 +1845,7 @@ class _ActionBar extends StatelessWidget {
                   'Lưu nháp',
                   style: TextStyle(
                     color: _C.primary,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -2123,7 +1870,7 @@ class _ActionBar extends StatelessWidget {
                   ),
                   child: const Text(
                     'Quay lại',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -2154,8 +1901,8 @@ class _ActionBar extends StatelessWidget {
                       : Text(
                           label,
                           style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                 ),
@@ -2205,7 +1952,7 @@ class _ServiceGroup extends StatelessWidget {
                       style: const TextStyle(
                         color: _C.ink,
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -2284,7 +2031,7 @@ class _ServiceCheck extends StatelessWidget {
                   label,
                   style: const TextStyle(
                     color: _C.ink,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -2294,240 +2041,6 @@ class _ServiceCheck extends StatelessWidget {
         ),
       ),
     ),
-  );
-}
-
-class _AreaChip extends StatelessWidget {
-  const _AreaChip({required this.label, required this.onDeleted});
-  final String label;
-  final VoidCallback onDeleted;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    height: 32,
-    padding: const EdgeInsets.only(left: 10, right: 4),
-    decoration: BoxDecoration(
-      color: _C.primarySoft,
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: _C.primary,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        SizedBox(
-          width: 32,
-          height: 32,
-          child: IconButton(
-            tooltip: 'Bỏ chọn $label',
-            padding: EdgeInsets.zero,
-            onPressed: onDeleted,
-            icon: const Icon(Icons.close_rounded, size: 15),
-            color: _C.primary,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _AreaSkeleton extends StatelessWidget {
-  const _AreaSkeleton({required this.lines});
-  final int lines;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: List.generate(
-      lines,
-      (index) => Container(
-        height: 48,
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _C.divider),
-        ),
-      ),
-    ),
-  );
-}
-
-class _WardLoading extends StatelessWidget {
-  const _WardLoading();
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          color: _C.primarySoft,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Đang tải phường/xã...',
-              style: TextStyle(
-                color: _C.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(height: 3),
-            Text(
-              'Vui lòng chờ. Danh sách thuộc tỉnh/thành đã chọn.',
-              style: _T.micro,
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 10),
-      const _AreaSkeleton(lines: 3),
-    ],
-  );
-}
-
-class _WardEmpty extends StatelessWidget {
-  const _WardEmpty({required this.query, required this.onClear});
-  final String query;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Container(
-        width: 76,
-        height: 76,
-        decoration: BoxDecoration(
-          color: _C.primarySoft,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: const Icon(
-          Icons.search_off_rounded,
-          color: _C.primary,
-          size: 32,
-        ),
-      ),
-      const SizedBox(height: 12),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _C.primarySoft,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Không tìm thấy phường/xã',
-              style: TextStyle(
-                color: _C.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              query.isEmpty
-                  ? 'Không có khu vực phù hợp.'
-                  : 'Không có kết quả “$query”. Hãy thử tên khác hoặc xóa từ khóa.',
-              style: _T.micro,
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 8),
-      SizedBox(
-        width: double.infinity,
-        height: 44,
-        child: TextButton(
-          onPressed: onClear,
-          style: TextButton.styleFrom(
-            backgroundColor: _C.primarySoft,
-            foregroundColor: _C.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          child: const Text(
-            'Xóa từ khóa',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-class _WardError extends StatelessWidget {
-  const _WardError({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Container(
-        width: 76,
-        height: 76,
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFECEE),
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: const Icon(Icons.wifi_off_rounded, color: _C.danger, size: 32),
-      ),
-      const SizedBox(height: 12),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFECEE),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Không tải được danh sách',
-              style: TextStyle(
-                color: _C.danger,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            SizedBox(height: 4),
-            Text(
-              'Kiểm tra kết nối mạng rồi thử lại. Tỉnh/thành đã chọn được giữ nguyên.',
-              style: _T.micro,
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 8),
-      SizedBox(
-        width: double.infinity,
-        height: 44,
-        child: FilledButton(
-          onPressed: onRetry,
-          style: FilledButton.styleFrom(
-            backgroundColor: _C.primarySoft,
-            foregroundColor: _C.primary,
-            elevation: 0,
-          ),
-          child: const Text('Thử lại'),
-        ),
-      ),
-    ],
   );
 }
 
@@ -2633,13 +2146,14 @@ class _DocumentSlot extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        height: 96,
+        constraints: const BoxConstraints(minHeight: 96),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           border: Border.all(color: uploaded ? _C.primary : _C.divider),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
@@ -2653,7 +2167,7 @@ class _DocumentSlot extends StatelessWidget {
               style: const TextStyle(
                 color: _C.ink,
                 fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 2),
@@ -2763,7 +2277,7 @@ class _FileRow extends StatelessWidget {
                 style: const TextStyle(
                   color: _C.ink,
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const Text('Đã tải lên', style: _T.micro),
@@ -2774,8 +2288,8 @@ class _FileRow extends StatelessWidget {
           trailing,
           style: const TextStyle(
             color: _C.primary,
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -2818,7 +2332,7 @@ class _OcrReadingIcon extends StatelessWidget {
               style: TextStyle(
                 color: _C.primary,
                 fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w500,
               ),
             ),
             SizedBox(height: 4),
@@ -3220,8 +2734,8 @@ class _Benefit extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: _C.ink,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 4),
@@ -3250,15 +2764,12 @@ class _ReferralCard extends StatelessWidget {
           'Cần chuẩn bị',
           style: TextStyle(
             color: _C.primary,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
         ),
         SizedBox(height: 4),
-        Text(
-          'Dịch vụ, khu vực, CCCD/Hộ chiếu, chứng chỉ nếu có.',
-          style: _T.micro,
-        ),
+        Text('Dịch vụ, CCCD/Hộ chiếu, chứng chỉ nếu có.', style: _T.micro),
       ],
     ),
   );
@@ -3310,8 +2821,8 @@ class _Empty extends StatelessWidget {
           title,
           style: const TextStyle(
             color: _C.ink,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 6),
@@ -3375,31 +2886,41 @@ abstract final class _C {
 abstract final class _T {
   static const overline = TextStyle(
     color: _C.primary,
-    fontSize: 9,
-    height: 1.2,
-    fontWeight: FontWeight.w700,
+    fontSize: 11,
+    height: 1.4,
+    fontWeight: FontWeight.w500,
   );
   static const hero = TextStyle(
     color: _C.ink,
-    fontSize: 24,
-    height: 1.08,
+    fontSize: 28,
+    height: 1.4,
     fontWeight: FontWeight.w800,
   );
   static const heading = TextStyle(
     color: _C.ink,
-    fontSize: 20,
-    height: 1.25,
-    fontWeight: FontWeight.w800,
+    fontSize: 22,
+    height: 1.4,
+    fontWeight: FontWeight.w600,
   );
-  static const body = TextStyle(color: _C.muted, fontSize: 11, height: 1.5);
-  static const caption = TextStyle(color: _C.muted, fontSize: 10, height: 1.4);
-  static const micro = TextStyle(color: _C.muted, fontSize: 9, height: 1.35);
-  static const navigation = TextStyle(color: _C.ink, fontSize: 8, height: 1.2);
+  static const body = TextStyle(color: _C.muted, fontSize: 16, height: 1.5);
+  static const caption = TextStyle(color: _C.muted, fontSize: 13, height: 1.4);
+  static const micro = TextStyle(
+    color: _C.muted,
+    fontSize: 11,
+    height: 1.4,
+    fontWeight: FontWeight.w500,
+  );
+  static const navigation = TextStyle(
+    color: _C.ink,
+    fontSize: 11,
+    height: 1.4,
+    fontWeight: FontWeight.w500,
+  );
   static const navigationPrimary = TextStyle(
     color: _C.primary,
-    fontSize: 8,
-    height: 1.2,
-    fontWeight: FontWeight.w600,
+    fontSize: 11,
+    height: 1.4,
+    fontWeight: FontWeight.w500,
   );
 }
 

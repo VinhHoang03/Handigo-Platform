@@ -1,4 +1,5 @@
-import { Eye, RefreshCw } from "lucide-react";
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
+import { Eye } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { DataTable } from "@/components/common/dashboard/DataTable";
@@ -17,18 +18,11 @@ export default function AdminSupportPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="admin-page-header">
         <div>
-          <h1 className="text-headline-lg font-bold">Yêu cầu hỗ trợ</h1>
+          <AdminPageTitle title="Yêu cầu hỗ trợ" />
         </div>
-        <button
-          type="button"
-          onClick={() => void support.load()}
-          disabled={support.loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 font-semibold text-primary disabled:opacity-50"
-        >
-          <RefreshCw size={18} className={support.loading ? "animate-spin" : ""} /> Làm mới
-        </button>
+        <AdminRefreshButton onRefresh={() => void support.load()} loading={support.loading} />
       </header>
 
       <SupportSummaryCards summary={support.summary} />

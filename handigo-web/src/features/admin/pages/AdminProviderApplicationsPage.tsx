@@ -1,3 +1,4 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
@@ -11,9 +12,10 @@ export default function AdminProviderApplicationsPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <div className="space-y-8">
-        <header className="space-y-2">
-          <h1 className="text-headline-lg font-bold text-on-surface">Duyệt hồ sơ thợ</h1>
+      <div className="space-y-4">
+        <header className="admin-page-header">
+          <AdminPageTitle title="Duyệt hồ sơ thợ" />
+          <AdminRefreshButton onRefresh={() => void applications.load()} loading={applications.loading} />
         </header>
 
         <section>

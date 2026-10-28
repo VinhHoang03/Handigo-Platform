@@ -22,6 +22,7 @@ class HandigoApp extends ConsumerWidget {
     ref.watch(bookingDraftPersistenceProvider);
     return MaterialApp.router(
       title: 'Handigo',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.light,

@@ -46,7 +46,7 @@ class _AiChatHistoryState extends State<AiChatHistory> {
           children: [
             Text(
               'LỊCH SỬ',
-              style: TextStyle(fontSize: 12, color: scheme.primary),
+              style: TextStyle(fontSize: 13, color: scheme.primary),
             ),
             const SizedBox(height: 4),
             Text(

@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:speech_to_text/speech_to_text.dart' as speech;
-import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
 import '../../../shared/utils/media_url.dart';
@@ -15,7 +14,6 @@ import '../../../shared/utils/category_color.dart';
 import '../../ai_chat/presentation/ai_chat_sheet.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/app_feedback.dart';
-import '../../providers/domain/featured_provider.dart';
 import '../../services/domain/service.dart';
 import '../../services/domain/service_category.dart';
 import '../../orders/presentation/order_screens.dart';
@@ -26,7 +24,8 @@ import 'customer_home_provider.dart';
 import 'device_location_provider.dart';
 
 class CustomerShell extends StatefulWidget {
-  const CustomerShell({super.key});
+  const CustomerShell({this.navigationShell, super.key});
+  final StatefulNavigationShell? navigationShell;
 
   @override
   State<CustomerShell> createState() => _CustomerShellState();
@@ -44,17 +43,30 @@ class _CustomerShellState extends State<CustomerShell> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final activeIndex = widget.navigationShell?.currentIndex ?? _index;
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'handigo-ai-chat',
-        tooltip: 'Trò chuyện với trợ lý AI Handigo',
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
-        shape: const CircleBorder(),
-        onPressed: () => showAiChatSheet(context),
-        child: const Icon(Icons.chat_bubble_rounded),
-      ),
+      resizeToAvoidBottomInset: false,
+      body:
+          widget.navigationShell ??
+          IndexedStack(index: _index, children: _pages),
+      floatingActionButton:
+          (widget.navigationShell == null ||
+              const [
+                '/customer',
+                '/customer/orders',
+                '/customer/chat',
+                '/customer/account',
+              ].contains(GoRouterState.of(context).uri.path))
+          ? FloatingActionButton(
+              heroTag: 'handigo-ai-chat',
+              tooltip: 'Trò chuyện với trợ lý AI Handigo',
+              backgroundColor: scheme.primary,
+              foregroundColor: scheme.onPrimary,
+              shape: const CircleBorder(),
+              onPressed: () => showAiChatSheet(context),
+              child: const Icon(Icons.chat_bubble_rounded),
+            )
+          : null,
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
@@ -70,18 +82,24 @@ class _CustomerShellState extends State<CustomerShell> {
               ])
                 Expanded(
                   child: Semantics(
-                    selected: _index == tabIndex,
+                    selected: activeIndex == tabIndex,
                     button: true,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: Material(
-                        color: _index == tabIndex
+                        color: activeIndex == tabIndex
                             ? scheme.primaryContainer
                             : scheme.surfaceContainerLowest,
                         borderRadius: BorderRadius.circular(12),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => setState(() => _index = tabIndex),
+                          onTap: () {
+                            if (widget.navigationShell case final shell?) {
+                              shell.goBranch(tabIndex);
+                            } else {
+                              setState(() => _index = tabIndex);
+                            }
+                          },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Column(
@@ -90,7 +108,7 @@ class _CustomerShellState extends State<CustomerShell> {
                                 Icon(
                                   icon,
                                   size: 22,
-                                  color: _index == tabIndex
+                                  color: activeIndex == tabIndex
                                       ? scheme.onPrimary
                                       : scheme.onSurfaceVariant,
                                 ),
@@ -100,11 +118,11 @@ class _CustomerShellState extends State<CustomerShell> {
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
-                                        color: _index == tabIndex
+                                        color: activeIndex == tabIndex
                                             ? scheme.onPrimary
                                             : scheme.onSurfaceVariant,
-                                        fontWeight: _index == tabIndex
-                                            ? FontWeight.w700
+                                        fontWeight: activeIndex == tabIndex
+                                            ? FontWeight.w600
                                             : FontWeight.w500,
                                       ),
                                 ),
@@ -129,18 +147,14 @@ class CustomerHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authControllerProvider);
     final home = ref.watch(customerHomeProvider);
     final location = ref.watch(deviceLocationProvider);
     return Scaffold(
       appBar: CustomerAppBar(
-        userName: auth.user?.fullName ?? 'bạn',
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
         unreadCount: home.asData?.value.unreadNotificationCount ?? 0,
-        locationLabel:
-            location.asData?.value.label ??
-            (location.hasError
-                ? 'Không tải được vị trí'
-                : 'Đang xác định vị trí...'),
+        locationLabel: location.asData?.value.label ?? 'Đang lấy vị trí...',
+        onReloadLocation: () => ref.invalidate(deviceLocationProvider),
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(customerHomeProvider.future),
@@ -160,80 +174,93 @@ class CustomerHomeScreen extends ConsumerWidget {
 
 class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomerAppBar({
-    required this.userName,
+    required this.toolbarHeight,
     required this.unreadCount,
     required this.locationLabel,
+    required this.onReloadLocation,
     super.key,
   });
 
-  final String userName;
   final int unreadCount;
   final String locationLabel;
+  final VoidCallback onReloadLocation;
+  final double toolbarHeight;
 
   @override
-  Size get preferredSize => const Size.fromHeight(72);
+  Size get preferredSize => Size.fromHeight(toolbarHeight);
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return AppBar(
-      toolbarHeight: 72,
-      titleSpacing: 12,
+      toolbarHeight: toolbarHeight,
+      automaticallyImplyLeading: false,
+      centerTitle: false,
+      titleSpacing: 20,
       elevation: 0,
-      shadowColor: Colors.transparent,
+      scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
+      backgroundColor: scheme.surfaceContainerLowest,
       shape: Border(
-        bottom: BorderSide(
-          color: Colors.black.withValues(alpha: .16),
-          width: .8,
-        ),
+        bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       title: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLow,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.location_on_outlined, color: scheme.primary),
-          ),
-          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'VỊ TRÍ HIỆN TẠI',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w600,
+            child: Semantics(
+              button: true,
+              label: 'Tải lại vị trí hiện tại',
+              child: InkWell(
+                onTap: onReloadLocation,
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 27,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'VỊ TRÍ HIỆN TẠI',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: scheme.outline,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.35,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              locationLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.titleSmall?.copyWith(
+                                color: scheme.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Row(
-                  children: [
-                    Text(
-                      locationLabel,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Icon(
-                      Icons.keyboard_arrow_down,
-                      size: 16,
-                      color: scheme.primary,
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             'Handigo',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: textTheme.titleMedium?.copyWith(
               color: scheme.primary,
               fontWeight: FontWeight.w800,
             ),
@@ -246,16 +273,17 @@ class CustomerAppBar extends StatelessWidget implements PreferredSizeWidget {
           onPressed: () => context.push('/customer/notifications'),
           icon: Badge(
             isLabelVisible: unreadCount > 0,
-            backgroundColor: scheme.secondary,
-            textColor: scheme.onSecondary,
-            label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+            backgroundColor: scheme.error,
+            smallSize: 8,
+            alignment: Alignment.topRight,
+            offset: const Offset(1, -2),
             child: Icon(
               Icons.notifications_none,
               color: scheme.onSurfaceVariant,
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
       ],
     );
   }
@@ -365,13 +393,18 @@ class _CustomerHomeContentState extends ConsumerState<CustomerHomeContent> {
         ),
         const SizedBox(height: 10),
         _ServiceHorizontalList(services: widget.data.services),
-        const SizedBox(height: 18),
+        const SizedBox(height: 20),
         _HomeSectionHeader(
-          title: 'Thợ nổi bật gần đây',
-          actionLabel: 'Bán kính 5km',
+          title: 'Voucher dành cho bạn',
+          actionLabel: 'Xem tất cả',
+          onAction: () => context.push('/customer/vouchers'),
         ),
         const SizedBox(height: 10),
-        _ProviderList(providers: widget.data.providers),
+        _VoucherHorizontalList(vouchers: widget.data.vouchers),
+        const SizedBox(height: 20),
+        const _HomeSectionHeader(title: 'Tin tức'),
+        const SizedBox(height: 10),
+        _NewsGrid(articles: widget.data.news),
       ],
     );
   }
@@ -533,7 +566,7 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
               selected: _selectedCategory == null,
               labelStyle: TextStyle(
                 fontWeight: _selectedCategory == null
-                    ? FontWeight.w700
+                    ? FontWeight.w600
                     : FontWeight.w500,
               ),
               onSelected: (_) => setState(() => _selectedCategory = null),
@@ -544,7 +577,7 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
                 selected: _selectedCategory == category.id,
                 labelStyle: TextStyle(
                   fontWeight: _selectedCategory == category.id
-                      ? FontWeight.w700
+                      ? FontWeight.w600
                       : FontWeight.w500,
                 ),
                 onSelected: (_) =>
@@ -565,7 +598,7 @@ class _HomeSearchFilterContentState extends State<_HomeSearchFilterContent> {
                 selected: _searchQuery == item,
                 labelStyle: TextStyle(
                   fontWeight: _searchQuery == item
-                      ? FontWeight.w700
+                      ? FontWeight.w600
                       : FontWeight.w500,
                 ),
                 onPressed: () => setState(() => _searchQuery = item),
@@ -635,8 +668,8 @@ class _HomeIntroCard extends StatelessWidget {
                         'ƯU ĐÃI DÀNH CHO BẠN',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -645,8 +678,8 @@ class _HomeIntroCard extends StatelessWidget {
                       'Đặt lịch lần đầu\n- Giảm 20%',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
-                        height: 1.08,
-                        fontWeight: FontWeight.w800,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -654,8 +687,8 @@ class _HomeIntroCard extends StatelessWidget {
                       'Áp dụng cho dịch vụ vệ sinh và sửa chữa tại nhà.',
                       style: TextStyle(
                         color: Color(0xD9FFFFFF),
-                        fontSize: 11,
-                        height: 1.25,
+                        fontSize: 13,
+                        height: 1.4,
                       ),
                     ),
                     const SizedBox(height: 11),
@@ -902,7 +935,7 @@ class _AllCategoryCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(
                   context,
-                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -1013,7 +1046,7 @@ class _CategoryCustomizationSheetState
                 child: Text(
                   'Tùy chỉnh danh mục',
                   style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1108,6 +1141,365 @@ class _ServiceHorizontalList extends StatelessWidget {
   }
 }
 
+class _VoucherHorizontalList extends StatelessWidget {
+  const _VoucherHorizontalList({required this.vouchers});
+
+  final List<HomeVoucher> vouchers;
+
+  @override
+  Widget build(BuildContext context) {
+    if (vouchers.isEmpty) {
+      return const _HomeEmpty(message: 'Hiện chưa có voucher khả dụng.');
+    }
+    return SizedBox(
+      height: 154,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: vouchers.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) => _HomeVoucherCard(
+          voucher: vouchers[index],
+          onTap: () => context.push('/customer/vouchers'),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeVoucherCard extends StatelessWidget {
+  const _HomeVoucherCard({required this.voucher, required this.onTap});
+
+  final HomeVoucher voucher;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final discount = voucher.discountType.toUpperCase() == 'PERCENT'
+        ? 'Giảm ${voucher.discountValue.toStringAsFixed(0)}%'
+        : 'Giảm ${_compactMoney(voucher.discountValue)}';
+    return SizedBox(
+      width: 248,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [scheme.primary, AppTheme.primaryDark],
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -24,
+                  top: -32,
+                  child: Container(
+                    width: 112,
+                    height: 112,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .08),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.confirmation_num_outlined,
+                            size: 21,
+                            color: Colors.white,
+                          ),
+                          const Spacer(),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: .16),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              child: Text(
+                                voucher.code,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        discount,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        voucher.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (voucher.minOrderAmount > 0)
+                        Text(
+                          'Đơn tối thiểu ${_compactMoney(voucher.minOrderAmount)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: Colors.white70),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NewsGrid extends StatelessWidget {
+  const _NewsGrid({required this.articles});
+
+  final List<HomeNewsArticle> articles;
+
+  @override
+  Widget build(BuildContext context) {
+    if (articles.isEmpty) {
+      return const _HomeEmpty(message: 'Chưa có tin tức mới.');
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: articles.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: .78,
+      ),
+      itemBuilder: (context, index) => _HomeNewsCard(
+        article: articles[index],
+        onTap: () => _showNewsArticle(context, articles[index]),
+      ),
+    );
+  }
+}
+
+class _HomeNewsCard extends StatelessWidget {
+  const _HomeNewsCard({required this.article, required this.onTap});
+
+  final HomeNewsArticle article;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: scheme.surfaceContainerLowest,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .55)),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ServiceCoverImage(
+              url: article.coverImage,
+              name: article.title,
+              fit: BoxFit.cover,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      article.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Expanded(
+                      child: Text(
+                        article.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                    if (_shortDate(article.publishedAt) case final date?)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_rounded,
+                            size: 13,
+                            color: scheme.outline,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            date,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: scheme.outline),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _showNewsArticle(BuildContext context, HomeNewsArticle article) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+    builder: (context) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: .86,
+      minChildSize: .55,
+      maxChildSize: .94,
+      builder: (context, controller) => ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 28),
+        children: [
+          Align(
+            alignment: Alignment.center,
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          Text(
+            article.category,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            article.title,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          if (_shortDate(article.publishedAt) case final date?) ...[
+            const SizedBox(height: 6),
+            Text(
+              date,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          ServiceCoverImage(
+            url: article.coverImage,
+            name: article.title,
+            fit: BoxFit.cover,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            article.excerpt,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          for (final block in article.content) ...[
+            if (block.type == 'list')
+              for (final item in block.items)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('• $item'),
+                )
+            else if (block.text?.trim().isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  block.text!,
+                  style: block.type == 'heading'
+                      ? Theme.of(context).textTheme.titleMedium
+                      : block.type == 'quote'
+                      ? Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontStyle: FontStyle.italic,
+                        )
+                      : Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+String _compactMoney(double value) {
+  if (value >= 1000000) {
+    final millions = value / 1000000;
+    return '${millions == millions.roundToDouble() ? millions.toStringAsFixed(0) : millions.toStringAsFixed(1)} triệu đ';
+  }
+  if (value >= 1000) return '${(value / 1000).round()}K đ';
+  return '${value.toStringAsFixed(0)} đ';
+}
+
+String? _shortDate(String? value) {
+  final date = DateTime.tryParse(value ?? '')?.toLocal();
+  if (date == null) return null;
+  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+}
+
 class _ServiceCard extends StatelessWidget {
   const _ServiceCard({required this.service});
   final Service service;
@@ -1159,7 +1551,7 @@ class _ServiceCard extends StatelessWidget {
                                   ? service.averageRating.toStringAsFixed(1)
                                   : 'Mới',
                               style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(fontWeight: FontWeight.w800),
+                                  ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -1189,9 +1581,9 @@ class _ServiceCard extends StatelessWidget {
                             _servicePrice(service),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelMedium
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w600,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
                           ),
@@ -1209,179 +1601,11 @@ class _ServiceCard extends StatelessWidget {
                           minimumSize: const Size(0, 32),
                           padding: const EdgeInsets.symmetric(horizontal: 9),
                           textStyle: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         child: const Text('Đặt ngay'),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProviderList extends StatefulWidget {
-  const _ProviderList({required this.providers});
-  final List<FeaturedProvider> providers;
-
-  @override
-  State<_ProviderList> createState() => _ProviderListState();
-}
-
-class _ProviderListState extends State<_ProviderList> {
-  static const _initialVisibleCount = 4;
-  bool _showAll = false;
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.providers.isEmpty)
-      return const _HomeEmpty(
-        message: 'Chưa có nhà cung cấp phù hợp để hiển thị.',
-      );
-    final visibleCount = _showAll
-        ? widget.providers.length
-        : widget.providers.length.clamp(0, _initialVisibleCount).toInt();
-    final hasMore = widget.providers.length > _initialVisibleCount;
-    return Column(
-      children: [
-        for (var index = 0; index < visibleCount; index++) ...[
-          _ProviderCard(provider: widget.providers[index]),
-          if (index < visibleCount - 1) const SizedBox(height: 10),
-        ],
-        if (hasMore)
-          TextButton.icon(
-            onPressed: () => setState(() => _showAll = !_showAll),
-            icon: Icon(
-              _showAll ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-            ),
-            label: Text(_showAll ? 'Thu gọn' : 'Xem thêm'),
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ProviderCard extends StatelessWidget {
-  const _ProviderCard({required this.provider});
-  final FeaturedProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final avatarUrl = usableMediaUrl(provider.avatar);
-    return SizedBox(
-      width: double.infinity,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: avatarUrl == null
-                    ? Container(
-                        width: 58,
-                        height: 58,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerLow,
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.person),
-                      )
-                    : Image.network(
-                        avatarUrl,
-                        width: 58,
-                        height: 58,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 58,
-                          height: 58,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerLow,
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.person),
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            provider.fullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.verified,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      provider.services.isEmpty
-                          ? 'Dịch vụ tại nhà'
-                          : provider.services.take(2).join(' & '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star,
-                          size: 15,
-                          color: AppTheme.starGold,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${provider.averageRating.toStringAsFixed(1)} (${provider.totalFeedbacks} đánh giá)',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                    if (provider.distanceMeters != null &&
-                        provider.distanceMeters! >= 0) ...[
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.near_me_outlined,
-                            size: 14,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            _formatProviderDistance(provider.distanceMeters!),
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -1528,9 +1752,4 @@ String _servicePrice(Service service) {
   final price = service.fixedPrice ?? service.minOptionPrice;
   if (price == null) return 'Liên hệ để biết giá';
   return 'Chỉ từ\n${price.toStringAsFixed(0)}đ';
-}
-
-String _formatProviderDistance(double meters) {
-  if (meters < 1000) return '${meters.round()} m';
-  return '${(meters / 1000).toStringAsFixed(1)} km';
 }

@@ -1,33 +1,13 @@
-import { BarChart, chartCompactMoney, chartMoney, dayLabel } from "@/components/common/chart";
+import { SeriesChartView, chartCompactMoney, chartMoney, dayLabel } from "@/components/common/chart";
 import type { RevenueSeriesPoint } from "../../types/adminRevenue.types";
 
-/**
- * Bản cũ đặt chiều cao cột bằng px tính tay (`(amount/max)*160`), nên biểu đồ
- * không co theo container. Nay để `ResponsiveContainer` lo phần đó.
- */
-export function CollectionChart({ points }: { points: RevenueSeriesPoint[] }) {
+export function CollectionChart({ points, type = "bar" }: { points: RevenueSeriesPoint[]; type?: string }) {
   const visiblePoints = points.slice(-31);
-
-  if (!visiblePoints.length) {
-    return (
-      <p className="py-12 text-center text-on-surface-variant">
-        Chưa có giao dịch thu tiền trong kỳ.
-      </p>
-    );
-  }
-
-  return (
-    <BarChart
-      data={visiblePoints.map((point) => ({
-        label: dayLabel(point.day ?? ""),
-        fullLabel: point.day ?? "",
-        value: point.amount,
-      }))}
-      ariaLabel="Dòng tiền thu theo ngày"
-      height={240}
-      singleColor
-      formatValue={(value) => chartMoney.format(value)}
-      formatAxisValue={(value) => chartCompactMoney.format(value)}
-    />
-  );
+  return <>
+    <SeriesChartView title="Dòng tiền thu theo ngày" type={type} xKey="day"
+      data={visiblePoints.map((point) => ({ day: point.day ?? "", amount: point.amount }))}
+      series={[{ dataKey: "amount", name: "Tiền thu" }]} formatX={dayLabel}
+      formatValue={(value) => chartMoney.format(value)} formatY={(value) => chartCompactMoney.format(value)} />
+    <p className="mt-3 text-right text-xs tabular-nums text-on-surface-variant">Đỉnh kỳ: {chartMoney.format(Math.max(...visiblePoints.map((point) => point.amount), 0))}</p>
+  </>;
 }

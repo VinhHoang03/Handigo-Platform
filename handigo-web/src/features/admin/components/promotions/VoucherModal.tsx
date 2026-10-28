@@ -23,14 +23,14 @@ export function VoucherModal({
   return (
     <Modal
       open={open}
-      title={mode === "edit" ? "Sửa voucher" : "Tạo voucher"}
+      title={mode === "edit" ? "Sửa mã giảm giá" : "Tạo mã giảm giá"}
       onClose={onClose}
       size="lg"
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormInput
-            label="Mã voucher"
+            label="Mã mã giảm giá"
             required
             value={form.code}
             onChange={(value) => onChange({ ...form, code: value.toUpperCase() })}

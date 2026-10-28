@@ -24,8 +24,8 @@ import { lockProviderSchedule, assertProviderSchedule } from "./providerSchedule
 import { calculateDuration } from "../utils/bookingPolicy";
 import { createLogger } from "../utils/logger";
 import { earnOrderRewards } from "./reward.service";
+import { createAssignmentWelcome, publishAssignmentWelcome } from "./chat.service";
 
-import { isAddressInProviderWorkingAreas } from "../utils/providerArea";
 
 const assignmentLogger = createLogger("AssignmentService");
 
@@ -399,12 +399,21 @@ export const AssignmentService = {
           await lockedProvider.save({ session });
         }
         await order.save({ session });
+        await createAssignmentWelcome(
+          order, lockedProvider._id as Types.ObjectId, providerUserId,
+          claimedAssignment._id as Types.ObjectId, session,
+        );
         return { assignment: claimedAssignment, order };
       }) ?? null;
     } finally {
       await session.endSession();
     }
     if (!result) throw new AppError("Không thể nhận đơn.", 409);
+    try {
+      await publishAssignmentWelcome(result.assignment._id as Types.ObjectId);
+    } catch (error) {
+      assignmentLogger.error("Đã lưu lời chào nhưng chưa phát được tin nhắn trực tiếp.", error, { assignmentId });
+    }
     emitToUser(result.order.customerId.toString(), "order:updated", {
       orderId: result.order._id.toString(),
     });

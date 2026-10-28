@@ -65,7 +65,7 @@ export function ApplicationReviewActions({ applicationType, busy, onApprove, onR
               <X size={18} /> Từ chối
             </button>
             <button type="button" onClick={onApprove} disabled={busy} className="btn-primary">
-              <Check size={18} /> {busy ? "Đang xử lý..." : applicationType === "service_addition" ? "Duyệt thêm dịch vụ" : "Phê duyệt provider"}
+              <Check size={18} /> {busy ? "Đang xử lý..." : applicationType === "service_addition" ? "Duyệt thêm dịch vụ" : "Phê duyệt nhà cung cấp"}
             </button>
           </>
         ) : (

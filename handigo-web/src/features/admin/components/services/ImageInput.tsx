@@ -84,7 +84,7 @@ export function ImageInput({ value, onChange, label = 'Ảnh dịch vụ', input
             className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           />
           <p aria-live="polite" className={`mt-1 text-xs ${msg.includes('lỗi') ? 'text-error' : 'text-on-surface-variant'}`}>
-            {msg || 'Nhập URL hoặc chọn file từ máy.'}
+            {msg || 'Nhập đường dẫn hoặc chọn tệp từ máy.'}
           </p>
         </div>
       </div>

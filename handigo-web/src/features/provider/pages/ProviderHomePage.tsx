@@ -5,7 +5,6 @@ import { ProviderHomeStats } from "../components/home/ProviderHomeStats";
 import { ProviderRevenueChart } from "../components/home/ProviderRevenueChart";
 import { ProviderRecentBookings } from "../components/home/ProviderRecentBookings";
 import { ProviderTodaySchedule } from "../components/home/ProviderTodaySchedule";
-import { ProviderWorkingAreasCard } from "../components/home/ProviderWorkingAreasCard";
 import { useProviderHomeData } from "../components/home/useProviderHomeData";
 
 const ProviderHomePage = () => {
@@ -57,11 +56,6 @@ const ProviderHomePage = () => {
               scheduleError={data.scheduleError}
             />
 
-            <ProviderWorkingAreasCard
-              workingAreas={data.workingAreas}
-              isLoadingAreas={data.isLoadingAreas}
-              areasError={data.areasError}
-            />
           </div>
         </section>
       </div>

@@ -6,6 +6,7 @@ import { NotificationBell } from "@/components/common/NotificationBell";
 import { authService } from "@/features/auth/services/auth.service";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { MessageCenter } from "@/features/chat/components/MessageCenter";
+import { maskEmail } from "@/features/profile/utils/userProfileForm.utils";
 import { ChevronRight, House, LogOut, User, Wallet } from "lucide-react";
 
 interface ProviderTopbarProps {
@@ -138,7 +139,7 @@ export function ProviderTopbar({
                     {user?.fullName || "Nhà cung cấp"}
                   </p>
                   <p className="truncate text-xs text-on-surface-variant">
-                    {user?.email || "Kênh của provider"}
+                    {user?.email ? maskEmail(user.email, true) : "Kênh của provider"}
                   </p>
                 </div>
 

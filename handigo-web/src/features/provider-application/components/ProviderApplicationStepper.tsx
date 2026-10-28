@@ -1,8 +1,8 @@
-const labels = ["Lĩnh vực", "Khu vực", "Giới thiệu"];
+const labels = ["Lĩnh vực", "Hồ sơ"];
 
 export function ProviderApplicationStepper({ step }: { step: number }) {
   return (
-    <ol className="mb-6 grid grid-cols-3 gap-2" aria-label="Tiến độ đăng ký">
+    <ol className="mb-6 grid grid-cols-2 gap-2" aria-label="Tiến độ đăng ký">
       {labels.map((label, index) => {
         const value = index + 1;
         return (

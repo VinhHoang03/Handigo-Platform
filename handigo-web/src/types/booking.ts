@@ -160,6 +160,7 @@ export interface Order {
   customerAttachments?: string[];
   completionEvidenceImages?: string[];
   completionNote?: string | null;
+  confirmation?: { customerConfirmedAt?: string | null; providerConfirmedAt?: string | null };
   providerId?: {
     _id: string;
     userId?: {
@@ -172,8 +173,6 @@ export interface Order {
     completedOrders?: number;
     totalCompletedOrders?: number;
     avatar?: string | null;
-    serviceArea?: { province?: string; ward?: string };
-    workingAreas?: string[];
     averageRating?: number;
     totalFeedbacks?: number;
     experienceYears?: number;

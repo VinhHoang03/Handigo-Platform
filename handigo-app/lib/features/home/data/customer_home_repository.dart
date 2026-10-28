@@ -1,6 +1,5 @@
 import '../../../core/network/api_client.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../providers/domain/featured_provider.dart';
 import '../../services/domain/service.dart';
 import '../../services/domain/service_category.dart';
 import '../domain/customer_home_data.dart';
@@ -13,17 +12,20 @@ class CustomerHomeRepository {
     final results = await Future.wait<dynamic>([
       _loadCategories(),
       _loadServices(),
-      _loadProviders(currentPosition),
       _loadUnreadCount(),
+      _loadOptional(_loadVouchers),
+      _loadOptional(_loadNews),
     ]);
-    final unreadCount = results.length > 3 && results[3] is num
-        ? (results[3] as num).toInt()
+    final unreadCount = results.length > 2 && results[2] is num
+        ? (results[2] as num).toInt()
         : 0;
     return CustomerHomeData(
       categories: results[0] as List<ServiceCategory>,
       services: results[1] as List<Service>,
-      providers: results[2] as List<FeaturedProvider>,
+      providers: const [],
       unreadNotificationCount: unreadCount,
+      vouchers: results[3] as List<HomeVoucher>,
+      news: results[4] as List<HomeNewsArticle>,
     );
   }
 
@@ -37,33 +39,15 @@ class CustomerHomeRepository {
   }
 
   Future<List<Service>> _loadServices() async {
-    final response = await _api.request('/services', query: {
-      'page': 1,
-      'limit': 6,
-      'isActive': 'true',
-    });
+    final response = await _api.request(
+      '/services',
+      query: {'page': 1, 'limit': 6, 'isActive': 'true'},
+    );
     final data = response['data'] as Map<String, dynamic>? ?? const {};
     final items = data['items'] as List<dynamic>? ?? const [];
     return items
         .whereType<Map<String, dynamic>>()
         .map(Service.fromJson)
-        .toList();
-  }
-
-  Future<List<FeaturedProvider>> _loadProviders(Position? currentPosition) async {
-    final response = await _api.request(
-      '/providers/featured',
-      query: {
-        if (currentPosition != null) ...{
-          'latitude': currentPosition.latitude,
-          'longitude': currentPosition.longitude,
-        },
-      },
-    );
-    final items = response['data'] as List<dynamic>? ?? const [];
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(FeaturedProvider.fromJson)
         .toList();
   }
 
@@ -74,5 +58,41 @@ class CustomerHomeRepository {
     );
     final data = response['data'] as Map<String, dynamic>? ?? const {};
     return (data['count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<List<HomeVoucher>> _loadVouchers() async {
+    final response = await _api.request(
+      '/vouchers/available',
+      authenticated: true,
+    );
+    final data = response['data'];
+    final items = data is List<dynamic>
+        ? data
+        : data is Map<String, dynamic>
+        ? data['items'] as List<dynamic>? ?? const []
+        : const <dynamic>[];
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(HomeVoucher.fromJson)
+        .take(6)
+        .toList();
+  }
+
+  Future<List<HomeNewsArticle>> _loadNews() async {
+    final response = await _api.request('/news');
+    final items = response['data'] as List<dynamic>? ?? const [];
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(HomeNewsArticle.fromJson)
+        .take(4)
+        .toList();
+  }
+
+  Future<List<T>> _loadOptional<T>(Future<List<T>> Function() loader) async {
+    try {
+      return await loader();
+    } catch (_) {
+      return <T>[];
+    }
   }
 }

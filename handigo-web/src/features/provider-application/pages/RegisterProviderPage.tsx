@@ -22,8 +22,8 @@ export default function RegisterProviderPage() {
   const setUser = useAuthStore((state) => state.setUser);
   const isDirectProvider = user?.role.toUpperCase() === "PROVIDER";
   const providerApplication = useProviderApplication(applicationId);
-  const [step, setStep] = useState<1 | 2 | 3>(
-    isDirectProvider ? user?.providerOnboardingStep || 1 : 1,
+  const [step, setStep] = useState<1 | 2>(
+    isDirectProvider ? Math.min(user?.providerOnboardingStep || 1, 2) as 1 | 2 : 1,
   );
   const [form, setForm] = useState(initialProviderApplicationForm);
   const [success, setSuccess] = useState("");
@@ -47,28 +47,7 @@ export default function RegisterProviderPage() {
         : [...value.serviceIds, id],
     }));
 
-  const addArea = (area: string) => {
-    const value = area.trim();
-    if (value && !form.workingAreas.includes(value)) {
-      setForm((current) => ({
-        ...current,
-        workingAreas: [...current.workingAreas, value],
-      }));
-    }
-  };
-
-  const removeArea = (value: string) =>
-    setForm((current) => ({
-      ...current,
-      workingAreas: current.workingAreas.filter((item) => item !== value),
-    }));
-
-  const canContinue =
-    step === 1
-      ? providerApplication.categories.some(
-          (category) => (category.services || []).length > 0,
-        ) && form.serviceIds.length > 0
-      : form.workingAreas.length > 0;
+  const canContinue = providerApplication.categories.some((category) => (category.services || []).length > 0) && form.serviceIds.length > 0;
 
   const submissionErrors = getProviderApplicationSubmissionErrors(form);
   const canSubmit = submissionErrors.length === 0 && uploadCount === 0;
@@ -143,7 +122,7 @@ export default function RegisterProviderPage() {
             Trở thành thợ dịch vụ
           </h1>
           <p className="mt-1 text-on-surface-variant">
-            Hoàn thành 3 bước để gửi hồ sơ chuyên môn.
+            Hoàn thành 2 bước để gửi hồ sơ chuyên môn.
           </p>
         </div>
 
@@ -180,8 +159,6 @@ export default function RegisterProviderPage() {
             onExperienceChange={(experienceYears) =>
               setForm({ ...form, experienceYears })
             }
-            onAddArea={addArea}
-            onRemoveArea={removeArea}
             onUploadAsset={uploadAsset}
             savingDraft={providerApplication.savingDraft}
             submitError={providerApplication.submitError}
@@ -196,7 +173,7 @@ export default function RegisterProviderPage() {
             onBack={() =>
               step === 1 ? navigate(-1) : setStep((step - 1) as 1 | 2)
             }
-            onNext={() => setStep((step + 1) as 2 | 3)}
+            onNext={() => setStep(2)}
             onSubmit={() => void send()}
           />
         </AsyncState>

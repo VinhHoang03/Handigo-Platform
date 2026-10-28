@@ -18,7 +18,7 @@ export const buildVoucherColumns = ({
 }: VoucherColumnHandlers): Array<DataTableColumn<Voucher>> => [
   {
     key: "voucher",
-    header: "Voucher",
+    header: "Mã giảm giá",
     render: (voucher) => (
       <div className="min-w-0">
         <p className="font-semibold text-on-surface">{voucher.name}</p>
@@ -79,23 +79,23 @@ export const buildVoucherColumns = ({
         {!voucher.ownerId && <button
           onClick={() => onEdit(voucher)}
           className="rounded-lg p-2 text-primary hover:bg-primary/10"
-          aria-label="Sửa voucher"
+          aria-label="Sửa mã giảm giá"
         >
           <Pencil aria-hidden="true" size={20} />
         </button>}
         <button
           onClick={() => onToggle(voucher)}
           className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high"
-          aria-label="Đổi trạng thái voucher"
+          aria-label="Đổi trạng thái mã giảm giá"
         >
           {voucher.isActive && voucher.status === "ACTIVE" ? <PauseCircle aria-hidden="true" size={20} /> : <PlayCircle aria-hidden="true" size={20} />}
         </button>
         <button
           onClick={() => onDelete(voucher)}
           disabled={Boolean(voucher.ownerId && voucher.usedCount > 0)}
-          title={voucher.ownerId && voucher.usedCount > 0 ? "Không thể xóa mã đổi điểm đã sử dụng" : "Xóa voucher"}
+          title={voucher.ownerId && voucher.usedCount > 0 ? "Không thể xóa mã đổi điểm đã sử dụng" : "Xóa mã giảm giá"}
           className="rounded-lg p-2 text-error hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Xóa voucher"
+          aria-label="Xóa mã giảm giá"
         >
           <Trash2 aria-hidden="true" size={20} />
         </button>

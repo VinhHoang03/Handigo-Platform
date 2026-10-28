@@ -18,14 +18,13 @@ export function readProviderApplicationDraft(key: string, sourceVersion: string 
       !form || typeof form.description !== 'string' ||
       !Number.isInteger(form.experienceYears) ||
       !Array.isArray(form.serviceIds) || !form.serviceIds.every((id) => typeof id === 'string') ||
-      !Array.isArray(form.workingAreas) || !form.workingAreas.every((area) => typeof area === 'string') ||
       !form.identityDocument || !['cccd', 'passport'].includes(form.identityDocument.type) ||
       typeof form.identityDocument.documentNumber !== 'string' ||
       typeof form.identityDocument.fullName !== 'string' ||
       !Array.isArray(form.certificates) || !form.certificates.every((certificate) =>
         certificate && typeof certificate.title === 'string' && Array.isArray(certificate.imageUrls))
     ) return null;
-    return form;
+    return { description: form.description, experienceYears: form.experienceYears, serviceIds: form.serviceIds, identityDocument: form.identityDocument, certificates: form.certificates, onboardingStep: form.onboardingStep };
   } catch {
     return null;
   }

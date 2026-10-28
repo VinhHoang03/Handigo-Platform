@@ -341,7 +341,7 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
                     child: Text(
                       'Thêm địa chỉ',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),

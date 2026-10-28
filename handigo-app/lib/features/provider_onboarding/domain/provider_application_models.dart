@@ -8,7 +8,6 @@ class ProviderApplication {
     this.description = '',
     this.experienceYears = 0,
     this.serviceIds = const [],
-    this.workingAreas = const [],
     this.identityDocument,
     this.certificates = const [],
   });
@@ -24,7 +23,6 @@ class ProviderApplication {
       description: '${json['description'] ?? ''}',
       experienceYears: (json['experienceYears'] as num?)?.toInt() ?? 0,
       serviceIds: _strings(json['serviceIds']),
-      workingAreas: _strings(json['workingAreas']),
       identityDocument: identity is Map
           ? IdentityDocument.fromJson(Map<String, dynamic>.from(identity))
           : null,
@@ -43,7 +41,7 @@ class ProviderApplication {
   final String id, status, description;
   final String? rejectionReason, rejectionNotes;
   final int? onboardingStep, experienceYears;
-  final List<String> serviceIds, workingAreas;
+  final List<String> serviceIds;
   final IdentityDocument? identityDocument;
   final List<ProviderCertificate> certificates;
 }

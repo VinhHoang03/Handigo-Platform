@@ -46,14 +46,14 @@ export function ServiceSuggestionReviewModal({
             </p>
             <h2 className="mt-1 text-xl font-bold text-on-surface">{getSuggestionName(suggestion)}</h2>
             <p className="mt-3 whitespace-pre-line text-sm leading-6 text-on-surface-variant">
-              {suggestion.description || "Provider chưa nhập mô tả."}
+              {suggestion.description || "Nhà cung cấp chưa nhập mô tả."}
             </p>
           </div>
 
           {suggestion.suggestionType === "service" ? (
             <label className="block">
               <span className="mb-2 block text-sm font-bold text-on-surface">
-                Danh mục sẽ gán service
+                Danh mục sẽ gán dịch vụ
               </span>
               <select
                 value={categoryId}
@@ -68,21 +68,21 @@ export function ServiceSuggestionReviewModal({
                 ))}
               </select>
               <p className="mt-2 text-xs text-on-surface-variant">
-                Khi duyệt, hệ thống tự tạo service mới từ đề xuất trong danh mục này.
-                {createdServiceName ? ` Service đã tạo: ${createdServiceName}.` : ""}
+                Khi duyệt, hệ thống tự tạo dịch vụ mới từ đề xuất trong danh mục này.
+                {createdServiceName ? ` Dịch vụ đã tạo: ${createdServiceName}.` : ""}
               </p>
             </label>
           ) : (
             <label className="block">
               <span className="mb-2 block text-sm font-bold text-on-surface">
-                Gắn category đã tạo
+                Gắn danh mục đã tạo
               </span>
               <select
                 value={createdCategoryId}
                 onChange={(event) => onCreatedCategoryIdChange(event.target.value)}
                 className="min-h-11 w-full rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-3 py-2"
               >
-                <option value="">Chưa gắn category</option>
+                <option value="">Chưa gắn danh mục</option>
                 {categories.map((category) => (
                   <option key={category._id} value={category._id}>
                     {category.name}
@@ -93,7 +93,7 @@ export function ServiceSuggestionReviewModal({
           )}
 
           <label className="block">
-            <span className="mb-2 block text-sm font-bold text-on-surface">Ghi chú admin</span>
+            <span className="mb-2 block text-sm font-bold text-on-surface">Ghi chú quản trị viên</span>
             <textarea
               rows={4}
               value={adminNote}

@@ -17,9 +17,9 @@ export const buildWalletTableColumns = (
 ): Array<DataTableColumn<AdminWalletRow>> => [
   {
     key: "provider",
-    header: "Provider",
+    header: "Nhà cung cấp",
     className: "font-bold",
-    render: (wallet) => wallet.provider?.fullName || "Provider",
+    render: (wallet) => wallet.provider?.fullName || "Nhà cung cấp",
   },
   {
     key: "contact",
@@ -27,7 +27,7 @@ export const buildWalletTableColumns = (
     className: "text-sm",
     render: (wallet) => (
       <>
-        <p>{wallet.provider?.email || "Chưa có email"}</p>
+        <p>{wallet.provider?.email || "Chưa có thư điện tử"}</p>
         <p className="text-on-surface-variant">
           {wallet.provider?.phone || "Chưa có số điện thoại"}
         </p>

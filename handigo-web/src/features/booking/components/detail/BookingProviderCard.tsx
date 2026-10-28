@@ -1,7 +1,7 @@
 import { InitialsAvatar } from "@/components/common/InitialsAvatar";
 import { OrderChatButton } from "@/features/chat/components/OrderChatButton";
 import type { ProviderInfo } from "./bookingDetailProvider";
-import { Banknote, Hammer, type LucideIcon, MapPin, Phone, Star, UserSearch } from "lucide-react";
+import { Banknote, Hammer, type LucideIcon, Phone, Star, UserSearch } from "lucide-react";
 type ProviderDetailProps = {
   icon: LucideIcon;
   label: string;
@@ -71,11 +71,6 @@ export const BookingProviderCard = ({
             icon={Phone}
             label="Số điện thoại"
             value={providerInfo.phone || "Chưa cập nhật"}
-          />
-          <ProviderDetail
-            icon={MapPin}
-            label="Khu vực"
-            value={providerInfo.area || "Chưa cập nhật"}
           />
           <ProviderDetail
             icon={Hammer}

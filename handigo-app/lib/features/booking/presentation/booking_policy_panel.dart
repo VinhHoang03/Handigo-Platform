@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 class BookingPolicyPanel extends StatelessWidget {
   const BookingPolicyPanel({required this.policies, super.key});
@@ -20,8 +21,8 @@ class BookingPolicyPanel extends StatelessWidget {
       'Ưu đãi không được hoàn thành tiền. Mỗi buổi định kỳ có trạng thái, thanh toán và hoàn tiền riêng; hủy các buổi còn lại được tính theo từng buổi.',
       'Số tiền hoàn và phí được hiển thị trong bước xác nhận hủy theo dữ liệu mới nhất. Nếu có vấn đề khi thực hiện hoặc sau hoàn thành, dùng chức năng báo cáo vấn đề đơn hàng.',
     ];
-    return ExpansionTile(
-      title: const Text('Chính sách đặt dịch vụ'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final paragraph in paragraphs)
           Padding(
@@ -31,4 +32,90 @@ class BookingPolicyPanel extends StatelessWidget {
       ],
     );
   }
+}
+
+class BookingPolicyConsent extends StatefulWidget {
+  const BookingPolicyConsent({
+    required this.accepted,
+    required this.policies,
+    required this.onChanged,
+    super.key,
+  });
+  final bool accepted;
+  final Map<String, dynamic>? policies;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  State<BookingPolicyConsent> createState() => _BookingPolicyConsentState();
+}
+
+class _BookingPolicyConsentState extends State<BookingPolicyConsent> {
+  late final TapGestureRecognizer _link = TapGestureRecognizer()
+    ..onTap = _showPolicies;
+
+  @override
+  void dispose() {
+    _link.dispose();
+    super.dispose();
+  }
+
+  void _showPolicies() {
+    final policies = widget.policies;
+    if (policies == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        title: Row(
+          children: [
+            const Expanded(child: Text('Chính sách Handigo')),
+            IconButton(
+              tooltip: 'Đóng chính sách',
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: SingleChildScrollView(
+            child: BookingPolicyPanel(policies: policies),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text.rich(
+          TextSpan(
+            style: Theme.of(context).textTheme.bodyMedium,
+            children: [
+              const TextSpan(text: 'Tôi đã đọc và đồng ý với '),
+              TextSpan(
+                text: 'chính sách Handigo',
+                recognizer: widget.policies == null ? null : _link,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      Checkbox(
+        value: widget.accepted,
+        semanticLabel: 'Đồng ý với chính sách Handigo',
+        onChanged: widget.policies == null
+            ? null
+            : (value) => widget.onChanged(value == true),
+      ),
+    ],
+  );
 }

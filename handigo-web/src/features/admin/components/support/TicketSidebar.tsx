@@ -34,7 +34,7 @@ export function TicketSidebar({ ticket, admins, busy, onAssign, onStatusChange, 
 
       {!ticket.createdViolationId && ticket.status !== "cancelled" && (
         <button type="button" onClick={onCreateViolation} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-on-error">
-          Tạo vi phạm
+          Tạo vi phạm và áp dụng hình phạt
         </button>
       )}
 
