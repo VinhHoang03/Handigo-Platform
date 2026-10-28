@@ -1,24 +1,31 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
+import { AdminDatePicker } from "../components/shared/AdminDatePicker";
 import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { revenueRangeFromSearch } from "../components/revenue/revenue-period";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { getErrorMessage } from "@/utils/apiError";
 import { adminOperationsApi } from "../api/adminOperations.api";
 import { DashboardCharts } from "../components/dashboard/DashboardCharts";
 import { DashboardMetricGrid } from "../components/dashboard/DashboardMetricGrid";
-import { DashboardUserStats } from "../components/dashboard/DashboardUserStats";
 import { DashboardInsights } from "../components/dashboard/DashboardInsights";
+import { currentDashboardMonth } from "../components/dashboard/dashboard-period";
+import "../components/dashboard/dashboard-operations.css";
 import type {
   AdminOrderAnalytics,
-  AdminOverview,
   AdminProviderAnalytics,
 } from "../types/adminOperations.types";
 
 export default function AdminDashboardPage() {
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [params] = useSearchParams();
+  const initialRange = revenueRangeFromSearch(params.toString());
+  const [fromDate, setFromDate] = useState(initialRange.fromDate);
+  const [toDate, setToDate] = useState(initialRange.toDate);
+  const defaultPeriod = currentDashboardMonth();
+  const effectiveFromDate = fromDate || defaultPeriod.fromDate;
+  const effectiveToDate = toDate || defaultPeriod.toDate;
   const [orders, setOrders] = useState<AdminOrderAnalytics | null>(null);
   const [providers, setProviders] = useState<AdminProviderAnalytics | null>(
     null,
@@ -31,16 +38,14 @@ export default function AdminDashboardPage() {
       setLoading(true);
       setError("");
       const query = {
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
+        fromDate: effectiveFromDate,
+        toDate: effectiveToDate,
         topLimit: 5,
       };
-      const [overviewData, orderData, providerData] = await Promise.all([
-        adminOperationsApi.overview(query),
+      const [orderData, providerData] = await Promise.all([
         adminOperationsApi.orderAnalytics(query),
         adminOperationsApi.providerAnalytics(query),
       ]);
-      setOverview(overviewData);
       setOrders(orderData);
       setProviders(providerData);
     } catch (requestError) {
@@ -50,7 +55,7 @@ export default function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, setError, toDate]);
+  }, [effectiveFromDate, setError, effectiveToDate]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void load(), 0);
@@ -65,23 +70,8 @@ export default function AdminDashboardPage() {
         </div>
         <div className="admin-header-actions">
         <div className="admin-date-range" role="group" aria-label="Khoảng thời gian thống kê">
-        <label>
-          <span>Từ ngày</span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(event) => setFromDate(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Đến ngày</span>
-          <input
-            type="date"
-            value={toDate}
-            min={fromDate || undefined}
-            onChange={(event) => setToDate(event.target.value)}
-          />
-        </label>
+        <AdminDatePicker label="Từ ngày" compact value={effectiveFromDate} max={effectiveToDate} onChange={setFromDate} />
+        <AdminDatePicker label="Đến ngày" compact value={effectiveToDate} min={effectiveFromDate} onChange={setToDate} />
         </div>
         <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
         </div>
@@ -90,20 +80,22 @@ export default function AdminDashboardPage() {
       <AsyncState
         loading={loading}
         error={error}
-        empty={!overview || !orders || !providers}
+        empty={!orders || !providers}
         emptyMessage="Chưa có dữ liệu tổng quan."
         onRetry={load}
       >
-        {overview && orders && providers && (
+        {orders && providers && (
           <>
-            <DashboardUserStats />
-            <DashboardMetricGrid
-              overview={overview}
-              orders={orders}
+            <DashboardInsights key={`${effectiveFromDate}:${effectiveToDate}`} fromDate={effectiveFromDate} toDate={effectiveToDate} summary={(insights) => <DashboardMetricGrid
+              monthly={effectiveFromDate.endsWith("-01") && effectiveToDate === new Date(Date.UTC(Number(effectiveFromDate.slice(0, 4)), Number(effectiveFromDate.slice(5, 7)), 0)).toISOString().slice(0, 10)}
+              revenuePath={`/admin/revenue?${new URLSearchParams({ fromDate: effectiveFromDate, toDate: effectiveToDate })}`}
+              periodComparison={insights?.comparison}
+              ratingStats={insights?.quality.ratingStats}
+              previousPeriodLabel={insights ? `${new Date(insights.period.previousFromDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} – ${new Date(insights.period.previousToDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}` : undefined}
+              periodLabel={insights ? `${new Date(insights.period.fromDate).toLocaleDateString('vi-VN')} – ${new Date(insights.period.toDate).toLocaleDateString('vi-VN')}` : 'Đang tải kỳ thống kê'}
               providers={providers}
-            />
-            <DashboardInsights key={`${fromDate}:${toDate}`} fromDate={fromDate || undefined} toDate={toDate || undefined} />
-            <DashboardCharts orders={orders} providers={providers} query={{ fromDate: fromDate || undefined, toDate: toDate || undefined, topLimit: 5 }} />
+            />} />
+            <DashboardCharts orders={orders} providers={providers} query={{ fromDate: effectiveFromDate, toDate: effectiveToDate, topLimit: 5 }} />
           </>
         )}
       </AsyncState>

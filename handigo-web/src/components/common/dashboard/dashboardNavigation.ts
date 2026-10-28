@@ -134,3 +134,8 @@ export function isNavItemActive(
     ? pathname.startsWith(item.path)
     : pathname === item.path;
 }
+
+export const getDashboardNavLabel = (item: DashboardNavItem) =>
+  item.pendingCount && item.pendingCount > 0 && item.pendingLabel
+    ? `${item.label}. ${item.pendingLabel}${item.pendingStale ? ". Số liệu lần cập nhật thành công gần nhất" : ""}`
+    : item.label;

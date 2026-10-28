@@ -12,12 +12,13 @@ function DataDetails({ children }: { children: ReactNode }) {
   </details>;
 }
 
-export function CategoryChartView({ data, type, title, formatValue = (value) => chartNumber.format(value), formatAxisValue }: {
+export function CategoryChartView({ data, type, title, formatValue = (value) => chartNumber.format(value), formatAxisValue, showDetails = true }: {
   data: DonutSlice[];
   type: string;
   title: string;
   formatValue?: (value: number) => string;
   formatAxisValue?: (value: number) => string;
+  showDetails?: boolean;
 }) {
   const total = data.reduce((sum, item) => sum + item.value, 0);
   const table = <ChartDataTable caption={title} columns={["Hạng mục", "Giá trị", "Tỷ trọng"]}
@@ -31,7 +32,7 @@ export function CategoryChartView({ data, type, title, formatValue = (value) => 
           height={type === "horizontal" ? Math.max(280, data.length * 44 + 48) : 280}
           formatValue={formatValue} formatAxisValue={formatAxisValue} showValues />
       </div></div>}
-    <DataDetails>{table}</DataDetails>
+    {showDetails && <DataDetails>{table}</DataDetails>}
   </>;
 }
 

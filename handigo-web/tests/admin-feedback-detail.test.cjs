@@ -8,7 +8,7 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const sourceRoot = path.join(__dirname, '../src');
 
-function renderDetail(data, { loading = false, error = '' } = {}) {
+function renderDetail(data, { loading = false, error = '', byOrder = false } = {}) {
   const cache = new Map();
   let stateIndex = 0;
   function load(filename) {
@@ -21,6 +21,7 @@ function renderDetail(data, { loading = false, error = '' } = {}) {
     vm.runInNewContext(code, { exports, require(name) {
       if (name === '@/components/common/Modal') return { Modal: ({ title, children }) => React.createElement('div', { role: 'dialog' }, title, children) };
       if (name === '@/features/feedback/api/feedback.api') return { feedbackApi: {} };
+      if (name === '../../api/adminDashboard.api') return { adminDashboardApi: {} };
       if (name === 'react' && filename.endsWith('AdminFeedbackDetailModal.tsx')) return {
         useState: () => [[data, loading, error, 0][stateIndex++], () => {}], useEffect() {},
       };
@@ -31,7 +32,7 @@ function renderDetail(data, { loading = false, error = '' } = {}) {
     return exports;
   }
   const { AdminFeedbackDetailModal } = load(path.join(sourceRoot, 'features/admin/components/feedback/AdminFeedbackDetailModal.tsx'));
-  return renderToStaticMarkup(React.createElement(AdminFeedbackDetailModal, { feedbackId: 'review1', onClose() {} }));
+  return renderToStaticMarkup(React.createElement(AdminFeedbackDetailModal, { ...(byOrder ? { orderId: 'order1' } : { feedbackId: 'review1' }), onClose() {} }));
 }
 
 const feedback = { _id: 'review1', customerId: null, serviceId: null, rating: 2, createdAt: '2026-10-27T01:00:00Z', images: ['https://example.com/danh-gia.jpg'], isVisible: true,
@@ -60,4 +61,12 @@ test('Modal có trạng thái đang tải và nút thử lại khi API lỗi', (
   const html = renderDetail(null, { error: 'Không thể tải dữ liệu' });
   assert.ok(html.includes('Không thể tải dữ liệu'));
   assert.ok(html.includes('Thử lại'));
+});
+
+test('Chi tiết đơn đang xử lý mở được khi chưa có đánh giá và chưa xác nhận hoàn thành', () => {
+  const html = renderDetail({ feedback: null, order: { ...order, status: 'in_progress', statusHistory: [], confirmation: null }, quotation: null }, { byOrder: true });
+  assert.ok(html.includes('Chi tiết đơn hàng'));
+  assert.ok(html.includes('Đang thực hiện'));
+  assert.ok(!html.includes('Đánh giá và phản hồi'));
+  assert.ok(html.includes('Chưa ghi nhận thời điểm xác nhận hoàn thành'));
 });

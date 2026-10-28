@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { adminDashboardQuerySchema } from "./adminDashboard.validator";
 
 const objectIdSchema = z
   .string()
@@ -27,7 +28,8 @@ export const paymentHistoryQuerySchema = z.object({
   status: z.enum(["pending", "paid", "failed", "refunded"]).optional(),
   method: z.enum(["payos", "vnpay", "cash", "wallet"]).optional(),
   paymentType: z.enum(["full", "remaining", "inspection_deposit"]).optional(),
-});
+  dateField: z.enum(["paidAt", "refundedAt"]).optional(),
+}).and(adminDashboardQuerySchema);
 
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
 export type PaymentHistoryQuery = z.infer<typeof paymentHistoryQuerySchema>;
