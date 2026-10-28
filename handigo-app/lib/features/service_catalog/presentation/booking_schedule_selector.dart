@@ -98,7 +98,7 @@ class _BookingScheduleButtonState extends ConsumerState<BookingScheduleButton> {
                     : 'Đã ngoài khung giờ làm việc, đơn của bạn sẽ được xử lý vào ngày mai.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.3,
+                  height: 1.4,
                 ),
               ),
             ),
@@ -357,7 +357,7 @@ class _BookingScheduleSelectorState
                                 format(index),
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: selected == index
-                                      ? FontWeight.w700
+                                      ? FontWeight.w600
                                       : FontWeight.w500,
                                   color: unavailable(index)
                                       ? theme.colorScheme.onSurface.withValues(
@@ -399,7 +399,7 @@ class _BookingScheduleSelectorState
             child: Text(
               'Chọn ngày và giờ hẹn',
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),

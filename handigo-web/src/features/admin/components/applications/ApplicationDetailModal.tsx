@@ -32,7 +32,7 @@ export function ApplicationDetailModal({ application, busy, onApprove, onReject,
           <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
             <p className="text-xs font-bold uppercase tracking-wider text-primary">Loại đơn</p>
             <p className="mt-2 text-base font-semibold text-on-surface">
-              {isServiceAddition ? "Đăng ký bổ sung dịch vụ mới" : "Đăng ký từ customer lên provider"}
+              {isServiceAddition ? "Đăng ký bổ sung dịch vụ mới" : "Đăng ký từ khách hàng lên nhà cung cấp"}
             </p>
             {isServiceAddition && (
               <p className="mt-2 text-sm text-on-surface-variant">
@@ -60,10 +60,6 @@ export function ApplicationDetailModal({ application, busy, onApprove, onReject,
                 <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Kinh nghiệm</p>
                 <p className="mt-2 text-headline-md font-bold text-primary">{application.experienceYears}+</p>
                 <p className="text-xs text-on-surface-variant">năm hoạt động</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Khu vực hoạt động</p>
-                <p className="mt-2 text-sm font-semibold text-on-surface">{application.workingAreas.join(", ") || "Chưa cập nhật"}</p>
               </div>
             </div>
           )}

@@ -9,6 +9,7 @@ import type {
 } from "@/features/case-management/types/caseManagement.types";
 import { getErrorMessage } from "@/utils/apiError";
 import { adminCasesApi } from "../../api/adminCases.api";
+import { PENALTY_LABELS } from "./case-status.constants";
 
 interface ViolationFormModalProps {
   open: boolean;
@@ -19,16 +20,6 @@ interface ViolationFormModalProps {
   onClose: () => void;
   onCreated: () => void;
 }
-
-const PENALTIES: Array<{ value: PenaltyType; label: string }> = [
-  { value: "WARNING", label: "Cảnh cáo" },
-  { value: "TEMPORARY_SUSPEND", label: "Tạm khóa tài khoản" },
-  { value: "PERMANENT_BAN", label: "Khóa tài khoản vĩnh viễn" },
-  { value: "RESTRICT_FEATURE", label: "Hạn chế tính năng" },
-  { value: "RESTRICT_ORDER_RECEIVING", label: "Hạn chế nhận đơn" },
-  { value: "RESTRICT_CHAT", label: "Hạn chế trò chuyện" },
-  { value: "RESTRICT_VOUCHER", label: "Hạn chế voucher" },
-];
 
 export function ViolationFormModal({
   open,
@@ -88,14 +79,14 @@ export function ViolationFormModal({
   return (
     <Modal open={open} title="Tạo vi phạm và áp dụng hình phạt" onClose={onClose} size="lg" danger closeOnEsc={!busy} closeOnOverlayClick={!busy}>
       <form onSubmit={submit} className="space-y-4">
-        {sourceType === "SUPPORT_TICKET" && <label className="block text-sm font-semibold">ID người dùng vi phạm<input value={targetUserId} onChange={(event) => setTargetUserId(event.target.value)} pattern="[0-9a-fA-F]{24}" required disabled={busy} placeholder="Nhập MongoDB ObjectId của người vi phạm" className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3" /><span className="mt-2 block text-xs font-normal text-on-surface-variant">Ticket không xác định sẵn bên vi phạm; quản trị viên phải chọn đúng người dùng sau khi review nội dung.</span></label>}
+        {sourceType === "SUPPORT_TICKET" && <label className="block text-sm font-semibold">Mã người dùng vi phạm<input value={targetUserId} onChange={(event) => setTargetUserId(event.target.value)} pattern="[0-9a-fA-F]{24}" required disabled={busy} placeholder="Nhập mã định danh gồm 24 ký tự hệ thập lục phân của người vi phạm" className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3" /><span className="mt-2 block text-xs font-normal text-on-surface-variant">Yêu cầu hỗ trợ không xác định sẵn bên vi phạm; quản trị viên phải chọn đúng người dùng sau khi xem xét nội dung.</span></label>}
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm font-semibold">Loại vi phạm<input value={violationType} onChange={(event) => setViolationType(event.target.value)} minLength={2} maxLength={100} required disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3" /></label>
           <label className="text-sm font-semibold">Mức độ<select value={severity} onChange={(event) => setSeverity(event.target.value as ViolationSeverity)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3"><option value="LOW">Thấp</option><option value="MEDIUM">Trung bình</option><option value="HIGH">Cao</option><option value="CRITICAL">Nghiêm trọng</option></select></label>
         </div>
         <label className="block text-sm font-semibold">Lý do xác nhận vi phạm<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={3000} rows={4} required disabled={busy} className="mt-2 w-full rounded-xl border border-outline-variant p-3" /></label>
         <label className="block text-sm font-semibold">Quyết định xử lý<textarea value={adminDecision} onChange={(event) => setAdminDecision(event.target.value)} minLength={5} maxLength={3000} rows={4} required disabled={busy} className="mt-2 w-full rounded-xl border border-outline-variant p-3" /></label>
-        <label className="block text-sm font-semibold">Hình phạt<select value={penaltyType} onChange={(event) => setPenaltyType(event.target.value as PenaltyType)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3">{PENALTIES.map((penalty) => <option key={penalty.value} value={penalty.value}>{penalty.label}</option>)}</select></label>
+        <label className="block text-sm font-semibold">Hình phạt<select value={penaltyType} onChange={(event) => setPenaltyType(event.target.value as PenaltyType)} disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3">{Object.entries(PENALTY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         {penaltyType === "TEMPORARY_SUSPEND" && <label className="block text-sm font-semibold">Thời hạn (ngày)<input type="number" value={durationDays} onChange={(event) => setDurationDays(event.target.value)} min={1} max={3650} required disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3" /></label>}
         {penaltyType === "RESTRICT_FEATURE" && <label className="block text-sm font-semibold">Tính năng bị hạn chế<input value={feature} onChange={(event) => setFeature(event.target.value)} maxLength={100} required disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant px-3" /></label>}
         <label className="block text-sm font-semibold">Ghi chú hình phạt<textarea value={penaltyNote} onChange={(event) => setPenaltyNote(event.target.value)} maxLength={1000} rows={3} disabled={busy} className="mt-2 w-full rounded-xl border border-outline-variant p-3" /></label>

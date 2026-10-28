@@ -1,7 +1,7 @@
 import { Modal } from "@/components/common/Modal";
 import { caseDateTime } from "./case-table-columns";
 import type { SelectedAdminCase } from "./case-detail.types";
-import { CASE_STATUS_LABELS } from "./case-status.constants";
+import { CASE_STATUS_LABELS, PENALTY_LABELS, VIOLATION_SEVERITY_LABELS } from "./case-status.constants";
 
 function EvidenceLinks({ urls }: { urls: string[] }) {
   if (!urls.length) return <p className="text-sm text-on-surface-variant">Chưa có bằng chứng.</p>;
@@ -121,7 +121,7 @@ export function CaseDetailModal({
             )}
             {selected.kind === "report" && !selected.item.createdViolationId && (
               <section className="rounded-2xl border border-outline-variant p-4">
-                <h3 className="font-bold">Review báo cáo</h3>
+                <h3 className="font-bold">Xem xét báo cáo</h3>
                 <select value={nextStatus} onChange={(event) => onNextStatusChange(event.target.value)} className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant px-3">
                   <option value="">Chọn trạng thái</option>
                   <option value="under_review">Đang xem xét</option>
@@ -129,21 +129,21 @@ export function CaseDetailModal({
                   <option value="rejected">Từ chối</option>
                   <option value="resolved">Đã xử lý</option>
                 </select>
-                <textarea value={reviewNote} onChange={(event) => onReviewNoteChange(event.target.value)} maxLength={3000} rows={3} placeholder="Ghi chú review..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
+                <textarea value={reviewNote} onChange={(event) => onReviewNoteChange(event.target.value)} maxLength={3000} rows={3} placeholder="Ghi chú xem xét..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
                 <textarea value={resolutionNote} onChange={(event) => onResolutionNoteChange(event.target.value)} maxLength={3000} rows={3} placeholder="Kết luận xử lý..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
                 <button type="button" onClick={onReviewReport} disabled={busy || !nextStatus} className="btn-primary mt-3 w-full">Cập nhật</button>
               </section>
             )}
             {selected.kind !== "violation" && !selected.item.createdViolationId && (
-              <button type="button" onClick={onOpenViolationForm} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-on-error">Tạo vi phạm và áp dụng penalty</button>
+              <button type="button" onClick={onOpenViolationForm} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-on-error">Tạo vi phạm và áp dụng hình phạt</button>
             )}
             {selected.kind !== "violation" && selected.item.createdViolationId && (
               <p className="rounded-xl bg-success-container p-4 text-sm font-semibold text-on-success-container">Hồ sơ đã tạo bản ghi vi phạm.</p>
             )}
             {selected.kind === "violation" && (
               <section className="rounded-2xl border border-outline-variant p-4 text-sm">
-                <p><b>Mức độ:</b> {selected.item.severity}</p>
-                <p className="mt-2"><b>Hình phạt:</b> {selected.item.penaltyType}</p>
+                <p><b>Mức độ:</b> {VIOLATION_SEVERITY_LABELS[selected.item.severity]}</p>
+                <p className="mt-2"><b>Hình phạt:</b> {PENALTY_LABELS[selected.item.penaltyType]}</p>
                 {selected.item.penalty?.durationDays && <p className="mt-2"><b>Thời hạn:</b> {selected.item.penalty.durationDays} ngày</p>}
                 {selected.item.endAt && <p className="mt-2"><b>Kết thúc:</b> {caseDateTime.format(new Date(selected.item.endAt))}</p>}
               </section>

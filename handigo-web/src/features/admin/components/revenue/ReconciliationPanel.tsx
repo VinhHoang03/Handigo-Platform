@@ -11,8 +11,8 @@ export function ReconciliationPanel({
   const rows: Array<[string, number]> = [
     ["Thu thành công qua hệ thống", data.collectedPaymentRevenue],
     ["Hoàn tiền", -data.refundedRevenue],
-    ["GMV thanh toán online", data.onlineCompletedRevenue],
-    ["GMV thanh toán tiền mặt", data.cashCompletedRevenue],
+    ["Tổng giá trị giao dịch thanh toán trực tuyến", data.onlineCompletedRevenue],
+    ["Tổng giá trị giao dịch thanh toán tiền mặt", data.cashCompletedRevenue],
     ["Tiền đặt cọc đã thu", data.depositRevenue],
   ];
 
@@ -29,7 +29,7 @@ export function ReconciliationPanel({
       </dl>
       <div className={"mt-5 rounded-xl p-4 text-sm " + (Math.abs(difference) < 1 ? "bg-success-container text-on-success-container" : "bg-warning-container text-on-warning-container")}>
         <p className="tabular-nums font-bold">Chênh lệch đối soát: {money.format(difference)}</p>
-        <p className="mt-1">GMV = phí nền tảng + thu nhập provider. Số liệu chuẩn khi chênh lệch bằng 0.</p>
+        <p className="mt-1">Tổng giá trị giao dịch = phí nền tảng + thu nhập nhà cung cấp. Số liệu chuẩn khi chênh lệch bằng 0.</p>
       </div>
     </article>
   );

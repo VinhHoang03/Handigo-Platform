@@ -144,9 +144,6 @@ export function ProviderDescriptionStep({
           <b>Dịch vụ:</b> {selectedNames.join(", ") || "Chưa chọn"}
         </p>
         <p>
-          <b>Khu vực:</b> {form.workingAreas.join(", ") || "Chưa thêm"}
-        </p>
-        <p>
           <b>Giấy tờ:</b>{" "}
           {hasIdentityImage ? "Đã tải ảnh để admin duyệt" : "Chưa tải ảnh"}
         </p>

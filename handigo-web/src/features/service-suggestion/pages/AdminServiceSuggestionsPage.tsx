@@ -148,6 +148,7 @@ export default function AdminServiceSuggestionsPage() {
           onSuggestionTypeChange={setSuggestionType}
           count={suggestions.length}
           onRefresh={() => void loadData()}
+          loading={isLoading}
         />
 
 

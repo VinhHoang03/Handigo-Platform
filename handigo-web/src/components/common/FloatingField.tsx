@@ -5,7 +5,7 @@ import {
   type Ref,
   type TextareaHTMLAttributes,
 } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Search } from 'lucide-react';
 
 interface FieldFrameProps {
   id: string;
@@ -70,7 +70,7 @@ export function FloatingInput({
       label={label}
       error={error}
       hint={hint}
-      className={containerClassName}
+      className={`${containerClassName || ''} ${type === 'search' ? 'form-field--search' : ''}`}
     >
       <input
         {...props}
@@ -84,6 +84,9 @@ export function FloatingInput({
         className={`form-field__input ${isPassword ? 'pr-12' : ''}`}
         onChange={(event) => onValueChange(event.target.value)}
       />
+      {type === 'search' && (
+        <Search aria-hidden="true" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+      )}
       {isPassword && (
         <button
           type="button"

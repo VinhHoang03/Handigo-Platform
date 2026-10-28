@@ -73,7 +73,7 @@ export function WithdrawalDetailModal({
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <Info label="Nhà cung cấp" value={withdrawal.userId.fullName} />
-              <Info label="Email" value={withdrawal.userId.email} />
+              <Info label="Thư điện tử" value={withdrawal.userId.email} />
               <Info label="Số tiền" value={withdrawalMoney.format(withdrawal.amount)} />
               <Info label="Trạng thái" value={statusLabelFor(withdrawal.status)} />
               <Info label="Ngày tạo" value={withdrawalDateTime.format(new Date(withdrawal.createdAt))} />
@@ -99,7 +99,7 @@ export function WithdrawalDetailModal({
 
             {withdrawal.adminNote && (
               <p className="rounded-lg bg-surface-container-low p-3 text-sm">
-                <b>Ghi chú admin:</b> {withdrawal.adminNote}
+                <b>Ghi chú quản trị viên:</b> {withdrawal.adminNote}
               </p>
             )}
 

@@ -16,14 +16,12 @@ import {
   PerformanceStats,
   ProfileSection,
   ProviderHero,
-  ServiceAreaPanel,
   VerificationPanel,
 } from "../ProviderProfileComponents";
 import type {
   ProviderCertificate,
   ProviderProfile,
   PerformanceStat,
-  ServiceArea,
   VerificationItem,
 } from "../../types/provider.types";
 import type { CertificateForm } from "../../utils/providerProfilePage";
@@ -59,8 +57,6 @@ export function ProviderProfileMainGrid({
   verificationItems,
   onPasswordClick,
   canChangePassword,
-  serviceArea,
-  onEditServiceArea,
   applicationHistoryKey,
   onEditApplication,
 }: {
@@ -92,8 +88,6 @@ export function ProviderProfileMainGrid({
   verificationItems: VerificationActionItem[];
   onPasswordClick: () => void;
   canChangePassword: boolean;
-  serviceArea: ServiceArea;
-  onEditServiceArea: () => void;
   applicationHistoryKey: number;
   onEditApplication: (application: ProviderApplication) => void;
 }) {
@@ -158,7 +152,6 @@ export function ProviderProfileMainGrid({
           onPasswordClick={onPasswordClick}
           canChangePassword={canChangePassword}
         />
-        <ServiceAreaPanel area={serviceArea} onEdit={onEditServiceArea} />
 
         <ProfileSection title="Lịch sử đơn/hồ sơ">
           <ProviderApplicationHistory

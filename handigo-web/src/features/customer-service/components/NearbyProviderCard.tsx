@@ -95,13 +95,6 @@ export function NearbyProviderCard({
         </Link>)}
       </div>
 
-      <p className="mt-3 line-clamp-1 text-xs text-on-surface-variant">
-        {[provider.serviceArea?.ward, provider.serviceArea?.province]
-          .filter(Boolean)
-          .join(", ") ||
-          provider.workingAreas.slice(0, 2).join(", ") ||
-          "Khu vực hoạt động chưa cập nhật"}
-      </p>
 
       {allowSelection && (
         <>

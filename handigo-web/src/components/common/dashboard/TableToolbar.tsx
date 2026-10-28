@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Search } from "lucide-react";
 
 /**
  * Thanh công cụ phía trên bảng admin: ô tìm kiếm + khe cắm bộ lọc + khe cắm
@@ -30,15 +31,19 @@ export function TableToolbar({ search, filters, actions }: TableToolbarProps) {
         {hasSearchOrFilters && (
           <div className="grid flex-1 gap-3 sm:grid-cols-2">
             {search && (
+              <div className="relative min-w-0">
+              <Search aria-hidden="true" size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
               <input
                 type="search"
                 value={search.value}
                 onChange={(event) => search.onChange(event.target.value)}
                 placeholder={search.placeholder}
+                aria-label={search.placeholder || "Tìm kiếm"}
                 disabled={search.disabled}
                 maxLength={search.maxLength ?? 100}
-                className="min-h-11 rounded-xl border border-outline-variant px-3 disabled:bg-surface-container"
+                className="min-h-11 w-full rounded-xl border border-outline-variant pl-10 pr-3 disabled:bg-surface-container"
               />
+              </div>
             )}
             {filters}
           </div>

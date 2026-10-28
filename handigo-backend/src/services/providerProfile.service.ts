@@ -192,7 +192,6 @@ const formatPendingProviderProfile = async (
       verified: false,
       serviceIds: application.serviceIds.map(toIdString),
       services,
-      workingAreas: application.workingAreas || [],
       averageRating: 0,
       totalFeedbacks: 0,
       totalCompletedOrders: 0,
@@ -235,8 +234,6 @@ const formatProviderProfile = async (provider: IProvider) => {
       verified: provider.verified,
       serviceIds: (provider.serviceIds as unknown[]).map(toIdString),
       services: formatServices(provider),
-      workingAreas: provider.workingAreas || [],
-      serviceArea: provider.serviceArea,
       averageRating: provider.averageRating,
       totalFeedbacks: provider.totalFeedbacks,
       totalCompletedOrders: provider.totalCompletedOrders,
@@ -262,7 +259,7 @@ export const getFeaturedProviders = async (origin?: {
   })
     .sort({ averageRating: -1, totalFeedbacks: -1, createdAt: -1 })
     .limit(12)
-    .populate({ path: "userId", select: "fullName avatar" })
+    .populate({ path: "userId", select: "fullName avatar gender" })
     .populate(servicePopulate)
     .lean();
 
@@ -293,7 +290,7 @@ export const getFeaturedProviders = async (origin?: {
   const featuredProviders = providers
     .filter((provider) => provider.userId)
     .map((provider) => {
-      const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string };
+      const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string; gender?: "male" | "female" | "other" };
       const services = provider.serviceIds as unknown as Array<{ _id: Types.ObjectId; name?: string }>;
       return {
         id: provider._id.toString(),
@@ -301,9 +298,8 @@ export const getFeaturedProviders = async (origin?: {
           id: user._id.toString(),
           fullName: user.fullName,
           avatar: user.avatar,
+          gender: user.gender ?? provider.identityDocument?.gender ?? null,
         },
-        workingAreas: provider.workingAreas || [],
-        serviceArea: provider.serviceArea,
         services: services.map((service) => ({
           id: service._id.toString(),
           name: service.name || "",
@@ -462,7 +458,7 @@ export const getNearbyProvidersForCustomer = async (
     _id: { $in: providerIds },
     isDeleted: false,
   })
-    .populate({ path: "userId", select: "fullName avatar" })
+    .populate({ path: "userId", select: "fullName avatar gender" })
     .populate(servicePopulate)
     .lean();
 
@@ -474,6 +470,7 @@ export const getNearbyProvidersForCustomer = async (
         _id: Types.ObjectId;
         fullName?: string;
         avatar?: string | null;
+        gender?: "male" | "female" | "other" | null;
       };
       const services = provider.serviceIds as unknown as Array<{
         _id: Types.ObjectId;
@@ -486,13 +483,12 @@ export const getNearbyProvidersForCustomer = async (
           id: user?._id?.toString() || "",
           fullName: user?.fullName || "Chuyên gia Handigo",
           avatar: user?.avatar || null,
+          gender: user?.gender ?? provider.identityDocument?.gender ?? null,
         },
         services: services.map((item) => ({
           id: item._id.toString(),
           name: item.name || "",
         })),
-        workingAreas: provider.workingAreas || [],
-        serviceArea: provider.serviceArea,
         availabilityStatus: provider.availabilityStatus,
         averageRating: provider.averageRating,
         totalFeedbacks: provider.totalFeedbacks,
@@ -515,7 +511,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
     isDeleted: false,
     verified: true,
   })
-    .populate({ path: "userId", select: "fullName avatar createdAt" })
+    .populate({ path: "userId", select: "fullName avatar gender createdAt" })
     .populate(servicePopulate)
     .lean();
 
@@ -527,6 +523,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
     _id: Types.ObjectId;
     fullName?: string;
     avatar?: string | null;
+    gender?: "male" | "female" | "other" | null;
     createdAt?: Date;
   };
   const services = provider.serviceIds as unknown as Array<{
@@ -565,6 +562,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
       id: user._id.toString(),
       fullName: user.fullName || "Chuyên gia Handigo",
       avatar: user.avatar || null,
+      gender: user.gender ?? provider.identityDocument?.gender ?? null,
       joinedAt: user.createdAt,
     },
     provider: {
@@ -598,8 +596,6 @@ export const getPublicProviderProfile = async (providerId: string) => {
             slug: service.slug || "",
           })),
       })),
-      workingAreas: provider.workingAreas || [],
-      serviceArea: provider.serviceArea,
       averageRating: provider.averageRating,
       totalFeedbacks: provider.totalFeedbacks,
       totalCompletedOrders: provider.totalCompletedOrders,
@@ -697,15 +693,6 @@ export const updateMyProviderProfile = async (
   if (payload.bio !== undefined) provider.bio = payload.bio;
   if (payload.mainServiceText !== undefined) {
     provider.mainServiceText = payload.mainServiceText;
-  }
-  if (payload.serviceArea !== undefined) {
-    provider.serviceArea = {
-      province: payload.serviceArea.province,
-      ward: payload.serviceArea.ward,
-    };
-  }
-  if (payload.workingAreas !== undefined) {
-    provider.workingAreas = [...new Set(payload.workingAreas)];
   }
   await provider.save();
   await provider.populate(servicePopulate);

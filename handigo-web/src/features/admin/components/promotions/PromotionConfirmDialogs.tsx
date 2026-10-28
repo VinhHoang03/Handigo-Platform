@@ -24,16 +24,16 @@ export function PromotionConfirmDialogs({
     <>
       <ConfirmDialog
         open={Boolean(toggleTarget)}
-        title={isPausing ? "Tạm dừng voucher" : "Kích hoạt voucher"}
-        message={`Bạn có chắc chắn muốn ${isPausing ? "tạm dừng" : "kích hoạt"} voucher "${toggleTarget?.code || ""}"?`}
+        title={isPausing ? "Tạm dừng mã giảm giá" : "Kích hoạt mã giảm giá"}
+        message={`Bạn có chắc chắn muốn ${isPausing ? "tạm dừng" : "kích hoạt"} mã giảm giá "${toggleTarget?.code || ""}"?`}
         busy={busy}
         onCancel={onCancelToggle}
         onConfirm={onConfirmToggle}
       />
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Xóa voucher"
-        message={`Bạn có chắc chắn muốn xóa voucher "${deleteTarget?.code || ""}"? Thao tác này sẽ ẩn voucher khỏi danh sách quản lý.`}
+        title="Xóa mã giảm giá"
+        message={`Bạn có chắc chắn muốn xóa mã giảm giá "${deleteTarget?.code || ""}"? Thao tác này sẽ ẩn mã giảm giá khỏi danh sách quản lý.`}
         busy={busy}
         onCancel={onCancelDelete}
         onConfirm={onConfirmDelete}

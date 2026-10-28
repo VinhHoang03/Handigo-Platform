@@ -1,3 +1,4 @@
+import '../../../shared/widgets/rating_stars.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +24,15 @@ final orderFeedbackContextProvider = FutureProvider.autoDispose
                   ))['data']
               as Map<String, dynamic>,
     );
+
+Future<void> showOrderReport(BuildContext context, OrderDetail order) async {
+  await Navigator.push<bool>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => _OrderResponseScreen(order: order, report: true),
+    ),
+  );
+}
 
 class OrderFollowupPanel extends ConsumerStatefulWidget {
   const OrderFollowupPanel({required this.order, super.key});
@@ -102,6 +112,7 @@ class _OrderFollowupPanelState extends ConsumerState<OrderFollowupPanel> {
           });
       if (!mounted) return;
       final id = await showModalBottomSheet<String>(
+        useRootNavigator: true,
         context: context,
         builder: (context) => SafeArea(
           child: ListView(
@@ -256,7 +267,9 @@ class _OrderFollowupPanelState extends ConsumerState<OrderFollowupPanel> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           if (feedback != null) ...[
-                            Text('${feedback['rating']} / 5 sao'),
+                            Text(
+                              '${formatRating(feedback['rating'] as num)} / 5 sao',
+                            ),
                             Text('${feedback['comment'] ?? ''}'),
                             if (feedback['providerReply'] is Map)
                               Text(
@@ -264,14 +277,13 @@ class _OrderFollowupPanelState extends ConsumerState<OrderFollowupPanel> {
                               ),
                           ],
                           if (data['canReview'] == true)
-                            OutlinedButton(
-                              onPressed: () => openForm(feedback: feedback),
-                              child: Text(
-                                feedback == null
-                                    ? 'Viết đánh giá'
-                                    : 'Chỉnh sửa đánh giá',
-                              ),
-                            )
+                            if (feedback == null)
+                              _InlineOrderReview(orderId: order.id)
+                            else
+                              OutlinedButton(
+                                onPressed: () => openForm(feedback: feedback),
+                                child: const Text('Chỉnh sửa đánh giá'),
+                              )
                           else
                             Text(
                               '${data['reason'] ?? 'Đơn chưa đủ điều kiện đánh giá.'}',
@@ -282,14 +294,117 @@ class _OrderFollowupPanelState extends ConsumerState<OrderFollowupPanel> {
                   ),
             ),
           ),
-        TextButton.icon(
-          onPressed: () => openForm(report: true),
-          icon: const Icon(Icons.flag_outlined),
-          label: const Text('Báo cáo vấn đề đơn hàng'),
-        ),
       ],
     );
   }
+}
+
+class _InlineOrderReview extends ConsumerStatefulWidget {
+  const _InlineOrderReview({required this.orderId});
+  final String orderId;
+
+  @override
+  ConsumerState<_InlineOrderReview> createState() => _InlineOrderReviewState();
+}
+
+class _InlineOrderReviewState extends ConsumerState<_InlineOrderReview> {
+  final comment = TextEditingController();
+  double rating = 0;
+  bool sending = false;
+  bool sent = false;
+  String? error;
+
+  @override
+  void dispose() {
+    comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> submit() async {
+    if (sending || sent || rating == 0) return;
+    setState(() {
+      sending = true;
+      error = null;
+    });
+    try {
+      await ref
+          .read(apiClientProvider)
+          .request(
+            '/feedback',
+            method: 'POST',
+            authenticated: true,
+            data: {
+              'orderId': widget.orderId,
+              'rating': rating,
+              'comment': comment.text.trim(),
+              'images': <String>[],
+            },
+          );
+      if (!mounted) return;
+      setState(() => sent = true);
+      ref.invalidate(orderFeedbackContextProvider(widget.orderId));
+    } catch (failure) {
+      if (mounted)
+        setState(
+          () => error = failure is ApiException
+              ? failure.message
+              : 'Chưa thể gửi đánh giá. Nội dung đã nhập được giữ lại.',
+        );
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const SizedBox(height: 8),
+      RatingStars(
+        value: rating,
+        onChanged: sending || sent
+            ? null
+            : (value) => setState(() => rating = value),
+      ),
+      if (rating > 0)
+        Text(
+          '${formatRating(rating)} / 5 sao',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      if (rating > 0) ...[
+        const SizedBox(height: 8),
+        TextField(
+          controller: comment,
+          enabled: !sending && !sent,
+          minLines: 2,
+          maxLines: 5,
+          maxLength: 1000,
+          decoration: const InputDecoration(
+            labelText: 'Nhận xét (không bắt buộc)',
+            hintText: 'Chia sẻ thêm trải nghiệm của bạn...',
+          ),
+        ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        FilledButton(
+          onPressed: sending || sent ? null : submit,
+          child: Text(
+            sending
+                ? 'Đang gửi...'
+                : sent
+                ? 'Đã gửi đánh giá'
+                : 'Gửi đánh giá',
+          ),
+        ),
+      ],
+    ],
+  );
 }
 
 class _OrderResponseScreen extends ConsumerStatefulWidget {
@@ -312,7 +427,7 @@ class _OrderResponseScreenState extends ConsumerState<_OrderResponseScreen> {
   late final content = TextEditingController(
     text: widget.feedback?['comment'] as String?,
   );
-  late int rating = (widget.feedback?['rating'] as num?)?.toInt() ?? 5;
+  late double rating = (widget.feedback?['rating'] as num?)?.toDouble() ?? 5;
   late final images = (widget.feedback?['images'] as List? ?? [])
       .whereType<String>()
       .toList();
@@ -462,16 +577,11 @@ class _OrderResponseScreenState extends ConsumerState<_OrderResponseScreen> {
                   : null,
             )
           else
-            DropdownButtonFormField<int>(
-              initialValue: rating,
-              decoration: const InputDecoration(labelText: 'Số sao'),
-              items: [
-                for (var i = 1; i <= 5; i++)
-                  DropdownMenuItem(value: i, child: Text('$i sao')),
-              ],
+            RatingStars(
+              value: rating,
               onChanged: busy
                   ? null
-                  : (value) => setState(() => rating = value!),
+                  : (value) => setState(() => rating = value),
             ),
           const SizedBox(height: 16),
           TextFormField(

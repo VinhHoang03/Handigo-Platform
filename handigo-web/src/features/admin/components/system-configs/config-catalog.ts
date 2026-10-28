@@ -46,7 +46,7 @@ export const configDefinitions: ConfigDefinition[] = [
     isPublic: false,
     description: "Tỷ lệ phí nền tảng áp dụng khi tạo đơn dịch vụ giá cố định.",
     effect:
-      "Có hiệu lực khi khách tạo đơn mới. Đơn đã tạo trước đó giữ snapshot phí cũ.",
+      "Có hiệu lực khi khách tạo đơn mới. Đơn đã tạo trước đó giữ bản ghi phí cũ.",
     isEffective: true,
   },
   {
@@ -58,9 +58,9 @@ export const configDefinitions: ConfigDefinition[] = [
     unit: "VNĐ",
     isPublic: false,
     description:
-      "Số dư ví tối thiểu provider phải duy trì để được điều phối và nhận đơn mới.",
+      "Số dư ví tối thiểu nhà cung cấp phải duy trì để được điều phối và nhận đơn mới.",
     effect:
-      "Có hiệu lực khi hệ thống chọn provider và khi provider xác nhận nhận đơn.",
+      "Có hiệu lực khi hệ thống chọn nhà cung cấp và khi nhà cung cấp xác nhận nhận đơn.",
     isEffective: true,
   },
   {
@@ -79,27 +79,27 @@ export const configDefinitions: ConfigDefinition[] = [
   },
   {
     key: "MATCHING_PROVIDER_TIMEOUT_SECONDS",
-    label: "Thời gian chờ provider nhận đơn",
+    label: "Thời gian chờ nhà cung cấp nhận đơn",
     group: "booking",
     type: "NUMBER",
     defaultValue: 60,
     unit: "giây",
     isPublic: false,
     description:
-      "Số giây hệ thống chờ nhóm provider hiện tại phản hồi trước khi mở nhóm tiếp theo.",
+      "Số giây hệ thống chờ nhóm nhà cung cấp hiện tại phản hồi trước khi mở nhóm tiếp theo.",
     effect: "Áp dụng cho đề nghị mới, gồm đơn thường, lịch hẹn, chọn thợ và tìm thợ thay thế. Thời hạn tối đa bằng thời gian trước khi mở rộng tìm kiếm; ví dụ mở rộng sau 1 phút thì mỗi đề nghị tối đa 60 giây, kể cả ở vòng mở rộng. Đề nghị đang chờ giữ thời hạn đã lưu.",
     isEffective: true,
   },
   {
     key: "MATCHING_BATCH_SIZE",
-    label: "Số provider nhận đơn cùng lúc",
+    label: "Số nhà cung cấp nhận đơn cùng lúc",
     group: "booking",
     type: "NUMBER",
     defaultValue: 3,
-    unit: "provider",
+    unit: "nhà cung cấp",
     isPublic: false,
     description:
-      "Số provider phù hợp nhận cùng một lượt đề nghị; người xác nhận hợp lệ đầu tiên sẽ được nhận đơn.",
+      "Số nhà cung cấp phù hợp nhận cùng một lượt đề nghị; người xác nhận hợp lệ đầu tiên sẽ được nhận đơn.",
     effect: "Nên đặt từ 3 đến 5 để cân bằng tốc độ, công bằng và số lượng thông báo.",
     isEffective: true,
   },
@@ -160,8 +160,8 @@ export const configDefinitions: ConfigDefinition[] = [
     unit: "VNĐ",
     isPublic: false,
     description:
-      "Số tiền tối thiểu provider được phép tạo trong một yêu cầu rút tiền.",
-    effect: "Có hiệu lực khi provider tạo yêu cầu rút tiền mới.",
+      "Số tiền tối thiểu nhà cung cấp được phép tạo trong một yêu cầu rút tiền.",
+    effect: "Có hiệu lực khi nhà cung cấp tạo yêu cầu rút tiền mới.",
     isEffective: true,
   },
   {
@@ -173,9 +173,9 @@ export const configDefinitions: ConfigDefinition[] = [
     unit: "VNĐ",
     isPublic: false,
     description:
-      "Số tiền tối đa provider được phép tạo trong một yêu cầu rút tiền.",
+      "Số tiền tối đa nhà cung cấp được phép tạo trong một yêu cầu rút tiền.",
     effect:
-      "Có hiệu lực khi provider tạo yêu cầu rút tiền mới. Đặt 0 nếu muốn bỏ giới hạn tối đa.",
+      "Có hiệu lực khi nhà cung cấp tạo yêu cầu rút tiền mới. Đặt 0 nếu muốn bỏ giới hạn tối đa.",
     isEffective: true,
   },
   {
@@ -187,19 +187,19 @@ export const configDefinitions: ConfigDefinition[] = [
     isPublic: true,
     description: "Số điện thoại hỗ trợ hiển thị cho khách hàng.",
     effect:
-      "Có thể đọc qua API cấu hình công khai để frontend/mobile hiển thị.",
+      "Có thể lấy từ cấu hình công khai để hiển thị trên web và ứng dụng di động.",
     isEffective: false,
   },
   {
     key: "SUPPORT_EMAIL",
-    label: "Email hỗ trợ",
+    label: "Thư điện tử hỗ trợ",
     group: "display",
     type: "STRING",
     defaultValue: "support@handigo.vn",
     isPublic: true,
-    description: "Email hỗ trợ hiển thị trong các kênh chăm sóc khách hàng.",
+    description: "Thư điện tử hỗ trợ hiển thị trong các kênh chăm sóc khách hàng.",
     effect:
-      "Có thể đọc qua API cấu hình công khai để frontend/mobile hiển thị.",
+      "Có thể lấy từ cấu hình công khai để hiển thị trên web và ứng dụng di động.",
     isEffective: false,
   },
   {
@@ -212,7 +212,7 @@ export const configDefinitions: ConfigDefinition[] = [
     description:
       "Bật khi cần hạn chế một số chức năng trong thời gian bảo trì.",
     effect:
-      "Chưa nối vào middleware chặn chức năng. Cần bổ sung logic backend nếu muốn dùng.",
+      "Chưa nối vào lớp trung gian chặn chức năng. Cần bổ sung xử lý phía máy chủ nếu muốn dùng.",
     isEffective: false,
   },
   {
@@ -222,9 +222,9 @@ export const configDefinitions: ConfigDefinition[] = [
     type: "JSON",
     defaultValue: { screen: "notifications" },
     isPublic: false,
-    description: "JSON mặc định dùng khi gửi thông báo hệ thống.",
+    description: "Dữ liệu có cấu trúc mặc định dùng khi gửi thông báo hệ thống.",
     effect:
-      "Chưa nối vào luồng gửi thông báo. Cần bổ sung logic backend nếu muốn dùng.",
+      "Chưa nối vào luồng gửi thông báo. Cần bổ sung xử lý phía máy chủ nếu muốn dùng.",
     isEffective: false,
   },
 ];
@@ -233,5 +233,5 @@ export const typeOptions: Record<SystemConfigType, { label: string; icon: Lucide
   STRING: { label: "Chuỗi", icon: Type },
   NUMBER: { label: "Số", icon: Tag },
   BOOLEAN: { label: "Bật/Tắt", icon: ToggleRight },
-  JSON: { label: "JSON", icon: Braces },
+  JSON: { label: "Dữ liệu có cấu trúc", icon: Braces },
 };

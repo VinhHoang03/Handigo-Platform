@@ -13,6 +13,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/utils/media_url.dart';
+import '../../../shared/widgets/provider_avatar.dart';
 import '../../../shared/widgets/service_images.dart';
 import '../../orders/domain/order_summary.dart';
 import '../../orders/presentation/order_screens.dart';
@@ -129,7 +130,8 @@ final providerAssignmentsProvider =
     });
 
 class ProviderShell extends StatefulWidget {
-  const ProviderShell({super.key});
+  const ProviderShell({this.navigationShell, super.key});
+  final StatefulNavigationShell? navigationShell;
   @override
   State<ProviderShell> createState() => _ProviderShellState();
 }
@@ -140,19 +142,23 @@ class _ProviderShellState extends State<ProviderShell> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final activeIndex = widget.navigationShell?.currentIndex ?? index;
     return Scaffold(
-      body: IndexedStack(
-        index: index,
-        children: [
-          ProviderDashboardScreen(
-            onOrders: () => setState(() => index = 1),
-            onSchedule: _showSchedule,
+      resizeToAvoidBottomInset: false,
+      body:
+          widget.navigationShell ??
+          IndexedStack(
+            index: index,
+            children: [
+              ProviderDashboardScreen(
+                onOrders: () => setState(() => index = 1),
+                onSchedule: _showSchedule,
+              ),
+              const ProviderOrdersScreen(),
+              ProviderScheduleScreen(isActive: index == 2),
+              const ProviderAccountScreen(),
+            ],
           ),
-          const ProviderOrdersScreen(),
-          ProviderScheduleScreen(isActive: index == 2),
-          const ProviderAccountScreen(),
-        ],
-      ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
@@ -168,18 +174,24 @@ class _ProviderShellState extends State<ProviderShell> {
               ])
                 Expanded(
                   child: Semantics(
-                    selected: index == tabIndex,
+                    selected: activeIndex == tabIndex,
                     button: true,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: Material(
-                        color: index == tabIndex
+                        color: activeIndex == tabIndex
                             ? scheme.primaryContainer
                             : scheme.surfaceContainerLowest,
                         borderRadius: BorderRadius.circular(12),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => setState(() => index = tabIndex),
+                          onTap: () {
+                            if (widget.navigationShell case final shell?) {
+                              shell.goBranch(tabIndex);
+                            } else {
+                              setState(() => index = tabIndex);
+                            }
+                          },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Column(
@@ -188,7 +200,7 @@ class _ProviderShellState extends State<ProviderShell> {
                                 Icon(
                                   icon,
                                   size: 22,
-                                  color: index == tabIndex
+                                  color: activeIndex == tabIndex
                                       ? scheme.onPrimary
                                       : scheme.onSurfaceVariant,
                                 ),
@@ -198,11 +210,11 @@ class _ProviderShellState extends State<ProviderShell> {
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
-                                        color: index == tabIndex
+                                        color: activeIndex == tabIndex
                                             ? scheme.onPrimary
                                             : scheme.onSurfaceVariant,
-                                        fontWeight: index == tabIndex
-                                            ? FontWeight.w700
+                                        fontWeight: activeIndex == tabIndex
+                                            ? FontWeight.w600
                                             : FontWeight.w500,
                                       ),
                                 ),
@@ -245,7 +257,7 @@ class ProviderDashboardScreen extends ConsumerWidget {
               'Handigo',
               style: TextStyle(
                 color: scheme.primary,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -472,26 +484,26 @@ class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
         ),
         title: const Text(
           'Trạng thái nhận việc',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               _availabilityLabel(widget.data.availabilityStatus),
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 13),
             ),
             if (location?.isLoading == true)
               const Text(
                 'Đang cập nhật vị trí...',
-                style: TextStyle(fontSize: 12),
+                style: TextStyle(fontSize: 13),
               ),
             if (location?.isLoading != true &&
                 (location?.hasError == true || trackingError != null))
               Text(
                 'Chưa lấy được vị trí hiện tại.',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: Theme.of(context).colorScheme.error,
                 ),
               ),
@@ -596,7 +608,7 @@ class _ProviderHero extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                ProviderAvatar(url: user?.avatar),
+                ProviderAvatar(url: user?.avatar, gender: user?.gender),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -607,7 +619,7 @@ class _ProviderHero extends ConsumerWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -640,34 +652,6 @@ class _ProviderHero extends ConsumerWidget {
   }
 }
 
-class ProviderAvatar extends StatelessWidget {
-  const ProviderAvatar({this.url, super.key});
-  final String? url;
-  @override
-  Widget build(BuildContext context) {
-    final image = usableMediaUrl(url);
-    final scheme = Theme.of(context).colorScheme;
-    final placeholder = ColoredBox(
-      color: scheme.primaryFixed,
-      child: Icon(Icons.handyman_outlined, color: scheme.primary),
-    );
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: image == null
-            ? placeholder
-            : Image.network(
-                image,
-                fit: BoxFit.cover,
-                errorBuilder: (_, error, stack) => placeholder,
-              ),
-      ),
-    );
-  }
-}
-
 class _WalletSummary extends StatelessWidget {
   const _WalletSummary({required this.data});
   final ProviderOverview data;
@@ -693,7 +677,7 @@ class _WalletSummary extends StatelessWidget {
                   child: Text(
                     'Ví Handigo',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -737,7 +721,7 @@ class _WalletSummary extends StatelessWidget {
                                 style: Theme.of(context).textTheme.titleLarge
                                     ?.copyWith(
                                       color: color,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w600,
                                     ),
                               ),
                             ),
@@ -807,7 +791,7 @@ class _MetricCard extends StatelessWidget {
             value,
             style: Theme.of(
               context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -832,7 +816,7 @@ class _SectionHeading extends StatelessWidget {
             title,
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         ?action,
@@ -982,7 +966,7 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -1029,7 +1013,7 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
                       _money(item.totalAmount!),
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: scheme.primary,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -1101,22 +1085,9 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
     final state = ref.watch(providerOrderPageProvider(query));
     final assignments = ref.watch(providerAssignmentsProvider);
     final scheme = Theme.of(context).colorScheme;
-    final page = state.asData?.value;
-    final hasOrders = filter == 'pending'
-        ? assignments.asData?.value.isNotEmpty == true
-        : page?.items.any(
-                (order) => filter == 'all' || order.status == filter,
-              ) ==
-              true;
-    final totalPages = !hasOrders
-        ? 0
-        : filter == 'pending'
-        ? 1
-        : page!.totalPages.clamp(1, 100000);
-    final currentPage = hasOrders ? (filter == 'pending' ? 1 : pageIndex) : 0;
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72 * MediaQuery.textScalerOf(context).scale(1),
+        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
         title: Row(
           children: [
             Container(
@@ -1137,9 +1108,9 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
                 'Lịch sử đơn hàng',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -1268,35 +1239,6 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
                         );
                       },
                     ),
-            ),
-          ),
-          SafeArea(
-            top: false,
-            minimum: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (totalPages > 1)
-                  IconButton(
-                    tooltip: 'Trang trước',
-                    onPressed: pageIndex > 1
-                        ? () => setState(() => pageIndex--)
-                        : null,
-                    icon: const Icon(Icons.chevron_left),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Trang $currentPage/$totalPages'),
-                ),
-                if (totalPages > 1)
-                  IconButton(
-                    tooltip: 'Trang sau',
-                    onPressed: pageIndex < totalPages
-                        ? () => setState(() => pageIndex++)
-                        : null,
-                    icon: const Icon(Icons.chevron_right),
-                  ),
-              ],
             ),
           ),
         ],
@@ -1436,7 +1378,7 @@ class _ProviderScheduleScreenState
     );
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72 * MediaQuery.textScalerOf(context).scale(1),
+        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
         title: Row(
           children: [
             Container(
@@ -1459,8 +1401,8 @@ class _ProviderScheduleScreenState
                 children: [
                   Text(
                     'Lịch làm việc',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1589,7 +1531,7 @@ class _ProviderScheduleScreenState
                             title: Text(
                               '${scheduled.length} lịch hẹn',
                               style: const TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: scheduled.isEmpty
@@ -1607,7 +1549,7 @@ class _ProviderScheduleScreenState
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
-                                            fontWeight: FontWeight.w700,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       if (scheduled.any(
@@ -1666,7 +1608,7 @@ class ProviderStatusBadge extends StatelessWidget {
         label ?? orderStatusLabel(status),
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -1746,14 +1688,14 @@ class _WeekStrip extends StatelessWidget {
                           children: [
                             Text(
                               labels[day.weekday - 1],
-                              style: const TextStyle(fontSize: 12),
+                              style: const TextStyle(fontSize: 13),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               DateFormat('d/M').format(day),
                               style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1767,8 +1709,8 @@ class _WeekStrip extends StatelessWidget {
                                         label,
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       )
                                     : Container(
@@ -1833,7 +1775,7 @@ class _AppointmentCard extends StatelessWidget {
                       : DateFormat(
                           showDate ? 'dd/MM • HH:mm' : 'HH:mm',
                         ).format(order.scheduledAt!.toLocal()),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 ProviderStatusBadge(status: order.status),
               ],
@@ -1845,7 +1787,7 @@ class _AppointmentCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: Theme.of(
                 context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             if (order.totalAmount != null) ...[
               const SizedBox(height: 6),
@@ -1853,7 +1795,7 @@ class _AppointmentCard extends StatelessWidget {
                 _money(order.totalAmount!),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -1903,7 +1845,7 @@ class ProviderAccountScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72 * MediaQuery.textScalerOf(context).scale(1),
+        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
         title: Row(
           children: [
             Container(
@@ -1922,9 +1864,9 @@ class ProviderAccountScreen extends ConsumerWidget {
             Expanded(
               child: Text(
                 'Tài khoản',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -1937,12 +1879,12 @@ class ProviderAccountScreen extends ConsumerWidget {
             margin: EdgeInsets.zero,
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
-              leading: ProviderAvatar(url: user?.avatar),
+              leading: ProviderAvatar(url: user?.avatar, gender: user?.gender),
               title: Text(
                 user?.fullName ?? 'Đối tác Handigo',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
                 user?.email ?? '',
@@ -2035,7 +1977,7 @@ class ProviderAccountScreen extends ConsumerWidget {
     String route,
   ) => ListTile(
     leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-    title: Text(title, style: const TextStyle(fontSize: 14)),
+    title: Text(title, style: const TextStyle(fontSize: 16)),
     trailing: const Icon(Icons.chevron_right, size: 20),
     onTap: () => context.push(route),
   );

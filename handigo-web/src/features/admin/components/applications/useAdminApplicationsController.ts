@@ -10,7 +10,7 @@ import type { AdminApplication, AdminQuery } from "../../types/admin.types";
  * `AdminProviderApplicationsPage` để trang chính chỉ còn lo bố cục.
  */
 export function useAdminApplicationsController() {
-  const [query, setQuery] = useState<AdminQuery>({ page: 1, limit: 10 });
+  const [query, setQuery] = useState<AdminQuery>({ page: 1, limit: 20 });
   const { result, loading, error, load } = useAdminList("applications", query);
   const items = (result?.items || []) as AdminApplication[];
   const [categories, setCategories] = useState<Category[]>([]);

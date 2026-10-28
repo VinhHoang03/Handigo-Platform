@@ -40,6 +40,7 @@ flutter:
     - assets/brand/handigo-logo.png
     - assets/brand/ai-assistant.svg
     - assets/payments/payos-logo.png
+    - assets/avatars/
     - assets/icons/account/
     - assets/audio/assignment-alert.wav
   fonts:

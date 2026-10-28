@@ -4,7 +4,7 @@ import User from "../models/user.model";
 import { Session } from "../models/session.model";
 import { disconnectUserSockets } from "../sockets/socketServer";
 import * as providerApplicationService from "./providerApplication.service";
-import { getAdminFeedbacks as listFeedbacks } from "./feedback.service";
+import { getAdminFeedbacks as listFeedbacks, getAdminFeedbackDetail } from "./feedback.service";
 import { SAFE_USER_PROJECTION } from "./user.service";
 
 interface UserQuery {
@@ -122,3 +122,4 @@ export const getProviderApplications = providerApplicationService.getApplication
 export const getProviderApplicationById = providerApplicationService.getApplicationById;
 export const reviewProviderApplication = providerApplicationService.reviewApplication;
 export const getFeedbacks = listFeedbacks;
+export const getFeedbackDetail = getAdminFeedbackDetail;

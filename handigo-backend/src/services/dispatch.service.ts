@@ -705,8 +705,9 @@ export const DispatchService = {
       }).select("_id orderCode customerId providerId").limit(100);
       for (const order of overdueOrders) {
         const claimed = await Order.findOneAndUpdate(
-          { _id: order._id, status: "in_progress", "overdueReview.escalatedAt": null },
-          { $set: { "overdueReview.escalatedAt": now } },
+          { _id: order._id, status: "in_progress", isDeleted: false, "overdueReview.escalatedAt": null },
+          // Trường cha có default null nên phải khởi tạo object thay vì ghi vào đường dẫn con.
+          { $set: { overdueReview: { escalatedAt: now } } },
           { returnDocument: "after", runValidators: true },
         );
         if (!claimed || !order.providerId) continue;

@@ -6,6 +6,8 @@ import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { OrderStatus } from "../models/orderStatus.model";
 import { Service } from "../models/service.model";
+import { RepairQuotation } from "../models/repairQuotation.model";
+import { withOrderAddress } from "../utils/orderAddress";
 
 interface FeedbackPayload {
   orderId: string;
@@ -24,6 +26,7 @@ interface PaginationQuery {
   page?: string | number;
   limit?: string | number;
   rating?: string | number;
+  ratingBelow?: string | number;
   hasImages?: string | boolean;
   replied?: string | boolean;
   keyword?: string;
@@ -310,7 +313,7 @@ const buildFeedbackFilter = (
 ) => {
   const filter: Record<string, unknown> = { ...base, isDeleted: false };
   const rating = Number(query.rating);
-  if (Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+  if (Number.isInteger(rating * 2) && rating >= 1 && rating <= 5) {
     filter.rating = rating;
   }
 
@@ -582,10 +585,14 @@ export const getAdminFeedbacks = async (query: PaginationQuery = {}) => {
   const isVisible = parseBoolean(query.isVisible);
   if (isVisible !== undefined) base.isVisible = isVisible;
   const filter = buildFeedbackFilter(query, base);
+  const ratingBelow = Number(query.ratingBelow);
+  if (filter.rating === undefined && Number.isFinite(ratingBelow) && ratingBelow >= 1 && ratingBelow <= 5) {
+    filter.rating = { $lt: ratingBelow };
+  }
 
   const [items, total] = await Promise.all([
     Feedback.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ rating: 1, createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .populate("customerId", "fullName email avatar")
@@ -594,14 +601,61 @@ export const getAdminFeedbacks = async (query: PaginationQuery = {}) => {
         select: "userId",
         populate: { path: "userId", select: "fullName email avatar" },
       })
-      .populate("orderId", "orderCode status")
+      .populate("orderId", "orderCode status scheduledAt")
       .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
       .populate("providerReply.repliedBy", "fullName avatar"),
     Feedback.countDocuments(filter),
   ]);
 
+  const orderIds = items.flatMap((item) => item.orderId?._id ? [item.orderId._id] : []);
+  const startedOrders = await OrderStatus.aggregate<{ _id: Types.ObjectId; performedAt: Date }>([
+    { $match: { orderId: { $in: orderIds }, status: "in_progress", isDeleted: false } },
+    { $group: { _id: "$orderId", performedAt: { $min: "$createdAt" } } },
+  ]);
+  const performedAtByOrder = new Map(startedOrders.map((item) => [item._id.toString(), item.performedAt]));
+
   return {
-    items,
+    items: items.map((item) => {
+      const value = item.toObject();
+      const order = value.orderId as unknown as { _id: Types.ObjectId; performedAt?: Date | null } | null;
+      if (order?._id) order.performedAt = performedAtByOrder.get(order._id.toString()) ?? null;
+      return value;
+    }),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+};
+
+export const getAdminFeedbackDetail = async (feedbackId: string) => {
+  assertObjectId(feedbackId, "đánh giá");
+  const feedback = await Feedback.findOne({ _id: feedbackId, isDeleted: false })
+    .select("orderId customerId providerId serviceId rating comment images isVisible providerReply createdAt")
+    .populate("customerId", "fullName avatar phone email")
+    .populate({ path: "providerId", select: "userId", populate: { path: "userId", select: "fullName avatar phone email" } })
+    .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
+    .populate("providerReply.repliedBy", "fullName avatar")
+    .lean();
+  if (!feedback) throw new AppError("Không tìm thấy đánh giá.", 404);
+
+  const order = await Order.findOne({ _id: feedback.orderId, isDeleted: false })
+    .select("orderCode customerId providerId serviceId addressId addressSnapshot orderType scheduledAt status paymentMethod paymentStatus pricing depositAmount depositPaidAt inspectionRequired currentQuotationId quotationFinalAmount selectedOptionsSnapshot problemDescription customerAttachments completionEvidenceImages completionNote confirmation cancellation createdAt updatedAt")
+    .populate("customerId", "fullName avatar phone email")
+    .populate({ path: "providerId", select: "userId", populate: { path: "userId", select: "fullName avatar phone email" } })
+    .populate({ path: "serviceId", select: "name serviceType image coverImage", transform: serviceImageResponse })
+    .populate("addressId", "fullAddress detailAddress ward district province note")
+    .lean();
+  if (!order) return { feedback, order: null, quotation: null };
+
+  const [statusHistory, quotation] = await Promise.all([
+    OrderStatus.find({ orderId: order._id, isDeleted: false })
+      .select("status previousStatus changedByRole note createdAt")
+      .sort({ createdAt: 1, statusVersion: 1 }).lean(),
+    order.currentQuotationId ? RepairQuotation.findOne({ _id: order.currentQuotationId, orderId: order._id, isDeleted: false })
+      .select("quotationCode status finalAmount discountAmount subtotalAmount directPaymentConfirmedAt directPaymentConfirmedAmount customerConfirmed providerConfirmed")
+      .lean() : Promise.resolve(null),
+  ]);
+  return {
+    feedback,
+    order: { ...withOrderAddress(order), statusHistory },
+    quotation: quotation ? { quotation, items: [] } : null,
   };
 };

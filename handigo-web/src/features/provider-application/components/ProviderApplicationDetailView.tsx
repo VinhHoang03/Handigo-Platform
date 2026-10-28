@@ -83,10 +83,6 @@ export function ApplicationDetail({
         <p>
           <b>Kỹ năng:</b> {serviceNames || "Chưa cập nhật"}
         </p>
-        <p>
-          <b>Khu vực:</b>{" "}
-          {application.workingAreas.join(", ") || "Chưa cập nhật"}
-        </p>
         <p className="sm:col-span-2">
           <b>Mô tả:</b> {application.description || "Chưa cập nhật"}
         </p>

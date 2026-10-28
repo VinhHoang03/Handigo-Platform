@@ -54,7 +54,7 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
                 </select>
               </label>
               <FormInput label="Tên dịch vụ" name="service-name" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} />
-              <FormInput label="Slug" name="service-slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống…" />
+              <FormInput label="Đường dẫn định danh" name="service-slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống…" />
             </div>
             <div className="lg:col-span-2">
               <FormTextArea label="Mô tả" name="service-description" value={form.description} onChange={(value) => onChange({ ...form, description: value })} />

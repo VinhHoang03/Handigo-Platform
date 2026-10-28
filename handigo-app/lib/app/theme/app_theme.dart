@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Bảng màu theo DESIGN.md của giao diện Handigo mobile.
@@ -25,6 +26,10 @@ abstract final class AppTheme {
   static ThemeData get dark => _build(Brightness.dark);
 
   static ThemeData _build(Brightness brightness) {
+    final fontFamily = switch (defaultTargetPlatform) {
+      TargetPlatform.iOS || TargetPlatform.macOS => '.SF Pro Text',
+      _ => 'Roboto',
+    };
     final scheme = brightness == Brightness.light
         ? const ColorScheme.light(
             primary: primaryDark,
@@ -73,41 +78,44 @@ abstract final class AppTheme {
             inversePrimary: Color(0xFFC3C0FF),
           )
         : ColorScheme.fromSeed(seedColor: primary, brightness: brightness);
-    final baseText =
-        (brightness == Brightness.light
-                ? Typography.material2021().black
-                : Typography.material2021().white)
-            .apply(fontFamily: 'Inter');
+    TextStyle style(double size, FontWeight weight) => TextStyle(
+      fontFamily: fontFamily,
+      fontSize: size,
+      fontWeight: weight,
+      height: 1.5,
+      letterSpacing: 0,
+      color: scheme.onSurface,
+    );
+    final textTheme = TextTheme(
+      displayLarge: style(28, FontWeight.w800),
+      displayMedium: style(28, FontWeight.w800),
+      displaySmall: style(28, FontWeight.w800),
+      headlineLarge: style(28, FontWeight.w800),
+      headlineMedium: style(28, FontWeight.w800),
+      headlineSmall: style(22, FontWeight.w600),
+      titleLarge: style(22, FontWeight.w600),
+      titleMedium: style(16, FontWeight.w600),
+      titleSmall: style(16, FontWeight.w600),
+      bodyLarge: style(16, FontWeight.w400),
+      bodyMedium: style(16, FontWeight.w400),
+      bodySmall: style(13, FontWeight.w400),
+      labelLarge: style(16, FontWeight.w600),
+      labelMedium: style(13, FontWeight.w400),
+      labelSmall: style(11, FontWeight.w500),
+    );
     return ThemeData(
       useMaterial3: true,
-      fontFamily: 'Inter',
-      textTheme: baseText.copyWith(
-        displayLarge: baseText.displayLarge?.copyWith(
-          fontFamily: 'Hanken Grotesk',
-        ),
-        displayMedium: baseText.displayMedium?.copyWith(
-          fontFamily: 'Hanken Grotesk',
-        ),
-        displaySmall: baseText.displaySmall?.copyWith(
-          fontFamily: 'Hanken Grotesk',
-        ),
-        headlineLarge: baseText.headlineLarge?.copyWith(
-          fontFamily: 'Hanken Grotesk',
-        ),
-        headlineMedium: baseText.headlineMedium?.copyWith(
-          fontFamily: 'Hanken Grotesk',
-        ),
-        headlineSmall: baseText.headlineSmall?.copyWith(
-          fontFamily: 'Hanken Grotesk',
-        ),
-        titleLarge: baseText.titleLarge?.copyWith(fontFamily: 'Hanken Grotesk'),
-        titleMedium: baseText.titleMedium?.copyWith(
-          fontFamily: 'Hanken Grotesk',
-        ),
-        titleSmall: baseText.titleSmall?.copyWith(fontFamily: 'Hanken Grotesk'),
-      ),
+      fontFamily: fontFamily,
+      textTheme: textTheme,
       scaffoldBackgroundColor: scheme.surface,
       colorScheme: scheme,
+      appBarTheme: AppBarThemeData(
+        titleTextStyle: textTheme.titleLarge,
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
       chipTheme: ChipThemeData(
         backgroundColor: scheme.surfaceContainerLowest,
         selectedColor: scheme.primary,
@@ -128,7 +136,9 @@ abstract final class AppTheme {
         shape: const StadiumBorder(),
         labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         labelStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: fontFamily,
+          fontSize: 13,
+          height: 1.5,
           color: WidgetStateColor.resolveWith(
             (states) => states.contains(WidgetState.selected)
                 ? scheme.onPrimary
@@ -139,9 +149,11 @@ abstract final class AppTheme {
           fontWeight: FontWeight.w500,
         ),
         secondaryLabelStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: fontFamily,
+          fontSize: 13,
+          height: 1.5,
           color: scheme.onPrimary,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
       ),
       cardTheme: CardThemeData(

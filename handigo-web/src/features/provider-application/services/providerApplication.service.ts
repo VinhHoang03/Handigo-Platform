@@ -91,14 +91,11 @@ const cleanCertificates = (
   });
 
 const cleanDraft = (payload: ProviderApplicationDraftPayload): ProviderApplicationDraftPayload => ({
-  ...payload,
+  applicationType: payload.applicationType,
+  experienceYears: payload.experienceYears,
+  onboardingStep: payload.onboardingStep,
   serviceIds: [...new Set(payload.serviceIds)],
   description: payload.description.trim(),
-  workingAreas: [
-    ...new Set(
-      payload.workingAreas.map((area) => area.trim()).filter(Boolean),
-    ),
-  ],
   identityDocument: {
     type: payload.identityDocument.type,
     documentNumber: payload.identityDocument.documentNumber.trim(),
@@ -141,19 +138,15 @@ export const providerApplicationService = {
     }
 
     const clean = {
-      ...payload,
+      applicationType: payload.applicationType,
+      experienceYears: payload.experienceYears,
       serviceIds: [...new Set(payload.serviceIds)],
       description: payload.description.trim(),
-      workingAreas: [
-        ...new Set(
-          payload.workingAreas.map((area) => area.trim()).filter(Boolean),
-        ),
-      ],
       identityDocument: cleanIdentity(payload.identityDocument),
       certificates: cleanCertificates(payload.certificates),
     };
 
-    if (!clean.serviceIds.length || !clean.workingAreas.length || !clean.description) {
+    if (!clean.serviceIds.length || !clean.description) {
       throw new Error('Vui lòng hoàn thành tất cả thông tin bắt buộc.');
     }
 
@@ -164,14 +157,14 @@ export const providerApplicationService = {
       throw new Error('Vui lòng kiểm tra lại ngày cấp và ngày hết hạn của tài liệu.');
     }
     const clean = {
-      ...payload,
+      applicationType: payload.applicationType,
+      experienceYears: payload.experienceYears,
       serviceIds: [...new Set(payload.serviceIds)],
       description: payload.description.trim(),
-      workingAreas: [...new Set(payload.workingAreas.map((area) => area.trim()).filter(Boolean))],
       identityDocument: cleanIdentity(payload.identityDocument),
       certificates: cleanCertificates(payload.certificates),
     };
-    if (!clean.serviceIds.length || !clean.workingAreas.length || !clean.description) {
+    if (!clean.serviceIds.length || !clean.description) {
       throw new Error('Vui lòng hoàn thành tất cả thông tin bắt buộc.');
     }
     return providerApplicationApi.resubmit(id, clean);

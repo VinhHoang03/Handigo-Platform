@@ -10,10 +10,11 @@ export function UserFilters({
   onChange: (query: AdminQuery) => void;
 }) {
   return (
-    <div className="grid gap-3 border-y border-outline-variant/40 py-4 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem]">
+    <div className="grid gap-3 py-4 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem]">
       <FloatingInput
         id="admin-user-keyword"
-        label="Tên hoặc email"
+        type="search"
+        label="Tìm theo tên hoặc email"
         value={query.keyword || ''}
         onValueChange={(value) => onChange({ ...query, keyword: value, page: 1 })}
       />

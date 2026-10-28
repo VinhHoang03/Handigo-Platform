@@ -272,6 +272,14 @@
     @apply pointer-events-none absolute left-4 top-1/2 origin-left -translate-y-1/2 text-sm text-on-surface-variant transition-all duration-200;
   }
 
+  .form-field--search .form-field__input {
+    @apply pl-10;
+  }
+
+  .form-field--search .form-field__label {
+    @apply left-10;
+  }
+
   .form-field__input:focus ~ .form-field__label,
   .form-field__input:not(:placeholder-shown) ~ .form-field__label {
     @apply top-2.5 translate-y-0 scale-[0.78] font-medium text-primary;

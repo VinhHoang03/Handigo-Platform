@@ -85,7 +85,7 @@ export function NewsFormModal({
             </label>
           </div>
           {form.coverImage && <img src={form.coverImage} alt="Xem trước ảnh bìa" width="1200" height="630" className="mt-4 h-52 w-full rounded-xl object-cover" />}
-          <input required type="url" maxLength={1000} value={form.coverImage} onChange={(event) => onFormChange({ ...form, coverImage: event.target.value })} placeholder="Hoặc nhập URL ảnh bìa" className={`mt-4 ${inputClass}`} />
+          <input required type="url" maxLength={1000} value={form.coverImage} onChange={(event) => onFormChange({ ...form, coverImage: event.target.value })} placeholder="Hoặc nhập đường dẫn ảnh bìa" className={`mt-4 ${inputClass}`} />
         </section>
 
         <NewsContentBlocksEditor content={form.content} onChange={(content) => onFormChange({ ...form, content })} />

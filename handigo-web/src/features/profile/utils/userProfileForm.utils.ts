@@ -38,10 +38,16 @@ export const formatDate = (value?: string | null) => {
   return date.toLocaleDateString("vi-VN");
 };
 
-export const maskEmail = (email?: string | null) => {
+export const maskEmail = (email?: string | null, showSuffix = false) => {
   if (!email) return "Chưa cập nhật";
   const [localPart, domain] = email.split("@");
   if (!domain) return email;
+
+  if (showSuffix) {
+    const prefix = localPart.slice(0, localPart.length > 4 ? 2 : 1);
+    const suffix = localPart.length > 4 ? localPart.slice(-2) : "";
+    return `${prefix}**********${suffix}@${domain}`;
+  }
 
   const visibleLength = Math.min(3, Math.max(1, localPart.length));
   return `${localPart.slice(0, visibleLength)}******@${domain}`;

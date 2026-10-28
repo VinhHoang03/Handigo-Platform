@@ -1,22 +1,36 @@
 enum UserRole {
-  customer('Khách hàng'), provider('Nhà cung cấp'), admin('Quản trị viên');
+  customer('Khách hàng'),
+  provider('Nhà cung cấp'),
+  admin('Quản trị viên');
+
   const UserRole(this.label);
   final String label;
   static UserRole parse(String value) => switch (value.toUpperCase()) {
-    'CUSTOMER' => customer, 'PROVIDER' => provider, 'ADMIN' => admin,
+    'CUSTOMER' => customer,
+    'PROVIDER' => provider,
+    'ADMIN' => admin,
     _ => throw const FormatException('Vai trò tài khoản không hợp lệ.'),
   };
 }
 
 class AppUser {
-  const AppUser({required this.id, required this.fullName, required this.email,
-    required this.role, this.avatar, this.isGoogleAccount = false, this.providerOnboardingStatus});
+  const AppUser({
+    required this.id,
+    required this.fullName,
+    required this.email,
+    required this.role,
+    this.avatar,
+    this.gender,
+    this.isGoogleAccount = false,
+    this.providerOnboardingStatus,
+  });
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
     id: (json['id'] ?? json['_id']) as String,
     fullName: json['fullName'] as String,
     email: json['email'] as String,
     role: UserRole.parse(json['role'] as String),
     avatar: json['avatar'] as String?,
+    gender: json['gender'] as String?,
     isGoogleAccount: json['isGoogleAccount'] as bool? ?? false,
     providerOnboardingStatus: json['providerOnboardingStatus'] as String?,
   );
@@ -25,8 +39,10 @@ class AppUser {
   final String email;
   final UserRole role;
   final String? avatar;
+  final String? gender;
   final bool isGoogleAccount;
   final String? providerOnboardingStatus;
-  bool get canViewOrders => role == UserRole.customer ||
+  bool get canViewOrders =>
+      role == UserRole.customer ||
       (role == UserRole.provider && providerOnboardingStatus == 'APPROVED');
 }

@@ -103,7 +103,6 @@ export interface ProviderApplicationPayload {
   description: string;
   experienceYears: number;
   serviceIds: string[];
-  workingAreas: string[];
   identityDocument: ProviderApplicationIdentityDocument;
   certificates: ProviderApplicationCertificate[];
 }

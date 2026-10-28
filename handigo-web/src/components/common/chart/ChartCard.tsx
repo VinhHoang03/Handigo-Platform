@@ -36,15 +36,15 @@ export function ChartCard({
   children,
 }: ChartCardProps) {
   return (
-    <article className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+    <article className="min-w-0 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h2 className="text-title-lg font-bold text-on-surface">{title}</h2>
           {description && (
             <p className="mt-1 text-sm text-on-surface-variant">{description}</p>
           )}
         </div>
-        {action}
+        {action && <div className="shrink-0">{action}</div>}
       </div>
 
       {loading ? (

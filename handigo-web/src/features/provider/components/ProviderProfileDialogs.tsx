@@ -1,6 +1,5 @@
 import type { FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
-import { WorkingAreasStep } from "@/features/provider-application/components/WorkingAreasStep";
 
 interface ProfessionalDialogProps {
   open: boolean;
@@ -72,49 +71,3 @@ export function ProfessionalProfileDialog({
   );
 }
 
-export function ServiceAreaDialog({
-  open,
-  areas,
-  saving,
-  onChange,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  areas: string[];
-  saving?: boolean;
-  error?: string;
-  onChange: (areas: string[]) => void;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <Modal open={open} title="Chỉnh sửa khu vực phục vụ" onClose={onClose} size="lg">
-      <div className="space-y-6">
-        <WorkingAreasStep
-          areas={areas}
-          onAdd={(value) => !areas.includes(value) && onChange([...areas, value])}
-          onRemove={(value) => onChange(areas.filter((item) => item !== value))}
-        />
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            className="rounded-lg bg-surface-container px-4 py-2 font-bold"
-            disabled={saving}
-            onClick={onClose}
-          >
-            Hủy
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={saving || areas.length === 0}
-            onClick={onSave}
-          >
-            {saving ? "Đang lưu..." : "Lưu khu vực"}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}

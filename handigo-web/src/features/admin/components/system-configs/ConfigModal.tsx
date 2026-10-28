@@ -34,7 +34,7 @@ export function ConfigModal({
         <div className="rounded-lg border border-outline-variant/30 bg-surface-container-low p-4">
           {item.group !== "policy" && (
             <>
-              <p className="text-sm text-on-surface-variant">Key hệ thống</p>
+              <p className="text-sm text-on-surface-variant">Mã hệ thống</p>
               <p className="mt-1 font-mono font-semibold text-on-surface">
                 {item.key}
               </p>
@@ -136,7 +136,7 @@ function ValueField({
   if (item.type === "JSON") {
     return (
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold">Giá trị JSON</span>
+        <span className="mb-1 block text-sm font-semibold">Dữ liệu có cấu trúc (JSON)</span>
         <textarea
           required
           rows={8}

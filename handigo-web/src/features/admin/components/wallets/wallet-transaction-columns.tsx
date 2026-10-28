@@ -1,6 +1,7 @@
 import type { DataTableColumn } from "@/components/common/dashboard/DataTable";
 import type { WalletTransaction } from "@/features/wallet/types/wallet.types";
 import { walletDateTime, walletMoney } from "./wallet-table-columns";
+import { transactionLabels } from "@/features/wallet/components/wallet-formatters";
 
 /** Bảng lịch sử giao dịch bên trong modal chi tiết ví. */
 export const walletTransactionColumns: Array<DataTableColumn<WalletTransaction>> = [
@@ -13,7 +14,7 @@ export const walletTransactionColumns: Array<DataTableColumn<WalletTransaction>>
   {
     key: "type",
     header: "Loại",
-    render: (transaction) => transaction.type,
+    render: (transaction) => transactionLabels[transaction.type],
   },
   {
     key: "amount",

@@ -2,13 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { InitialsAvatar } from '../common/InitialsAvatar';
 import { normalizeImageUrl } from '@/utils/imageUrl';
-import { ArrowUpRight, MapPin, Star, type LucideIcon } from "lucide-react";
+import { ArrowUpRight,  Star, type LucideIcon } from "lucide-react";
 interface ProviderCardProps {
   name: string;
   rating: number;
   totalFeedbacks: number;
   services: string[];
-  area: string;
   img?: string | null;
   tabIndex?: number;
 }
@@ -66,7 +65,7 @@ const ProviderRatingBadge = ({ rating, totalFeedbacks }: { rating: number; total
   );
 };
 
-export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img, tabIndex }: ProviderCardProps) => (
+export const ProviderCard = ({ name, rating, totalFeedbacks, services, img, tabIndex }: ProviderCardProps) => (
   <article className="home-provider-card group flex h-full flex-col rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-3">
     <div className="relative mb-4 overflow-hidden rounded-xl">
       <ProviderCardMedia name={name} img={img} />
@@ -75,10 +74,6 @@ export const ProviderCard = ({ name, rating, totalFeedbacks, services, area, img
 
     <h3 title={name} className="truncate font-headline-md text-lg font-semibold tracking-tight text-on-surface">{name}</h3>
 
-    <p className="mt-2 flex min-h-8 items-start gap-1 text-on-surface-variant">
-      <MapPin aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-primary" />
-      <span title={area} className="line-clamp-2 text-xs leading-5">{area || 'Chưa cập nhật khu vực hoạt động'}</span>
-    </p>
 
     <div className="mb-5 mt-3 flex min-h-6 flex-wrap gap-1.5">
       {services.slice(0, 2).map((service) => (

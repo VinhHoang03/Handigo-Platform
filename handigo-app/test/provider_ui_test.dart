@@ -1,3 +1,5 @@
+import 'package:handigo_app/features/orders/presentation/order_detail_overview.dart';
+import 'package:handigo_app/features/provider/presentation/provider_order_directions_sheet.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -24,6 +26,7 @@ import 'package:handigo_app/features/provider/domain/provider_models.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_account_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_detail_screen.dart';
+import 'package:handigo_app/features/provider/presentation/quotation_editor_screen.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_feedback_panel.dart';
 
 final previewKey = GlobalKey();
@@ -241,6 +244,7 @@ Future<void> _showScreen(
             depositPaidAt: today,
             totalAmount: 270000,
             customerName: 'Khách hàng kiểm tra',
+            customerPhone: '0901234567',
             addressLabel: 'Địa chỉ kiểm tra bố cục trên thiết bị nhỏ',
             scheduledAt: today.add(const Duration(hours: 14)),
             problemDescription: 'Kiểm tra đường ống và khắc phục rò rỉ.',
@@ -385,9 +389,12 @@ void main() {
       size: const Size(320, 640),
       scale: 2,
     );
-    await tester.tap(find.text('Lập báo giá sửa chữa'));
-    await tester.pumpAndSettle();
-    expect(find.byType(TextFormField), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.byType(QuotationEditorScreen),
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Lập báo giá sửa chữa'), findsNothing);
     await tester.scrollUntilVisible(
       find.text('Thời lượng sửa chữa (phút)'),
       200,
@@ -405,8 +412,7 @@ void main() {
     await tester.ensureVisible(find.byType(TextFormField).last);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    expect(find.byType(QuotationEditorScreen), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -424,7 +430,7 @@ void main() {
     await savePreview(tester, 'home');
     await tester.tap(find.text('Đơn hàng').last);
     await tester.pumpAndSettle();
-    expect(find.text('HDG-001'), findsOneWidget);
+    expect(find.text('Mã đơn HDG-001'), findsOneWidget);
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     expect(find.text('2 lịch hẹn'), findsOneWidget);
@@ -590,8 +596,8 @@ void main() {
     await tester.ensureVisible(progressFilter);
     await tester.tap(progressFilter);
     await tester.pumpAndSettle();
-    expect(find.text('HDG-002'), findsOneWidget);
-    expect(find.text('HDG-001'), findsNothing);
+    expect(find.text('Mã đơn HDG-002'), findsOneWidget);
+    expect(find.text('Mã đơn HDG-001'), findsNothing);
     await tester.ensureVisible(find.text('Chờ phản hồi').first);
     await tester.tap(find.text('Chờ phản hồi').first);
     await tester.pumpAndSettle();
@@ -622,6 +628,54 @@ void main() {
     expect(find.text(orders.first.serviceName), findsWidgets);
   });
 
+  testWidgets(
+    'Chi tiết provider dùng lại thông tin dịch vụ và thẻ địa chỉ mở chỉ đường',
+    (tester) async {
+      await _showScreen(
+        tester,
+        const ProviderOrderDetailScreen(orderId: 'detail'),
+      );
+      expect(find.text('Trạng thái công việc'), findsNothing);
+      expect(
+        tester
+            .widget<OrderDetailOverview>(find.byType(OrderDetailOverview))
+            .providerView,
+        isTrue,
+      );
+      expect(find.text('Theo dõi và chia sẻ vị trí'), findsNothing);
+      await tester.tap(find.text('Địa chỉ').first);
+      await tester.pumpAndSettle();
+      expect(find.byType(ProviderOrderDirectionsSheet), findsOneWidget);
+      expect(
+        find.text('Địa chỉ đơn chưa có tọa độ để chỉ đường.'),
+        findsOneWidget,
+      );
+      expect(find.text('Thử lại'), findsOneWidget);
+      await tester.tap(find.byTooltip('Đóng chỉ đường'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProviderOrderDirectionsSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Menu chi tiết provider có tải lại, báo cáo và hủy đơn', (
+    tester,
+  ) async {
+    await _showScreen(
+      tester,
+      const ProviderOrderDetailScreen(orderId: 'detail'),
+    );
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('Tải lại đơn'), findsOneWidget);
+    expect(find.text('Báo cáo đơn'), findsOneWidget);
+    expect(find.text('Hủy đơn'), findsOneWidget);
+    await tester.tap(find.text('Báo cáo đơn'));
+    await tester.pumpAndSettle();
+    expect(find.text('Báo cáo vấn đề'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final status in ['accepted', 'in_progress', 'completed', 'cancelled']) {
     testWidgets('Nút chi tiết phù hợp trạng thái $status', (tester) async {
       await _showScreen(
@@ -630,19 +684,24 @@ void main() {
         status: status,
       );
       expect(
-        find.text('Bắt đầu thực hiện'),
+        find.text('Trượt để bắt đầu xử lý'),
         status == 'accepted' ? findsOneWidget : findsNothing,
       );
       expect(
         find.text('Hoàn tất & nghiệm thu'),
         status == 'in_progress' ? findsOneWidget : findsNothing,
       );
-      expect(
-        find.text('Lập báo giá sửa chữa'),
-        ['accepted', 'in_progress'].contains(status)
-            ? findsOneWidget
-            : findsNothing,
-      );
+      expect(find.text('Lập báo giá sửa chữa'), findsNothing);
+      if (['accepted', 'in_progress'].contains(status)) {
+        await tester.scrollUntilVisible(
+          find.byType(QuotationEditorScreen),
+          180,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.byType(QuotationEditorScreen), findsOneWidget);
+      } else {
+        expect(find.byType(QuotationEditorScreen), findsNothing);
+      }
       if (status == 'in_progress') await savePreview(tester, 'detail');
       expect(tester.takeException(), isNull);
     });

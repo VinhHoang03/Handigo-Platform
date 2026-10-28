@@ -46,7 +46,7 @@ import {
   violationIdSchema,
   violationListQuerySchema,
 } from "../validations/violation.validator";
-import { feedbackListQuerySchema } from "../validations/feedback.validator";
+import { adminFeedbackListQuerySchema } from "../validations/feedback.validator";
 
 const router = Router();
 
@@ -73,8 +73,14 @@ router.patch(
 );
 
 router.get(
+  "/feedbacks/:id",
+  validate(adminEntityIdParamSchema, "params"),
+  adminController.getFeedbackDetail,
+);
+
+router.get(
   "/feedbacks",
-  validate(feedbackListQuerySchema, "query"),
+  validate(adminFeedbackListQuerySchema, "query"),
   adminController.getFeedbacks,
 );
 

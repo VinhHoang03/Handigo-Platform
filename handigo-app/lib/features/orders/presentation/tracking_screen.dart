@@ -12,8 +12,13 @@ import '../../auth/domain/app_user.dart';
 import 'order_screens.dart';
 
 class OrderTrackingScreen extends ConsumerStatefulWidget {
-  const OrderTrackingScreen({required this.orderId, super.key});
+  const OrderTrackingScreen({
+    required this.orderId,
+    this.embedded = false,
+    super.key,
+  });
   final String orderId;
+  final bool embedded;
   @override
   ConsumerState<OrderTrackingScreen> createState() =>
       _OrderTrackingScreenState();
@@ -21,6 +26,8 @@ class OrderTrackingScreen extends ConsumerStatefulWidget {
 
 class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     with WidgetsBindingObserver {
+  final _mapController = MapController();
+  bool _mapReady = false;
   StreamSubscription<dynamic>? events;
   StreamSubscription<Position>? positions;
   Timer? timer;
@@ -35,6 +42,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() {
+      if (!mounted) return;
       final connection = ref.read(realtimeConnectionProvider);
       events = connection?.events.listen((event) {
         if (event.name == 'connect') join();
@@ -68,6 +76,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
             coordinates = Map<String, dynamic>.from(response['data'] as Map);
             updatedAt = DateTime.now();
           });
+          _fitMap();
           loadRoute();
         } else {
           setState(
@@ -116,6 +125,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
           route = Map<String, dynamic>.from(data);
           updatedAt = DateTime.now();
         });
+      _fitMap();
     } catch (failure) {
       if (mounted)
         setState(
@@ -210,11 +220,138 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _mapController.dispose();
     timer?.cancel();
     events?.cancel();
     positions?.cancel();
     super.dispose();
   }
+
+  LatLng? _coordinate(dynamic value) {
+    if (value is! Map ||
+        value['latitude'] is! num ||
+        value['longitude'] is! num)
+      return null;
+    final lat = (value['latitude'] as num).toDouble();
+    final lng = (value['longitude'] as num).toDouble();
+    return lat.isFinite && lng.isFinite && lat.abs() <= 90 && lng.abs() <= 180
+        ? LatLng(lat, lng)
+        : null;
+  }
+
+  List<LatLng> get _routePoints => route == null
+      ? []
+      : ((route!['geometry'] as Map)['coordinates'] as List)
+            .map(
+              (point) => LatLng(
+                (point[1] as num).toDouble(),
+                (point[0] as num).toDouble(),
+              ),
+            )
+            .toList();
+
+  LatLng? get _destination {
+    final order = ref.read(orderDetailProvider(widget.orderId)).asData?.value;
+    return _coordinate({
+      'latitude': order?.addressLatitude,
+      'longitude': order?.addressLongitude,
+    });
+  }
+
+  List<LatLng> get _displayPoints {
+    final points = _routePoints;
+    if (points.isNotEmpty) return points;
+    final provider = _coordinate(coordinates?['provider']);
+    final destination = _destination;
+    return [provider, destination].whereType<LatLng>().toList();
+  }
+
+  void _fitMap() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_mapReady) return;
+      final points = _displayPoints.toSet().toList();
+      if (points.length > 1) {
+        _mapController.fitCamera(
+          CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(points),
+            padding: const EdgeInsets.all(32),
+          ),
+        );
+      } else if (points.isNotEmpty) {
+        _mapController.move(points.first, 14);
+      }
+    });
+  }
+
+  Widget _buildMap(
+    List<LatLng> points, {
+    bool hasRoute = true,
+    bool providerKnown = true,
+    bool destinationKnown = true,
+  }) => SizedBox(
+    height: 320,
+    child: FlutterMap(
+      key: ValueKey(widget.orderId),
+      mapController: _mapController,
+      options: MapOptions(
+        onMapReady: () => _mapReady = true,
+        initialCenter: points.first,
+        initialZoom: 14,
+        initialCameraFit: points.toSet().length > 1
+            ? CameraFit.bounds(
+                bounds: LatLngBounds.fromPoints(points),
+                padding: const EdgeInsets.all(32),
+              )
+            : null,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.handigo.handigo_app',
+        ),
+        if (hasRoute)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: points,
+                color: Theme.of(context).colorScheme.primary,
+                strokeWidth: 5,
+              ),
+            ],
+          ),
+        MarkerLayer(
+          markers: [
+            if (providerKnown)
+              Marker(
+                point: points.first,
+                child: const Tooltip(
+                  message: 'Vị trí chuyên gia',
+                  child: Icon(Icons.handyman, size: 36, color: Colors.blue),
+                ),
+              ),
+            if (destinationKnown)
+              Marker(
+                point: points.last,
+                child: const Tooltip(
+                  message: 'Địa chỉ dịch vụ',
+                  child: Icon(Icons.location_on, size: 36, color: Colors.red),
+                ),
+              ),
+          ],
+        ),
+        RichAttributionWidget(
+          attributions: [
+            TextSourceAttribution(
+              'OpenStreetMap contributors',
+              onTap: () => launchUrl(
+                Uri.parse('https://www.openstreetmap.org/copyright'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -223,16 +360,59 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
       positions?.cancel();
       positions = null;
     }
-    final points = route == null
-        ? <LatLng>[]
-        : ((route!['geometry'] as Map)['coordinates'] as List)
-              .map(
-                (point) => LatLng(
-                  (point[1] as num).toDouble(),
-                  (point[0] as num).toDouble(),
+    final points = _routePoints;
+    if (widget.embedded) {
+      final display = _displayPoints;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (display.isNotEmpty)
+            _buildMap(
+              display,
+              hasRoute: points.isNotEmpty,
+              providerKnown:
+                  points.isNotEmpty ||
+                  _coordinate(coordinates?['provider']) != null,
+              destinationKnown: points.isNotEmpty || _destination != null,
+            )
+          else
+            SizedBox(
+              height: 240,
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                child: Center(
+                  child: loading
+                      ? const CircularProgressIndicator()
+                      : const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'Đang chờ vị trí chuyên gia và địa chỉ dịch vụ.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                 ),
-              )
-              .toList();
+              ),
+            ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (route != null)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Quãng đường: ${((route!['distanceMeters'] as num) / 1000).toStringAsFixed(1)} km · Dự kiến: ${((route!['durationSeconds'] as num) / 60).ceil()} phút',
+              ),
+            ),
+        ],
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Theo dõi đơn hàng')),
       body: ListView(
@@ -260,70 +440,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
           if (loading) const LinearProgressIndicator(),
           if (points.isNotEmpty) ...[
             const SizedBox(height: 12),
-            SizedBox(
-              height: 320,
-              child: FlutterMap(
-                key: ValueKey(widget.orderId),
-                options: MapOptions(
-                  initialCameraFit: CameraFit.bounds(
-                    bounds: LatLngBounds.fromPoints(points),
-                    padding: const EdgeInsets.all(32),
-                  ),
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.handigo.handigo_app',
-                  ),
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: points,
-                        color: Theme.of(context).colorScheme.primary,
-                        strokeWidth: 5,
-                      ),
-                    ],
-                  ),
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: points.first,
-                        child: const Tooltip(
-                          message: 'Vị trí chuyên gia',
-                          child: Icon(
-                            Icons.handyman,
-                            size: 36,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ),
-                      Marker(
-                        point: points.last,
-                        child: const Tooltip(
-                          message: 'Địa chỉ dịch vụ',
-                          child: Icon(
-                            Icons.location_on,
-                            size: 36,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  RichAttributionWidget(
-                    attributions: [
-                      TextSourceAttribution(
-                        'OpenStreetMap contributors',
-                        onTap: () => launchUrl(
-                          Uri.parse('https://www.openstreetmap.org/copyright'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            _buildMap(points),
             Text(
               'Quãng đường: ${((route!['distanceMeters'] as num) / 1000).toStringAsFixed(1)} km · Dự kiến di chuyển: ${((route!['durationSeconds'] as num) / 60).ceil()} phút',
             ),

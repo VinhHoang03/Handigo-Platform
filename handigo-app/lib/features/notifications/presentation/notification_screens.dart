@@ -29,7 +29,7 @@ class _NotificationCenterScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(notificationListProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Thông báo')),
+      appBar: AppBar(title: Text('Thông báo', style: Theme.of(context).textTheme.headlineLarge)),
       body: state.when(
         loading: () => const AppLoading(),
         error: (_, __) => AppMessage(
@@ -181,8 +181,8 @@ class _NotificationChip extends StatelessWidget {
                     color: isSelected
                         ? scheme.primary
                         : scheme.onSurfaceVariant,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -257,7 +257,7 @@ class _NotificationTile extends ConsumerWidget {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -276,7 +276,7 @@ class _NotificationTile extends ConsumerWidget {
                                   'Chưa đọc',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: theme.colorScheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),

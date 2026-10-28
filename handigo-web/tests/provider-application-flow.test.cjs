@@ -162,7 +162,7 @@ test('Khôi phục bản chỉnh sửa theo tài khoản và lần xét duyệt,
   });
   const key = storage.providerApplicationDraftKey('nguoi-dung-1', 'ho-so');
   const form = {
-    description: 'Nội dung đã sửa', experienceYears: 2, serviceIds: ['dich-vu'], workingAreas: [],
+    description: 'Nội dung đã sửa', experienceYears: 2, serviceIds: ['dich-vu'], 
     identityDocument: { type: 'cccd', documentNumber: '', fullName: '' }, certificates: [], onboardingStep: 2,
   };
   assert.equal(storage.writeProviderApplicationDraft(key, { form, sourceVersion: 'lan-1' }), true);
@@ -178,11 +178,11 @@ test('Khôi phục bản chỉnh sửa theo tài khoản và lần xét duyệt,
 test('Hướng dẫn chỉ rõ thông tin thiếu và chứng chỉ chưa đầy đủ, CCCD không yêu cầu mặt sau', () => {
   const { getProviderApplicationSubmissionErrors } = load('utils/providerApplicationValidation.ts');
   const form = {
-    description: '', experienceYears: 2, serviceIds: [], workingAreas: [],
+    description: '', experienceYears: 2, serviceIds: [], 
     identityDocument: { type: 'cccd', documentNumber: '', fullName: '' }, certificates: [],
   };
-  assert.equal(getProviderApplicationSubmissionErrors(form).length, 6);
-  Object.assign(form, { description: 'Có kinh nghiệm', serviceIds: ['dich-vu'], workingAreas: ['khu-vuc'] });
+  assert.equal(getProviderApplicationSubmissionErrors(form).length, 5);
+  Object.assign(form, { description: 'Có kinh nghiệm', serviceIds: ['dich-vu'] });
   Object.assign(form.identityDocument, { documentNumber: '123', fullName: 'Nguyễn An', frontImageUrl: 'anh' });
   assert.equal(getProviderApplicationSubmissionErrors(form).length, 0);
   form.certificates.push({ title: 'Chứng chỉ', imageUrls: [] });
@@ -231,7 +231,7 @@ function formSync(provider, storage = new Map()) {
   let cursor = 0;
   let timerId = 0;
   let form = {
-    description: '', experienceYears: 2, serviceIds: [], workingAreas: [],
+    description: '', experienceYears: 2, serviceIds: [], 
     identityDocument: { type: 'cccd', documentNumber: '', fullName: '' }, certificates: [],
   };
   let step = 1;
@@ -304,7 +304,7 @@ test('CUSTOMER lưu từ bước 1 và phản hồi lưu nháp không ghi đè n
 test('Sửa hồ sơ bị từ chối được khôi phục khi tải lại, không sửa hồ sơ máy chủ trước khi gửi', () => {
   let saves = 0;
   const application = { _id: 'tu-choi', status: 'rejected', updatedAt: 'lan-1',
-    serviceIds: [], workingAreas: [], certificates: [], description: 'Bản gốc' };
+    serviceIds: [],  certificates: [], description: 'Bản gốc' };
   const provider = { loadedApplication: application, application, loading: false, loadError: '',
     saveDraft: async () => { saves++; } };
   const first = formSync(provider);
@@ -324,4 +324,32 @@ test('Tải hồ sơ lỗi không lưu nháp rỗng hoặc thay bản chỉnh s�
   scenario.tick(0); scenario.render(); scenario.tick(700);
   assert.equal(saves, 0);
   assert.equal(scenario.storage.size, 0);
+});
+
+test('Gửi, gửi lại và lưu nháp không còn yêu cầu hoặc gửi khu vực từ bản nháp cũ', () => {
+  const calls = [];
+  const api = {
+    create: payload => { calls.push(payload); return payload; },
+    resubmit: (_, payload) => { calls.push(payload); return payload; },
+    saveDraft: payload => { calls.push(payload); return payload; },
+  };
+  const { providerApplicationService } = load('services/providerApplication.service.ts', {
+    '../api/providerApplication.api': { providerApplicationApi: api },
+    '../utils/providerApplicationValidation': load('utils/providerApplicationValidation.ts'),
+  });
+  const form = {
+    description: 'Có kinh nghiệm', experienceYears: 2, serviceIds: ['dich-vu'],
+    identityDocument: { type: 'cccd', documentNumber: '123456789012', fullName: 'Nguyễn Văn An', frontImageUrl: 'https://example.com/cccd.jpg' },
+    certificates: [],
+    workingAreas: ['Dữ liệu cũ'], serviceArea: { province: 'Dữ liệu cũ' },
+  };
+  providerApplicationService.submit(form);
+  providerApplicationService.resubmit('ho-so', form);
+  providerApplicationService.saveDraft(form);
+  assert.equal(calls.length, 3);
+  for (const payload of calls) {
+    assert.equal(Object.hasOwn(payload, 'workingAreas'), false);
+    assert.equal(Object.hasOwn(payload, 'serviceArea'), false);
+    assert.equal(payload.serviceIds[0], 'dich-vu');
+  }
 });

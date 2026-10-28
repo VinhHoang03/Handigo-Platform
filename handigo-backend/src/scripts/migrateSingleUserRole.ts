@@ -34,7 +34,7 @@ const resolveProviderOnboarding = async (
     Provider.exists({ userId, verified: true, isDeleted: false }),
     ProviderApplication.findOne({ userId, isDeleted: false })
       .sort({ updatedAt: -1 })
-      .select("status serviceIds workingAreas")
+      .select("status serviceIds")
       .lean(),
   ]);
 
@@ -50,10 +50,8 @@ const resolveProviderOnboarding = async (
   if (!application?.serviceIds?.length) {
     return { status: "PROFILE_INCOMPLETE", step: 1 };
   }
-  if (!application.workingAreas?.length) {
-    return { status: "PROFILE_INCOMPLETE", step: 2 };
-  }
-  return { status: "PROFILE_INCOMPLETE", step: 3 };
+
+  return { status: "PROFILE_INCOMPLETE", step: 2 };
 };
 
 const migrate = async () => {

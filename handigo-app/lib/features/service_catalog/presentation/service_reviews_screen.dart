@@ -35,7 +35,7 @@ class ServiceReviewPreview extends ConsumerWidget {
                 'Đánh giá thực tế',
                 style: Theme.of(
                   context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             TextButton(
@@ -223,7 +223,7 @@ class _ServiceReviewsScreenState extends ConsumerState<ServiceReviewsScreen> {
                       selected: _hasImages,
                       labelStyle: TextStyle(
                         fontWeight: _hasImages
-                            ? FontWeight.w700
+                            ? FontWeight.w600
                             : FontWeight.w500,
                       ),
                       onSelected: (value) => setState(() {
@@ -378,7 +378,7 @@ class ServiceReviewCard extends StatelessWidget {
                         Icon(
                           star <= review.rating
                               ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
+                              : star - .5 <= review.rating ? Icons.star_half_rounded : Icons.star_outline_rounded,
                           size: 16,
                           color: AppTheme.starGold,
                         ),

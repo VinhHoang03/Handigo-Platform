@@ -968,7 +968,7 @@ export const OrderService = {
       .populate("addressId")
       .populate({
         path: "providerId",
-        populate: { path: "userId", select: "fullName phone avatar" },
+        populate: { path: "userId", select: "fullName phone avatar gender" },
       })
       .lean();
 

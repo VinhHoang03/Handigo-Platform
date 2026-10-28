@@ -117,6 +117,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(LoginScreen), findsOneWidget);
 
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Đăng nhập'));
       await tester.tap(find.widgetWithText(FilledButton, 'Đăng nhập'));
       await tester.pumpAndSettle();
       expect(find.text('Vui lòng nhập email hợp lệ'), findsOneWidget);
@@ -129,6 +130,7 @@ void main() {
         find.byType(TextFormField).at(1),
         'MatKhau-Test-123!',
       );
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Đăng nhập'));
       await tester.tap(find.widgetWithText(FilledButton, 'Đăng nhập'));
       await tester.pumpAndSettle();
       expect(repository.submittedEmail, 'flutter-test@example.invalid');

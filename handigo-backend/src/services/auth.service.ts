@@ -68,6 +68,7 @@ type AuthUserResponse = {
   fullName: string;
   phone?: string;
   avatar?: string | null;
+  gender?: "male" | "female" | "other" | null;
   role: string;
   status: string;
   isEmailVerified: boolean;
@@ -177,6 +178,7 @@ const toAuthUserResponse = (user: IUser): AuthUserResponse => ({
   fullName: user.fullName,
   phone: user.phone,
   avatar: user.avatar,
+  gender: user.gender,
   role: user.role,
   status: user.status,
   isEmailVerified: user.isEmailVerified,
