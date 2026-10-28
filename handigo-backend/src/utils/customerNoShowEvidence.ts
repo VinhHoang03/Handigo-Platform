@@ -4,6 +4,10 @@ interface EvidenceTime {
   time?: string | null;
 }
 
+// Chỉ dùng sai số dưới một phút khi ảnh thực sự không hiển thị giây.
+export const getNoShowEvidenceTimePrecision = (event: EvidenceTime): "minute" | "second" =>
+  /^\d{1,2}:\d{2}$/.test(event.time?.trim() ?? "") ? "minute" : "second";
+
 // Ngày tương đối luôn neo vào lần tải ảnh, không đổi theo ngày admin mở hồ sơ.
 export const resolveNoShowEvidenceTime = (event: EvidenceTime, uploadedAt?: Date | null): string | null => {
   const anchor = uploadedAt?.getTime();

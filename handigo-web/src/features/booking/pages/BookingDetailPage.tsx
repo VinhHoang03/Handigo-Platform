@@ -22,6 +22,7 @@ import {
 } from "../components/detail/bookingDetailFormatters";
 import { formatOrderAddress } from "../components/detail/bookingDetailProvider";
 import { ArrowLeft, ChevronRight } from "lucide-react";
+import { RebookButton } from '../components/RebookButton';
 
 const BookingDetailContent = () => {
   const {
@@ -74,7 +75,7 @@ const BookingDetailContent = () => {
         >
           <ArrowLeft aria-hidden="true" size={24} />
         </Link>
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="font-headline-lg text-headline-lg text-on-surface">
             Chi tiết đơn hàng
           </h1>
@@ -86,6 +87,7 @@ const BookingDetailContent = () => {
             <span className="text-primary font-bold">#{order.orderCode}</span>
           </nav>
         </div>
+        <RebookButton orderId={order._id} status={order.status} />
       </div>
 
       <BookingStatusBanners

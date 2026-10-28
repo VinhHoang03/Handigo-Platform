@@ -113,30 +113,20 @@ const BookingHistoryPage = () => {
     }
   };
 
-  const formattedBookings: BookingListItem[] = (orders || []).map((order) => ({
-    id: order?._id || "unknown",
-    serviceName: order?.serviceId?.name || "Dịch vụ",
-    statusLabel: getOrderStatusMeta(order?.status || "created").label,
-    statusTone: mapStatusToTone(order?.status || "created"),
-    status: order?.status || "created",
-    schedule: order?.scheduledAt
-      ? new Date(order.scheduledAt).toLocaleString("vi-VN")
-      : "Sớm nhất",
-    meta: order?.providerId
-      ? `Chuyên gia: ${order.providerId.name || "Đã phân công"}`
-      : "Đang tìm chuyên gia",
-    price: formatCurrency(
-      order.status === "completed" &&
-        (order.inspectionRequired ||
-          order.serviceId?.serviceType === "variable_price")
-        ? (order.quotationFinalAmount ?? order.pricing?.totalPaidAmount ?? 0)
-        : (order.pricing?.totalPaidAmount ?? 0),
-    ),
-    imageUrl:
-      (order?.serviceId?.coverImage === undefined
-        ? order?.serviceId?.image
-        : order.serviceId.coverImage) || undefined,
-    primaryAction: order?.status === "completed" ? "Đánh giá" : "Xem chi tiết",
+  const formattedBookings: BookingListItem[] = (orders || []).map(order => ({
+    id: order?._id || 'unknown',
+    serviceName: order?.serviceId?.name || 'Dịch vụ',
+    statusLabel: getOrderStatusMeta(order?.status || 'created').label,
+    statusTone: mapStatusToTone(order?.status || 'created'),
+    status: order?.status || 'created',
+    schedule: order?.scheduledAt ? new Date(order.scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất',
+    meta: order?.providerId ? `Chuyên gia: ${order.providerId.userId?.fullName || order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
+    price: formatCurrency(order.status === 'completed'
+      && (order.inspectionRequired || order.serviceId?.serviceType === 'variable_price')
+      ? order.quotationFinalAmount ?? order.pricing?.totalPaidAmount ?? 0
+      : order.pricing?.totalPaidAmount ?? 0),
+    imageUrl: (order?.serviceId?.coverImage === undefined ? order?.serviceId?.image : order.serviceId.coverImage) || undefined,
+    primaryAction: order?.status === 'completed' ? 'Đánh giá' : 'Xem chi tiết',
   }));
 
   return (

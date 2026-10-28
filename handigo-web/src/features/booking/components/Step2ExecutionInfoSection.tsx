@@ -2,6 +2,7 @@ import { AddressBookManager } from '@/features/profile/components/AddressBookMan
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import type { UserAddress } from '@/features/profile/types/profile.types';
 import { ImagePlus, Loader2, X } from "lucide-react";
+import { useBookingStore } from '../hooks/useBookingStore';
 
 interface Step2ExecutionInfoSectionProps {
   addressId?: string;
@@ -25,6 +26,7 @@ export const Step2ExecutionInfoSection = ({
   customerAttachments, isUploadingImages, uploadError, onUploadImages, onRemoveAttachment,
 }: Step2ExecutionInfoSectionProps) => {
   const user = useAuthStore((state) => state.user);
+  const rebookSource = useBookingStore(state => state.rebookSource);
 
   return (
     <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm">
@@ -37,6 +39,7 @@ export const Step2ExecutionInfoSection = ({
           <AddressBookManager
             compact
             selectable
+            autoSelect={!rebookSource}
             singleAddressMode={isFromServiceDetail}
             selectedAddressId={addressId}
             defaultRecipient={{

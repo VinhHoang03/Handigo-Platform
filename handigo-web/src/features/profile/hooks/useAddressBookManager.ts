@@ -15,6 +15,7 @@ import { getErrorMessage } from "@/utils/apiError";
 interface UseAddressBookManagerParams {
   selectedAddressId?: string;
   selectable?: boolean;
+  autoSelect?: boolean;
   singleAddressMode?: boolean;
   onSelectAddress?: (address: UserAddress | null) => void;
 }
@@ -26,6 +27,7 @@ interface UseAddressBookManagerParams {
 export function useAddressBookManager({
   selectedAddressId,
   selectable = false,
+  autoSelect = true,
   singleAddressMode = false,
   onSelectAddress,
 }: UseAddressBookManagerParams) {
@@ -58,7 +60,7 @@ export function useAddressBookManager({
   }, [loadAddresses]);
 
   useEffect(() => {
-    if (!selectable || addresses.length === 0) return;
+    if (!selectable || !autoSelect || addresses.length === 0) return;
 
     const selectedAddress = addresses.find(
       (item) => item.id === selectedAddressId,
@@ -68,7 +70,7 @@ export function useAddressBookManager({
     if (nextAddress.id !== selectedAddressId) {
       onSelectAddress?.(nextAddress);
     }
-  }, [addresses, onSelectAddress, selectable, selectedAddressId]);
+  }, [addresses, autoSelect, onSelectAddress, selectable, selectedAddressId]);
 
   const openCreate = () => {
     setEditingAddress(null);

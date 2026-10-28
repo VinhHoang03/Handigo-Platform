@@ -152,3 +152,30 @@ test('Phần đầu chỉ hiển thị mô tả của thợ, bỏ các dòng h�
   assert.equal(getNoShowUserDescription('Khách vắng mặt.\nĐã gọi nhiều lần.\nThợ xác nhận đã gọi hoặc nhắn tin nhưng không liên hệ được khách.\nĐã đến: 2026-10-26T15:40:00Z.'),
     'Khách vắng mặt.\nĐã gọi nhiều lần.');
 });
+
+test('Chi tiết từng cuộc gọi hiển thị lý do bị loại và độ chính xác đến phút', () => {
+  const data = details();
+  data.evidence[1].callEvents = [{ phoneNumber: '0773368198', dateLabel: 'Hôm nay', time: '09:01',
+    resolvedAt: '2026-10-28T02:01:00.000Z', direction: 'outgoing', outcome: 'no_answer',
+    eligible: false, failures: ['Đã tính cuộc gọi tới số này trong cùng phút'], timePrecision: 'minute' }];
+  const html = renderToStaticMarkup(React.createElement(NoShowReviewDetails, { details: data, report: report() }));
+  assert.match(html, /Đối chiếu theo quy tắc hiện tại/);
+  assert.match(html, /Không được tính/);
+  assert.match(html, /Đã tính cuộc gọi tới số này trong cùng phút/);
+  assert.match(html, /Ảnh chỉ hiển thị đến phút/);
+});
+
+test('Chỉ báo cáo khách vắng mặt đang chờ mới có nút xác minh lại', () => {
+  const props = { open: true, detailLoading: false, selected: { kind: 'report', item: report({ status: 'pending' }) },
+    detailEvidence: [], busy: false, evidenceNote: '', nextStatus: '', reviewNote: '', resolutionNote: '', onReverifyReport() {} };
+  assert.match(renderToStaticMarkup(React.createElement(CaseDetailModal, props)), />Xác minh lại</);
+  props.busy = true;
+  const tree = CaseDetailModal(props);
+  const action = all(tree, node => node.type === 'button' && node.props.children === 'Đang xử lý...');
+  assert.ok(action.some(node => node.props.disabled));
+  props.busy = false;
+  for (const status of ['confirmed', 'rejected', 'resolved']) {
+    props.selected.item.status = status;
+    assert.doesNotMatch(renderToStaticMarkup(React.createElement(CaseDetailModal, props)), />Xác minh lại</);
+  }
+});

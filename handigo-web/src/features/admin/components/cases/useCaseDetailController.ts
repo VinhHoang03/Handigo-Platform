@@ -126,6 +126,21 @@ export function useCaseDetailController(
     }
   };
 
+  const reverifyReport = async () => {
+    if (busy || !selected || selected.kind !== "report" || !selected.item.isCustomerNoShow) return;
+    const reportId = selected.item._id;
+    try {
+      setBusy(true);
+      setActionError("");
+      const item = await adminCasesApi.reverifyReport(reportId);
+      setSelected(current => current?.kind === "report" && current.item._id === reportId ? { kind: "report", item } : current);
+      await reload();
+      addToast("Đã xác minh lại cuộc gọi và lưu lịch sử kiểm tra.", "success");
+    } catch (requestError) {
+      setActionError(getErrorMessage(requestError, "Không thể xác minh lại cuộc gọi."));
+    } finally { setBusy(false); }
+  };
+
   const selectedTitle = selected?.kind === "complaint"
     ? selected.item.title
     : selected?.kind === "report"
@@ -178,6 +193,7 @@ export function useCaseDetailController(
         adminCasesApi.updateComplaint(selected.item._id, nextStatus as ComplaintStatus, resolutionNote.trim() || undefined),
       ),
     onReviewReport: () => void runReportAction(),
+    onReverifyReport: () => void reverifyReport(),
     openViolationForm,
   };
 }

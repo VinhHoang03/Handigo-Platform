@@ -39,6 +39,7 @@ interface CaseDetailModalProps {
   onResolutionNoteChange: (value: string) => void;
   onUpdateComplaint: () => void;
   onReviewReport: () => void;
+  onReverifyReport?: () => void;
   onOpenViolationForm: () => void;
   onClose: () => void;
 }
@@ -61,6 +62,7 @@ export function CaseDetailModal({
   onResolutionNoteChange,
   onUpdateComplaint,
   onReviewReport,
+  onReverifyReport,
   onOpenViolationForm,
   onClose,
 }: CaseDetailModalProps) {
@@ -97,6 +99,11 @@ export function CaseDetailModal({
               )}
             </section>
             {selected.kind === "report" && selected.item.isCustomerNoShow && <NoShowVerificationSummary report={selected.item} />}
+            {selected.kind === "report" && selected.item.isCustomerNoShow && ["pending", "under_review"].includes(selected.item.status)
+              && !selected.item.createdViolationId && onReverifyReport && <div className="space-y-2 rounded-xl border border-outline-variant p-3 text-sm">
+                <button type="button" disabled={busy} onClick={onReverifyReport} className="btn-secondary disabled:opacity-50">{busy ? "Đang xử lý..." : "Xác minh lại"}</button>
+                <p className="text-xs text-on-surface-variant">Đối chiếu lại cuộc gọi trên bằng chứng và khoảng thời gian chờ đã lưu. Kết quả cũ được ghi vào lịch sử; admin tiếp tục quyết định xử lý báo cáo.</p>
+              </div>}
             {selected.kind === "report" && selected.item.noShowDetails && <NoShowReviewDetails details={selected.item.noShowDetails} report={selected.item} />}
             {selected.kind !== "violation" && !(selected.kind === "report" && selected.item.noShowDetails?.evidence.length) && <section><h3 className="mb-3 font-bold">Bằng chứng</h3><EvidenceLinks urls={detailEvidence} /></section>}
             {selected.kind === "complaint" && selected.item.requestedEvidenceNote && (

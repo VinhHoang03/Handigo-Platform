@@ -65,6 +65,58 @@ function service(options = {}) {
 }
 const { evaluateNoShowEvidence } = service();
 
+test('Đến 09:01:30, ảnh gọi 09:01/09:02/09:03 chỉ có phút được tính đủ 3/3', () => {
+  const items = callEvidence();
+  items[1].uploadedAt = new Date('2026-10-28T09:12:00+07:00');
+  items[1].analysis.calls = ['09:03', '09:02', '09:01', '08:49'].map(time => ({
+    phoneNumber: '0773368198', dateLabel: 'Hôm nay', time, occurredAt: null, direction: 'outgoing', outcome: 'no_answer',
+  }));
+  const result = service().inspectNoShowCalls(items, { customerPhone: '0773368198',
+    waitStartedAt: Date.parse('2026-10-28T09:01:30+07:00'), now: Date.parse('2026-10-28T09:12:00+07:00') });
+  assert.equal(result.validCount, 3);
+  assert.equal(result.events[2].eligible, true);
+  assert.equal(result.events[2].timePrecision, 'minute');
+  assert.equal(result.events[3].eligible, false);
+  assert.match(result.events[3].failures.join(), /trước thời gian bắt đầu chờ/);
+});
+
+test('Ảnh có giây hoặc chỉ có ISO chính xác vẫn loại cuộc trước lúc bắt đầu chờ', () => {
+  const items = callEvidence();
+  items[1].uploadedAt = new Date('2026-10-28T09:12:00+07:00');
+  const calls = [
+    { time: '09:01:29', occurredAt: null },
+    { time: '09:01:30', occurredAt: null },
+    { time: null, occurredAt: '2026-10-28T09:01:00+07:00', dateLabel: null },
+    { time: '09:13', occurredAt: null },
+  ];
+  items[1].analysis.calls = calls.map(call => ({ phoneNumber: '0773368198', dateLabel: 'Hôm nay', direction: 'outgoing', outcome: 'no_answer', ...call }));
+  const result = service().inspectNoShowCalls(items, { customerPhone: '0773368198',
+    waitStartedAt: Date.parse('2026-10-28T09:01:30+07:00'), now: Date.parse('2026-10-28T09:12:00+07:00') });
+  assert.equal(result.validCount, 1);
+  assert.equal(result.events[0].eligible, false);
+  assert.equal(result.events[0].timePrecision, 'second');
+  assert.equal(result.events[1].eligible, true);
+  assert.equal(result.events[2].eligible, false);
+  assert.equal(result.events[3].eligible, false);
+  assert.match(result.events[3].failures.join(), /Không quy đổi được ngày giờ/);
+});
+
+test('Nới độ chính xác đến phút không bỏ kiểm tra trùng phút, sai số hoặc cuộc đã kết nối', () => {
+  const items = callEvidence();
+  items[1].uploadedAt = new Date('2026-10-28T09:12:00+07:00');
+  items[1].analysis.calls = [
+    { time: '09:01' }, { time: '09:01' }, { time: '09:02', phoneNumber: '0900000000' },
+    { time: '09:02', direction: 'incoming' }, { time: '09:03', outcome: 'answered' },
+  ].map(call => ({ phoneNumber: '0773368198', dateLabel: 'Hôm nay', occurredAt: null, direction: 'outgoing', outcome: 'no_answer', ...call }));
+  const result = service().getNoShowCallVerification(items, { customerPhone: '0773368198',
+    waitStartedAt: Date.parse('2026-10-28T09:01:30+07:00'), now: Date.parse('2026-10-28T09:12:00+07:00') });
+  assert.equal(result.checks.validCount, 1);
+  assert.equal(result.checks.passed, false);
+  assert.match(result.comparison.events[1].failures.join(), /cùng phút/);
+  assert.match(result.comparison.events[2].failures.join(), /không khớp/);
+  assert.match(result.reasons.join(), /có kết nối/);
+});
+
 test('Hai nhóm ảnh, GPS và tin nhắn Handigo chưa được phản hồi đủ điều kiện tự duyệt', () => {
   const result = evaluateNoShowEvidence(evidence(), facts());
   assert.equal(result.decision, 'auto_eligible');

@@ -129,6 +129,7 @@ export default function AdminCasesPage() {
         onResolutionNoteChange={detail.setResolutionNote}
         onUpdateComplaint={detail.onUpdateComplaint}
         onReviewReport={detail.onReviewReport}
+        onReverifyReport={detail.onReverifyReport}
         onOpenViolationForm={detail.openViolationForm}
         onClose={detail.closeDetail}
       />
