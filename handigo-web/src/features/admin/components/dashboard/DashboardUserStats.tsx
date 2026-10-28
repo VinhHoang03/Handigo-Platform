@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshCw, Users, Radio } from "lucide-react";
+import { Users, ArrowUpRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { chartNumber } from "@/components/common/chart";
 import { getErrorMessage } from "@/utils/apiError";
 import { adminDashboardApi } from "../../api/adminDashboard.api";
 import type { AdminUserPresence } from "../../types/adminDashboard.types";
+import type { AdminProviderAnalytics } from "../../types/adminOperations.types";
 
-export function DashboardUserStats() {
+export function DashboardUserStats({ providers }: { providers: AdminProviderAnalytics }) {
   const [data, setData] = useState<AdminUserPresence | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,30 +37,23 @@ export function DashboardUserStats() {
     return () => { requestRef.current += 1; window.clearTimeout(start); window.clearInterval(interval); document.removeEventListener("visibilitychange", poll); };
   }, [load]);
 
-  return <section aria-label="Thống kê tài khoản" className="min-w-0 space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="text-title-lg font-bold">Người dùng trong hệ thống</h2>
-      <button type="button" onClick={() => void load()} disabled={loading} aria-label="Làm mới thống kê người dùng"
-        className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-primary hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50">
-        <RefreshCw size={17} aria-hidden="true" className={loading ? "animate-spin motion-reduce:animate-none" : ""} />
-        <span>Cập nhật mỗi 30 giây</span>
-      </button>
+  return <article aria-label="Thống kê tài khoản" aria-busy={loading} className="dashboard-metric dashboard-user-stats relative min-w-0 rounded-xl border border-outline-variant/40 p-4 hover:border-primary/50">
+    <Link to="/admin/users" aria-label="Xem người dùng hệ thống" className="absolute inset-0 rounded-xl focus-visible:outline-2 focus-visible:outline-primary" />
+    <div className="flex items-start gap-3">
+      <Users aria-hidden="true" size={20} className="shrink-0 text-primary" />
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm text-on-surface-variant">Người dùng hệ thống</h3>
+      </div>
+      <ArrowUpRight aria-hidden="true" size={16} className="pointer-events-none shrink-0 text-primary" />
     </div>
-    <div className="grid gap-4 md:grid-cols-2" aria-busy={loading}>
-      <article className="flex items-start gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
-        <Users aria-hidden="true" className="mt-1 shrink-0 text-primary" />
-        <div className="min-w-0"><h3 className="text-sm text-on-surface-variant">Người dùng đã đăng ký</h3>
-          <p className="mt-1 text-headline-md font-bold tabular-nums">{data ? chartNumber.format(data.totalRegisteredUsers) : "—"}</p>
-          <p className="mt-1 text-xs text-on-surface-variant">Gồm mọi vai trò; không tính tài khoản đã xóa.</p></div>
-      </article>
-      <article className="flex items-start gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
-        <Radio aria-hidden="true" className="mt-1 shrink-0 text-success" />
-        <div className="min-w-0"><h3 className="text-sm text-on-surface-variant">Người dùng đang online</h3>
-          <p className="mt-1 text-headline-md font-bold tabular-nums">{data?.onlineUsers == null ? "—" : chartNumber.format(data.onlineUsers)}</p>
-          <p className="mt-1 text-xs text-on-surface-variant">{data?.onlineUsers === null ? "Chưa xác định được kết nối realtime." : "Tài khoản đang kết nối realtime; mỗi người chỉ tính một lần."}</p></div>
-      </article>
+    <div className="mt-3 flex items-center justify-between gap-3">
+      <p className="text-2xl font-bold tabular-nums">{data ? chartNumber.format(data.totalRegisteredUsers) : "—"}</p>
+      <dl className="space-y-1 text-right text-xs text-on-surface-variant">
+        <div className="flex justify-end gap-1"><dt>Online:</dt><dd className="font-semibold tabular-nums text-success">{data?.onlineUsers == null ? "—" : chartNumber.format(data.onlineUsers)}</dd></div>
+        <div className="flex justify-end gap-1"><dt>Thợ hoạt động:</dt><dd className="font-semibold tabular-nums text-on-surface">{chartNumber.format(providers.activeProviders)}</dd></div>
+        <div className="flex justify-end gap-1" title="Số người dùng đăng ký mới trong 7 ngày gần nhất"><dt>Số người dùng mới:</dt><dd className="font-semibold tabular-nums text-on-surface">{data?.newUsersLast7Days == null ? "—" : chartNumber.format(data.newUsersLast7Days)}</dd></div>
+      </dl>
     </div>
-    <div role="status" className="text-xs text-on-surface-variant">{data ? `Cập nhật lúc ${new Date(data.asOf).toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}. Số liệu hiện tại, không phụ thuộc bộ lọc ngày.` : loading ? "Đang tải thống kê người dùng…" : "Chưa có số liệu người dùng."}</div>
     {error && <p role="alert" className="text-sm text-error">{error}{data ? " Số liệu trên là lần cập nhật thành công gần nhất." : ""}</p>}
-  </section>;
+  </article>;
 }

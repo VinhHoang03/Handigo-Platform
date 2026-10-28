@@ -16,6 +16,8 @@ import { getOrderStatusMeta } from '@/utils/orderStatus';
 import { toneOutlineClasses } from '@/utils/statusTone';
 import { getErrorMessage } from '@/utils/apiError';
 import { normalizeImageUrl } from '@/utils/imageUrl';
+import { adminDashboardApi } from '../../api/adminDashboard.api';
+import type { Feedback } from '@/features/feedback/types/feedback.types';
 
 const panelClass = 'min-w-0 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-4 sm:p-5';
 const roleLabels: Record<string, string> = { customer: 'Khách hàng', provider: 'Thợ', admin: 'Quản trị viên', system: 'Hệ thống' };
@@ -30,19 +32,22 @@ function EvidenceImages({ images, label }: { images?: string[]; label: string })
   </div>;
 }
 
-export function AdminFeedbackDetailModal({ feedbackId, onClose }: { feedbackId: string; onClose: () => void }) {
-  const [data, setData] = useState<AdminFeedbackDetail | null>(null);
+export function AdminFeedbackDetailModal({ feedbackId, orderId, onClose }: { onClose: () => void } & ({ feedbackId: string; orderId?: never } | { orderId: string; feedbackId?: never })) {
+  const [data, setData] = useState<(Omit<AdminFeedbackDetail, 'feedback'> & { feedback: Feedback | null }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    feedbackApi.adminDetail(feedbackId)
+    const request = orderId
+      ? adminDashboardApi.orderDetail(orderId).then((value) => ({ ...value, feedback: null }))
+      : feedbackApi.adminDetail(feedbackId ?? '');
+    request
       .then((value) => { if (active) setData(value); })
-      .catch((requestError: unknown) => { if (active) setError(getErrorMessage(requestError, 'Không thể tải chi tiết đánh giá.')); })
+      .catch((requestError: unknown) => { if (active) setError(getErrorMessage(requestError, 'Không thể tải chi tiết đơn hàng.')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [feedbackId, attempt]);
+  }, [feedbackId, orderId, attempt]);
   const retry = () => { setLoading(true); setError(''); setAttempt((value) => value + 1); };
   const order = data?.order;
   const provider = order?.providerId?.userId;
@@ -51,7 +56,7 @@ export function AdminFeedbackDetailModal({ feedbackId, onClose }: { feedbackId: 
   const status = order ? getOrderStatusMeta(order.status) : null;
   const completed = order?.statusHistory?.filter((item) => item.status === 'completed').at(-1);
 
-  return <Modal open title="Chi tiết đơn hàng và đánh giá" onClose={onClose} size="xl">
+  return <Modal open title={orderId ? 'Chi tiết đơn hàng' : 'Chi tiết đơn hàng và đánh giá'} onClose={onClose} size="xl">
     <AsyncState loading={loading} error={error} empty={!data} onRetry={retry}>
       {data && <div className="space-y-4">
         {order && status ? <>
@@ -103,7 +108,7 @@ export function AdminFeedbackDetailModal({ feedbackId, onClose }: { feedbackId: 
             </section>
           </div>
         </> : <p role="status" className="rounded-xl bg-surface-container-low p-4 text-sm">Đơn hàng không còn tồn tại. Thông tin đánh giá vẫn được hiển thị bên dưới.</p>}
-        <section className={panelClass}>
+        {data.feedback && <section className={panelClass}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <CardTitle icon={Star} title="Đánh giá và phản hồi" />
             <StatusBadge value={data.feedback.isVisible ? 'visible' : 'hidden'} />
@@ -116,7 +121,7 @@ export function AdminFeedbackDetailModal({ feedbackId, onClose }: { feedbackId: 
             <EvidenceImages images={data.feedback.providerReply.images} label="Ảnh phản hồi" />
           </>}
           {!data.feedback.providerReply && <p className="mt-4 text-sm text-on-surface-variant">Thợ chưa phản hồi đánh giá.</p>}
-        </section>
+        </section>}
       </div>}
     </AsyncState>
   </Modal>;

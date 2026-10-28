@@ -76,6 +76,7 @@ export interface AdminRefund {
 }
 
 export interface AdminPayment {
+  orderCode?: string | null;
   _id: string;
   orderId: string;
   customerId: string;
@@ -105,6 +106,9 @@ export interface AdminPayment {
 }
 
 export interface PaymentQuery {
+  fromDate?: string;
+  toDate?: string;
+  dateField?: "paidAt" | "refundedAt";
   page?: number;
   limit?: number;
   status?: PaymentStatus;

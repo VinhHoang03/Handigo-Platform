@@ -2,7 +2,9 @@ import { Router } from "express";
 import {
   getAdminOrders,
   getAdminInsights,
+  getAdminMonthlyTrend,
   getAdminUserPresence,
+  getAdminPendingCounts,
   getAdminProviders,
   getAdminRevenue,
   getDashboardOverview,
@@ -22,6 +24,8 @@ dashboardRoutes.get("/overview", getDashboardOverview);
 
 dashboardRoutes.get("/insights", roleMiddleware("ADMIN"), getAdminInsights);
 dashboardRoutes.get("/presence", roleMiddleware("ADMIN"), getAdminUserPresence);
+dashboardRoutes.get("/pending-work", roleMiddleware("ADMIN"), getAdminPendingCounts);
+dashboardRoutes.get("/monthly-trend", roleMiddleware("ADMIN"), getAdminMonthlyTrend);
 dashboardRoutes.get("/revenue", roleMiddleware("ADMIN"), getAdminRevenue);
 dashboardRoutes.get("/orders", roleMiddleware("ADMIN"), getAdminOrders);
 dashboardRoutes.get("/providers", roleMiddleware("ADMIN"), getAdminProviders);

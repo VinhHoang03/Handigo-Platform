@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
+import { AdminLayoutContext } from "./dashboard/adminLayout.context";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { DashboardLayout } from "@/components/common/dashboard/DashboardLayout";
@@ -19,7 +20,13 @@ interface DashboardShellProps {
   hideSidebar?: boolean;
 }
 
-export function DashboardShell({
+export function DashboardShell(props: DashboardShellProps) {
+  const insideAdminLayout = useContext(AdminLayoutContext);
+  if (props.role === "ADMIN" && insideAdminLayout) return <>{props.children}</>;
+  return <StandaloneDashboardShell {...props} />;
+}
+
+function StandaloneDashboardShell({
   role,
   children,
   switchLabel,

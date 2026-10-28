@@ -5,7 +5,10 @@ import { AnimatedBackground } from "@/components/home/AnimatedBackground";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { ProviderTopbar } from "./ProviderTopbar";
-import { isNavItemActive } from "./dashboardNavigation";
+import { isNavItemActive, getDashboardNavLabel } from "./dashboardNavigation";
+import { NavPendingBadge } from "./NavPendingBadge";
+import { useAdminPendingCounts } from "@/features/admin/hooks/useAdminPendingCounts";
+import { withAdminPendingCounts } from "@/features/admin/utils/adminPendingNavigation";
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
 import "./provider-content.css";
 import "./admin-content.css";
@@ -57,6 +60,8 @@ export function DashboardLayout({
     !hideSidebar &&
     navItems.length > 0,
   );
+  const { counts, stale } = useAdminPendingCounts(isAdmin && hasSidebar);
+  const navigationItems = isAdmin ? withAdminPendingCounts(navItems, counts, stale) : navItems;
 
   return (
     <div className={`min-h-dvh ${isAdmin ? "overflow-x-clip" : "overflow-x-hidden"} bg-background font-body-md text-body-md ${isProvider ? "relative isolate" : ""}`}>
@@ -83,7 +88,7 @@ export function DashboardLayout({
       {hasSidebar && currentRole && (
         <DashboardSidebar
           role={currentRole}
-          navItems={navItems}
+          navItems={navigationItems}
           switchLabel={switchLabel}
           onSwitch={onSwitch}
           switchVariant={switchVariant}
@@ -110,7 +115,7 @@ export function DashboardLayout({
 
         {hasSidebar && (
           <nav className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-4 border-t border-outline-variant/30 bg-surface-container-lowest/92 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
-            {navItems.slice(0, 4).map((item) => {
+            {navigationItems.slice(0, 4).map((item) => {
               const active = isNavItemActive(location.pathname, item);
               const className = `flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-center ${active ? "bg-primary/10 text-primary" : "text-on-surface-variant"}`;
 
@@ -130,8 +135,10 @@ export function DashboardLayout({
               }
 
               return (
-                <Link key={item.label} to={item.path} className={className}>
-                  <item.icon aria-hidden="true" size={20} />
+                <Link key={item.label} to={item.path} className={className} aria-label={getDashboardNavLabel(item)}>
+                  <span className="relative inline-flex shrink-0"><item.icon aria-hidden="true" size={20} />
+                    <NavPendingBadge count={item.pendingCount} compact stale={item.pendingStale} />
+                  </span>
                   <span className="max-w-full truncate text-[10px] font-medium">
                     {item.label}
                   </span>

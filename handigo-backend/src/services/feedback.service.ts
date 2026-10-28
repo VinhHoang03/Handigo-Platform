@@ -7,8 +7,7 @@ import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { OrderStatus } from "../models/orderStatus.model";
 import { Service } from "../models/service.model";
-import { RepairQuotation } from "../models/repairQuotation.model";
-import { withOrderAddress } from "../utils/orderAddress";
+import { getAdminOrderDetail } from "./adminOrderDetail.service";
 
 interface FeedbackPayload {
   orderId: string;
@@ -672,26 +671,6 @@ export const getAdminFeedbackDetail = async (feedbackId: string) => {
     .lean();
   if (!feedback) throw new AppError("Không tìm thấy đánh giá.", 404);
 
-  const order = await Order.findOne({ _id: feedback.orderId, isDeleted: false })
-    .select("orderCode customerId providerId serviceId addressId addressSnapshot orderType scheduledAt status paymentMethod paymentStatus pricing depositAmount depositPaidAt inspectionRequired currentQuotationId quotationFinalAmount selectedOptionsSnapshot problemDescription customerAttachments completionEvidenceImages completionNote confirmation cancellation createdAt updatedAt")
-    .populate("customerId", "fullName avatar phone email")
-    .populate({ path: "providerId", select: "userId", populate: { path: "userId", select: "fullName avatar phone email" } })
-    .populate({ path: "serviceId", select: "name serviceType image coverImage", transform: serviceImageResponse })
-    .populate("addressId", "fullAddress detailAddress ward district province note")
-    .lean();
-  if (!order) return { feedback, order: null, quotation: null };
-
-  const [statusHistory, quotation] = await Promise.all([
-    OrderStatus.find({ orderId: order._id, isDeleted: false })
-      .select("status previousStatus changedByRole note createdAt")
-      .sort({ createdAt: 1, statusVersion: 1 }).lean(),
-    order.currentQuotationId ? RepairQuotation.findOne({ _id: order.currentQuotationId, orderId: order._id, isDeleted: false })
-      .select("quotationCode status finalAmount discountAmount subtotalAmount directPaymentConfirmedAt directPaymentConfirmedAmount customerConfirmed providerConfirmed")
-      .lean() : Promise.resolve(null),
-  ]);
-  return {
-    feedback,
-    order: { ...withOrderAddress(order), statusHistory },
-    quotation: quotation ? { quotation, items: [] } : null,
-  };
+  const context = feedback.orderId ? await getAdminOrderDetail(String(feedback.orderId)) : { order: null, quotation: null };
+  return { feedback, ...context };
 };

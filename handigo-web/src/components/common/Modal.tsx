@@ -35,6 +35,7 @@ const focusableSelector = [
 // Nhiều modal có thể đóng không theo thứ tự mở, nên dùng chung trạng thái khóa cuộn.
 let openModalCount = 0;
 let previousBodyOverflow = '';
+const openModalIds: string[] = [];
 
 export function Modal({
   open,
@@ -65,26 +66,34 @@ export function Modal({
     previousFocusRef.current = document.activeElement;
     if (openModalCount === 0) previousBodyOverflow = document.body.style.overflow;
     openModalCount += 1;
+    openModalIds.push(titleId);
     document.body.style.overflow = 'hidden';
+    const overlay = dialogRef.current?.parentElement;
+    if (overlay) overlay.style.zIndex = String(200 + openModalCount);
 
     window.requestAnimationFrame(() => {
+      if (openModalIds.at(-1) !== titleId) return;
       const dialog = dialogRef.current;
       const firstFocusable = dialog?.querySelector<HTMLElement>(focusableSelector);
       (firstFocusable || dialog)?.focus();
     });
 
     return () => {
+      const wasTop = openModalIds.at(-1) === titleId;
+      const index = openModalIds.lastIndexOf(titleId);
+      if (index >= 0) openModalIds.splice(index, 1);
       openModalCount -= 1;
       if (openModalCount === 0) document.body.style.overflow = previousBodyOverflow;
       const previousFocus = previousFocusRef.current;
-      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+      if (wasTop && previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
     };
-  }, [open]);
+  }, [open, titleId]);
 
   useEffect(() => {
     if (!open) return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (openModalIds.at(-1) !== titleId) return;
       if (event.key === 'Escape' && closeOnEsc) {
         event.preventDefault();
         onCloseRef.current();
@@ -123,7 +132,7 @@ export function Modal({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [closeOnEsc, open]);
+  }, [closeOnEsc, open, titleId]);
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
     if (closeOnOverlayClick && event.target === event.currentTarget) onClose();

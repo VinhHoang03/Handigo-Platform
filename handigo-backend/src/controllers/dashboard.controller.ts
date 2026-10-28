@@ -3,9 +3,11 @@ import { requireRequestUser } from "../middlewares/authContext";
 import * as dashboardService from "../services/dashboard.service";
 import * as adminDashboardService from "../services/adminDashboard.service";
 import { adminDashboardQuerySchema } from "../validations/adminDashboard.validator";
+import { getAdminMonthlyTrend as loadAdminMonthlyTrend } from "../services/adminMonthlyTrend.service";
 import { AppError } from "../utils/appError";
 import {
   dashboardQuerySchema,
+  adminOperationsQuerySchema,
   providerAvailabilitySchema,
   providerDashboardQuerySchema,
 } from "../validations/dashboard.validator";
@@ -17,6 +19,13 @@ export const getAdminInsights = async (req: Request, res: Response, next: NextFu
   } catch (error) { return next(error); }
 };
 
+export const getAdminMonthlyTrend = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await loadAdminMonthlyTrend(adminDashboardQuerySchema.parse(req.query));
+    return res.json({ success: true, data, message: "Đã tải số đơn và doanh thu theo tháng." });
+  } catch (error) { return next(error); }
+};
+
 export const getAdminUserPresence = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await adminDashboardService.getAdminUserPresence();
@@ -24,9 +33,16 @@ export const getAdminUserPresence = async (_req: Request, res: Response, next: N
   } catch (error) { return next(error); }
 };
 
+export const getAdminPendingCounts = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await adminDashboardService.getAdminPendingCounts();
+    return res.json({ success: true, data, message: "Đã tải số việc đang chờ xử lý" });
+  } catch (error) { return next(error); }
+};
+
 export const getAdminOverview = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const query = dashboardQuerySchema.parse(req.query);
+    const query = adminOperationsQuerySchema.parse(req.query);
     const data = await dashboardService.getAdminOverview(query);
 
     return res.json({ success: true, data, message: "Get admin dashboard overview successfully" });
@@ -42,7 +58,7 @@ export const getDashboardOverview = async (
 ) => {
   try {
     const user = requireRequestUser(req);
-    const query = user.role === "PROVIDER" ? providerDashboardQuerySchema.parse(req.query) : dashboardQuerySchema.parse(req.query);
+    const query = user.role === "PROVIDER" ? providerDashboardQuerySchema.parse(req.query) : user.role === "ADMIN" ? adminOperationsQuerySchema.parse(req.query) : dashboardQuerySchema.parse(req.query);
 
     if (user.role === "ADMIN") {
       const data = await dashboardService.getAdminOverview(query);
@@ -62,7 +78,7 @@ export const getDashboardOverview = async (
 
 export const getAdminRevenue = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const query = dashboardQuerySchema.parse(req.query);
+    const query = adminOperationsQuerySchema.parse(req.query);
     const data = await dashboardService.getAdminRevenue(query);
 
     return res.json({ success: true, data, message: "Get admin revenue dashboard successfully" });
@@ -73,7 +89,7 @@ export const getAdminRevenue = async (req: Request, res: Response, next: NextFun
 
 export const getAdminOrders = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const query = dashboardQuerySchema.parse(req.query);
+    const query = adminOperationsQuerySchema.parse(req.query);
     const data = await dashboardService.getAdminOrders(query);
 
     return res.json({ success: true, data, message: "Get admin order dashboard successfully" });
@@ -84,7 +100,7 @@ export const getAdminOrders = async (req: Request, res: Response, next: NextFunc
 
 export const getAdminProviders = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const query = dashboardQuerySchema.parse(req.query);
+    const query = adminOperationsQuerySchema.parse(req.query);
     const data = await dashboardService.getAdminProviders(query);
 
     return res.json({ success: true, data, message: "Get admin provider dashboard successfully" });

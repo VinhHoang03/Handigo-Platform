@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { adminDashboardQuerySchema } from "./adminDashboard.validator";
 
 const dateStringSchema = z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: "Ngày không hợp lệ",
@@ -36,6 +37,11 @@ export const dashboardQuerySchema = z
   });
 
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
+export const adminOperationsQuerySchema = dashboardQuerySchema.safeExtend({
+  fromDate: adminDashboardQuerySchema.shape.fromDate,
+  toDate: adminDashboardQuerySchema.shape.toDate,
+});
 
 const providerDayBoundary = (value: string, end: boolean) => {
   const day = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Intl.DateTimeFormat("en-CA", {

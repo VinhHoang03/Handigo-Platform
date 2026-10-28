@@ -5,6 +5,7 @@ import { Session } from "../models/session.model";
 import { disconnectUserSockets } from "../sockets/socketServer";
 import * as providerApplicationService from "./providerApplication.service";
 import { getAdminFeedbacks as listFeedbacks, getAdminFeedbackDetail } from "./feedback.service";
+import { getAdminOrderDetail } from "./adminOrderDetail.service";
 import { SAFE_USER_PROJECTION } from "./user.service";
 import { Violation } from "../models/violation.model";
 
@@ -129,3 +130,8 @@ export const getProviderApplicationById = providerApplicationService.getApplicat
 export const reviewProviderApplication = providerApplicationService.reviewApplication;
 export const getFeedbacks = listFeedbacks;
 export const getFeedbackDetail = getAdminFeedbackDetail;
+export const getOrderDetail = async (id: string) => {
+  const result = await getAdminOrderDetail(id);
+  if (!result.order) throw new AppError("Không tìm thấy đơn hàng.", 404);
+  return result;
+};
