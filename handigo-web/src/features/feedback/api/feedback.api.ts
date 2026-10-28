@@ -1,5 +1,13 @@
 import api from '@/api/client';
 import type { Feedback, FeedbackList, FeedbackPayload, FeedbackQuery, OrderFeedbackContext } from '../types/feedback.types';
+import type { Order } from '@/types/booking';
+import type { QuotationDetail } from '@/features/provider/types/providerOrder.types';
+
+export interface AdminFeedbackDetail {
+  feedback: Feedback;
+  order: Order | null;
+  quotation: QuotationDetail | null;
+}
 
 const data = <T>(response: { data: { data: T } }) => response.data.data;
 export const feedbackApi = {
@@ -15,6 +23,7 @@ export const feedbackApi = {
     return data<FeedbackList>(await api.get('/feedback/provider/me', { params }));
   },
   adminList: async (query: FeedbackQuery) => data<FeedbackList>(await api.get('/admin/feedbacks', { params: query })),
+  adminDetail: async (id: string) => data<AdminFeedbackDetail>(await api.get(`/admin/feedbacks/${id}`)),
   reply: async (id: string, content: string, images?: string[]) => data<Feedback>(await api.put(`/feedback/${id}/reply`, { content, images })),
   setVisibility: async (id: string, isVisible: boolean) => data<Feedback>(await api.patch(`/feedback/${id}/visibility`, { isVisible })),
   uploadImages: async (files: File[]) => {

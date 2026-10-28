@@ -40,7 +40,7 @@ export const parseValue = (type: SystemConfigType, value: string) => {
   try {
     return JSON.parse(value);
   } catch {
-    throw new Error("Giá trị JSON không hợp lệ.");
+    throw new Error("Dữ liệu không đúng định dạng JSON.");
   }
 };
 

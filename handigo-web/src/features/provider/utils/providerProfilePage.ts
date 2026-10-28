@@ -8,7 +8,6 @@ import type {
   ProviderOcrSuggestion,
   ProviderProfile,
   ProviderProfileResponse,
-  ServiceArea,
   VerificationItem,
   VerificationStatus,
 } from "../types/provider.types";
@@ -264,14 +263,6 @@ export const buildPerformanceStats = (
     },
   ];
 };
-
-export const buildServiceArea = (
-  profile: ProviderProfileResponse | null,
-): ServiceArea => ({
-  province: profile?.provider.serviceArea?.province,
-  ward: profile?.provider.serviceArea?.ward,
-  workingAreas: profile?.provider.workingAreas,
-});
 
 export const buildVerificationItems = (
   profile: ProviderProfileResponse,

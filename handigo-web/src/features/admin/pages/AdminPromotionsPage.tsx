@@ -110,7 +110,7 @@ export default function AdminPromotionsPage() {
       else await voucherApi.create(payload);
       setModalMode(null);
       setEditing(null);
-      setNotice(modalMode === "edit" ? "Đã cập nhật voucher." : "Đã tạo voucher mới.");
+      setNotice(modalMode === "edit" ? "Đã cập nhật mã giảm giá." : "Đã tạo mã giảm giá mới.");
       await load();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -127,7 +127,7 @@ export default function AdminPromotionsPage() {
     try {
       if (toggleTarget.isActive && toggleTarget.status === "ACTIVE") await voucherApi.disable(toggleTarget.id);
       else await voucherApi.enable(toggleTarget.id);
-      setNotice("Đã cập nhật trạng thái voucher.");
+      setNotice("Đã cập nhật trạng thái mã giảm giá.");
       setToggleTarget(null);
       await load();
     } catch (err) {
@@ -144,7 +144,7 @@ export default function AdminPromotionsPage() {
     setNotice("");
     try {
       await voucherApi.delete(deleteTarget.id);
-      setNotice("Đã xóa voucher.");
+      setNotice("Đã xóa mã giảm giá.");
       setDeleteTarget(null);
       await load();
     } catch (err) {
@@ -158,10 +158,10 @@ export default function AdminPromotionsPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <div className="mb-6 flex gap-3"><button type="button" aria-pressed={!automatic} onClick={() => setAutomatic(false)} className="rounded-xl border p-3">Voucher nhập mã</button><button type="button" aria-pressed={automatic} onClick={() => setAutomatic(true)} className="rounded-xl border p-3">Khuyến mãi tự động</button></div>
+      <div className="mb-6 flex gap-3"><button type="button" aria-pressed={!automatic} onClick={() => setAutomatic(false)} className="rounded-xl border p-3">Mã giảm giá nhập mã</button><button type="button" aria-pressed={automatic} onClick={() => setAutomatic(true)} className="rounded-xl border p-3">Khuyến mãi tự động</button></div>
       {automatic ? <AutomaticPromotionsPanel /> : <>
       <div className="space-y-6">
-        <PromotionHeader stats={stats} notice={notice} error={error} onCreate={openCreate} />
+        <PromotionHeader stats={stats} notice={notice} error={error} onCreate={openCreate} onRefresh={() => void load()} loading={loading} />
 
         <RewardOffersPanel />
 
@@ -179,7 +179,7 @@ export default function AdminPromotionsPage() {
             columns={columns}
             rows={items}
             rowKey={(voucher) => voucher.id}
-            emptyState={<div className="p-10 text-center text-on-surface-variant">Chưa có voucher phù hợp.</div>}
+            emptyState={<div className="p-10 text-center text-on-surface-variant">Chưa có mã giảm giá phù hợp.</div>}
             minWidthClassName="min-w-[900px]"
           />
         </AsyncState>

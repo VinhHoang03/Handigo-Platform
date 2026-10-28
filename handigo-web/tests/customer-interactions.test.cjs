@@ -543,7 +543,7 @@ test('Lỗi lưu hồ sơ provider không thay toàn bộ trang bằng khung bá
     '../components/profile/ProviderProfileDialogsGroup': { ProviderProfileDialogsGroup: 'profile-dialogs' },
     '../components/profile/ProviderProfilePageSkeleton': { ProviderProfilePageSkeleton: 'skeleton' },
   };
-  for (const name of ['useProviderIdentityFlow', 'useProviderCertificateFlow', 'useProviderServiceAreaFlow', 'useProviderPasswordFlow', 'useProviderProfileUiState']) {
+  for (const name of ['useProviderIdentityFlow', 'useProviderCertificateFlow', 'useProviderPasswordFlow', 'useProviderProfileUiState']) {
     modules[`../components/profile/${name}`] = { [name]: () => ({}) };
   }
   const { default: ProviderProfilePage } = load('features/provider/pages/ProviderProfilePage.tsx', modules);

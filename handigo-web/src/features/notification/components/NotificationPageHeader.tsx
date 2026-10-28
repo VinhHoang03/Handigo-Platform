@@ -1,4 +1,5 @@
 import { CheckCheck, Megaphone, RefreshCw } from "lucide-react";
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 export function NotificationPageHeader({
   isAdmin,
   busy,
@@ -15,26 +16,26 @@ export function NotificationPageHeader({
   onOpenSend: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className={isAdmin ? "admin-page-header" : "flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"}>
       <div>
-        <h1 className="text-headline-lg font-bold text-on-background">
+        {isAdmin ? <AdminPageTitle title="Thông báo" /> : <h1 className="text-headline-lg font-bold text-on-background">
           Thông báo
-        </h1>
+        </h1>}
       </div>
-      <div className="flex flex-wrap gap-3">
-        <button
+      <div className={isAdmin ? "admin-header-actions" : "flex flex-wrap gap-3"}>
+        {!isAdmin && <button
           type="button"
           onClick={onRefresh}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low"
+          className={`inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold ${isAdmin ? "text-primary" : "text-on-surface"} hover:bg-surface-container-low`}
         >
           <RefreshCw aria-hidden="true" size={20} />
           Tải lại
-        </button>
+        </button>}
         <button
           type="button"
           onClick={onMarkAll}
           disabled={busy || unreadCount === 0}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold text-on-surface hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50"
+          className={`inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-5 py-3 font-semibold ${isAdmin ? "text-primary" : "text-on-surface"} hover:bg-surface-container-low disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <CheckCheck aria-hidden="true" size={20} />
           Đánh dấu tất cả
@@ -49,6 +50,7 @@ export function NotificationPageHeader({
             Gửi thông báo
           </button>
         )}
+        {isAdmin && <AdminRefreshButton onRefresh={onRefresh} loading={busy} />}
       </div>
     </div>
   );

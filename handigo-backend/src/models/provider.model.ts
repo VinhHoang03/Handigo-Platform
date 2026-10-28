@@ -80,7 +80,8 @@ export interface IProvider extends Document, IBaseDocument {
   scheduleVersion?: number;
   verified: boolean;
   serviceIds: Types.ObjectId[];
-  workingAreas: string[];
+  /** Dữ liệu cũ đã ngừng sử dụng, không nạp vào hồ sơ. */
+  workingAreas?: string[];
   averageRating: number;
   totalFeedbacks: number;
   totalCompletedOrders: number;
@@ -169,7 +170,7 @@ const ProviderSchema = new Schema<IProvider>(
     description: { type: String, required: true },
     bio: { type: String, trim: true, maxlength: 2000 },
     mainServiceText: { type: String, trim: true, maxlength: 200 },
-    serviceArea: { type: ProviderServiceAreaSchema, default: undefined },
+    serviceArea: { type: ProviderServiceAreaSchema, select: false },
     experienceYears: { type: Number, required: true, min: 0, default: 0 },
     scheduleVersion: { type: Number, default: 0, min: 0 },
     availabilityStatus: {
@@ -192,7 +193,7 @@ const ProviderSchema = new Schema<IProvider>(
     },
     verified: { type: Boolean, default: false },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: "Service" }],
-    workingAreas: { type: [String], default: [] },
+    workingAreas: { type: [String], default: undefined, select: false },
     averageRating: { type: Number, default: 0, min: 0, max: 5 },
     totalFeedbacks: { type: Number, default: 0, min: 0 },
     totalCompletedOrders: { type: Number, default: 0, min: 0 },
@@ -205,7 +206,6 @@ const ProviderSchema = new Schema<IProvider>(
 
 ProviderSchema.index({ serviceIds: 1 });
 ProviderSchema.index({ availabilityStatus: 1, verified: 1 });
-ProviderSchema.index({ "serviceArea.province": 1, "serviceArea.ward": 1 });
 
 export const Provider = model<IProvider>(
   "Provider",

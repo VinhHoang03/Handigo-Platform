@@ -66,7 +66,7 @@ export function useOrderFeedback(orderId: string) {
   };
 }
 
-export function useFeedbackList(mode: 'provider' | 'admin', query: FeedbackQuery) {
+export function useFeedbackList(mode: 'provider' | 'admin', query: FeedbackQuery, onLoaded?: (result: FeedbackList) => void) {
   const [result, setResult] = useState<FeedbackList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>('', "error");
@@ -74,25 +74,32 @@ export function useFeedbackList(mode: 'provider' | 'admin', query: FeedbackQuery
     try {
       setLoading(true);
       setError('');
-      setResult(await (mode === 'provider' ? feedbackService.loadProvider(query) : feedbackService.loadAdmin(query)));
+      const value = await (mode === 'provider' ? feedbackService.loadProvider(query) : feedbackService.loadAdmin(query));
+      setResult(value);
+      onLoaded?.(value);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Không thể tải danh sách đánh giá.');
     } finally {
       setLoading(false);
     }
-  }, [mode, query, setError]);
+  }, [mode, query, setError, onLoaded]);
   useEffect(() => {
     let active = true;
     const request = mode === 'provider'
       ? feedbackService.loadProvider(query)
       : feedbackService.loadAdmin(query);
     request
-      .then((value) => { if (active) setResult(value); })
+      .then((value) => {
+        if (active) {
+          setResult(value);
+          onLoaded?.(value);
+        }
+      })
       .catch((requestError: unknown) => {
         if (active) setError(requestError instanceof Error ? requestError.message : 'Không thể tải danh sách đánh giá.');
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [mode, query, setError]);
+  }, [mode, query, setError, onLoaded]);
   return { result, loading, error, load };
 }

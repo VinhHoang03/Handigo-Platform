@@ -24,7 +24,7 @@ export const serviceSuggestionTableColumns: Array<DataTableColumn<ServiceSuggest
   },
   {
     key: "provider",
-    header: "Provider",
+    header: "Nhà cung cấp",
     className: "font-medium",
     render: (suggestion) => getSuggestionProviderName(suggestion),
   },

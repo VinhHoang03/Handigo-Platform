@@ -28,7 +28,7 @@ function MetricCard({
   note: string;
 }) {
   return (
-    <article className="rounded-2xl border border-outline-variant/40 bg-surface p-5">
+    <article className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
           <Icon size={21} />
@@ -62,7 +62,7 @@ export function DashboardMetricGrid({
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
         icon={WalletCards}
-        label="Tổng doanh thu"
+        label="Tổng tiền ghi nhận qua hệ thống"
         value={chartMoney.format(overview.totalRevenue)}
         note={`Doanh thu nền tảng ${chartMoney.format(overview.platformRevenue)}`}
       />
@@ -74,7 +74,7 @@ export function DashboardMetricGrid({
       />
       <MetricCard
         icon={UserRoundCheck}
-        label="Provider đang hoạt động"
+        label="Nhà cung cấp đang hoạt động"
         value={chartNumber.format(providers.activeProviders)}
         note={`${providers.onlineProviders} đang trực tuyến / ${providers.totalProviders} hồ sơ`}
       />
@@ -92,13 +92,13 @@ export function DashboardMetricGrid({
       />
       <MetricCard
         icon={Star}
-        label="Điểm provider trung bình"
+        label="Điểm nhà cung cấp trung bình"
         value={providers.averageProviderRating.toFixed(2)}
-        note={`Trên ${providers.totalProviders} hồ sơ provider`}
+        note={`Trên ${providers.totalProviders} hồ sơ nhà cung cấp`}
       />
       <MetricCard
         icon={PiggyBank}
-        label="Thu nhập provider"
+        label="Thu nhập nhà cung cấp"
         value={chartMoney.format(overview.providerEarnings)}
         note={`Đã rút ${chartMoney.format(overview.totalWithdrawals)}`}
       />

@@ -97,7 +97,15 @@ for (const paymentMethod of ['cash', 'wallet', 'bank']) {
   });
 }
 
+test('App chưa có bước đến nơi vẫn bắt đầu đơn theo luồng cũ', async () => {
+  const context = setup({ arrival: null });
+  const order = await context.start();
+  assert.equal(order.status, 'in_progress');
+  assert.equal(context.saves(), 2);
+});
+
 for (const [name, overrides, options, error] of [
+  ['báo khách vắng mặt đang chờ duyệt', { customerNoShow: { status: 'pending' } }, {}, /đang chờ xử lý/],
   ['đang thực hiện đơn khác', {}, { activeOrder: true }, /Bạn đang thực hiện một đơn khác/],
   ['không thuộc thợ', {}, { owned: false }, /Đơn không thuộc về bạn/],
   ['lịch chưa xác nhận', { bookingStatus: 'reserved' }, {}, /Lịch hẹn chưa được thanh toán và xác nhận/],

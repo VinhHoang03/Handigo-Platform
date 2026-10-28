@@ -11,6 +11,7 @@ class OrderSummary {
     this.serviceImage,
     this.providerName,
     this.providerAvatar,
+    this.providerGender,
     this.customerName,
     this.customerAvatar,
     this.totalAmount,
@@ -55,6 +56,15 @@ class OrderSummary {
       providerAvatar: providerUser is Map<String, dynamic>
           ? providerUser['avatar'] as String?
           : null,
+      providerGender: providerUser is Map<String, dynamic>
+          ? (providerUser['gender'] ??
+                    (provider is Map<String, dynamic>
+                        ? provider['gender']
+                        : null))
+                as String?
+          : provider is Map<String, dynamic>
+          ? provider['gender'] as String?
+          : null,
       customerName: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['fullName'] as String?
           : null,
@@ -77,6 +87,7 @@ class OrderSummary {
   final String? serviceImage;
   final String? providerName;
   final String? providerAvatar;
+  final String? providerGender;
   final String? customerName;
   final String? customerAvatar;
   final double? totalAmount;
@@ -111,12 +122,16 @@ class OrderDetail {
     this.problemDescription,
     this.totalAmount,
     this.providerName,
+    this.providerAvatar,
+    this.providerGender,
+    this.providerRating,
     this.addressLabel,
     this.hasAdditionalQuotation = false,
     this.currentQuotationId,
     this.serviceImage,
     this.customerName,
     this.customerAvatar,
+    this.customerPhone,
     List<OrderStatusEvent>? statusHistory,
     this.customerCancellationDeadline,
     this.inspectionRequired = false,
@@ -137,12 +152,22 @@ class OrderDetail {
     this.addressId,
     this.selectedOptions = const [],
     this.pricing = const {},
+    this.readyForMatching = false,
+    this.hasPendingAssignment = false,
+    this.createdAt,
+    this.updatedAt,
+    this.cancellationReason,
+    this.cancelledAt,
+    this.addressLatitude,
+    this.addressLongitude,
   }) : _statusHistory = statusHistory;
 
   factory OrderDetail.fromJson(Map<String, dynamic> json) {
     final service = json['serviceId'];
     final provider = json['providerId'];
     final address = json['addressId'];
+    final location = json['addressSnapshot'] ?? address;
+    final cancellation = json['cancellation'] as Map?;
     final pricing = json['pricing'];
     final providerUser = provider is Map<String, dynamic>
         ? provider['userId']
@@ -165,6 +190,21 @@ class OrderDetail {
       providerName: providerUser is Map<String, dynamic>
           ? providerUser['fullName'] as String?
           : null,
+      providerAvatar: providerUser is Map<String, dynamic>
+          ? providerUser['avatar'] as String?
+          : null,
+      providerGender: providerUser is Map<String, dynamic>
+          ? (providerUser['gender'] ??
+                    (provider is Map<String, dynamic>
+                        ? provider['gender']
+                        : null))
+                as String?
+          : provider is Map<String, dynamic>
+          ? provider['gender'] as String?
+          : null,
+      providerRating: provider is Map
+          ? (provider['averageRating'] as num?)?.toDouble()
+          : null,
       addressLabel: (json['addressSnapshot'] ?? address) is Map<String, dynamic>
           ? formatAddressData(
               (json['addressSnapshot'] ?? address) as Map<String, dynamic>,
@@ -177,6 +217,9 @@ class OrderDetail {
           : null,
       customerName: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['fullName'] as String?
+          : null,
+      customerPhone: json['customerId'] is Map<String, dynamic>
+          ? (json['customerId'] as Map<String, dynamic>)['phone'] as String?
           : null,
       customerAvatar: json['customerId'] is Map<String, dynamic>
           ? (json['customerId'] as Map<String, dynamic>)['avatar'] as String?
@@ -223,6 +266,18 @@ class OrderDetail {
           .whereType<Map<String, dynamic>>()
           .toList(),
       pricing: pricing is Map ? Map<String, dynamic>.from(pricing) : const {},
+      readyForMatching: json['readyForMatching'] == true,
+      hasPendingAssignment: json['hasPendingAssignment'] == true,
+      createdAt: _date(json['createdAt']),
+      updatedAt: _date(json['updatedAt']),
+      cancellationReason: cancellation?['reason'] as String?,
+      cancelledAt: _date(cancellation?['cancelledAt']),
+      addressLatitude: location is Map
+          ? (location['latitude'] as num?)?.toDouble()
+          : null,
+      addressLongitude: location is Map
+          ? (location['longitude'] as num?)?.toDouble()
+          : null,
     );
   }
 
@@ -236,13 +291,15 @@ class OrderDetail {
   final DateTime? scheduledAt;
   final String? problemDescription;
   final double? totalAmount;
-  final String? providerName;
+  final String? providerName, providerAvatar, providerGender;
+  final double? providerRating;
   final String? addressLabel;
   final bool hasAdditionalQuotation;
   final String? currentQuotationId;
   final String? serviceImage;
   final String? customerName;
   final String? customerAvatar;
+  final String? customerPhone;
   final List<OrderStatusEvent>? _statusHistory;
   final DateTime? customerCancellationDeadline;
   final bool inspectionRequired, hasPricingSnapshot;
@@ -257,6 +314,21 @@ class OrderDetail {
   final String? serviceId, addressId;
   final List<Map<String, dynamic>> selectedOptions;
   final Map<String, dynamic> pricing;
+  final bool readyForMatching, hasPendingAssignment;
+  final DateTime? createdAt, updatedAt, cancelledAt;
+  final String? cancellationReason;
+  final double? addressLatitude, addressLongitude;
+  OrderSummary get summary => OrderSummary(
+    id: id,
+    code: code,
+    serviceName: serviceName,
+    status: status,
+    paymentStatus: paymentStatus,
+    bookingStatus: bookingStatus,
+    readyForMatching: readyForMatching,
+    hasPendingAssignment: hasPendingAssignment,
+    depositPaidAt: depositPaidAt,
+  );
   bool get isAppointment => ['scheduled', 'recurring'].contains(orderType);
   bool get appointmentConfirmed =>
       !isAppointment || bookingStatus == 'confirmed';
@@ -300,14 +372,22 @@ class OrderDetail {
 }
 
 class OrderStatusEvent {
-  const OrderStatusEvent({required this.status, this.createdAt});
+  const OrderStatusEvent({
+    required this.status,
+    this.createdAt,
+    this.note,
+    this.previousStatus,
+  });
   factory OrderStatusEvent.fromJson(Map<String, dynamic> json) =>
       OrderStatusEvent(
         status: json['status'] as String,
         createdAt: _date(json['createdAt']),
+        note: json['note'] as String?,
+        previousStatus: json['previousStatus'] as String?,
       );
   final String status;
   final DateTime? createdAt;
+  final String? note, previousStatus;
 }
 
 class CancellationPreview {
@@ -360,6 +440,8 @@ class RepairQuotation {
     this.inspectionNote,
     this.recommendation,
     this.directPaymentConfirmedAt,
+    this.paidDeposit,
+    this.remainingDirectPaymentAmount,
     this.customerConfirmed = false,
   });
   factory RepairQuotation.fromJson(Map<String, dynamic> json) {
@@ -381,6 +463,9 @@ class RepairQuotation {
       inspectionNote: quotation['inspectionNote'] as String?,
       recommendation: quotation['recommendation'] as String?,
       directPaymentConfirmedAt: _date(quotation['directPaymentConfirmedAt']),
+      paidDeposit: (quotation['paidDeposit'] as num?)?.toDouble(),
+      remainingDirectPaymentAmount:
+          (quotation['remainingDirectPaymentAmount'] as num?)?.toDouble(),
       customerConfirmed: quotation['customerConfirmed'] as bool? ?? false,
       items: rawItems
           .whereType<Map<String, dynamic>>()
@@ -398,6 +483,7 @@ class RepairQuotation {
   final double discountAmount;
   final String? inspectionNote, recommendation;
   final DateTime? directPaymentConfirmedAt;
+  final double? paidDeposit, remainingDirectPaymentAmount;
   final bool customerConfirmed;
   bool get usable =>
       status == 'saved' || (status == 'approved' && customerConfirmed);

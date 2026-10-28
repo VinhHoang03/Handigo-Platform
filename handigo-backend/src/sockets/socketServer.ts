@@ -11,6 +11,20 @@ export const setSocketServer = (io: Server) => {
   socketServer = io;
 };
 
+/** Đếm theo phòng tài khoản đã xác thực, không đếm trùng các tab/thiết bị. */
+export const getOnlineUserIds = async (): Promise<string[] | null> => {
+  if (!socketServer) return null;
+  const sockets = await socketServer.fetchSockets();
+  const ids = new Set<string>();
+  for (const socket of sockets) {
+    for (const room of socket.rooms) {
+      const match = /^user:([a-f\d]{24})$/i.exec(room);
+      if (match) ids.add(match[1]);
+    }
+  }
+  return [...ids];
+};
+
 export const emitToUser = (userId: string, event: string, payload: unknown) => {
   socketServer?.to(`user:${userId}`).emit(event, payload);
 };

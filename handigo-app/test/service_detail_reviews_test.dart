@@ -71,6 +71,10 @@ class _BookingRepository implements ServiceCatalogRepository {
   };
   @override
   Future<List<Address>> addresses() async => savedAddresses;
+  @override
+  Future<List<Map<String, dynamic>>> nearbyProviders(
+    Map<String, dynamic> query,
+  ) async => [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -187,6 +191,17 @@ void main() {
     expect(container.read(bookingDraftProvider).addressId, 'true');
     expect(find.text('Nhà riêng'), findsOneWidget);
     expect(find.text('Văn phòng'), findsNothing);
+    final providerChoiceY = tester
+        .getTopLeft(find.text('Lựa chọn thợ phù hợp'))
+        .dy;
+    expect(
+      providerChoiceY,
+      greaterThan(tester.getTopLeft(find.text('Địa chỉ làm việc')).dy),
+    );
+    expect(
+      providerChoiceY,
+      lessThan(tester.getTopLeft(find.text('Thời gian thực hiện')).dy),
+    );
     await tester.scrollUntilVisible(
       find.text('Đổi'),
       180,
@@ -217,6 +232,8 @@ void main() {
       await tester.tap(
         find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'),
       );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Vệ sinh tiêu chuẩn'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Vệ sinh tiêu chuẩn'));
       await tester.pump();
@@ -440,6 +457,8 @@ void main() {
     expect(find.text('Vệ sinh tiêu chuẩn'), findsOneWidget);
     final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
     expect(sheet.constraints!.maxHeight, closeTo(844 * .65, .1));
+    await tester.ensureVisible(find.text('Vệ sinh tiêu chuẩn'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Vệ sinh tiêu chuẩn'));
     await tester.pumpAndSettle();
     final note = find.widgetWithText(TextField, 'Ghi chú gì đó cho thợ');
@@ -487,8 +506,8 @@ void main() {
       }).processSteps.single.title,
       'Kiểm tra',
     );
-    expect(AppTheme.light.textTheme.bodyMedium?.fontFamily, 'Inter');
-    expect(AppTheme.dark.textTheme.titleMedium?.fontFamily, 'Hanken Grotesk');
+    expect(AppTheme.light.textTheme.bodyMedium?.fontFamily, 'Roboto');
+    expect(AppTheme.dark.textTheme.titleMedium?.fontFamily, 'Roboto');
   });
 
   testWidgets(
@@ -516,37 +535,26 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Ẩn quy trình rỗng và giới hạn 4 đánh giá tốt, xem tất cả chuyển trang',
-    (tester) async {
-      await showScreen(
-        tester,
-        value: const ServiceDetail(
-          service: Service(
-            id: '1',
-            name: 'Dịch vụ',
-            description: '',
-            serviceType: 'fixed_price',
-          ),
-          options: [],
+  testWidgets('Ẩn quy trình rỗng và bỏ phần đánh giá trong chi tiết dịch vụ', (
+    tester,
+  ) async {
+    await showScreen(
+      tester,
+      value: const ServiceDetail(
+        service: Service(
+          id: '1',
+          name: 'Dịch vụ',
+          description: '',
+          serviceType: 'fixed_price',
         ),
-      );
-      await tester.scrollUntilVisible(find.text('Đánh giá thực tế'), 200);
-      expect(find.text('Quy trình thực hiện'), findsNothing);
-      expect(find.byType(ServiceReviewCard), findsNWidgets(4));
-      expect(find.text('Khách 1'), findsNothing);
-      expect(find.text('Khách 2'), findsNothing);
-      final cards = tester
-          .widgetList<ServiceReviewCard>(find.byType(ServiceReviewCard))
-          .toList();
-      expect(cards.first.review.id, '6');
-      await tester.tap(find.text('Xem tất cả ›'));
-      await tester.pumpAndSettle();
-      expect(find.text('Đánh giá dịch vụ'), findsOneWidget);
-      expect(find.text('Khách 1'), findsOneWidget);
-      await capturePreview(tester, 'service-reviews-preview');
-    },
-  );
+        options: [],
+      ),
+    );
+    expect(find.text('Quy trình thực hiện'), findsNothing);
+    expect(find.text('Đánh giá thực tế'), findsNothing);
+    expect(find.byType(ServiceReviewCard), findsNothing);
+    expect(find.byType(ServiceReviewPreview), findsNothing);
+  });
 
   testWidgets('Lọc sao, ảnh, tìm kiếm, gói và phân trang gửi đúng truy vấn', (
     tester,
@@ -650,7 +658,8 @@ void main() {
         tester,
       ) async {
         await showScreen(tester, size: size, scale: scale);
-        await tester.scrollUntilVisible(find.text('Đánh giá thực tế'), 200);
+        await tester.scrollUntilVisible(find.text('Quy trình thực hiện'), 200);
+        expect(find.byType(ServiceReviewPreview), findsNothing);
         expect(tester.takeException(), isNull);
         final button = tester.getRect(
           find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'),
@@ -658,7 +667,9 @@ void main() {
         expect(button.right, closeTo(size.width - 26, 1));
         await showScreen(tester, full: true, size: size, scale: scale);
         await tester.scrollUntilVisible(
-          find.byType(ServiceReviewCard).first,
+          find.byWidgetPredicate(
+            (widget) => widget is ServiceReviewCard && widget.review.id == '6',
+          ),
           200,
           scrollable: find.byType(Scrollable).first,
         );

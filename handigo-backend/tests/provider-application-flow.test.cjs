@@ -29,7 +29,7 @@ function setup(applicationType = 'initial', status = 'pending', failCommit = fal
   const userUpdates = [];
   const application = {
     _id: applicationId, userId, applicationType, status, reviewHistory: [],
-    description: 'Có kinh nghiệm', experienceYears: 2, workingAreas: ['Phường A, Thành phố B'],
+    description: 'Có kinh nghiệm', experienceYears: 2,
     serviceIds: [new Types.ObjectId(serviceId)], certificates: [],
     async save() { events.push('save'); },
   };
@@ -87,8 +87,62 @@ function setup(applicationType = 'initial', status = 'pending', failCommit = fal
     },
   };
   const exports = loadSource('../src/services/providerApplication.service.ts', modules);
-  return { review: exports.reviewApplication, application, events, userUpdates, notifications, provider };
+  return { review: exports.reviewApplication, list: exports.getApplications, models, application, events, userUpdates, notifications, provider };
 }
+
+test('Danh sách ưu tiên hồ sơ cần duyệt trước khi phân trang và giữ thứ tự khi lấy chi tiết', async () => {
+  const context = setup();
+  const ids = [new Types.ObjectId(applicationId), new Types.ObjectId(userId)];
+  const documents = ids.map((_id) => ({ _id, description: 'Hồ sơ thử nghiệm' }));
+  let pipeline;
+  let countFilter;
+  const fromDate = new Date('2026-10-01T00:00:00+07:00');
+  const toDate = new Date('2026-10-27T23:59:59.999+07:00');
+  context.models.ProviderApplication.aggregate = async (stages) => {
+    pipeline = stages;
+    return ids.map((_id) => ({ _id }));
+  };
+  context.models.ProviderApplication.countDocuments = async (filter) => {
+    countFilter = filter;
+    return 22;
+  };
+  context.models.ProviderApplication.find = (filter) => {
+    assert.deepEqual(filter._id.$in.map(String), ids.map(String));
+    return {
+      populate() { return this; },
+      then(resolve) { return Promise.resolve([...documents].reverse()).then(resolve); },
+    };
+  };
+
+  const result = await context.list({ page: 2, limit: 20, fromDate, toDate });
+  const stages = JSON.parse(JSON.stringify(pipeline));
+  assert.equal(stages[0].$match.isDeleted, false);
+  assert.deepEqual(stages[0].$match.status, { $ne: 'draft' });
+  assert.equal(countFilter.createdAt.$gte, fromDate);
+  assert.equal(countFilter.createdAt.$lte, toDate);
+  assert.deepEqual(stages[2].$addFields.reviewPriority.$cond, [
+    { $in: ['$status', ['pending', 'resubmitted']] }, 0, 1,
+  ]);
+  assert.deepEqual(stages[3], { $sort: { reviewPriority: 1, createdAt: -1, _id: -1 } });
+  assert.deepEqual(stages[4], { $skip: 20 });
+  assert.deepEqual(stages[5], { $limit: 20 });
+  assert.deepEqual(Array.from(result.items, (item) => String(item._id)), ids.map(String));
+  assert.equal(result.pagination.totalPages, 2);
+  assert.equal(result.items.some((item) => 'reviewPriority' in item), false);
+});
+
+test('Danh sách trống giữ bộ lọc trạng thái và không truy vấn chi tiết hồ sơ', async () => {
+  const context = setup();
+  context.models.ProviderApplication.aggregate = async (pipeline) => {
+    assert.equal(pipeline[0].$match.status, 'approved');
+    return [];
+  };
+  context.models.ProviderApplication.countDocuments = async () => 0;
+  context.models.ProviderApplication.find = () => assert.fail('Không cần lấy chi tiết khi danh sách trống');
+  const result = await context.list({ status: 'approved', limit: 20 });
+  assert.equal(result.items.length, 0);
+  assert.equal(result.pagination.total, 0);
+});
 
 test('Từ chối bổ sung dịch vụ không thay đổi quyền provider đã được duyệt', async () => {
   const context = setup('service_addition');

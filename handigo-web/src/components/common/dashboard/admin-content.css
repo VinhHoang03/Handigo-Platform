@@ -1,0 +1,123 @@
+.admin-content .admin-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 12px;
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+}
+
+.admin-content .admin-page-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-headline-lg);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.admin-content .admin-page-header > div {
+  min-width: 0;
+}
+
+.admin-content .admin-header-actions,
+.admin-content .admin-date-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-content .admin-date-range label {
+  position: relative;
+  display: block;
+}
+
+.admin-content .admin-date-range label > span {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  padding: 0 4px;
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface-variant);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.admin-content .admin-date-range input {
+  width: 144px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 12px;
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  font-size: 14px;
+}
+
+.admin-content .admin-header-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-content .admin-header-summary p {
+  margin: 0;
+}
+
+.admin-content .admin-page-header button {
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  box-shadow: none;
+}
+
+.admin-content .admin-page-header :is(button, input):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (min-width: 1024px) {
+  .admin-content .admin-page-header {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    height: 72px;
+  }
+
+  .admin-content .admin-page-header > :first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .admin-content .admin-header-actions,
+  .admin-content .admin-date-range {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+  }
+
+  .admin-content .admin-page-header h1 {
+    font-size: 36px;
+  }
+
+  .admin-content .admin-page-title > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

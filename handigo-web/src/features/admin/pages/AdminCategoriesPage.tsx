@@ -1,7 +1,8 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { CatalogStatusPill } from "../components/categories/CatalogStatusPill";
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { CircleAlert, Image as ImageIcon, ListPlus, Pencil, PlusCircle, Wrench } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -68,7 +69,7 @@ function CategoryServicesDropdown({
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Loại giá</small><strong className="font-semibold text-on-surface">{service.serviceType === 'fixed_price' ? 'Giá cố định' : 'Giá linh hoạt'}</strong></span>
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Giá</small><strong className="font-semibold text-on-surface">{price == null ? 'Chưa có giá' : serviceMoney.format(price)}</strong></span>
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Tùy chọn</small><strong className="font-semibold text-on-surface">{optionsLoading ? 'Đang tải…' : optionCounts[service._id] ?? 0}</strong></span>
-                    <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Slug</small><strong className="break-all whitespace-normal font-medium text-on-surface-variant">/{service.slug}</strong></span>
+                    <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Đường dẫn định danh</small><strong className="break-all whitespace-normal font-medium text-on-surface-variant">/{service.slug}</strong></span>
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Cập nhật</small><strong className="font-medium text-on-surface-variant">{service.updatedAt ? serviceDateFormatter.format(new Date(service.updatedAt)) : '—'}</strong></span>
                 </div>
                 <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
@@ -98,6 +99,8 @@ export default function AdminCategoriesPage() {
   const [editingOption, setEditingOption] = useState<ServiceOption | null>(null);
   const [optionFormError, setOptionFormError] = useToastFeedback<string>('', "error");
   const [serviceBusy, setServiceBusy] = useState(false);
+  const optionStatusRequests = useRef(new Set<string>());
+  const [optionStatusBusy, setOptionStatusBusy] = useState<string[]>([]);
 
   const openEditService = (service: Service) => {
     setEditingService(service);
@@ -130,6 +133,7 @@ export default function AdminCategoriesPage() {
 
   const saveService = async (event: FormEvent) => {
     event.preventDefault();
+    if (optionStatusRequests.current.size > 0) return;
     setServiceBusy(true);
     try {
       if (editingService) {
@@ -190,6 +194,22 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const toggleOptionStatus = async (option: ServiceOption) => {
+    if (serviceBusy || optionStatusRequests.current.has(option._id)) return;
+    optionStatusRequests.current.add(option._id);
+    setOptionStatusBusy([...optionStatusRequests.current]);
+    try {
+      const updated = await categoryServiceApi.updateServiceOption(option._id, { isActive: !option.isActive });
+      setServiceOptions(current => current.map(item => item._id === updated._id ? updated : item));
+      addToast(updated.isActive ? 'Đã bật hiển thị tùy chọn.' : 'Đã tắt hiển thị tùy chọn.', 'success');
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái tùy chọn. Vui lòng thử lại.', 'error');
+    } finally {
+      optionStatusRequests.current.delete(option._id);
+      setOptionStatusBusy([...optionStatusRequests.current]);
+    }
+  };
+
   const sortedCategories = useMemo(
     () =>
       [...c.categories].sort((a, b) => {
@@ -219,13 +239,11 @@ export default function AdminCategoriesPage() {
   return (
     <DashboardShell role="ADMIN">
       <div className="space-y-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="admin-page-header">
           <div>
-            <h1 className="font-headline-lg text-headline-lg font-bold text-on-surface">
-              Quản lý danh mục dịch vụ
-            </h1>
+            <AdminPageTitle title="Quản lý danh mục dịch vụ" />
           </div>
-          <div className="text-left sm:text-right">
+          <div className="admin-header-summary">
             <p className="flex items-center justify-start gap-2 text-sm font-semibold text-on-surface-variant sm:justify-end">
               <span
                 aria-hidden="true"
@@ -238,7 +256,8 @@ export default function AdminCategoriesPage() {
               {c.serviceStats.total}
             </p>
           </div>
-        </header>
+        <AdminRefreshButton onRefresh={() => void c.reload()} loading={c.loading} />
+      </header>
 
 
         <CategoryFilterBar
@@ -316,8 +335,8 @@ export default function AdminCategoriesPage() {
         mode={editingService ? "edit" : "create"}
         categories={c.categories}
         form={serviceForm}
-        busy={serviceBusy}
-        blockClose={serviceBusy || Boolean(optionModal)}
+        busy={serviceBusy || optionStatusBusy.length > 0}
+        blockClose={serviceBusy || optionStatusBusy.length > 0 || Boolean(optionModal)}
         onChange={setServiceForm}
         onClose={() => setServiceModal(false)}
         onSubmit={saveService}
@@ -348,7 +367,7 @@ export default function AdminCategoriesPage() {
                   <div key={group} className="space-y-2">
                     <h4 className="border-b border-outline-variant/40 pb-1 text-xs font-bold uppercase tracking-wide text-primary">{group}</h4>
                     {options.map((option) => (
-                      <div key={option._id} className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-outline-variant/60 px-4 py-3 text-sm">
+                      <div key={option._id} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3 rounded-lg border border-outline-variant/60 px-4 py-3 text-sm sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
                         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low text-on-surface-variant">
                           {option.image && isImageUrl(option.image) ? <ReliableImage src={option.image} alt="" aria-hidden="true" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" size={20} />}
                         </div>
@@ -357,9 +376,10 @@ export default function AdminCategoriesPage() {
                           <span className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-auto whitespace-pre-wrap rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-950 shadow-lg group-hover/option:block">{option.description || 'Chưa có mô tả'}</span>
                           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant"><span>{OPTION_TYPE_LABELS[option.optionType]}</span><span>Chọn nhiều: {option.selectionMode === 'multiple' ? 'Có' : 'Không'}</span><span>Cho phép số lượng: {option.allowsQuantity ? 'Có' : 'Không'}</span></div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-3">
-                          <span className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant"><span className={`h-2.5 w-2.5 rounded-full ${option.isActive ? 'bg-success' : 'bg-outline'}`} aria-hidden="true" />{option.price.toLocaleString('vi-VN')} đ</span>
-                          <button type="button" onClick={() => openEditOption(option)} className="rounded p-1 text-primary hover:bg-primary/10" aria-label={`Sửa tùy chọn ${option.name}`}><Pencil size={16} /></button>
+                        <div className="col-span-2 flex shrink-0 items-center justify-end gap-3 sm:col-span-1">
+                          <span className="text-xs text-on-surface-variant">{option.price.toLocaleString('vi-VN')} đ</span>
+                          <CatalogStatusPill name={`tùy chọn ${option.name}`} active={option.isActive} busy={serviceBusy || optionStatusBusy.includes(option._id)} onToggle={() => void toggleOptionStatus(option)} />
+                          <button type="button" disabled={serviceBusy || optionStatusBusy.includes(option._id)} onClick={() => openEditOption(option)} className="rounded p-1 text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60" aria-label={`Sửa tùy chọn ${option.name}`}><Pencil aria-hidden="true" size={16} /></button>
                         </div>
                       </div>
                     ))}

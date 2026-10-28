@@ -4,7 +4,6 @@ import { Modal } from '@/components/common/Modal';
 import { customerServiceApi, type PublicProviderProfile } from '@/features/customer-service/api/customerService.api';
 import { ProviderProfileHeader } from '@/features/customer-service/components/ProviderProfileHeader';
 import { ProviderAboutSection } from '@/features/customer-service/components/ProviderAboutSection';
-import { ProviderServiceAreas } from '@/features/customer-service/components/ProviderServiceAreas';
 import { ProviderFeedbackSection } from '@/features/customer-service/components/ProviderFeedbackSection';
 import { InfoSection } from '@/features/customer-service/components/ProviderProfilePrimitives';
 
@@ -70,7 +69,6 @@ export const BookingProviderDetails = ({ providerId, canSelect, onClose, onSelec
               {profile.provider.services.length === 0 && <p>Chưa cập nhật dịch vụ.</p>}
             </div>
           </InfoSection>
-          <ProviderServiceAreas compact areas={profile.provider.workingAreas.length ? profile.provider.workingAreas : [[profile.provider.serviceArea?.ward, profile.provider.serviceArea?.province].filter(Boolean).join(', ')].filter(Boolean)} />
           <ProviderFeedbackSection compact feedbacks={profile.feedbacks} totalFeedbacks={profile.provider.totalFeedbacks} />
         </div>
       )}

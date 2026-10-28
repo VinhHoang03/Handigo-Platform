@@ -3,7 +3,6 @@ import { ServiceAdditionApplicationDialog } from "@/features/provider-applicatio
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import {
   ProfessionalProfileDialog,
-  ServiceAreaDialog,
 } from "../ProviderProfileDialogs";
 import {
   ProviderIdentityDialog,
@@ -29,12 +28,6 @@ export function ProviderProfileDialogsGroup({
   editingServiceApplication,
   onServiceApplicationClose,
   onServiceApplicationSubmitted,
-  isServiceAreaModalOpen,
-  workingAreasForm,
-  serviceAreaError,
-  onServiceAreaChange,
-  onServiceAreaClose,
-  onServiceAreaSave,
   isIdentityModalOpen,
   identityForm,
   identityError,
@@ -67,12 +60,6 @@ export function ProviderProfileDialogsGroup({
   editingServiceApplication: ProviderApplication | null;
   onServiceApplicationClose: () => void;
   onServiceApplicationSubmitted: () => void;
-  isServiceAreaModalOpen: boolean;
-  workingAreasForm: string[];
-  serviceAreaError: string;
-  onServiceAreaChange: (areas: string[]) => void;
-  onServiceAreaClose: () => void;
-  onServiceAreaSave: () => void;
   isIdentityModalOpen: boolean;
   identityForm: IdentityForm;
   identityError: string;
@@ -118,15 +105,6 @@ export function ProviderProfileDialogsGroup({
         />
       )}
 
-      <ServiceAreaDialog
-        open={isServiceAreaModalOpen}
-        areas={workingAreasForm}
-        saving={isSaving}
-        error={serviceAreaError}
-        onChange={onServiceAreaChange}
-        onClose={onServiceAreaClose}
-        onSave={onServiceAreaSave}
-      />
 
       <ProviderIdentityDialog
         open={isIdentityModalOpen}

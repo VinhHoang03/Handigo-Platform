@@ -38,7 +38,7 @@ export function CategoryFormModal({
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-sm font-semibold">Slug</span>
+          <span className="mb-1 block text-sm font-semibold">Đường dẫn định danh</span>
           <input
             disabled={busy}
             value={form.slug}

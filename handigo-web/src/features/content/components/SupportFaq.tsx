@@ -109,7 +109,7 @@ export function SupportFaq({ query, group, onGroupChange }: SupportFaqProps) {
                   />
                 </button>
                 {isOpen && (
-                  <p className="max-w-[80ch] pb-6 text-pretty leading-7 text-on-surface-variant">
+                  <p className="support-faq-answer max-w-[80ch] pb-6 text-pretty leading-7 text-on-surface-variant">
                     {faq.answer}
                   </p>
                 )}

@@ -1,3 +1,4 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useState } from "react";
 import { useToast } from "@/components/common/Toast";
 import { getErrorMessage } from "@/utils/apiError";
@@ -41,11 +42,9 @@ export default function AdminUsersPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <header>
-        <h1 className="text-headline-lg font-bold">Quản lý người dùng</h1>
-        <p className="text-on-surface-variant">
-          Tìm kiếm, xem chi tiết và quản lý trạng thái tài khoản.
-        </p>
+      <header className="admin-page-header">
+        <AdminPageTitle title="Quản lý người dùng" />
+      <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
       </header>
       <UserFilters query={query} onChange={setQuery} />
       <AsyncState

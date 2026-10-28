@@ -91,7 +91,7 @@ export function ServiceImagesEditor({ coverImage, galleryImages, disabled, onBus
   return <fieldset className="space-y-4 rounded-xl border border-outline-variant p-4">
     <legend className="px-2 font-bold">Ảnh dịch vụ</legend>
     <div>
-      <p className="mb-2 font-semibold">Ảnh bìa / thumbnail</p>
+      <p className="mb-2 font-semibold">Ảnh bìa / ảnh thu nhỏ</p>
       {coverImage && <ReliableImage src={coverImage} alt="Ảnh bìa dịch vụ" className="mb-2 aspect-video w-full rounded-lg bg-surface-container object-contain" />}
       {input('cover')}
       {coverImage && <button type="button" disabled={locked} onClick={() => onChange('', galleryImages)} className="ml-3 text-sm text-error">Xóa ảnh bìa</button>}

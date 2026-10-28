@@ -9,11 +9,34 @@ import { previewServiceBooking } from "../services/servicePricing.service";
 import { updateExpectedEnd } from "../services/providerSchedule.service";
 import { respondToProviderReassignment } from "../services/orderReassignment.service";
 import { getCustomerBookingPolicies } from "../services/bookingPolicy.service";
+import { markOrderArrival, checkCustomerNoShowEligibility, reportCustomerNoShow, uploadNoShowEvidence } from "../services/customerNoShow.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
 
 const uid = (req: Request): string => requireRequestUser(req).id;
+
+export const arriveOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await markOrderArrival(String(req.params.orderId), uid(req))); }
+  catch (error) { return next(error); }
+};
+
+export const customerNoShowEligibility = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await checkCustomerNoShowEligibility(String(req.params.orderId), uid(req))); }
+  catch (error) { return next(error); }
+};
+
+export const createCustomerNoShowReport = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await reportCustomerNoShow(String(req.params.orderId), uid(req), req.body), 201); }
+  catch (error) { return next(error); }
+};
+
+export const createCustomerNoShowEvidence = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) throw new AppError("Vui lòng chọn ảnh bằng chứng.", 400);
+    return ok(res, await uploadNoShowEvidence(String(req.params.orderId), uid(req), req.body.kind, req.file), 201);
+  } catch (error) { return next(error); }
+};
 
 export const getBookingPolicies = async (_req: Request, res: Response, next: NextFunction) => {
   try { return ok(res, await getCustomerBookingPolicies()); }

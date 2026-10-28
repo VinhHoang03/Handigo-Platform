@@ -232,7 +232,7 @@ class _AiChatComposerState extends State<AiChatComposer> {
                 child: Text(
                   '${images.length}/4 ảnh hiện trạng. ${attachmentsDirty ? 'Nhấn Gửi để cập nhật ảnh trước khi xác nhận.' : 'Ảnh sẽ được gửi kèm đơn sau xác nhận.'}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
@@ -244,7 +244,7 @@ class _AiChatComposerState extends State<AiChatComposer> {
                   error ??
                       'Đang nghe tiếng Việt… Nhấn dừng, kiểm tra nội dung rồi gửi.',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 13,
                     color: error != null
                         ? scheme.error
                         : scheme.onSurfaceVariant,

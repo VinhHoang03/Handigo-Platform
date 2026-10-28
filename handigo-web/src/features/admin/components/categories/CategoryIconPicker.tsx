@@ -42,7 +42,7 @@ export function CategoryIconPicker({ icon, color, name, disabled, unavailableCol
         <div className="min-w-0 flex-1">
           <p className="break-words font-bold">{name.trim() || 'Tên danh mục'}</p>
           <p className="text-sm text-on-surface-variant">{selected.label}</p>
-          <p className="mt-1 text-xs text-on-surface-variant">Nét icon và nền nhạt cùng tông màu.</p>
+          <p className="mt-1 text-xs text-on-surface-variant">Nét biểu tượng và nền nhạt cùng tông màu.</p>
         </div>
       </div>
       <div className="space-y-2">

@@ -4,6 +4,8 @@ import type { AdminSupportTicket } from "../../types/adminSupport.types";
 import { SupportAttachments } from "./SupportAttachments";
 import { SupportPriorityBadge, SupportStatusBadge } from "./SupportBadges";
 import { dateTime, ticketAge } from "./support.constants";
+import { getOrderStatusMeta } from "@/utils/orderStatus";
+import { PAYMENT_STATUS_LABELS } from "../payments/payment-constants";
 
 interface TicketThreadProps {
   ticket: AdminSupportTicket;
@@ -39,7 +41,7 @@ export function TicketThread({ ticket, busy, onRespond }: TicketThreadProps) {
         </div>
         {ticket.orderId && (
           <p className="mt-2 text-sm">
-            Đơn liên quan: <b>{ticket.orderId.orderCode}</b> · {ticket.orderId.status} · {ticket.orderId.paymentStatus}
+            Đơn liên quan: <b>{ticket.orderId.orderCode}</b> · {getOrderStatusMeta(ticket.orderId.status).label} · {ticket.orderId.paymentStatus === "unpaid" ? "Chưa thanh toán" : ticket.orderId.paymentStatus === "partially_paid" ? "Đã thanh toán một phần" : PAYMENT_STATUS_LABELS[ticket.orderId.paymentStatus as keyof typeof PAYMENT_STATUS_LABELS] || "Chưa xác định"}
           </p>
         )}
       </section>

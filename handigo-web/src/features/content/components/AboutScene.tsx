@@ -16,22 +16,35 @@ export function AboutScene({ variant }: AboutSceneProps) {
     const motion = window.matchMedia("(prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine)");
     let frame = 0;
     let bounds: DOMRect | undefined;
-    const reset = () => {
+    const current = { x: -28, y: -16 };
+    const target = { ...current };
+    const render = () => {
+      current.x += (target.x - current.x) * 0.1;
+      current.y += (target.y - current.y) * 0.1;
+      scene.style.setProperty("--scene-rx", `${current.y}deg`);
+      scene.style.setProperty("--scene-ry", `${current.x}deg`);
+      if (Math.abs(target.x - current.x) > 0.05 || Math.abs(target.y - current.y) > 0.05) {
+        frame = requestAnimationFrame(render);
+      }
+    };
+    const animateToTarget = () => {
       cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(render);
+    };
+    const reset = () => {
       bounds = undefined;
-      scene.style.removeProperty("--scene-rx");
-      scene.style.removeProperty("--scene-ry");
+      target.x = -28;
+      target.y = -16;
+      animateToTarget();
     };
     const move = (event: PointerEvent) => {
       if (!motion.matches || event.pointerType !== "mouse") return;
       bounds ??= scene.getBoundingClientRect();
       const x = Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1));
       const y = Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1));
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        scene.style.setProperty("--scene-rx", `${-16 - y * 9}deg`);
-        scene.style.setProperty("--scene-ry", `${-28 + x * 16}deg`);
-      });
+      target.x = -28 + x * 10;
+      target.y = -16 - y * 6;
+      animateToTarget();
     };
     scene.addEventListener("pointermove", move, { passive: true });
     scene.addEventListener("pointerleave", reset);
@@ -39,7 +52,7 @@ export function AboutScene({ variant }: AboutSceneProps) {
     window.addEventListener("resize", reset);
     motion.addEventListener("change", reset);
     return () => {
-      reset();
+      cancelAnimationFrame(frame);
       scene.removeEventListener("pointermove", move);
       scene.removeEventListener("pointerleave", reset);
       window.removeEventListener("scroll", reset);

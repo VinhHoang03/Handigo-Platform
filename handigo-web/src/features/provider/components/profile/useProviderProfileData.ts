@@ -11,7 +11,6 @@ import type {
 import {
   buildPerformanceStats,
   buildProviderProfileView,
-  buildServiceArea,
   emptyProfessionalForm,
   optional,
   toProfessionalForm,
@@ -97,7 +96,6 @@ export function useProviderProfileData(availabilityStatus: string) {
     [availabilityStatus, profile],
   );
 
-  const serviceArea = useMemo(() => buildServiceArea(profile), [profile]);
 
   const { handleUserProfileSave, handleAvatarSave } = useProviderProfileSave({
     profile,
@@ -156,7 +154,6 @@ export function useProviderProfileData(availabilityStatus: string) {
     loadProfile,
     profileView,
     performanceStats,
-    serviceArea,
     handleUserProfileSave,
     handleAvatarSave,
     handleProfessionalSubmit,

@@ -1,6 +1,7 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { RefreshCw, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { DataTable } from "@/components/common/dashboard/DataTable";
@@ -108,21 +109,11 @@ export default function AdminWalletsPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="admin-page-header">
         <div>
-          <h1 className="text-headline-lg font-bold">Quản lý ví provider</h1>
-          <p className="mt-2 text-on-surface-variant">
-            Kiểm tra số dư, lịch sử giao dịch và điều chỉnh có ghi nhận lý do.
-          </p>
+          <AdminPageTitle title="Quản lý ví nhà cung cấp" />
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 font-semibold text-primary disabled:opacity-40"
-        >
-          <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> Làm mới
-        </button>
+        <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
       </header>
 
       <section className="rounded-2xl border border-outline-variant/40 bg-surface p-4">
@@ -133,8 +124,8 @@ export default function AdminWalletsPage() {
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               maxLength={100}
-              placeholder="Tìm theo tên, email hoặc số điện thoại..."
-              aria-label="Tìm provider"
+              placeholder="Tìm theo tên, email hoặc số điện thoại…"
+              aria-label="Tìm nhà cung cấp"
               className="min-h-11 w-full rounded-xl border border-outline-variant pl-10 pr-3"
             />
           </label>
@@ -161,7 +152,7 @@ export default function AdminWalletsPage() {
         loading={loading}
         error={error}
         empty={!items.length}
-        emptyMessage="Không có ví provider phù hợp."
+        emptyMessage="Không có ví nhà cung cấp phù hợp."
         onRetry={load}
       >
         <DataTable

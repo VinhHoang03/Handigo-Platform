@@ -153,7 +153,7 @@ class AuthScaffold extends StatelessWidget {
         title,
         textAlign: TextAlign.center,
         style: theme.textTheme.headlineMedium?.copyWith(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: theme.colorScheme.onSurface,
         ),
       ),
@@ -221,7 +221,7 @@ class _HandigoMark extends StatelessWidget {
         'Handigo',
         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
           color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w600,
           letterSpacing: -0.5,
         ),
       ),

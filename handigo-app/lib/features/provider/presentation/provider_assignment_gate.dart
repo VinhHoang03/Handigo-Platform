@@ -279,8 +279,8 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                         const Text(
                           'Bạn có đơn hàng mới',
                           style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
                             color: Colors.black,
                           ),
                         ),
@@ -295,7 +295,7 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                                 item.serviceName,
                                 style: const TextStyle(
                                   fontSize: 22,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                   color: Colors.black,
                                 ),
                               ),
@@ -306,7 +306,7 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -319,7 +319,7 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                               TextSpan(
                                 text: item.orderCode,
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -423,7 +423,7 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                                       ).format(item.totalAmount),
                                       style: const TextStyle(
                                         fontSize: 22,
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),

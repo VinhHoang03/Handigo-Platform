@@ -57,7 +57,7 @@ export const buildChatbotContext = async (
   const provider =
     user.role === "PROVIDER"
       ? await Provider.findOne({ userId: user.id, isDeleted: false })
-          .select("_id availabilityStatus verified serviceIds workingAreas")
+          .select("_id availabilityStatus verified serviceIds")
           .populate("serviceIds", "name")
           .lean()
       : null;
@@ -84,7 +84,6 @@ export const buildChatbotContext = async (
         ? {
             availabilityStatus: provider.availabilityStatus,
             verified: provider.verified,
-            workingAreas: provider.workingAreas,
             services: provider.serviceIds,
           }
         : null,

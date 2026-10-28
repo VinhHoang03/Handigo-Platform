@@ -68,7 +68,6 @@ export const hasProviderApplicationDateErrors = (
 export const getProviderApplicationSubmissionErrors = (form: ProviderApplicationPayload) => {
   const errors: string[] = [];
   if (!form.serviceIds.length) errors.push('Chọn ít nhất một dịch vụ ở bước 1.');
-  if (!form.workingAreas.length) errors.push('Thêm ít nhất một khu vực hoạt động ở bước 2.');
   if (!form.description.trim()) errors.push('Nhập mô tả kinh nghiệm.');
   if (!form.identityDocument.documentNumber.trim()) errors.push('Nhập số giấy tờ định danh.');
   if (!form.identityDocument.fullName.trim()) errors.push('Nhập họ tên trên giấy tờ.');

@@ -11,22 +11,24 @@ export function AboutValues() {
   return (
     <section
       aria-labelledby="about-values-heading"
-      className="px-6 py-12 lg:py-16"
+      className="about-values px-6 py-16 lg:py-24"
     >
       <div className="mx-auto grid max-w-7xl gap-x-14 gap-y-10 lg:grid-cols-12">
         <div className="lg:col-span-5">
+          <p className="about-section-index">02 / Điều chúng tôi giữ vững</p>
           <h2
             id="about-values-heading"
-            className="text-balance font-headline-lg text-3xl font-bold tracking-[-0.02em] text-on-surface"
+            className="mt-4 text-balance font-headline-lg text-3xl font-bold tracking-[-0.03em] text-on-surface sm:text-4xl"
           >
-            Điều chúng tôi cam kết được ngay hôm nay
+            Niềm tin bắt đầu từ những điều có thể kiểm chứng
           </h2>
-          <ul className="mt-8 space-y-7">
-            {aboutCommitments.map((item) => (
-              <li key={item.title} className="flex items-start gap-4">
-                <item.icon aria-hidden="true" size={22} className="mt-0.5 shrink-0 text-primary" />
+          <ul className="mt-10 space-y-3">
+            {aboutCommitments.map((item, index) => (
+              <li key={item.title} className="about-commitment flex items-start gap-4">
+                <span className="about-commitment__number">0{index + 1}</span>
                 <div className="min-w-0">
-                  <h3 className="font-headline-md text-base font-semibold text-on-surface">
+                  <h3 className="flex items-center gap-2 font-headline-md text-base font-semibold text-on-surface">
+                    <item.icon aria-hidden="true" size={18} className="shrink-0 text-primary" />
                     {item.title}
                   </h3>
                   <p className="mt-1.5 text-pretty leading-7 text-on-surface-variant">
@@ -38,17 +40,19 @@ export function AboutValues() {
           </ul>
         </div>
 
-        <div className="lg:col-span-7 lg:pt-2">
-          <h3 className="font-headline-md text-lg font-semibold text-on-surface">
+        <div className="about-values__panel lg:col-span-7">
+          <p className="text-label-sm font-semibold uppercase tracking-[0.18em] text-secondary">
             Giá trị cốt lõi
-          </h3>
-          <dl className="mt-4 border-t border-outline-variant/50">
-            {coreValues.map((value) => (
+          </p>
+          <dl className="mt-5">
+            {coreValues.map((value, index) => (
               <div
                 key={value.title}
-                className="grid gap-1 border-b border-outline-variant/50 py-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-6"
+                className="about-value-row grid gap-2 py-6 sm:grid-cols-[42px_150px_minmax(0,1fr)] sm:items-start sm:gap-5"
               >
-                <dt className="font-headline-md text-base font-semibold text-on-surface">
+                <span className="about-value-row__index" aria-hidden="true">0{index + 1}</span>
+                <dt className="flex items-center gap-2 font-headline-md text-base font-semibold text-on-surface">
+                  <value.icon aria-hidden="true" size={18} className="text-primary" />
                   {value.title}
                 </dt>
                 <dd className="text-pretty leading-7 text-on-surface-variant">

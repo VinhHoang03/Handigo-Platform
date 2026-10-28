@@ -26,7 +26,11 @@ export function PublicSupportCta() {
       </p>
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-        <Link to="/login?redirect=/ho-tro" className="btn-primary px-7">
+        <Link
+          to="/login"
+          state={{ from: "/ho-tro?focus=tao-yeu-cau" }}
+          className="btn-primary px-7"
+        >
           Đăng nhập để gửi yêu cầu
         </Link>
         <Link to="/register" className="btn-secondary px-7">

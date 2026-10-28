@@ -4,9 +4,21 @@ import '../../../core/network/api_exception.dart';
 import '../../orders/domain/order_summary.dart';
 import 'provider_screens.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'quotation_voice_sheet.dart';
 
 class QuotationEditorScreen extends ConsumerStatefulWidget {
-  const QuotationEditorScreen({required this.order, this.quotation, super.key});
+  const QuotationEditorScreen({
+    required this.order,
+    this.quotation,
+    this.embedded = false,
+    this.onSaved,
+    this.onBusyChanged,
+    super.key,
+  });
+  final bool embedded;
+  final Future<void> Function()? onSaved;
+  final ValueChanged<bool>? onBusyChanged;
   final OrderDetail order;
   final RepairQuotation? quotation;
 
@@ -31,23 +43,24 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
     text: '${widget.quotation?.discountAmount ?? 0}',
   );
   late final List<_ItemDraft> items =
-      widget.quotation?.items.map(_ItemDraft.fromItem).toList() ??
-      [_ItemDraft()];
+      widget.quotation?.items.map(_ItemDraft.fromItem).toList() ?? [];
   bool busy = false;
+  int _revision = 0;
   String? error;
 
   Future<void> scan() async {
     if (busy) return;
-    final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (file == null || !mounted) return;
     setState(() {
       busy = true;
       error = null;
     });
+    widget.onBusyChanged?.call(true);
     try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      if (file == null || !mounted) return;
       final scanned = await ref
           .read(providerRepositoryProvider)
           .scanQuotation(widget.order.id, file);
@@ -57,19 +70,23 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
           items.removeLast().dispose();
         }
         items.addAll(scanned.take(100 - items.length).map(_ItemDraft.fromItem));
-        if (items.isEmpty) items.add(_ItemDraft());
+        _revision++;
         error =
             'Đã đọc ảnh. Vui lòng kiểm tra từng hạng mục và đơn giá trước khi lưu.';
       });
     } catch (failure) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => error = failure is ApiException
               ? failure.message
               : 'Chưa thể đọc ảnh. Bạn vẫn có thể nhập báo giá thủ công.',
         );
+      }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() => busy = false);
+        widget.onBusyChanged?.call(false);
+      }
     }
   }
 
@@ -86,6 +103,24 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
 
   Future<void> save() async {
     if (busy || !form.currentState!.validate()) return;
+    if (items.isEmpty) {
+      setState(() => error = 'Vui lòng thêm ít nhất một hạng mục báo giá.');
+      return;
+    }
+    if (items.any(
+      (item) =>
+          item.title.text.trim().isEmpty ||
+          item.title.text.trim().length > 200 ||
+          !_types.containsKey(item.type) ||
+          _integer(item.quantity.text, 1, 1000) != null ||
+          _amount(item.price.text) != null,
+    )) {
+      setState(
+        () => error =
+            'Có hạng mục chưa hợp lệ. Chạm vào hạng mục để kiểm tra tên, số lượng và đơn giá.',
+      );
+      return;
+    }
     final subtotal = items.fold<double>(
       0,
       (sum, item) =>
@@ -99,6 +134,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
       busy = true;
       error = null;
     });
+    widget.onBusyChanged?.call(true);
     try {
       await ref.read(providerRepositoryProvider).saveQuotation(
         widget.order.id,
@@ -121,136 +157,415 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
         },
         current: widget.quotation,
       );
-      if (mounted) Navigator.pop(context, true);
+      if (!mounted) return;
+      if (widget.embedded) {
+        await widget.onSaved?.call();
+      } else {
+        Navigator.pop(context, true);
+      }
     } catch (failure) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => error = failure is ApiException
               ? failure.message
               : 'Chưa thể lưu báo giá. Dữ liệu đã nhập được giữ lại.',
         );
+      }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() => busy = false);
+        widget.onBusyChanged?.call(false);
+      }
     }
   }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(
-        widget.quotation == null ? 'Lập báo giá sửa chữa' : 'Chỉnh sửa báo giá',
-      ),
-    ),
-    body: Form(
-      key: form,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            widget.order.serviceName,
-            style: Theme.of(context).textTheme.titleLarge,
+  Future<void> _voice() async {
+    if (busy) return;
+    final instruction = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const QuotationVoiceSheet(),
+    );
+    if (!mounted || instruction == null || instruction.trim().isEmpty) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    widget.onBusyChanged?.call(true);
+    final revision = _revision;
+    try {
+      final reply = await ref.read(providerRepositoryProvider).assistQuotation(
+        widget.order.id,
+        {
+          'instruction': instruction.trim(),
+          'revision': revision,
+          'items': [
+            for (var i = 0; i < items.length; i++)
+              {
+                'rowId': 'row-$i',
+                'title': items[i].title.text.trim(),
+                'description': items[i].original['description'] ?? '',
+                'note': items[i].original['note'] ?? '',
+                'itemType': items[i].type,
+                'quantity': int.tryParse(items[i].quantity.text) ?? 1,
+                'unitPrice': double.tryParse(items[i].price.text) ?? 0,
+              },
+          ],
+          'inspectionNote': note.text,
+          'recommendation': recommendation.text,
+        },
+      );
+      if (!mounted) return;
+      if (reply['revision'] != revision || revision != _revision) {
+        throw const FormatException(
+          'Báo giá đã thay đổi. Vui lòng thử lại để AI xử lý dữ liệu mới.',
+        );
+      }
+      final next = [
+        for (final item in items)
+          <String, dynamic>{
+            ...item.original,
+            'title': item.title.text,
+            'quantity': int.parse(item.quantity.text),
+            'unitPrice': double.parse(item.price.text),
+            'itemType': item.type,
+          },
+      ];
+      for (final update
+          in (reply['updates'] as List? ?? const []).whereType<Map>()) {
+        final fields = Map<String, dynamic>.from(update['fields'] as Map);
+        if (update['rowId'] == null) {
+          next.add({
+            'title': '',
+            'quantity': 1,
+            'unitPrice': 0,
+            'itemType': 'material',
+            ...fields,
+          });
+        } else {
+          final index = int.tryParse(
+            update['rowId'].toString().replaceFirst('row-', ''),
+          );
+          if (index == null || index < 0 || index >= items.length) {
+            throw const FormatException('AI trả về hạng mục không hợp lệ.');
+          }
+          next[index] = {...next[index], ...fields};
+        }
+      }
+      if (next.length > 100) {
+        throw const FormatException('Báo giá tối đa 100 hạng mục.');
+      }
+      final drafts = next
+          .map((item) => _ItemDraft.fromItem(QuotationItem.fromJson(item)))
+          .toList();
+      setState(() {
+        for (final item in items) {
+          item.dispose();
+        }
+        items
+          ..clear()
+          ..addAll(drafts);
+        if (reply['inspectionNote'] is String) {
+          note.text = reply['inspectionNote'] as String;
+        }
+        if (reply['recommendation'] is String) {
+          recommendation.text = reply['recommendation'] as String;
+        }
+        _revision++;
+        error = [
+          reply['message'] ?? 'Đã điền vào báo giá.',
+          ...?reply['warnings'] as List?,
+          'Kiểm tra các hạng mục và đơn giá trước khi lưu.',
+        ].join('\n');
+      });
+    } catch (failure) {
+      if (mounted) {
+        setState(
+          () => error = failure is ApiException
+              ? failure.message
+              : failure is FormatException
+              ? failure.message
+              : 'Chưa thể điền báo giá bằng AI. Dữ liệu hiện tại được giữ lại.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => busy = false);
+        widget.onBusyChanged?.call(false);
+      }
+    }
+  }
+
+  Future<void> _editItem([int? index]) async {
+    if (busy) return;
+    final source = index == null ? null : items[index];
+    final draft = source == null
+        ? _ItemDraft()
+        : _ItemDraft(
+            name: source.title.text,
+            count: int.parse(source.quantity.text),
+            amount: double.parse(source.price.text),
+            type: source.type,
+            original: source.original,
+          );
+    final key = GlobalKey<FormState>();
+    final accepted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            MediaQuery.viewInsetsOf(context).bottom + 20,
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: busy ? null : scan,
-            icon: const Icon(Icons.document_scanner_outlined),
-            label: const Text('Đọc hạng mục từ ảnh báo giá'),
-          ),
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+          child: SingleChildScrollView(
+            child: Form(
+              key: key,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    index == null
+                        ? 'Thêm hạng mục báo giá'
+                        : 'Chỉnh sửa hạng mục',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: draft.title,
+                    maxLength: 200,
+                    decoration: const InputDecoration(
+                      labelText: 'Tên hạng mục',
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Nhập tên hạng mục.'
+                        : null,
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: draft.type,
+                    decoration: const InputDecoration(
+                      labelText: 'Loại hạng mục',
+                    ),
+                    items: [
+                      for (final entry in _types.entries)
+                        DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                    ],
+                    onChanged: (value) => update(() => draft.type = value!),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: draft.quantity,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Số lượng'),
+                    validator: (value) => _integer(value, 1, 1000),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: draft.price,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Đơn giá (đ)'),
+                    validator: _amount,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () {
+                      if (key.currentState!.validate()) {
+                        Navigator.pop(context, true);
+                      }
+                    },
+                    child: const Text('Xác nhận hạng mục'),
+                  ),
+                ],
               ),
             ),
-          for (var i = 0; i < items.length; i++)
-            Card(
-              key: ObjectKey(items[i]),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
+          ),
+        ),
+      ),
+    );
+    // Chờ sheet kết thúc hiệu ứng đóng trước khi giải phóng các ô nhập.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted || accepted != true) {
+      draft.dispose();
+      return;
+    }
+    setState(() {
+      if (index == null) {
+        items.add(draft);
+      } else {
+        items[index] = draft;
+        source!.dispose();
+      }
+      _revision++;
+    });
+  }
+
+  static const _types = {
+    'material': 'Vật tư',
+    'labor': 'Nhân công',
+    'replacement_part': 'Linh kiện',
+    'other': 'Khác',
+  };
+  String _money(num value) =>
+      '${NumberFormat.decimalPattern('vi_VN').format(value)} đ';
+
+  Widget _itemCard(int index) {
+    final item = items[index];
+    final quantity = int.tryParse(item.quantity.text) ?? 1;
+    final price = double.tryParse(item.price.text) ?? 0;
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      key: ObjectKey(item),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: busy ? null : () => _editItem(index),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 4, 10),
+          child: Row(
+            children: [
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Expanded(child: Text('Hạng mục ${i + 1}')),
-                        IconButton(
-                          tooltip: 'Xóa hạng mục',
-                          onPressed: busy || items.length == 1
-                              ? null
-                              : () {
-                                  final item = items[i];
-                                  setState(() => items.removeAt(i));
-                                  item.dispose();
-                                },
-                          icon: const Icon(Icons.delete_outline),
+                        Text(
+                          item.title.text,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: item.type == 'labor'
+                                ? scheme.secondaryContainer
+                                : scheme.primaryFixed,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            _types[item.type] ?? 'Khác',
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
                         ),
                       ],
                     ),
-                    TextFormField(
-                      controller: items[i].title,
-                      enabled: !busy,
-                      maxLength: 200,
-                      decoration: const InputDecoration(
-                        labelText: 'Tên hạng mục',
+                    const SizedBox(height: 6),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Số lượng $quantity × ${_money(price)} = ',
+                          ),
+                          TextSpan(
+                            text: _money(quantity * price),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
                       ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Nhập tên hạng mục.'
-                          : null,
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: items[i].type,
-                      decoration: const InputDecoration(
-                        labelText: 'Loại hạng mục',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'labor',
-                          child: Text('Nhân công'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'material',
-                          child: Text('Vật tư'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'replacement_part',
-                          child: Text('Linh kiện'),
-                        ),
-                        DropdownMenuItem(value: 'other', child: Text('Khác')),
-                      ],
-                      onChanged: busy
-                          ? null
-                          : (value) => setState(() => items[i].type = value!),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: items[i].quantity,
-                      enabled: !busy,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Số lượng'),
-                      validator: (value) => _integer(value, 1, 1000),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: items[i].price,
-                      enabled: !busy,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Đơn giá (đ)',
-                      ),
-                      validator: _amount,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
               ),
+              IconButton(
+                tooltip: 'Xóa hạng mục',
+                onPressed: busy
+                    ? null
+                    : () {
+                        setState(() {
+                          items.removeAt(index);
+                          _revision++;
+                        });
+                        item.dispose();
+                      },
+                icon: Icon(Icons.delete_outline, color: scheme.error, size: 20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subtotal = items.fold<double>(
+      0,
+      (sum, item) =>
+          sum +
+          (int.tryParse(item.quantity.text) ?? 0) *
+              (double.tryParse(item.price.text) ?? 0),
+    );
+    final total = (subtotal - (double.tryParse(discount.text) ?? 0)).clamp(
+      0,
+      double.infinity,
+    );
+    final content = Form(
+      key: form,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.format_list_bulleted_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Hạng mục báo giá (${items.length})',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Quét ảnh bằng AI',
+                onPressed: busy || items.length >= 100 ? null : scan,
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+              ),
+              IconButton(
+                tooltip: 'Nhập báo giá bằng giọng nói AI',
+                onPressed: busy ? null : _voice,
+                icon: const Icon(Icons.mic_none_rounded),
+              ),
+            ],
+          ),
+          if (busy)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(error!),
+            ),
+          for (var i = 0; i < items.length; i++) _itemCard(i),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Chưa có hạng mục. Thêm thủ công, quét ảnh hoặc dùng giọng nói AI.',
+              ),
             ),
           OutlinedButton.icon(
-            onPressed: busy || items.length >= 100
-                ? null
-                : () => setState(() => items.add(_ItemDraft())),
-            icon: const Icon(Icons.add),
-            label: const Text('Thêm hạng mục'),
+            onPressed: busy || items.length >= 100 ? null : _editItem,
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Thêm hạng mục báo giá'),
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -265,6 +580,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
           const SizedBox(height: 12),
           TextFormField(
             controller: discount,
+            onChanged: (_) => setState(() {}),
             enabled: !busy,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Giảm giá (đ)'),
@@ -274,7 +590,7 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
           TextFormField(
             controller: note,
             enabled: !busy,
-            minLines: 2,
+            minLines: 1,
             maxLines: 5,
             maxLength: 2000,
             decoration: const InputDecoration(labelText: 'Ghi chú khảo sát'),
@@ -282,24 +598,37 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
           TextFormField(
             controller: recommendation,
             enabled: !busy,
-            minLines: 2,
+            minLines: 1,
             maxLines: 5,
             maxLength: 2000,
             decoration: const InputDecoration(labelText: 'Đề xuất xử lý'),
           ),
+          const SizedBox(height: 12),
+          Text(
+            'Tổng báo giá: ${_money(total)}',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          Text('Cọc đã áp dụng: ${_money(widget.order.appliedDeposit)}'),
+          Text(
+            'Thu trực tiếp: ${_money((total - widget.order.appliedDeposit).clamp(0, double.infinity))}',
+          ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: busy ? null : save,
+            child: Text(busy ? 'Đang xử lý...' : 'Lưu báo giá'),
+          ),
         ],
       ),
-    ),
-    bottomNavigationBar: SafeArea(
-      child: Padding(
+    );
+    if (widget.embedded) return content;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Báo giá sửa chữa')),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: FilledButton(
-          onPressed: busy ? null : save,
-          child: Text(busy ? 'Đang lưu...' : 'Lưu báo giá'),
-        ),
+        child: content,
       ),
-    ),
-  );
+    );
+  }
 }
 
 String? _integer(String? value, int min, int max) {
@@ -311,7 +640,7 @@ String? _integer(String? value, int min, int max) {
 
 String? _amount(String? value) {
   final number = double.tryParse(value ?? '');
-  return number == null || !number.isFinite || number < 0
+  return number == null || !number.isFinite || number < 0 || number > 1000000000
       ? 'Nhập số tiền không âm hợp lệ.'
       : null;
 }

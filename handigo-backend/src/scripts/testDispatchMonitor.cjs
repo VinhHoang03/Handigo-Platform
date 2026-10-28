@@ -25,7 +25,7 @@ const flush = () => new Promise(setImmediate);
 async function testOverdueReview() {
   const rows = [null, undefined, {}, { escalatedAt: null }, { escalatedAt: new Date() }]
     .map((overdueReview, index) => ({ _id: String(index), orderCode: `TEST-${index}`,
-      customerId: 'customer', providerId: 'provider', status: 'in_progress', isDeleted: false, overdueReview }));
+      customerId: 'customer', providerId: 'provider', status: 'in_progress', isDeleted: false, updatedAt: new Date(), overdueReview }));
   const notifications = [];
   const failures = [];
   let nextTick;
@@ -35,12 +35,14 @@ async function testOverdueReview() {
   const overdueContext = { exports: {}, timeoutMonitor: null, MATCHING_TIMEOUT_SCAN_INTERVAL_MS: 10000, Date,
     setInterval: fn => { nextTick = fn; return { unref() {} }; },
     getNumberConfigValue: async (_key, fallback) => fallback,
+    findOverdueOrders: async () => rows.filter(row => !row.overdueReview?.escalatedAt),
     dispatchLogger: { error: (...args) => failures.push(args) },
     Order: {
       find: filter => query(filter.status === 'in_progress' ? rows.filter(row => !row.overdueReview?.escalatedAt) : []),
       findOneAndUpdate: async (filter, update, options) => {
         const row = rows.find(value => value._id === filter._id);
         assert.equal(filter['overdueReview.escalatedAt'], null);
+        assert.equal(filter.updatedAt, row.updatedAt);
         assert.equal(options.runValidators, true);
         if (row.overdueReview?.escalatedAt) return null;
         if ('overdueReview.escalatedAt' in update.$set) {

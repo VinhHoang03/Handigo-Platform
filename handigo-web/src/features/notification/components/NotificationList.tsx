@@ -5,6 +5,7 @@ import {
 } from "./notification-type-meta";
 import { Check } from "lucide-react";
 import { getNotificationUnavailableReason } from "@/components/common/notification-bell/notificationBell.utils";
+import { getRoleLabel } from "@/components/common/navbar/navbar.types";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",
@@ -103,7 +104,7 @@ function NotificationListItem({
                     item.recipient.email ||
                     item.recipient.id}
                 </span>
-                {item.recipient.role && ` (${item.recipient.role})`}
+                {item.recipient.role && ` (${item.recipient.role === "ALL" ? "Tất cả người dùng" : getRoleLabel(item.recipient.role)})`}
               </p>
             )}
             <p className="mt-2 text-xs text-on-surface-variant">

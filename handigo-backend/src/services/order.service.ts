@@ -362,6 +362,7 @@ export const OrderService = {
         const hasConflict = await Order.exists({
           providerId: preferredProvider.providerId,
           status: { $in: ["accepted", "in_progress"] },
+          $nor: [{ status: "accepted", "customerNoShow.status": "pending" }],
           scheduledAt: { $gt: conflictStart, $lt: slotEnd },
           isDeleted: false,
         });
@@ -915,7 +916,7 @@ export const OrderService = {
       .populate("addressId")
       .populate({
         path: "providerId",
-        populate: { path: "userId", select: "fullName phone avatar" },
+        populate: { path: "userId", select: "fullName phone avatar gender" },
       })
       .lean();
 
@@ -961,7 +962,10 @@ export const OrderService = {
         const provider = await lockProviderSchedule(identity._id as Types.ObjectId, session);
         const order = await Order.findOne({ _id: orderId, providerId: provider._id, status: "accepted", isDeleted: false }).session(session);
         if (!order) throw new AppError("Đơn không thuộc về bạn hoặc không ở trạng thái đã nhận.", 409);
-        if (order.orderType === "scheduled") {
+        if (order.customerNoShow?.status === "pending") {
+          throw new AppError("Báo cáo khách không có mặt đang chờ xử lý, chưa thể bắt đầu làm việc.", 409);
+        }
+        if (["scheduled", "recurring"].includes(order.orderType)) {
           if (order.bookingStatus !== "confirmed") throw new AppError("Lịch hẹn chưa được thanh toán và xác nhận.", 409);
         }
         if (!order.inspectionRequired && order.paymentMethod !== "cash" && order.paymentStatus !== "paid") throw new AppError("Đơn chưa được thanh toán thành công.", 409);
@@ -1198,7 +1202,10 @@ export const OrderService = {
     confirmedExpectation?: CancellationExpectation,
   ): Promise<IOrder> {
     if (role === "provider") {
-      const order = await Order.findById(orderId).select("status currentQuotationId reassignment");
+      const order = await Order.findById(orderId).select("status currentQuotationId reassignment customerNoShow");
+      if (order?.customerNoShow?.status === "pending") {
+        throw new AppError("Báo cáo khách không có mặt đang chờ xử lý, chưa thể hủy nhận đơn.", 409);
+      }
       if (
         order && (order.status === "accepted" || order.reassignment?.automatic) &&
         !order.currentQuotationId

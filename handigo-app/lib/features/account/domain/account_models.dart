@@ -149,7 +149,7 @@ class FeedbackItem {
     final provider = json['providerId'];
     return FeedbackItem(
       id: _id(json),
-      rating: _num(json['rating']).toInt(),
+      rating: _num(json['rating']),
       comment: json['comment'] as String?,
       createdAt: json['createdAt'] as String?,
       providerName: provider is Map ? provider['fullName'] as String? : null,
@@ -157,7 +157,7 @@ class FeedbackItem {
     );
   }
   final String id;
-  final int rating;
+  final double rating;
   final String? comment, createdAt, providerName, orderId;
 }
 

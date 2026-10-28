@@ -83,7 +83,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Nguyễn Văn An'), findsOneWidget);
+      expect(find.text('Nguyễn Văn An'), findsNothing);
+      expect(find.text('Nhắn tin'), findsOneWidget);
       expect(find.text('Chưa có lịch hẹn'), findsOneWidget);
       expect(find.text('Đặt lại dịch vụ'), findsNothing);
       expect(tester.takeException(), isNull);

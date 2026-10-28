@@ -46,7 +46,7 @@ export function SaveConfirmModal({
             <span className="font-semibold">Cấu hình:</span> {item.label}
           </p>
           {item.group !== "policy" && <p>
-            <span className="font-semibold">Key:</span>{" "}
+            <span className="font-semibold">Mã:</span>{" "}
             <span className="font-mono">{item.key}</span>
           </p>}
           <p>

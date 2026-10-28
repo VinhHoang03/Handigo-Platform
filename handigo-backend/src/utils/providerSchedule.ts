@@ -2,12 +2,14 @@ import type { IOrder } from '../models/order.model';
 import type { BookingPolicy } from '../validations/bookingPolicy.validator';
 import { calculateDuration, type ScheduleInterval } from './bookingPolicy';
 
-type ScheduleOrder = Pick<IOrder, "serviceId" | "inspectionRequired" | "selectedOptionsSnapshot" | "schedule" | "scheduledAt" | "status"> & { createdAt?: Date };
+type ScheduleOrder = Pick<IOrder, "serviceId" | "inspectionRequired" | "selectedOptionsSnapshot" | "schedule" | "scheduledAt" | "status"> & { createdAt?: Date; confirmation?: IOrder["confirmation"] };
 
 export const getOrderInterval = (order: ScheduleOrder, policy: BookingPolicy, now = Date.now()): ScheduleInterval => {
   const duration = order.schedule?.durationMinutes ?? calculateDuration(order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot ?? [], policy);
   const start = order.schedule?.expectedStartAt?.getTime() ?? order.scheduledAt?.getTime() ?? order.createdAt?.getTime() ?? now;
   let end = order.schedule?.expectedEndAt?.getTime() ?? start + duration * 60000;
+  // Đơn đã hoàn thành chỉ giữ lịch đến giờ hoàn thành thực tế, kèm khoảng đệm bên dưới.
+  if (order.status === "completed") end = order.confirmation?.providerConfirmedAt?.getTime() ?? end;
   // Chưa hoàn tất thực tế thì không tự giải phóng lịch đã quá giờ dự kiến.
   if (["accepted", "in_progress"].includes(order.status) && end <= now) end = Infinity;
   return { start, end, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes };

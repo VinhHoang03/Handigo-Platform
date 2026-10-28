@@ -145,6 +145,23 @@ class ProviderRepository {
   );
   Future<String> uploadEvidence(XFile file) => _api.uploadOrderAttachment(file);
 
+  Future<Map<String, dynamic>> assistQuotation(
+    String orderId,
+    Map<String, dynamic> snapshot,
+  ) async {
+    final response = await _api.request(
+      '/orders/$orderId/quotation-agent/assist',
+      method: 'POST',
+      authenticated: true,
+      receiveTimeout: const Duration(seconds: 85),
+      data: snapshot,
+    );
+    if (response['data'] is! Map<String, dynamic>) {
+      throw const FormatException('Kết quả phân tích báo giá không hợp lệ.');
+    }
+    return response['data'] as Map<String, dynamic>;
+  }
+
   Future<List<QuotationItem>> scanQuotation(String orderId, XFile file) async {
     final data = await _api.uploadImages(
       '/orders/quotation-items/scan-image',

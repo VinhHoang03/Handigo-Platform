@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { PublicContentLayout } from "../components/PublicContentLayout";
 import { PublicSupportCta } from "../components/PublicSupportCta";
@@ -11,6 +12,9 @@ import {
 import { supportCategories } from "../data/supportData";
 import type { SupportFaqGroup } from "../data/support-faq";
 import { Search } from "lucide-react";
+import { useAuthStore } from "@/features/auth/store/auth.store";
+import { Reveal } from "@/components/common/Reveal";
+import "../components/content-motion.css";
 
 interface SupportPageProps {
   role?: SupportRole;
@@ -19,6 +23,34 @@ interface SupportPageProps {
 export default function SupportPage({ role }: SupportPageProps) {
   const [faqQuery, setFaqQuery] = useState("");
   const [faqGroup, setFaqGroup] = useState<SupportFaqGroup | null>(null);
+  const location = useLocation();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const userRole = useAuthStore((state) => state.user?.role);
+  const normalizedRole = userRole?.toUpperCase();
+  const authenticatedSupportRole: SupportRole | undefined =
+    isAuthenticated &&
+    (normalizedRole === "CUSTOMER" || normalizedRole === "PROVIDER")
+      ? normalizedRole
+      : undefined;
+  const supportRole = role ?? authenticatedSupportRole;
+
+  useEffect(() => {
+    const shouldFocusCreateTicket =
+      new URLSearchParams(location.search).get("focus") === "tao-yeu-cau";
+
+    if (!supportRole || !shouldFocusCreateTicket) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      document.getElementById("tao-yeu-cau-ho-tro")?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [location.search, supportRole]);
 
   // Bốn thẻ danh mục nay là bộ lọc thật cho danh sách câu hỏi bên dưới, thay vì
   // bốn tấm thẻ chỉ để nhìn.
@@ -32,7 +64,7 @@ export default function SupportPage({ role }: SupportPageProps) {
   const content = (
     <>
       <section
-        className={`px-5 py-12 text-center sm:px-6 sm:py-16 ${
+        className={`content-page-hero px-5 py-12 text-center sm:px-6 sm:py-16 ${
           role ? "rounded-3xl border border-outline-variant/20 bg-surface-container-low" : "sm:py-20"
         }`}
       >
@@ -55,63 +87,75 @@ export default function SupportPage({ role }: SupportPageProps) {
         </div>
       </section>
 
-      <section
-        aria-labelledby="support-categories-heading"
-        className={`mx-auto max-w-7xl ${role ? "py-4" : "px-6 pb-2 pt-12"}`}
-      >
-        <h2
-          id="support-categories-heading"
-          className="mb-7 font-headline-lg text-3xl font-bold tracking-[-0.02em] text-on-surface"
+      <Reveal>
+        <section
+          aria-labelledby="support-categories-heading"
+          className={`mx-auto max-w-7xl ${role ? "py-4" : "px-6 pb-2 pt-12"}`}
         >
-          Danh mục hỗ trợ
-        </h2>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {supportCategories.map((category) => (
-            <button
-              key={category.title}
-              type="button"
-              onClick={() => selectCategory(category.title)}
-              className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-left transition-colors hover:border-primary/30 hover:bg-surface-container-low"
-            >
-              <IconTile icon={category.icon} />
-              <h3 className="mt-5 text-lg font-semibold text-on-surface">
-                {category.title}
-              </h3>
-              <p className="mt-2 text-pretty text-sm leading-6 text-on-surface-variant">
-                {category.text}
-              </p>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <SupportFaq
-        query={faqQuery}
-        group={faqGroup}
-        onGroupChange={setFaqGroup}
-      />
-
-      {role ? (
-        <>
-          <SupportTicketSection role={role} />
-          <section className="rounded-3xl bg-surface-container p-5 sm:p-6">
-            <h2 className="mb-5 text-xl font-semibold text-on-surface">
-              Kênh hỗ trợ
-            </h2>
-            <SupportChannels compact />
-          </section>
-        </>
-      ) : (
-        <section className="mx-auto grid max-w-7xl items-start gap-8 px-6 pb-4 pt-3 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <PublicSupportCta />
-          <aside className="rounded-3xl bg-surface-container p-6">
-            <h2 className="mb-5 text-xl font-semibold text-on-surface">
-              Kênh hỗ trợ
-            </h2>
-            <SupportChannels />
-          </aside>
+          <h2
+            id="support-categories-heading"
+            className="mb-7 font-headline-lg text-3xl font-bold tracking-[-0.02em] text-on-surface"
+          >
+            Danh mục hỗ trợ
+          </h2>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {supportCategories.map((category) => (
+              <button
+                key={category.title}
+                type="button"
+                onClick={() => selectCategory(category.title)}
+                className="support-category-card rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-6 text-left transition-colors hover:border-primary/30 hover:bg-surface-container-low"
+              >
+                <IconTile icon={category.icon} />
+                <h3 className="mt-5 text-lg font-semibold text-on-surface">
+                  {category.title}
+                </h3>
+                <p className="mt-2 text-pretty text-sm leading-6 text-on-surface-variant">
+                  {category.text}
+                </p>
+              </button>
+            ))}
+          </div>
         </section>
-      )}
+      </Reveal>
+
+      <Reveal>
+        <SupportFaq
+          query={faqQuery}
+          group={faqGroup}
+          onGroupChange={setFaqGroup}
+        />
+      </Reveal>
+
+      <Reveal>
+        {supportRole ? (
+          <div
+            className={
+              role
+                ? "contents"
+                : "mx-auto grid max-w-7xl gap-8 px-6 pb-4 pt-3"
+            }
+          >
+            <SupportTicketSection role={supportRole} />
+            <section className="rounded-3xl bg-surface-container p-5 sm:p-6">
+              <h2 className="mb-5 text-xl font-semibold text-on-surface">
+                Kênh hỗ trợ
+              </h2>
+              <SupportChannels compact />
+            </section>
+          </div>
+        ) : (
+          <section className="mx-auto grid max-w-7xl items-start gap-8 px-6 pb-4 pt-3 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <PublicSupportCta />
+            <aside className="rounded-3xl bg-surface-container p-6">
+              <h2 className="mb-5 text-xl font-semibold text-on-surface">
+                Kênh hỗ trợ
+              </h2>
+              <SupportChannels />
+            </aside>
+          </section>
+        )}
+      </Reveal>
     </>
   );
 

@@ -15,6 +15,7 @@ import { ProviderOrderDetailSkeleton } from '../components/orders/ProviderOrderD
 import { useProviderOrderDetail } from '../hooks/useProviderOrderDetail';
 import { getPaymentStatusLabel, orderTypeLabels } from '../utils/providerOrderDetailLabels';
 import { ArrowLeft, CircleAlert } from "lucide-react";
+import { OrderArrivalPanel } from '../components/orders/OrderArrivalPanel';
 
 export default function ProviderOrderDetailPage() {
   const { orderId } = useParams();
@@ -43,6 +44,9 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
     handleAccept,
     handleReject,
     handleStart,
+    handleArrival,
+    checkNoShow,
+    handleNoShow,
     handleComplete,
     handleConfirmQuotationPayment,
     requestCancelConfirmation,
@@ -141,6 +145,8 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
         </div>
 
         <OrderTrackingMap order={order} viewerRole="PROVIDER" />
+        {!quotation && !order.currentQuotationId && <OrderArrivalPanel order={order} busy={busy} onArrival={handleArrival}
+          onCancel={!isQuotationOrder ? () => setCancelOpen(true) : undefined} checkNoShow={checkNoShow} onNoShow={handleNoShow} />}
 
         <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-2">
           {isQuotationOrder ? (
@@ -157,7 +163,8 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
               onComplete={handleComplete}
               onConfirmPayment={handleConfirmQuotationPayment}
             />
-          ) : (
+          ) : (order.status !== 'accepted' || (!!order.arrival && order.arrival.providerId === order.providerId?._id)) ? (
+            <div className="lg:col-span-2">
             <FixedPriceActionForm
               order={order}
               onStart={handleStart}
@@ -165,7 +172,8 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
               onCancel={() => setCancelOpen(true)}
               busy={busy}
             />
-          )}
+            </div>
+          ) : null}
         </div>
 
         {order.status === 'completed' && <ProviderOrderFeedbackThread orderId={order._id} />}

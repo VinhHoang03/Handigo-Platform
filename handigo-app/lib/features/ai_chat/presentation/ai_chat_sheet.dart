@@ -14,6 +14,7 @@ import 'ai_chat_composer.dart';
 
 Future<void> showAiChatSheet(BuildContext context) =>
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -264,8 +265,8 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                           'Trợ lý Handigo',
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
                                 letterSpacing: -.5,
                               ),
                         ),
@@ -275,7 +276,7 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                               ? 'Hỗ trợ dành cho nhà cung cấp'
                               : 'Hỗ trợ dành cho khách hàng',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
@@ -368,7 +369,7 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                       child: Text(
                         status,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
@@ -673,7 +674,7 @@ class _AiWelcome extends StatelessWidget {
             'CHÀO BẠN, MÌNH LÀ HANDIGO',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
               color: scheme.primary,
             ),
@@ -685,7 +686,7 @@ class _AiWelcome extends StatelessWidget {
                 : 'Bạn cần giúp gì cho ngôi nhà?',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
               letterSpacing: -.5,
             ),
@@ -697,8 +698,8 @@ class _AiWelcome extends StatelessWidget {
                 : 'Tôi có thể giúp đặt dịch vụ, gửi yêu cầu hỗ trợ, khiếu nại và tra cứu chính sách Handigo.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 14,
-              height: 1.7,
+              fontSize: 16,
+              height: 1.5,
               color: scheme.onSurfaceVariant,
             ),
           ),
@@ -742,7 +743,7 @@ class _AiWelcome extends StatelessWidget {
                       Expanded(
                         child: Text(
                           suggestion.$2,
-                          style: const TextStyle(fontSize: 14),
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -904,7 +905,7 @@ class _AiMessageFrame extends StatelessWidget {
                     ),
                   ),
                   child: DefaultTextStyle.merge(
-                    style: const TextStyle(fontSize: 14, height: 1.7),
+                    style: const TextStyle(fontSize: 16, height: 1.5),
                     child: child,
                   ),
                 ),

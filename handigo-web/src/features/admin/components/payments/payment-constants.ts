@@ -3,6 +3,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
   PaymentType,
+  RefundStatus,
 } from "../../types/adminOperations.types";
 
 export const paymentMoney = new Intl.NumberFormat("vi-VN", {
@@ -49,3 +50,13 @@ export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
 
 /** Các trạng thái hoàn tiền cho phép admin bấm thử lại. */
 export const RETRYABLE_REFUND_STATUSES = ["failed", "manual_review", "retry_required"];
+
+export const REFUND_STATUS_LABELS: Record<RefundStatus | "retry_required", string> = {
+  requested: "Đã yêu cầu hoàn tiền",
+  requesting: "Đang gửi yêu cầu hoàn tiền",
+  pending: "Đang xử lý",
+  succeeded: "Đã hoàn tiền",
+  failed: "Hoàn tiền thất bại",
+  manual_review: "Cần kiểm tra thủ công",
+  retry_required: "Cần thử hoàn tiền lại",
+};

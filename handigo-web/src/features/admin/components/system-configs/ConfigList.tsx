@@ -31,7 +31,7 @@ export function ConfigList({
               <span
                 className={`rounded-md px-2 py-0.5 text-xs font-semibold ${item.isEffective ? "bg-success-container text-on-success-container" : "bg-warning-container text-on-warning-container"}`}
               >
-                {item.isEffective ? "Đã nối logic" : "Chưa nối logic"}
+                {item.isEffective ? "Đang áp dụng" : "Chưa áp dụng"}
               </span>
             </div>
             <p className={`mt-1 text-sm leading-5 text-on-surface-variant ${item.group === "policy" ? "line-clamp-2" : ""}`}>

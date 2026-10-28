@@ -42,7 +42,7 @@ class AppSearchField extends StatelessWidget {
         cursorColor: scheme.primary,
         style: theme.textTheme.bodyMedium?.copyWith(
           color: scheme.onSurfaceVariant,
-          height: 1.2,
+          height: 1.4,
         ),
         decoration: InputDecoration(
           hintText: hintText,

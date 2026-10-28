@@ -67,7 +67,7 @@ function setup({ failIncome = false, failOrders = false } = {}) {
   });
   const { useProviderHomeData } = load('features/provider/components/home/useProviderHomeData.ts', {
     ...hooks, './useProviderOrdersSchedule': orderHook, './useProviderRevenue': { useProviderRevenue: () => ({}) },
-    './useProviderWorkingAreas': { useProviderWorkingAreas: () => ({}) }, '../../api/providerDashboard.api': {
+    './useProviderRating': { useProviderRating: () => ({ rating: { average: 4.8, total: 10 } }) }, '../../api/providerDashboard.api': {
       providerDashboardApi: { overview: async () => { if (failIncome) throw Error('Nguồn thu nhập tạm lỗi'); return { monthlyEarnings: 288000 }; } },
     },
   });
@@ -82,6 +82,7 @@ test('Thu nhập lấy từ tổng quan, số đơn đang thực hiện lấy t�
   await new Promise(setImmediate);
   const result = runtime.render();
   assert.equal(result.monthlyIncome, 288000); assert.equal(result.activeOrders, 7); assert.equal(result.totalOrders, 120);
+  assert.equal(result.rating.average, 4.8); assert.equal(result.rating.total, 10);
   assert(runtime.calls.some(call => call.page === 1 && call.limit === 1 && call.status === 'in_progress'));
   assert.notEqual(result.monthlyIncome, result.recentOrders[0].pricing.providerEarningAmount);
   runtime.unmount();

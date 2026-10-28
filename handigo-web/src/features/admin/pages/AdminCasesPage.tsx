@@ -1,6 +1,7 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useState } from "react";
-import { Eye, RefreshCw } from "lucide-react";
+import { Eye } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
@@ -60,14 +61,11 @@ export default function AdminCasesPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="admin-page-header">
         <div>
-          <h1 className="text-headline-lg font-bold">Khiếu nại, báo cáo và vi phạm</h1>
-          <p className="mt-2 text-on-surface-variant">Kiểm tra bằng chứng, ra quyết định xử lý và áp dụng hình phạt từ nguồn đã xác minh.</p>
+          <AdminPageTitle title="Khiếu nại, báo cáo và vi phạm" />
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 font-semibold text-primary disabled:opacity-40">
-          <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> Làm mới
-        </button>
+        <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
       </header>
 
       <CaseTabs tab={tab} onSwitch={switchTab} />

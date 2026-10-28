@@ -2,8 +2,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/provider_application_models.dart';
 
-typedef AdministrativeArea = ({int code, String name});
-
 class ProviderApplicationRepository {
   const ProviderApplicationRepository(this._api);
   final ApiClient _api;
@@ -71,26 +69,6 @@ class ProviderApplicationRepository {
         purpose: 'certificate',
         documentKind: 'certificate',
       );
-  Future<List<AdministrativeArea>> provinces() =>
-      _administrativeAreas('/vietnam-addresses/provinces');
-  Future<List<AdministrativeArea>> wards(int provinceCode) =>
-      _administrativeAreas('/vietnam-addresses/provinces/$provinceCode/wards');
-  Future<List<AdministrativeArea>> _administrativeAreas(String path) async {
-    final data = (await _api.request(path))['data'];
-    if (data is! List) return const [];
-    return data
-        .whereType<Map>()
-        .map((item) {
-          final json = Map<String, dynamic>.from(item);
-          return (
-            code: (json['code'] as num).toInt(),
-            name: '${json['name'] ?? ''}',
-          );
-        })
-        .where((item) => item.name.isNotEmpty)
-        .toList();
-  }
-
   ProviderApplication _parse(Map<String, dynamic> response) =>
       ProviderApplication.fromJson(
         Map<String, dynamic>.from(response['data'] as Map),

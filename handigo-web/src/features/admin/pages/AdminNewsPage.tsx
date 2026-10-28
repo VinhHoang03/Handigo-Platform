@@ -1,3 +1,4 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { AsyncState } from "@/components/common/AsyncState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -16,10 +17,9 @@ export default function AdminNewsPage() {
   return (
     <DashboardShell role="ADMIN">
       <div className="space-y-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="admin-page-header">
           <div>
-            <h1 className="font-headline-lg text-headline-lg font-bold text-on-surface">Quản lý tin tức</h1>
-            <p className="mt-1 text-on-surface-variant">Soạn thảo, lưu nháp và xuất bản nội dung trên trang tin tức.</p>
+            <AdminPageTitle title="Quản lý tin tức" />
           </div>
           <button
             type="button"
@@ -29,7 +29,8 @@ export default function AdminNewsPage() {
             <Plus aria-hidden="true" size={20} className="block leading-none" />
             Đăng bài mới
           </button>
-        </header>
+        <AdminRefreshButton onRefresh={() => void news.load()} loading={news.isLoading} />
+      </header>
 
 
         <NewsStatsBar {...news.stats} />

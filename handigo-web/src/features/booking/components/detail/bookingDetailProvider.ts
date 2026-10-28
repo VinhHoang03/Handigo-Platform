@@ -4,7 +4,6 @@ export type ProviderInfo = {
   name: string;
   phone?: string;
   avatar?: string | null;
-  area?: string;
   completedOrders: number;
   rating: number;
   feedbacks: number;
@@ -15,14 +14,10 @@ export type ProviderInfo = {
 export const getProviderInfo = (order: Order): ProviderInfo | null => {
   if (!order.providerId) return null;
   const p = order.providerId;
-  const area = p.serviceArea
-    ? [p.serviceArea.ward, p.serviceArea.province].filter(Boolean).join(", ")
-    : p.workingAreas?.join(", ");
   return {
     name: p.userId?.fullName || p.name || "Chuyên gia",
     phone: p.userId?.phone,
     avatar: p.userId?.avatar || p.avatar,
-    area,
     completedOrders: p.totalCompletedOrders ?? p.completedOrders ?? 0,
     rating: p.averageRating ?? 0,
     feedbacks: p.totalFeedbacks ?? 0,
