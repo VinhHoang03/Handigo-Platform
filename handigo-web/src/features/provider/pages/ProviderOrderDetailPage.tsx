@@ -18,8 +18,12 @@ import { ArrowLeft, CircleAlert } from "lucide-react";
 import { OrderArrivalPanel } from '../components/orders/OrderArrivalPanel';
 
 export default function ProviderOrderDetailPage() {
-  const navigate = useNavigate();
   const { orderId } = useParams();
+  return <ProviderOrderDetailContent key={orderId} orderId={orderId} />;
+}
+
+function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }) {
+  const navigate = useNavigate();
   const {
     order,
     assignment,

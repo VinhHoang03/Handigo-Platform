@@ -2,22 +2,23 @@ import { Link } from "react-router-dom";
 import { Banknote, Zap } from "lucide-react";
 
 interface ProviderHomeHeaderProps {
-  firstName: string;
-  activeOrders: number;
+  fullName: string;
+  activeOrders: number | null;
 }
 
 export function ProviderHomeHeader({
-  firstName,
+  fullName,
   activeOrders,
 }: ProviderHomeHeaderProps) {
   return (
     <section className="flex flex-col justify-between gap-md md:flex-row md:items-end">
       <div>
         <h2 className="font-headline-lg text-headline-lg text-primary">
-          Chào buổi sáng, {firstName}!
+          Xin chào, {fullName}!
         </h2>
         <p className="text-body-lg text-on-surface-variant">
-          Hôm nay bạn có {activeOrders} đơn đang được thực hiện.
+          Chúc bạn một ngày làm việc hiệu quả.
+          {activeOrders !== null && ` Bạn đang thực hiện ${activeOrders} đơn.`}
         </p>
       </div>
       <div className="flex flex-wrap gap-sm">

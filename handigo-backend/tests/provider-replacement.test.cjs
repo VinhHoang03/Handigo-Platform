@@ -26,6 +26,7 @@ function loadService(name, modules, internals = []) {
       if (name === '../utils/logger') return { createLogger: () => ({ info() {}, warn() {}, error() {}, debug() {} }) };
       if (name === '../validations/refundPolicy.validator') return { DEFAULT_REFUND_POLICY: { providerCompensationPercent: 80 } };
       if (name === './systemConfig.service') return { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }) };
+      if (name === './penaltyPolicy.service') return { assertFeatureAllowed: async () => {} };
       // Chỉ nạp các module được giả lập, không chạm cấu hình hoặc database thật.
       return {};
     },

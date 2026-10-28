@@ -19,9 +19,11 @@ export type AgentPolicyConsent = { accepted: true; version: string };
 export type AgentBookingAction =
   | { type: "update"; revision: number; patch: { mode?: "update" | "pause" | "discard" | "resume"; quantity?: number;
       selectedOptions?: Array<{ optionId: string; quantity: number }>; addressId?: string; paymentMethod?: "bank" | "wallet" | "cash";
-      orderType?: "normal" | "scheduled"; scheduledAt?: string | null; preferredProviderId?: string | null } }
+      orderType?: "normal" | "scheduled"; scheduledAt?: string | null; preferredProviderId?: string | null; saveAddressToBook?: boolean } }
   | { type: "rebook_decision"; proposalId: string; accept: boolean }
-  | { type: "restore_draft"; backupId: string };
+  | { type: "restore_draft"; backupId: string }
+  | { type: "provider"; orderId: string }
+  | { type: "feedback"; feedback: { orderId: string; mode: "create" | "update"; rating: number; comment?: string | null; customerAttachments?: string[] } };
 export type AgentSend = (message: string, customerAttachments?: string[], bookingAction?: AgentBookingAction) => Promise<void>;
 export type AgentRequest = { sessionId: string } & AgentInput;
 export interface AgentConfirmation {
@@ -37,6 +39,7 @@ export interface AgentSessionHistory {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 export interface AgentBookingValues {
+  saveAddressToBook?: boolean;
   serviceId?: string;
   uniformQuantity?: number;
   selectedOptions?: Array<{ optionId: string; quantity: number }>;
@@ -54,7 +57,8 @@ export interface AgentSession {
   rebookProposal?: { id: string } | null;
   draftBackup?: { id: string } | null;
   viewedOrder?: { orderId: string; orderCode: string } | null;
-  orderActions?: { orderId: string; orderCode: string; quotation: boolean; refunds: boolean; payment: boolean; rebook: boolean; reason?: string } | null;
+  orderActions?: { orderId: string; orderCode: string; quotation: boolean; refunds: boolean; payment: boolean; rebook: boolean; provider?: boolean; feedback?: boolean; reason?: string } | null;
+  assignedProvider?: AgentAssignedProvider | null;
   bookingDraft?: { status: "active" | "paused" | "discarded" | "booked"; revision: number; summary: string[]; missing: string[];
     hasDraftAddress?: boolean;
     values?: AgentBookingValues;
@@ -71,6 +75,14 @@ export interface AgentSession {
   requiresReconciliation: boolean;
   interruptedRequest: AgentInput | null;
   requiresNewSession: boolean;
+}
+
+export interface AgentAssignedProvider {
+  orderId: string; orderCode: string; status: string; checkedAt: string;
+  provider: { id: string; name: string; phone: string | null; averageRating: number; totalCompletedOrders: number } | null;
+  canContact: boolean; canTrack: boolean;
+  location: { latitude: number; longitude: number; updatedAt: string } | null;
+  trackingMessage: string; path: string; message: string;
 }
 
 export interface AgentPayment {

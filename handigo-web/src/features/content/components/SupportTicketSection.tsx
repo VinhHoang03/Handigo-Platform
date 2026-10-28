@@ -16,11 +16,14 @@ export type { SupportRole };
 export function SupportTicketSection({ role }: { role: SupportRole }) {
   const [searchInput, setSearchInput] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const support = useSupportTickets(role);
+  const support = useSupportTickets();
 
   return (
     <>
-      <section className="space-y-6 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-5 sm:p-7">
+      <section
+        id="tao-yeu-cau-ho-tro"
+        className="scroll-mt-28 space-y-6 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-5 sm:p-7"
+      >
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-label-sm font-semibold uppercase tracking-wider text-primary">
@@ -101,7 +104,6 @@ export function SupportTicketSection({ role }: { role: SupportRole }) {
           open
           kind="ticket"
           role={role}
-          orders={support.orders}
           onClose={() => setCreateOpen(false)}
           onCreated={() => void support.loadTickets()}
         />

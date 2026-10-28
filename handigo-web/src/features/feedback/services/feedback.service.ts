@@ -5,9 +5,10 @@ import type { FeedbackPayload, FeedbackQuery } from '../types/feedback.types';
 export const feedbackService = {
   loadOrderContext: feedbackApi.getOrderContext,
   loadOrderFeedback: feedbackApi.getByOrder,
-  save: async (feedbackId: string | undefined, payload: FeedbackPayload, newImages: File[]) => {
+  save: async (feedbackId: string | undefined, payload: FeedbackPayload, newImages: File[], isCurrent: () => boolean = () => true) => {
     try {
       const uploaded = newImages.length ? await feedbackApi.uploadImages(newImages) : [];
+      if (!isCurrent()) throw new Error('Đơn hàng đã thay đổi. Vui lòng mở lại đánh giá.');
       const finalPayload = { ...payload, images: [...(payload.images || []), ...uploaded] };
       return feedbackId
         ? feedbackApi.update(feedbackId, finalPayload)

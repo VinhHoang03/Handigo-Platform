@@ -100,6 +100,7 @@ const ViolationSchema = new Schema<IViolation>(
 );
 
 ViolationSchema.index({ userId: 1, status: 1 });
+ViolationSchema.index({ status: 1, penaltyType: 1, endAt: 1, userId: 1 });
 ViolationSchema.index({ sourceType: 1, sourceId: 1 });
 
 export const Violation = model<IViolation>("Violation", ViolationSchema, "violations");

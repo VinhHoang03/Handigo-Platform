@@ -182,10 +182,6 @@ export const useCreateBookingStep2Form = () => {
     }
 
 
-    if (orderType === 'normal' && !isWithinImmediateBookingHours(new Date())) {
-      nextErrors.scheduledAt = 'Đặt ngay chỉ khả dụng từ 08:00 đến 21:00. Vui lòng chọn Hẹn giờ.';
-    }
-
     if (shouldShowSchedulePicker && !scheduleDate) {
       nextErrors.scheduledAt = 'Vui lòng chọn ngày thực hiện dịch vụ.';
     } else if (shouldShowSchedulePicker && !scheduledAt?.includes('T')) {
@@ -194,15 +190,9 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
     }
     if (shouldShowSchedulePicker && scheduledAt?.includes('T')
-      && (new Date(scheduledAt).getHours() < 8
-        || new Date(scheduledAt).getHours() > 21
-        || (new Date(scheduledAt).getHours() === 21 && (
-          new Date(scheduledAt).getMinutes() > 0
-          || new Date(scheduledAt).getSeconds() > 0
-          || new Date(scheduledAt).getMilliseconds() > 0
-        ))
+      && (!Number.isFinite(new Date(scheduledAt).getTime())
         || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())) {
-      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.';
+      nextErrors.scheduledAt = 'Vui lòng chọn thời gian hợp lệ và không sớm hơn phút hiện tại.';
     }
     // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
     // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.

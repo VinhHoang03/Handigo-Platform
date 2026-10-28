@@ -1,12 +1,12 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AsyncState } from '@/components/common/AsyncState';
 import { InitialsAvatar } from '@/components/common/InitialsAvatar';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { chatApi } from '../api/chat.api';
-import { useChatSocket } from '../hooks/useChatSocket';
-import type { ChatMessage, Conversation } from '../types/chat.types';
+import { useChatMessages } from '../hooks/useChatMessages';
+import type { Conversation } from '../types/chat.types';
 import { ChatHeaderMenu } from './ChatHeaderMenu';
 import { ChatReportDialog } from './ChatReportDialog';
 import { MessageComposer } from './MessageComposer';
@@ -15,16 +15,19 @@ import { normalizeImageUrl } from '@/utils/imageUrl';
 import { useChatUiStore } from '../store/chatUi.store';
 import { MessageCircle, Minus, Wrench, X } from 'lucide-react';
 
-const sortMessages = (items: ChatMessage[]) => [...items].sort((a, b) => {
-  const timeDifference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  return timeDifference || a._id.localeCompare(b._id);
-});
+type ChatPopupProps = { orderId?: string; conversation?: Conversation; open: boolean; onClose: () => void };
 
-export function ChatPopup({ orderId, conversation: initialConversation, open, onClose }: { orderId?: string; conversation?: Conversation; open: boolean; onClose: () => void }) {
+export function ChatPopup(props: ChatPopupProps) {
+  const accountId = useAuthStore((state) => state.user?.id || state.user?._id);
+  return <ChatPopupContent key={`${accountId}:${props.conversation?._id ?? props.orderId}:${props.open}`} {...props} />;
+}
+
+function ChatPopupContent({ orderId, conversation: initialConversation, open, onClose }: ChatPopupProps) {
   const { addToast } = useToast();
   const currentUser = useAuthStore((state) => state.user);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const history = useChatMessages(open ? conversationId : null);
+  const { messages, setMessages, addMessage, updateMessage, removeMessage } = history;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useToastFeedback<string>('', "error");
   const [minimized, setMinimized] = useState(false);
@@ -35,18 +38,6 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
   const registerOpenPopup = useChatUiStore((state) => state.registerOpenPopup);
   const unregisterOpenPopup = useChatUiStore((state) => state.unregisterOpenPopup);
   const menuRef = useRef<HTMLDivElement>(null);
-  const addMessage = useCallback((message: ChatMessage) => {
-    setMessages((items) => items.some((item) => item._id === message._id) ? items : sortMessages([...items, message]));
-  }, []);
-  const updateMessage = useCallback((message: ChatMessage) => {
-    setMessages((items) => sortMessages(items.map((item) => item._id === message._id ? message : item)));
-  }, []);
-  const removeMessage = useCallback((messageId: string) => {
-    setMessages((items) => items.filter((item) => item._id !== messageId));
-  }, []);
-
-  useChatSocket(open ? conversationId : null, addMessage, updateMessage, removeMessage);
-
   useEffect(() => {
     if (!open) return;
     registerOpenPopup();
@@ -55,14 +46,16 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
 
   useEffect(() => {
     if (!open) return;
-    queueMicrotask(() => { setLoading(true); setError(''); });
+    let active = true;
+    queueMicrotask(() => { if (active) { setLoading(true); setError(''); } });
     const conversationRequest = initialConversation
       ? Promise.resolve(initialConversation)
       : orderId
         ? chatApi.getOrCreateByOrder(orderId)
         : Promise.reject(new Error('Không tìm thấy cuộc trò chuyện.'));
     conversationRequest
-      .then(async (conversation) => {
+      .then((conversation) => {
+        if (!active) return;
         setConversationId(conversation._id);
         const role = currentUser?.role.toUpperCase();
         const customer = typeof conversation.customerId === 'object' ? conversation.customerId : null;
@@ -71,15 +64,10 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
           : null;
         const otherUser = role === 'PROVIDER' ? customer : providerUser;
         setPartner(otherUser ? { fullName: otherUser.fullName || 'Người dùng Handigo', avatar: otherUser.avatar } : null);
-        const page = await chatApi.messages(conversation._id);
-        setMessages((current) => {
-          const merged = new Map([...page.items, ...current].map((message) => [message._id, message]));
-          return sortMessages([...merged.values()]);
-        });
-        await chatApi.seen(conversation._id);
       })
-      .catch(() => setError('Đơn dịch vụ chưa sẵn sàng để trò chuyện.'))
-      .finally(() => setLoading(false));
+      .catch(() => { if (active) setError('Đơn dịch vụ chưa sẵn sàng để trò chuyện.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [open, orderId, initialConversation, currentUser?.role, setError]);
 
   const currentUserId = currentUser?.id || currentUser?._id || '';
@@ -188,8 +176,9 @@ export function ChatPopup({ orderId, conversation: initialConversation, open, on
         </div>
       </header>
       {notice && <div className="bg-primary/10 px-4 py-2 text-xs text-primary">{notice}</div>}
-      <AsyncState loading={loading} error={error}><MessageThread messages={messages} currentUserId={currentUserId} onEdit={editMessage} onDelete={deleteMessage} /></AsyncState>
-      {!loading && !error && <MessageComposer onSend={send} onSendImage={sendImage} />}
+      {history.error && messages.length > 0 && <div role="alert" className="px-4 py-2 text-sm text-error">{history.error}<button type="button" onClick={history.retry} disabled={history.loading} className="ml-2 font-semibold underline">Thử lại</button></div>}
+      <AsyncState loading={loading || (history.loading && !messages.length)} error={error || (!messages.length ? history.error : '')} onRetry={history.retry}><MessageThread messages={messages} currentUserId={currentUserId} onEdit={editMessage} onDelete={deleteMessage} hasMore={history.hasMore} loadingOlder={history.loading} onLoadOlder={() => void history.loadOlder()} /></AsyncState>
+      {!loading && !error && conversationId && <MessageComposer onSend={send} onSendImage={sendImage} />}
       {reportOpen && <ChatReportDialog onClose={() => setReportOpen(false)} onSubmit={submitReport} />}
     </aside>,
     document.body,

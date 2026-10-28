@@ -38,6 +38,15 @@ async function run() {
   const agent = new AgentService({ acquire: async () => ({ session, lockId: "khoa" }), save: async () => {}, release: async () => {} }, loop);
   const send = (message: string) => agent.send(user, session.id, { requestId: randomUUID(), message });
   const pending = () => session.pendingAction;
+  vouchers = [{ code: "COC10", name: "Giảm cọc", discountAmount: 10000, finalAmount: 30000 },
+    { code: "COC5", name: "Giảm cọc ít hơn", discountAmount: 5000, finalAmount: 35000 }];
+  session.bookingDraft = await updateBookingDraft(undefined, { mode: "update", serviceId }, user.id, deps);
+  await loop.prepareBookingDraft(session, { user, sessionId: session.id, session, signal: AbortSignal.timeout(5000) }, async () => {});
+  assert.equal(pending()?.tool, "create_booking");
+  assert(session.conversation[session.conversation.length - 1].content.includes("Có 2 mã giảm giá dùng được"), "Chủ động nhắc mã phù hợp khi đặt dịch vụ, không cần khách hỏi.");
+  assert.equal(session.bookingDraft.values.voucherCode, undefined, "Không tự áp mã khi nhắc khách.");
+  assert.equal((pending()?.preview as { amount: number }).amount, 40000);
+  vouchers = [];
   await send("Tôi muốn áp mã giảm giá");
   assert.equal(pending()?.tool, "create_booking");
   assert(session.conversation[session.conversation.length - 1].content.includes("chưa có mã giảm giá"));
@@ -61,6 +70,8 @@ async function run() {
   await send("Không dùng voucher");
   assert.equal(session.bookingDraft.values.voucherCode, undefined);
   assert.equal((pending()?.preview as { amount: number }).amount, 40000);
+  const resumed = await updateBookingDraft(session.bookingDraft, { mode: "resume" }, user.id, deps);
+  assert(!resumed.choiceGroups.some((group) => group.label === "Voucher có thể sử dụng"), "Không nhắc chọn lại khi khách đã bỏ mã.");
   await send("Chọn mã giảm giá giảm nhiều nhất");
   assert.equal(session.bookingDraft.values.voucherCode, "COC10");
   failLookup = true;

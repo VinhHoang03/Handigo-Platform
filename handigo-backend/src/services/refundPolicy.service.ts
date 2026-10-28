@@ -1,4 +1,5 @@
 import { DEFAULT_REFUND_POLICY, type RefundPolicy } from "../validations/refundPolicy.validator";
+import type { IOrder } from "../models/order.model";
 
 export const REFUND_POLICY_VERSION = "HANDIGO_REFUND_V1";
 export const CUSTOMER_CANCELLATION_POLICY_VERSION = "HANDIGO_CUSTOMER_CANCEL_5M_V1";
@@ -9,11 +10,8 @@ export const isQuotationDeclinedReason = (reason = "") =>
   reason.trim() === QUOTATION_DECLINED_REASON || reason.trim().startsWith(`${QUOTATION_DECLINED_REASON}:`);
 
 export type RefundPolicyRole = "customer" | "provider" | "admin";
-export type RefundPolicyOrderType =
-  | "normal"
-  | "urgent"
-  | "scheduled"
-  | "recurring";
+// Đọc được lịch sử cũ để tính hoàn tiền, không mở lại các loại đơn đã ngừng dùng.
+export type RefundPolicyOrderType = IOrder["orderType"];
 
 export interface RefundPolicyInput {
   role: RefundPolicyRole;

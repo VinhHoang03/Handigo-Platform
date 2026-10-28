@@ -34,6 +34,8 @@ export function AgentBookingActions({ session, disabled, onOpenTool, onSend, onC
     {capabilities?.reason && <p className="text-xs text-on-surface-variant">{capabilities.reason}</p>}
     <div className={rowClass} tabIndex={0}>
       <Link className={buttonClass} to={`/customer/bookings/${orderId}`}><ArrowUpRight aria-hidden="true" />Xem đơn hàng</Link>
+      {capabilities?.provider && <button type="button" className={buttonClass} disabled={disabled} onClick={() => send(`Xem thợ thực hiện đơn ${orderId}.`, { type: "provider", orderId })}><UserRound aria-hidden="true" />Thợ thực hiện</button>}
+      {capabilities?.feedback && <button type="button" className={buttonClass} disabled={disabled} onClick={() => onOpenTool("feedback")}>Đánh giá dịch vụ</button>}
       {capabilities?.quotation && <button type="button" className={buttonClass} disabled={disabled} onClick={() => send(`Xem báo giá đơn ${orderId}.`)}><FileText aria-hidden="true" />Xem báo giá</button>}
       {capabilities?.refunds && <button type="button" className={buttonClass} disabled={disabled} onClick={() => send(`Tra hoàn tiền đơn ${orderId}.`)}><Wallet aria-hidden="true" />Tra hoàn tiền</button>}
       {capabilities?.payment && onCheckPayment && <button type="button" className={buttonClass} disabled={disabled} onClick={() => onCheckPayment(orderId)}><RotateCw aria-hidden="true" />Kiểm tra thanh toán</button>}
@@ -49,6 +51,10 @@ export function AgentBookingActions({ session, disabled, onOpenTool, onSend, onC
     <button type="button" className={buttonClass} disabled={disabled} onClick={() => update("Bỏ bản nháp đang đặt.", "discard")}>Bỏ bản nháp</button>{restore}
   </div></>;
   if (draft?.status === "active") return <>{orderActions}<div className={rowClass} aria-label="Hành động với bản nháp đặt lịch" tabIndex={0}>
+    {draft.hasDraftAddress && <button type="button" className={buttonClass} disabled={disabled}
+      onClick={() => send(draft.values?.saveAddressToBook === false ? "Lưu địa chỉ mới khi đặt đơn thành công." : "Chỉ dùng địa chỉ này một lần, không lưu vào sổ địa chỉ.",
+        { type: "update", revision: draft.revision, patch: { saveAddressToBook: draft.values?.saveAddressToBook === false } })}>
+      <MapPin aria-hidden="true" />{draft.values?.saveAddressToBook === false ? "Cho phép lưu địa chỉ" : "Dùng địa chỉ một lần"}</button>}
     {!pending && <>
       <button type="button" className={buttonClass} disabled={disabled} onClick={() => onOpenTool("schedule")}><CalendarDays aria-hidden="true" />Chọn ngày giờ</button>
       <button type="button" className={buttonClass} disabled={disabled} onClick={() => onOpenTool("address")}><MapPin aria-hidden="true" />Chọn địa chỉ khác</button>

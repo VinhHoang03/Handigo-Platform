@@ -114,7 +114,8 @@ export interface IOrder extends Document, IBaseDocument {
   servicePackageId?: Types.ObjectId | null;
   selectedOptionIds: Types.ObjectId[];
   selectedOptionsSnapshot: ISelectedOptionSnapshot[];
-  addressId: Types.ObjectId;
+  addressId: Types.ObjectId | null;
+  // Giữ kiểu dữ liệu lịch sử; API và service tạo đơn chỉ nhận normal/scheduled.
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | null;
   bookingStatus:
@@ -254,7 +255,8 @@ const OrderSchema = new Schema<IOrder>(
       type: [SelectedOptionSnapshotSchema],
       default: [],
     },
-    addressId: { type: Schema.Types.ObjectId, ref: "Address", required: true },
+    addressId: { type: Schema.Types.ObjectId, ref: "Address", default: null,
+      required: function (this: IOrder) { return !this.addressSnapshot; } },
     addressSnapshot: { type: new Schema({
       recipientName: String, recipientPhone: String, fullAddress: { type: String, required: true },
       province: { type: String, required: true }, ward: { type: String, required: true },

@@ -18,6 +18,7 @@ export type ProviderOnboardingStatus =
 export interface IUser extends Document {
   email: string;
   passwordHash: string | null;
+  tokenVersion?: number;
   googleId?: string | null;
   facebookId?: string | null;
   fullName: string;
@@ -27,6 +28,7 @@ export interface IUser extends Document {
   gender?: "male" | "female" | "other" | null;
   role: UserRole;
   status: UserStatus;
+  temporaryLockId?: mongoose.Types.ObjectId;
   registrationIntent?: RegistrationIntent;
   providerOnboardingStatus?: ProviderOnboardingStatus | null;
   providerOnboardingStep?: 1 | 2 | 3 | null;
@@ -58,6 +60,7 @@ const UserSchema = new Schema<IUser>(
       type: String,
       default: null,
     },
+    tokenVersion: { type: Number, default: 0, min: 0 },
 
     googleId: {
       type: String,
@@ -124,6 +127,7 @@ const UserSchema = new Schema<IUser>(
       enum: ["active", "locked"],
       default: "active",
     },
+    temporaryLockId: { type: Schema.Types.ObjectId, ref: "Violation", select: false },
 
     isEmailVerified: {
       type: Boolean,

@@ -75,6 +75,11 @@ export const getNotificationTarget = (
     }
   }
 
+  const assignmentId = getDataString(item, "assignmentId");
+  if (role === "PROVIDER" && assignmentId && orderId) {
+    return `/provider/orders?assignmentId=${encodeURIComponent(assignmentId)}&orderId=${encodeURIComponent(orderId)}`;
+  }
+
   if (actionUrl && isInternalPath(actionUrl)) return actionUrl;
 
   if (orderId) {

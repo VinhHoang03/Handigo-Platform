@@ -70,9 +70,7 @@ export function ProviderAssignmentModal() {
         <div className="rounded-2xl bg-surface-container-low p-sm">
           <p className="text-[10px] font-bold uppercase text-on-surface-variant">Địa chỉ</p>
           <p className="mt-1 text-sm">
-            {(order.addressId as { fullAddress?: string; detailAddress?: string }).fullAddress ||
-              (order.addressId as { detailAddress?: string }).detailAddress ||
-              shortAddress(order)}
+            {shortAddress(order) || 'Chưa có thông tin khu vực'}
           </p>
         </div>
 

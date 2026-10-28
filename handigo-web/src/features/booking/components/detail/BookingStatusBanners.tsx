@@ -149,7 +149,7 @@ export const BookingStatusBanners = ({
         <div className="mt-md">
           <NearbyProviderSelector
             serviceId={order.serviceId._id}
-            addressId={order.addressId._id}
+            addressId={order.addressId?._id ?? undefined}
             scheduledAt={order.scheduledAt || undefined}
             recurrenceUnit={order.recurrenceUnit || undefined}
             recurrenceCount={order.totalOccurrences || undefined}

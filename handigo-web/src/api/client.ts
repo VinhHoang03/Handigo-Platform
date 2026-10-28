@@ -1,4 +1,4 @@
-import axios, { type InternalAxiosRequestConfig } from "axios";
+import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 import { tokenStorage } from "./tokenStorage";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 
@@ -8,11 +8,18 @@ interface RefreshTokenResponse {
 
 type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
+  _sessionRevision?: number;
 };
 
 const REFRESH_TOKEN_PATH = "/auth/refresh-token";
 const REFRESH_THRESHOLD_MS = 60_000;
 let refreshPromise: Promise<string> | null = null;
+let refreshRevision: number | undefined;
+const assertCurrentSession = (revision: number | undefined) => {
+  if (revision !== useAuthStore.getState().sessionRevision) {
+    throw new axios.CanceledError("Phiên đăng nhập đã thay đổi. Vui lòng thực hiện lại thao tác.");
+  }
+};
 const REFRESH_LOCK_NAME = "handigo-refresh-token";
 const apiBaseUrl = import.meta.env.DEV
   ? "/api"
@@ -52,49 +59,59 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const requestNewAccessToken = async () => {
-  const response = await api.post<RefreshTokenResponse>(REFRESH_TOKEN_PATH);
+const requestNewAccessToken = async (revision: number | undefined) => {
+  assertCurrentSession(revision);
+  const config: AxiosRequestConfig & { _sessionRevision?: number } = { _sessionRevision: revision };
+  const response = await api.post<RefreshTokenResponse>(REFRESH_TOKEN_PATH, undefined, config);
+  assertCurrentSession(revision);
   const token = response.data.token;
   useAuthStore.getState().setToken(token);
   return token;
 };
 
-const refreshAcrossTabs = async () => {
+const refreshAcrossTabs = async (revision: number | undefined) => {
   if (typeof navigator !== "undefined" && navigator.locks) {
-    return navigator.locks.request(REFRESH_LOCK_NAME, requestNewAccessToken);
+    return navigator.locks.request(REFRESH_LOCK_NAME, () => requestNewAccessToken(revision));
   }
 
-  return requestNewAccessToken();
+  return requestNewAccessToken(revision);
 };
 
 export const refreshAccessToken = async () => {
-  if (!refreshPromise) {
-    refreshPromise = refreshAcrossTabs()
+  const revision = useAuthStore.getState().sessionRevision;
+  if (!refreshPromise || refreshRevision !== revision) {
+    refreshRevision = revision;
+    const task = refreshAcrossTabs(revision)
       .catch((error) => {
         const shouldLogout =
           !isNetworkError(error) &&
           (!axios.isAxiosError(error) ||
             [401, 403].includes(error.response?.status ?? 0));
-        if (shouldLogout) {
+        if (shouldLogout && !axios.isCancel(error) && revision === useAuthStore.getState().sessionRevision) {
           useAuthStore.getState().logout();
         }
         throw error;
       })
       .finally(() => {
-        refreshPromise = null;
+        if (refreshPromise === task) refreshPromise = null;
       });
+    refreshPromise = task;
   }
 
   return refreshPromise;
 };
 
 api.interceptors.request.use(async (config) => {
+  const request = config as RetriableRequestConfig;
+  request._sessionRevision ??= useAuthStore.getState().sessionRevision;
+  assertCurrentSession(request._sessionRevision);
   let token = tokenStorage.get();
   const isRefreshRequest = config.url === REFRESH_TOKEN_PATH;
 
   if (token && !isRefreshRequest && shouldRefreshToken(token)) {
     token = await refreshAccessToken();
   }
+  assertCurrentSession(request._sessionRevision);
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -103,21 +120,26 @@ api.interceptors.request.use(async (config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    assertCurrentSession((response.config as RetriableRequestConfig)._sessionRevision);
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config as RetriableRequestConfig | undefined;
+    if (originalRequest) assertCurrentSession(originalRequest._sessionRevision);
 
     if (
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest._retry &&
       originalRequest.url !== REFRESH_TOKEN_PATH &&
-      originalRequest.url !== "/auth/login"
+      !["/auth/login", "/auth/google-login", "/auth/facebook-login", "/auth/logout"].includes(originalRequest.url ?? "")
     ) {
       originalRequest._retry = true;
 
       try {
         const token = await refreshAccessToken();
+        assertCurrentSession(originalRequest._sessionRevision);
         originalRequest.headers.Authorization = `Bearer ${token}`;
         return api.request(originalRequest);
       } catch (refreshError) {

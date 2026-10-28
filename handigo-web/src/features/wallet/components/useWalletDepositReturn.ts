@@ -37,16 +37,15 @@ export function useWalletDepositReturn({ refreshAll, setError, setNotice }: UseW
       setError('');
       setNotice('');
       try {
-        if (walletDepositStatus === 'cancelled') {
-          await walletApi.cancelDeposit(orderCode);
+        const transaction = walletDepositStatus === 'cancelled'
+          ? await walletApi.cancelDeposit(orderCode)
+          : await walletApi.syncDeposit(orderCode);
+        if (transaction.status === 'success') {
+          setNotice('Nạp ví thành công. Số dư đã được cập nhật.');
+        } else if (transaction.status === 'cancelled') {
           setNotice('Đã hủy giao dịch nạp ví.');
         } else {
-          const transaction = await walletApi.syncDeposit(orderCode);
-          if (transaction.status === 'success') {
-            setNotice('Nạp ví thành công. Số dư đã được cập nhật.');
-          } else {
-            setNotice('Giao dịch nạp ví chưa được PayOS xác nhận, vui lòng kiểm tra lại sau.');
-          }
+          setNotice('Giao dịch nạp ví chưa được PayOS xác nhận, vui lòng kiểm tra lại sau.');
         }
         sessionStorage.removeItem(PENDING_DEPOSIT_ORDER_CODE_KEY);
         await refreshAll();

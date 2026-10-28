@@ -12,7 +12,7 @@ import type { QuotationAgentInput } from "../validations/quotationAgent.validato
 export async function quotationAgentOrder(orderId: string, userId: string) {
   const order = await getQuotationOrderForProvider(orderId, userId);
   if (order.isDeleted || !["accepted", "in_progress"].includes(order.status)) throw new AppError("Chỉ soạn báo giá cho đơn đang được nhận hoặc thực hiện.", 409);
-  if (["scheduled", "recurring"].includes(order.orderType) && order.bookingStatus !== "confirmed") throw new AppError("Lịch hẹn chưa được xác nhận để soạn báo giá.", 409);
+  if (order.orderType === "scheduled" && order.bookingStatus !== "confirmed") throw new AppError("Lịch hẹn chưa được xác nhận để soạn báo giá.", 409);
   return order;
 }
 

@@ -4,8 +4,9 @@ import { AgentBookingEditor, type AgentBookingEditMode } from "./AgentBookingEdi
 import { AgentBookingSchedule } from "./AgentBookingSchedule";
 import { AgentBookingProviders } from "./AgentBookingProviders";
 import { AgentWalletTopUp } from "./AgentWalletTopUp";
+import { AgentBookingFeedback } from "./AgentBookingFeedback";
 
-export type AgentBookingTool = AgentBookingEditMode | "schedule" | "providers" | "wallet";
+export type AgentBookingTool = AgentBookingEditMode | "schedule" | "providers" | "wallet" | "feedback";
 
 export function AgentBookingTools({ tool, session, userId, anchorRef, disabled, onClose, onSend }: {
   tool: AgentBookingTool; session: AgentSession; userId: string; anchorRef: RefObject<HTMLDivElement | null>;
@@ -14,6 +15,10 @@ export function AgentBookingTools({ tool, session, userId, anchorRef, disabled, 
   const draft = session.bookingDraft;
   const preview = session.pendingConfirmation?.tool === "create_booking" ? session.pendingConfirmation.preview : undefined;
   const values = { ...draft?.values };
+  if (tool === "feedback") {
+    const orderId = session.orderActions?.orderId ?? session.viewedOrder?.orderId;
+    return orderId ? <AgentBookingFeedback key={orderId} orderId={orderId} disabled={disabled} onSend={onSend} onClose={onClose} /> : null;
+  }
   if (values.uniformQuantity === undefined && typeof preview?.quantity === "number") values.uniformQuantity = preview.quantity;
   if (tool === "wallet") {
     const orderId = draft && ["active", "paused"].includes(draft.status) ? undefined : session.orderActions?.orderId ?? session.viewedOrder?.orderId ?? draft?.orderId ?? session.payment?.orderId;

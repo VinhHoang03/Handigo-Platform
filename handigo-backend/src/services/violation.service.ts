@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { ClientSession, Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import { Complaint } from "../models/complaint.model";
 import { Report } from "../models/report.model";
@@ -6,6 +6,8 @@ import { Session } from "../models/session.model";
 import { SupportTicket } from "../models/supportTicket.model";
 import { PenaltyType, Violation } from "../models/violation.model";
 import User from "../models/user.model";
+import { disconnectUserSockets } from "../sockets/socketServer";
+import { normalizeRestrictedFeature } from "./penaltyPolicy.service";
 
 interface Query {
   page?: string | number;
@@ -54,11 +56,11 @@ const populateViolation = () => [
   { path: "handledBy", select: "fullName email" },
 ];
 
-const resolveSource = async (payload: CreateViolationPayload) => {
+const resolveSource = async (payload: CreateViolationPayload, session: ClientSession) => {
   assertObjectId(payload.sourceId, "Source id");
 
   if (payload.sourceType === "REPORT") {
-    const report = await Report.findOne({ _id: payload.sourceId, isDeleted: false });
+    const report = await Report.findOne({ _id: payload.sourceId, isDeleted: false }).session(session);
     if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
     if (report.isCustomerNoShow && report.status !== "confirmed") {
       throw new AppError("Vui lòng chấp thuận báo cáo khách vắng mặt và xử lý hỗ trợ trước khi tạo vi phạm.", 409);
@@ -77,7 +79,7 @@ const resolveSource = async (payload: CreateViolationPayload) => {
   }
 
   if (payload.sourceType === "COMPLAINT") {
-    const complaint = await Complaint.findOne({ _id: payload.sourceId, isDeleted: false });
+    const complaint = await Complaint.findOne({ _id: payload.sourceId, isDeleted: false }).session(session);
     if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
     if (complaint.createdViolationId) {
       throw new AppError("Khiếu nại đã có bản ghi vi phạm", 400);
@@ -92,7 +94,7 @@ const resolveSource = async (payload: CreateViolationPayload) => {
     };
   }
 
-  const ticket = await SupportTicket.findOne({ _id: payload.sourceId, isDeleted: false });
+  const ticket = await SupportTicket.findOne({ _id: payload.sourceId, isDeleted: false }).session(session);
   if (!ticket) throw new AppError("Không tìm thấy yêu cầu hỗ trợ", 404);
   if (ticket.createdViolationId) {
     throw new AppError("Yêu cầu hỗ trợ đã có bản ghi vi phạm", 400);
@@ -107,7 +109,7 @@ const resolveSource = async (payload: CreateViolationPayload) => {
   };
 };
 
-const applyPenalty = async (userId: string, penaltyType: PenaltyType) => {
+const applyPenalty = async (userId: string, penaltyType: PenaltyType, violationId: Types.ObjectId, session: ClientSession) => {
   if (penaltyType === "WARNING") return;
   if (
     penaltyType === "TEMPORARY_SUSPEND" ||
@@ -115,12 +117,15 @@ const applyPenalty = async (userId: string, penaltyType: PenaltyType) => {
     penaltyType === "account_locked" ||
     penaltyType === "provider_suspended"
   ) {
-    await User.findOneAndUpdate(
-      { _id: userId, isDeleted: false },
-      { status: "locked" },
-      { new: true, runValidators: true },
-    );
-    await Session.updateMany({ userId, revokedAt: null }, { revokedAt: new Date() });
+    const user = await User.findOneAndUpdate({ _id: userId, isDeleted: false },
+      { $inc: { __v: 1 } }, { session, new: true, runValidators: true }).select("+temporaryLockId");
+    if (!user) throw new AppError("Không tìm thấy người dùng vi phạm", 404);
+    if (penaltyType === "TEMPORARY_SUSPEND") {
+      if (user.status === "active" || user.temporaryLockId) user.temporaryLockId = violationId;
+    } else user.set("temporaryLockId", undefined);
+    user.status = "locked";
+    await user.save({ session });
+    await Session.updateMany({ userId, revokedAt: null }, { revokedAt: new Date() }, { session, runValidators: true });
   }
 };
 
@@ -131,87 +136,100 @@ const getPenaltyEndAt = (penalty: CreateViolationPayload["penalty"]) => {
 
 export const createViolation = async (adminId: string, payload: CreateViolationPayload) => {
   assertObjectId(adminId, "Admin id");
-  const source = await resolveSource(payload);
-  const userId = source.userId;
-
-  if (!userId) {
-    throw new AppError("Cần chọn người dùng vi phạm", 400);
+  if (payload.penalty.type === "RESTRICT_FEATURE") {
+    const feature = normalizeRestrictedFeature(payload.penalty.feature ?? "");
+    if (!feature) throw new AppError("Chức năng bị hạn chế không được hỗ trợ.", 400);
+    payload = { ...payload, penalty: { ...payload.penalty, feature } };
   }
-  assertObjectId(userId, "User id");
+  const result = await mongoose.connection.transaction(async (session) => {
+    const source = await resolveSource(payload, session);
+    const userId = source.userId;
 
-  const violatedUser = await User.findOne({ _id: userId, isDeleted: false }).select("_id role");
-  if (!violatedUser) throw new AppError("Không tìm thấy người dùng vi phạm", 404);
-  if (violatedUser.role === "ADMIN") {
-    throw new AppError("Không thể tạo vi phạm cho tài khoản quản trị trong phiên bản này", 400);
-  }
+    if (!userId) {
+      throw new AppError("Cần chọn người dùng vi phạm", 400);
+    }
+    assertObjectId(userId, "User id");
 
-  const now = new Date();
-  const violation = await Violation.create({
-    userId,
-    sourceType: payload.sourceType,
-    sourceId: payload.sourceId,
-    relatedReportId: source.relatedReportId,
-    relatedComplaintId: source.relatedComplaintId,
-    relatedSupportTicketId: source.relatedSupportTicketId,
-    orderId: source.orderId ? new Types.ObjectId(source.orderId) : null,
-    violationType: payload.violationType,
-    severity: payload.severity,
-    penaltyType: payload.penalty.type,
-    penalty: payload.penalty,
-    handledBy: adminId,
-    reason: payload.reason,
-    adminDecision: payload.adminDecision,
-    note: payload.penalty.note ?? null,
-    startAt: now,
-    endAt: getPenaltyEndAt(payload.penalty),
-    appliedAt: now,
+    const violatedUser = await User.findOne({ _id: userId, isDeleted: false }).select("_id role").session(session);
+    if (!violatedUser) throw new AppError("Không tìm thấy người dùng vi phạm", 404);
+    if (violatedUser.role === "ADMIN") {
+      throw new AppError("Không thể tạo vi phạm cho tài khoản quản trị trong phiên bản này", 400);
+    }
+
+    const now = new Date();
+    const [violation] = await Violation.create([{
+      userId,
+      sourceType: payload.sourceType,
+      sourceId: payload.sourceId,
+      relatedReportId: source.relatedReportId,
+      relatedComplaintId: source.relatedComplaintId,
+      relatedSupportTicketId: source.relatedSupportTicketId,
+      orderId: source.orderId ? new Types.ObjectId(source.orderId) : null,
+      violationType: payload.violationType,
+      severity: payload.severity,
+      penaltyType: payload.penalty.type,
+      penalty: payload.penalty,
+      handledBy: adminId,
+      reason: payload.reason,
+      adminDecision: payload.adminDecision,
+      note: payload.penalty.note ?? null,
+      startAt: now,
+      endAt: getPenaltyEndAt(payload.penalty),
+      appliedAt: now,
+    }], { session });
+
+    await applyPenalty(userId, payload.penalty.type, violation._id as Types.ObjectId, session);
+
+    if (payload.sourceType === "REPORT") {
+      await Report.findByIdAndUpdate(
+        payload.sourceId,
+        {
+          status: "confirmed",
+          handledBy: adminId,
+          handledAt: now,
+          reviewNote: payload.reason,
+          resolutionNote: payload.adminDecision,
+          createdViolationId: violation._id,
+        },
+        { runValidators: true, session },
+      );
+    } else if (payload.sourceType === "COMPLAINT") {
+      await Complaint.findByIdAndUpdate(
+        payload.sourceId,
+        {
+          $inc: { __v: 1 },
+          status: "resolved",
+          reviewedBy: adminId,
+          reviewedAt: now,
+          resolvedBy: adminId,
+          resolvedAt: now,
+          resolutionNote: payload.adminDecision,
+          createdViolationId: violation._id,
+        },
+        { runValidators: true, session },
+      );
+    } else {
+      await SupportTicket.findByIdAndUpdate(
+        payload.sourceId,
+        {
+          $inc: { __v: 1 },
+          status: "resolved",
+          assignedAdminId: adminId,
+          resolvedBy: adminId,
+          resolvedAt: now,
+          resolutionNote: payload.adminDecision,
+          createdViolationId: violation._id,
+        },
+        { runValidators: true, session },
+      );
+    }
+
+    return { violationId: violation._id, userId };
   });
-
-  await applyPenalty(userId, payload.penalty.type);
-
-  if (payload.sourceType === "REPORT") {
-    await Report.findByIdAndUpdate(
-      payload.sourceId,
-      {
-        status: "confirmed",
-        handledBy: adminId,
-        handledAt: now,
-        reviewNote: payload.reason,
-        resolutionNote: payload.adminDecision,
-        createdViolationId: violation._id,
-      },
-      { runValidators: true },
-    );
-  } else if (payload.sourceType === "COMPLAINT") {
-    await Complaint.findByIdAndUpdate(
-      payload.sourceId,
-      {
-        status: "resolved",
-        reviewedBy: adminId,
-        reviewedAt: now,
-        resolvedBy: adminId,
-        resolvedAt: now,
-        resolutionNote: payload.adminDecision,
-        createdViolationId: violation._id,
-      },
-      { runValidators: true },
-    );
-  } else {
-    await SupportTicket.findByIdAndUpdate(
-      payload.sourceId,
-      {
-        status: "resolved",
-        assignedAdminId: adminId,
-        resolvedBy: adminId,
-        resolvedAt: now,
-        resolutionNote: payload.adminDecision,
-        createdViolationId: violation._id,
-      },
-      { runValidators: true },
-    );
+  if (["TEMPORARY_SUSPEND", "PERMANENT_BAN", "account_locked", "provider_suspended"].includes(payload.penalty.type)) {
+    disconnectUserSockets(result.userId);
   }
-
-  return Violation.findById(violation._id).populate(populateViolation());
+  return Violation.findById(result.violationId).populate(populateViolation());
 };
 
 export const getAdminViolations = async (query: Query = {}) => {

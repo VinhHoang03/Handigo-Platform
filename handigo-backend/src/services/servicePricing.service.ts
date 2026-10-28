@@ -38,6 +38,9 @@ export const buildServicePricingSnapshot = async (
   uniformQuantity?: number,
   _orderType = "normal",
 ) => {
+  if (_orderType !== "normal" && _orderType !== "scheduled") {
+    throw new AppError("Chỉ hỗ trợ đặt ngay hoặc hẹn giờ.", 400);
+  }
   if (
     !Array.isArray(selectedOptionIdsInput) ||
     selectedOptionIdsInput.some((id) => typeof id !== "string")

@@ -144,6 +144,7 @@ test('Chỉ chi tiết admin được bổ sung kết quả AI; API của ngư�
   let calls = 0;
   const modules = {
     mongoose: require('mongoose'),
+    '../models/provider.model': { Provider: { findOne: () => ({ select: async () => null }) } },
     '../models/report.model': { Report: { findOne: () => ({ populate: async () => report }) } },
     './customerNoShowVerification.service': { getAdminNoShowDetails: async () => { calls++; return { evidence: [] }; } },
   };

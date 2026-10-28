@@ -8,9 +8,9 @@ export const TOOL_GROUPS = {
     "get_addresses", "get_booking_vouchers", "search_booking_providers", "save_booking_address", "update_booking_draft", "create_booking"],
   support: [...orders, "create_support_ticket", "get_my_support_tickets", "get_support_ticket",
     "reply_support_ticket", "cancel_support_ticket"],
-  complaint: [...orders, "create_complaint", "get_my_complaints", "get_complaint", "cancel_complaint"],
-  order: [...orders, "rebook_booking", "get_previous_providers", "get_booking_quotation", "reject_booking_quotation", "get_booking_refunds", "get_order_provider_options", "select_order_provider", "respond_provider_reassignment", "get_cancellation_preview", "cancel_booking"],
-  payment: [...orders, "get_booking_quotation", "get_booking_refunds", "create_payment", "get_payment_status"],
+  complaint: [...orders, "create_complaint", "get_my_complaints", "get_complaint", "cancel_complaint", "add_complaint_evidence"],
+  order: [...orders, "get_booking_provider", "get_booking_feedback", "submit_booking_feedback", "rebook_booking", "get_previous_providers", "get_booking_quotation", "reject_booking_quotation", "get_booking_refunds", "get_order_provider_options", "select_order_provider", "respond_provider_reassignment", "get_cancellation_preview", "cancel_booking"],
+  payment: [...orders, "get_booking_quotation", "get_booking_refunds", "create_payment", "get_payment_status", "cancel_payment"],
 } as const;
 
 export const COMMON_TOOLS = ["search_customer_knowledge", "get_system_info"];
@@ -21,7 +21,7 @@ export type ToolIntent = z.infer<typeof toolGroupSchema>["intent"];
 
 export const selectToolGroup = {
   name: "select_tool_group",
-  description: "Chọn nhóm công cụ theo yêu cầu mới nhất và ngữ cảnh: booking = tìm dịch vụ, giá, đặt/sửa/tiếp tục bản nháp, đặt lại đơn cũ hoặc tìm thợ từng phục vụ; support = yêu cầu hỗ trợ; complaint = khiếu nại; order = tìm đơn nhiều tiêu chí, đọc/từ chối báo giá, tra hoàn tiền, hủy đơn, phí hủy, chọn lại thợ cho đơn đã tạo; payment = thanh toán, đọc báo giá hoặc tra hoàn tiền/giao dịch. Chọn một nhóm mỗi lần; có thể chuyển nhóm khi cần bước khác. Không làm thay đổi dữ liệu khách hàng.",
+  description: "Chọn nhóm công cụ theo yêu cầu mới nhất và ngữ cảnh: booking = tìm dịch vụ, giá, đặt/sửa/tiếp tục bản nháp, đặt lại đơn cũ hoặc tìm thợ từng phục vụ; support = yêu cầu hỗ trợ; complaint = khiếu nại hoặc bổ sung ảnh bằng chứng; order = tra thợ thực hiện/liên hệ/vị trí, tạo/sửa/xem đánh giá dịch vụ, tìm đơn nhiều tiêu chí, đọc/từ chối báo giá, tra hoàn tiền, hủy đơn, phí hủy, chọn lại thợ cho đơn đã tạo; payment = thanh toán, hủy riêng QR nhưng giữ đơn, đọc báo giá hoặc tra hoàn tiền/giao dịch. Chọn một nhóm mỗi lần; có thể chuyển nhóm khi cần bước khác. Không làm thay đổi dữ liệu khách hàng.",
   requiresConfirmation: false,
   inputSchema: z.toJSONSchema(toolGroupSchema, { io: "input" }),
 };

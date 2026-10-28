@@ -458,11 +458,16 @@ test('Tin khách trả lời ghi dấu trên đơn trước khi tạo tin; tin c
     const provider = { _id: new Types.ObjectId(), userId: new Types.ObjectId() };
     const order = { _id: new Types.ObjectId(), customerId: new Types.ObjectId(), providerId: provider._id, status: 'accepted' };
     const conversation = { _id: new Types.ObjectId(), orderId: order._id, providerId: provider._id, customerId: order.customerId, async save() { events.push('conversation'); } };
+    const session = { async withTransaction(work) { return work(); }, async endSession() {} };
     const chat = load('services/chat.service.ts', {
-      mongoose: { Types }, '../utils/appError': { AppError },
+      mongoose: { Types, async startSession() { return session; } }, '../utils/appError': { AppError },
+      '../utils/transaction': { withTransactionRetry: (currentSession, work) => currentSession.withTransaction(work) },
+      './penaltyPolicy.service': { async assertFeatureAllowed() {} },
       '../models/order.model': { Order: {
         findOne: async () => order,
-        async updateOne(filter, update) {
+        async updateOne(filter, update, options) {
+          assert.equal(options.session, session);
+          assert.equal(options.runValidators, true);
           assert.equal(filter['customerNoShow.status'], 'pending');
           assert.equal(filter.status, 'accepted');
           assert.equal(+update.$set['customerNoShow.customerRepliedAt'], now);
@@ -470,9 +475,20 @@ test('Tin khách trả lời ghi dấu trên đơn trước khi tạo tin; tin c
         },
       } },
       '../models/provider.model': { Provider: { findOne: async () => provider } },
-      '../models/conversation.model': { Conversation: { findOne: async () => conversation } },
+      '../models/conversation.model': { Conversation: {
+        findOne: async () => conversation,
+        async findOneAndUpdate(filter, update, options) {
+          assert.equal(options.session, session);
+          return conversation;
+        },
+      } },
       '../models/message.model': { Message: {
-        async create(payload) { events.push('message'); return { _id: new Types.ObjectId(), ...payload, createdAt: new Clock() }; },
+        async create(payload, options) {
+          assert.equal(options.session, session);
+          events.push('message');
+          return [{ _id: new Types.ObjectId(), ...payload[0], createdAt: new Clock() }];
+        },
+        findOne: () => query(null),
         findById: () => ({ populate: async () => ({}) }),
       } },
     });

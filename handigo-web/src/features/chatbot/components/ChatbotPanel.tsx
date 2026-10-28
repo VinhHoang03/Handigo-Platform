@@ -12,6 +12,7 @@ import { AgentBookingConfirmation } from "./AgentBookingConfirmation";
 import { AgentBookingTools, type AgentBookingTool } from "./AgentBookingTools";
 import { AgentBookingActions } from "./AgentBookingActions";
 import { AgentWalletResumeCard } from "./AgentWalletResumeCard";
+import { AgentAssignedProviderCard } from "./AgentAssignedProviderCard";
 import type { AgentWalletResume } from "../utils/agentWalletResume";
 
 const getAudienceLabel = (audience: ChatbotAudience) => {
@@ -40,6 +41,7 @@ export function ChatbotPanel({
   paymentMessageId,
   onCheckPayment,
   onChangePaymentMethod,
+  onCancelPayment,
   onContinue,
   history,
   onToggleHistory,
@@ -68,6 +70,7 @@ export function ChatbotPanel({
   paymentMessageId?: string;
   onCheckPayment?: (orderId: string) => void;
   onChangePaymentMethod?: (orderId: string) => void;
+  onCancelPayment?: (orderId: string, paymentId: string) => void;
   onContinue?: () => void;
   history?: ReactNode;
   onToggleHistory?: () => void;
@@ -159,6 +162,7 @@ export function ChatbotPanel({
         <ChatbotMessageList
           onSend={onSend}
           choicesDisabled={attachmentsDirty || taskBlocked || Boolean(pendingConfirmation) || Boolean(availabilityMessage) || Boolean(error)}
+          bookingVoucherChoicesEnabled={audience === "CUSTOMER" && pendingConfirmation?.tool === "create_booking" && !attachmentsDirty && !controlsDisabled}
           messages={messages}
           isReplying={isReplying}
           activity={activity}
@@ -168,25 +172,27 @@ export function ChatbotPanel({
           onDecision={onDecision}
           renderConfirmation={renderConfirmation}
           renderAfterMessage={(message) => payment && onCheckPayment && message._id === paymentMessageId
-            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
+            ? <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} onCancel={taskBlocked || availabilityMessage ? undefined : onCancelPayment} />
             : null}
         >
           {pendingConfirmation && onDecision && !messages.some((message) => message.confirmation?.actionId === pendingConfirmation.actionId) && (
             renderConfirmation(pendingConfirmation, false)
           )}
           {payment && onCheckPayment && !messages.some((message) => message._id === paymentMessageId) && (
-            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} />
+            <AgentPaymentCard payment={payment} disabled={isReplying || isLoading || Boolean(pendingConfirmation) || Boolean(error)} onCheck={onCheckPayment} onChangeMethod={taskBlocked || availabilityMessage ? undefined : onChangePaymentMethod} onCancel={taskBlocked || availabilityMessage ? undefined : onCancelPayment} />
           )}
           {walletResume && walletResume.sessionId === agentSession?.sessionId && onResumeWallet && onDismissWallet && (
             <AgentWalletResumeCard key={walletResume.depositOrderCode} context={walletResume}
               disabled={controlsDisabled || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking")}
               onContinue={onResumeWallet} onDismiss={onDismissWallet} />
           )}
+          {agentSession?.assignedProvider && <AgentAssignedProviderCard key={`${agentSession.assignedProvider.orderId}:${agentSession.assignedProvider.checkedAt}`}
+            value={agentSession.assignedProvider} disabled={controlsDisabled || Boolean(pendingConfirmation) || attachmentsDirty} onSend={onSend} />}
         </ChatbotMessageList>
       ))}
 
       {!history && onContinue && !pendingConfirmation && (
-        <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{taskBlocked ? "Kiểm tra kết quả tạo đơn" : "Tiếp tục yêu cầu"}</button>
+        <button type="button" onClick={onContinue} disabled={isReplying || isLoading} className="mx-4 mb-2 shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary disabled:opacity-50">{taskBlocked ? "Kiểm tra kết quả thao tác" : "Tiếp tục yêu cầu"}</button>
       )}
       <div ref={toolsAnchorRef} className="shrink-0">
         {!history && audience === "CUSTOMER" && <div className="border-t border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 sm:px-4 [&_button]:shrink-0 [&_a]:shrink-0">
@@ -219,10 +225,12 @@ export function ChatbotPanel({
       )}
       {!history && <ChatbotComposer
         key={agentSession?.sessionId ?? "new"}
-        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking") || taskBlocked}
+        disabled={isLoading || isReplying || Boolean(availabilityMessage) || Boolean(pendingConfirmation && pendingConfirmation.tool !== "create_booking")
+          || taskBlocked && (!agentSession?.requiresReconciliation || Boolean(error))}
         onSend={onSend}
-        onUploadAttachment={agentSession?.bookingDraft?.status === "booked" ? undefined : onUploadAttachment}
-        attachmentUrls={agentSession?.bookingDraft?.values?.customerAttachments}
+        onUploadAttachment={onUploadAttachment}
+        attachmentUrls={agentSession?.bookingDraft?.status === "active" ? agentSession.bookingDraft.values?.customerAttachments : undefined}
+        attachmentPurpose={agentSession?.bookingDraft?.status === "active" ? "booking" : "general"}
         onAttachmentChange={(dirty) => setAttachmentEdit(dirty ? fingerprint : null)}
         onActivityChange={setComposerBusy}
         voiceEnabled={audience === "CUSTOMER"}

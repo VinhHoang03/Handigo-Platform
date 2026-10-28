@@ -15,9 +15,11 @@ const visual = process.argv.find((arg) => arg.startsWith('--visual='))?.split('=
 const business = process.argv.includes('--business');
 const scroll = process.argv.includes('--scroll');
 const historyActions = process.argv.includes('--history-actions');
+const paymentCancellation = process.argv.includes('--payment-cancellation');
+const flowExtensions = process.argv.includes('--flow-extensions');
 const screenshot = visual ? path.join(tmpdir(), `handigo-agent-${visual}-${viewport.replace(',', 'x')}.png`) : null;
 const folder = await mkdtemp(path.join(tmpdir(), 'handigo-agent-booking-'));
-const mocks = ['booking.api', 'customerService.api', 'wallet.api', 'agent.api', 'chatbot.api', 'authenticatedSocket', 'tokenStorage', 'auth.store'];
+const mocks = ['booking.api', 'feedback.api', 'customerService.api', 'wallet.api', 'agent.api', 'chatbot.api', 'authenticatedSocket', 'tokenStorage', 'auth.store'];
 let server;
 let browser;
 let connection;
@@ -25,6 +27,8 @@ try {
   const bundle = await rolldown({ input: path.join(root, 'tests/fixtures/agent-booking.browser.jsx'), cwd: root,
     transform: { jsx: 'react-jsx' },
     plugins: [{ name: 'api-gia-lap', resolveId(id) {
+      if (id.endsWith('.css')) return '\0agent-style.js';
+      if (id === '@/api/client') return '\0api-client';
       if (mocks.some((name) => id.includes(name)) || id === '@/components/common/Toast') return '\0' + id;
       if (id.startsWith('@/')) {
         const base = path.join(root, 'src', id.slice(2));
@@ -32,10 +36,25 @@ try {
       }
     }, load(id) {
       if (!id.startsWith('\0')) return;
+      if (id === '\0agent-style.js') return '';
+      if (id === '\0api-client') return `export default {get: async (url) => {
+        const f = window.__agentFixture;
+        if (url.includes('/chat/orders/')) { f.chatOrderId = url.split('/')[3]; return {data:{data:{_id:'cuoc-tro-chuyen',providerId:{userId:{fullName:'Thợ thực tế'}},customerId:{fullName:'Khách kiểm thử'}}}}; }
+        if (url.includes('/messages')) return {data:{data:{items:[],pagination:{page:1,total:0,totalPages:0}}}};
+        throw Error('API chưa được khai báo trong fixture.');
+      }, post: async () => ({data:{data:{}}})};`;
       if (id.includes('booking.api')) return `export const bookingApi = {
+        getOrderById: async (id) => { const f = window.__agentFixture; f.mapOrderId = id; if (++f.mapReads === 1) throw Error('Lỗi tải vị trí giả lập'); return f.orderDetail; },
+        getPaymentById: async () => window.__agentFixture.paymentRecord,
+        getPaymentQr: async () => new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="white"/><rect x="10" y="10" width="80" height="80" fill="black"/></svg>'], {type:'image/svg+xml'}),
+        reconcilePayosPayment: async () => ({payment:window.__agentFixture.paymentRecord}),
         getBookingPolicies: async () => { const f = window.__agentFixture; if (++f.policiesRead === 1) throw Error('Lỗi chính sách giả lập'); return f.policies; },
         getAddresses: async () => { const f = window.__agentFixture; if (++f.addressReads === 1) throw Error('Lỗi địa chỉ giả lập'); return f.addresses; }
       };`;
+      if (id.includes('feedback.api')) return `export const feedbackApi = { getOrderContext: async () => {
+        const f = window.__agentFixture; if (f.feedbackError) { f.feedbackError = false; throw Error('Lỗi kiểm tra đánh giá giả lập'); }
+        return f.feedbackContext;
+      }};`;
       if (id.includes('customerService.api')) return `export const customerServiceApi = {
         nearbyProviders: async () => { const f = window.__agentFixture; if (f.session.bookingDraft?.hasDraftAddress) throw Error('Không được tra địa chỉ tạm qua API sổ địa chỉ'); return f.providers; },
         publicProviderProfile: async () => window.__agentFixture.profile,
@@ -54,7 +73,8 @@ try {
   await bundle.close();
   const assets = await readdir(path.join(root, 'dist/assets'));
   const cssName = assets.find((name) => /^index-.*\.css$/.test(name));
-  const css = cssName ? await readFile(path.join(root, 'dist/assets', cssName)) : Buffer.from('');
+  const css = Buffer.concat([cssName ? await readFile(path.join(root, 'dist/assets', cssName)) : Buffer.from(''),
+    await readFile(path.join(root, 'node_modules/leaflet/dist/leaflet.css'))]);
   const script = await readFile(path.join(folder, 'app.js'));
   server = createServer(async (req, res) => {
     if (req.url === '/app.js') { res.setHeader('Content-Type', 'application/javascript'); res.end(script); }
@@ -113,8 +133,7 @@ try {
   });
   const [width, height] = viewport.split(',').map(Number);
   await invoke('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
-  await invoke('Emulation.setFocusEmulationEnabled', { enabled: true });
-  await invoke('Page.navigate', { url: `http://127.0.0.1:${port}/agent-check${visual ? `?visual=${encodeURIComponent(visual)}` : historyActions ? '?history-actions=true' : scroll ? '?scroll=true' : business ? '?business=true' : ''}` });
+  await invoke('Page.navigate', { url: `http://127.0.0.1:${port}/agent-check${visual ? `?visual=${encodeURIComponent(visual)}` : flowExtensions ? '?flow-extensions=true' : paymentCancellation ? '?payment-cancellation=true' : historyActions ? '?history-actions=true' : scroll ? '?scroll=true' : business ? '?business=true' : ''}` });
   let output = '';
   const deadline = Date.now() + 45000;
   while (Date.now() < deadline) {
@@ -136,7 +155,9 @@ try {
     await writeFile(screenshot, Buffer.from(capture.data, 'base64'));
   }
   if (screenshot) console.log(`Ảnh kiểm tra giao diện: ${screenshot}`);
-  console.log(historyActions ? `Đạt tìm đơn/thợ cũ (${viewport}): thao tác đúng đơn, chọn đúng thợ trùng tên, giữ bản nháp, phân trang, rỗng và thử lại.` : scroll ? `Đạt cuộn chat (${viewport}): giữ tin vừa gửi khi chờ phản hồi và khi có bản xác nhận dài.` : visual ? `Đạt kiểm tra bố cục (${viewport}, ${visual}).` : business ? `Đạt 9–14 trên web (${viewport}): kiểm tra ảnh/giới hạn/lỗi upload, ảnh trong tin nhắn và xác nhận, bỏ ảnh, xác nhận lại và nút tra cứu đúng đơn.` : `Đạt 1–6 (${viewport}): sửa form và thử lại an toàn, chọn lịch UTC+7, hồ sơ thợ, nạp ví quay lại đúng đơn, chính sách và hành động theo trạng thái.`);
+  if (flowExtensions) console.log(`Đạt mở rộng agent (${viewport}): địa chỉ một lần, thợ thực tế/gọi/chat/bản đồ, thử lại lỗi, đánh giá mới/sửa/từ chối và gửi ảnh hỗ trợ sau đặt đơn.`);
+  if (paymentCancellation) console.log(`Đạt hủy QR (${viewport}): xác nhận/từ chối, giữ đơn, lỗi hủy giữ QR, ẩn QR sau xác minh và nhận tiền đồng thời.`);
+  if (!paymentCancellation && !flowExtensions) console.log(historyActions ? `Đạt tìm đơn/thợ cũ (${viewport}): thao tác đúng đơn, chọn đúng thợ trùng tên, giữ bản nháp, phân trang, rỗng và thử lại.` : scroll ? `Đạt cuộn chat (${viewport}): giữ tin vừa gửi khi chờ phản hồi và khi có bản xác nhận dài.` : visual ? `Đạt kiểm tra bố cục (${viewport}, ${visual}).` : business ? `Đạt 9–14 trên web (${viewport}): kiểm tra ảnh/giới hạn/lỗi upload, ảnh trong tin nhắn và xác nhận, bỏ ảnh, xác nhận lại và nút tra cứu đúng đơn.` : `Đạt 1–6 (${viewport}): sửa form và thử lại an toàn, chọn lịch UTC+7, hồ sơ thợ, nạp ví quay lại đúng đơn, chính sách và hành động theo trạng thái.`);
 } finally {
   connection?.close();
   if (browser && browser.exitCode === null) {

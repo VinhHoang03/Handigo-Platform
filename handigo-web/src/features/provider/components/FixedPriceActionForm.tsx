@@ -214,7 +214,7 @@ export function FixedPriceActionForm({
         ))}
         <div className={showStart ? 'mx-auto flex w-full max-w-2xl flex-col gap-3' : 'space-y-sm'}>
         {showStart && (
-          <button type="button" disabled={busy || !order.arrival || order.arrival.providerId !== order.providerId?._id || order.customerNoShow?.status === 'pending'} onClick={onStart} className="btn-primary w-full px-4 py-3 text-base font-bold">
+          <button type="button" disabled={busy || !order.arrival || order.arrival.providerId !== order.providerId?._id} onClick={onStart} className="btn-primary w-full px-4 py-3 text-base font-bold">
             {busy ? 'Đang xử lý...' : 'Bắt đầu làm việc'}
           </button>
         )}
@@ -226,7 +226,7 @@ export function FixedPriceActionForm({
         {showCancel && (
           <button
             type="button"
-            disabled={busy || order.customerNoShow?.status === 'pending'}
+            disabled={busy}
             onClick={onCancel}
             className="w-full rounded-xl border border-error/30 px-4 py-3 text-sm font-bold text-error transition-colors hover:bg-error/5"
           >

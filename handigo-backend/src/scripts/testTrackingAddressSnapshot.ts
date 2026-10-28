@@ -26,6 +26,9 @@ async function run() {
     assert.deepEqual(route.destination, { latitude: 21, longitude: 105 });
     const state = await tracking.getOrderTrackingState(String(stored._id), String(customerId), "CUSTOMER");
     assert.equal(state.customer?.latitude, 21); assert.equal(liveAddressReads, 0);
+    stored.addressId = null;
+    const oneTime = await tracking.getOrderTrackingState(String(stored._id), String(customerId), "CUSTOMER");
+    assert.equal(oneTime.customer?.latitude, 21); assert.equal(liveAddressReads, 0, "Đơn một lần không cần đọc sổ địa chỉ để theo dõi.");
     delete stored.addressSnapshot;
     const legacy = await tracking.getOrderTrackingRoute(String(stored._id), String(customerId), "CUSTOMER") as unknown as { destination: unknown };
     assert.deepEqual(legacy.destination, { latitude: 22, longitude: 106 });

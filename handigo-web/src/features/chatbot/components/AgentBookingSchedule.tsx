@@ -28,8 +28,8 @@ export function AgentBookingSchedule({ anchorRef, scheduledAt, disabled, onClose
     if (date && time) {
       const value = Date.parse(`${date}T${time}:00+07:00`);
       const currentMinute = Math.floor(Date.now() / 60000) * 60000;
-      if (!Number.isFinite(value) || value < currentMinute || time < "08:00" || time > "21:00") {
-        setError("Chọn giờ từ 08:00 đến 21:00, không sớm hơn phút hiện tại theo giờ Việt Nam."); return;
+      if (!Number.isFinite(value) || value < currentMinute) {
+        setError("Chọn thời gian hợp lệ, không sớm hơn phút hiện tại theo giờ Việt Nam."); return;
       }
     }
     setSaving(true);

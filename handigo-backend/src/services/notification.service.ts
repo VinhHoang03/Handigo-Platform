@@ -123,14 +123,11 @@ export const createNotificationRecord = async (
     data: input.data ?? null,
   });
   document.$locals.deferRealtime = options?.deferRealtime === true;
+  // Hook của model phát một lần; khi hoãn, service gọi phát sau khi transaction commit.
   const [notification] = await Notification.create(
     [document],
     { session: options?.session },
   );
-
-  if (options?.emitRealtime && !options.deferRealtime) {
-    emitRealtimeNotification(notification);
-  }
 
   return notification;
 };

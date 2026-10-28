@@ -58,8 +58,8 @@ try {
   });
   assert.match(defaults.currentMinute, /T16:37:00$/);
   assert.equal(defaults.restoredCurrentMinute, defaults.currentMinute);
-  assert.match(defaults.beforeOpening, /T08:00:00$/);
-  assert.match(defaults.afterClosing, /T08:00:00$/);
+  assert.match(defaults.beforeOpening, /T07:59:00$/);
+  assert.match(defaults.afterClosing, /T22:00:00$/);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const trigger = page.getByRole('button', { name: 'Chọn khung giờ', exact: true });
@@ -87,11 +87,11 @@ try {
   await page.keyboard.press('End');
   await minute.focus();
   await page.keyboard.press('End');
-  await page.getByRole('button', { name: 'Chọn 21:59', exact: true }).click();
-  await expect(trigger).toHaveText('21:59');
+  await page.getByRole('button', { name: 'Chọn 23:59', exact: true }).click();
+  await expect(trigger).toHaveText('23:59');
   await trigger.click();
   await expect(minute.getByRole('option', { selected: true })).toHaveText('59');
-  await expect(hour.getByRole('option', { selected: true })).toHaveText('21');
+  await expect(hour.getByRole('option', { selected: true })).toHaveText('23');
   await page.keyboard.press('Escape');
   await expect(hour).toHaveCount(0);
   assert.deepEqual(errors, []);

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { tokenStorage } from "@/api/tokenStorage";
 import type { User } from "../types/auth.types";
+import { resetBookingSession } from "@/features/booking/hooks/useBookingStore";
 
 const USER_STORAGE_KEY = "handigo:user";
 
@@ -31,6 +32,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isInitializing: boolean;
+  sessionRevision: number;
   setAuth: (user: User, token: string, remember?: boolean) => void;
   setToken: (token: string) => void;
   setUser: (user: User) => void;
@@ -41,31 +43,38 @@ interface AuthState {
 const initialToken = tokenStorage.get();
 const initialUser = getStoredUser();
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: initialUser,
   token: initialToken,
   isAuthenticated: !!initialToken && !!initialUser,
   isInitializing: true,
+  sessionRevision: 0,
   setAuth: (user, token, remember = true) => {
+    if ((get().user?.id ?? get().user?._id) !== (user.id || user._id)) resetBookingSession();
     localStorage.setItem('handigo:remember-login', String(remember));
     tokenStorage.set(token, remember);
     setStoredUser(user, remember);
-    set({ user, token, isAuthenticated: true, isInitializing: false });
+    set({ user, token, isAuthenticated: true, isInitializing: false, sessionRevision: get().sessionRevision + 1 });
   },
   setToken: (token) => {
     tokenStorage.set(token);
     set({ token, isAuthenticated: true });
   },
   setUser: (user) => {
+    const changedAccount = (get().user?.id ?? get().user?._id) !== (user.id || user._id);
+    if (changedAccount) resetBookingSession();
     setStoredUser(user);
-    set({ user, isAuthenticated: true, isInitializing: false });
+    set({ user, isAuthenticated: true, isInitializing: false,
+      sessionRevision: get().sessionRevision + (changedAccount ? 1 : 0) });
   },
   finishInitialization: () => {
     set({ isInitializing: false });
   },
   logout: () => {
+    resetBookingSession();
     tokenStorage.clear();
     clearStoredUser();
-    set({ user: null, token: null, isAuthenticated: false, isInitializing: false });
+    set({ user: null, token: null, isAuthenticated: false, isInitializing: false,
+      sessionRevision: get().sessionRevision + 1 });
   },
 }));

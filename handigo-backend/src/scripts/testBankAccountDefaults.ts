@@ -13,6 +13,8 @@ async function run() {
   const session = {};
   const query = <T>(value: T): any => ({ session: (valueSession: unknown) => { assert.equal(valueSession, session); return Promise.resolve(value); } });
   const matches = (row: any, filter: any) => String(row.userId) === String(filter.userId) && !row.isDeleted &&
+    (!filter.bankCode || row.bankCode === filter.bankCode) &&
+    (!filter.accountNumber || row.accountNumber === filter.accountNumber) &&
     (!filter._id || (filter._id.$ne ? row._id !== filter._id.$ne : row._id === String(filter._id)));
   mock.method(mongoose.connection, "transaction", async (fn: any) => {
     const before = structuredClone(rows);

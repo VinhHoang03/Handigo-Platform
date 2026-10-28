@@ -15,7 +15,10 @@ vm.runInNewContext(code, { exports: componentExports, require(name) {
   if (name === 'react/jsx-runtime') return require(name);
   if (name === 'lucide-react') return { CalendarDays: () => null, MapPin: () => null, Phone: () => null,
     Ticket: () => null, User: () => null, Wrench: () => null };
-  if (name.includes('providerOrder.utils')) return { formatDateTime: () => 'Ngày thử nghiệm' };
+  if (name.includes('providerOrder.utils')) return {
+    formatDateTime: () => 'Ngày thử nghiệm',
+    getOrderRecipient: order => ({ fullName: order.addressId?.recipientName || 'Khách hàng' }),
+  };
   if (name.includes('InitialsAvatar')) return { InitialsAvatar: () => null };
   if (name.includes('ReliableImage')) return { ReliableImage: () => null };
   if (name.includes('imageUrl')) return { normalizeImageUrl: value => value };

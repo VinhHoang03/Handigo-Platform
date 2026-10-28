@@ -17,7 +17,7 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
     <section className="space-y-3">
       <h3 className="font-semibold text-on-surface">1. Đặt lịch, tìm thợ và thanh toán</h3>
       <ul className={listClass}>
-        <li>Khách cần cung cấp đúng dịch vụ, số lượng, địa chỉ, thông tin liên hệ và mô tả công việc. Khung giờ đặt dịch vụ từ 08:00 đến 21:00 theo giờ Việt Nam; lịch hẹn không được sớm hơn phút hiện tại.</li>
+        <li>Khách cần cung cấp đúng dịch vụ, số lượng, địa chỉ, thông tin liên hệ và mô tả công việc. Lịch hẹn không được sớm hơn phút hiện tại.</li>
         <li>Đơn cần thanh toán trước phải hoàn tất trong thời hạn hiển thị; thời gian giữ lịch chờ thanh toán mặc định theo cấu hình hiện tại là {number(policies.paymentHoldMinutes)} phút. Hết hạn có thể tự hủy; lịch định kỳ có thời hạn thanh toán riêng cho từng buổi được ghi trong đơn.</li>
         <li>Hệ thống tìm thợ trong bán kính {number(matching.initialRadiusKm)} km, mở rộng đến {number(matching.expandedRadiusKm)} km sau {number(matching.expandAfterMinutes)} phút và tìm thêm tối đa {number(matching.expandedDurationMinutes)} phút trong vòng mở rộng. Mỗi đề nghị có thời hạn phản hồi tối đa {number(matching.providerResponseSeconds)} giây và có thể kết thúc sớm khi chuyển vòng tìm kiếm.</li>
         <li>Với vòng tìm thợ tự động, nếu hết vòng mà không có thợ nhận, đơn được hủy và hoàn 100% khoản đã thanh toán. Với thợ được chọn trực tiếp, khách có thể được yêu cầu chọn thợ khác hoặc đồng ý tìm thợ thay thế.</li>

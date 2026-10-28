@@ -28,14 +28,20 @@ const isNetworkError = (error: unknown) => {
 };
 
 let restorePromise: Promise<User | null> | null = null;
+let restoreRevision: number | undefined;
 
 const restoreUserSession = async (): Promise<User | null> => {
+  const revision = useAuthStore.getState().sessionRevision;
+  const isCurrent = () => revision === useAuthStore.getState().sessionRevision;
   try {
     if (!useAuthStore.getState().token) await refreshAccessToken();
+    if (!isCurrent()) return null;
     const user = await getMeApi();
+    if (!isCurrent()) return null;
     useAuthStore.getState().setUser(user);
     return user;
   } catch (error) {
+    if (!isCurrent() || axios.isCancel(error)) return null;
     const status = axios.isAxiosError(error) ? error.response?.status : undefined;
     if (isNetworkError(error) || status === 429 || (status !== undefined && status >= 500)) {
       useAuthStore.getState().finishInitialization();
@@ -50,8 +56,11 @@ const restoreUserSession = async (): Promise<User | null> => {
 export const authService = {
   restoreSession: () => {
     // Các lời gọi đồng thời dùng chung một lần khôi phục phiên.
-    if (!restorePromise) {
-      restorePromise = restoreUserSession().finally(() => { restorePromise = null; });
+    const revision = useAuthStore.getState().sessionRevision;
+    if (!restorePromise || restoreRevision !== revision) {
+      restoreRevision = revision;
+      const task = restoreUserSession().finally(() => { if (restorePromise === task) restorePromise = null; });
+      restorePromise = task;
     }
     return restorePromise;
   },
@@ -150,12 +159,12 @@ export const authService = {
   },
 
   logout: async () => {
+    useAuthStore.getState().logout();
     try {
       await logoutApi();
     } catch (error) {
+      if (axios.isCancel(error)) return;
       console.warn("API đăng xuất thất bại, tiếp tục xóa phiên đăng nhập trên thiết bị:", error);
-    } finally {
-      useAuthStore.getState().logout();
     }
   }
 };

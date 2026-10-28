@@ -15,6 +15,14 @@ import { newSession } from "../ai/agent/agent-state";
 
 // Kiểm thử không kết nối database, không đọc cấu hình bí mật hoặc gọi cổng thanh toán.
 async function run() {
+  const escalatedAt = new Date();
+  const overdueMessage = "Đơn hàng quá thời gian dự kiến và đang cần xác nhận tiến độ.";
+  assert.deepEqual(describeOrderProgress({ "overdueReview.escalatedAt": escalatedAt }), [overdueMessage]);
+  assert.deepEqual(describeOrderProgress({ overdueReview: { escalatedAt } }), [overdueMessage]);
+  assert.deepEqual(describeOrderProgress({ overdueReview: { escalatedAt }, "overdueReview.escalatedAt": escalatedAt }), [overdueMessage]);
+  for (const overdueReview of [null, undefined, {}, { escalatedAt: null }]) {
+    assert.deepEqual(describeOrderProgress({ overdueReview }), []);
+  }
   const orderId = new Types.ObjectId();
   const subscription = { _id: new Types.ObjectId(), orderId, userId: new Types.ObjectId().toString(), sessionId: "phien-kiem-thu",
     createdAt: new Date("2026-10-01T00:00:00Z") };
@@ -95,6 +103,10 @@ async function run() {
   assert.ok(stored.get(`booking:${orderId}`)?.content.includes("Đã thanh toán tiền cọc."));
   assert.ok(!stored.get(`booking:${orderId}`)?.content.includes("chưa thanh toán"));
   assert.ok([...stored.values()].some((message) => message.content.includes("thất bại hoặc hết hạn")));
+  const beforeSwitch = stored.size;
+  await publishAgentOrderChange(change("doi-phuong-thuc", Payment.collection.collectionName, { status: "failed" },
+    { failureReason: "Đã hủy PayOS để đổi phương thức thanh toán" }));
+  assert.equal(stored.size, beforeSwitch, "Không gửi tin riêng khi hủy QR cũ để đổi phương thức");
   assert.ok([...stored.values()].some((message) => message.content.includes("Khoản hoàn tiền đã hoàn tất")));
   assert.ok([...stored.values()].some((message) => message.content.includes("Báo giá đã được chấp nhận")));
 

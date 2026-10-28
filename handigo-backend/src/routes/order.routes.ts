@@ -20,7 +20,6 @@ import {
   assignmentIdParamSchema,
   cancellationPreviewQuerySchema,
   cancelOrderSchema,
-  cancelRecurringSeriesSchema,
   completeOrderSchema,
   customerNoShowSchema,
   customerNoShowEvidenceSchema,
@@ -50,10 +49,8 @@ import {
   getProviderOrders,
   getProviderRecentOrders,
   getOrderById,
-  getRecurringSeries,
   cancelOrder,
   previewCancellation,
-  cancelRecurringSeries,
   startOrder,
   arriveOrder,
   customerNoShowEligibility,
@@ -172,13 +169,6 @@ router.get("/:orderId/matching-providers", roleMiddleware("CUSTOMER"), validate(
 
 router.get("/:orderId", validate(orderIdParamSchema, "params"), getOrderById);
 
-router.get(
-  "/:orderId/series",
-  roleMiddleware("CUSTOMER"),
-  validate(orderIdParamSchema, "params"),
-  getRecurringSeries,
-);
-
 router.patch(
   "/:orderId/appointment-provider",
   roleMiddleware("CUSTOMER"),
@@ -215,14 +205,6 @@ router.get(
   validate(orderIdParamSchema, "params"),
   validate(cancellationPreviewQuerySchema, "query"),
   previewCancellation,
-);
-
-router.patch(
-  "/:orderId/cancel-series",
-  roleMiddleware("CUSTOMER"),
-  validate(orderIdParamSchema, "params"),
-  validate(cancelRecurringSeriesSchema),
-  cancelRecurringSeries,
 );
 
 // POST   /orders/:orderId/start    → Provider: start working on order

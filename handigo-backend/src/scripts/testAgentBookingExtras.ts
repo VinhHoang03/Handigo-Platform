@@ -46,6 +46,13 @@ async function run() {
   };
   const draft = await updateBookingDraft(undefined, { mode: "update", serviceQuery: "Vệ sinh điều hòa" }, userId, deps);
   assert.equal(draft.values.addressId, addressId);
+  const oneTimeDraft = await updateBookingDraft(draft, { mode: "update" }, userId, deps, "Đặt tại địa chỉ này một lần, không lưu vào sổ địa chỉ.");
+  assert.equal(oneTimeDraft.values.saveAddressToBook, false, "Tôn trọng không lưu dù model không gửi lại trường lựa chọn.");
+  const keptStorage = await updateBookingDraft(oneTimeDraft, { mode: "update", quantity: 2 }, userId, deps);
+  assert.equal(keptStorage.values.saveAddressToBook, false);
+  assert.equal(readyBookingArguments(keptStorage)?.saveAddressToBook, false);
+  const saveAgain = await updateBookingDraft(keptStorage, { mode: "update", saveAddressToBook: true }, userId, deps, "Tôi muốn lưu địa chỉ khi đặt đơn.");
+  assert.equal(saveAgain.values.saveAddressToBook, true);
   const duplicates = { ...deps, addresses: async () => [
     { id: addressId, fullAddress: "12 Nguyễn Trãi", ward: "Phường A", province: "Hà Nội", isDefault: false },
     { id: alternateId, fullAddress: " 12 Nguyễn Trãi ", ward: "Phường A", province: "Hà Nội", isDefault: false },

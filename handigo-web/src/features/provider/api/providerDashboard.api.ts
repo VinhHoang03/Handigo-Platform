@@ -4,6 +4,7 @@ export type ProviderAvailabilityStatus = "online" | "offline" | "busy";
 
 interface ProviderOverview {
   availabilityStatus?: ProviderAvailabilityStatus;
+  monthlyEarnings: number;
 }
 
 export interface ProviderEarningPoint {

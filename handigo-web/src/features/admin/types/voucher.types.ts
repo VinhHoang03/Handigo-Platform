@@ -1,6 +1,6 @@
 import type { RewardOffer } from '@/features/rewards/api/rewards.api';
 
-export type AdminRewardOffer = RewardOffer & {
+export type AdminRewardOffer = Omit<RewardOffer, 'termsVersion'> & {
   isActive: boolean;
   discountType: 'AMOUNT' | 'PERCENT';
   applicableOrderType: 'fixed_price' | 'variable_price';

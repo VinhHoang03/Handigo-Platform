@@ -98,7 +98,7 @@ export const requestProviderReassignment = async (
             readyForMatching: true,
             matchingStartedAt: null,
             matchingSearch: null,
-            bookingStatus: order.bookingStatus === "reserved" ? "reserved" : "not_required",
+            bookingStatus: "not_required",
             reassignment,
           },
         },

@@ -58,7 +58,7 @@ export function ChatbotWidget({
     setPaymentAnchor((previous) => {
       if (previous?.key === key && session.messages.some((message) => message._id === previous.messageId)) return previous;
       const related = [...session.messages].reverse().find((message) => message.confirmation?.booking?.orderId === session.payment?.orderId
-        || (message.confirmation?.tool === "create_payment" && message.confirmation.preview.orderId === session.payment?.orderId));
+        || (["create_payment", "cancel_payment"].includes(message.confirmation?.tool ?? "") && message.confirmation?.preview.orderId === session.payment?.orderId));
       const message = related ?? [...session.messages].reverse().find((message) => message.sender === "assistant") ?? session.messages.at(-1);
       return message ? { key, messageId: message._id } : null;
     });
@@ -342,13 +342,13 @@ export function ChatbotWidget({
             disabled={isLoading || isReplying} onSelect={(id) => void selectSession(id)} onDelete={deleteSession} /> : undefined}
           onContinue={usesAgent && (agentSession?.state === "FAILED" || agentSession?.retryableStep) && !requiresNewSession && !error
             && ((!agentSession.requiresReconciliation && !agentSession.interruptedRequest)
-              || agentSession.messages.some((message) => message.confirmation?.tool === "create_booking"
+              || agentSession.requiresReconciliation || agentSession.messages.some((message) => message.confirmation?.tool === "create_booking"
                 && ["UNKNOWN", "EXECUTING"].includes(message.confirmation.status ?? "")))
             ? () => void sendMessage("Tiếp tục yêu cầu.").catch(() => undefined) : undefined}
           onClose={() => setIsOpen(false)}
           onRetry={() => void retry()}
           onSend={sendMessage}
-          onUploadAttachment={usesAgent ? uploadAttachment : undefined}
+          onUploadAttachment={usesAgent && !agentSession?.requiresReconciliation ? uploadAttachment : undefined}
           agentSession={usesAgent ? agentSession : undefined}
           userId={userId}
           walletResume={walletResume}
@@ -365,7 +365,13 @@ export function ChatbotWidget({
             void sendMessage("").catch(() => undefined);
           }}
           onChangePaymentMethod={(orderId) => {
-            void sendMessage(`Đổi phương thức thanh toán cho đơn ${orderId}.`).catch(() => undefined);
+            const payment = agentSession?.payment;
+            void sendMessage(payment?.orderId === orderId && ["unpaid", "failed"].includes(payment.status)
+              ? `Tôi muốn thanh toán lại đơn ${orderId}. Cho tôi chọn phương thức thanh toán phù hợp.`
+              : `Đổi phương thức thanh toán cho đơn ${orderId}.`).catch(() => undefined);
+          }}
+          onCancelPayment={(orderId, paymentId) => {
+            void sendMessage(`Hủy QR thanh toán đơn ${orderId}, giao dịch ${paymentId}.`).catch(() => undefined);
           }}
           onDecision={(decision, policyConsent) => void decide(decision, policyConsent)}
           taskBlocked={agentSession?.requiresReconciliation || (usesAgent && Boolean(error))}

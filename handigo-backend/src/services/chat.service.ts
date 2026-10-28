@@ -1,10 +1,12 @@
-import { Types } from "mongoose";
+import mongoose, { ClientSession, Types } from "mongoose";
+import { withTransactionRetry } from "../utils/transaction";
 import { AppError } from "../utils/appError";
 import { Conversation } from "../models/conversation.model";
 import { Message } from "../models/message.model";
 import { Order, type IOrder } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { Report } from "../models/report.model";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 type SenderRole = "customer" | "provider";
@@ -21,6 +23,34 @@ interface SendMessagePayload {
 }
 
 const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress", "completed"];
+
+const withConversationWrite = async <T>(
+  conversationId: string,
+  work: (conversation: InstanceType<typeof Conversation>, session: ClientSession) => Promise<T>,
+) => {
+  const session = await mongoose.startSession();
+  try {
+    return await withTransactionRetry(session, async () => {
+      const conversation = await Conversation.findOneAndUpdate(
+        { _id: conversationId, isDeleted: false }, { $inc: { __v: 1 } },
+        { new: true, session, runValidators: true },
+      );
+      if (!conversation) throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
+      return work(conversation, session);
+    });
+  } finally { await session.endSession(); }
+};
+
+const refreshConversationPreview = async (conversation: InstanceType<typeof Conversation>, session: ClientSession) => {
+  const latest = await Message.findOne({ conversationId: conversation._id, isDeleted: false })
+    .sort({ createdAt: -1, _id: -1 }).session(session);
+  conversation.lastMessage = latest ? {
+    messageId: latest._id as Types.ObjectId, senderId: latest.senderId,
+    messageType: latest.messageType as "text" | "image",
+    content: latest.content || latest.imageUrl || "", sentAt: latest.createdAt,
+  } : null;
+  await conversation.save({ session });
+};
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -227,6 +257,7 @@ export const sendMessage = async (
   conversationId: string,
   payload: SendMessagePayload,
 ) => {
+  await assertFeatureAllowed(userId, "chat");
   const { conversation, participant } = await getConversationForParticipant(
     userId,
     role,
@@ -242,30 +273,27 @@ export const sendMessage = async (
     throw new AppError("Vui lòng nhập nội dung tin nhắn", 400);
   }
 
-  if (participant.senderRole === "customer") {
-    // Ghi trước khi nhận tin để tự duyệt cùng đơn phát hiện phản hồi đồng thời và thử lại giao dịch.
-    await Order.updateOne({ _id: conversation.orderId, status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
-      { $set: { "customerNoShow.customerRepliedAt": new Date() } }, { runValidators: true });
-  }
-  const message = await Message.create({
-    conversationId: conversation._id,
-    senderId: userId,
-    senderRole: participant.senderRole,
-    messageType,
-    content: payload.content ?? null,
-    imageUrl: payload.imageUrl ?? null,
+  const messageId = await withConversationWrite(conversationId, async (current, session) => {
+    if (participant.senderRole === "customer") {
+      // Ghi cùng giao dịch để tự duyệt phát hiện phản hồi đồng thời và thử lại.
+      await Order.updateOne({ _id: conversation.orderId, status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
+        { $set: { "customerNoShow.customerRepliedAt": new Date() } }, { session, runValidators: true });
+    }
+    const [message] = await Message.create([{
+      conversationId: conversation._id,
+      senderId: userId,
+      senderRole: participant.senderRole,
+      messageType,
+      content: payload.content ?? null,
+      imageUrl: payload.imageUrl ?? null,
+    }], { session });
+
+    await refreshConversationPreview(current, session);
+    return message._id;
   });
 
-  conversation.lastMessage = {
-    messageId: message._id as Types.ObjectId,
-    senderId: new Types.ObjectId(userId),
-    messageType,
-    content,
-    sentAt: message.createdAt,
-  };
-  await conversation.save();
 
-  return Message.findById(message._id).populate("senderId", "fullName avatar role");
+  return Message.findById(messageId).populate("senderId", "fullName avatar role");
 };
 
 export const markConversationSeen = async (
@@ -309,6 +337,7 @@ export const updateMessage = async (
   messageId: string,
   content: string,
 ) => {
+  await assertFeatureAllowed(userId, "chat");
   assertObjectId(messageId, "message id");
   const message = await Message.findOne({ _id: messageId, isDeleted: false });
   if (!message) throw new AppError("Không tìm thấy tin nhắn.", 404);
@@ -325,12 +354,16 @@ export const updateMessage = async (
     throw new AppError("Chỉ có thể chỉnh sửa tin nhắn văn bản.", 400);
   }
 
-  message.content = content.trim();
-  await message.save();
-  if (conversation.lastMessage?.messageId.toString() === messageId) {
-    conversation.lastMessage.content = message.content;
-    await conversation.save();
-  }
+  await withConversationWrite(conversation._id.toString(), async (current, session) => {
+    const latest = await Message.findOne({ _id: messageId, senderId: userId, isDeleted: false }).session(session);
+    if (!latest) throw new AppError("Không tìm thấy tin nhắn.", 404);
+    latest.content = content.trim();
+    await latest.save({ session });
+    if (current.lastMessage?.messageId.toString() === messageId) {
+      current.lastMessage.content = latest.content;
+      await current.save({ session });
+    }
+  });
   return Message.findById(message._id).populate("senderId", "fullName avatar role");
 };
 
@@ -352,24 +385,18 @@ export const deleteMessage = async (
     throw new AppError("Bạn chỉ có thể xóa tin nhắn của mình.", 403);
   }
 
-  message.isDeleted = true;
-  message.deletedAt = new Date();
-  await message.save();
+  await withConversationWrite(conversation._id.toString(), async (current, session) => {
+    const latest = await Message.findOne({ _id: messageId, senderId: userId, isDeleted: false }).session(session);
+    if (!latest) throw new AppError("Không tìm thấy tin nhắn.", 404);
+    latest.isDeleted = true;
+    latest.deletedAt = new Date();
+    await latest.save({ session });
 
-  if (conversation.lastMessage?.messageId.toString() === messageId) {
-    const latestMessage = await Message.findOne({
-      conversationId: conversation._id,
-      isDeleted: false,
-    }).sort({ createdAt: -1, _id: -1 });
-    conversation.lastMessage = latestMessage ? {
-      messageId: latestMessage._id as Types.ObjectId,
-      senderId: latestMessage.senderId,
-      messageType: latestMessage.messageType as "text" | "image",
-      content: latestMessage.content || latestMessage.imageUrl || "",
-      sentAt: latestMessage.createdAt,
-    } : null;
-    await conversation.save();
-  }
+    if (current.lastMessage?.messageId.toString() === messageId) {
+      await refreshConversationPreview(current, session);
+    }
+  });
+
 
   return { _id: message._id, conversationId: message.conversationId };
 };

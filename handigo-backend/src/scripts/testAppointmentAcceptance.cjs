@@ -136,16 +136,16 @@ function reset() { orders = []; assignments = []; lockCount = 0; claims = 0; not
   const first = makeOrder('09:00', '10:00', { recurringGroupId: group });
   makeOrder('14:00', '15:00', { recurringGroupId: group });
   makeOrder('13:00', '16:00', { providerId: provider._id, status: 'accepted' });
-  await assert.rejects(offer(first)(), error => error.statusCode === 409);
-  assert.equal(first.status, 'created'); assert.equal(claims, 0);
+  await offer(first)();
+  assert.equal(first.status, 'accepted'); assert.equal(claims, 1);
 
   reset();
   const reservedGroup = new Types.ObjectId();
   const anchor = makeOrder('09:00', '10:00', { recurringGroupId: reservedGroup });
   const later = makeOrder('14:00', '15:00', { recurringGroupId: reservedGroup });
   await offer(anchor)();
-  assert.equal(anchor.bookingStatus, 'confirmed'); assert.equal(later.bookingStatus, 'reserved');
-  assert.equal(later.status, 'accepted'); assert.equal(provider.availabilityStatus, 'online');
+  assert.equal(anchor.bookingStatus, 'confirmed'); assert.equal(later.bookingStatus, undefined);
+  assert.equal(later.status, 'created'); assert.equal(provider.availabilityStatus, 'online');
   assert.equal(lockCount, 1); assert.equal(notifications, 1);
 
   reset();
@@ -162,5 +162,5 @@ function reset() { orders = []; assignments = []; lockCount = 0; claims = 0; not
   assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
   assert.equal(orders.filter(order => order.status === 'accepted').length, 1);
   assert.equal(lockCount, 2);
-  console.log('Đã kiểm tra nhận lịch hẹn: thời lượng, dự phòng, ca làm việc, chuỗi lịch, thợ thay thế và nhận đồng thời.');
+  console.log('Đã kiểm tra nhận lịch hẹn: thời lượng, dự phòng, ca làm việc, không nhận kèm đơn có mã nhóm cũ, thợ thay thế và nhận đồng thời.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
