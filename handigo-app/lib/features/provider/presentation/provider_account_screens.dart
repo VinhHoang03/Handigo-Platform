@@ -6,6 +6,7 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/provider_avatar.dart';
 import '../../account/domain/account_models.dart';
 import 'provider_screens.dart';
 
@@ -91,6 +92,7 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
                 name: '${user['fullName'] ?? 'Đối tác Handigo'}',
                 bio: '${provider['bio'] ?? provider['description'] ?? ''}',
                 avatar: user['avatar'] as String?,
+                gender: user['gender'] as String?,
               ),
               const SizedBox(height: 16),
               _ProfileSection(
@@ -141,16 +143,9 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
               ),
               const SizedBox(height: 14),
               _ProfileSection(
-                title: 'Dịch vụ & khu vực phục vụ',
-                icon: Icons.location_on_outlined,
-                children: [
-                  Text(_serviceNames(provider['services'])),
-                  const SizedBox(height: 6),
-                  Text(
-                    _areas(provider['workingAreas'], provider['serviceArea']),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+                title: 'Dịch vụ cung cấp',
+                icon: Icons.home_repair_service_outlined,
+                children: [Text(_serviceNames(provider['services']))],
               ),
               const SizedBox(height: 14),
               Row(
@@ -280,9 +275,14 @@ class _ProviderProfileScreenState extends ConsumerState<ProviderProfileScreen> {
 }
 
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero({required this.name, required this.bio, this.avatar});
+  const _ProfileHero({
+    required this.name,
+    required this.bio,
+    this.avatar,
+    this.gender,
+  });
   final String name, bio;
-  final String? avatar;
+  final String? avatar, gender;
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
@@ -290,7 +290,7 @@ class _ProfileHero extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          ProviderAvatar(url: avatar),
+          ProviderAvatar(url: avatar, gender: gender),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -299,7 +299,7 @@ class _ProfileHero extends StatelessWidget {
                 Text(
                   name,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -343,7 +343,7 @@ class _ProfileSection extends StatelessWidget {
                 child: Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -494,7 +494,7 @@ class _WalletBalanceCard extends StatelessWidget {
             _money(wallet.balance),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: scheme.onPrimary,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
@@ -741,12 +741,6 @@ String _transactionStatus(String? value) =>
     }[value] ??
     value ??
     '';
-String _areas(dynamic areas, dynamic serviceArea) =>
-    'Khu vực: ${areas is List
-        ? areas.join(', ')
-        : serviceArea is Map
-        ? '${serviceArea['province'] ?? ''} ${serviceArea['ward'] ?? ''}'
-        : 'Chưa cập nhật'}';
 double _number(dynamic value) =>
     value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
 String _money(double value) => NumberFormat.currency(

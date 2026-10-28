@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import '../../../shared/widgets/app_search_field.dart';
 import 'dart:async';
 import '../../../core/network/realtime_connection.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/customer_page_header.dart';
 import '../../../core/network/paged_result.dart';
 import '../data/chat_repository.dart';
 import '../domain/chat_models.dart';
@@ -43,22 +45,18 @@ class _ConversationListScreenState
     final state = ref.watch(conversationListProvider);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 12,
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: scheme.surfaceContainerLow,
-              foregroundColor: scheme.primary,
-              child: const Icon(Icons.forum_rounded, size: 19),
-            ),
-            const SizedBox(width: 9),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [const Text('Đoạn chat')],
-            ),
-          ],
+      appBar: CustomerPageHeader(
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
+        backgroundColor: Colors.white,
+        title: 'Đoạn chat',
+        centerTitle: false,
+        leading: Center(
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: scheme.surfaceContainerLow,
+            foregroundColor: scheme.primary,
+            child: const Icon(Icons.forum_rounded, size: 19),
+          ),
         ),
       ),
       body: state.when(
@@ -264,8 +262,8 @@ class _ConversationCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -274,7 +272,7 @@ class _ConversationCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        height: 1.2,
+                        height: 1.4,
                         fontWeight: isUnread
                             ? FontWeight.w600
                             : FontWeight.w400,
@@ -297,7 +295,7 @@ class _ConversationCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
-                                height: 1.2,
+                                height: 1.4,
                               ),
                             ),
                           ),
@@ -328,7 +326,7 @@ class _ConversationCard extends StatelessWidget {
                           '1',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onPrimary,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -338,7 +336,7 @@ class _ConversationCard extends StatelessWidget {
                       _chatTime(item.lastMessageAt ?? item.updatedAt),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.primary,
-                        height: 1.2,
+                        height: 1.4,
                       ),
                     ),
                   ],
@@ -375,7 +373,9 @@ class ChatByOrderScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
       FutureBuilder<Conversation>(
-        future: ref.read(chatRepositoryProvider).conversationForOrder(orderId),
+        future: GoRouterState.of(context).extra is Conversation
+            ? Future.value(GoRouterState.of(context).extra as Conversation)
+            : ref.read(chatRepositoryProvider).conversationForOrder(orderId),
         builder: (_, snapshot) => snapshot.hasData
             ? ChatScreen(
                 conversationId: snapshot.data!.id,
@@ -452,11 +452,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         actions: [
           IconButton(
             onPressed: null,
-            icon: const Icon(Icons.phone_outlined),
-            tooltip: 'Gọi điện',
-          ),
-          IconButton(
-            onPressed: null,
             icon: const Icon(Icons.more_vert),
             tooltip: 'Tùy chọn',
           ),
@@ -464,34 +459,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: scheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.receipt_long_outlined,
-                  size: 18,
-                  color: scheme.onSecondaryContainer,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Trao đổi về đơn dịch vụ',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: scheme.onSecondaryContainer,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.chevron_right, size: 18),
-              ],
-            ),
-          ),
           Expanded(
             child: FutureBuilder<PagedResult<ChatMessage>>(
               future: ref

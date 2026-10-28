@@ -56,7 +56,7 @@ export function WalletDetailModal({
   return (
     <Modal
       open={Boolean(detail) || detailLoading}
-      title="Chi tiết ví provider"
+      title="Chi tiết ví nhà cung cấp"
       onClose={onClose}
       size="xl"
       closeOnOverlayClick={!busy}

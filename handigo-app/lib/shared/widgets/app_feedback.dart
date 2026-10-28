@@ -157,7 +157,7 @@ class _TopToastState extends State<_TopToast> {
                     if (widget.title != null) ...[
                       Text(
                         widget.title!,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 2),
                     ],
@@ -202,6 +202,7 @@ class AppBottomSheet extends StatelessWidget {
     bool enableDrag = true,
     bool useSafeArea = true,
   }) => showModalBottomSheet<T>(
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     isDismissible: isDismissible,

@@ -664,6 +664,7 @@ export const DispatchService = {
       for (const order of overdueOrders) {
         const claimed = await Order.findOneAndUpdate(
           { _id: order._id, status: "in_progress", isDeleted: false, updatedAt: order.updatedAt, "overdueReview.escalatedAt": null },
+          // Trường cha có default null nên phải khởi tạo object thay vì ghi vào đường dẫn con.
           { $set: { overdueReview: { escalatedAt: now } } },
           { returnDocument: "after", runValidators: true },
         );

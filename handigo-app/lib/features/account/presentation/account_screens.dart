@@ -10,6 +10,7 @@ import '../../../app/theme/app_theme.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/customer_page_header.dart';
 import '../../home/presentation/device_location_provider.dart';
 import '../data/account_repository.dart';
 import '../domain/account_models.dart';
@@ -89,29 +90,12 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        centerTitle: true,
-        toolbarHeight: 62,
+      appBar: CustomerPageHeader(
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
         backgroundColor: _accountSurface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          tooltip: 'Quay lại',
-          onPressed: () => context.canPop() ? context.pop() : null,
-          icon: SvgPicture.asset(
-            '$_accountIconPath/back.svg',
-            width: 22,
-            height: 22,
-          ),
-        ),
-        title: Text(
-          'Tài khoản & Cài đặt',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: _accountInk,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        automaticallyImplyLeading: false,
+        title: 'Tài khoản & Cài đặt',
+        titleColor: _accountInk,
         actions: [
           IconButton(
             tooltip: 'Trợ giúp',
@@ -247,7 +231,7 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -333,6 +317,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _pickGender() async {
     final selected = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -342,7 +327,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const ListTile(
               title: Text(
                 'Chọn giới tính',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             for (final option in const [
@@ -390,9 +375,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         title: Text(
           'Thông tin cá nhân',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: scheme.onSurface,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -427,7 +412,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   Text(
                     'Thông tin cơ bản',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -525,7 +510,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           textStyle: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         child: Text(_saving ? 'Đang lưu...' : 'Lưu thay đổi'),
                       ),
@@ -572,8 +557,8 @@ class AddressScreen extends ConsumerWidget {
           'Sổ địa chỉ của tôi',
           style: TextStyle(
             color: _accountInk,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
             letterSpacing: -.2,
           ),
         ),
@@ -615,8 +600,8 @@ class AddressScreen extends ConsumerWidget {
                                   'Địa chỉ đã lưu',
                                   style: TextStyle(
                                     color: _accountInk,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -807,7 +792,7 @@ class WalletScreen extends ConsumerWidget {
                               child: Text(
                                 'Ví Handigo',
                                 style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                             ),
                             Text(
@@ -825,7 +810,7 @@ class WalletScreen extends ConsumerWidget {
                         Text(
                           _money(wallet.balance),
                           style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         if (wallet.pendingBalance > 0)
                           Padding(
@@ -867,7 +852,7 @@ class WalletScreen extends ConsumerWidget {
                 child: Text(
                   'Phương thức đã lưu',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1330,8 +1315,8 @@ class VoucherScreen extends ConsumerWidget {
                           'Ưu đãi dành riêng cho bạn',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         SizedBox(height: 4),
@@ -1346,7 +1331,7 @@ class VoucherScreen extends ConsumerWidget {
                   Text(
                     'Voucher khả dụng',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -1399,7 +1384,7 @@ class _VoucherCard extends ConsumerWidget {
                     discount,
                     style: theme.textTheme.titleLarge?.copyWith(
                       color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1407,7 +1392,7 @@ class _VoucherCard extends ConsumerWidget {
                     item.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   if (item.description?.isNotEmpty == true)
                     Text(
@@ -1481,7 +1466,7 @@ class FeedbackScreen extends ConsumerWidget {
                   return Card(
                     child: ListTile(
                       title: Text(
-                        '★' * item.rating,
+                        '${'★' * item.rating.floor()}${item.rating % 1 == 0 ? '' : '½'} (${item.rating}/5)',
                         style: TextStyle(color: AppTheme.starGold),
                       ),
                       subtitle: Text(item.comment ?? 'Không có nhận xét'),
@@ -1762,7 +1747,7 @@ class _ProfileSummaryCard extends StatelessWidget {
                         color: _accountInk,
                         fontSize: 22,
                         height: 1.45,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1772,7 +1757,7 @@ class _ProfileSummaryCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: _accountMuted,
-                        fontSize: 12,
+                        fontSize: 13,
                         height: 1.45,
                       ),
                     ),
@@ -1807,7 +1792,7 @@ class _ProviderModeCard extends StatelessWidget {
           isApproved ? 'ĐỐI TÁC ĐÃ XÁC MINH' : 'MỞ RỘNG CƠ HỘI',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: _accountSurface,
-            fontSize: 12,
+            fontSize: 13,
             height: 1.45,
           ),
         ),
@@ -1818,7 +1803,7 @@ class _ProviderModeCard extends StatelessWidget {
             color: _accountSurface,
             fontSize: 22,
             height: 1.45,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 12),
@@ -1828,7 +1813,7 @@ class _ProviderModeCard extends StatelessWidget {
               : 'Đăng ký cung cấp dịch vụ trên Handigo.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: _accountSurface,
-            fontSize: 14,
+            fontSize: 16,
             height: 1.45,
           ),
         ),
@@ -1847,7 +1832,7 @@ class _ProviderModeCard extends StatelessWidget {
           child: Text(
             isApproved ? 'Chuyển sang chế độ Thợ  →' : 'Đăng ký ngay  →',
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               height: 1.45,
               fontWeight: FontWeight.w600,
             ),
@@ -1886,7 +1871,7 @@ class _WalletOverviewCard extends StatelessWidget {
                   'Ví Handigo',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: _accountInk,
-                    fontSize: 14,
+                    fontSize: 16,
                     height: 1.45,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1899,7 +1884,7 @@ class _WalletOverviewCard extends StatelessWidget {
             'Số dư khả dụng',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: _accountMuted,
-              fontSize: 12,
+              fontSize: 13,
               height: 1.45,
             ),
           ),
@@ -1908,9 +1893,9 @@ class _WalletOverviewCard extends StatelessWidget {
             balance == null ? 'Đang tải...' : _accountMoney(balance!),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: _accountInk,
-              fontSize: 30,
+              fontSize: 28,
               height: 1.45,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 12),
@@ -1991,7 +1976,7 @@ class _AccountAvatar extends StatelessWidget {
       color: _figmaPrimary,
       fontSize: 22,
       height: 1.45,
-      fontWeight: FontWeight.w800,
+      fontWeight: FontWeight.w600,
     ),
   );
 }
@@ -2016,7 +2001,7 @@ class _AccountSection extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: _accountMuted,
-          fontSize: 14,
+          fontSize: 16,
           height: 1.45,
           fontWeight: FontWeight.w600,
         ),
@@ -2035,7 +2020,7 @@ class _SectionLabel extends StatelessWidget {
     text,
     style: Theme.of(
       context,
-    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
   );
 }
 
@@ -2069,7 +2054,7 @@ class _ProfileHero extends StatelessWidget {
                     name.isEmpty ? '?' : name.substring(0, 1).toUpperCase(),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   )
                 : null,
@@ -2080,7 +2065,7 @@ class _ProfileHero extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(
               context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 2),
           Text(
@@ -2171,7 +2156,7 @@ class _ProfileField extends StatelessWidget {
                 label,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: scheme.onSurfaceVariant,
-                  fontSize: 10,
+                  fontSize: 11,
                 ),
               ),
               TextField(
@@ -2180,8 +2165,8 @@ class _ProfileField extends StatelessWidget {
                 textInputAction: textInputAction,
                 readOnly: readOnly,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  fontSize: 16,
                 ),
                 decoration: InputDecoration(
                   isDense: true,
@@ -2224,7 +2209,7 @@ class _ProfileField extends StatelessWidget {
                         actionLabel!,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -2274,7 +2259,7 @@ class _ProfileReadOnlyField extends StatelessWidget {
                     label,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
-                      fontSize: 10,
+                      fontSize: 11,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -2293,8 +2278,8 @@ class _ProfileReadOnlyField extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                                fontSize: 16,
                               ),
                         ),
                       ),
@@ -2340,7 +2325,7 @@ class _VerifiedBadge extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: Theme.of(context).colorScheme.primary,
-            fontSize: 10,
+            fontSize: 11,
           ),
         ),
       ],
@@ -2397,7 +2382,7 @@ class _AddAddressCard extends StatelessWidget {
                     style: TextStyle(
                       color: _accountInk,
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   SizedBox(height: 4),
@@ -2406,7 +2391,7 @@ class _AddAddressCard extends StatelessWidget {
                     style: TextStyle(
                       color: _accountMuted,
                       fontSize: 13,
-                      height: 1.35,
+                      height: 1.4,
                     ),
                   ),
                 ],
@@ -2435,7 +2420,7 @@ class _AddressSectionLabel extends StatelessWidget {
     label,
     style: const TextStyle(
       color: _accountMuted,
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: FontWeight.w600,
     ),
   );
@@ -2468,8 +2453,8 @@ class _CurrentLocationSection extends StatelessWidget {
               'Dùng vị trí hiện tại của bạn',
               style: TextStyle(
                 color: _accountInk,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
             SizedBox(height: 3),
@@ -2488,7 +2473,7 @@ class _CurrentLocationSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
           minimumSize: const Size(0, 32),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
         child: const Text('Xác định vị trí'),
       ),
@@ -2536,7 +2521,7 @@ class _AddressCard extends StatelessWidget {
                     style: const TextStyle(
                       color: _accountInk,
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -2555,7 +2540,7 @@ class _AddressCard extends StatelessWidget {
                       style: TextStyle(
                         color: _figmaPrimary,
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -2569,7 +2554,7 @@ class _AddressCard extends StatelessWidget {
                     text: item.recipientName,
                     style: const TextStyle(
                       color: _accountInk,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const TextSpan(
@@ -2610,7 +2595,7 @@ class _AddressCard extends StatelessWidget {
                       'Ghi chú cho thợ:',
                       style: TextStyle(
                         color: _accountMuted,
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -2648,7 +2633,7 @@ class _AddressCard extends StatelessWidget {
                             'Địa chỉ mặc định',
                             style: TextStyle(
                               color: _accountMuted,
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -2666,8 +2651,8 @@ class _AddressCard extends StatelessWidget {
                           'Đặt làm mặc định',
                           style: TextStyle(
                             color: _figmaPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -2714,7 +2699,7 @@ ButtonStyle _addressActionStyle(Color color) => TextButton.styleFrom(
   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
   minimumSize: const Size(0, 32),
   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
 );
 
 class _EmptyAddress extends StatelessWidget {
@@ -2738,8 +2723,8 @@ class _EmptyAddress extends StatelessWidget {
               'Bạn chưa có địa chỉ',
               style: const TextStyle(
                 color: _accountInk,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
@@ -2787,7 +2772,7 @@ class _AddressPrivacyFooter extends StatelessWidget {
                 style: TextStyle(
                   color: _accountInk,
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               SizedBox(height: 4),
@@ -2795,7 +2780,7 @@ class _AddressPrivacyFooter extends StatelessWidget {
                 'Địa chỉ của bạn chỉ được chia sẻ với kỹ thuật viên sau khi đơn đặt dịch vụ được xác nhận.',
                 style: TextStyle(
                   color: _accountMuted,
-                  fontSize: 12,
+                  fontSize: 13,
                   height: 1.45,
                 ),
               ),
@@ -2950,7 +2935,7 @@ class _AccountMenuTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: _accountInk,
-                        fontSize: 14,
+                        fontSize: 16,
                         height: 1.45,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2963,7 +2948,7 @@ class _AccountMenuTile extends StatelessWidget {
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: item.comingSoon ? _figmaPrimary : _accountMuted,
                         fontWeight: item.comingSoon ? FontWeight.w600 : null,
-                        fontSize: 12,
+                        fontSize: 13,
                         height: 1.45,
                       ),
                     ),

@@ -104,159 +104,227 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               )
             : const ForgotPasswordScreen(),
       ),
-      GoRoute(path: '/customer', builder: (_, __) => const CustomerShell()),
-      GoRoute(
-        path: '/customer/notifications',
-        builder: (_, __) => const NotificationCenterScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (_, __, navigationShell) =>
+            CustomerShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/customer',
+                builder: (_, __) => const CustomerHomeScreen(),
+              ),
+              GoRoute(
+                path: '/customer/notifications',
+                builder: (_, __) => const NotificationCenterScreen(),
+              ),
+              GoRoute(
+                path: '/customer/services',
+                builder: (_, state) => ServiceCatalogScreen(
+                  initialSearch: state.uri.queryParameters['q'],
+                  initialCategoryId: state.uri.queryParameters['categoryId'],
+                ),
+              ),
+              GoRoute(
+                path: '/customer/services/:id',
+                builder: (_, state) =>
+                    ServiceDetailScreen(serviceId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: '/customer/services/:id/reviews',
+                builder: (_, state) => ServiceReviewsScreen(
+                  serviceId: state.pathParameters['id']!,
+                ),
+              ),
+              GoRoute(
+                path: '/customer/bookings/new/:serviceId',
+                builder: (_, state) => BookingRouteScreen(
+                  serviceId: state.pathParameters['serviceId']!,
+                ),
+              ),
+              GoRoute(
+                path: '/customer/bookings/success',
+                builder: (_, state) {
+                  final data = state.extra is Map
+                      ? state.extra! as Map
+                      : const <String, dynamic>{};
+                  return BookingSuccessScreen(
+                    orderId:
+                        state.uri.queryParameters['orderId'] ??
+                        data['orderId'] as String?,
+                    orderCode: data['orderCode'] as String?,
+                    paymentStatus: data['paymentStatus'] as String?,
+                    checkoutUrl: data['checkoutUrl'] as String?,
+                  );
+                },
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/customer/orders',
+                builder: (_, __) => const OrderListScreen(),
+              ),
+              GoRoute(
+                path: '/customer/orders/:id',
+                builder: (_, state) =>
+                    OrderDetailScreen(orderId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: '/customer/orders/:id/tracking',
+                builder: (_, state) =>
+                    OrderTrackingScreen(orderId: state.pathParameters['id']!),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/customer/chat',
+                builder: (_, __) => const ConversationListScreen(),
+              ),
+              GoRoute(
+                path: '/customer/chat/order/:id',
+                builder: (_, state) =>
+                    ChatByOrderScreen(orderId: state.pathParameters['id']!),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/customer/account',
+                builder: (_, __) => const AccountOverviewScreen(),
+              ),
+              GoRoute(
+                path: '/customer/profile',
+                builder: (_, __) => const ProfileScreen(),
+              ),
+              GoRoute(
+                path: '/customer/addresses',
+                builder: (_, __) => const AddressScreen(),
+              ),
+              GoRoute(
+                path: '/customer/wallet',
+                builder: (_, __) => const WalletScreen(),
+              ),
+              GoRoute(
+                path: '/customer/wallet/history',
+                builder: (_, __) => const CustomerPaymentHistoryScreen(),
+              ),
+              GoRoute(
+                path: '/customer/vouchers',
+                builder: (_, __) => const VoucherScreen(),
+              ),
+              GoRoute(
+                path: '/customer/feedback',
+                builder: (_, __) => const FeedbackScreen(),
+              ),
+              GoRoute(
+                path: '/customer/support',
+                builder: (_, __) => const SupportScreen(),
+              ),
+              GoRoute(
+                path: '/customer/complaints',
+                builder: (_, __) => const ComplaintScreen(),
+              ),
+              GoRoute(
+                path: '/customer/settings',
+                builder: (_, __) => const SettingsScreen(),
+              ),
+              GoRoute(
+                path: '/customer/provider-onboarding',
+                builder: (_, __) => const ProviderOnboardingScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
-      GoRoute(
-        path: '/customer/orders',
-        builder: (_, __) => const OrderListScreen(),
-      ),
-      GoRoute(
-        path: '/customer/orders/:id',
-        builder: (_, state) =>
-            OrderDetailScreen(orderId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/customer/orders/:id/tracking',
-        builder: (_, state) =>
-            OrderTrackingScreen(orderId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/customer/chat',
-        builder: (_, __) => const ConversationListScreen(),
-      ),
-      GoRoute(
-        path: '/customer/chat/order/:id',
-        builder: (_, state) =>
-            ChatByOrderScreen(orderId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/customer/account',
-        builder: (_, __) => const AccountOverviewScreen(),
-      ),
-      GoRoute(
-        path: '/customer/profile',
-        builder: (_, __) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: '/customer/addresses',
-        builder: (_, __) => const AddressScreen(),
-      ),
-      GoRoute(
-        path: '/customer/wallet',
-        builder: (_, __) => const WalletScreen(),
-      ),
-      GoRoute(
-        path: '/customer/wallet/history',
-        builder: (_, __) => const CustomerPaymentHistoryScreen(),
-      ),
-      GoRoute(
-        path: '/customer/vouchers',
-        builder: (_, __) => const VoucherScreen(),
-      ),
-      GoRoute(
-        path: '/customer/feedback',
-        builder: (_, __) => const FeedbackScreen(),
-      ),
-      GoRoute(
-        path: '/customer/support',
-        builder: (_, __) => const SupportScreen(),
-      ),
-      GoRoute(
-        path: '/customer/complaints',
-        builder: (_, __) => const ComplaintScreen(),
-      ),
-      GoRoute(
-        path: '/customer/settings',
-        builder: (_, __) => const SettingsScreen(),
-      ),
-      GoRoute(
-        path: '/customer/provider-onboarding',
-        builder: (_, __) => const ProviderOnboardingScreen(),
-      ),
-      GoRoute(
-        path: '/customer/services',
-        builder: (_, state) => ServiceCatalogScreen(
-          initialSearch: state.uri.queryParameters['q'],
-          initialCategoryId: state.uri.queryParameters['categoryId'],
-        ),
-      ),
-      GoRoute(
-        path: '/customer/services/:id',
-        builder: (_, state) =>
-            ServiceDetailScreen(serviceId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/customer/services/:id/reviews',
-        builder: (_, state) =>
-            ServiceReviewsScreen(serviceId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/customer/bookings/new/:serviceId',
-        builder: (_, state) =>
-            BookingRouteScreen(serviceId: state.pathParameters['serviceId']!),
-      ),
-      GoRoute(
-        path: '/customer/bookings/success',
-        builder: (_, state) {
-          final data = state.extra is Map
-              ? state.extra! as Map
-              : const <String, dynamic>{};
-          return BookingSuccessScreen(
-            orderId:
-                state.uri.queryParameters['orderId'] ??
-                data['orderId'] as String?,
-            orderCode: data['orderCode'] as String?,
-            paymentStatus: data['paymentStatus'] as String?,
-            checkoutUrl: data['checkoutUrl'] as String?,
-          );
-        },
-      ),
-      GoRoute(path: '/provider', builder: (_, __) => const ProviderShell()),
-      GoRoute(
-        path: '/provider/chat/order/:id',
-        builder: (_, state) =>
-            ChatByOrderScreen(orderId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/provider/orders/:id/tracking',
-        builder: (_, state) =>
-            OrderTrackingScreen(orderId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/provider/chat',
-        builder: (_, state) => const ConversationListScreen(),
-      ),
-      GoRoute(
-        path: '/provider/orders/:id',
-        builder: (_, state) =>
-            ProviderOrderDetailScreen(orderId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/provider/profile',
-        builder: (_, __) => const ProviderProfileScreen(),
-      ),
-      GoRoute(
-        path: '/provider/wallet',
-        builder: (_, __) => const ProviderWalletScreen(),
-      ),
-      GoRoute(
-        path: '/provider/banks',
-        builder: (_, __) => const ProviderBankAccountsScreen(),
-      ),
-      GoRoute(
-        path: '/provider/feedback',
-        builder: (_, __) => const ProviderFeedbackScreen(),
-      ),
-      GoRoute(
-        path: '/provider/notifications',
-        builder: (_, __) => const NotificationCenterScreen(),
-      ),
-      GoRoute(
-        path: '/provider/settings',
-        builder: (_, __) => const ProviderSettingsScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (_, __, navigationShell) =>
+            ProviderShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/provider',
+                builder: (context, _) => ProviderDashboardScreen(
+                  onOrders: () => context.go('/provider/orders'),
+                  onSchedule: () => context.go('/provider/schedule'),
+                ),
+              ),
+              GoRoute(
+                path: '/provider/chat/order/:id',
+                builder: (_, state) =>
+                    ChatByOrderScreen(orderId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: '/provider/chat',
+                builder: (_, state) => const ConversationListScreen(),
+              ),
+              GoRoute(
+                path: '/provider/notifications',
+                builder: (_, __) => const NotificationCenterScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/provider/orders',
+                builder: (_, __) => const ProviderOrdersScreen(),
+              ),
+              GoRoute(
+                path: '/provider/orders/:id/tracking',
+                builder: (_, state) =>
+                    OrderTrackingScreen(orderId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: '/provider/orders/:id',
+                builder: (_, state) => ProviderOrderDetailScreen(
+                  orderId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/provider/schedule',
+                builder: (_, __) => const ProviderScheduleScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/provider/account',
+                builder: (_, __) => const ProviderAccountScreen(),
+              ),
+              GoRoute(
+                path: '/provider/profile',
+                builder: (_, __) => const ProviderProfileScreen(),
+              ),
+              GoRoute(
+                path: '/provider/wallet',
+                builder: (_, __) => const ProviderWalletScreen(),
+              ),
+              GoRoute(
+                path: '/provider/banks',
+                builder: (_, __) => const ProviderBankAccountsScreen(),
+              ),
+              GoRoute(
+                path: '/provider/feedback',
+                builder: (_, __) => const ProviderFeedbackScreen(),
+              ),
+              GoRoute(
+                path: '/provider/settings',
+                builder: (_, __) => const ProviderSettingsScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
     ],
   );

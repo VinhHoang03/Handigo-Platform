@@ -1,4 +1,4 @@
-import mongoose, { ClientSession, Types } from "mongoose";
+import mongoose, { type ClientSession, Types } from "mongoose";
 import { withTransactionRetry } from "../utils/transaction";
 import { AppError } from "../utils/appError";
 import { Conversation } from "../models/conversation.model";
@@ -6,6 +6,8 @@ import { Message } from "../models/message.model";
 import { Order, type IOrder } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { Report } from "../models/report.model";
+import User from "../models/user.model";
+import { emitToConversation } from "../sockets/socketServer";
 import { assertFeatureAllowed } from "./penaltyPolicy.service";
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
@@ -23,6 +25,66 @@ interface SendMessagePayload {
 }
 
 const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress", "completed"];
+
+export const buildAssignmentWelcomeContent = (
+  providerName: string,
+  order: Pick<IOrder, "orderCode" | "createdAt" | "scheduledAt">,
+) => {
+  const format = (date: Date) => {
+    const parts = new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh", hourCycle: "h23",
+      hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric",
+    }).formatToParts(date);
+    const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+    return `${value("hour")}:${value("minute")} ngày ${value("day")}/${value("month")}/${value("year")}`;
+  };
+  const name = providerName.trim() || "thợ Handigo";
+  const greeting = `Chào bạn, tôi là ${name}, thợ đã nhận đơn ${order.orderCode} của bạn được đặt lúc ${format(order.createdAt)}.`;
+  return `${greeting} ${order.scheduledAt
+    ? `Tôi sẽ đến đúng lịch hẹn lúc ${format(order.scheduledAt)}.`
+    : "Tôi sẽ sớm đến địa chỉ thực hiện và liên hệ với bạn trước khi đến."} Hẹn gặp bạn!`;
+};
+
+// Lưu cùng giao dịch nhận đơn; mã assignment là khóa duy nhất cho lời chào này.
+export const createAssignmentWelcome = async (
+  order: IOrder,
+  providerId: Types.ObjectId,
+  providerUserId: string,
+  assignmentId: Types.ObjectId,
+  session: ClientSession,
+) => {
+  const existing = await Message.findById(assignmentId).session(session);
+  if (existing) return;
+  const user = await User.findById(providerUserId).select("fullName").session(session);
+  const previous = await Conversation.findOne({ orderId: order._id }).session(session);
+  const conversation = await Conversation.findOneAndUpdate(
+    { orderId: order._id },
+    {
+      $set: {
+        customerId: order.customerId, providerId,
+        ...(previous && previous.providerId.toString() !== providerId.toString()
+          ? { providerLastSeenAt: null } : {}),
+      },
+      $setOnInsert: { orderId: order._id },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true, session },
+  );
+  const content = buildAssignmentWelcomeContent(user?.fullName ?? "", order);
+  const [message] = await Message.create([{
+    _id: assignmentId, conversationId: conversation._id,
+    senderId: providerUserId, senderRole: "provider", messageType: "text", content,
+  }], { session });
+  conversation.lastMessage = {
+    messageId: message!._id as Types.ObjectId, senderId: new Types.ObjectId(providerUserId),
+    messageType: "text", content, sentAt: message!.createdAt,
+  };
+  await conversation.save({ session });
+};
+
+export const publishAssignmentWelcome = async (assignmentId: Types.ObjectId) => {
+  const message = await Message.findById(assignmentId).populate("senderId", "fullName avatar role");
+  if (message) emitToConversation(message.conversationId.toString(), "message:new", message);
+};
 
 const withConversationWrite = async <T>(
   conversationId: string,

@@ -5,6 +5,7 @@ import {
   PAYMENT_STATUS_LABELS,
   PAYMENT_TYPE_LABELS,
   RETRYABLE_REFUND_STATUSES,
+  REFUND_STATUS_LABELS,
   paymentDateTime,
   paymentMoney,
 } from "./payment-constants";
@@ -33,12 +34,12 @@ export function PaymentDetailModal({
         { label: "Số tiền", value: paymentMoney.format(payment.amount) },
         { label: "Phương thức", value: PAYMENT_METHOD_LABELS[payment.method] },
         { label: "Loại thanh toán", value: PAYMENT_TYPE_LABELS[payment.paymentType] },
-        { label: "Payment ID", value: payment._id },
-        { label: "Order ID", value: String(payment.orderId) },
-        { label: "Customer ID", value: String(payment.customerId) },
+        { label: "Mã thanh toán", value: payment._id },
+        { label: "Mã đơn dịch vụ", value: String(payment.orderId) },
+        { label: "Mã khách hàng", value: String(payment.customerId) },
         { label: "Mã giao dịch", value: orEmpty(payment.transactionCode) },
-        { label: "Gateway order code", value: orEmpty(payment.gatewayOrderCode) },
-        { label: "Gateway transaction ID", value: orEmpty(payment.gatewayTransactionId) },
+        { label: "Mã đơn tại cổng thanh toán", value: orEmpty(payment.gatewayOrderCode) },
+        { label: "Mã giao dịch tại cổng thanh toán", value: orEmpty(payment.gatewayTransactionId) },
         { label: "Tạo lúc", value: paymentDateTime.format(new Date(payment.createdAt)) },
         {
           label: "Thanh toán lúc",
@@ -73,7 +74,7 @@ export function PaymentDetailModal({
               <p className="font-bold">
                 Hoàn {refund.rate ?? 100}% · {paymentMoney.format(refund.amount ?? payment.amount)}
               </p>
-              <p className="mt-1">Trạng thái đối soát: {refund.status || "đang xử lý"}</p>
+              <p className="mt-1">Trạng thái đối soát: {refund.status ? REFUND_STATUS_LABELS[refund.status] : "Đang xử lý"}</p>
               {canRetryRefund && (
                 <button
                   type="button"

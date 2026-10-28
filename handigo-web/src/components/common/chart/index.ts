@@ -6,6 +6,10 @@
  * đội bundle của khách, và buộc màu series đi qua token M3 trong `chart-theme`.
  */
 export { ChartCard } from "./ChartCard";
+export { SelectableChartCard } from "./SelectableChartCard";
+export { ChartDataTable } from "./ChartDataTable";
+export { CategoryChartView, SeriesChartView } from "./ChartViews";
+export { categoryChartOptions, rankingChartOptions, trendChartOptions, revenueChartOptions } from "./chart-options";
 export { ChartA11yTable } from "./ChartA11yTable";
 export { DonutChart, type DonutSlice } from "./DonutChart";
 export { LineChart, type LineSeries } from "./LineChart";

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Navbar } from "@/components/common/Navbar";
 import { AnimatedBackground } from "@/components/home/AnimatedBackground";
@@ -8,6 +8,7 @@ import { ProviderTopbar } from "./ProviderTopbar";
 import { isNavItemActive } from "./dashboardNavigation";
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
 import "./provider-content.css";
+import "./admin-content.css";
 
 const normalizeRole = (role?: string | null): DashboardRole | undefined => {
   const value = role?.toUpperCase();
@@ -46,6 +47,7 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const currentRole = role ?? normalizeRole(user?.role);
   const isAdmin = currentRole === "ADMIN";
   const isProvider = currentRole === "PROVIDER";
@@ -69,6 +71,7 @@ export function DashboardLayout({
         />
       ) : (
         <Navbar
+          adminSidebar={isAdmin && hasSidebar ? (isSidebarCollapsed ? "collapsed" : "expanded") : undefined}
           role={currentRole}
           userAvatar={userAvatar}
           showStatusToggle={showStatusToggle}
@@ -84,15 +87,17 @@ export function DashboardLayout({
           switchLabel={switchLabel}
           onSwitch={onSwitch}
           switchVariant={switchVariant}
+          collapsed={isAdmin && isSidebarCollapsed}
+          onToggle={isAdmin ? () => setIsSidebarCollapsed((value) => !value) : undefined}
         />
       )}
 
       <main
         id="main-content"
-        className={`relative min-h-dvh pb-12 pt-32 ${hasSidebar ? "lg:pl-80 xl:pl-[21rem]" : ""}`}
+        className={`relative min-h-dvh pb-12 ${isAdmin ? "pt-28 lg:pt-[88px]" : "pt-32"} transition-[padding-left] duration-300 motion-reduce:transition-none ${hasSidebar ? (isAdmin ? (isSidebarCollapsed ? "lg:pl-20" : "lg:pl-72") : "lg:pl-80 xl:pl-[21rem]") : ""}`}
       >
         <div
-          className={`mx-auto px-4 sm:px-5 ${isProvider ? "provider-content space-y-5" : "space-y-8"} ${
+          className={`mx-auto px-4 sm:px-5 ${isProvider ? "provider-content space-y-5" : isAdmin ? "admin-content space-y-4" : "space-y-8"} ${
             isAdmin
               ? "max-w-none lg:px-5 xl:px-6"
               : isProvider

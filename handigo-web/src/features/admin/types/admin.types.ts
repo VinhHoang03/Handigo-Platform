@@ -55,8 +55,8 @@ export interface ApplicationCertificate {
 }
 export interface AdminApplication {
   _id: string; userId: ApplicationUser | null; description: string; experienceYears: number;
+  serviceIds: ServiceRef[];
   applicationType: 'initial' | 'service_addition';
-  serviceIds: ServiceRef[]; workingAreas: string[];
   identityDocument?: ApplicationIdentityDocument;
   certificates?: ApplicationCertificate[];
   status: 'pending' | 'resubmitted' | 'approved' | 'rejected';
@@ -79,7 +79,7 @@ export interface AdminApplication {
   updatedAt: string;
 }
 export interface ListResult<T> { items: T[]; pagination: Pagination }
-export interface AdminQuery { page?: number; limit?: number; keyword?: string; role?: string; status?: string; categoryId?: string; applicationType?: string }
+export interface AdminQuery { page?: number; limit?: number; keyword?: string; role?: string; status?: string; categoryId?: string; applicationType?: string; fromDate?: string; toDate?: string }
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
 export interface AdminWithdrawalUser { _id: string; fullName: string; email: string; phone?: string }
 export interface AdminWithdrawalBankAccount {

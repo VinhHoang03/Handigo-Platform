@@ -30,7 +30,7 @@ function SummaryCard({
 
 export function SupportSummaryCards({ summary }: { summary: SupportSummary }) {
   const cards = [
-    { icon: Inbox, label: "Đang tồn", value: summary.active, description: "Ticket cần tiếp tục xử lý" },
+    { icon: Inbox, label: "Đang tồn", value: summary.active, description: "Yêu cầu hỗ trợ cần tiếp tục xử lý" },
     { icon: AlertCircle, label: "Khẩn cấp", value: summary.urgentActive, description: "Ưu tiên xử lý ngay" },
     { icon: UserX, label: "Chưa phân công", value: summary.unassignedActive, description: "Chưa có người phụ trách" },
     { icon: CircleCheckBig, label: "Hoàn tất hôm nay", value: summary.resolvedToday, description: "Đã xử lý hoặc đóng" },

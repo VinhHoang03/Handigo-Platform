@@ -77,6 +77,6 @@ function CalendarJson({ value, onChange }: { value: typeof defaultBookingPolicy.
   return <textarea aria-label="Ca và ngày nghỉ riêng của thợ" rows={8} className={inputClass} value={text} onChange={(event) => {
     setText(event.target.value);
     try { const parsed = JSON.parse(event.target.value); event.target.setCustomValidity(''); onChange(parsed); }
-    catch { event.target.setCustomValidity('Vui lòng nhập JSON hợp lệ.'); }
+    catch { event.target.setCustomValidity('Vui lòng nhập dữ liệu đúng định dạng JSON.'); }
   }} />;
 }

@@ -28,10 +28,10 @@ export function useRegisterProviderFormSync({
   user?: User | null;
   navigate: NavigateFunction;
   providerApplication: ReturnType<typeof useProviderApplication>;
-  step: 1 | 2 | 3;
+  step: 1 | 2;
   form: ProviderApplicationPayload;
   setForm: Dispatch<SetStateAction<ProviderApplicationPayload>>;
-  setStep: Dispatch<SetStateAction<1 | 2 | 3>>;
+  setStep: Dispatch<SetStateAction<1 | 2>>;
 }) {
   const [hydratedSource, setHydratedSource] = useState<{
     key: string;
@@ -61,7 +61,7 @@ export function useRegisterProviderFormSync({
       const draft = editable ? readProviderApplicationDraft(draftKey, sourceVersion) : null;
       setForm(draft || (loadedApplication ? applicationToForm(loadedApplication) : initialProviderApplicationForm));
       if (draft?.onboardingStep && [1, 2, 3].includes(draft.onboardingStep)) {
-        setStep(draft.onboardingStep);
+        setStep(Math.min(draft.onboardingStep, 2) as 1 | 2);
       }
       setHydratedSource({ key: draftKey, application: loadedApplication });
     }, 0);

@@ -27,7 +27,8 @@ export interface IProviderApplication extends Document, IBaseDocument {
   description: string;
   experienceYears: number;
   serviceIds: Types.ObjectId[];
-  workingAreas: string[];
+  /** Dữ liệu cũ đã ngừng sử dụng, không nạp vào hồ sơ. */
+  workingAreas?: string[];
   identityDocument?: IIdentityDocument;
   certificates: IProviderCertificate[];
   status: ProviderApplicationStatus;
@@ -140,7 +141,7 @@ const ProviderApplicationSchema = new Schema<IProviderApplication>(
     description: { type: String, default: "" },
     experienceYears: { type: Number, required: true, min: 0, default: 0 },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: "Service" }],
-    workingAreas: { type: [String], default: [] },
+    workingAreas: { type: [String], default: undefined, select: false },
     identityDocument: { type: IdentityDocumentSchema, default: undefined },
     certificates: { type: [ProviderCertificateSchema], default: [] },
     status: {

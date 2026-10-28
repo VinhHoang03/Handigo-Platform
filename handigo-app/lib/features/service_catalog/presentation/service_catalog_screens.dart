@@ -1,3 +1,4 @@
+import '../../../shared/widgets/booking_details_summary.dart';
 import '../../../shared/widgets/app_search_field.dart';
 import '../../../shared/widgets/service_images.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +24,6 @@ import '../../../core/network/api_exception.dart';
 import '../domain/service_detail.dart';
 import '../domain/automatic_promotion.dart';
 import 'service_catalog_provider.dart';
-import 'service_reviews_screen.dart';
 import 'service_option_selector.dart';
 import 'booking_schedule_selector.dart';
 import 'booking_note_input.dart';
@@ -70,6 +70,7 @@ class _ServiceCatalogScreenState extends ConsumerState<ServiceCatalogScreen> {
     var categoryId = _categoryId;
     var sort = _sort;
     final applied = await showModalBottomSheet<bool>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -175,7 +176,7 @@ class _ServiceCatalogScreenState extends ConsumerState<ServiceCatalogScreen> {
               'Handigo',
               style: theme.textTheme.titleLarge?.copyWith(
                 color: scheme.primary,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -271,7 +272,7 @@ class _ServiceCatalogScreenState extends ConsumerState<ServiceCatalogScreen> {
                             child: Text(
                               'Tất cả dịch vụ',
                               style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -402,7 +403,7 @@ class _CatalogPromotionBanner extends StatelessWidget {
                         voucher.name,
                         style: theme.textTheme.titleLarge?.copyWith(
                           color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           height: 1.15,
                         ),
                       ),
@@ -443,7 +444,7 @@ class _CatalogPromotionBanner extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: Colors.white,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -642,7 +643,7 @@ class _ServiceListTile extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 4),
@@ -674,7 +675,7 @@ class _ServiceListTile extends StatelessWidget {
                             : '${NumberFormat.decimalPattern('vi').format(price)}đ',
                         style: theme.textTheme.titleLarge?.copyWith(
                           color: scheme.primary,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -760,7 +761,7 @@ class _ServiceDetailContent extends ConsumerWidget {
     final service = detail.service;
     final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.only(bottom: 112),
+      padding: const EdgeInsets.only(bottom: 16),
       children: [
         ServiceImageGallery(
           key: ValueKey(
@@ -784,7 +785,7 @@ class _ServiceDetailContent extends ConsumerWidget {
                   service.categoryName!,
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: theme.colorScheme.secondary,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               const SizedBox(height: 8),
@@ -793,7 +794,7 @@ class _ServiceDetailContent extends ConsumerWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 8),
@@ -801,13 +802,6 @@ class _ServiceDetailContent extends ConsumerWidget {
                 spacing: 14,
                 runSpacing: 6,
                 children: [
-                  _ServiceStat(
-                    icon: Icons.star_rounded,
-                    color: AppTheme.starGold,
-                    label: service.totalFeedbacks > 0
-                        ? '${service.averageRating.toStringAsFixed(1)} (${service.totalFeedbacks} đánh giá)'
-                        : 'Chưa có đánh giá',
-                  ),
                   _ServiceStat(
                     icon: Icons.check_circle_outline,
                     color: theme.colorScheme.primary,
@@ -833,7 +827,7 @@ class _ServiceDetailContent extends ConsumerWidget {
                 Text(
                   'Quy trình thực hiện',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -847,10 +841,6 @@ class _ServiceDetailContent extends ConsumerWidget {
               ],
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-          child: ServiceReviewPreview(serviceId: service.id),
-        ),
       ],
     );
   }
@@ -901,7 +891,7 @@ class _ServiceHighlights extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -936,7 +926,7 @@ class _ServiceStat extends StatelessWidget {
           label,
           style: Theme.of(
             context,
-          ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
     ],
@@ -950,6 +940,7 @@ void _openBooking(BuildContext context, WidgetRef ref, ServiceDetail detail) {
     controller.startService(detail.service.id);
   }
   showModalBottomSheet<void>(
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     constraints: BoxConstraints.tightFor(
@@ -1000,7 +991,7 @@ class _StickyBookingBar extends StatelessWidget {
                   priceLabel.replaceFirst(RegExp(r'^Từ\s+'), ''),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: scheme.primary,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -1018,7 +1009,7 @@ class _StickyBookingBar extends StatelessWidget {
                 foregroundColor: scheme.onPrimary,
                 textStyle: Theme.of(
                   context,
-                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             );
             if (MediaQuery.textScalerOf(context).scale(14) > 20) {
@@ -1072,8 +1063,8 @@ class _ProcessStep extends StatelessWidget {
                 '$number',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -1102,7 +1093,7 @@ class _ProcessStep extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1154,6 +1145,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   int _step = 0;
   bool _busy = false;
   BookingPreview? _preview;
+  DateTime? _reviewedAt;
+  String? _reviewProviderName;
   List<Address> _addresses = const [];
   final _descriptionController = TextEditingController();
   final _voucherController = TextEditingController();
@@ -1293,6 +1286,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     detail: widget.detail,
                     draft: draft,
                     preview: _preview,
+                    address: _addresses
+                        .where((item) => item.id == draft.addressId)
+                        .firstOrNull,
+                    reviewedAt: _reviewedAt,
+                    providerName: _reviewProviderName,
+                    quantity: _uniformQuantity ? draft.uniformQuantity : 1,
                   ),
                 if (_addresses.isEmpty && _step == 0)
                   OutlinedButton(
@@ -1332,35 +1331,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     OutlinedButton(
                       onPressed: _reloadPolicies,
                       child: const Text('Tải lại chính sách đặt dịch vụ'),
-                    )
-                  else
-                    BookingPolicyPanel(policies: _policies!),
-                  CheckboxListTile(
-                    value: _policyAccepted,
-                    onChanged: _policies == null
-                        ? null
-                        : (value) =>
-                              setState(() => _policyAccepted = value == true),
-                    title: const Text(
-                      'Tôi đã đọc và đồng ý với chính sách Handigo',
                     ),
+                  BookingPolicyConsent(
+                    accepted: _policyAccepted,
+                    policies: _policies,
+                    onChanged: (value) =>
+                        setState(() => _policyAccepted = value),
                   ),
-                  for (final address in _addresses.where(
-                    (item) => item.id == draft.addressId,
-                  ))
-                    ListTile(
-                      title: Text(
-                        '${address.recipientName} · ${address.recipientPhone}',
-                      ),
-                      subtitle: Text(address.displayAddress),
-                    ),
-                  for (final option in widget.detail.options.where(
-                    (item) => draft.selectedOptionIds.contains(item.id),
-                  ))
-                    ListTile(
-                      title: Text(option.name),
-                      trailing: Text('× ${draft.quantities[option.id] ?? 1}'),
-                    ),
                 ],
               ],
             ),
@@ -1476,6 +1453,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       if (mounted)
         setState(() {
           _preview = preview;
+          _reviewedAt = DateTime.now();
+          _reviewProviderName = draft.preferredProviderId == null
+              ? null
+              : providers
+                    .where(
+                      (item) =>
+                          bookingProviderId(item) == draft.preferredProviderId,
+                    )
+                    .map(bookingProviderName)
+                    .firstOrNull;
           _step = 1;
         });
     } catch (error) {
@@ -1607,6 +1594,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   Future<void> _addAddress() async {
     final result = await showModalBottomSheet<Map<String, String>>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -1701,7 +1689,7 @@ class _BookingForm extends ConsumerWidget {
               child: Text(
                 'Địa chỉ làm việc',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -1713,21 +1701,23 @@ class _BookingForm extends ConsumerWidget {
           onAddAddress: onAddAddress,
         ),
         const SizedBox(height: 12),
-        if (detail.options.isNotEmpty) ...[
-          Text('Chọn gói dịch vụ', style: theme.textTheme.titleMedium),
-          ServiceOptionSelector(detail: detail),
-          const SizedBox(height: 16),
-        ],
+        const BookingProviderSelector(),
+        const SizedBox(height: 16),
         Text(
           'Thời gian thực hiện',
           style: theme.textTheme.titleMedium?.copyWith(
             color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 6),
         const BookingScheduleButton(),
         const SizedBox(height: 12),
+        if (detail.options.isNotEmpty) ...[
+          Text('Chọn gói dịch vụ', style: theme.textTheme.titleMedium),
+          ServiceOptionSelector(detail: detail),
+          const SizedBox(height: 16),
+        ],
         const Divider(height: 1),
         const SizedBox(height: 16),
         _SectionLabel(
@@ -1739,7 +1729,6 @@ class _BookingForm extends ConsumerWidget {
           onUploadingChanged: onUploadingChanged,
         ),
         const SizedBox(height: 16),
-        const BookingProviderSelector(),
         const SizedBox(height: 8),
         BookingVoucherSelector(
           controller: voucherController,
@@ -1788,7 +1777,7 @@ class _BookingForm extends ConsumerWidget {
                               Text(
                                 _paymentLabel(method),
                                 style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                               const SizedBox(height: 3),
@@ -1827,10 +1816,18 @@ class _BookingReview extends StatelessWidget {
     required this.detail,
     required this.draft,
     required this.preview,
+    required this.address,
+    required this.reviewedAt,
+    required this.providerName,
+    required this.quantity,
   });
   final ServiceDetail detail;
   final BookingDraft draft;
   final BookingPreview? preview;
+  final Address? address;
+  final DateTime? reviewedAt;
+  final String? providerName;
+  final int quantity;
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1840,7 +1837,7 @@ class _BookingReview extends StatelessWidget {
           leading: const Icon(Icons.home_repair_service_outlined),
           title: Text(
             detail.service.name,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           subtitle: Text(
             '${_bookingTypeLabel(draft.type)} · ${_paymentLabel(draft.paymentMethod)}',
@@ -1848,20 +1845,34 @@ class _BookingReview extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 12),
-      if (draft.scheduledAt != null)
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.calendar_month_outlined),
-            title: const Text('Lịch hẹn'),
-            subtitle: Text(_date(draft.scheduledAt!)),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: BookingDetailsSummary(
+            address: address?.displayAddress ?? 'Chưa có thông tin địa chỉ',
+            contact: address == null
+                ? null
+                : '${address!.recipientName} · ${address!.recipientPhone}',
+            scheduledAt: draft.scheduledAt,
+            placedAt: reviewedAt,
+            isPreview: true,
+            providerName: providerName,
+            options: [
+              for (final option in detail.options.where(
+                (item) => draft.selectedOptionIds.contains(item.id),
+              ))
+                (name: option.name, quantity: draft.quantities[option.id] ?? 1),
+            ],
+            quantity: draft.selectedOptionIds.isEmpty ? quantity : null,
           ),
         ),
+      ),
       const SizedBox(height: 8),
       Text(
         'Chi tiết thanh toán',
         style: Theme.of(
           context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
       ),
       if (preview != null)
         Card(
@@ -1890,7 +1901,7 @@ class _BookingReview extends StatelessWidget {
                       'Voucher đã chọn: ${draft.voucherCode}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -1960,11 +1971,13 @@ class _SectionLabel extends StatelessWidget {
       children: [
         Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     ),
@@ -1994,10 +2007,13 @@ class _StepIndicator extends StatelessWidget {
                 : Text('${index + 1}'),
           ),
           const SizedBox(width: 8),
-          Text(
-            labels[index],
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: index == step ? FontWeight.w800 : FontWeight.w500,
+          Flexible(
+            flex: index == 0 ? 3 : 2,
+            child: Text(
+              labels[index],
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: index == step ? FontWeight.w600 : FontWeight.w500,
+              ),
             ),
           ),
           if (index < labels.length - 1)
@@ -2033,20 +2049,26 @@ class _PriceRow extends StatelessWidget {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: emphasized
-              ? const TextStyle(fontWeight: FontWeight.bold)
-              : null,
+        Expanded(
+          child: Text(
+            label,
+            style: emphasized
+                ? const TextStyle(fontWeight: FontWeight.w600)
+                : null,
+          ),
         ),
-        Text(
-          _money(value),
-          style: emphasized
-              ? TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
-                )
-              : null,
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            _money(value),
+            textAlign: TextAlign.right,
+            style: emphasized
+                ? TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  )
+                : null,
+          ),
         ),
       ],
     ),
@@ -2060,8 +2082,6 @@ String _priceLabel(Service service) {
   return price == null ? 'Liên hệ để biết giá' : 'Từ ${_money(price)}';
 }
 
-String _date(DateTime value) =>
-    '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 String _paymentLabel(PaymentMethod value) => switch (value) {
   PaymentMethod.wallet => 'Ví Handigo',
   PaymentMethod.bank => 'Chuyển khoản/PayOS',

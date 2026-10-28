@@ -97,6 +97,12 @@ function model(collection) {
       if (!row) return null;
       apply(row, update); return document(row, collection, options.session);
     }),
+    updateOne: async (filter, update, options) => {
+      assert.ok(options.session); assert.equal(options.runValidators, true);
+      const row = view(options.session)[collection].find(item => matches(item, filter));
+      if (!row) return { matchedCount: 0 };
+      apply(row, update); return { matchedCount: 1 };
+    },
     create: async (rows, { session }) => {
       assert.ok(session);
       if (collection === 'complaints') await pause('create');
@@ -130,6 +136,9 @@ const modules = {
   '../models/provider.model': { Provider: { findOne: () => query(() => ({ _id: providerId, userId: providerUser })) } },
   '../models/orderStatus.model': { OrderStatus: { findOne: () => query(() => ({ createdAt: new Date() })) } },
   '../models/report.model': {},
+  '../models/user.model': {},
+  '../sockets/socketServer': { emitToConversation: () => {} },
+  './penaltyPolicy.service': { assertFeatureAllowed: async () => {} },
 };
 const complaints = load('../services/complaint.service', modules);
 const chat = load('../services/chat.service', modules);

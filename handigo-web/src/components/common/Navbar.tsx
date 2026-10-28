@@ -16,6 +16,7 @@ import type { AppRole, NavbarItem } from "./navbar/navbar.types";
 export type { AppRole };
 
 interface NavbarProps {
+  adminSidebar?: "expanded" | "collapsed";
   role?: AppRole;
   isScrolled?: boolean;
   userAvatar?: string | null;
@@ -25,6 +26,7 @@ interface NavbarProps {
 }
 
 export function Navbar({
+  adminSidebar,
   role,
   isScrolled,
   userAvatar,
@@ -97,7 +99,7 @@ export function Navbar({
     <nav
       className={`fixed left-1/2 z-[70] w-[calc(100%-32px)] max-w-7xl -translate-x-1/2 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest/85 px-4 py-3 text-primary shadow-sm backdrop-blur-xl transition-all duration-300 sm:px-6 ${
         scrolled ? "top-2 shadow-xl" : "top-4"
-      }`}
+      } ${adminSidebar ? `lg:top-0 lg:right-0 lg:w-auto lg:max-w-none lg:translate-x-0 lg:rounded-none ${adminSidebar === "collapsed" ? "lg:left-20" : "lg:left-72"}` : ""} motion-reduce:transition-none`}
     >
       <div className="relative flex items-center justify-between gap-3">
         <BrandLogo compact to="/" />

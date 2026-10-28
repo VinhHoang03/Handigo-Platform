@@ -1,6 +1,6 @@
 import type { DataTableColumn } from "@/components/common/dashboard/DataTable";
 import type { CaseRow } from "./case-detail.types";
-import { CASE_STATUS_LABELS } from "./case-status.constants";
+import { CASE_STATUS_LABELS, VIOLATION_SOURCE_LABELS } from "./case-status.constants";
 import { CaseTitle } from "@/features/case-management/components/CaseTitle";
 
 export const caseDateTime = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
@@ -27,7 +27,7 @@ export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
     className: "min-w-[200px] whitespace-normal break-words text-sm",
     render: (item) =>
       "violationType" in item
-        ? item.sourceType
+        ? VIOLATION_SOURCE_LABELS[item.sourceType]
         : "complainantId" in item
           ? item.complainantId.fullName
           : item.reporterId.fullName,

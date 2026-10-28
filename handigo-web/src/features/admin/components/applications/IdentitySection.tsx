@@ -5,6 +5,14 @@ import { documentTypeLabel, formatDate } from "./application-detail.utils";
 const genderLabel = (gender?: ApplicationIdentityDocument["gender"]) =>
   gender === "male" ? "Nam" : gender === "female" ? "Nữ" : gender === "other" ? "Khác" : "Chưa cập nhật";
 
+const verificationLabels: Record<NonNullable<ApplicationIdentityDocument["provider"]>, string> = {
+  manual: "Thủ công",
+  fpt: "FPT",
+  vnpt: "VNPT",
+  viettel: "Viettel",
+  didit: "Didit",
+};
+
 export function IdentitySection({ identity }: { identity?: ApplicationIdentityDocument }) {
   if (!identity) {
     return (
@@ -28,7 +36,7 @@ export function IdentitySection({ identity }: { identity?: ApplicationIdentityDo
         <p><b>Số giấy tờ:</b> {identity.documentNumber || "Chưa cập nhật"}</p>
         <p><b>Họ tên:</b> {identity.fullName || "Chưa cập nhật"}</p>
         <p><b>Nơi cấp:</b> {identity.issuedPlace || "Chưa cập nhật"}</p>
-        <p><b>Nguồn xác thực:</b> {identity.provider || "manual"}</p>
+        <p><b>Nguồn xác thực:</b> {verificationLabels[identity.provider || "manual"]}</p>
         <p><b>Ngày cấp:</b> {formatDate(identity.issuedAt)}</p>
         <p><b>Ngày hết hạn:</b> {formatDate(identity.expiresAt)}</p>
         <p><b>Ngày sinh:</b> {formatDate(identity.dateOfBirth)}</p>

@@ -1,12 +1,28 @@
 import { NextFunction, Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import * as dashboardService from "../services/dashboard.service";
+import * as adminDashboardService from "../services/adminDashboard.service";
+import { adminDashboardQuerySchema } from "../validations/adminDashboard.validator";
 import { AppError } from "../utils/appError";
 import {
   dashboardQuerySchema,
   providerAvailabilitySchema,
   providerDashboardQuerySchema,
 } from "../validations/dashboard.validator";
+
+export const getAdminInsights = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await adminDashboardService.getAdminInsights(adminDashboardQuerySchema.parse(req.query));
+    return res.json({ success: true, data, message: "Đã tải thông tin vận hành quản trị" });
+  } catch (error) { return next(error); }
+};
+
+export const getAdminUserPresence = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await adminDashboardService.getAdminUserPresence();
+    return res.json({ success: true, data, message: "Đã tải thống kê người dùng" });
+  } catch (error) { return next(error); }
+};
 
 export const getAdminOverview = async (req: Request, res: Response, next: NextFunction) => {
   try {

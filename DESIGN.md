@@ -43,13 +43,15 @@ Màu trạng thái không thay cho nhãn. Chữ nhỏ trên nền Surface dùng 
 
 | Cấp | Cỡ/độ đậm Nova | Áp dụng |
 | --- | --- | --- |
-| Large Title | 28 / Bold | Tiêu đề màn gốc |
+| Large Title | 28 / ExtraBold (800) | Tiêu đề màn gốc |
 | Title | 22 / SemiBold | Tiêu đề màn chi tiết/nhóm chính |
 | Body | 16 / Regular | Nội dung, trường nhập, thông tin cần quyết định |
 | Caption | 13 / Regular | Metadata, thời gian, giải thích ngắn |
 | Small | 11 / Medium | Metadata ít quan trọng; không dùng cho giá phải trả, hạn phản hồi hoặc lỗi cần xử lý |
 
 iOS dùng font hệ thống San Francisco; Android dùng Roboto. Line height 1.4–1.6; tránh hơn ba độ đậm trên một màn. Không thu nhỏ chữ để nhét địa chỉ, phí hoặc nút. Cho phép tăng cỡ chữ theo hệ thống; chiều cao component phải nở theo nội dung. Nội dung dự án và nhãn UI dùng tiếng Việt có dấu.
+
+Ánh xạ Flutter: `headlineLarge` dành cho tiêu đề màn gốc (28/800); `titleLarge` và `headlineSmall` dành cho tiêu đề màn chi tiết, modal và nhóm chính (22/600). `bodyLarge`/`bodyMedium` là nội dung và input (16/400); `bodySmall`/`labelMedium` là chú thích (13/400); `labelSmall` là thông tin phụ (11/500). Tên trong hàng danh sách, nhãn nút và thông tin cần nhấn mạnh có thể dùng 16/600 qua `titleMedium`/`titleSmall`/`labelLarge`, không dùng 800–900 thay cho phân cấp nội dung. Chiều cao dòng mặc định là 1.5; tiêu đề dài được xuống dòng, không co font để nhét.
 
 ### Khoảng cách, bố cục và bán kính
 

@@ -13,7 +13,7 @@ class ServiceReview {
     final customer = json['customer'] as Map<String, dynamic>? ?? {};
     return ServiceReview(
       id: json['_id'] as String,
-      rating: (json['rating'] as num).toInt(),
+      rating: (json['rating'] as num).toDouble(),
       customerName: customer['fullName'] as String? ?? 'Khách hàng',
       avatar: customer['avatar'] as String?,
       comment: json['comment'] as String? ?? '',
@@ -30,7 +30,7 @@ class ServiceReview {
   }
   final String id, customerName, comment;
   final String? avatar;
-  final int rating;
+  final double rating;
   final DateTime? createdAt;
   final List<String> images, optionNames;
 }

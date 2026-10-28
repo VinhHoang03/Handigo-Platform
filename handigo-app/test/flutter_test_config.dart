@@ -20,6 +20,15 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
       '${directory.path}/material_fonts/MaterialIcons-Regular.otf',
     );
     if (icons.existsSync()) {
+      final font = File(
+        '${directory.path}/material_fonts/roboto-regular.ttf',
+      );
+      if (font.existsSync()) {
+        await (FontLoader('Roboto')..addFont(
+              Future.value(ByteData.sublistView(font.readAsBytesSync())),
+            ))
+            .load();
+      }
       await (FontLoader('MaterialIcons')..addFont(
             Future.value(ByteData.sublistView(icons.readAsBytesSync())),
           ))

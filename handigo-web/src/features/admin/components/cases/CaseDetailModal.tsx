@@ -1,7 +1,7 @@
 import { Modal } from "@/components/common/Modal";
 import { caseDateTime } from "./case-table-columns";
 import type { SelectedAdminCase } from "./case-detail.types";
-import { CASE_STATUS_LABELS } from "./case-status.constants";
+import { CASE_STATUS_LABELS, PENALTY_LABELS, VIOLATION_SEVERITY_LABELS } from "./case-status.constants";
 import { NoShowReviewDetails } from "./NoShowReviewDetails";
 import { NoShowVerificationSummary } from "./NoShowVerificationSummary";
 import { getNoShowUserDescription } from "./no-show-review.utils";
@@ -160,8 +160,8 @@ export function CaseDetailModal({
             )}
             {selected.kind === "violation" && (
               <section className="rounded-2xl border border-outline-variant p-4 text-sm">
-                <p><b>Mức độ:</b> {selected.item.severity}</p>
-                <p className="mt-2"><b>Hình phạt:</b> {selected.item.penaltyType}</p>
+                <p><b>Mức độ:</b> {VIOLATION_SEVERITY_LABELS[selected.item.severity]}</p>
+                <p className="mt-2"><b>Hình phạt:</b> {PENALTY_LABELS[selected.item.penaltyType]}</p>
                 {selected.item.penalty?.durationDays && <p className="mt-2"><b>Thời hạn:</b> {selected.item.penalty.durationDays} ngày</p>}
                 {selected.item.endAt && <p className="mt-2"><b>Kết thúc:</b> {caseDateTime.format(new Date(selected.item.endAt))}</p>}
               </section>

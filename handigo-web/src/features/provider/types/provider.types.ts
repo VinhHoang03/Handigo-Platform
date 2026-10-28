@@ -62,10 +62,6 @@ export interface ProviderAssetUpload {
   ocrSuggestion?: ProviderOcrSuggestion;
 }
 
-export interface ProviderServiceArea {
-  province?: string;
-  ward?: string;
-}
 
 export interface ProviderServiceRef {
   id: string;
@@ -152,8 +148,6 @@ export interface UpdateProviderProfilePayload {
   description?: string;
   bio?: string;
   mainServiceText?: string;
-  serviceArea?: ProviderServiceArea;
-  workingAreas?: string[];
 }
 
 export interface ProviderProfileResponse {
@@ -180,8 +174,6 @@ export interface ProviderProfileResponse {
     verified: boolean;
     serviceIds: string[];
     services?: ProviderServiceRef[];
-    workingAreas: string[];
-    serviceArea?: ProviderServiceArea;
     averageRating: number;
     totalFeedbacks: number;
     totalCompletedOrders: number;
@@ -234,11 +226,6 @@ export interface VerificationItem {
   statusTone: 'approved' | 'pending' | 'rejected';
 }
 
-export interface ServiceArea {
-  province?: string;
-  ward?: string;
-  workingAreas?: string[];
-}
 
 export interface BankAccount {
   shortName: string;
