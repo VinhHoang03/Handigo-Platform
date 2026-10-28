@@ -3,6 +3,8 @@ import * as locationController from "../controllers/location.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validate.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
+import { geocodeAddressSchema } from "../validations/address.validator";
+import { routingRateLimit } from "../middlewares/rateLimit.middleware";
 import {
   currentLocationSchema,
   reverseGeocodeQuerySchema,
@@ -11,6 +13,7 @@ import {
 const router = Router();
 
 router.use(authMiddleware);
+router.post("/geocode", routingRateLimit, validate(geocodeAddressSchema), locationController.geocodeAddress);
 router.get(
   "/reverse-geocode",
   validate(reverseGeocodeQuerySchema, "query"),

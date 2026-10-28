@@ -16,6 +16,7 @@ interface AddressBookFormFieldsProps {
   isLocating: boolean;
   isResolvingMapAddress: boolean;
   isSaving?: boolean;
+  showLocationPicker?: boolean;
   onInputChange: (field: keyof AddressFormState, value: string | boolean) => void;
   onProvinceChange: (option: SearchableSelectOption | null) => void;
   onWardChange: (option: SearchableSelectOption | null) => void;
@@ -32,6 +33,7 @@ export function AddressBookFormFields({
   isLocating,
   isResolvingMapAddress,
   isSaving,
+  showLocationPicker = true,
   onInputChange,
   onProvinceChange,
   onWardChange,
@@ -109,7 +111,8 @@ export function AddressBookFormFields({
         />
       </label>
 
-      <div className="order-7 space-y-3 md:col-span-2">
+      {showLocationPicker && <div className="order-7 space-y-3 md:col-span-2">
+        <p className="text-sm text-on-surface-variant">Nhập địa chỉ, sau đó kiểm tra và xác nhận vị trí ghim trên bản đồ.</p>
         <button
           type="button"
           disabled={isLocating || isResolvingMapAddress || isSaving}
@@ -135,7 +138,7 @@ export function AddressBookFormFields({
           isResolvingAddress={isResolvingMapAddress}
           onPositionChange={onPositionChange}
         />
-      </div>
+      </div>}
 
       <FloatingTextarea
         id="address-note"

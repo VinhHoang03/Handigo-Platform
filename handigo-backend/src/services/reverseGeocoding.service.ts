@@ -72,6 +72,7 @@ export interface AddressSearchCandidate {
   longitude: number;
   placeId?: string;
   matchLevel?: string;
+  matchCode?: string;
   category?: string;
 }
 const searchCache = new Map<string, CacheEntry<AddressSearchCandidate[]>>();
@@ -376,7 +377,7 @@ export const searchAddressLocations = async (query: string): Promise<AddressSear
     try {
       const response = await axios.get<Array<LocationIqResponse & {
         lat?: string; lon?: string; class?: string;
-        matchquality?: { matchlevel?: string };
+        matchquality?: { matchlevel?: string; matchcode?: string };
       }>>("https://us1.locationiq.com/v1/search", {
         params: { key: getLocationIqApiKey(), q: query, format: "json", countrycodes: "vn",
           addressdetails: 1, matchquality: 1, limit: 5, "accept-language": "vi" },
@@ -398,7 +399,7 @@ export const searchAddressLocations = async (query: string): Promise<AddressSear
           latitude, longitude,
           placeId: item.osm_type && item.osm_id ? `osm:${item.osm_type}:${item.osm_id}`
             : item.place_id ? `locationiq:${item.place_id}` : undefined,
-          matchLevel: item.matchquality?.matchlevel, category: item.class,
+          matchLevel: item.matchquality?.matchlevel, matchCode: item.matchquality?.matchcode, category: item.class,
         }];
       });
       if (candidates.length) {

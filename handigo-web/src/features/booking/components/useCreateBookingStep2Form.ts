@@ -28,6 +28,7 @@ export const useCreateBookingStep2Form = () => {
     orderType, setOrderType,
     scheduledAt, setScheduledAt, isScheduleAutomatic, problemDescription, setProblemDescription,
     customerAttachments, setCustomerAttachments,
+    rebookSource,
   } = useBookingStore();
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useToastFeedback<string | null>(null, "error");
@@ -81,6 +82,7 @@ export const useCreateBookingStep2Form = () => {
 
   useEffect(() => {
     if (scheduleInitialized.current || orderType !== 'scheduled') return;
+    if (rebookSource && !scheduledAt) return;
     scheduleInitialized.current = true;
     if (scheduledAt && !isScheduleAutomatic) return;
     const initialScheduledAt = getInitialScheduledAt(scheduledAt);
@@ -88,7 +90,7 @@ export const useCreateBookingStep2Form = () => {
       setScheduledAt(initialScheduledAt, true);
       setPreferredProviderId(undefined);
     }
-  }, [orderType, scheduledAt, isScheduleAutomatic, setScheduledAt, setPreferredProviderId]);
+  }, [orderType, scheduledAt, isScheduleAutomatic, setScheduledAt, setPreferredProviderId, rebookSource]);
 
   const handleUploadImages = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -204,6 +206,9 @@ export const useCreateBookingStep2Form = () => {
           : 'Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.';
     }
 
+    if (rebookSource && requestedProviderId && preferredProviderId !== requestedProviderId) {
+      nextErrors.preferredProviderId = 'Thợ cũ chưa khả dụng với lựa chọn hiện tại. Vui lòng chọn thợ khác hoặc chọn Handigo tự điều phối.';
+    }
     setFormErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };

@@ -1,5 +1,5 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import type { UserAddress, UserAddressPayload } from "@/features/profile/types/profile.types";
 import { getErrorMessage } from "@/utils/apiError";
 import {
@@ -37,15 +37,16 @@ export function useAddressBookForm({
     toAddressForm(address, addressCount, defaultRecipient),
   );
   const [addressFormError, setAddressFormError] = useToastFeedback<string>("", "error");
+  const [step, setStep] = useState<'details' | 'location'>('details');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const saving = useRef(false);
 
   const {
-    provinces,
     provinceOptions,
     wardOptions,
     isProvinceLoading,
     isWardLoading,
     administrativeError,
-    setProvinces,
     setWards,
   } = useAddressAdministrativeUnits({
     open,
@@ -63,13 +64,15 @@ export function useAddressBookForm({
     isResolvingMapAddress,
     handleUseCurrentLocation: startCurrentLocationLookup,
     updateAddressFromCoordinate,
-    setLocationHint,
-  } = useAddressGeocoding({ provinces, setProvinces, setWards, setAddressForm });
+    findAddressCoordinates,
+    cancelLookup,
+  } = useAddressGeocoding({ setAddressForm });
 
   const handleAddressInputChange = (
     field: keyof AddressFormState,
     value: string | boolean,
   ) => {
+    if (field === 'addressLine') cancelLookup();
     setAddressForm((current) => {
       const next = { ...current, [field]: value };
       if (field === "addressLine") {
@@ -82,6 +85,7 @@ export function useAddressBookForm({
   const handleProvinceChange = (
     option: { value: number; label: string } | null,
   ) => {
+    cancelLookup();
     setAddressForm((current) =>
       clearGeocodedFields({
         ...current,
@@ -92,12 +96,12 @@ export function useAddressBookForm({
       }),
     );
     setWards([]);
-    setLocationHint("");
   };
 
   const handleWardChange = (
     option: { value: number; label: string } | null,
   ) => {
+    cancelLookup();
     setAddressForm((current) =>
       clearGeocodedFields({
         ...current,
@@ -105,7 +109,6 @@ export function useAddressBookForm({
         wardCode: option?.value,
       }),
     );
-    setLocationHint("");
   };
 
   const handleUseCurrentLocation = () => {
@@ -122,6 +125,22 @@ export function useAddressBookForm({
       return;
     }
 
+    if (step === 'details') {
+      setStep('location');
+      if (!Number.isFinite(addressForm.latitude) || !Number.isFinite(addressForm.longitude)) {
+        void findAddressCoordinates(submission.payload);
+      }
+      return;
+    }
+    if (!Number.isFinite(addressForm.latitude) || !Number.isFinite(addressForm.longitude)
+      || Math.abs(addressForm.latitude!) > 90 || Math.abs(addressForm.longitude!) > 180) {
+      setAddressFormError("Vui lòng chọn vị trí ghim trên bản đồ trước khi xác nhận lưu địa chỉ.");
+      return;
+    }
+    if (saving.current || isLocating || isResolvingMapAddress) return;
+
+    saving.current = true;
+    setIsSubmitting(true);
     try {
       await onSubmit(submission.payload, address);
       onClose();
@@ -132,11 +151,18 @@ export function useAddressBookForm({
           "Không thể lưu địa chỉ. Vui lòng thử lại.",
         ),
       );
-    }
+    } finally { saving.current = false; setIsSubmitting(false); }
   };
 
   return {
     addressForm,
+    step,
+    isSubmitting,
+    backToDetails: () => { if (saving.current) return; cancelLookup(); setAddressFormError(''); setStep('details'); },
+    retryLookup: () => {
+      const submission = prepareAddressSubmission(addressForm);
+      if (submission.payload) void findAddressCoordinates(submission.payload);
+    },
     addressFormError,
     administrativeError,
     locationError,

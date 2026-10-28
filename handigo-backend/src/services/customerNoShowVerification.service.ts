@@ -17,11 +17,11 @@ import { CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS, CUSTOMER_NO_SHOW_WAIT_MINUTES, 
 import { Order } from "../models/order.model";
 import { reverseGeocode } from "./reverseGeocoding.service";
 import { createLogger } from "../utils/logger";
-import { resolveNoShowEvidenceTime } from "../utils/customerNoShowEvidence";
+import { getNoShowEvidenceTimePrecision, resolveNoShowEvidenceTime } from "../utils/customerNoShowEvidence";
 
 const logger = createLogger("CustomerNoShowAI");
 
-export const NO_SHOW_VERIFICATION_VERSION = "HANDIGO_NO_SHOW_AI_V4";
+export const NO_SHOW_VERIFICATION_VERSION = "HANDIGO_NO_SHOW_AI_V5";
 
 // Chỉ dùng cho chi tiết báo cáo của quản trị viên; không trả mã băm hoặc dữ liệu tải lên chưa gửi.
 export const getAdminNoShowDetails = async (report: IReport) => {
@@ -45,7 +45,8 @@ export const getAdminNoShowDetails = async (report: IReport) => {
     ? order.scheduledAt?.getTime() ?? 0 : 0;
   const callComparison = inspectNoShowCalls(evidence, {
     customerPhone: customer?.phone?.trim() || address?.recipientPhone || "",
-    waitStartedAt: Math.max(arrival?.arrivedAt.getTime() ?? checkedAt.getTime(), scheduled), now: checkedAt.getTime(),
+    waitStartedAt: report.noShowVerification?.checks?.waiting.waitStartedAt?.getTime()
+      ?? Math.max(arrival?.arrivedAt.getTime() ?? checkedAt.getTime(), scheduled), now: checkedAt.getTime(),
   });
   let arrivalAddress: string | null = null;
   let attribution: string | null = null;
@@ -56,6 +57,7 @@ export const getAdminNoShowDetails = async (report: IReport) => {
       attribution = resolved.attribution;
     } catch { /* Tra cứu địa chỉ lỗi vẫn hiển thị bằng chứng và khoảng cách từ tọa độ đã lưu. */ }
   }
+  let callIndex = 0;
   return {
     callComparison: { ...callComparison, phoneSource: customer?.phone?.trim() ? "customer_account" : "order_recipient",
       skipWaitForTesting: CUSTOMER_NO_SHOW_SKIP_WAIT_FOR_TESTING },
@@ -70,9 +72,11 @@ export const getAdminNoShowDetails = async (report: IReport) => {
       analysisStatus: item.analysisStatus, analysis: item.analysis, analysisFailure: item.analysisFailure ?? null,
       resolvedContactAt: item.analysis ? resolveNoShowEvidenceTime({ occurredAt: item.analysis.contactAt,
         dateLabel: item.analysis.contactDateLabel, time: item.analysis.contactTime }, item.uploadedAt ?? item.createdAt) : null,
-      callEvents: (item.analysis?.calls ?? []).map((call) => ({ ...call,
-        resolvedAt: resolveNoShowEvidenceTime(call, item.uploadedAt ?? item.createdAt),
-      })),
+      callEvents: (item.analysis?.calls ?? []).map((call) => {
+        const comparison = item.kind === "contact" && item.analysis?.imageType === "call" ? callComparison.events[callIndex++] : undefined;
+        return { ...call, resolvedAt: resolveNoShowEvidenceTime(call, item.uploadedAt ?? item.createdAt),
+          ...(comparison && { eligible: comparison.eligible, failures: comparison.failures, timePrecision: comparison.timePrecision }) };
+      }),
     })),
   };
 };
@@ -104,11 +108,15 @@ export const inspectNoShowCalls = (evidence: VerificationEvidence[], facts: Pick
       const resolvedAt = resolveNoShowEvidenceTime(call, item.uploadedAt ?? item.createdAt);
       const normalizedPhone = normalizePhone(call.phoneNumber ?? "");
       const phoneMatched = /^0\d{9}$/.test(expectedPhone) && normalizedPhone === expectedPhone;
-      const inWindow = resolvedAt !== null && Date.parse(resolvedAt) >= facts.waitStartedAt && Date.parse(resolvedAt) <= facts.now;
+      const timePrecision = getNoShowEvidenceTimePrecision(call);
+      const windowStart = timePrecision === "minute" ? Math.floor(facts.waitStartedAt / 60_000) * 60_000 : facts.waitStartedAt;
+      const inWindow = resolvedAt !== null && Date.parse(resolvedAt) >= windowStart && Date.parse(resolvedAt) <= facts.now;
       const failures: string[] = [];
       if (!phoneMatched) failures.push(`Số trong ảnh ${normalizedPhone || "không đọc được"} không khớp số đối chiếu ${expectedPhone || "chưa có"}`);
       if (!resolvedAt) failures.push("Không quy đổi được ngày giờ cuộc gọi");
-      else if (!inWindow) failures.push("Cuộc gọi nằm ngoài khoảng thời gian đối chiếu");
+      else if (!inWindow) failures.push(Date.parse(resolvedAt) < windowStart
+        ? "Cuộc gọi trước thời gian bắt đầu chờ (ngoài khoảng thời gian đối chiếu)"
+        : "Cuộc gọi sau thời điểm xác minh (ngoài khoảng thời gian đối chiếu)");
       if (call.direction !== "outgoing") failures.push("Không xác nhận được đây là cuộc gọi đi");
       if (call.outcome !== "no_answer") failures.push("Không xác nhận được cuộc gọi không được trả lời");
       const key = `${normalizedPhone}:${resolvedAt ? Math.floor(Date.parse(resolvedAt) / 60_000) : ""}`;
@@ -116,11 +124,27 @@ export const inspectNoShowCalls = (evidence: VerificationEvidence[], facts: Pick
         if (seen.has(key)) failures.push("Đã tính cuộc gọi tới số này trong cùng phút");
         else seen.add(key);
       }
-      return { phoneNumber: call.phoneNumber, normalizedPhone, resolvedAt, phoneMatched, inWindow,
+      return { phoneNumber: call.phoneNumber, normalizedPhone, resolvedAt, phoneMatched, inWindow, timePrecision,
         direction: call.direction, outcome: call.outcome, eligible: !failures.length, failures };
     }));
   return { expectedPhone, waitStartedAt: new Date(facts.waitStartedAt), checkedAt: new Date(facts.now),
     validCount: events.filter((event) => event.eligible).length, events };
+};
+
+export const getNoShowCallVerification = (evidence: VerificationEvidence[], facts: Pick<VerificationFacts, "customerPhone" | "waitStartedAt" | "now">) => {
+  const comparison = inspectNoShowCalls(evidence, facts);
+  const callImages = evidence.filter(item => item.kind === "contact" && item.analysis?.imageType === "call");
+  const answered = comparison.events.some(call => call.phoneMatched && call.inWindow && call.outcome === "answered");
+  const reasons: string[] = [];
+  if (answered) reasons.push("Lịch sử cuộc gọi có kết nối với khách trong thời gian chờ; cần quản trị viên xem xét.");
+  if (!callImages.length || comparison.validCount < 3) {
+    reasons.push(`Chỉ xác minh được ${comparison.validCount}/3 cuộc gọi đi không được trả lời tới đúng số khách trong thời gian chờ. Cần ảnh lịch sử cuộc gọi, không đếm số gộp hoặc cuộc gọi trùng phút.`);
+    for (const [index, event] of comparison.events.entries()) {
+      if (event.failures.length && index < 5) reasons.push(`Cuộc gọi ${index + 1}: ${event.failures.join("; ")}.`);
+    }
+  }
+  return { comparison, reasons, checks: { passed: comparison.validCount >= 3 && !answered
+    && !callImages.some(item => item.analysis?.contactOutcome === "answered"), validCount: comparison.validCount, requiredCount: 3 } };
 };
 
 export const evaluateNoShowEvidence = (
@@ -157,11 +181,8 @@ export const evaluateNoShowEvidence = (
   const phoneMatches = (phone: string) => /^0\d{9}$/.test(expectedPhone) && normalizePhone(phone) === expectedPhone;
   const duringWait = (timestamp: string | null) => timestamp !== null
     && Date.parse(timestamp) >= facts.waitStartedAt && Date.parse(timestamp) <= facts.now;
-  const callImages = contact.filter((item) => item.analysis?.imageType === "call");
-  const comparison = inspectNoShowCalls(evidence, facts);
-  if (comparison.events.some((call) => call.phoneMatched && call.inWindow && call.outcome === "answered")) {
-    reasons.push("Lịch sử cuộc gọi có kết nối với khách trong thời gian chờ; cần quản trị viên xem xét.");
-  }
+  const callVerification = getNoShowCallVerification(evidence, facts);
+  const { comparison } = callVerification;
   const chatMatched = contact.some((item) => {
     const analysis = item.analysis;
     if (!analysis || analysis.imageType !== "chat" || analysis.contactOutcome !== "no_response"
@@ -179,12 +200,7 @@ export const evaluateNoShowEvidence = (
   if (!chatMatched) {
     reasons.push("Cần ảnh nhắn tin qua Handigo khớp tin nhắn thật của thợ trong đúng đơn, khách chưa phản hồi.");
   }
-  if (!callImages.length || comparison.validCount < 3) {
-    reasons.push(`Chỉ xác minh được ${comparison.validCount}/3 cuộc gọi đi không được trả lời tới đúng số khách trong thời gian chờ. Cần ảnh lịch sử cuộc gọi, không đếm số gộp hoặc cuộc gọi trùng phút.`);
-    for (const [index, event] of comparison.events.entries()) {
-      if (event.failures.length && index < 5) reasons.push(`Cuộc gọi ${index + 1}: ${event.failures.join("; ")}.`);
-    }
-  }
+  reasons.push(...callVerification.reasons);
   return {
     decision: reasons.length ? "manual_review" : "auto_eligible",
     reasons: reasons.length ? reasons : [`Vị trí trong 200 m, có ảnh địa điểm, ảnh chat khớp tin nhắn Handigo và ${comparison.validCount} cuộc gọi đi không được trả lời tới đúng số khách; chưa ghi nhận khách phản hồi.`],
@@ -197,8 +213,7 @@ export const evaluateNoShowEvidence = (
         || facts.now - facts.waitStartedAt >= CUSTOMER_NO_SHOW_WAIT_MINUTES * 60_000,
         skippedForTesting: CUSTOMER_NO_SHOW_SKIP_WAIT_FOR_TESTING, waitStartedAt: new Date(facts.waitStartedAt),
         requiredMinutes: CUSTOMER_NO_SHOW_WAIT_MINUTES },
-      calls: { passed: comparison.validCount >= 3 && !comparison.events.some((call) => call.phoneMatched && call.inWindow && call.outcome === "answered")
-        && !callImages.some((item) => item.analysis?.contactOutcome === "answered"), validCount: comparison.validCount, requiredCount: 3 },
+      calls: callVerification.checks,
       chat: { passed: chatMatched && messages.length > 0 && !facts.customerReplied, messageCount: messages.length,
         customerReplied: facts.customerReplied },
     },
