@@ -274,6 +274,11 @@ export const sendMessage = async (
   }
 
   const messageId = await withConversationWrite(conversationId, async (current, session) => {
+    if (participant.senderRole === "customer") {
+      // Ghi cùng giao dịch để tự duyệt phát hiện phản hồi đồng thời và thử lại.
+      await Order.updateOne({ _id: conversation.orderId, status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
+        { $set: { "customerNoShow.customerRepliedAt": new Date() } }, { session, runValidators: true });
+    }
     const [message] = await Message.create([{
       conversationId: conversation._id,
       senderId: userId,

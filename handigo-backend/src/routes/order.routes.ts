@@ -3,6 +3,7 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { roleMiddleware } from "../middlewares/role.middleware";
 import { approvedProviderMiddleware } from "../middlewares/approvedProvider.middleware";
 import { uploadOrderAttachmentImage } from "../middlewares/orderAttachmentUpload.middleware";
+import { uploadCustomerNoShowEvidence } from "../middlewares/customerNoShowEvidenceUpload.middleware";
 import { uploadQuotationImage } from "../middlewares/quotationImageUpload.middleware";
 import { uploadQuotationAudio } from "../middlewares/quotationAudioUpload.middleware";
 import { quotationAgentAssist, quotationAgentHistory, quotationAgentTranscribe } from "../controllers/quotationAgent.controller";
@@ -20,6 +21,8 @@ import {
   cancellationPreviewQuerySchema,
   cancelOrderSchema,
   completeOrderSchema,
+  customerNoShowSchema,
+  customerNoShowEvidenceSchema,
   createRepairQuotationSchema,
   updateRepairQuotationSchema,
   confirmQuotationPaymentSchema,
@@ -49,6 +52,10 @@ import {
   cancelOrder,
   previewCancellation,
   startOrder,
+  arriveOrder,
+  customerNoShowEligibility,
+  createCustomerNoShowReport,
+  createCustomerNoShowEvidence,
   completeOrder,
   confirmQuotationPayment,
   uploadOrderAttachment,
@@ -72,6 +79,15 @@ const router = Router();
 
 // All routes require authentication
 router.use(authMiddleware);
+router.post("/:orderId/arrival", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  validate(orderIdParamSchema, "params"), arriveOrder);
+router.get("/:orderId/customer-no-show/eligibility", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  validate(orderIdParamSchema, "params"), customerNoShowEligibility);
+router.post("/:orderId/customer-no-show", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  dispatchRateLimit, validate(orderIdParamSchema, "params"), validate(customerNoShowSchema), createCustomerNoShowReport);
+router.post("/:orderId/customer-no-show/evidence", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
+  ocrRateLimit, uploadRateLimit, validate(orderIdParamSchema, "params"), uploadCustomerNoShowEvidence,
+  validate(customerNoShowEvidenceSchema), createCustomerNoShowEvidence);
 router.get("/booking-policies", roleMiddleware("CUSTOMER"), getBookingPolicies);
 router.post("/preview", roleMiddleware("CUSTOMER"), validate(previewBookingSchema), previewBooking);
 router.patch("/:orderId/expected-end", roleMiddleware("PROVIDER"), approvedProviderMiddleware, validate(orderIdParamSchema, "params"), validate(updateExpectedEndSchema), updateOrderExpectedEnd);

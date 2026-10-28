@@ -148,6 +148,8 @@ export interface OrderReassignment {
 }
 
 export interface Order {
+  arrival?: { providerId: string; arrivedAt: string; latitude: number; longitude: number } | null;
+  customerNoShow?: { reportId: string; status: 'pending' | 'approved' | 'rejected'; reportedAt: string; reviewedAt?: string | null; compensationAmount: number } | null;
   customerCancellationDeadline?: string | null;
   statusHistory?: Array<{ _id: string; status: string; previousStatus?: string | null; changedByRole: string; note?: string | null; createdAt: string }>;
   schedule?: { durationMinutes: number; bufferMinutes: number; travelMinutes: number; expectedStartAt?: string | null; expectedEndAt?: string | null } | null;
@@ -189,6 +191,7 @@ export interface Order {
     subtotal?: number;
   }>;
   addressId: (Omit<Address, "_id"> & { _id: string | null }) | null;
+  addressSnapshot?: Partial<Address> | null;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string | null;
   bookingStatus?:

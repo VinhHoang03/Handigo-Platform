@@ -107,9 +107,9 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                 'Lịch sử đơn hàng',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
           ],

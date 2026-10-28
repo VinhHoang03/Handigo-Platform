@@ -8,7 +8,7 @@ import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useProviderAvailabilityStore } from "../store/providerAvailability.store";
 import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 
-const getCurrentCoordinates = () =>
+export const getCurrentCoordinates = () =>
   new Promise<GeolocationCoordinates>((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Trình duyệt không hỗ trợ xác định vị trí"));

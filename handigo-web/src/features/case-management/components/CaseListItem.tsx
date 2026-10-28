@@ -1,4 +1,5 @@
 import type { Complaint, Report, SupportTicket } from "../types/caseManagement.types";
+import { CaseTitle } from "./CaseTitle";
 
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" });
 
@@ -15,13 +16,13 @@ export function CaseListItem({ item, statusLabel, onOpenDetail }: CaseListItemPr
   return (
     <article className="rounded-2xl border border-outline-variant/40 bg-surface p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
             <span className="rounded-full bg-primary/10 px-3 py-1 font-bold text-primary">{statusLabel}</span>
             <span>#{item._id.slice(-8).toUpperCase()}</span>
             <span>{dateFormatter.format(new Date(item.createdAt))}</span>
           </div>
-          <h2 className="mt-3 truncate text-lg font-bold">{getTitle(item)}</h2>
+          <h2 className="mt-3 whitespace-normal break-words text-lg font-bold"><CaseTitle title={getTitle(item)} /></h2>
           <p className="mt-2 line-clamp-2 text-sm leading-6 text-on-surface-variant">{item.description}</p>
         </div>
         <button

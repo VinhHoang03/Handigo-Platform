@@ -83,6 +83,12 @@ export interface IOrderReassignment {
 }
 
 export interface IOrder extends Document, IBaseDocument {
+  arrival?: { providerId: Types.ObjectId; arrivedAt: Date; latitude: number; longitude: number } | null;
+  customerNoShow?: {
+    reportId: Types.ObjectId; status: "pending" | "approved" | "rejected";
+    reportedAt: Date; reviewedAt?: Date | null; compensationAmount: Money;
+    evidenceIds?: Types.ObjectId[]; customerRepliedAt?: Date | null;
+  } | null;
   promotionUsedAt?: Date | null;
   promotionReleasedAt?: Date | null;
   statusVersion: number;
@@ -206,6 +212,21 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    arrival: { type: new Schema({
+      providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
+      arrivedAt: { type: Date, required: true },
+      latitude: { type: Number, required: true, min: -90, max: 90 },
+      longitude: { type: Number, required: true, min: -180, max: 180 },
+    }, { _id: false }), default: null },
+    customerNoShow: { type: new Schema({
+      reportId: { type: Schema.Types.ObjectId, ref: "Report", required: true },
+      status: { type: String, enum: ["pending", "approved", "rejected"], required: true },
+      reportedAt: { type: Date, required: true },
+      reviewedAt: { type: Date, default: null },
+      compensationAmount: { type: Number, required: true, min: 0 },
+      evidenceIds: { type: [{ type: Schema.Types.ObjectId, ref: "CustomerNoShowEvidence" }], default: [] },
+      customerRepliedAt: { type: Date, default: null },
+    }, { _id: false }), default: null },
     statusVersion: { type: Number, default: 0, min: 0 },
     overdueReview: { type: new Schema({ escalatedAt: { type: Date, default: null } }, { _id: false }), default: null },
     schedule: { type: new Schema({
