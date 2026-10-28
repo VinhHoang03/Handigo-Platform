@@ -13,7 +13,6 @@ import {
   type CustomerProfileTab,
 } from "@/features/customer/components/ProfileTabsNav";
 import { SecurityTabSection } from "@/features/customer/components/SecurityTabSection";
-import { NotificationSettingsSection } from "@/features/customer/components/NotificationSettingsSection";
 import { PasswordSecurityModals } from "@/features/customer/components/PasswordSecurityModals";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 
@@ -123,8 +122,6 @@ export default function CustomerProfilePage() {
             canChangePassword={!isGoogleAccount}
           />
         )}
-
-        {activeTab === "profile" && <NotificationSettingsSection />}
 
         {activeTab === "applications" && (
           <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm sm:p-6 md:p-8">

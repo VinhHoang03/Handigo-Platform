@@ -103,7 +103,7 @@ export const customerServiceApi = {
 
   nearbyProviders: async (
     serviceId: string,
-    addressId: string,
+    addressId: string | undefined,
     scheduledAt?: string,
     recurrenceUnit?: "weekly" | "monthly",
     recurrenceCount?: number,

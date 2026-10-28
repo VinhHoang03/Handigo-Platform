@@ -28,14 +28,12 @@ export const AgentOrderProviderService = {
       : "Đơn không còn ở trạng thái chọn lại thợ. Hãy kiểm tra trạng thái hiện tại." };
     const address = order.addressSnapshot ?? await Address.findOne({ _id: order.addressId, userId, isDeleted: { $ne: true } });
     if (!address) throw new AppError("Không tìm thấy địa chỉ thực hiện của đơn.", 404);
-    const related = order.recurringGroupId ? await Order.find({ recurringGroupId: order.recurringGroupId,
-      customerId: userId, isDeleted: false }) : [order];
-    const declined = await OrderAssignment.find({ orderId: { $in: related.map((item) => item._id) },
+    const declined = await OrderAssignment.find({ orderId: order._id,
       status: { $in: ["rejected", "timeout", "cancelled"] }, isDeleted: false }).select("providerId").lean();
     const excludeProviderIds = [...new Set([...declined.map((item) => String(item.providerId)),
       ...(order.reassignment?.previousProviderIds || []).map(String)])].map((id) => new Types.ObjectId(id));
     const policy = await getBookingPolicy();
-    const scheduleIntervals = related.filter((item) => item.status === "created").map((item) => {
+    const scheduleIntervals = [order].map((item) => {
       const interval = getOrderInterval(item, policy);
       if (item.scheduledAt) return interval;
       const start = Date.now() + interval.travelMinutes * 60000;

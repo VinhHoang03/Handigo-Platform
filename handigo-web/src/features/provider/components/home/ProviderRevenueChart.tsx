@@ -34,11 +34,11 @@ export function ProviderRevenueChart({
 }: ProviderRevenueChartProps) {
   return (
     <ChartCard
-      title="Doanh thu"
+      title="Thu nhập"
       loading={isLoadingEarnings}
       error={earningsError || undefined}
       isEmpty={revenueTotal === 0}
-      emptyMessage="Chưa phát sinh doanh thu trong khoảng thời gian này."
+      emptyMessage="Chưa phát sinh thu nhập trong khoảng thời gian này."
       height={256}
       action={
         <div className="flex items-center justify-between gap-3 sm:justify-end">

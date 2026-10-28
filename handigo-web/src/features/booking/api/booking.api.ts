@@ -1,4 +1,5 @@
 import api from "@/api/client";
+import { createBookingOnce } from '../utils/createBookingOnce';
 import { isAxiosError } from "axios";
 import type {
   Address,
@@ -107,11 +108,12 @@ export const bookingApi = {
   },
 
   createOrder: async (payload: CreateOrderPayload) => {
-    const response = await api.post<{ success: boolean; data: Order }>(
-      "/orders",
-      payload,
-    );
-    return response.data.data;
+    return createBookingOnce(payload, async (confirmedPayload, requestId) => {
+      const response = await api.post<{ success: boolean; data: Order }>(
+        "/orders", confirmedPayload, { headers: { 'Idempotency-Key': requestId } },
+      );
+      return response.data.data;
+    });
   },
 
   createPayment: async (payload: {

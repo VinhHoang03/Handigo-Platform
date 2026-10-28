@@ -2,6 +2,9 @@ import { Modal } from "@/components/common/Modal";
 import { caseDateTime } from "./case-table-columns";
 import type { SelectedAdminCase } from "./case-detail.types";
 import { CASE_STATUS_LABELS, PENALTY_LABELS, VIOLATION_SEVERITY_LABELS } from "./case-status.constants";
+import { NoShowReviewDetails } from "./NoShowReviewDetails";
+import { NoShowVerificationSummary } from "./NoShowVerificationSummary";
+import { getNoShowUserDescription } from "./no-show-review.utils";
 
 function EvidenceLinks({ urls }: { urls: string[] }) {
   if (!urls.length) return <p className="text-sm text-on-surface-variant">Chưa có bằng chứng.</p>;
@@ -61,12 +64,16 @@ export function CaseDetailModal({
   onOpenViolationForm,
   onClose,
 }: CaseDetailModalProps) {
+  const hasReviewPanel = selected?.kind === "violation"
+    || (selected?.kind === "complaint" && !["resolved", "rejected", "cancelled"].includes(selected.item.status))
+    || (selected?.kind === "report" && !selected.item.createdViolationId
+      && (!selected.item.isCustomerNoShow || ["pending", "under_review"].includes(selected.item.status)));
   return (
     <Modal open={open} title={selectedTitle || "Chi tiết hồ sơ"} onClose={onClose} size="xl" closeOnOverlayClick={!busy}>
       {detailLoading && !selected ? (
         <div className="p-10 text-center text-on-surface-variant">Đang tải chi tiết...</div>
       ) : selected ? (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
+        <div className={`grid gap-6 ${hasReviewPanel ? "xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]" : "grid-cols-1"}`}>
           <div className="space-y-5">
             <section className="rounded-2xl bg-surface-container-low p-5">
               <div className="flex flex-wrap gap-2 text-xs text-on-surface-variant">
@@ -74,7 +81,13 @@ export function CaseDetailModal({
                 <span>#{selected.item._id.slice(-8).toUpperCase()}</span>
                 <span>{caseDateTime.format(new Date(selected.item.createdAt))}</span>
               </div>
-              {selected.kind !== "violation" && <p className="mt-4 whitespace-pre-wrap text-sm leading-6">{selected.item.description}</p>}
+              {selected.kind !== "violation" && <p className="mt-4 whitespace-pre-wrap text-sm leading-6">{selected.kind === "report" && selected.item.isCustomerNoShow
+                ? getNoShowUserDescription(selected.item.description) : selected.item.description}</p>}
+              {selected.kind === "report" && !selected.item.isCustomerNoShow && selected.item.noShowVerification && <div className="mt-4 space-y-2 rounded-xl bg-primary/5 p-3 text-sm">
+                <p className="font-bold">Kết quả xác minh bằng chứng{selected.item.reviewedByType === 'system' ? ' · Đã tự duyệt' : ''}</p>
+                {selected.item.noShowVerification.reasons.map((reason, index) => <p key={index}>{reason}</p>)}
+                <p className="text-xs text-on-surface-variant">{caseDateTime.format(new Date(selected.item.noShowVerification.checkedAt))}</p>
+              </div>}
               {selected.kind === "violation" && (
                 <>
                   <p className="mt-4 text-sm"><b>Người vi phạm:</b> {selected.item.userId.fullName} · {selected.item.userId.email}</p>
@@ -83,14 +96,16 @@ export function CaseDetailModal({
                 </>
               )}
             </section>
-            {selected.kind !== "violation" && <section><h3 className="mb-3 font-bold">Bằng chứng</h3><EvidenceLinks urls={detailEvidence} /></section>}
+            {selected.kind === "report" && selected.item.isCustomerNoShow && <NoShowVerificationSummary report={selected.item} />}
+            {selected.kind === "report" && selected.item.noShowDetails && <NoShowReviewDetails details={selected.item.noShowDetails} report={selected.item} />}
+            {selected.kind !== "violation" && !(selected.kind === "report" && selected.item.noShowDetails?.evidence.length) && <section><h3 className="mb-3 font-bold">Bằng chứng</h3><EvidenceLinks urls={detailEvidence} /></section>}
             {selected.kind === "complaint" && selected.item.requestedEvidenceNote && (
               <section className="rounded-xl bg-warning-container p-4 text-sm text-on-warning-container">
                 <b>Nội dung yêu cầu bổ sung:</b>
                 <p className="mt-2">{selected.item.requestedEvidenceNote}</p>
               </section>
             )}
-            {selected.kind !== "violation" && selected.item.resolutionNote && (
+            {selected.kind !== "violation" && !(selected.kind === "report" && selected.item.isCustomerNoShow) && selected.item.resolutionNote && (
               <section className="rounded-xl bg-success-container p-4 text-sm text-on-success-container">
                 <b>Kết quả xử lý:</b>
                 <p className="mt-2 whitespace-pre-wrap">{selected.item.resolutionNote}</p>
@@ -98,7 +113,7 @@ export function CaseDetailModal({
             )}
           </div>
 
-          <aside className="space-y-5">
+          {hasReviewPanel && <aside className="space-y-5">
             {selected.kind === "complaint" && !["resolved", "rejected", "cancelled"].includes(selected.item.status) && (
               <>
                 <section className="rounded-2xl border border-outline-variant p-4">
@@ -119,26 +134,22 @@ export function CaseDetailModal({
                 </section>
               </>
             )}
-            {selected.kind === "report" && !selected.item.createdViolationId && (
+            {selected.kind === "report" && !selected.item.createdViolationId
+              && (!selected.item.isCustomerNoShow || ["pending", "under_review"].includes(selected.item.status)) && (
               <section className="rounded-2xl border border-outline-variant p-4">
                 <h3 className="font-bold">Xem xét báo cáo</h3>
+                {selected.item.isCustomerNoShow && <p className="mt-2 text-sm text-on-surface-variant">Chấp thuận báo cáo sẽ hủy đơn và Handigo chi hỗ trợ thợ 5.000đ; không thu thêm của khách. Kiểm tra mốc đến nơi, liên hệ và ảnh bằng chứng trước khi quyết định.</p>}
                 <select value={nextStatus} onChange={(event) => onNextStatusChange(event.target.value)} className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant px-3">
                   <option value="">Chọn trạng thái</option>
                   <option value="under_review">Đang xem xét</option>
-                  <option value="confirmed">Xác nhận</option>
+                  <option value="confirmed">{selected.item.isCustomerNoShow ? 'Chấp thuận và hỗ trợ 5.000đ' : 'Xác nhận'}</option>
                   <option value="rejected">Từ chối</option>
-                  <option value="resolved">Đã xử lý</option>
+                  {!selected.item.isCustomerNoShow && <option value="resolved">Đã xử lý</option>}
                 </select>
                 <textarea value={reviewNote} onChange={(event) => onReviewNoteChange(event.target.value)} maxLength={3000} rows={3} placeholder="Ghi chú xem xét..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
                 <textarea value={resolutionNote} onChange={(event) => onResolutionNoteChange(event.target.value)} maxLength={3000} rows={3} placeholder="Kết luận xử lý..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
                 <button type="button" onClick={onReviewReport} disabled={busy || !nextStatus} className="btn-primary mt-3 w-full">Cập nhật</button>
               </section>
-            )}
-            {selected.kind !== "violation" && !selected.item.createdViolationId && (
-              <button type="button" onClick={onOpenViolationForm} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-on-error">Tạo vi phạm và áp dụng hình phạt</button>
-            )}
-            {selected.kind !== "violation" && selected.item.createdViolationId && (
-              <p className="rounded-xl bg-success-container p-4 text-sm font-semibold text-on-success-container">Hồ sơ đã tạo bản ghi vi phạm.</p>
             )}
             {selected.kind === "violation" && (
               <section className="rounded-2xl border border-outline-variant p-4 text-sm">
@@ -148,7 +159,16 @@ export function CaseDetailModal({
                 {selected.item.endAt && <p className="mt-2"><b>Kết thúc:</b> {caseDateTime.format(new Date(selected.item.endAt))}</p>}
               </section>
             )}
-          </aside>
+          </aside>}
+          {selected.kind !== "violation" && !selected.item.createdViolationId
+            && !(selected.kind === "report" && selected.item.isCustomerNoShow && selected.item.status !== "confirmed") && (
+            <div className="flex justify-end border-t border-outline-variant/40 pt-4 xl:col-span-full">
+              <button type="button" onClick={onOpenViolationForm} className="w-full rounded-xl bg-error px-6 py-3 font-bold text-on-error sm:w-auto sm:min-w-48">Tạo vi phạm</button>
+            </div>
+          )}
+          {selected.kind !== "violation" && selected.item.createdViolationId && (
+            <p className="rounded-xl bg-success-container p-4 text-sm font-semibold text-on-success-container xl:col-span-full">Hồ sơ đã tạo bản ghi vi phạm.</p>
+          )}
         </div>
       ) : null}
     </Modal>

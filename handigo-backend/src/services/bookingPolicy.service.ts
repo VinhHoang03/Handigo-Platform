@@ -30,6 +30,6 @@ export const getCustomerBookingPolicies = async () => {
     },
   };
   // Tăng phiên bản nội dung khi thay đổi cách diễn đạt/điều khoản trong BookingPolicyContent.
-  const version = createHash("sha256").update(JSON.stringify({ contentVersion: 1, policies })).digest("hex");
+  const version = createHash("sha256").update(JSON.stringify({ contentVersion: 2, policies })).digest("hex");
   return { ...policies, version };
 };

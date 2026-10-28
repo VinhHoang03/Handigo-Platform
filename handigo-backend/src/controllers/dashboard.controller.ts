@@ -7,6 +7,7 @@ import { AppError } from "../utils/appError";
 import {
   dashboardQuerySchema,
   providerAvailabilitySchema,
+  providerDashboardQuerySchema,
 } from "../validations/dashboard.validator";
 
 export const getAdminInsights = async (req: Request, res: Response, next: NextFunction) => {
@@ -41,7 +42,7 @@ export const getDashboardOverview = async (
 ) => {
   try {
     const user = requireRequestUser(req);
-    const query = dashboardQuerySchema.parse(req.query);
+    const query = user.role === "PROVIDER" ? providerDashboardQuerySchema.parse(req.query) : dashboardQuerySchema.parse(req.query);
 
     if (user.role === "ADMIN") {
       const data = await dashboardService.getAdminOverview(query);
@@ -94,7 +95,7 @@ export const getAdminProviders = async (req: Request, res: Response, next: NextF
 
 export const getProviderOverview = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const query = dashboardQuerySchema.parse(req.query);
+    const query = providerDashboardQuerySchema.parse(req.query);
     const data = await dashboardService.getProviderOverview(requireRequestUser(req), query);
 
     return res.json({ success: true, data, message: "Get provider dashboard overview successfully" });
@@ -105,7 +106,7 @@ export const getProviderOverview = async (req: Request, res: Response, next: Nex
 
 export const getProviderEarnings = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const query = dashboardQuerySchema.parse(req.query);
+    const query = providerDashboardQuerySchema.parse(req.query);
     const data = await dashboardService.getProviderEarnings(requireRequestUser(req), query);
 
     return res.json({ success: true, data, message: "Get provider earning dashboard successfully" });

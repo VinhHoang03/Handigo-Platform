@@ -55,6 +55,20 @@ export interface IReportEvidenceFile {
 }
 
 export interface IReport extends Document, IBaseDocument {
+  noShowVerification?: {
+    decision: "auto_eligible" | "manual_review";
+    reasons: string[];
+    checkedAt: Date;
+    policyVersion: string;
+    checks?: {
+      location: { passed: boolean; distanceMeters: number | null; radiusMeters: number };
+      waiting: { passed: boolean; skippedForTesting: boolean; waitStartedAt: Date; requiredMinutes: number };
+      calls: { passed: boolean; validCount: number; requiredCount: number };
+      chat: { passed: boolean; messageCount: number; customerReplied: boolean };
+    } | null;
+  } | null;
+  reviewedByType?: "system" | "admin" | null;
+  isCustomerNoShow?: boolean;
   reporterId: Types.ObjectId;
   targetType: ReportTargetType;
   targetUserId?: Types.ObjectId | null;
@@ -91,6 +105,30 @@ const ReportEvidenceFileSchema = new Schema<IReportEvidenceFile>(
 
 const ReportSchema = new Schema<IReport>(
   {
+    noShowVerification: { type: new Schema({
+      decision: { type: String, enum: ["auto_eligible", "manual_review"], required: true },
+      reasons: { type: [String], required: true },
+      checkedAt: { type: Date, required: true },
+      policyVersion: { type: String, required: true },
+      checks: { type: new Schema({
+        location: {
+          passed: { type: Boolean, required: true }, distanceMeters: { type: Number, default: null },
+          radiusMeters: { type: Number, required: true },
+        },
+        waiting: {
+          passed: { type: Boolean, required: true }, skippedForTesting: { type: Boolean, required: true },
+          waitStartedAt: { type: Date, required: true }, requiredMinutes: { type: Number, required: true },
+        },
+        calls: {
+          passed: { type: Boolean, required: true }, validCount: { type: Number, required: true }, requiredCount: { type: Number, required: true },
+        },
+        chat: {
+          passed: { type: Boolean, required: true }, messageCount: { type: Number, required: true }, customerReplied: { type: Boolean, required: true },
+        },
+      }, { _id: false }), default: null },
+    }, { _id: false }), default: null },
+    reviewedByType: { type: String, enum: ["system", "admin"], default: null },
+    isCustomerNoShow: { type: Boolean, default: false },
     reporterId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     targetType: {
       type: String,

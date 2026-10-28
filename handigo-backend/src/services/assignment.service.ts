@@ -1,4 +1,5 @@
 import { serviceImageResponse } from "../utils/serviceImageResponse";
+import { withAssignmentArea } from "../utils/orderAddress";
 import mongoose, { Types } from "mongoose";
 import { randomBytes } from "crypto";
 import { Order } from "../models/order.model";
@@ -69,7 +70,7 @@ const assertQuotationOrder = (
   if (!["accepted", "in_progress"].includes(order.status)) {
     throw new AppError("Chỉ được lưu báo giá khi đơn đã nhận hoặc đang thực hiện.", 409);
   }
-  if (["scheduled", "recurring"].includes(order.orderType) && order.bookingStatus !== "confirmed") {
+  if (order.orderType === "scheduled" && order.bookingStatus !== "confirmed") {
     throw new AppError("Lịch hẹn chưa được thanh toán và xác nhận.", 409);
   }
 };
@@ -199,7 +200,7 @@ const saveRepairQuotation = async (
           title: update ? "Báo giá đã được cập nhật" : "Báo giá đã được lưu",
           content: `Thợ đã ${update ? "cập nhật" : "lưu"} báo giá cho đơn ${currentOrder.orderCode}. Vui lòng xem chi phí mới nhất.`,
           data: { orderId: currentOrder.id, quotationId: currentQuotation.id, revision: currentQuotation.revision },
-        }, { session });
+        }, { session, deferRealtime: true });
       }
       return currentQuotation;
     });
@@ -316,10 +317,10 @@ export const AssignmentService = {
     }
 
     const assignedOrder = await Order.findById(assignment.orderId).select(
-      "addressId customerId orderCode orderType scheduledAt status bookingStatus recurringGroupId occurrenceNumber paymentStatus paymentMethod reassignment",
+      "addressId addressSnapshot customerId orderCode orderType scheduledAt status bookingStatus paymentStatus paymentMethod reassignment",
     );
     const assignedAddress = assignedOrder
-      ? await Address.findById(assignedOrder.addressId).select("ward province")
+      ? assignedOrder.addressSnapshot ?? await Address.findById(assignedOrder.addressId).select("ward province")
       : null;
     // Phạm vi địa lý đã được kiểm tra khi gửi đề nghị; không chặn lại theo phường/xã.
     if (!assignedAddress) {
@@ -351,7 +352,7 @@ export const AssignmentService = {
           || (order.paymentMethod === "cash" && await Payment.exists({
             orderId: order._id, method: "cash", status: "pending", isDeleted: false,
           }).session(session));
-        if (!hasInitialPayment && !(isAppointment && order.reassignment?.automatic && order.bookingStatus === "reserved")) {
+        if (!hasInitialPayment) {
           throw new AppError("Đơn hàng chưa hoàn tất bước thanh toán.", 409);
         }
 
@@ -366,16 +367,7 @@ export const AssignmentService = {
           expectedStartAt,
           expectedEndAt: new Date(expectedStartAt.getTime() + durationMinutes * 60000),
         };
-        const isReplacement = order.reassignment?.status === "matching";
-        const appointmentOrders = isAppointment && order.recurringGroupId && !isReplacement
-          ? await Order.find({
-              recurringGroupId: order.recurringGroupId,
-              status: "created",
-              providerId: null,
-              isDeleted: false,
-            }).session(session)
-          : [order];
-        await assertProviderSchedule(lockedProvider._id as Types.ObjectId, appointmentOrders, session, policy);
+        await assertProviderSchedule(lockedProvider._id as Types.ObjectId, [order], session, policy);
 
         const respondedAt = new Date();
         const claimedAssignment = await OrderAssignment.findOneAndUpdate(
@@ -391,30 +383,17 @@ export const AssignmentService = {
         );
         if (!claimedAssignment) throw new AppError("Yêu cầu nhận đơn không còn khả dụng.", 409);
 
+        if (String(order.providerId) !== String(lockedProvider._id)) {
+          order.arrival = null;
+          order.customerNoShow = null;
+        }
         order.providerId = lockedProvider._id as Types.ObjectId;
         order.status = "accepted";
         if (order.reassignment?.status === "matching") order.reassignment.status = "matched";
         order.readyForMatching = false;
         if (isAppointment) {
-          order.bookingStatus = order.bookingStatus === "reserved" ? "reserved" : "confirmed";
+          order.bookingStatus = "confirmed";
           order.paymentDueAt = null;
-          if (order.recurringGroupId && !isReplacement) {
-            await Order.updateMany(
-              {
-                _id: { $in: appointmentOrders.map((item) => item._id).filter((id) => id.toString() !== order._id.toString()) },
-                status: "created",
-                providerId: null,
-              },
-              { $set: {
-                providerId: lockedProvider._id,
-                status: "accepted",
-                bookingStatus: "reserved",
-                paymentDueAt: null,
-                readyForMatching: false,
-              } },
-              { session, runValidators: true },
-            );
-          }
         } else {
           lockedProvider.availabilityStatus = "busy";
           await lockedProvider.save({ session });
@@ -437,7 +416,6 @@ export const AssignmentService = {
     }
     emitToUser(result.order.customerId.toString(), "order:updated", {
       orderId: result.order._id.toString(),
-      recurringGroupId: result.order.recurringGroupId?.toString(),
     });
     try {
       await closeCompetingAssignments(result.order._id as Types.ObjectId, result.assignment._id as Types.ObjectId);
@@ -446,7 +424,7 @@ export const AssignmentService = {
         userId: result.order.customerId,
         type: "ORDER",
         title: isAppointment
-          ? (result.order.recurringGroupId ? "Chuyên gia đã nhận chuỗi lịch" : "Chuyên gia đã nhận lịch")
+          ? "Chuyên gia đã nhận lịch"
           : "Chuyên gia đã nhận đơn",
         content: `Chuyên gia đã nhận đơn ${result.order.orderCode}.${isAppointment ? " Chuyên gia sẽ thực hiện theo lịch hẹn." : ""}`,
         data: { orderId: result.order._id },
@@ -521,7 +499,7 @@ export const AssignmentService = {
 
     if (assignment.assignmentType === "appointment") {
       const appointmentOrder = await Order.findById(assignment.orderId).select(
-        "recurringGroupId preferredProviderId",
+        "preferredProviderId",
       );
       if (appointmentOrder?.preferredProviderId) {
         await requestDirectProviderReassignment(
@@ -530,22 +508,6 @@ export const AssignmentService = {
           rejectReason,
         );
         return;
-      }
-      if (appointmentOrder?.preferredProviderId && appointmentOrder.recurringGroupId) {
-        await Order.updateMany(
-          {
-            recurringGroupId: appointmentOrder.recurringGroupId,
-            status: "created",
-          },
-          {
-            $set: {
-              bookingStatus: "rejected",
-              preferredProviderId: null,
-              paymentDueAt: null,
-            },
-          },
-          { runValidators: true },
-        );
       }
       if (appointmentOrder?.preferredProviderId) {
         const order = await Order.findOneAndUpdate(
@@ -864,12 +826,9 @@ export const AssignmentService = {
           "orderCode",
           "serviceId",
           "addressId",
+          "addressSnapshot",
           "orderType",
           "scheduledAt",
-          "recurringGroupId",
-          "recurrenceUnit",
-          "occurrenceNumber",
-          "totalOccurrences",
           "pricing",
           "inspectionRequired",
           "createdAt",
@@ -878,6 +837,7 @@ export const AssignmentService = {
           { path: "serviceId", select: "name image coverImage serviceType depositAmount fixedPrice", transform: serviceImageResponse },
           { path: "addressId", select: "ward province" },
         ],
+        transform: withAssignmentArea,
       })
       .sort({ assignedAt: -1 })
       .lean();

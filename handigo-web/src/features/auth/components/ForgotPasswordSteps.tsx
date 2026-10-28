@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { FloatingInput } from "@/components/common/FloatingField";
+import { OtpInput } from "./OtpInput";
 
 /** Thanh tiến trình 3 bước của luồng khôi phục mật khẩu. */
 export function ForgotPasswordProgress({
@@ -77,17 +78,12 @@ export function ForgotOtpStep({
 }) {
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
-      <FloatingInput
+      <OtpInput
         id="forgot-otp"
-        label="Mã OTP"
         value={otp}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        required
-        onValueChange={(value) => onOtpChange(value.replace(/\D/g, "").slice(0, 6))}
+        onValueChange={onOtpChange}
       />
-      <button type="submit" disabled={otp.length !== 6} className="btn-primary w-full">
+      <button type="submit" disabled={!/^\d{6}$/.test(otp)} className="btn-primary w-full">
         Tiếp tục
       </button>
       <div className="flex flex-wrap items-center justify-between gap-3">

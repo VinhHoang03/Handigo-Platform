@@ -34,6 +34,7 @@ import {
 } from "./refundPolicy.service";
 import { getRefundRetryDecision } from "./refundProcessing";
 import { getRefundPolicy } from "./systemConfig.service";
+import { settleCustomerNoShow, CustomerNoShowReview } from "./customerNoShowSettlement.service";
 
 type CancellationRole = "customer" | "provider" | "admin";
 type SystemCancellationType = "payment_timeout" | "provider_unavailable";
@@ -46,6 +47,7 @@ export interface CancellationExpectation {
 }
 
 interface CancelOrderInput {
+  customerNoShowReview?: CustomerNoShowReview;
   confirmedExpectation?: CancellationExpectation;
   quotationRejection?: { quotationId: string; revision: number; reason?: string };
   orderId: string;
@@ -1414,6 +1416,10 @@ export const cancelOrdersWithSettlement = async (
   inputs: CancelOrderInput[],
 ): Promise<IOrder[]> => {
   for (const input of inputs) {
+    if (input.customerNoShowReview && (input.role !== "admin"
+      || (input.customerNoShowReview.automated ? !input.system || !!input.actorId : !input.actorId || input.system))) {
+      throw new AppError("Chỉ quản trị viên hoặc luồng xác minh hệ thống được chấp thuận báo cáo khách vắng mặt.", 403);
+    }
     assertObjectId(input.orderId, "ID đơn hàng");
     if (!input.actorId && (!input.system || input.role !== "admin")) {
       throw new AppError("Không xác định được người thực hiện hủy đơn", 401);
@@ -1489,6 +1495,9 @@ export const cancelOrdersWithSettlement = async (
         }
 
       const cancelledAt = new Date();
+      if (input.customerNoShowReview) {
+        await settleCustomerNoShow(order, input.actorId, input.customerNoShowReview, session);
+      }
       const paidAmount = await getPaidOrderAmount(
         order._id as Types.ObjectId,
         session,
@@ -1503,6 +1512,10 @@ export const cancelOrdersWithSettlement = async (
       );
       if (!refundPolicy.canCancel) {
         throw new AppError(refundPolicy.policyReason, 409);
+      }
+      if (input.customerNoShowReview) {
+        refundPolicy.policyVersion = "HANDIGO_CUSTOMER_NO_SHOW_V1";
+        refundPolicy.policyReason = "Khách vắng mặt đã được xác minh; hoàn toàn bộ khoản đã thanh toán, Handigo chi riêng 5.000đ hỗ trợ thợ.";
       }
       if (input.confirmedExpectation && (
         refundPolicy.paidAmount !== input.confirmedExpectation.paidAmount
@@ -1549,6 +1562,7 @@ export const cancelOrdersWithSettlement = async (
             status: "cancelled",
             readyForMatching: false,
             cancellation,
+            ...(input.customerNoShowReview ? { customerNoShow: order.customerNoShow } : {}),
             ...(replacementFailed ? { "reassignment.status": "failed" } : {}),
           },
         },
@@ -1634,7 +1648,7 @@ export const cancelOrdersWithSettlement = async (
         );
         await compensateProviderPayments(claimedOrder, session);
 
-        if (claimedOrder.providerId && (wasInProgress || ["normal", "urgent"].includes(claimedOrder.orderType))) {
+        if (!input.customerNoShowReview && claimedOrder.providerId && (wasInProgress || ["normal", "urgent"].includes(claimedOrder.orderType))) {
           await Provider.updateOne(
             { _id: claimedOrder.providerId },
             { $set: { availabilityStatus: "online" } },

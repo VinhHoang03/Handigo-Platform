@@ -5,7 +5,7 @@ import { bookingSchema, type BookingArguments } from "./booking.schemas";
 import { requireBookingAttachments } from "../../agent/booking-attachments";
 import { getCustomerBookingPolicies } from "../../../services/bookingPolicy.service";
 export const createBookingTool: AgentTool<BookingArguments> = {
-  name: "create_booking", description: "Tạo đơn đặt ngay hoặc lịch hẹn sau xác nhận, hỗ trợ voucher và chuyên gia ưu tiên đã kiểm tra. Chưa hỗ trợ đặt định kỳ.",
+  name: "create_booking", description: "Tạo đơn đặt ngay hoặc lịch hẹn một lần sau xác nhận, hỗ trợ voucher và chuyên gia ưu tiên đã kiểm tra.",
   inputSchema: bookingSchema, mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
   preview: async (context, args) => {
     requireBookingAttachments(context.session, args.customerAttachments);

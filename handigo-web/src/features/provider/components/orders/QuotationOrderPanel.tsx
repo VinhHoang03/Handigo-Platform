@@ -5,7 +5,7 @@ import type { CreateQuotationPayload, QuotationDetail } from '../../types/provid
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { FixedPriceActionForm } from '../FixedPriceActionForm';
 import { RepairQuotationForm } from '../RepairQuotationForm';
-import { CalendarX, Hourglass } from "lucide-react";
+import { CalendarX } from "lucide-react";
 import { getQuotationStatusLabel } from '@/features/booking/components/detail/bookingDetailFormatters';
 
 interface QuotationOrderPanelProps {
@@ -37,6 +37,7 @@ export function QuotationOrderPanel({
   const appliedDepositAmount = getAppliedQuotationDeposit(order);
   const [editing, setEditing] = useState(false);
   const canEdit = !isUnconfirmedAppointment && ['accepted', 'in_progress'].includes(order.status)
+    && (order.status !== 'accepted' || (!!order.arrival && order.arrival.providerId === order.providerId?._id))
     && (!quotation || ['saved', 'approved'].includes(quotation.quotation.status));
   const showForm = canEdit && (showQuotationForm || editing);
   const usableQuotation = quotation && (quotation.quotation.status === 'saved' || quotation.quotation.status === 'approved');
@@ -116,10 +117,10 @@ export function QuotationOrderPanel({
               </button>}
               {canEdit && <button type="button" disabled={busy} onClick={() => setEditing(true)}
                 className="btn-secondary order-2 sm:order-none sm:ml-auto">Chỉnh sửa báo giá</button>}
-          {usableQuotation && order.status === 'accepted' && (
+          {usableQuotation && order.status === 'accepted' && order.arrival && order.arrival.providerId === order.providerId?._id && (
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || !order.arrival || order.arrival.providerId !== order.providerId?._id || order.customerNoShow?.status === 'pending'}
                   onClick={onStart}
                   className="btn-primary order-1 w-full py-3 text-base font-bold sm:order-none sm:w-auto"
                 >
@@ -150,13 +151,6 @@ export function QuotationOrderPanel({
             onCancel={onCancel}
             busy={busy}
           />
-        </div>
-      )}
-
-      {!isUnconfirmedAppointment && !quotation && !showForm && (
-        <div className="flex h-full flex-col items-center justify-center border border-outline-variant/30 bg-surface-container-lowest p-md text-center text-on-surface-variant">
-          <Hourglass aria-hidden="true" size={36} className="mb-2" />
-          <p>Chờ khách hàng hoặc bước tiếp theo</p>
         </div>
       )}
 

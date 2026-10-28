@@ -4,9 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
-import { bookingApi } from "@/features/booking/api/booking.api";
-import { providerOrderApi } from "@/features/provider/api/providerOrder.api";
-import type { Order } from "@/types/booking";
 import { getErrorMessage } from "@/utils/apiError";
 import { caseManagementApi } from "../api/caseManagement.api";
 import { CaseDetailModal, type SelectedCase } from "../components/CaseDetailModal";
@@ -42,7 +39,6 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
   const [tab, setTab] = useState<CaseTab>(initialTab);
   const [query, setQuery] = useState<CaseListQuery>({ page: 1, limit: 10 });
   const [items, setItems] = useState<Array<Complaint | SupportTicket | Report>>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -76,24 +72,6 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [load]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadOrders = async () => {
-      try {
-        const result = role === "CUSTOMER" ? await bookingApi.getMyOrders(1, 50) : await providerOrderApi.getProviderOrders(1, 50);
-        let nextOrders = result.items;
-        if (role === "CUSTOMER" && requestedOrderId && !nextOrders.some((order) => order._id === requestedOrderId)) {
-          nextOrders = [await bookingApi.getOrderById(requestedOrderId), ...nextOrders];
-        }
-        if (!cancelled) setOrders(nextOrders);
-      } catch {
-        if (!cancelled) setOrders([]);
-      }
-    };
-    void loadOrders();
-    return () => { cancelled = true; };
-  }, [requestedOrderId, role]);
 
   const closeCreateModal = () => {
     setCreateKind(null);
@@ -190,7 +168,7 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
         </div>
       </AsyncState>
       <Pagination page={query.page || 1} totalPages={totalPages} onChange={(page) => setQuery((current) => ({ ...current, page }))} />
-      {createKind && <CreateCaseModal open kind={createKind} role={role} orders={orders} initialOrderId={requestedOrderId} onClose={closeCreateModal} onCreated={() => void load()} />}
+      {createKind && <CreateCaseModal open kind={createKind} role={role} initialOrderId={requestedOrderId} onClose={closeCreateModal} onCreated={() => void load()} />}
       <CaseDetailModal selected={selected} loading={detailLoading} busy={busy} actionError={actionError} onClose={() => { setSelected(null); setActionError(""); }} onCancel={cancelSelected} onAddEvidence={addEvidence} onRespond={respond} />
     </DashboardShell>
   );

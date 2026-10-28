@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { NearbyProviderSelector } from "@/features/customer-service/components/NearbyProviderSelector";
 import type { Order } from "@/types/booking";
 
@@ -40,6 +41,14 @@ export const BookingStatusBanners = ({
   paymentBannerSlot,
 }: BookingStatusBannersProps) => (
   <>
+    {order.status === "accepted" && order.arrival && <div role="status" className="mb-lg rounded-2xl border border-primary/20 bg-primary-container/10 p-md text-sm">
+      <p className="font-bold">Thợ đã đến địa chỉ của bạn</p>
+      <p className="mt-1">Vui lòng liên hệ thợ để bắt đầu dịch vụ.</p>
+    </div>}
+    {order.customerNoShow?.status === "pending" && <div role="status" className="mb-lg rounded-2xl bg-warning-container p-md text-sm text-on-warning-container">
+      Thợ báo không liên hệ được bạn. Handigo đang xem xét; nếu thông tin chưa chính xác, vui lòng liên hệ thợ hoặc gửi yêu cầu hỗ trợ.
+      <Link to="/customer/support" className="ml-2 font-semibold underline">Liên hệ hỗ trợ</Link>
+    </div>}
     {/* Khi đang chạy vòng tìm thợ thì khối đếm ngược bên dưới đã nói rồi, không
         hiện thêm banner chờ xác nhận nữa. */}
     {order.status !== "cancelled" && order.bookingStatus === "awaiting_provider" && !isWaitingForProvider && (
@@ -140,7 +149,7 @@ export const BookingStatusBanners = ({
         <div className="mt-md">
           <NearbyProviderSelector
             serviceId={order.serviceId._id}
-            addressId={order.addressId._id}
+            addressId={order.addressId?._id ?? undefined}
             scheduledAt={order.scheduledAt || undefined}
             recurrenceUnit={order.recurrenceUnit || undefined}
             recurrenceCount={order.totalOccurrences || undefined}

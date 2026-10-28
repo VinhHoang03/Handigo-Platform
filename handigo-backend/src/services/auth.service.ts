@@ -12,6 +12,7 @@ import { generateOtp, getOtpExpireDate, hashOtp } from "../utils/otp";
 import { sendOtpEmail } from "../utils/mail";
 import {
   getRefreshSecret,
+  isTokenVersionCurrent,
   signAccessToken,
   signRefreshToken,
 } from "../utils/token";
@@ -22,6 +23,8 @@ import {
   normalizeExternalPersonName,
 } from "../utils/profileValidation";
 import { markProviderOffline } from "./providerPresence.service";
+import { disconnectUserSockets } from "../sockets/socketServer";
+import { refreshAccountLock } from "./penaltyPolicy.service";
 
 const SALT_ROUNDS = 10;
 
@@ -80,6 +83,7 @@ type AuthUserResponse = {
 type RefreshTokenPayload = jwt.JwtPayload & {
   id: string;
   sessionId: string;
+  tokenVersion?: number;
 };
 
 type AuthTokens = {
@@ -206,11 +210,19 @@ const ensureWalletForUser = async (userId: Types.ObjectId | string): Promise<voi
     { upsert: true },
   );
 };
-const createAndSendRegisterOtp = async (user: IUser): Promise<void> => {
+const createAndSendRegisterOtp = async (
+  user: IUser,
+  changes: Record<string, unknown> = {},
+): Promise<void> => {
   const otp = generateOtp();
-  user.registerOtp = hashOtp(otp);
-  user.registerOtpExpire = getOtpExpireDate();
-  await user.save();
+  const updated = await User.findOneAndUpdate(
+    { _id: user._id, isEmailVerified: false, isDeleted: false,
+      passwordHash: user.passwordHash, registerOtp: user.registerOtp ?? null },
+    { $set: { ...changes, registerOtp: hashOtp(otp), registerOtpExpire: getOtpExpireDate() },
+      ...(Object.prototype.hasOwnProperty.call(changes, "phone") && changes.phone === undefined ? { $unset: { phone: 1 } } : {}) },
+    { new: true, runValidators: true },
+  );
+  if (!updated) throw new AppError("Thông tin đăng ký đã thay đổi. Vui lòng thử lại.", 409);
 
   await sendOtpEmail(user.email, "Verify your Handigo account", otp);
 };
@@ -241,14 +253,12 @@ export const register = async (payload: {
   const passwordHash = await bcrypt.hash(payload.password, SALT_ROUNDS);
 
   if (existingUser) {
-    existingUser.passwordHash = passwordHash;
-    existingUser.fullName = payload.fullName;
-    existingUser.phone = payload.phone;
-    existingUser.status = "active";
-    existingUser.registrationIntent = payload.registrationType || "CUSTOMER";
     try {
+      await createAndSendRegisterOtp(existingUser, {
+        passwordHash, fullName: payload.fullName, phone: payload.phone,
+        status: "active", registrationIntent: payload.registrationType || "CUSTOMER",
+      });
       await ensureWalletForUser(existingUser._id as Types.ObjectId);
-      await createAndSendRegisterOtp(existingUser);
     } catch (error: any) {
       if (error?.code === 11000 && error?.keyPattern?.phone) {
         throw new AppError("Số điện thoại đã được sử dụng", 409);
@@ -298,22 +308,23 @@ export const verifyRegisterOtp = async (
   ensureOtpValid(otp, user.registerOtp, user.registerOtpExpire);
 
   const isProviderRegistration = user.registrationIntent === "PROVIDER";
-  user.isEmailVerified = true;
-  user.role = isProviderRegistration ? "PROVIDER" : "CUSTOMER";
-  user.providerOnboardingStatus = isProviderRegistration
-    ? "PROFILE_INCOMPLETE"
-    : null;
-  user.providerOnboardingStep = isProviderRegistration ? 1 : null;
-  user.registrationIntent = undefined;
-  user.registerOtp = undefined;
-  user.registerOtpExpire = undefined;
-  await user.save();
+  const verifiedUser = await User.findOneAndUpdate(
+    { _id: user._id, isDeleted: false, isEmailVerified: false,
+      registerOtp: user.registerOtp, registerOtpExpire: { $gt: new Date() },
+      passwordHash: user.passwordHash, registrationIntent: user.registrationIntent ?? null },
+    { $set: { isEmailVerified: true, role: isProviderRegistration ? "PROVIDER" : "CUSTOMER",
+      providerOnboardingStatus: isProviderRegistration ? "PROFILE_INCOMPLETE" : null,
+      providerOnboardingStep: isProviderRegistration ? 1 : null },
+      $unset: { registrationIntent: 1, registerOtp: 1, registerOtpExpire: 1 } },
+    { new: true, runValidators: true },
+  );
+  if (!verifiedUser) throw new AppError("Thông tin đăng ký đã thay đổi. Vui lòng yêu cầu mã mới.", 409);
 
   if (!isProviderRegistration) return null;
 
   await markProviderOffline(user._id.toString());
-  const tokens = await issueSessionTokens(user);
-  return { ...tokens, user: toAuthUserResponse(user) };
+  const tokens = await issueSessionTokens(verifiedUser);
+  return { ...tokens, user: toAuthUserResponse(verifiedUser) };
 };
 
 export const resendRegisterOtp = async (email: string): Promise<void> => {
@@ -340,6 +351,7 @@ export const login = async (
     throw new AppError("Email hoặc mật khẩu không đúng", 401);
   }
 
+  await refreshAccountLock(user);
   if (user.status === "locked") {
     throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
@@ -445,6 +457,32 @@ const getGoogleProfileFromAccessToken = async (
   }
 };
 
+const linkOAuthAccount = async (
+  user: IUser,
+  identity: { googleId: string } | { facebookId: string },
+  name?: string,
+) => {
+  const unverified = !user.isEmailVerified;
+  const linked = await User.findOneAndUpdate(
+    { _id: user._id, isDeleted: false, status: "active",
+      isEmailVerified: user.isEmailVerified, passwordHash: user.passwordHash,
+      registerOtp: user.registerOtp ?? null },
+    { $set: { ...identity, isEmailVerified: true,
+      ...(!isValidPersonName(user.fullName)
+        ? { fullName: normalizeExternalPersonName(user.fullName || name) } : {}),
+      ...(unverified ? { passwordHash: null } : {}) },
+      ...(unverified ? {
+        $unset: { registerOtp: 1, registerOtpExpire: 1, registrationIntent: 1,
+          resetPasswordOtp: 1, resetPasswordOtpExpire: 1,
+          resetPasswordTokenHash: 1, resetPasswordExpire: 1 },
+        $inc: { tokenVersion: 1 },
+      } : {}) },
+    { new: true, runValidators: true },
+  );
+  if (!linked) throw new AppError("Thông tin tài khoản đã thay đổi. Vui lòng đăng nhập lại.", 409);
+  return linked;
+};
+
 export const googleLogin = async (payload: GoogleLoginPayload) => {
   const googleProfile = payload.credential
     ? await getGoogleProfileFromCredential(payload.credential)
@@ -466,6 +504,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
     $or: [{ googleId }, { email: normalizedEmail }],
   });
 
+  if (user) await refreshAccountLock(user);
   if (user && user.status === "locked") {
     throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
@@ -487,14 +526,7 @@ export const googleLogin = async (payload: GoogleLoginPayload) => {
       isEmailVerified: true,
     });
   } else {
-    authenticatedUser.googleId = googleId;
-    authenticatedUser.isEmailVerified = true;
-    if (!isValidPersonName(authenticatedUser.fullName)) {
-      authenticatedUser.fullName = normalizeExternalPersonName(
-        authenticatedUser.fullName || name,
-      );
-    }
-    await authenticatedUser.save();
+    authenticatedUser = await linkOAuthAccount(authenticatedUser, { googleId }, name);
   }
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
@@ -550,6 +582,7 @@ export const facebookLogin = async (accessToken: string) => {
     $or: [{ facebookId: user_id }, { email: normalizedEmail }],
   });
 
+  if (existingUser) await refreshAccountLock(existingUser);
   if (existingUser && existingUser.status === "locked") {
     throw new AppError("Tài khoản không được phép đăng nhập", 403);
   }
@@ -571,24 +604,7 @@ export const facebookLogin = async (accessToken: string) => {
       isEmailVerified: true,
     });
   } else {
-    let shouldSave = false;
-    if (authenticatedUser.facebookId !== user_id) {
-      authenticatedUser.facebookId = user_id;
-      shouldSave = true;
-    }
-    if (!authenticatedUser.isEmailVerified) {
-      authenticatedUser.isEmailVerified = true;
-      shouldSave = true;
-    }
-    if (!isValidPersonName(authenticatedUser.fullName)) {
-      authenticatedUser.fullName = normalizeExternalPersonName(
-        authenticatedUser.fullName || name,
-      );
-      shouldSave = true;
-    }
-    if (shouldSave) {
-      await authenticatedUser.save();
-    }
+    authenticatedUser = await linkOAuthAccount(authenticatedUser, { facebookId: user_id }, name);
   }
 
   await ensureWalletForUser(authenticatedUser._id as Types.ObjectId);
@@ -643,12 +659,27 @@ export const resetPassword = async (
 
   ensureOtpValid(otp, user.resetPasswordOtp, user.resetPasswordOtpExpire);
 
-  user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  user.resetPasswordOtp = undefined;
-  user.resetPasswordOtpExpire = undefined;
-  user.resetPasswordTokenHash = undefined;
-  user.resetPasswordExpire = undefined;
-  await user.save();
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  // Chỉ một yêu cầu được dùng OTP; lượt gửi lại hoặc đổi mật khẩu làm mất hiệu lực snapshot cũ.
+  const result = await User.updateOne({
+    _id: user._id,
+    passwordHash: user.passwordHash,
+    resetPasswordOtp: user.resetPasswordOtp,
+    resetPasswordOtpExpire: { $eq: user.resetPasswordOtpExpire, $gt: new Date() },
+  }, {
+    $set: { passwordHash },
+    $inc: { tokenVersion: 1 },
+    $unset: {
+      resetPasswordOtp: 1,
+      resetPasswordOtpExpire: 1,
+      resetPasswordTokenHash: 1,
+      resetPasswordExpire: 1,
+    },
+  }, { runValidators: true });
+  if (result.matchedCount !== 1) {
+    throw new AppError("Mã OTP không hợp lệ hoặc đã hết hạn", 400);
+  }
+  disconnectUserSockets(user._id.toString());
 
   await Session.updateMany(
     { userId: user._id, revokedAt: null },
@@ -680,6 +711,10 @@ export const refreshToken = async (
     throw new AppError("Không tìm thấy người dùng", 404);
   }
 
+  if (!isTokenVersionCurrent(decoded, user)) {
+    throw new AppError("Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.", 401);
+  }
+
   const session = await Session.findOne({
     _id: decoded.sessionId,
     userId: user._id,
@@ -693,6 +728,7 @@ export const refreshToken = async (
     throw new AppError("Phiên làm mới đăng nhập không hợp lệ hoặc đã hết hạn", 401);
   }
 
+  await refreshAccountLock(user);
   if (user.status === "locked") {
     await Session.findByIdAndUpdate(session._id, { revokedAt: new Date() });
     throw new AppError("Tài khoản không được phép đăng nhập", 403);
@@ -766,7 +802,9 @@ export const changePassword = async (
   }
 
   user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  user.$inc("tokenVersion", 1);
   await user.save();
+  disconnectUserSockets(user._id.toString());
 
   await Session.updateMany(
     { userId: user._id, revokedAt: null },
@@ -778,7 +816,7 @@ export const getCurrentUser = async (
   userId: string,
 ): Promise<Partial<IUser> & { isGoogleAccount: boolean }> => {
   const user = await User.findById(userId).select(
-    "-passwordHash -registerOtp -resetPasswordOtp",
+    "-passwordHash -registerOtp -resetPasswordOtp -tokenVersion",
   );
 
   if (!user) {

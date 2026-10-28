@@ -33,55 +33,19 @@ export const createOrderSchema = z.object({
   addressId: objectIdSchema,
   preferredProviderId: objectIdSchema.optional(),
   orderType: z
-    .enum(["normal", "urgent", "scheduled", "recurring"])
+    .enum(["normal", "scheduled"])
     .optional(),
   scheduledAt: z
     .string()
     .datetime({ offset: true, message: "Thời gian thực hiện không hợp lệ" })
     .optional(),
-  recurrenceUnit: z.enum(["weekly", "monthly"]).optional(),
-  recurrenceCount: z.coerce.number().int().min(1).max(12).optional(),
   problemDescription: z.string().trim().max(2000).optional(),
   customerAttachments: z.array(z.string().url()).max(4).optional(),
   promotionId: objectIdSchema.optional(),
   voucherId: objectIdSchema.optional(),
   voucherCode: z.string().trim().min(1).max(50).optional(),
   paymentMethod: z.enum(["wallet", "bank", "cash"]),
-}).superRefine((payload, context) => {
-  if (payload.orderType !== "recurring") return;
-  if (!payload.recurrenceUnit) {
-    context.addIssue({
-      code: "custom",
-      path: ["recurrenceUnit"],
-      message: "Vui lòng chọn chu kỳ định kỳ",
-    });
-  }
-  if (!payload.recurrenceCount) {
-    context.addIssue({
-      code: "custom",
-      path: ["recurrenceCount"],
-      message: "Vui lòng chọn số buổi định kỳ",
-    });
-  } else if (
-    payload.recurrenceUnit === "weekly" &&
-    ![1, 2, 3, 4].includes(payload.recurrenceCount)
-  ) {
-    context.addIssue({
-      code: "custom",
-      path: ["recurrenceCount"],
-      message: "Lịch hằng tuần chỉ hỗ trợ từ 1 đến 4 buổi",
-    });
-  } else if (
-    payload.recurrenceUnit === "monthly" &&
-    ![4, 8, 12].includes(payload.recurrenceCount)
-  ) {
-    context.addIssue({
-      code: "custom",
-      path: ["recurrenceCount"],
-      message: "Lịch hằng tháng phải gồm 4, 8 hoặc 12 buổi",
-    });
-  }
-});
+}).strict();
 
 const cancellationAmountSchema = z.number({ error: "Số tiền xác nhận phải là số hợp lệ." })
   .finite("Số tiền xác nhận phải là số hữu hạn.")
@@ -103,11 +67,6 @@ export const cancelOrderSchema = z.object({
   confirmedExpectation: cancellationExpectationSchema.optional(),
 });
 
-export const cancelRecurringSeriesSchema = cancelOrderSchema.omit({ confirmedExpectation: true }).extend({
-  confirmedExpectations: z.array(cancellationExpectationSchema.extend({ orderId: objectIdSchema }))
-    .min(1, "Cần xác nhận số tiền của ít nhất một buổi trong chuỗi lịch.").optional(),
-});
-
 export const previewBookingSchema = z.object({
   voucherCode: createOrderSchema.shape.voucherCode,
   serviceId: createOrderSchema.shape.serviceId,
@@ -115,7 +74,7 @@ export const previewBookingSchema = z.object({
   selectedOptionIds: createOrderSchema.shape.selectedOptionIds,
   selectedOptions: createOrderSchema.shape.selectedOptions,
   orderType: createOrderSchema.shape.orderType,
-});
+}).strict();
 
 export const reassignmentResponseSchema = z.object({
   decision: z.enum(["accept", "decline"], {
@@ -128,6 +87,18 @@ export const orderIdParamSchema = z.object({
 });
 
 export const updateExpectedEndSchema = z.object({ expectedEndAt: z.string().datetime({ offset: true }) });
+
+export const customerNoShowSchema = z.object({
+  description: z.string().trim().min(10, "Vui lòng mô tả việc liên hệ khách ít nhất 10 ký tự.").max(2000, "Mô tả không được vượt quá 2.000 ký tự."),
+  arrivalEvidenceIds: z.array(objectIdSchema, { error: "Vui lòng tải ảnh đã đến nơi trước khi gửi báo cáo." }).min(1, "Vui lòng gửi ít nhất một ảnh đã đến nơi.").max(4, "Mỗi loại tối đa 4 ảnh, tổng cộng không quá 5 ảnh."),
+  contactEvidenceIds: z.array(objectIdSchema, { error: "Vui lòng tải ảnh liên hệ khách trước khi gửi báo cáo." }).min(1, "Vui lòng gửi ít nhất một ảnh liên hệ khách.").max(4, "Mỗi loại tối đa 4 ảnh, tổng cộng không quá 5 ảnh."),
+  contactedCustomer: z.literal(true, { error: "Vui lòng xác nhận đã gọi hoặc nhắn tin cho khách." }),
+}).superRefine((value, context) => {
+  const ids = [...value.arrivalEvidenceIds, ...value.contactEvidenceIds];
+  if (ids.length > 5 || new Set(ids).size !== ids.length) context.addIssue({ code: "custom", message: "Chọn từ 2 đến 5 ảnh khác nhau, đủ cả ảnh đã đến nơi và ảnh liên hệ khách." });
+});
+
+export const customerNoShowEvidenceSchema = z.object({ kind: z.enum(["arrival", "contact"], { error: "Loại ảnh bằng chứng không hợp lệ." }) });
 
 export const quotationIdParamSchema = z.object({
   quotationId: objectIdSchema,
@@ -288,7 +259,7 @@ export const rejectAssignmentSchema = z.object({
 });
 
 export const cancellationPreviewQuerySchema = z.object({
-  scope: z.enum(["single", "series"]).optional().default("single"),
+  scope: z.enum(["single"]).optional().default("single"),
 });
 
 export const selectAppointmentProviderSchema = z.object({

@@ -13,7 +13,7 @@ interface Step2TimeSlotFieldsetProps {
   onSelectSlot: (startTime: string) => void;
 }
 
-/** Chọn giờ từ 08 đến 21 và phút từ 00 đến 59, chặn thời điểm đã qua. */
+/** Chọn giờ và phút trong ngày, chặn thời điểm đã qua. */
 export const Step2TimeSlotFieldset = ({
   scheduledAt, currentTimestamp, error, onSelectSlot,
 }: Step2TimeSlotFieldsetProps) => {
@@ -30,8 +30,7 @@ export const Step2TimeSlotFieldset = ({
   const earliest = getEarliestScheduledAt(new Date(currentTimestamp)).getTime();
   const isUnavailable = (slot: string) => {
     const timestamp = new Date(`${selectedDate}T${slot}:00`).getTime();
-    const [hour, minute] = slot.split(':').map(Number);
-    return !Number.isFinite(timestamp) || timestamp < earliest || hour > 21 || (hour === 21 && minute > 0);
+    return !Number.isFinite(timestamp) || timestamp < earliest;
   };
 
   const firstAvailableMinute = (hour: string) => minutes.find((minute) => !isUnavailable(`${hour}:${minute}`));

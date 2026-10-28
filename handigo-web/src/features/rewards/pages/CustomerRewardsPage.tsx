@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Gift, History, Info, LoaderCircle, Sparkles, Ticket, ArrowRight } from "lucide-react";
@@ -21,12 +22,12 @@ export default function CustomerRewardsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>("", "error");
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [selected, setSelected] = useState<RewardOffer | null>(null);
+  const [selected, setSelected] = useState<(RewardOffer & { validityDays: number }) | null>(null);
   const [redeeming, setRedeeming] = useState(false);
   const [redeemError, setRedeemError] = useToastFeedback<string>("", "error");
   const [paging, setPaging] = useState(false);
   const [onlyAffordable, setOnlyAffordable] = useState(false);
-  const pending = useRef<{ offerId: string; requestId: string } | null>(null);
+  const pending = useRef<{ offerId: string; requestId: string; termsVersion: string } | null>(null);
   const submitting = useRef(false);
   const load = useCallback(async () => {
     try {
@@ -50,13 +51,19 @@ export default function CustomerRewardsPage() {
   const redeem = async () => {
     if (!selected || submitting.current) return;
     submitting.current = true; setRedeeming(true); setRedeemError("");
-    pending.current ??= { offerId: selected.id, requestId: crypto.randomUUID() };
+    pending.current ??= { offerId: selected.id, requestId: crypto.randomUUID(), termsVersion: selected.termsVersion };
     try {
-      await rewardsApi.redeem(pending.current.offerId, pending.current.requestId);
+      await rewardsApi.redeem(pending.current.offerId, pending.current.requestId, pending.current.termsVersion);
       pending.current = null; setSelected(null);
       addToast("Đổi mã thành công! Mã đã được thêm vào ưu đãi của bạn.", "success");
       await load();
-    } catch (failure) { setRedeemError(getErrorMessage(failure, "Chưa xác định được kết quả. Hãy thử lại cùng yêu cầu này.")); }
+    } catch (failure) {
+      setRedeemError(getErrorMessage(failure, "Chưa xác định được kết quả. Hãy thử lại cùng yêu cầu này."));
+      if (isAxiosError(failure) && [404, 409].includes(failure.response?.status ?? 0)) {
+        pending.current = null; setSelected(null);
+        await load();
+      }
+    }
     finally { submitting.current = false; setRedeeming(false); }
   };
   const changePage = async (section: "vouchers" | "history", page: number) => {
@@ -121,7 +128,7 @@ export default function CustomerRewardsPage() {
                   <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-fixed text-primary"><Ticket aria-hidden="true" size={26} /></div>
                   <h3 className="text-xl font-bold text-on-surface">{offer.name}</h3><p className="mt-2 text-[13px] leading-6 text-on-surface-variant">{offer.applicableOrderType === "variable_price" ? `Mã áp dụng với đơn báo giá. Hiệu lực ${overview.policy.validityDays} ngày từ khi đổi.` : `Đơn giá cố định từ ${rewardMoney(offer.minOrderAmount)}. Hiệu lực ${overview.policy.validityDays} ngày từ khi đổi.`}</p>
                   {offer.maxDiscountAmount != null && <p className="mt-2 text-[13px] font-medium text-on-surface-variant">Giảm tối đa {rewardMoney(offer.maxDiscountAmount)}.</p>}
-                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-outline-variant pt-4"><span className="font-bold text-primary">{rewardNumber(offer.points)} điểm</span><button type="button" disabled={overview.balance < offer.points} onClick={() => { setSelected(offer); setRedeemError(""); if (pending.current?.offerId !== offer.id) pending.current = null; }} className={`${button} bg-primary text-on-primary hover:bg-primary-hover`}>{overview.balance < offer.points ? "Chưa đủ điểm" : "Đổi ngay"}</button></div>
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-outline-variant pt-4"><span className="font-bold text-primary">{rewardNumber(offer.points)} điểm</span><button type="button" disabled={overview.balance < offer.points} onClick={() => { setSelected({ ...offer, validityDays: overview.policy.validityDays }); setRedeemError(""); if (pending.current?.offerId !== offer.id) pending.current = null; }} className={`${button} bg-primary text-on-primary hover:bg-primary-hover`}>{overview.balance < offer.points ? "Chưa đủ điểm" : "Đổi ngay"}</button></div>
                 </article>)}
               </div>
               {!offers.length && <p className={`${panel} text-[13px] text-on-surface-variant`}>Chưa có ưu đãi phù hợp với số điểm hiện tại. Bỏ chọn bộ lọc để xem tất cả.</p>}
@@ -143,7 +150,7 @@ export default function CustomerRewardsPage() {
       </Modal>
       <Modal open={Boolean(selected)} onClose={() => { if (!redeeming) setSelected(null); }} title="Xác nhận đổi mã giảm giá" size="sm" closeOnEsc={!redeeming} closeOnOverlayClick={!redeeming}>
         {selected?.maxDiscountAmount != null && <p className="mb-3 text-[13px] font-semibold">Giảm tối đa {rewardMoney(selected.maxDiscountAmount)}.</p>}
-        {selected && <><p className="text-[13px] leading-7">Dùng <strong>{rewardNumber(selected.points)} điểm</strong> để nhận mã <strong>{selected.name.toLowerCase()}</strong> {selected.applicableOrderType === "variable_price" ? "chỉ dùng giảm phí cọc cho đơn báo giá" : `cho đơn giá cố định từ ${rewardMoney(selected.minOrderAmount)}`}.</p><p className="mt-3 text-[13px] text-on-surface-variant">Mã có hạn {overview?.policy.validityDays} ngày. Điểm đã đổi không được hoàn lại.</p><div className="mt-6 flex justify-end gap-3"><button type="button" disabled={redeeming} onClick={() => setSelected(null)} className={`${button} bg-surface-container-low`}>Để sau</button><button type="button" disabled={redeeming} onClick={() => void redeem()} className={`${button} bg-primary text-on-primary hover:bg-primary-hover`}>{redeeming ? "Đang đổi…" : redeemError ? "Thử lại yêu cầu" : "Xác nhận đổi"}</button></div></>}
+        {selected && <><p className="text-[13px] leading-7">Dùng <strong>{rewardNumber(selected.points)} điểm</strong> để nhận mã <strong>{selected.name.toLowerCase()}</strong> {selected.applicableOrderType === "variable_price" ? "chỉ dùng giảm phí cọc cho đơn báo giá" : `cho đơn giá cố định từ ${rewardMoney(selected.minOrderAmount)}`}.</p><p className="mt-3 text-[13px] text-on-surface-variant">Mã có hạn {selected.validityDays} ngày. Điểm đã đổi không được hoàn lại.</p><div className="mt-6 flex justify-end gap-3"><button type="button" disabled={redeeming} onClick={() => setSelected(null)} className={`${button} bg-surface-container-low`}>Để sau</button><button type="button" disabled={redeeming} onClick={() => void redeem()} className={`${button} bg-primary text-on-primary hover:bg-primary-hover`}>{redeeming ? "Đang đổi…" : redeemError ? "Thử lại yêu cầu" : "Xác nhận đổi"}</button></div></>}
       </Modal>
     </DashboardShell>
   );

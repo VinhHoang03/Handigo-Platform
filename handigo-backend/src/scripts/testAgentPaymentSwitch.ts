@@ -54,10 +54,11 @@ async function run() {
     const payments = await import("../services/payment.service");
     mock.method(Order, "findOne", async (filter: { customerId: string }) => filter.customerId === user.id ? order : null);
     mock.method(Order, "findById", async () => order);
-    mock.method(Payment, "findOne", async (filter: { _id?: string; customerId?: string; method?: string; status?: string }) => {
+    mock.method(Payment, "findOne", async (filter: { _id?: string; customerId?: string; method?: string | { $in: string[] }; status?: string | { $in: string[] } }) => {
       if (filter.customerId) assert.equal(filter.customerId, user.id);
-      if (filter.method && active?.method !== filter.method) return null;
+      if (filter.method && !(typeof filter.method === "string" ? active?.method === filter.method : filter.method.$in.includes(active?.method ?? ""))) return null;
       if (typeof filter.status === "string" && active?.status !== filter.status) return null;
+      if (filter.status && typeof filter.status !== "string" && !filter.status.$in.includes(active?.status ?? "")) return null;
       return filter._id ? active?._id === filter._id ? active : null : active;
     });
     mock.method(Wallet, "findOne", () => ({ select: async () => ({ balance }) }));

@@ -123,14 +123,52 @@ export function CaseDetailModal({
               <>
                 <section className="space-y-3">
                   <h3 className="font-bold">Trao đổi</h3>
-                  {selected.item.responses.map((response, index) => <article key={`${response.respondedAt}-${index}`} className={`rounded-2xl border p-4 ${response.responderRole === "ADMIN" ? "ml-8 border-primary/20 bg-primary/5" : "mr-8 border-outline-variant"}`}><div className="flex justify-between gap-3 text-xs text-on-surface-variant"><b>{response.responderId?.fullName || (response.responderRole === "ADMIN" ? "Quản trị viên" : "Người dùng")}</b><span>{dateTime.format(new Date(response.respondedAt))}</span></div><p className="mt-2 whitespace-pre-wrap text-sm">{response.message}</p><FileLinks files={response.attachments} /></article>)}
+                  {selected.item.responses.map((response, index) => {
+                    const isAdmin = response.responderRole === "ADMIN";
+                    return (
+                      <article
+                        key={`${response.respondedAt}-${index}`}
+                        className={`rounded-2xl border p-4 ${
+                          isAdmin
+                            ? "ml-8 border-primary/20 bg-primary/5"
+                            : "mr-8 border-outline-variant"
+                        }`}
+                      >
+                        <div className="flex justify-between gap-3 text-xs text-on-surface-variant">
+                          <b className={isAdmin ? "text-primary" : "text-on-surface"}>
+                            {isAdmin ? "Bộ phận hỗ trợ" : "Bạn"}
+                          </b>
+                          <span>
+                            {dateTime.format(new Date(response.respondedAt))}
+                          </span>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap text-sm">
+                          {response.message}
+                        </p>
+                        <FileLinks files={response.attachments} />
+                      </article>
+                    );
+                  })}
                 </section>
                 {!['resolved', 'closed', 'cancelled'].includes(selected.item.status) && (
                   <form onSubmit={submitResponse} className="rounded-2xl border border-outline-variant p-4">
-                    <label className="font-bold">Phản hồi</label>
-                    <textarea value={reply} onChange={(event) => setReply(event.target.value)} minLength={1} maxLength={3000} rows={4} required className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
+                    <label className="font-bold">Bổ sung thông tin</label>
+                    <p className="mt-1 text-sm text-on-surface-variant">
+                      Gửi thêm nội dung hoặc hình ảnh để bộ phận hỗ trợ xử lý yêu
+                      cầu chính xác hơn.
+                    </p>
+                    <textarea
+                      value={reply}
+                      onChange={(event) => setReply(event.target.value)}
+                      minLength={1}
+                      maxLength={3000}
+                      rows={4}
+                      required
+                      placeholder="Nhập thông tin cần bổ sung..."
+                      className="mt-3 w-full rounded-xl border border-outline-variant p-3"
+                    />
                     <EvidenceImagePicker files={files} onChange={setFiles} disabled={busy} />
-                    <button type="submit" disabled={busy || !reply.trim()} className="btn-primary mt-3">{busy ? "Đang gửi..." : "Gửi phản hồi"}</button>
+                    <button type="submit" disabled={busy || !reply.trim()} className="btn-primary mt-3">{busy ? "Đang gửi..." : "Gửi bổ sung"}</button>
                   </form>
                 )}
               </>

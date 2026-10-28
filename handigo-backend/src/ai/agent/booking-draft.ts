@@ -20,6 +20,7 @@ export const bookingDraftPatchSchema = z.object({
   quantity: z.number().int().min(1).max(99).optional(),
   optionPreference: z.string().trim().max(300).nullable().optional(),
   addressId: idSchema.nullable().optional(),
+  saveAddressToBook: z.boolean().optional(),
   addressPreference: z.string().trim().max(300).nullable().optional(),
   voucherCode: z.string().trim().min(1).max(50).nullable().optional(),
   voucherPreference: z.enum(["best", "choose"]).nullable().optional(),
@@ -63,8 +64,6 @@ export interface BookingDraft {
   summary: string[];
   choiceGroups: AgentChoiceGroup[];
   orderId?: string;
-  /** Internal flag: true khi scheduledAt được tự động chuyển sang ngày hôm sau vì đã qua giờ */
-  _autoAdvancedDay?: boolean;
 }
 export interface DraftService {
   id: string; name: string; slug?: string; serviceType: string; requiresOptionSelection: boolean;
@@ -193,6 +192,10 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   draft.availableVouchers = []; draft.providerCandidates = [];
   draft.voucherFeedback = undefined;
   const values = draft.values;
+  const addressStorageRequest = customerMessage ? normalizeAddress(customerMessage) : "";
+  const oneTimeAddress = /(?:khong|dung) (?:can )?luu dia chi|(?:khong|dung) (?:can )?luu (?:vao )?so dia chi|chi dung dia chi(?: nay)? (?:mot|1) lan|dia chi(?: nay)? (?:chi )?dung (?:mot|1) lan/.test(addressStorageRequest);
+  if (oneTimeAddress) values.saveAddressToBook = false;
+  else if (input.saveAddressToBook !== undefined) values.saveAddressToBook = input.saveAddressToBook;
   if (draft.draftAddress && ((input.addressId !== undefined && input.addressId !== draft.draftAddress.id)
     || input.addressPreference)) draft.draftAddress = undefined;
   if (input.selectedOptions !== undefined || input.quantity !== undefined || input.serviceId && input.serviceId !== values.serviceId) {
@@ -307,14 +310,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   if (input.scheduledAt === null) {
     delete values.scheduledAt; delete draft.sources.scheduledAt;
   } else if (input.scheduledAt) {
-    let scheduledMs = Date.parse(input.scheduledAt);
-    // Nếu giờ đã qua, tự chuyển sang ngày hôm sau cùng giờ thay vì báo lỗi
-    if (scheduledMs <= Date.now()) {
-      scheduledMs += 24 * 3600 * 1000;
-      draft._autoAdvancedDay = true;
-    } else {
-      draft._autoAdvancedDay = false;
-    }
+    const scheduledMs = Date.parse(input.scheduledAt);
     // Tính giờ địa phương tại Asia/Ho_Chi_Minh (+07:00) để format ISO với offset đúng
     const localMs = scheduledMs + 7 * 3600 * 1000; // UTC → +07:00 chỉ dùng để lấy các thành phần local
     const d = new Date(localMs);
@@ -484,12 +480,16 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       draft.summary.push(`${option.name} × ${item.quantity}`);
     }
   }
+  if (values.orderType === "normal" && !isWithinAppointmentHours(new Date())) {
+    draft.missing.push("Đặt ngay chỉ khả dụng từ 08:00 đến 21:00 theo giờ Việt Nam. Vui lòng chọn Hẹn giờ.");
+  }
   if (values.orderType === "scheduled") {
     const outsideHours = values.scheduledAt && !isWithinAppointmentHours(new Date(values.scheduledAt));
-    if (!values.scheduledAt || Date.parse(values.scheduledAt) < getEarliestScheduledAt().getTime() || outsideHours) {
-      // scheduledAt bị thiếu hoặc vẫn nằm trong quá khứ (sau khi đã thử auto-advance)
+    if (!values.scheduledAt || Date.parse(values.scheduledAt) <= Date.now()
+      || Date.parse(values.scheduledAt) < getEarliestScheduledAt().getTime() || outsideHours) {
+      // Giờ hẹn không hợp lệ phải được khách chọn lại, không tự đổi ngày.
       if (values.scheduledAt) { delete values.scheduledAt; delete draft.sources.scheduledAt; }
-      draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai, từ 08:00 đến 21:00${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
+      draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
       if (draft.scheduleDate) {
         const hours = draft.timeWindow === "morning" ? [8, 9, 10] : draft.timeWindow === "afternoon" ? [13, 14, 15]
           : draft.timeWindow === "evening" ? [18, 19, 20] : [9, 14, 18];
@@ -498,15 +498,11 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
           .map((time) => new Date(time).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }));
         if (options.length) draft.choiceGroups.push({ label: "Giờ hẹn mong muốn (chưa giữ chỗ)", multiple: false, options });
       }
-    } else if (draft._autoAdvancedDay) {
-      // Đã tự chuyển sang hôm sau, thêm ghi chú vào summary
-      const displayTime = new Date(Date.parse(values.scheduledAt!)).toLocaleString("vi-VN",
-        { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
-      draft.summary.push(`Giờ đã chọn đã qua, lịch được chuyển sang ${displayTime} (ngày mai). Bạn có thể đổi lại.`);
     }
   }
   const address = addresses.find((item) => item.id === values.addressId);
   if (address) draft.summary.push(`Địa chỉ: ${bookingAddressLabel(address)}`);
+  if (values.saveAddressToBook === false) draft.summary.push("Địa chỉ chỉ dùng cho đơn này, không thêm vào sổ địa chỉ.");
   if (draft.rebookNeedsOptionReview) {
     draft.missing.push("Gói cũ đã thay đổi. Vui lòng chọn lại gói và số lượng trước khi đặt lại");
   }
@@ -592,6 +588,9 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
           draft.summary.push(`Voucher ${selected.code}: giảm ${selected.discountAmount.toLocaleString("vi-VN")} đ; còn ${selected.finalAmount.toLocaleString("vi-VN")} đ.`);
         }
         if ((!draft.voucherDecision && draft.availableVouchers.length) || (values.voucherCode && !selected)) {
+          if (!draft.voucherDecision) {
+            draft.voucherFeedback = `Có ${draft.availableVouchers.length} mã giảm giá dùng được cho đơn này. Bạn có thể chọn mã bên dưới trước khi xác nhận.`;
+          }
           draft.choiceGroups.push({ label: "Voucher có thể sử dụng", multiple: false,
             options: [...draft.availableVouchers.slice(0, 10).map((voucher) => `${voucher.code} — giảm ${voucher.discountAmount.toLocaleString("vi-VN")} đ`), "Không dùng voucher"] });
         }

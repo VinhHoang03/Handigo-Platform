@@ -1,5 +1,5 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { feedbackService } from '../services/feedback.service';
 import type { FeedbackList, FeedbackPayload, FeedbackQuery, OrderFeedbackContext } from '../types/feedback.types';
 
@@ -9,8 +9,13 @@ export function useOrderFeedback(orderId: string) {
   const [loading, setLoading] = useState(isValidOrderId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(isValidOrderId ? '' : 'Mã đơn hàng không hợp lệ.');
+  const requestRevision = useRef(0);
+  const invalidateRequests = useCallback(() => { requestRevision.current++; }, []);
+  const currentContext = context?.order._id === orderId ? context : null;
 
   const load = useCallback(async () => {
+    const revision = ++requestRevision.current;
+    const isCurrent = () => requestRevision.current === revision;
     if (!isValidOrderId) {
       setError('Mã đơn hàng không hợp lệ.');
       setLoading(false);
@@ -19,43 +24,43 @@ export function useOrderFeedback(orderId: string) {
     try {
       setLoading(true);
       setError('');
-      setContext(await feedbackService.loadOrderContext(orderId));
+      const value = await feedbackService.loadOrderContext(orderId);
+      if (isCurrent()) setContext(value);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Không thể tải đánh giá.');
+      if (isCurrent()) setError(requestError instanceof Error ? requestError.message : 'Không thể tải đánh giá.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [isValidOrderId, orderId]);
 
   useEffect(() => {
     let active = true;
-    if (!isValidOrderId) return () => { active = false; };
-    feedbackService.loadOrderContext(orderId)
-      .then((value) => { if (active) setContext(value); })
-      .catch((requestError: unknown) => {
-        if (active) setError(requestError instanceof Error ? requestError.message : 'Không thể tải đánh giá.');
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [isValidOrderId, orderId]);
+    void Promise.resolve().then(() => { if (active) return load(); });
+    return () => { active = false; invalidateRequests(); };
+  }, [invalidateRequests, load]);
 
   const save = async (payload: FeedbackPayload, files: File[]) => {
+    if (!currentContext || !currentContext.canReview || loading || payload.orderId !== orderId) {
+      throw new Error('Thông tin đánh giá chưa khớp đơn hàng. Vui lòng tải lại.');
+    }
+    const revision = requestRevision.current;
+    const isCurrent = () => requestRevision.current === revision;
     setSaving(true);
     setError('');
     try {
-      const feedback = await feedbackService.save(context?.feedback?._id, payload, files);
-      setContext((current) => current ? { ...current, feedback } : current);
+      const feedback = await feedbackService.save(currentContext.feedback?._id, payload, files, isCurrent);
+      if (isCurrent()) setContext((current) => current?.order._id === orderId ? { ...current, feedback } : current);
     } finally {
-      setSaving(false);
+      if (isCurrent()) setSaving(false);
     }
   };
 
   return {
-    context,
-    feedback: context?.feedback || null,
-    loading,
+    context: currentContext,
+    feedback: currentContext?.feedback || null,
+    loading: loading || (isValidOrderId && !currentContext && !error),
     saving,
-    error,
+    error: isValidOrderId ? error : 'Mã đơn hàng không hợp lệ.',
     load,
     save,
   };

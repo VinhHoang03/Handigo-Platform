@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { FloatingInput } from "@/components/common/FloatingField";
+import { OtpInput } from "./OtpInput";
 
 interface RegisterOtpFormProps {
   otp: string;
@@ -22,20 +22,16 @@ export function RegisterOtpForm({
 }: RegisterOtpFormProps) {
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
-      <FloatingInput
+      <OtpInput
         id="register-otp"
-        label="Mã OTP"
         value={otp}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        required
-        onValueChange={(value) => onOtpChange(value.replace(/\D/g, "").slice(0, 6))}
+        disabled={isSubmitting}
+        onValueChange={onOtpChange}
       />
 
       <button
         type="submit"
-        disabled={isSubmitting || otp.length !== 6}
+        disabled={isSubmitting || !/^\d{6}$/.test(otp)}
         className="btn-primary w-full"
       >
         {isSubmitting ? "Đang xác thực..." : "Xác thực OTP"}

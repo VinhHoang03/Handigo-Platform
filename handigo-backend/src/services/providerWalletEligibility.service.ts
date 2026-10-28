@@ -2,6 +2,8 @@ import { Types } from "mongoose";
 import { Wallet } from "../models/wallet.model";
 import { AppError } from "../utils/appError";
 import { getNumberConfigValue } from "./systemConfig.service";
+import User from "../models/user.model";
+import { assertFeatureAllowed, getRestrictedUserIds } from "./penaltyPolicy.service";
 
 export const PROVIDER_MINIMUM_WALLET_BALANCE_CONFIG_KEY =
   "PROVIDER_MINIMUM_WALLET_BALANCE";
@@ -25,12 +27,16 @@ export const getEligibleProviderUserIds = async () => {
     .select("userId")
     .lean();
 
-  return wallets.map((wallet) => wallet.userId as Types.ObjectId);
+  const restricted = await getRestrictedUserIds("order_receiving");
+  const users = await User.find({ _id: { $in: wallets.map((wallet) => wallet.userId), $nin: restricted },
+    status: "active", isDeleted: false }).select("_id").lean();
+  return users.map((user) => user._id as Types.ObjectId);
 };
 
 export const assertProviderWalletEligible = async (
   providerUserId: string | Types.ObjectId,
 ) => {
+  await assertFeatureAllowed(providerUserId, "order_receiving");
   const minimumBalance = await getProviderMinimumWalletBalance();
   const wallet = await Wallet.findOne({
     userId: providerUserId,

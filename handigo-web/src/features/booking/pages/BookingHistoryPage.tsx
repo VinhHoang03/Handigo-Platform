@@ -1,5 +1,5 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   BookingHistoryCard,
@@ -21,6 +21,7 @@ import { formatCurrency } from "@/utils/currency";
 const filters = [
   { label: "Tất cả", value: "all" },
   { label: "Đang xử lý", value: "created" },
+  { label: "Thợ đã nhận", value: "accepted" },
   { label: "Đang thực hiện", value: "in_progress" },
   { label: "Đã hoàn thành", value: "completed" },
   { label: "Đã hủy", value: "cancelled" },
@@ -35,8 +36,18 @@ const BookingHistoryPage = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [resultQuery, setResultQuery] = useState('');
+  const requestRevision = useRef(0);
+  const inFlight = useRef(false);
+  const committedPage = useRef<{ query: string; page: number } | null>(null);
+  const queryKey = JSON.stringify([activeFilter, debouncedSearch]);
+  const isCurrentQuery = resultQuery === queryKey;
+  const invalidateRequests = useCallback(() => {
+    requestRevision.current++;
+    inFlight.current = false;
+  }, []);
 
-  // Handle debouncing search term to avoid too many API calls
+  // Chờ khách ngừng nhập trước khi tìm kiếm.
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -44,45 +55,48 @@ const BookingHistoryPage = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  const fetchOrders = useCallback(
-    async (
-      filter: string,
-      search: string,
-      targetPage: number,
-      append = false,
-    ) => {
-      // Avoid synchronous setState warning in build
-      setTimeout(() => setLoading(true), 0);
-      try {
-        // Map 'all' to undefined for the API
-        const statusParam = filter === "all" ? undefined : filter;
-        const data = await bookingApi.getMyOrders(
-          targetPage,
-          10,
-          statusParam,
-          search,
-        );
-        setOrders((current) =>
-          append ? [...current, ...data.items] : data.items,
-        );
-        setTotal(data.pagination.total);
-        setPage(targetPage);
-        setError("");
-      } catch {
-        setError("Không thể tải lịch sử đặt dịch vụ. Vui lòng thử lại.");
-      } finally {
-        setTimeout(() => setLoading(false), 0);
+  const fetchOrders = useCallback(async (filter: string, search: string, targetPage: number, append = false) => {
+    const query = JSON.stringify([filter, search]);
+    if (append && (inFlight.current || committedPage.current?.query !== query
+      || targetPage !== committedPage.current.page + 1)) return;
+    const revision = ++requestRevision.current;
+    inFlight.current = true;
+    if (!append) committedPage.current = null;
+    setLoading(true);
+    setError('');
+    try {
+      const statusParam = filter === 'all' ? undefined : filter;
+      const data = await bookingApi.getMyOrders(targetPage, 10, statusParam, search);
+      if (revision !== requestRevision.current) return;
+      setOrders((current) => append
+        ? [...new Map([...current, ...data.items].map(order => [order._id, order])).values()]
+        : data.items);
+      setTotal(data.pagination.total);
+      setPage(targetPage);
+      committedPage.current = { query, page: targetPage };
+      setResultQuery(query);
+      setError('');
+    } catch {
+      if (revision !== requestRevision.current) return;
+      setResultQuery(query);
+      setError('Không thể tải lịch sử đặt dịch vụ. Vui lòng thử lại.');
+    } finally {
+      if (revision === requestRevision.current) {
+        inFlight.current = false;
+        setLoading(false);
       }
-    },
-    [setError],
-  );
+    }
+  }, [setError]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchOrders(activeFilter, debouncedSearch, 1);
     }, 0);
-    return () => clearTimeout(timer);
-  }, [activeFilter, debouncedSearch, fetchOrders]);
+    return () => {
+      clearTimeout(timer);
+      invalidateRequests();
+    };
+  }, [activeFilter, debouncedSearch, fetchOrders, invalidateRequests]);
 
   const mapStatusToTone = (status: string): BookingStatusTone => {
     switch (status) {
@@ -183,8 +197,8 @@ const BookingHistoryPage = () => {
 
       <div className="grid grid-cols-1 gap-md">
         <AsyncState
-          loading={loading}
-          error={error}
+          loading={loading || !isCurrentQuery}
+          error={isCurrentQuery ? error : ''}
           onRetry={() => void fetchOrders(activeFilter, debouncedSearch, 1)}
           skeleton={<BookingHistoryListSkeleton />}
         >
@@ -221,7 +235,7 @@ const BookingHistoryPage = () => {
         </AsyncState>
       </div>
 
-      {!loading && total > 5 && formattedBookings.length < total && (
+      {!loading && isCurrentQuery && !error && total > 5 && formattedBookings.length < total && (
         <div className="pt-lg flex justify-center">
           <button
             type="button"

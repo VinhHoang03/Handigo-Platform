@@ -83,6 +83,12 @@ export interface IOrderReassignment {
 }
 
 export interface IOrder extends Document, IBaseDocument {
+  arrival?: { providerId: Types.ObjectId; arrivedAt: Date; latitude: number; longitude: number } | null;
+  customerNoShow?: {
+    reportId: Types.ObjectId; status: "pending" | "approved" | "rejected";
+    reportedAt: Date; reviewedAt?: Date | null; compensationAmount: Money;
+    evidenceIds?: Types.ObjectId[]; customerRepliedAt?: Date | null;
+  } | null;
   promotionUsedAt?: Date | null;
   promotionReleasedAt?: Date | null;
   statusVersion: number;
@@ -108,7 +114,8 @@ export interface IOrder extends Document, IBaseDocument {
   servicePackageId?: Types.ObjectId | null;
   selectedOptionIds: Types.ObjectId[];
   selectedOptionsSnapshot: ISelectedOptionSnapshot[];
-  addressId: Types.ObjectId;
+  addressId: Types.ObjectId | null;
+  // Giữ kiểu dữ liệu lịch sử; API và service tạo đơn chỉ nhận normal/scheduled.
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: Date | null;
   bookingStatus:
@@ -205,6 +212,21 @@ const DiscountSnapshotSchema = new Schema<IDiscountSnapshot>(
 
 const OrderSchema = new Schema<IOrder>(
   {
+    arrival: { type: new Schema({
+      providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
+      arrivedAt: { type: Date, required: true },
+      latitude: { type: Number, required: true, min: -90, max: 90 },
+      longitude: { type: Number, required: true, min: -180, max: 180 },
+    }, { _id: false }), default: null },
+    customerNoShow: { type: new Schema({
+      reportId: { type: Schema.Types.ObjectId, ref: "Report", required: true },
+      status: { type: String, enum: ["pending", "approved", "rejected"], required: true },
+      reportedAt: { type: Date, required: true },
+      reviewedAt: { type: Date, default: null },
+      compensationAmount: { type: Number, required: true, min: 0 },
+      evidenceIds: { type: [{ type: Schema.Types.ObjectId, ref: "CustomerNoShowEvidence" }], default: [] },
+      customerRepliedAt: { type: Date, default: null },
+    }, { _id: false }), default: null },
     statusVersion: { type: Number, default: 0, min: 0 },
     overdueReview: { type: new Schema({ escalatedAt: { type: Date, default: null } }, { _id: false }), default: null },
     schedule: { type: new Schema({
@@ -233,7 +255,8 @@ const OrderSchema = new Schema<IOrder>(
       type: [SelectedOptionSnapshotSchema],
       default: [],
     },
-    addressId: { type: Schema.Types.ObjectId, ref: "Address", required: true },
+    addressId: { type: Schema.Types.ObjectId, ref: "Address", default: null,
+      required: function (this: IOrder) { return !this.addressSnapshot; } },
     addressSnapshot: { type: new Schema({
       recipientName: String, recipientPhone: String, fullAddress: { type: String, required: true },
       province: { type: String, required: true }, ward: { type: String, required: true },

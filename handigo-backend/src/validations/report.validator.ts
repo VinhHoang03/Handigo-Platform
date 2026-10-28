@@ -39,6 +39,12 @@ export const createReportSchema = z
       return true;
     },
     "Thiếu thông tin đối tượng bị báo cáo",
+  )
+  .refine(
+    (data) => (!data.targetProviderId || data.targetType === "provider") &&
+      (!data.targetFeedbackId || data.targetType === "feedback") &&
+      (!data.conversationId || data.targetType === "chat_conversation"),
+    "Liên kết tài nguyên không phù hợp với loại báo cáo",
   );
 
 export const reviewReportSchema = z.object({

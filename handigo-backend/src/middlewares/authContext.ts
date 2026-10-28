@@ -4,6 +4,7 @@ import type { UserRole } from "../models/user.model";
 import { AppError } from "../utils/appError";
 
 export interface AuthenticatedUser extends JwtPayload {
+  tokenVersion?: number;
   id: string;
   email: string;
   role: UserRole;

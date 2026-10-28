@@ -10,6 +10,12 @@ import { ConversationListSkeleton } from "./ConversationListSkeleton";
 import { MessageCircle, MessagesSquare, RefreshCw } from "lucide-react";
 
 export function MessageCenter() {
+  const accountId = useAuthStore((state) => state.user?.id || state.user?._id);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  return isAuthenticated ? <AccountMessageCenter key={accountId} /> : null;
+}
+
+function AccountMessageCenter() {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [open, setOpen] = useState(false);
@@ -18,6 +24,8 @@ export function MessageCenter() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>("", "error");
   const rootRef = useRef<HTMLDivElement>(null);
+  const requestRevision = useRef(0);
+  const invalidateRequests = useCallback(() => { requestRevision.current++; }, []);
   const role = user?.role.toUpperCase();
   const currentUserId = user?.id || user?._id;
 
@@ -35,40 +43,28 @@ export function MessageCenter() {
     () => items.filter(isUnread).length,
     [isUnread, items],
   );
-  const conversationIds = useMemo(
-    () => items.map((conversation) => conversation._id),
-    [items],
-  );
-
   const load = useCallback(async (showLoading = false) => {
+    const revision = ++requestRevision.current;
     try {
       if (showLoading) setLoading(true);
       setError("");
       const result = await chatApi.conversations();
-      setItems(result.items);
+      if (requestRevision.current === revision) setItems(result.items);
     } catch {
-      setError("Không thể tải danh sách tin nhắn.");
+      if (requestRevision.current === revision) setError("Không thể tải danh sách tin nhắn.");
     } finally {
-      if (showLoading) setLoading(false);
+      if (requestRevision.current === revision) setLoading(false);
     }
   }, [setError]);
 
   useEffect(() => {
     let active = true;
-    chatApi.conversations()
-      .then((result) => {
-        if (active) setItems(result.items);
-      })
-      .catch(() => {
-        if (active) setError("Không thể tải danh sách tin nhắn.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    void Promise.resolve().then(() => { if (active) return load(true); });
     return () => {
       active = false;
+      invalidateRequests();
     };
-  }, [setError]);
+  }, [invalidateRequests, load]);
 
   useEffect(() => {
     const handleOutside = (event: MouseEvent) => {
@@ -79,28 +75,28 @@ export function MessageCenter() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !conversationIds.length) return;
+    if (!isAuthenticated) return;
     const { socket, dispose } = createAuthenticatedSocket();
-    const joinConversations = () => {
-      conversationIds.forEach((conversationId) => {
-        socket.emit("conversation:join", { conversationId });
-      });
-    };
     const refresh = () => void load();
-    socket.on("connect", joinConversations);
+    const refreshVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    socket.on("connect", refresh);
     socket.on("message:new", refresh);
     socket.on("message:updated", refresh);
     socket.on("message:deleted", refresh);
     socket.on("message:seen", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshVisible);
     return () => {
-      socket.off("connect", joinConversations);
+      socket.off("connect", refresh);
       socket.off("message:new", refresh);
       socket.off("message:updated", refresh);
       socket.off("message:deleted", refresh);
       socket.off("message:seen", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshVisible);
       dispose();
     };
-  }, [conversationIds, isAuthenticated, load]);
+  }, [isAuthenticated, load]);
 
   const openConversation = (conversation: Conversation) => {
     setSelected(conversation);
@@ -114,7 +110,7 @@ export function MessageCenter() {
           type="button"
           aria-label="Tin nhắn"
           aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => { if (!open) void load(true); setOpen((value) => !value); }}
           className="relative inline-flex rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary"
         >
           <MessageCircle aria-hidden="true" size={24} />

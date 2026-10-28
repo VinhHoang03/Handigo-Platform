@@ -57,7 +57,7 @@ export function useNearbyProviders({
   useEffect(() => {
     let isMounted = true;
 
-    if (!enabled || !serviceId || !addressId || (requireSelection && !scheduledAt)) {
+    if (!enabled || !serviceId || (!addressId && !orderId) || (requireSelection && !scheduledAt)) {
       onAvailabilityChange?.("idle");
       return () => {
         isMounted = false;

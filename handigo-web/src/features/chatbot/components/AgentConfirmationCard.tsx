@@ -10,6 +10,7 @@ const labels: Record<string, string> = {
   originalAmount: "Giá trước giảm", voucherCode: "Voucher", discountAmount: "Giảm giá", providerName: "Chuyên gia ưu tiên",
   previousAddress: "Địa chỉ trước khi sửa", recipientName: "Người nhận", recipientPhone: "Số điện thoại người nhận",
   addressNote: "Ghi chú địa chỉ",
+  addressStorage: "Lưu địa chỉ", rating: "Số sao",
   paymentMethod: "Thanh toán", amount: "Số tiền", description: "Mô tả",
   orderCode: "Mã đơn", reason: "Lý do hủy", paidAmount: "Đã thanh toán",
   refundAmount: "Dự kiến hoàn", cancellationFee: "Phí hủy", note: "Lưu ý",
@@ -22,7 +23,7 @@ const labels: Record<string, string> = {
 const paymentLabels: Record<string, string> = { cash: "Tiền mặt", bank: "Trực tuyến", wallet: "Ví Handigo" };
 function formatValue(key: string, value: unknown, serviceType?: unknown) {
   if (value == null) return "";
-  if (key === "quantity" && typeof value === "number") return value.toLocaleString("vi-VN");
+  if (["quantity", "rating"].includes(key) && typeof value === "number") return value.toLocaleString("vi-VN");
   if (typeof value === "number") return `${value.toLocaleString("vi-VN")} đ`;
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string").map((item) => {
     if (key !== "options" || serviceType !== "variable_price") return item;
@@ -82,7 +83,7 @@ export function AgentConfirmationCard({ action, disabled, onDecision, readOnly =
       })}
     </dl>
     {Array.isArray(action.preview.customerAttachments) && action.preview.customerAttachments.length > 0 && <div className="px-4 pb-4">
-      <p className="mb-2 text-xs text-on-surface-variant">Ảnh hiện trạng gửi kèm đơn</p>
+      <p className="mb-2 text-xs text-on-surface-variant">{action.tool === "create_booking" ? "Ảnh hiện trạng gửi kèm đơn" : "Ảnh đính kèm yêu cầu"}</p>
       <div className="grid grid-cols-4 gap-2">{action.preview.customerAttachments.filter((url): url is string => typeof url === "string" && url.startsWith("https://")).map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer" aria-label={`Mở ảnh hiện trạng ${index + 1}`} className="overflow-hidden rounded-lg focus-visible:outline-2 focus-visible:outline-primary">
         <img src={url} alt={`Ảnh hiện trạng ${index + 1}`} loading="lazy" className="aspect-square w-full object-cover" />
       </a>)}</div>

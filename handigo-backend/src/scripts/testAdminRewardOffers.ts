@@ -7,10 +7,15 @@ import { Voucher } from "../models/voucher.model";
 import { Order } from "../models/order.model";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
 import { getRewardOffers, updateConfig, createConfig } from "../services/systemConfig.service";
-import { getAdminRewardOffers, saveAdminRewardOffer, getRewardOverview, getMyRewardVouchers, redeemReward } from "../services/reward.service";
+import { getAdminRewardOffers, saveAdminRewardOffer, getRewardOverview, getMyRewardVouchers, redeemReward as redeemRewardService } from "../services/reward.service";
 import { getAdminVouchers, updateAdminVoucher, disableAdminVoucher, enableAdminVoucher, deleteAdminVoucher } from "../services/voucher.service";
 import { rewardOfferSchema } from "../validations/reward.validator";
 import { adminVoucherQuerySchema } from "../validations/voucher.validator";
+
+const redeemReward = async (userId: string, offerId: string, requestId: string) => {
+  const overview = await getRewardOverview(userId);
+  return redeemRewardService(userId, offerId, requestId, overview.policy.offers.find((offer) => offer.id === offerId)?.termsVersion);
+};
 
 // Cô lập database; kiểm tra cấu hình thật, cấp mã, phân quyền và quản lý mã cá nhân.
 async function run() {

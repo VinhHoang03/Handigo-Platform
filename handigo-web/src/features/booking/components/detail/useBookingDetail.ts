@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
+import { getAppliedQuotationDeposit, getRemainingQuotationPayment } from '@/utils/quotationPayment';
 import { useParams } from "react-router-dom";
 import { useBookingDetailData } from "./useBookingDetailData";
 import { useMatchingCountdown } from "./useMatchingCountdown";
@@ -72,7 +72,7 @@ export const useBookingDetail = () => {
     .reduce((total, payment) => total + payment.amount, 0);
   const appliedDepositAmount = order ? getAppliedQuotationDeposit(order, paidDepositAmount) : paidDepositAmount;
   const remainingQuotationAmount = quotation
-    ? getDirectRepairPayment(quotation.quotation.finalAmount, appliedDepositAmount)
+    ? getRemainingQuotationPayment(quotation.quotation, appliedDepositAmount, order?.status)
     : 0;
   const canMakeInitialPayment = Boolean(
     order &&

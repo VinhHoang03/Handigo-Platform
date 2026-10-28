@@ -17,6 +17,7 @@ type UseProviderProfileSaveParams = {
   setIsSaving: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string | null>>;
   syncAuthUser: (nextUser: UserProfileData) => void;
+  isCurrent: () => boolean;
 };
 
 /** Saves the shared personal-info form and the avatar, both of which patch
@@ -27,14 +28,17 @@ export function useProviderProfileSave({
   setIsSaving,
   setError,
   syncAuthUser,
+  isCurrent,
 }: UseProviderProfileSaveParams) {
   const { addToast } = useToast();
   async function handleUserProfileSave(payload: UserProfileFormValue) {
+    if (!isCurrent()) return;
     setIsSaving(true);
     setError(null);
 
     try {
       const nextUser = await updateUserProfile(payload);
+      if (!isCurrent()) return;
       setProfile((current) =>
         current
           ? {
@@ -53,6 +57,7 @@ export function useProviderProfileSave({
       syncAuthUser(nextUser);
       addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (saveError) {
+      if (!isCurrent()) return;
       setError(
         getErrorMessage(
           saveError,
@@ -61,17 +66,18 @@ export function useProviderProfileSave({
       );
       throw saveError;
     } finally {
-      setIsSaving(false);
+      if (isCurrent()) setIsSaving(false);
     }
   }
 
   async function handleAvatarSave(url: string) {
-    if (!profile) return;
+    if (!profile || !isCurrent()) return;
     setIsSaving(true);
     setError(null);
 
     try {
       const nextUser = await updateUserAvatar(url);
+      if (!isCurrent()) return;
       setProfile((current) =>
         current
           ? {
@@ -86,6 +92,7 @@ export function useProviderProfileSave({
       syncAuthUser(nextUser);
       addToast("Đã cập nhật hồ sơ cá nhân.", "success");
     } catch (saveError) {
+      if (!isCurrent()) return;
       setError(
         getErrorMessage(
           saveError,
@@ -94,7 +101,7 @@ export function useProviderProfileSave({
       );
       throw saveError;
     } finally {
-      setIsSaving(false);
+      if (isCurrent()) setIsSaving(false);
     }
   }
 

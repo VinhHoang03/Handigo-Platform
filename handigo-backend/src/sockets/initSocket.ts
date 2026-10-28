@@ -14,6 +14,8 @@ import { currentLocationSchema } from "../validations/location.validator";
 import { orderIdParamSchema } from "../validations/order.validator";
 import { markProviderOffline, restoreProviderAfterReconnect } from "../services/providerPresence.service";
 import { createLogger } from "../utils/logger";
+import { isTokenVersionCurrent } from "../utils/token";
+import { refreshAccountLock } from "../services/penaltyPolicy.service";
 
 const PROVIDER_OFFLINE_GRACE_MS = 30_000;
 const socketLogger = createLogger("SocketServer");
@@ -29,6 +31,7 @@ const getAccessSecret = (): string => {
 };
 
 interface SocketUser {
+  tokenVersion?: number;
   id: string;
   email: string;
   role: "CUSTOMER" | "PROVIDER" | "ADMIN";
@@ -64,15 +67,21 @@ export const initSocket = (server: HttpServer) => {
 
       const decoded = jwt.verify(token, getAccessSecret()) as SocketUser;
       const user = await User.findOne({ _id: decoded.id, isDeleted: false });
+      if (user) await refreshAccountLock(user);
 
       if (!user || user.status === "locked") {
         return next(new Error("Người dùng không được phép kết nối socket"));
+      }
+
+      if (!isTokenVersionCurrent(decoded, user)) {
+        return next(new Error("Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại."));
       }
 
       socket.user = {
         id: user._id.toString(),
         email: user.email,
         role: user.role,
+        tokenVersion: decoded.tokenVersion ?? 0,
       };
       next();
     } catch (error) {
@@ -87,8 +96,8 @@ export const initSocket = (server: HttpServer) => {
     });
     socket.use(async (_packet, next) => {
       try {
-        const current = await User.findOne({ _id: socketUser.id, isDeleted: false }).select("status role").lean();
-        if (!current || current.status === "locked" || current.role !== socketUser.role) {
+        const current = await User.findOne({ _id: socketUser.id, isDeleted: false }).select("status role tokenVersion").lean();
+        if (!current || current.status === "locked" || current.role !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
           next(new Error("Tài khoản không còn quyền sử dụng kết nối này."));
           socket.disconnect(true);
           return;
@@ -100,6 +109,16 @@ export const initSocket = (server: HttpServer) => {
     });
     const userRoom = `user:${socketUser.id}`;
     socket.join(userRoom);
+    // Kiểm tra lại sau khi vào room để chặn phiên đổi mật khẩu giữa lúc bắt tay và kết nối.
+    void User.findOne({ _id: socketUser.id, isDeleted: false })
+      .select("status role tokenVersion")
+      .lean()
+      .then((current) => {
+        if (!current || current.status === "locked" || current.role !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
+          socket.disconnect(true);
+        }
+      })
+      .catch(() => socket.disconnect(true));
 
     if (socketUser.role === "PROVIDER") {
       const pendingOfflineTimer = providerOfflineTimers.get(socketUser.id);
@@ -242,7 +261,13 @@ export const initSocket = (server: HttpServer) => {
           socket.user!.role as "CUSTOMER" | "PROVIDER",
           coordinates,
         );
-        io.to(`order:${orderId}`).emit("order:location", location);
+        // Kiểm tra lại phân công sau khi lưu vị trí; room đơn có thể còn socket của thợ cũ.
+        const recipients = await orderTrackingService.getOrderTrackingRecipientIds(orderId, socket.user!.id);
+        const sockets = await io.in(`order:${orderId}`).fetchSockets();
+        const recipientRooms = recipients.map((userId) => `user:${userId}`);
+        const socketIds = sockets.filter((member) =>
+          recipientRooms.some((room) => member.rooms.has(room))).map((member) => member.id);
+        if (socketIds.length) io.to(socketIds).emit("order:location", location);
         callback?.({ success: true, data: location });
       } catch (error: any) {
         callback?.({ success: false, message: error.message });

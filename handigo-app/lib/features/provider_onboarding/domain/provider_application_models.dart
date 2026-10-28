@@ -51,6 +51,14 @@ class IdentityDocument {
     this.type = 'cccd',
     this.documentNumber = '',
     this.fullName = '',
+    this.issuedPlace,
+    this.issuedAt,
+    this.expiresAt,
+    this.dateOfBirth,
+    this.gender,
+    this.nationality,
+    this.placeOfOrigin,
+    this.placeOfResidence,
     this.frontImageUrl,
     this.backImageUrl,
     this.passportImageUrl,
@@ -63,6 +71,14 @@ class IdentityDocument {
         documentNumber:
             '${json['documentNumber'] ?? json['numberLast4'] ?? ''}',
         fullName: '${json['fullName'] ?? ''}',
+        issuedPlace: json['issuedPlace'] as String?,
+        issuedAt: json['issuedAt'] as String?,
+        expiresAt: json['expiresAt'] as String?,
+        dateOfBirth: json['dateOfBirth'] as String?,
+        gender: json['gender'] as String?,
+        nationality: json['nationality'] as String?,
+        placeOfOrigin: json['placeOfOrigin'] as String?,
+        placeOfResidence: json['placeOfResidence'] as String?,
         frontImageUrl: json['frontImageUrl'] as String?,
         backImageUrl: json['backImageUrl'] as String?,
         passportImageUrl: json['passportImageUrl'] as String?,
@@ -70,6 +86,14 @@ class IdentityDocument {
         rejectionReason: json['rejectionReason'] as String?,
       );
   final String type, documentNumber, fullName, verificationStatus;
+  final String? issuedPlace,
+      issuedAt,
+      expiresAt,
+      dateOfBirth,
+      gender,
+      nationality,
+      placeOfOrigin,
+      placeOfResidence;
   final String? frontImageUrl, backImageUrl, passportImageUrl, rejectionReason;
 }
 
@@ -78,6 +102,7 @@ class ProviderCertificate {
     required this.title,
     this.certificateNumber,
     this.issuer,
+    this.issuedAt,
     this.imageUrls = const [],
     this.status = 'pending',
   });
@@ -86,11 +111,12 @@ class ProviderCertificate {
         title: '${json['title'] ?? ''}',
         certificateNumber: json['certificateNumber'] as String?,
         issuer: json['issuer'] as String?,
+        issuedAt: json['issuedAt'] as String?,
         imageUrls: _strings(json['imageUrls']),
         status: '${json['status'] ?? 'pending'}',
       );
   final String title, status;
-  final String? certificateNumber, issuer;
+  final String? certificateNumber, issuer, issuedAt;
   final List<String> imageUrls;
 }
 

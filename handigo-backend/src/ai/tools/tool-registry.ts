@@ -21,6 +21,10 @@ export class ToolRegistry {
       || (policy?.roles && !policy.roles.includes(context.user.role))) {
       throw new AppError("Tool không tồn tại hoặc bạn không có quyền sử dụng.", 403);
     }
+    if (context.readOnly && (this.needsConfirmation(tool)
+      || ["update_booking_draft", "rebook_booking"].includes(tool.name))) {
+      throw new AppError("Thao tác trước đang cần đối soát. Bạn vẫn có thể tra cứu; chưa thể ghi thay đổi hoặc đặt đơn mới.", 409);
+    }
     return tool;
   }
 

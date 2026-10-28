@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { authService } from '../services/auth.service';
 import { AuthFeedback } from '../components/AuthFeedback';
+import { maskEmail } from '@/features/profile/utils/userProfileForm.utils';
 import {
   ForgotEmailStep,
   ForgotOtpStep,
@@ -51,7 +52,7 @@ export default function ForgotPasswordPage() {
   const handleConfirmOtp = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    if (otp.length !== 6) {
+    if (!/^\d{6}$/.test(otp)) {
       setError('Mã OTP phải gồm 6 chữ số.');
       return;
     }
@@ -108,7 +109,7 @@ export default function ForgotPasswordPage() {
   const description = step === 'email'
     ? 'Nhập email tài khoản để nhận mã xác thực.'
     : step === 'otp'
-      ? `Mã xác thực đã được gửi đến ${normalizedEmail}.`
+      ? `Mã xác thực đã được gửi đến ${maskEmail(normalizedEmail, 'edges')}.`
       : 'Mật khẩu mới cần có ít nhất 8 ký tự.';
 
   return (

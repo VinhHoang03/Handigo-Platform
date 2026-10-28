@@ -137,6 +137,49 @@ export type ReportStatus =
   | "resolved";
 
 export interface Report {
+  noShowDetails?: {
+    callComparison?: {
+      expectedPhone: string; phoneSource: 'order_recipient' | 'customer_account';
+      waitStartedAt: string; checkedAt: string; validCount: number; skipWaitForTesting: boolean;
+      events: Array<{
+        phoneNumber: string | null; normalizedPhone: string; resolvedAt: string | null;
+        phoneMatched: boolean; inWindow: boolean; direction: 'outgoing' | 'incoming' | 'unknown';
+        outcome: 'no_answer' | 'answered' | 'unknown'; eligible: boolean; failures: string[];
+      }>;
+    };
+    location: {
+      orderAddress: string | null; arrivalAddress: string | null; attribution: string | null;
+      arrivedAt: string | null; distanceMeters: number | null; withinRadius: boolean | null; radiusMeters: number;
+    };
+    evidence: Array<{
+      id: string; kind: 'arrival' | 'contact'; url: string; analysisStatus: 'analyzed' | 'unavailable';
+      analysisFailure?: { reason: string; httpStatus: number | null } | null;
+      resolvedContactAt?: string | null;
+      callEvents?: Array<{
+        phoneNumber: string | null; dateLabel: string | null; time: string | null;
+        occurredAt: string | null; resolvedAt: string | null;
+        direction: 'outgoing' | 'incoming' | 'unknown'; outcome: 'no_answer' | 'answered' | 'unknown';
+      }>;
+      analysis: {
+        imageType: 'arrival' | 'chat' | 'call' | 'other'; locationText: string | null;
+        chatChannel?: 'handigo' | 'external' | 'unknown';
+        phoneNumbers: string[]; contactAt: string | null; providerMessage: string | null;
+        contactDateLabel?: string | null; contactTime?: string | null;
+        contactOutcome: 'no_response' | 'no_answer' | 'answered' | 'unknown'; uncertainties: string[];
+      } | null;
+    }>;
+  } | null;
+  noShowVerification?: {
+    decision: 'auto_eligible' | 'manual_review'; reasons: string[]; checkedAt: string; policyVersion: string;
+    checks?: {
+      location: { passed: boolean; distanceMeters: number | null; radiusMeters: number };
+      waiting: { passed: boolean; skippedForTesting: boolean; waitStartedAt: string; requiredMinutes: number };
+      calls: { passed: boolean; validCount: number; requiredCount: number };
+      chat: { passed: boolean; messageCount: number; customerReplied: boolean };
+    } | null;
+  } | null;
+  reviewedByType?: 'system' | 'admin' | null;
+  isCustomerNoShow?: boolean;
   _id: string;
   reporterId: CaseUser;
   targetType: ReportTargetType;

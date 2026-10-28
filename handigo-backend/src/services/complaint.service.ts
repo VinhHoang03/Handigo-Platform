@@ -1,4 +1,5 @@
-import { Types } from "mongoose";
+import mongoose, { ClientSession, Types } from "mongoose";
+import { withTransactionRetry } from "../utils/transaction";
 import { AppError } from "../utils/appError";
 import { Complaint, ComplaintStatus } from "../models/complaint.model";
 import { ComplaintEvidence } from "../models/complaintEvidence.model";
@@ -25,6 +26,18 @@ interface EvidenceFilePayload {
 
 const TERMINAL_STATUSES: ComplaintStatus[] = ["resolved", "rejected", "cancelled"];
 
+const withComplaintTransaction = async <T>(work: (session: ClientSession) => Promise<T>) => {
+  const session = await mongoose.startSession();
+  try { return await withTransactionRetry(session, work); }
+  finally { await session.endSession(); }
+};
+
+const lockComplaint = (id: string, session: ClientSession, complainantId?: string) =>
+  Complaint.findOneAndUpdate(
+    { _id: id, isDeleted: false, ...(complainantId ? { complainantId } : {}) },
+    { $inc: { __v: 1 } }, { session, new: true, runValidators: true },
+  );
+
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
     throw new AppError(`${fieldName} không hợp lệ`, 400);
@@ -37,15 +50,15 @@ const getPagination = (query: Query = {}) => {
   return { page, limit, skip: (page - 1) * limit };
 };
 
-const getProviderByUserId = async (userId: string) => {
-  return Provider.findOne({ userId, isDeleted: false }).select("_id userId");
+const getProviderByUserId = async (userId: string, session?: ClientSession) => {
+  return Provider.findOne({ userId, isDeleted: false }).select("_id userId").session(session ?? null);
 };
 
-const resolveOrderParticipant = async (userId: string, role: UserRole, orderId: string) => {
+const resolveOrderParticipant = async (userId: string, role: UserRole, orderId: string, session?: ClientSession) => {
   assertObjectId(userId, "User id");
   assertObjectId(orderId, "Order id");
 
-  const order = await Order.findOne({ _id: orderId, isDeleted: false });
+  const order = await Order.findOne({ _id: orderId, isDeleted: false }).session(session ?? null);
   if (!order) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
   if (order.status !== "completed") {
     throw new AppError("Chỉ có thể khiếu nại đơn dịch vụ đã hoàn thành", 400);
@@ -60,12 +73,12 @@ const resolveOrderParticipant = async (userId: string, role: UserRole, orderId: 
   if (role === "CUSTOMER" && order.customerId.toString() === userId) {
     const provider = await Provider.findOne({ _id: order.providerId, isDeleted: false }).select(
       "userId",
-    );
+    ).session(session ?? null);
     if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ", 404);
     complainantRole = "CUSTOMER";
     targetUserId = provider.userId;
   } else if (role === "PROVIDER") {
-    const provider = await getProviderByUserId(userId);
+    const provider = await getProviderByUserId(userId, session);
     if (!provider || order.providerId.toString() !== provider._id.toString()) {
       throw new AppError("Bạn không có quyền khiếu nại đơn dịch vụ này", 403);
     }
@@ -78,7 +91,7 @@ const resolveOrderParticipant = async (userId: string, role: UserRole, orderId: 
   return { order, complainantRole, targetUserId };
 };
 
-const getCompletedAt = async (orderId: Types.ObjectId, fallback: Date) => {
+const getCompletedAt = async (orderId: Types.ObjectId, fallback: Date, session?: ClientSession) => {
   const completedStatus = await OrderStatus.findOne({
     orderId,
     status: "completed",
@@ -86,13 +99,14 @@ const getCompletedAt = async (orderId: Types.ObjectId, fallback: Date) => {
   })
     .sort({ createdAt: -1 })
     .select("createdAt")
+    .session(session ?? null)
     .lean();
 
   return completedStatus?.createdAt ?? fallback;
 };
 
-const assertComplaintWindow = async (orderId: Types.ObjectId, fallback: Date) => {
-  const completedAt = await getCompletedAt(orderId, fallback);
+const assertComplaintWindow = async (orderId: Types.ObjectId, fallback: Date, session?: ClientSession) => {
+  const completedAt = await getCompletedAt(orderId, fallback, session);
   const deadline = completedAt.getTime() + 3 * 24 * 60 * 60 * 1000;
   if (Date.now() > deadline) {
     throw new AppError("Chỉ có thể tạo khiếu nại trong vòng 3 ngày từ khi hoàn thành đơn", 400);
@@ -124,19 +138,21 @@ export const getComplaintCreationContext = async (
   userId: string,
   role: UserRole,
   orderId: string,
+  session?: ClientSession,
 ) => {
   const { order, complainantRole, targetUserId } = await resolveOrderParticipant(
     userId,
     role,
     orderId,
+    session,
   );
-  await assertComplaintWindow(order._id as Types.ObjectId, order.updatedAt);
+  await assertComplaintWindow(order._id as Types.ObjectId, order.updatedAt, session);
 
   const existing = await Complaint.findOne({
     orderId: order._id,
     complainantId: userId,
     isDeleted: false,
-  });
+  }).session(session ?? null);
   if (existing) {
     throw new AppError("Bạn đã tạo khiếu nại cho đơn dịch vụ này", 400);
   }
@@ -153,20 +169,30 @@ export const createComplaint = async (
     description: string;
     evidenceImages?: string[];
   },
+  resourceId?: Types.ObjectId,
 ) => {
-  const { order, complainantRole, targetUserId } = await getComplaintCreationContext(userId, role, payload.orderId);
-
-  const complaint = await Complaint.create({
-    orderId: order._id,
-    complainantId: userId,
-    complainantRole,
-    targetUserId,
-    title: payload.title,
-    description: payload.description,
-    evidenceImages: payload.evidenceImages ?? [],
+  assertObjectId(payload.orderId, "Order id");
+  const complaintId = await withComplaintTransaction(async (session) => {
+    const lockedOrder = await Order.findOneAndUpdate(
+      { _id: payload.orderId, isDeleted: false }, { $inc: { __v: 1 } },
+      { session, new: true, runValidators: true },
+    );
+    if (!lockedOrder) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
+    const { order, complainantRole, targetUserId } = await getComplaintCreationContext(userId, role, payload.orderId, session);
+    const [complaint] = await Complaint.create([{
+      ...(resourceId ? { _id: resourceId } : {}),
+      orderId: order._id,
+      complainantId: userId,
+      complainantRole,
+      targetUserId,
+      title: payload.title,
+      description: payload.description,
+      evidenceImages: payload.evidenceImages ?? [],
+    }], { session });
+    return complaint._id;
   });
 
-  const populated = await Complaint.findById(complaint._id).populate(populateComplaint());
+  const populated = await Complaint.findById(complaintId).populate(populateComplaint());
   return withEvidence(populated);
 };
 
@@ -208,21 +234,20 @@ export const getComplaintForUser = async (userId: string, complaintId: string) =
 export const cancelComplaint = async (userId: string, complaintId: string) => {
   assertObjectId(userId, "User id");
   assertObjectId(complaintId, "Complaint id");
-  const complaint = await Complaint.findOne({
-    _id: complaintId,
-    complainantId: userId,
-    isDeleted: false,
-  });
-  if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-  if (TERMINAL_STATUSES.includes(complaint.status)) {
-    throw new AppError("Khiếu nại đã kết thúc, không thể hủy", 400);
-  }
+  await withComplaintTransaction(async (session) => {
+    const complaint = await lockComplaint(complaintId, session, userId);
+    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
+    if (TERMINAL_STATUSES.includes(complaint.status)) {
+      throw new AppError("Khiếu nại đã kết thúc, không thể hủy", 400);
+    }
 
-  complaint.status = "cancelled";
-  complaint.resolvedAt = new Date();
-  await complaint.save();
+    complaint.status = "cancelled";
+    complaint.resolvedAt = new Date();
+    await complaint.save({ session });
+  });
   return getComplaintForUser(userId, complaintId);
 };
+
 
 export const addComplaintEvidence = async (
   userId: string,
@@ -232,36 +257,40 @@ export const addComplaintEvidence = async (
 ) => {
   assertObjectId(userId, "User id");
   assertObjectId(complaintId, "Complaint id");
-  const complaint = await Complaint.findOne({ _id: complaintId, isDeleted: false });
-  if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
+  await withComplaintTransaction(async (session) => {
+    const complaint = await lockComplaint(complaintId, session);
+    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
 
-  if (role !== "ADMIN" && complaint.complainantId.toString() !== userId) {
-    throw new AppError("Bạn không có quyền bổ sung bằng chứng cho khiếu nại này", 403);
-  }
-  if (TERMINAL_STATUSES.includes(complaint.status)) {
-    throw new AppError("Khiếu nại đã kết thúc, không thể bổ sung bằng chứng", 400);
-  }
+    if (role !== "ADMIN" && complaint.complainantId.toString() !== userId) {
+      throw new AppError("Bạn không có quyền bổ sung bằng chứng cho khiếu nại này", 403);
+    }
+    if (TERMINAL_STATUSES.includes(complaint.status)) {
+      throw new AppError("Khiếu nại đã kết thúc, không thể bổ sung bằng chứng", 400);
+    }
 
-  await ComplaintEvidence.insertMany(
-    payload.files.map((file) => ({
-      complaintId: complaint._id,
-      uploadedBy: userId,
-      fileType: file.fileType,
-      url: file.url,
-      mimeType: file.mimeType ?? null,
-      fileName: file.fileName ?? null,
-      note: payload.note ?? null,
-    })),
-  );
+    await ComplaintEvidence.insertMany(
+      payload.files.map((file) => ({
+        complaintId: complaint._id,
+        uploadedBy: userId,
+        fileType: file.fileType,
+        url: file.url,
+        mimeType: file.mimeType ?? null,
+        fileName: file.fileName ?? null,
+        note: payload.note ?? null,
+      })),
+      { session },
+    );
 
-  if (complaint.status === "evidence_requested") {
-    complaint.status = "under_review";
-    await complaint.save();
-  }
+    if (complaint.status === "evidence_requested") {
+      complaint.status = "under_review";
+    }
+    await complaint.save({ session });
 
-  const populated = await Complaint.findById(complaint._id).populate(populateComplaint());
+  });
+  const populated = await Complaint.findById(complaintId).populate(populateComplaint());
   return withEvidence(populated);
 };
+
 
 export const getAdminComplaints = async (query: Query = {}) => {
   const { page, limit, skip } = getPagination(query);
@@ -308,19 +337,22 @@ export const requestEvidence = async (
 ) => {
   assertObjectId(adminId, "Admin id");
   assertObjectId(complaintId, "Complaint id");
-  const complaint = await Complaint.findOne({ _id: complaintId, isDeleted: false });
-  if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-  if (TERMINAL_STATUSES.includes(complaint.status)) {
-    throw new AppError("Khiếu nại đã kết thúc", 400);
-  }
+  await withComplaintTransaction(async (session) => {
+    const complaint = await lockComplaint(complaintId, session);
+    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
+    if (TERMINAL_STATUSES.includes(complaint.status)) {
+      throw new AppError("Khiếu nại đã kết thúc", 400);
+    }
 
-  complaint.status = "evidence_requested";
-  complaint.reviewedBy = new Types.ObjectId(adminId);
-  complaint.reviewedAt = new Date();
-  complaint.requestedEvidenceNote = requestedEvidenceNote;
-  await complaint.save();
+    complaint.status = "evidence_requested";
+    complaint.reviewedBy = new Types.ObjectId(adminId);
+    complaint.reviewedAt = new Date();
+    complaint.requestedEvidenceNote = requestedEvidenceNote;
+    await complaint.save({ session });
+  });
   return getAdminComplaintById(complaintId);
 };
+
 
 export const updateComplaintStatus = async (
   adminId: string,
@@ -329,20 +361,26 @@ export const updateComplaintStatus = async (
 ) => {
   assertObjectId(adminId, "Admin id");
   assertObjectId(complaintId, "Complaint id");
-  const complaint = await Complaint.findOne({ _id: complaintId, isDeleted: false });
-  if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-  if (complaint.createdViolationId && payload.status !== "resolved") {
-    throw new AppError("Khiếu nại đã tạo vi phạm, chỉ có thể giữ trạng thái đã xử lý", 400);
-  }
+  await withComplaintTransaction(async (session) => {
+    const complaint = await lockComplaint(complaintId, session);
+    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
+    if (complaint.createdViolationId && payload.status !== "resolved") {
+      throw new AppError("Khiếu nại đã tạo vi phạm, chỉ có thể giữ trạng thái đã xử lý", 400);
+    }
 
-  complaint.status = payload.status;
-  complaint.reviewedBy = new Types.ObjectId(adminId);
-  complaint.reviewedAt = new Date();
-  complaint.resolutionNote = payload.resolutionNote ?? complaint.resolutionNote ?? null;
-  if (TERMINAL_STATUSES.includes(payload.status)) {
-    complaint.resolvedBy = new Types.ObjectId(adminId);
-    complaint.resolvedAt = new Date();
-  }
-  await complaint.save();
+    complaint.status = payload.status;
+    complaint.reviewedBy = new Types.ObjectId(adminId);
+    complaint.reviewedAt = new Date();
+    complaint.resolutionNote = payload.resolutionNote ?? complaint.resolutionNote ?? null;
+    if (TERMINAL_STATUSES.includes(payload.status)) {
+      complaint.resolvedBy = new Types.ObjectId(adminId);
+      complaint.resolvedAt = new Date();
+    } else {
+      complaint.resolvedBy = null;
+      complaint.resolvedAt = null;
+    }
+    await complaint.save({ session });
+  });
   return getAdminComplaintById(complaintId);
 };
+

@@ -2,6 +2,7 @@ import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
 import type { Order } from "@/types/booking";
+import { useCaseOrders } from "../hooks/useCaseOrders";
 import { getErrorMessage } from "@/utils/apiError";
 import { caseManagementApi } from "../api/caseManagement.api";
 import type {
@@ -20,7 +21,6 @@ interface CreateCaseModalProps {
   open: boolean;
   kind: CreateCaseKind;
   role: "CUSTOMER" | "PROVIDER";
-  orders: Order[];
   initialOrderId?: string;
   onClose: () => void;
   onCreated: () => void;
@@ -39,12 +39,12 @@ export function CreateCaseModal({
   open,
   kind,
   role,
-  orders,
   initialOrderId,
   onClose,
   onCreated,
 }: CreateCaseModalProps) {
   const { addToast } = useToast();
+  const { orders, loading: ordersLoading, error: ordersError, hasMore, loadMore } = useCaseOrders(role, initialOrderId);
   const [orderId, setOrderId] = useState(initialOrderId ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -138,7 +138,7 @@ export function CreateCaseModal({
             value={orderId}
             onChange={(event) => setOrderId(event.target.value)}
             required={kind !== "ticket"}
-            disabled={busy}
+            disabled={busy || ordersLoading}
             className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
           >
             <option value="">Chọn đơn dịch vụ</option>
@@ -149,6 +149,10 @@ export function CreateCaseModal({
             ))}
           </select>
         </label>
+        {ordersLoading && <p role="status" className="text-sm text-on-surface-variant">Đang tải danh sách đơn...</p>}
+        {ordersError && <p role="alert" className="text-sm text-error">{ordersError}</p>}
+        {(hasMore || ordersError) && <button type="button" onClick={() => void loadMore()} disabled={busy || ordersLoading} className="text-sm font-semibold text-primary">{ordersError ? "Thử tải lại đơn" : "Tải thêm đơn cũ"}</button>}
+        {!ordersLoading && !ordersError && !orders.length && <p className="text-sm text-on-surface-variant">Bạn chưa có đơn dịch vụ.</p>}
         {kind === "ticket" && (
           <TicketExtraFields
             category={category}
@@ -185,7 +189,7 @@ export function CreateCaseModal({
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
-          <button type="submit" disabled={busy} className="btn-primary">
+          <button type="submit" disabled={busy || ordersLoading} className="btn-primary">
             {busy ? "Đang gửi..." : "Gửi yêu cầu"}
           </button>
         </div>

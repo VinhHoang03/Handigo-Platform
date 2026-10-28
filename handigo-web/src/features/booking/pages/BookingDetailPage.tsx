@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { BookingShell } from "../components/BookingComponents";
 import { OrderFeedbackSection } from "@/features/feedback/components/OrderFeedbackSection";
 import { OrderTrackingMap } from "@/features/tracking/components/OrderTrackingMap";
@@ -23,7 +23,7 @@ import {
 import { formatOrderAddress } from "../components/detail/bookingDetailProvider";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 
-const BookingDetailPage = () => {
+const BookingDetailContent = () => {
   const {
     order,
     recurringOrders,
@@ -197,6 +197,11 @@ const BookingDetailPage = () => {
       />
     </BookingShell>
   );
+};
+
+const BookingDetailPage = () => {
+  const { bookingId } = useParams();
+  return <BookingDetailContent key={bookingId} />;
 };
 
 export default BookingDetailPage;

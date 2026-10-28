@@ -29,9 +29,8 @@ const hours = timeSlots.map((slot) => slot.slice(0, 2));
 const minutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
 
 const isTimeUnavailable = (time: string, date: string, earliest: number) => {
-  const [hour, minute] = time.split(':').map(Number);
   const timestamp = new Date(`${date}T${time}:00`).getTime();
-  return !Number.isFinite(timestamp) || timestamp < earliest || hour > 21 || (hour === 21 && minute > 0);
+  return !Number.isFinite(timestamp) || timestamp < earliest;
 };
 
 const findFirstAvailableTime = (date: string, earliest: number) => {

@@ -63,6 +63,12 @@ class ProviderApplicationRepository {
     documentKind: documentKind,
     onSendProgress: onSendProgress,
   );
+  Future<ProviderAssetUploadResult> uploadCertificateAsset(XFile file) =>
+      _api.uploadProviderApplicationAssetResult(
+        file,
+        purpose: 'certificate',
+        documentKind: 'certificate',
+      );
   ProviderApplication _parse(Map<String, dynamic> response) =>
       ProviderApplication.fromJson(
         Map<String, dynamic>.from(response['data'] as Map),

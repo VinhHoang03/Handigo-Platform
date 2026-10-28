@@ -15,14 +15,18 @@ const ProviderHomePage = () => {
     <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <ProviderHomeHeader
-          firstName={user?.fullName?.split(" ")[0] || "Provider"}
+          fullName={user?.fullName?.trim() || "bạn"}
           activeOrders={data.activeOrders}
         />
 
         <ProviderHomeStats
           totalOrders={data.totalOrders}
           activeOrders={data.activeOrders}
-          todayIncome={data.todayIncome}
+          monthlyIncome={data.monthlyIncome}
+          isLoadingIncome={data.isLoadingIncome}
+          incomeError={data.incomeError}
+          isLoadingOrders={data.isLoadingSchedule}
+          isLoadingActiveOrders={data.isLoadingActiveOrders}
           rating={data.rating}
         />
 

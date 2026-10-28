@@ -50,7 +50,7 @@ async function check(method, orderType, paymentType = 'full', status = 'created'
 }
 (async () => {
   for (const method of ['wallet', 'payos']) {
-    for (const type of ['normal', 'scheduled', 'recurring']) {
+    for (const type of ['normal', 'scheduled']) {
       await check(method, type);
       await check(method, type, 'inspection_deposit');
       await check(method, type, 'remaining', 'accepted');
@@ -62,5 +62,5 @@ async function check(method, orderType, paymentType = 'full', status = 'created'
   assert.equal(confirmedQuotationOrder.paymentStatus, 'paid', 'Webhook cọc lặp không hạ trạng thái đơn báo giá đã thanh toán.');
   const depositOnlyOrder = await check('payos', 'normal', 'inspection_deposit', 'in_progress', 40000);
   assert.equal(depositOnlyOrder.paymentStatus, 'partially_paid', 'Đơn mới chỉ thanh toán cọc vẫn được ghi nhận thanh toán một phần.');
-  console.log('Đạt: điều phối sau thanh toán ví/PayOS cho giá cố định, lịch hẹn và định kỳ; chặn trả thiếu và thanh toán bổ sung.');
+  console.log('Đạt: điều phối sau thanh toán ví/PayOS cho giá cố định và lịch hẹn; chặn trả thiếu và thanh toán bổ sung.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

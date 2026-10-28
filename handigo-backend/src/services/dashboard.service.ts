@@ -41,8 +41,9 @@ const sumAggregate = async (
 const formatGroup = (
   format: string,
   dateField = "createdAt",
+  timezone?: string,
 ): Record<string, unknown> => ({
-  $dateToString: { format, date: `$${dateField}` },
+  $dateToString: { format, date: `$${dateField}`, ...(timezone ? { timezone } : {}) },
 });
 
 const seriesAggregate = async (
@@ -52,12 +53,13 @@ const seriesAggregate = async (
   amountExpression: string | Record<string, unknown>,
   label: string,
   dateField = "createdAt",
+  timezone?: string,
 ) => {
   const rows = await model.aggregate([
     { $match: match },
     {
       $group: {
-        _id: formatGroup(format, dateField),
+        _id: formatGroup(format, dateField, timezone),
         amount: { $sum: amountExpression },
         count: { $sum: 1 },
       },
@@ -113,9 +115,10 @@ const baseWithdrawalMatch = (query: DashboardQuery) => ({
 });
 
 const currentMonthQuery = (): Pick<DashboardQuery, "fromDate" | "toDate"> => {
-  const now = new Date();
-  const fromDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-  const toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const offset = 7 * 60 * 60 * 1000;
+  const now = new Date(Date.now() + offset);
+  const fromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) - offset);
+  const toDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1) - offset - 1);
 
   return { fromDate, toDate };
 };
@@ -598,9 +601,9 @@ export const getProviderEarnings = async (user: RequestUser, query: DashboardQue
     completedOrderAmount,
     recentTransactionsResult,
   ] = await Promise.all([
-    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m-%d", providerNetEarningExpression, "day"),
-    seriesAggregate(WalletTransaction, transactionMatch, "%G-W%V", providerNetEarningExpression, "week"),
-    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m", providerNetEarningExpression, "month"),
+    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m-%d", providerNetEarningExpression, "day", "createdAt", "Asia/Ho_Chi_Minh"),
+    seriesAggregate(WalletTransaction, transactionMatch, "%G-W%V", providerNetEarningExpression, "week", "createdAt", "Asia/Ho_Chi_Minh"),
+    seriesAggregate(WalletTransaction, transactionMatch, "%Y-%m", providerNetEarningExpression, "month", "createdAt", "Asia/Ho_Chi_Minh"),
     Order.countDocuments(completedOrderMatch),
     sumAggregate(
       WalletTransaction,

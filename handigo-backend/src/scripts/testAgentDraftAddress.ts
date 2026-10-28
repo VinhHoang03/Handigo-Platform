@@ -98,6 +98,24 @@ async function run() {
   await AgentBookingService.create(userId, { ...args, addressId: concurrent.id }, expectation, undefined, undefined, concurrent);
   assert.equal(addressWrites, writesAfterBooking, "Tái sử dụng địa chỉ được lưu đồng thời trước khi xác nhận.");
   assert.equal(String(orders[1].addressId), String(addresses[0]._id));
+  const oneTime = { ...draft, id: new Types.ObjectId().toString() };
+  const oneTimeArgs = { ...args, addressId: oneTime.id, saveAddressToBook: false };
+  const beforeOneTime = addressWrites;
+  const single = await AgentBookingService.create(userId, oneTimeArgs, expectation, "phien-mot-lan", "xac-nhan-mot-lan", oneTime);
+  assert.equal(addressWrites, beforeOneTime, "Địa chỉ dùng một lần không ghi vào sổ.");
+  assert.equal(addresses.length, 1, "Không tạo hoặc xóa mục sổ địa chỉ hiện có.");
+  assert.equal(orders[2].addressId, null);
+  assert.equal(orders[2].addressSnapshot?.recipientPhone, draft.payload.recipientPhone);
+  assert.equal(orders[2].addressSnapshot?.latitude, draft.payload.latitude);
+  const singleAgain = await AgentBookingService.create(userId, oneTimeArgs, expectation, "phien-mot-lan", "xac-nhan-mot-lan", oneTime);
+  assert.equal(singleAgain.orderId, single.orderId); assert.equal(orders.length, 3);
+  failInsert = true;
+  await assert.rejects(() => AgentBookingService.create(userId, oneTimeArgs, expectation, "phien-mot-lan", "loi-ghi", oneTime));
+  assert.equal(addressWrites, beforeOneTime); assert.equal(orders.length, 3);
+  failInsert = false;
+  const noAddress = new Order({ addressId: null, addressSnapshot: null });
+  assert(noAddress.validateSync()?.errors.addressId, "Đơn không có địa chỉ hoặc bản chụp phải bị chặn.");
+  assert.equal(orders[2].validateSync()?.errors.addressId, undefined, "Đơn có bản chụp hợp lệ không cần mục sổ địa chỉ.");
   assert.throws(() => draftAddressDocument(new Types.ObjectId().toString(), draft.id, draft), /không thuộc phiên/);
   console.log("Đạt địa chỉ tạm: kiểm tra trước ghi, lưu cùng transaction đơn hàng, rollback khi lỗi, chống ghi lặp, tái sử dụng địa chỉ trùng và kiểm tra chủ sở hữu.");
 }
