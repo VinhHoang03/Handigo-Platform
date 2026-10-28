@@ -30,7 +30,7 @@ export const bookingSchema = priceSchema.extend({
     ctx.addIssue({ code: "custom", path: ["orderType"], message: "Có giờ hẹn thì phải chọn loại scheduled." });
   }
   if (value.scheduledAt && !isWithinAppointmentHours(new Date(value.scheduledAt))) {
-    ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn hợp lệ." });
+    ctx.addIssue({ code: "custom", path: ["scheduledAt"], message: "Vui lòng chọn giờ hẹn từ 08:00 đến 21:00 theo giờ Việt Nam." });
   }
 });
 export const availabilitySchema = priceSchema.extend({

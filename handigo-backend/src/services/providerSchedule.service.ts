@@ -13,7 +13,7 @@ export { getOrderInterval, isWithinWorkingCalendar } from '../utils/providerSche
 export const getAvailableProviderIds = async (
   providerIds: Types.ObjectId[],
   intervals: ScheduleInterval[],
-  options: { policy?: BookingPolicy; excludeOrderIds?: Types.ObjectId[]; session?: ClientSession } = {},
+  options: { policy?: BookingPolicy; excludeOrderIds?: Types.ObjectId[]; session?: ClientSession; checkWorkingCalendar?: boolean } = {},
 ) => {
   const policy = options.policy ?? await getBookingPolicy();
   if (intervals.some((interval, index) => intervals.slice(index + 1).some((other) => intervalsConflict(interval, other)))) return new Set<string>();
@@ -25,7 +25,7 @@ export const getAvailableProviderIds = async (
     isDeleted: false,
   }).session(options.session ?? null);
   return new Set(providerIds.filter((id) => {
-    if (!intervals.every((interval) => isWithinWorkingCalendar(id.toString(), interval, policy))) return false;
+    if (options.checkWorkingCalendar !== false && !intervals.every((interval) => isWithinWorkingCalendar(id.toString(), interval, policy))) return false;
     return !orders.some((order) => {
       if (order.providerId?.toString() !== id.toString()) return false;
       const actualInterval = getOrderInterval(order, policy);
@@ -49,16 +49,19 @@ export const lockProviderSchedule = async (providerId: Types.ObjectId, session: 
   const provider = await Provider.findOneAndUpdate(
     { _id: providerId, verified: true, isDeleted: false },
     { $inc: { scheduleVersion: 1 } },
-    { new: true, session, runValidators: true },
+    { returnDocument: "after", session, runValidators: true },
   );
   if (!provider) throw new AppError("Chuyên gia không còn khả dụng.", 409);
   return provider;
 };
 
-export const assertProviderSchedule = async (providerId: Types.ObjectId, orders: IOrder[], session: ClientSession, policy: BookingPolicy) => {
+export const assertProviderSchedule = async (providerId: Types.ObjectId, orders: IOrder[], session: ClientSession, policy: BookingPolicy,
+  options: { checkWorkingCalendar?: boolean } = {}) => {
   const intervals = orders.map((order) => getOrderInterval({ ...order.toObject(), status: "created" }, policy));
-  const available = await getAvailableProviderIds([providerId], intervals, { policy, session, excludeOrderIds: orders.map((order) => order._id as Types.ObjectId) });
-  if (!available.has(providerId.toString())) throw new AppError("Lịch làm việc không đủ thời gian thực hiện, dự phòng và di chuyển. Vui lòng chọn thời điểm khác.", 409);
+  const available = await getAvailableProviderIds([providerId], intervals, { policy, session, ...options, excludeOrderIds: orders.map((order) => order._id as Types.ObjectId) });
+  if (!available.has(providerId.toString())) throw new AppError(options.checkWorkingCalendar === false
+    ? "Thời gian thực hiện, dự phòng và di chuyển bị trùng với đơn khác. Vui lòng kiểm tra lại lịch làm việc."
+    : "Lịch làm việc không đủ thời gian thực hiện, dự phòng và di chuyển. Vui lòng chọn thời điểm khác.", 409);
 };
 
 export const updateExpectedEnd = async (orderId: string, userId: string, expectedEndAt: Date) => {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import { BookingDateTimeDialog } from "@/features/booking/components/BookingDateTimeDialog";
-import { getUpcomingDates } from "@/features/booking/components/step2Helpers";
+import { getUpcomingDates, isWithinImmediateBookingHours, isWithinScheduledBookingHours } from "@/features/booking/components/step2Helpers";
 import type { AgentSend } from "../types/agent.types";
 
 // Dùng giờ trên mặt đồng hồ Việt Nam cho bộ chọn dùng Date địa phương.
@@ -25,6 +25,9 @@ export function AgentBookingSchedule({ anchorRef, scheduledAt, disabled, onClose
   const submit = async (date?: string, time?: string) => {
     if (disabled || saving) return;
     setError("");
+    if (date && time ? !isWithinScheduledBookingHours(time) : !isWithinImmediateBookingHours()) {
+      setError("Vui lòng đặt lịch từ 08:00 đến 21:00 theo giờ Việt Nam."); return;
+    }
     if (date && time) {
       const value = Date.parse(`${date}T${time}:00+07:00`);
       const currentMinute = Math.floor(Date.now() / 60000) * 60000;
@@ -45,6 +48,6 @@ export function AgentBookingSchedule({ anchorRef, scheduledAt, disabled, onClose
 
   return <BookingDateTimeDialog anchorRef={anchorRef} scheduledAt={selectedValue} upcomingDates={getUpcomingDates(clock)}
     currentTimestamp={clock.getTime()} error={error} zIndex={180} disabled={disabled || saving}
-    description={saving ? "Đang cập nhật lịch hẹn…" : "Chọn ngày giờ mong muốn. Trợ lý sẽ kiểm tra lịch trống; chưa giữ chỗ."}
+    description={saving ? "Đang cập nhật lịch hẹn…" : "Chọn giờ từ 08:00 đến 21:00 theo giờ Việt Nam. Trợ lý sẽ kiểm tra lịch trống; chưa giữ chỗ."}
     onCancel={onClose} onImmediate={() => void submit()} onConfirm={(date, time) => void submit(date, time)} />;
 }

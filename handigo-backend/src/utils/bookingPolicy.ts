@@ -1,8 +1,10 @@
 import type { BookingPolicy } from "../validations/bookingPolicy.validator";
 
 export const isWithinAppointmentHours = (scheduledAt: Date) => {
-  // Tạm mở toàn bộ giờ trong ngày để kiểm thử booking.
-  return Number.isFinite(scheduledAt.getTime());
+  if (!Number.isFinite(scheduledAt.getTime())) return false;
+  const vietnamTime = new Date(scheduledAt.getTime() + 7 * 60 * 60000);
+  const minute = vietnamTime.getUTCHours() * 60 + vietnamTime.getUTCMinutes();
+  return minute >= 8 * 60 && minute <= 21 * 60;
 };
 
 export const getEarliestScheduledAt = (now = new Date()) => {
