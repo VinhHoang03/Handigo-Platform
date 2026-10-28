@@ -110,7 +110,7 @@ const BookingHistoryPage = () => {
     statusTone: mapStatusToTone(order?.status || 'created'),
     status: order?.status || 'created',
     schedule: order?.scheduledAt ? new Date(order.scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất',
-    meta: order?.providerId ? `Chuyên gia: ${order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
+    meta: order?.providerId ? `Chuyên gia: ${order.providerId.userId?.fullName || order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
     price: formatCurrency(order.status === 'completed'
       && (order.inspectionRequired || order.serviceId?.serviceType === 'variable_price')
       ? order.quotationFinalAmount ?? order.pricing?.totalPaidAmount ?? 0

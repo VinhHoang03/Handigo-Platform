@@ -146,7 +146,7 @@ export function LocationPickerMap({
           className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary"
         >
           {isResolvingAddress
-            ? "Đang xác định địa chỉ..."
+            ? "Đang tìm vị trí..."
             : hasCoordinate
               ? "Đã ghim vị trí"
               : "Chưa ghim vị trí"}

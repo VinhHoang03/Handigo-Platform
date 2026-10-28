@@ -38,6 +38,35 @@ const provinceOf = (candidate: AddressSearchCandidate, provinces: Administrative
 const isPlace = (item: AddressSearchCandidate) => item.matchLevel === "building" || item.matchLevel === "venue"
   || ["amenity", "building", "shop", "tourism", "office"].includes(item.category ?? "");
 
+/** Gợi ý ghim để khách xác nhận; khi thiếu địa chỉ cụ thể thì dùng khu vực đã chọn. */
+export async function suggestAddressMapLocation(address: { fullAddress: string; province: string; ward: string }) {
+  const matchesProvince = (item: AddressSearchCandidate) => provinceAliases(address.province).includes(unitName(item.province));
+  const matchesWard = (item: AddressSearchCandidate) => item.administrativeNames.some(name => sameUnit(name, address.ward))
+    || item.fullAddress.split(",").some(part => sameUnit(part, address.ward));
+  const parts = address.fullAddress.split(",").map(part => part.trim()).filter(Boolean);
+  for (const part of [address.ward, address.province, "Việt Nam"]) {
+    if (!parts.some(value => sameUnit(value, part))) parts.push(part);
+  }
+  const places = await searchAddressLocations(parts.join(", "));
+  let location = places.find(item => item.matchCode === "exact" && matchesProvince(item) && matchesWard(item)
+    && (isPlace(item) || item.matchLevel === "street" || item.category === "highway"));
+  if (!location) {
+    const matchesArea = (item: AddressSearchCandidate) => matchesProvince(item) && matchesWard(item)
+      && ["boundary", "place"].includes(item.category ?? "");
+    const areas = await searchAddressLocations(`${address.ward}, ${address.province}, Việt Nam`);
+    location = areas.find(matchesArea);
+    if (!location) {
+      const simplified = await searchAddressLocations(`${unitName(address.ward)}, ${unitName(address.province)}, Việt Nam`);
+      location = simplified.find(matchesArea);
+    }
+  }
+  if (!location) throw new AppError("Chưa tìm được vị trí của phường/xã đã chọn. Vui lòng kéo bản đồ để chọn ghim.", 422);
+  return {
+    ...address, latitude: location.latitude, longitude: location.longitude,
+    attribution: "© OpenStreetMap contributors | Search by LocationIQ.com",
+  };
+}
+
 /** Tên địa điểm được giữ nguyên; đơn vị hành chính và tọa độ luôn đối chiếu dữ liệu hệ thống. */
 export async function resolveAgentAddress(input: AddressInput) {
   const text = input.addressText?.trim() || input.fullAddress?.trim() || [input.ward, input.province].filter(Boolean).join(", ");

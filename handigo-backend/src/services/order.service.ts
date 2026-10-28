@@ -769,6 +769,11 @@ export const OrderService = {
         .skip(skip)
         .limit(limit)
         .populate({ path: "serviceId", select: "name image coverImage serviceType", transform: serviceImageResponse })
+        .populate({
+          path: "providerId",
+          select: "userId",
+          populate: { path: "userId", select: "fullName" },
+        })
         .lean(),
       Order.countDocuments(query),
     ]);

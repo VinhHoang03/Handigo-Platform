@@ -314,6 +314,7 @@ export interface OrderQuotation {
 }
 
 export interface BookingState {
+  rebookSource?: { orderId: string; orderCode: string; notices: string[] };
   categoryId?: string;
   serviceId?: string;
   selectedOptionIds: string[];

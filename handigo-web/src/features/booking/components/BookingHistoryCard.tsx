@@ -5,6 +5,7 @@ import type { BookingListItem, BookingStatusTone } from '../types/booking.types'
 import { toneOutlineClasses } from '@/utils/statusTone';
 import { getOrderStatusMeta } from '@/utils/orderStatus';
 import { Calendar, Info, Star, User } from "lucide-react";
+import { RebookButton } from './RebookButton';
 
 // Bảng màu quy về token ngữ nghĩa dùng chung, xem `utils/statusTone.ts`.
 const statusToneClass: Record<BookingStatusTone, string> = {
@@ -72,6 +73,7 @@ export const BookingHistoryCard: React.FC<{ booking: BookingListItem }> = ({ boo
         </div>
       ) : null}
       <div className="flex w-full flex-wrap items-center justify-end gap-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+        <RebookButton orderId={booking.id} status={booking.status} />
         <Link
           to={detailUrl}
           className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-primary/40 px-4 py-2 text-center font-label-md text-label-md font-bold text-primary transition-all hover:border-primary hover:bg-primary/5 active:scale-95 sm:flex-none"

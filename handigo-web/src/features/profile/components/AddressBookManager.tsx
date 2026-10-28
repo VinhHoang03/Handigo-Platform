@@ -10,6 +10,7 @@ interface AddressBookManagerProps {
   defaultRecipient: { name: string; phone: string };
   selectedAddressId?: string;
   selectable?: boolean;
+  autoSelect?: boolean;
   compact?: boolean;
   singleAddressMode?: boolean;
   onManageAddresses?: () => void;
@@ -20,6 +21,7 @@ export function AddressBookManager({
   defaultRecipient,
   selectedAddressId,
   selectable = false,
+  autoSelect = true,
   compact = false,
   singleAddressMode = false,
   onManageAddresses,
@@ -43,6 +45,7 @@ export function AddressBookManager({
   } = useAddressBookManager({
     selectedAddressId,
     selectable,
+    autoSelect,
     singleAddressMode,
     onSelectAddress,
   });

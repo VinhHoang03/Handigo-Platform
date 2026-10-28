@@ -100,3 +100,5 @@ export const mapAddressCandidateSchema = z.object({
   longitude: longitudeSchema.optional(),
   placeId: z.string().trim().max(255).optional(),
 });
+
+export const geocodeAddressSchema = mapAddressCandidateSchema.pick({ fullAddress: true, province: true, ward: true });

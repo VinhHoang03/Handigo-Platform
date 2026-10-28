@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ChevronDown, UserRound } from 'lucide-react';
 import { useNearbyProviders, type ProviderAvailabilityStatus } from '@/features/customer-service/components/useNearbyProviders';
 import { BookingProviderPicker } from './BookingProviderPicker';
+import { useBookingStore } from '../hooks/useBookingStore';
 
 interface Step2ProviderFieldsetProps {
   serviceId?: string;
@@ -25,6 +26,7 @@ export const Step2ProviderFieldset = ({
   onSelectProvider, onAvailabilityChange,
 }: Step2ProviderFieldsetProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const rebookSource = useBookingStore(state => state.rebookSource);
   const anchorRef = useRef<HTMLDivElement>(null);
   const { providers, isLoading, error: loadError } = useNearbyProviders({
     serviceId, addressId, scheduledAt, recurrenceUnit, recurrenceCount, requireSelection,
@@ -55,6 +57,9 @@ export const Step2ProviderFieldset = ({
       </button>
       </div>
       {error && !isExpanded && <p role="alert" className="mt-xs text-xs text-error">{error}</p>}
+      {rebookSource && requestedProviderId && canSearch && !isLoading && !loadError && !providers.some(provider => provider.id === requestedProviderId) && (
+        <p role="status" className="mt-xs text-xs text-error">Thợ cũ chưa khả dụng với địa chỉ và lịch này. Vui lòng mở danh sách để chọn thợ khác hoặc Handigo tự điều phối.</p>
+      )}
       {isExpanded && (
         <BookingProviderPicker
           anchorRef={anchorRef} providers={providers} preferredProviderId={preferredProviderId}
@@ -62,6 +67,8 @@ export const Step2ProviderFieldset = ({
           isLoading={isLoading} loadError={loadError} error={error}
           onClose={() => setIsExpanded(false)}
           onConfirm={(providerId, providerName) => {
+            const booking = useBookingStore.getState();
+            if (booking.rebookSource) booking.setRequestedProvider(undefined);
             onSelectProvider(providerId, providerName);
             setIsExpanded(false);
           }}
