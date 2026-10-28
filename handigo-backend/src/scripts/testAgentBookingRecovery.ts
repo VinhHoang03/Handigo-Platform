@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { mock } from "node:test";
+import { randomUUID } from "node:crypto";
 import { Types } from "mongoose";
 import { z } from "zod";
 import { Order } from "../models/order.model";
@@ -69,7 +70,7 @@ async function run() {
     const registry = new ToolRegistry().register({
       name: "create_booking", description: "Đặt đơn kiểm thử", inputSchema: bookingSchema,
       mutates: true, requiresConfirmation: true, roles: ["CUSTOMER"],
-      preview: async () => ({ amount: 200000, addressVersion: "kiem-thu" }),
+      preview: async () => ({ amount: 200000, addressVersion: "kiem-thu", policyVersion: "a".repeat(64) }),
       execute: (toolContext, values) => AgentBookingService.create(user.id, values,
         { amount: 200000, addressVersion: "kiem-thu" }, toolContext.sessionId, toolContext.actionId),
       reconcile: (toolContext) => AgentBookingService.reconcileBooking(user.id, toolContext.sessionId, toolContext.actionId!),
@@ -78,7 +79,15 @@ async function run() {
       { maxIterations: 1, systemPrompt: "Kiểm thử", timeoutMs: 5000 });
     const session = newSession(context.sessionId, user.id);
     const tool = registry.get("create_booking", context);
+    const authorize = () => {
+      const action = session.pendingAction!;
+      action.policyConsent = { actionId: action.id, version: "a".repeat(64), acceptedAt: new Date().toISOString() };
+      const requestId = randomUUID();
+      session.activeRequest = { requestId, digest: "kiem-thu", input: { requestId,
+        confirmation: { actionId: action.id, decision: "CONFIRM" } } };
+    };
     session.pendingAction = await loop.confirmation.prepare(tool, context, args);
+    authorize();
     await loop.execute(session, context, tool, args, async () => {}, session.pendingAction);
     assert.equal(session.actions[0].status, "EXPIRED");
     assert.equal(session.requiresReconciliation, false, "Từ chối trước khi ghi không được khóa phiên.");
@@ -86,6 +95,7 @@ async function run() {
 
     rejectBeforeWrite = false;
     session.pendingAction = await loop.confirmation.prepare(tool, context, args);
+    authorize();
     const actionId = session.pendingAction.id;
     await loop.execute(session, context, tool, args, async () => {}, session.pendingAction);
     assert.equal(session.actions[1].status, "UNKNOWN");

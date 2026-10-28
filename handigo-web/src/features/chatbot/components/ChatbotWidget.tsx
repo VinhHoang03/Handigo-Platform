@@ -252,11 +252,23 @@ export function ChatbotWidget({
   };
 
   const resetSession = async () => {
-    if (sending.current || isLoading || agentSession?.pendingConfirmation || agentSession?.requiresReconciliation) return;
+    if (sending.current || isLoading || pendingRequest.current || agentSession?.pendingConfirmation || agentSession?.requiresReconciliation) return;
     sending.current = true;
     setIsLoading(true);
     setError("");
     try {
+      // Phiên trống chỉ được lưu ở backend khi gửi tin nhắn hoặc tải ảnh đầu tiên.
+      if (!agentSession) {
+        liveOrderMessages.current.clear();
+        sessionId.current = crypto.randomUUID();
+        setMessages([]);
+        setPaymentAnchor(null);
+        setActivity("");
+        setShowHistory(false);
+        setHasLoaded(true);
+        try { sessionStorage.removeItem(storageKey); } catch { /* Chat vẫn hoạt động khi trình duyệt chặn lưu trữ. */ }
+        return;
+      }
       const session = await agentApi.reset(sessionId.current);
       applySession(session);
       setShowHistory(false);

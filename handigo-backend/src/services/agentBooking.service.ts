@@ -20,6 +20,7 @@ import type { IOrder } from "../models/order.model";
 import { AGENT_AREA_LOCATION_NOTE, AGENT_AREA_PLACE_PREFIX } from "./agentAddressResolver.service";
 import { draftAddressDocument, type DraftBookingAddress } from "./agentAddress.service";
 import { bookingAddressLabel } from "../ai/agent/booking-draft";
+import { happenedAfter } from "../ai/agent/reconciliation-evidence";
 
 function bookingView(order: Pick<IOrder, "_id" | "orderCode" | "status" | "bookingStatus" | "paymentStatus"
   | "orderType" | "paymentMethod" | "inspectionRequired" | "scheduledAt" | "depositAmount" | "pricing" | "voucherSnapshot" | "preferredProviderId">) {
@@ -110,6 +111,7 @@ export const AgentBookingService = {
     const options = await getOptionsByServiceId(serviceId);
     return {
       id: String(service._id), name: service.name, slug: service.slug, serviceType: service.serviceType,
+      description: service.description, processSteps: service.processSteps,
       fixedPrice: service.fixedPrice,
       optionGroups: service.optionGroups,
       requiresOptionSelection: service.requiresOptionSelection, options: options.map((option) => ({
@@ -146,6 +148,8 @@ export const AgentBookingService = {
       amountBeforeVoucher: Math.max(snapshot.baseAmount - promotionDiscountAmount, 0), inspectionRequired: service.serviceType === "variable_price",
     });
     return vouchers.map((voucher) => ({ code: voucher.code!, name: voucher.name,
+      discountType: voucher.discountType === "PERCENT" ? "PERCENT" as const : "AMOUNT" as const,
+      discountValue: voucher.discountValue,
       discountAmount: voucher.discountAmount ?? 0,
       finalAmount: Math.max(snapshot.bookingAmount - promotionDiscountAmount - (voucher.discountAmount ?? 0), 0),
       minOrderAmount: voucher.minOrderAmount, endAt: voucher.endAt.toISOString(), neverExpires: voucher.neverExpires ?? false,
@@ -334,5 +338,17 @@ export const AgentBookingService = {
     confirmedExpectation: { paidAmount: number; refundAmount: number; cancellationFee: number }) {
     await OrderService.cancelOrder(orderId, userId, "customer", reason, confirmedExpectation);
     return this.getBooking(userId, orderId);
+  },
+  async reconcileCancellation(userId: string, orderId: string, reason: string, expected: unknown, startedAt?: string) {
+    const order = await Order.findOne({ _id: orderId, customerId: userId, isDeleted: false });
+    const cancellation = order?.cancellation;
+    const policy = cancellation?.refundPolicy;
+    const preview = expected as { paidAmount?: number; refundAmount?: number; cancellationFee?: number } | null;
+    if (!order || order.status !== "cancelled" || cancellation?.cancelledByRole !== "customer"
+      || String(cancellation.cancelledBy) !== userId || cancellation.reason !== reason
+      || !happenedAfter(cancellation.cancelledAt, startedAt) || !preview || !policy
+      || policy.paidAmount !== preview.paidAmount || policy.refundAmount !== preview.refundAmount
+      || policy.cancellationFee !== preview.cancellationFee) return null;
+    return bookingView(order);
   },
 };

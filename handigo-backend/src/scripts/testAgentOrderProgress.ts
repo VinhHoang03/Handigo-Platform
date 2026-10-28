@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import { Types } from "mongoose";
+import { MemorySaver } from "@langchain/langgraph";
 import type { ChangeStreamDocument, Document } from "mongodb";
 import { AgentCaseSubscription, AgentOrderMessage, AgentOrderSubscription } from "../models/agentOrderProgress.model";
 import { Order } from "../models/order.model";
@@ -10,8 +11,14 @@ import { Refund } from "../models/refund.model";
 import { SupportTicket } from "../models/supportTicket.model";
 import { Complaint } from "../models/complaint.model";
 import * as socketServer from "../sockets/socketServer";
-import { combineAgentBookingPayment, describeOrderProgress, mergeAgentOrderMessages, publishAgentOrderChange, restoreAgentProgressTracking, safelyTrackAgentBooking, safelyTrackAgentCase, trackAgentBooking } from "../services/agentOrderProgress.service";
+import { combineAgentBookingPayment, describeOrderProgress, mergeAgentOrderMessages, publishAgentOrderChange, restoreAgentProgressTracking, restoreAgentSessionTracking, safelyTrackAgentBooking, safelyTrackAgentCase, trackAgentBooking } from "../services/agentOrderProgress.service";
 import { newSession } from "../ai/agent/agent-state";
+import { AgentService, sessionView } from "../ai/agent/agent.service";
+import { AgentLoop } from "../ai/agent/agent-loop.service";
+import { ToolRegistry } from "../ai/tools/tool-registry";
+import { getPaymentStatusTool } from "../ai/tools/implementations/payment.tools";
+import { buildCustomerSessionGraph, projectCustomerWorkflow, type CustomerWorkflowData } from "../ai/runtime/customer-workflow-state";
+import { CUSTOMER_GRAPH_VERSION } from "../ai/runtime/mongo-graph-access";
 
 // Kiểm thử không kết nối database, không đọc cấu hình bí mật hoặc gọi cổng thanh toán.
 async function run() {
@@ -125,6 +132,31 @@ async function run() {
   const afterPayment = emitted.length;
   await publishAgentOrderChange(change("coc-lap-lai", Payment.collection.collectionName, { status: "paid" }, { paymentType: "inspection_deposit" }));
   assert.equal(emitted.length, afterPayment, "Sự kiện cọc phát lại không gửi tin thừa.");
+  // Kiểm tra QR tự động không gửi thêm tin thành công khi đã cập nhật cùng thẻ tiến độ.
+  const paymentSession = newSession(subscription.sessionId, subscription.userId);
+  await mergeAgentOrderMessages(paymentSession);
+  const paymentMessage = "Đã thanh toán thành công.";
+  const paymentResult = { orderId: orderId.toString(), orderCode: "ORD-KIEM-THU", status: "paid" as const,
+    amount: 100000, paymentType: "full" as const, method: "payos", message: paymentMessage };
+  const registry = new ToolRegistry().register({ ...getPaymentStatusTool, execute: async () => paymentResult });
+  const service = new AgentService({
+    acquire: async () => ({ session: paymentSession, lockId: "khoa-kiem-thu" }),
+    save: async () => {}, release: async () => {},
+  }, new AgentLoop({ generate: async () => { throw new Error("Không gọi model khi kiểm tra QR."); } },
+    registry, { systemPrompt: "", maxIterations: 1, timeoutMs: 10000 }));
+  const statusInput = { requestId: "kiem-tra-qr", paymentStatus: { orderId: orderId.toString() } };
+  await service.send({ id: subscription.userId, role: "CUSTOMER" }, paymentSession.id, statusInput);
+  assert.ok(paymentSession.conversation.find((message) => message.id === `booking:${orderId}`)?.content.includes(paymentMessage));
+  assert.ok(!sessionView(paymentSession).messages.some((message) => message.content === paymentMessage),
+    "Không gửi tin thành công riêng sau khi thẻ tiến độ đã chứa kết quả.");
+  const messageCount = paymentSession.conversation.length;
+  await service.send({ id: subscription.userId, role: "CUSTOMER" }, paymentSession.id, statusInput);
+  assert.equal(paymentSession.conversation.length, messageCount, "Thử lại cùng request không thêm thông báo.");
+  paymentSession.conversation = [];
+  await service.send({ id: subscription.userId, role: "CUSTOMER" }, paymentSession.id,
+    { ...statusInput, requestId: "kiem-tra-khong-co-the-tien-do" });
+  assert.ok(sessionView(paymentSession).messages.some((message) => message.content === paymentMessage),
+    "Giữ thông báo thành công khi chưa có thẻ tiến độ đơn.");
   assert.match(describeOrderProgress({ scheduledAt: "2026-10-16T12:07:00Z" }).join("\n"), /16\/10\/2026 lúc 19:07\./);
 
   await publishAgentOrderChange(change("huy-don", Order.collection.collectionName, { status: "cancelled", cancellation: { reason: "Khách đổi lịch" } }));
@@ -161,12 +193,16 @@ async function run() {
   const refund = { paymentId: new Types.ObjectId(), customerId: subscription.userId, amount: 70000, destination: "handigo_wallet",
     lastError: "THONG-TIN-NOI-BO", providerResponse: { account: "TAI-KHOAN-NHAY-CAM" } };
   for (const [index, status] of ["requested", "requesting", "pending", "failed", "failed", "manual_review", "succeeded"].entries()) {
+    const emittedBeforeRefund: number = emitted.length;
     await publishAgentOrderChange(change(`hoan-${status}-${index}`, Refund.collection.collectionName, { status }, refund));
+    if (["requested", "requesting", "pending", "failed"].includes(status)) {
+      assert.equal(emitted.length, emittedBeforeRefund, "Không phát thông báo hoàn tiền trung gian hoặc mỗi lần thử lại.");
+    }
   }
   const refundMessages = [...stored.values()].filter((message) => message._id.startsWith("order-event:refund:") && message.content.includes("70.000 đồng"));
-  assert.equal(refundMessages.length, 5, "Gộp mốc đang xử lý và không lặp khi worker thử lại.");
+  assert.equal(refundMessages.length, 2, "Chỉ báo khi cần hỗ trợ và khi hoàn tiền thành công.");
   assert.ok(refundMessages.every((message) => message.content.includes("70.000 đồng") && message.content.includes("ví Handigo")));
-  assert.ok(refundMessages.some((message) => message.content.includes("tự động thử lại")));
+  assert.ok(refundMessages.every((message) => !message.content.includes("tự động thử lại") && !message.content.includes("đang được xử lý")));
   assert.ok(refundMessages.some((message) => message.content.includes("bộ phận hỗ trợ kiểm tra")));
   assert.ok(refundMessages.every((message) => !message.content.includes("THONG-TIN-NOI-BO") && !message.content.includes("TAI-KHOAN-NHAY-CAM")));
   const beforeDuplicateRefund = stored.size;
@@ -191,6 +227,19 @@ async function run() {
     { ...refund, customerId: new Types.ObjectId() }));
   await publishAgentOrderChange(change("hoan-noi-bo", Refund.collection.collectionName, { attemptCount: 3 }, refund));
   assert.equal(stored.size, afterRefund);
+  const legacyRefundSession = newSession(subscription.sessionId, subscription.userId);
+  const legacyIds = ["requested", "processing", "failed"].map((stage) => `order-event:refund:${orderId}:${stage}`);
+  for (const id of legacyIds) {
+    const message = { _id: id, content: "Thông báo hoàn tiền trung gian cũ", createdAt: new Date() };
+    stored.set(id, message);
+    legacyRefundSession.conversation.push({ id, role: "assistant", content: message.content, createdAt: message.createdAt.toISOString() });
+  }
+  legacyRefundSession.conversation.push({ id: "khach-hoi-hoan-tien", role: "user", content: "Hoàn tiền đang được xử lý chưa?", createdAt: new Date().toISOString() });
+  await mergeAgentOrderMessages(legacyRefundSession);
+  assert.ok(!legacyRefundSession.conversation.some((message) => legacyIds.includes(message.id)), "Ẩn thông báo trung gian trong checkpoint và lịch sử cũ.");
+  assert.ok(legacyIds.every((id) => stored.has(id)), "Không xóa bản ghi lịch sử trong database.");
+  assert.ok(legacyRefundSession.conversation.some((message) => message.id === "khach-hoi-hoan-tien"), "Giữ tin nhắn khách hỏi về hoàn tiền.");
+  assert.ok(legacyRefundSession.conversation.some((message) => message.id === `order-event:refund:${refund.paymentId}:succeeded`), "Giữ kết quả hoàn tiền thành công.");
 
   const adminResponse = { responderRole: "ADMIN", message: "Đã kiểm tra giao dịch của bạn.",
     respondedAt: new Date("2026-10-01T00:30:00Z"), responderId: "ADMIN-NOI-BO" };
@@ -270,6 +319,57 @@ async function run() {
     createdAt: new Date().toISOString(), expiresAt: new Date().toISOString(), status: "SUCCEEDED", result: { orderId: orderId.toString() } });
   await restoreAgentProgressTracking(recoveredSession);
   assert.ok(stored.has(`booking:${orderId}`), "Khôi phục đăng ký từ kết quả thành công đã lưu sau restart.");
+  // Crash sau checkpoint thành công nhưng trước cache directory: đọc đúng nguồn graph.
+  const emptyCache = newSession(subscription.sessionId, subscription.userId);
+  const directory = { _id: subscription.sessionId, userId: subscription.userId,
+    engine: "langgraph-customer" as const, data: emptyCache };
+  const graph = buildCustomerSessionGraph(new MemorySaver());
+  const graphConfig = { configurable: { thread_id: "checkpoint-khoi-phuc-theo-doi" } };
+  await graph.updateState(graphConfig, { data: { version: CUSTOMER_GRAPH_VERSION, session: structuredClone(recoveredSession) } }, "session");
+  let canonicalReads = 0;
+  const loadCanonical = async (id: string, userId: string) => {
+    assert.equal(id, subscription.sessionId); assert.equal(userId, subscription.userId);
+    canonicalReads++;
+    const snapshot = await graph.getState(graphConfig);
+    return projectCustomerWorkflow(snapshot.values.data as CustomerWorkflowData, id, userId);
+  };
+  stored.delete(`booking:${orderId}`);
+  await restoreAgentSessionTracking(directory, loadCanonical);
+  assert.equal(canonicalReads, 1);
+  assert.ok(stored.has(`booking:${orderId}`), "Cache rỗng không làm bỏ sót kết quả thành công trong checkpoint.");
+  const countAfterCanonicalRecovery = stored.size;
+  await restoreAgentSessionTracking(directory, loadCanonical);
+  assert.equal(stored.size, countAfterCanonicalRecovery, "Quét lại checkpoint không lặp thông báo.");
+  stored.delete(`booking:${orderId}`);
+  await restoreAgentSessionTracking({ ...directory, data: recoveredSession }, async () => emptyCache);
+  assert.ok(!stored.has(`booking:${orderId}`), "Cache thành công không cấp quyền theo dõi khi checkpoint chưa có kết quả.");
+  await assert.rejects(restoreAgentSessionTracking({ ...directory, data: recoveredSession }, async () => {
+    throw new Error("Kho checkpoint fixture lỗi.");
+  }));
+  assert.ok(!stored.has(`booking:${orderId}`), "Kho graph lỗi không dùng cache dự phòng.");
+  await assert.rejects(restoreAgentSessionTracking(directory, async () => ({ ...recoveredSession, userId: "khach-khac" })));
+  await assert.rejects(restoreAgentSessionTracking(directory, async () => ({ ...recoveredSession, id: "phien-khac" })));
+  assert.ok(!stored.has(`booking:${orderId}`), "Không khôi phục từ checkpoint khác chủ/khác phiên.");
+  const forbidGraphRead = async () => { throw new Error("Không được đọc graph trong nhánh này."); };
+  await restoreAgentSessionTracking({ ...directory, deletedAt: new Date(), data: recoveredSession }, forbidGraphRead);
+  await restoreAgentSessionTracking({ ...directory, engine: "langgraph-readonly", data: recoveredSession }, forbidGraphRead);
+  assert.ok(!stored.has(`booking:${orderId}`), "Không tạo đăng ký cho phiên đã ẩn hoặc graph chỉ đọc.");
+  await restoreAgentSessionTracking({ ...directory, engine: undefined, data: recoveredSession }, forbidGraphRead);
+  assert.ok(stored.has(`booking:${orderId}`), "Phiên cũ chưa có engine vẫn khôi phục từ nguồn legacy.");
+  initialized = false;
+  await restoreAgentSessionTracking(directory, async () => caseSession);
+  assert.ok(initialized, "Hỗ trợ cũng được khôi phục từ checkpoint khi directory chưa lưu kết quả.");
+  initialized = false;
+  mock.method(Complaint, "findOne", (filter: Record<string, unknown>) => {
+    assert.equal(filter.complainantId, subscription.userId);
+    assert.equal(filter.complainantRole, "CUSTOMER");
+    return { lean: async () => ({ _id: orderId, complainantId: subscription.userId, complainantRole: "CUSTOMER",
+      title: "Kiểm tra chất lượng", status: "pending", createdAt: subscription.createdAt }) };
+  });
+  const complaintSession = structuredClone(caseSession);
+  complaintSession.actions[0].tool = "create_complaint";
+  await restoreAgentSessionTracking(directory, async () => complaintSession);
+  assert.ok(initialized, "Khiếu nại được khôi phục từ kết quả chuẩn với ownership CUSTOMER.");
   const readFailure = mock.method(AgentOrderMessage, "find", () => { throw new Error("Lỗi lịch sử giả lập"); });
   assert.equal(await mergeAgentOrderMessages(recoveredSession), recoveredSession, "Lỗi thông báo không làm mất kết quả thành công.");
   readFailure.mock.restore();

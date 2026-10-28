@@ -12,6 +12,7 @@ import { AuditLog } from "../models/auditLog.model";
 import { Service } from "../models/service.model";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
+import { Refund } from "../models/refund.model";
 import { QUOTATION_DECLINED_REASON, isQuotationDeclinedReason } from "../services/refundPolicy.service";
 import { DEFAULT_REFUND_POLICY } from "../validations/refundPolicy.validator";
 
@@ -89,6 +90,7 @@ async function testCancellation(method: string, fee = 0, invalid?: string,
   });
   mock.method(Payment, "updateMany", async () => ({}));
   mock.method(Wallet, "findOne", () => query(wallet));
+  mock.method(Refund, "findOne", () => query(null));
   mock.method(Wallet, "findOneAndUpdate", (_filter: any, update: any, options: any) => {
     assert.equal(options.session, session);
     customerWallet.balance += update.$inc.balance; return query(customerWallet);

@@ -72,6 +72,8 @@ export function ChatbotMessageList({
   const latestDialogue = audience === "CUSTOMER"
     ? messages.findLast((message) => !message._id.startsWith("order-event:") && !message._id.startsWith("booking:"))
     : messages.at(-1);
+  const hasBookingForm = Boolean(renderConfirmation && messages.some((message) => message.confirmation?.tool === "create_booking"
+    && message.confirmation.actionId === pendingActionId));
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -137,13 +139,16 @@ export function ChatbotMessageList({
       {messages.map((message) => {
         const isUser = message.sender === "user";
         const isBookingConfirmation = !isUser && message.confirmation?.tool === "create_booking";
+        if (hasBookingForm && isBookingConfirmation && message.confirmation?.status === "EXPIRED") return null;
+        const visibleChoiceGroups = hasBookingForm && isBookingConfirmation
+          ? message.choiceGroups?.filter((group) => group.label !== "Voucher có thể sử dụng") : message.choiceGroups;
         const confirmation = !isUser && message.confirmation ? <div className={!isBookingConfirmation && message.content ? "mt-3" : ""}>
           {renderConfirmation ? renderConfirmation(message.confirmation, message.confirmation.actionId !== pendingActionId) : <AgentConfirmationCard action={message.confirmation}
             readOnly={message.confirmation.actionId !== pendingActionId}
             disabled={isReplying || confirmationsDisabled} onDecision={onDecision} />}
         </div> : null;
         const showChoices = !isUser && (message._id === latestDialogue?._id || message._id === messages.at(-1)?._id)
-          && (!message.confirmation || message.confirmation.actionId === pendingActionId) && Boolean(message.choiceGroups?.length) && onSend;
+          && (!message.confirmation || message.confirmation.actionId === pendingActionId) && Boolean(visibleChoiceGroups?.length) && onSend;
         const canChooseBookingVouchers = bookingVoucherChoicesEnabled && isBookingConfirmation
           && message.confirmation?.actionId === pendingActionId
           && message.choiceGroups?.every((group) => ["Voucher có thể sử dụng", "Kiểm tra voucher"].includes(group.label));
@@ -173,7 +178,7 @@ export function ChatbotMessageList({
                 </a>)}
               </div>}
               {showChoices && (
-                <AgentChoiceGroups key={message._id} groups={message.choiceGroups!}
+                <AgentChoiceGroups key={message._id} groups={visibleChoiceGroups!}
                   disabled={isReplying || (choicesDisabled && !canChooseBookingVouchers)} onSend={onSend!} />
               )}
               </div>}

@@ -11,6 +11,7 @@ import { Voucher } from "../models/voucher.model";
 import { VoucherUsage } from "../models/voucherUsage.model";
 import { OrderStatus } from "../models/orderStatus.model";
 import { Provider } from "../models/provider.model";
+import { Violation } from "../models/violation.model";
 import User from "../models/user.model";
 import * as pricing from "../services/servicePricing.service";
 import * as addresses from "../services/address.service";
@@ -67,6 +68,7 @@ async function run() {
     mock.method(Voucher, "findOne", queryPromotion);
     mock.method(Promotion, "findOne", () => ({ session: async () => null }));
     const emptyQuery = () => Object.assign(Promise.resolve([]), { sort: emptyQuery, lean: emptyQuery });
+    mock.method(Violation, "find", () => ({ select: () => ({ session: () => ({ lean: async () => [] }) }) }) as never);
     mock.method(Promotion, "find", emptyQuery);
     mock.method(OrderStatus, "updateOne", async () => ({ modifiedCount: 1 }) as never);
     mock.method(VoucherUsage, "exists", () => ({ session: async () => null }));

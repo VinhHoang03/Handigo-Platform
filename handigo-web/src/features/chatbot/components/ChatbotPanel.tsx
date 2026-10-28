@@ -96,6 +96,11 @@ export function ChatbotPanel({
   };
   const renderConfirmation = (action: AgentConfirmation, readOnly: boolean) => audience === "CUSTOMER" && action.tool === "create_booking" && !readOnly
     ? <AgentBookingConfirmation key={action.actionId} action={action} values={agentSession?.bookingDraft?.values}
+      vouchers={agentSession?.bookingDraft?.availableVouchers}
+      onVoucherChange={agentSession?.bookingDraft ? async (voucherCode) => {
+        await onSend(voucherCode ? `Áp mã ${voucherCode}.` : "Không dùng voucher.", undefined,
+          { type: "update", revision: agentSession.bookingDraft!.revision, patch: { voucherCode } });
+      } : undefined}
       disabled={isReplying || controlsDisabled || attachmentsDirty} onDecision={onDecision} onOpenTool={openTool} />
     : <AgentConfirmationCard action={action} readOnly={readOnly} disabled={isReplying || controlsDisabled || attachmentsDirty} onDecision={onDecision} />;
   return (

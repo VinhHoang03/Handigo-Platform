@@ -11,6 +11,7 @@ const factories: Record<string, (config: ProviderConfig) => LLMProvider> = {
   gemini: (config) => new GeminiProvider(config),
   claude: (config) => new ClaudeProvider(config),
 };
+export const DEFAULT_GEMINI_AGENT_MODEL = "gemini-3.1-flash-lite";
 const configSchema = z.object({
   provider: z.string().min(1), model: z.string().min(1), apiKey: z.string().min(1),
   temperature: z.coerce.number().min(0).max(1).default(0.2),
@@ -21,18 +22,18 @@ const configSchema = z.object({
     requiresConfirmation: z.boolean().optional() }).strict()).default({}),
 });
 
-export function loadAgentConfig() {
-  const provider = (process.env.AI_AGENT_PROVIDER || process.env.AI_CHAT_PROVIDER || "gemini").toLowerCase();
+export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env) {
+  const provider = (env.AI_AGENT_PROVIDER || env.AI_CHAT_PROVIDER || "gemini").toLowerCase();
   const keyNames: Record<string, string> = { gemini: "GEMINI_API_KEY", openai: "OPENAI_API_KEY", claude: "ANTHROPIC_API_KEY" };
   let tools: unknown;
-  try { tools = JSON.parse(process.env.AI_AGENT_TOOLS || "{}"); }
+  try { tools = JSON.parse(env.AI_AGENT_TOOLS || "{}"); }
   catch { throw new AppError("Cấu hình tool AI không hợp lệ.", 503); }
   const result = configSchema.safeParse({ provider,
-    model: process.env.AI_AGENT_MODEL || (provider === "gemini" ? process.env.AI_CHAT_MODEL || "gemini-2.5-flash" : undefined),
-    apiKey: process.env[keyNames[provider]], temperature: process.env.AI_AGENT_TEMPERATURE,
-    maxIterations: process.env.AI_AGENT_MAX_ITERATIONS, timeoutMs: process.env.AI_AGENT_TIMEOUT_MS, tools,
+    model: env.AI_AGENT_MODEL || (provider === "gemini" ? env.AI_CHAT_MODEL || DEFAULT_GEMINI_AGENT_MODEL : undefined),
+    apiKey: env[keyNames[provider]], temperature: env.AI_AGENT_TEMPERATURE,
+    maxIterations: env.AI_AGENT_MAX_ITERATIONS, timeoutMs: env.AI_AGENT_TIMEOUT_MS, tools,
   });
   if (!result.success || !factories[provider]) throw new AppError("Trợ lý AI chưa được cấu hình hợp lệ.", 503);
-  return { ...result.data, systemPrompt: `${AGENT_PROMPT}\n${process.env.AI_AGENT_SYSTEM_PROMPT || ""}`,
+  return { ...result.data, systemPrompt: `${AGENT_PROMPT}\n${env.AI_AGENT_SYSTEM_PROMPT || ""}`,
     createProvider: () => factories[provider](result.data) };
 }

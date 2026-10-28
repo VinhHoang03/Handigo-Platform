@@ -55,7 +55,8 @@ export interface BookingDraft {
   voucherPreference?: "best" | "choose";
   voucherFeedback?: string;
   providerCriteria?: "nearest" | "highest_rating" | "most_completed" | "choose";
-  availableVouchers?: Array<{ code: string; name: string; discountAmount: number; finalAmount: number; endAt?: string }>;
+  availableVouchers?: Array<{ code: string; name: string; discountAmount: number; finalAmount: number; endAt?: string;
+    discountType?: "PERCENT" | "AMOUNT"; discountValue?: number }>;
   providerCandidates?: Array<{ id: string; name: string; distanceMeters?: number; averageRating?: number; totalCompletedOrders?: number }>;
   requestedQuantity?: number;
   scheduleDate?: string;
@@ -65,6 +66,11 @@ export interface BookingDraft {
   choiceGroups: AgentChoiceGroup[];
   orderId?: string;
 }
+const voucherDiscountLabel = (voucher: NonNullable<BookingDraft["availableVouchers"]>[number]) =>
+  voucher.discountType === "PERCENT" && typeof voucher.discountValue === "number"
+    ? `${voucher.discountValue.toLocaleString("vi-VN")}%`
+    : `${(voucher.discountValue ?? voucher.discountAmount).toLocaleString("vi-VN")} đ`;
+
 export interface DraftService {
   id: string; name: string; slug?: string; serviceType: string; requiresOptionSelection: boolean;
   fixedPrice?: number | null;
@@ -556,7 +562,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       draft.missing.push("Chưa thể kiểm tra chuyên gia đã yêu cầu. Vui lòng thử lại hoặc chọn để hệ thống tự tìm thợ");
     }
     const canCheckVouchers = !draft.missing.length;
-    if (canCheckVouchers && deps.vouchers && draft.voucherDecision !== "declined") {
+    if (canCheckVouchers && deps.vouchers) {
       const lookup = await deps.vouchers(userId, bookingSchema.parse(values))
         .then((vouchers) => ({ vouchers, failed: false })).catch(() => ({ vouchers: [], failed: true }));
       if (lookup.failed) {
@@ -585,14 +591,14 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
         if (values.voucherCode && !selected) {
           draft.missing.push("Voucher đã chọn không còn phù hợp; chọn mã khác hoặc không dùng voucher");
         } else if (selected) {
-          draft.summary.push(`Voucher ${selected.code}: giảm ${selected.discountAmount.toLocaleString("vi-VN")} đ; còn ${selected.finalAmount.toLocaleString("vi-VN")} đ.`);
+          draft.summary.push(`Voucher ${selected.code}: giảm ${voucherDiscountLabel(selected)}; còn ${selected.finalAmount.toLocaleString("vi-VN")} đ.`);
         }
         if ((!draft.voucherDecision && draft.availableVouchers.length) || (values.voucherCode && !selected)) {
           if (!draft.voucherDecision) {
-            draft.voucherFeedback = `Có ${draft.availableVouchers.length} mã giảm giá dùng được cho đơn này. Bạn có thể chọn mã bên dưới trước khi xác nhận.`;
+            draft.voucherFeedback = `Có ${draft.availableVouchers.length} mã giảm giá dùng được cho đơn này. Bạn có thể chọn mã trong form trước khi xác nhận.`;
           }
           draft.choiceGroups.push({ label: "Voucher có thể sử dụng", multiple: false,
-            options: [...draft.availableVouchers.slice(0, 10).map((voucher) => `${voucher.code} — giảm ${voucher.discountAmount.toLocaleString("vi-VN")} đ`), "Không dùng voucher"] });
+            options: [...draft.availableVouchers.slice(0, 10).map((voucher) => `${voucher.code} — giảm ${voucherDiscountLabel(voucher)}`), "Không dùng voucher"] });
         }
         if ((draft.voucherPreference && !draft.availableVouchers.length) || (values.voucherCode && !selected)) {
           try {

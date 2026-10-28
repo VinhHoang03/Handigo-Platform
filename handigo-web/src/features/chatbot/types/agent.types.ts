@@ -19,7 +19,7 @@ export type AgentPolicyConsent = { accepted: true; version: string };
 export type AgentBookingAction =
   | { type: "update"; revision: number; patch: { mode?: "update" | "pause" | "discard" | "resume"; quantity?: number;
       selectedOptions?: Array<{ optionId: string; quantity: number }>; addressId?: string; paymentMethod?: "bank" | "wallet" | "cash";
-      orderType?: "normal" | "scheduled"; scheduledAt?: string | null; preferredProviderId?: string | null; saveAddressToBook?: boolean } }
+      orderType?: "normal" | "scheduled"; scheduledAt?: string | null; preferredProviderId?: string | null; saveAddressToBook?: boolean; voucherCode?: string | null } }
   | { type: "rebook_decision"; proposalId: string; accept: boolean }
   | { type: "restore_draft"; backupId: string }
   | { type: "provider"; orderId: string }
@@ -60,6 +60,7 @@ export interface AgentSession {
   orderActions?: { orderId: string; orderCode: string; quotation: boolean; refunds: boolean; payment: boolean; rebook: boolean; provider?: boolean; feedback?: boolean; reason?: string } | null;
   assignedProvider?: AgentAssignedProvider | null;
   bookingDraft?: { status: "active" | "paused" | "discarded" | "booked"; revision: number; summary: string[]; missing: string[];
+    availableVouchers?: Array<{ code: string; name: string; discountAmount: number; discountType?: "PERCENT" | "AMOUNT"; discountValue?: number }>;
     hasDraftAddress?: boolean;
     values?: AgentBookingValues;
     providerCandidates?: Array<{ id: string; name: string; averageRating?: number; totalCompletedOrders?: number; distanceMeters?: number }>;

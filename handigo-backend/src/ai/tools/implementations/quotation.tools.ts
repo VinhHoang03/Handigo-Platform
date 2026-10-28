@@ -19,5 +19,7 @@ export const rejectBookingQuotationTool: AgentTool<z.infer<typeof rejectionSchem
   description: "Khách yêu cầu từ chối báo giá pending: chuẩn bị bản xác nhận từ chối VÀ hủy đơn, kèm phí và tiền hoàn theo chính sách hiện có. Không thực hiện cho saved/approved hoặc đơn đang thực hiện. Chỉ thực hiện khi khách bấm xác nhận; thay đổi phiên bản báo giá hoặc số tiền phải xác nhận lại. Không gọi nếu khách chỉ hỏi ý nghĩa báo giá.",
   preview: (context, args) => AgentQuotationService.previewReject(context.user.id, args.orderId, args.reason),
   execute: (context, args) => AgentQuotationService.reject(context.user.id, args.orderId, args.reason, context.confirmedPreview),
+  reconcile: (context, args) => AgentQuotationService.reconcileRejection(context.user.id, args.orderId, args.reason,
+    context.confirmedPreview, context.actionCreatedAt),
   reply: (result) => ({ state: "COMPLETED", message: (result as { message: string }).message }),
 };

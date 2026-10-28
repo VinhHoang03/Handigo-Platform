@@ -11,6 +11,8 @@ import { getOrderInterval } from "./providerSchedule.service";
 import { respondToProviderReassignment } from "./orderReassignment.service";
 import { AppError } from "../utils/appError";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { happenedAfter } from "../ai/agent/reconciliation-evidence";
+import { AgentBookingService } from "./agentBooking.service";
 
 export const AgentOrderProviderService = {
   async options(userId: string, orderId: string) {
@@ -84,5 +86,26 @@ export const AgentOrderProviderService = {
       decision === "decline" ? { paidAmount: preview.paidAmount!, refundAmount: preview.refundAmount!,
         cancellationFee: preview.cancellationFee! } : undefined);
     return { orderId, orderCode: order.orderCode, status: order.status, reassignmentStatus: order.reassignment?.status };
+  },
+  async reconcileSelection(userId: string, orderId: string, providerId: string, startedAt?: string) {
+    const order = await Order.findOne({ _id: orderId, customerId: userId, isDeleted: false });
+    if (!order) return null;
+    const assignment = await OrderAssignment.findOne({ orderId, providerId, isDeleted: false });
+    if (!assignment || !["direct_request", "appointment"].includes(assignment.assignmentType)
+      || !happenedAfter(assignment.assignedAt, startedAt)) return null;
+    return { orderId, orderCode: order.orderCode, bookingStatus: order.bookingStatus,
+      message: "Đã tìm thấy yêu cầu gửi cho thợ đã chọn. Hãy kiểm tra trạng thái hiện tại để biết thợ đã nhận hay chưa." };
+  },
+  async reconcileResponse(userId: string, orderId: string, decision: "accept" | "decline", expected: unknown, startedAt?: string) {
+    const order = await Order.findOne({ _id: orderId, customerId: userId, isDeleted: false });
+    const preview = expected as { responseDeadline?: string } | null;
+    const reassignment = order?.reassignment;
+    if (!order || !reassignment || reassignment.automatic || !preview?.responseDeadline
+      || reassignment.expiresAt.toISOString() !== preview.responseDeadline || !happenedAfter(reassignment.respondedAt, startedAt)) return null;
+    if (decision === "decline") {
+      if (reassignment.status !== "declined" || !await AgentBookingService.reconcileCancellation(userId, orderId,
+        "Khách hàng từ chối tìm kỹ thuật viên thay thế.", expected, startedAt)) return null;
+    } else if (order.preferredProviderId || !["matching", "matched", "failed"].includes(reassignment.status)) return null;
+    return { orderId, orderCode: order.orderCode, status: order.status, reassignmentStatus: reassignment.status };
   },
 };

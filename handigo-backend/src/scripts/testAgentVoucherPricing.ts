@@ -10,6 +10,7 @@ import { Order } from "../models/order.model";
 import { Voucher } from "../models/voucher.model";
 import { Promotion } from "../models/promotion.model";
 import { VoucherUsage } from "../models/voucherUsage.model";
+import { Violation } from "../models/violation.model";
 import { DEFAULT_BOOKING_POLICY } from "../validations/bookingPolicy.validator";
 import { createAgentPaymentService, paymentExpectationSchema } from "../services/agentPayment.service";
 import { AgentService } from "../ai/agent/agent.service";
@@ -49,6 +50,7 @@ async function run() {
     session: () => query(value), select: () => query(value), lean: () => query(value), sort: () => query(value),
   });
   mock.method(Service, "findOne", () => query(service));
+  mock.method(Violation, "find", () => query([]));
   mock.method(Category, "exists", async () => ({ _id: new Types.ObjectId() }));
   mock.method(ServiceOption, "find", () => query([]));
   mock.method(Address, "findOne", (filter: any) => { assert.equal(filter.userId, user.id); return query(address); });
@@ -87,6 +89,8 @@ async function run() {
     assert.equal(stacked.discountAmount, 18000);
     assert.equal(stacked.amount, 162000, "Tính phần trăm trên giá sau ưu đãi tự động.");
     assert.equal((await AgentBookingService.vouchers(user.id, args))[0].finalAmount, stacked.amount);
+    assert.equal((await AgentBookingService.vouchers(user.id, args))[0].discountType, "PERCENT");
+    assert.equal((await AgentBookingService.vouchers(user.id, args))[0].discountValue, 10);
     automatic.allowVoucher = false;
     assert.equal((await AgentBookingService.preview(user.id, args)).amount, 180000, "Không ghép voucher với ưu đãi không cho kết hợp.");
     assert.equal((await AgentBookingService.vouchers(user.id, args))[0].finalAmount, 180000);

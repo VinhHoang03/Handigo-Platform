@@ -16,7 +16,7 @@ import 'package:handigo_app/features/ai_chat/presentation/ai_chat_sheet.dart';
 
 class _Repository extends AiChatRepository {
   _Repository(super.api);
-  bool failSend = false, failHistory = false;
+  bool failSend = false, failHistory = false, pauseSend = false;
   final requests = <Map<String, dynamic>>[];
   @override
   Future<Map<String, dynamic>?> latest() async => null;
@@ -26,6 +26,21 @@ class _Repository extends AiChatRepository {
     if (failSend) {
       failSend = false;
       throw const ApiException('Mất kết nối');
+    }
+    if (pauseSend) {
+      pauseSend = false;
+      return {
+        'sessionId': request['sessionId'],
+        'state': 'FAILED',
+        'interruptedRequest': {
+          'requestId': request['requestId'],
+          'message': request['message'],
+        },
+        'messages': [
+          {'sender': 'user', 'content': request['message']},
+          {'sender': 'assistant', 'content': 'Trợ lý phản hồi chậm. Chọn Thử lại.'},
+        ],
+      };
     }
     return {
       'sessionId': request['sessionId'],
@@ -241,6 +256,29 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test('Model tạm dừng vẫn thử lại đúng yêu cầu sau HTTP thành công', () async {
+    final repository = _repository();
+    final controller = AiChatController(repository);
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+    repository.pauseSend = true;
+    await controller.send('Hướng dẫn hủy QR');
+    expect(controller.error, contains('Thử lại'));
+    expect(controller.canSend, isFalse);
+    expect(controller.canReset, isFalse);
+    expect(await controller.selectSession('saved-1'), isFalse);
+    final paused = Map<String, dynamic>.of(repository.requests.single);
+    await controller.retry();
+    expect(repository.requests, hasLength(2));
+    expect(repository.requests.last, paused);
+    expect(controller.error, isNull);
+    expect(controller.canSend, isTrue);
+    expect(
+      controller.messages.where((message) => message['sender'] == 'user'),
+      hasLength(1),
+    );
+  });
 
   const voiceChannel = MethodChannel('plugin.csdcorp.com/speech_to_text');
   testWidgets('Từ chối quyền micro vẫn nhập được bằng bàn phím', (

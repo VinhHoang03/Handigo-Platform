@@ -50,7 +50,7 @@ export function providerDiagnostic(body: unknown, privateValues: string[] = []):
     : /API_KEY_SERVICE_BLOCKED|API_KEY_HTTP_REFERRER_BLOCKED|API_KEY_IP_ADDRESS_BLOCKED|PERMISSION_DENIED|SERVICE_DISABLED/i.test(text) ? "ACCESS_DENIED"
     : /too many states for serving|schema.{0,40}too complex|compiled grammar.{0,20}too large/i.test(text) ? "SCHEMA_TOO_COMPLEX"
     : /context_length_exceeded|context.{0,30}(?:limit|length|window)|too many (?:input )?tokens|token.{0,30}(?:limit|exceed)|maximum.{0,20}tokens|prompt is too long/i.test(text) ? "CONTEXT_LIMIT"
-    : /model_not_found|model.*not found|model.*does not exist/i.test(text) ? "MODEL_NOT_FOUND"
+    : /model_not_found|model.*not found|model.*does not exist|model.{0,80}no longer (?:available|supported)/i.test(text) ? "MODEL_NOT_FOUND"
     : /tool_call_id|tool_use_id|tool_result|messages responding to|function_response/i.test(text) ? "INVALID_TOOL_HISTORY"
     : /response_format|response_schema|responseSchema|responseJsonSchema/i.test(text) ? "INVALID_RESPONSE_SCHEMA"
     : /function_declarations|functionDeclarations|parametersJsonSchema|parameters_json_schema|invalid_function_parameters|schema for (?:function|tool)|tools[\[.].*(?:parameters|input_schema)/i.test(text) ? "INVALID_TOOL_SCHEMA"

@@ -21,6 +21,9 @@ const scroll = new URLSearchParams(location.search).has('scroll');
 const historyActions = new URLSearchParams(location.search).has('history-actions');
 const paymentCancellation = new URLSearchParams(location.search).has('payment-cancellation');
 const flowExtensions = new URLSearchParams(location.search).has('flow-extensions');
+const modelRecovery = new URLSearchParams(location.search).has('model-recovery');
+const newSession = new URLSearchParams(location.search).has('new-session');
+const voucherForm = new URLSearchParams(location.search).has('voucher-form');
 const calls = JSON.parse(sessionStorage.getItem('test:agent-calls') || '[]');
 const log = (value) => { calls.push(value); sessionStorage.setItem('test:agent-calls', JSON.stringify(calls)); };
 const fixture = window.__agentFixture = {
@@ -77,6 +80,10 @@ function book() {
   session.orderActions = { orderId: ids.order, orderCode: 'ORD-KIEM-THU', quotation: false, refunds: false, rebook: false, payment: true };
 }
 confirmation();
+if (modelRecovery) {
+  session.messages = []; session.bookingDraft = null; session.pendingConfirmation = null;
+  session.state = 'WAITING_USER_INPUT'; fixture.pauseNext = true;
+}
 const historicalOrders = [
   { orderId: '101010101010101010101010', orderCode: 'HD-SUA-CU', status: 'completed', serviceId: ids.service,
     service: 'Sửa điều hòa', serviceType: 'variable_price', hasQuotation: true,
@@ -155,6 +162,21 @@ fixture.send = async (request) => {
   log({ type: 'send', request });
   if (fixture.waitForSend) await fixture.waitForSend;
   if (fixture.failNext) { fixture.failNext = false; throw Error('Mất kết nối giả lập'); }
+  if (modelRecovery) {
+    if (fixture.pauseNext) {
+      fixture.pauseNext = false;
+      session.interruptedRequest = { requestId: request.requestId, message: request.message };
+      session.state = 'FAILED';
+      session.messages.push({ _id: crypto.randomUUID(), sender: 'user', content: request.message, createdAt: new Date().toISOString() },
+        { _id: crypto.randomUUID(), sender: 'assistant', content: 'Trợ lý phản hồi chậm. Chọn Thử lại.', createdAt: new Date().toISOString() });
+    } else {
+      assert(request.requestId === session.interruptedRequest.requestId && request.message === session.interruptedRequest.message
+        && request.sessionId === ids.session, 'tiếp tục đúng yêu cầu đang dở');
+      session.interruptedRequest = null; session.state = 'COMPLETED';
+      session.messages.push({ _id: crypto.randomUUID(), sender: 'assistant', content: 'Đã tiếp tục yêu cầu.', createdAt: new Date().toISOString() });
+    }
+    return structuredClone(session);
+  }
   if (flowExtensions) {
     const reply = (content) => session.messages.push({ _id: crypto.randomUUID(), sender: 'assistant', content, createdAt: new Date().toISOString() });
     const prepare = (tool, preview) => {
@@ -309,6 +331,22 @@ fixture.upload = async (sessionId, file) => {
   if (fixture.failUpload) { fixture.failUpload = false; throw Error('Lỗi upload giả lập'); }
   return { url: location.origin.replace('http:', 'https:') + '/anh-hien-trang-' + crypto.randomUUID() + '.png' };
 };
+if (newSession) {
+  fixture.get = async () => fixture.saved ? structuredClone(session) : null;
+  fixture.reset = async (id) => {
+    log({ type: 'reset', sessionId: id });
+    if (!fixture.saved || id !== session.sessionId) throw Error('Không tìm thấy cuộc trò chuyện.');
+    session.sessionId = crypto.randomUUID(); session.messages = []; session.pendingConfirmation = null;
+    return structuredClone(session);
+  };
+  fixture.send = async (request) => {
+    log({ type: 'send', request }); fixture.saved = true;
+    session.sessionId = request.sessionId; session.state = 'WAITING_USER_INPUT';
+    session.pendingConfirmation = null; session.bookingDraft = null;
+    session.messages = [{ _id: crypto.randomUUID(), sender: 'assistant', content: 'Đã nhận tin nhắn kiểm thử.', createdAt: new Date().toISOString() }];
+    return structuredClone(session);
+  };
+}
 const root = createRoot(document.getElementById('root'));
 const render = (key) => root.render(<BrowserRouter key={key}><ChatbotWidget audience="CUSTOMER" /></BrowserRouter>);
 render('ban-dau');
@@ -400,6 +438,7 @@ async function verifyPaymentCancellation() {
   render('qr-nhan-tien-dong-thoi');
   await wait(() => document.querySelector('[aria-label="Mở Trợ lý Handigo"]'), 'mở kịch bản nhận tiền đồng thời');
   document.querySelector('[aria-label="Mở Trợ lý Handigo"]').click();
+  if (voucherForm) { await verifyVoucherOrder(); document.body.dataset.agentBookingPassed = 'true'; return; }
   await wait(() => qr() && button('Hủy QR'), 'QR đang chờ của kịch bản tiếp');
   fixture.cancelMode = 'paid';
   await click('Hủy QR'); await click('Xác nhận');
@@ -493,10 +532,42 @@ async function verifyFlowExtensions() {
   assert(panel.left >= 0 && panel.right <= innerWidth + 1, 'giao diện nằm trong màn hình');
   document.body.dataset.agentBookingPassed = 'true';
 }
+async function verifyModelRecovery() {
+  await wait(() => document.querySelector('aside textarea') && !document.querySelector('aside textarea').disabled, 'sẵn sàng nhập');
+  const input = document.querySelector('aside textarea');
+  change(input, 'Hướng dẫn hủy QR'); await pause();
+  input.closest('form').requestSubmit();
+  await wait(() => button('Thử lại') && session.interruptedRequest, 'hiển thị thử lại sau phản hồi tạm dừng');
+  const first = structuredClone(lastSend());
+  await click('Thử lại');
+  await wait(() => session.state === 'COMPLETED' && !button('Thử lại') && !document.querySelector('aside textarea').disabled, 'hoàn tất yêu cầu khi thử lại');
+  assert(calls.filter((item) => item.type === 'send').length === 2, 'chỉ gửi hai lần theo thao tác khách');
+  assert(lastSend().requestId === first.requestId && lastSend().sessionId === first.sessionId
+    && lastSend().message === first.message, 'giữ mã yêu cầu, phiên và nội dung');
+  assert(session.messages.filter((message) => message.sender === 'user').length === 1, 'không lặp tin nhắn khách');
+  document.body.dataset.agentBookingPassed = 'true';
+}
 async function run() {
   if (returned) return verifyWalletReturn();
   await wait(() => document.querySelector('[aria-label="Mở Trợ lý Handigo"]'), 'hiển thị widget');
   document.querySelector('[aria-label="Mở Trợ lý Handigo"]').click();
+  if (newSession) {
+    const task = () => document.querySelector('[aria-label="Bắt đầu tác vụ mới"]');
+    await wait(() => task() && !task().disabled && document.querySelector('aside textarea'), 'mở chat trống');
+    for (let i = 0; i < 2; i++) { task().click(); await pause(); }
+    assert(!button('Thử lại') && !document.body.textContent.includes('Không tìm thấy cuộc trò chuyện.'), 'dấu cộng không báo lỗi khi chưa lưu phiên');
+    assert(!calls.some((item) => item.type === 'reset'), 'không đặt lại ID chỉ tồn tại trên trình duyệt');
+    const input = document.querySelector('aside textarea'); change(input, 'Xin chào'); await pause();
+    document.querySelector('[aria-label="Gửi tin nhắn"]').click();
+    await wait(() => document.body.textContent.includes('Đã nhận tin nhắn kiểm thử.') && !task().disabled, 'gửi tin đầu sau dấu cộng');
+    const savedId = session.sessionId;
+    task().click();
+    await wait(() => session.sessionId !== savedId && !task().disabled, 'đặt lại phiên đã lưu qua backend');
+    assert(calls.filter((item) => item.type === 'reset').length === 1, 'phiên đã lưu vẫn kiểm tra reset ở backend');
+    assert(!button('Thử lại'), 'không lỗi sau đặt lại phiên đã lưu');
+    document.body.dataset.agentBookingPassed = 'true'; return;
+  }
+  if (modelRecovery) return verifyModelRecovery();
   if (flowExtensions) return verifyFlowExtensions();
   if (historyActions) return verifyHistoryActions();
   if (paymentCancellation) return verifyPaymentCancellation();
@@ -875,61 +946,79 @@ async function verifyBusiness() {
   document.body.dataset.agentBookingPassed = 'true';
 }
 async function verifyVoucherOrder() {
-  const container = document.createElement('div');
-  document.body.append(container);
+  const container = document.createElement('div'); document.body.append(container);
   const previewRoot = createRoot(container);
-  let action = { actionId: 'xac-nhan-voucher', tool: 'create_booking', preview: { title: 'Đặt dịch vụ', amount: 40000 },
+  let revision = 7;
+  let vouchers = [{ code: 'GIAM10PT', name: 'Ưu đãi 10%', discountType: 'PERCENT', discountValue: 10, discountAmount: 12000 },
+    { code: 'GIAM20K', name: 'Ưu đãi cố định', discountType: 'AMOUNT', discountValue: 20000, discountAmount: 20000 }];
+  let action = { actionId: 'xac-nhan-voucher', tool: 'create_booking', preview: { title: 'Tạo đơn dịch vụ', unitPrice: 120000, amount: 120000 },
     expiresAt: new Date(Date.now() + 600000).toISOString() };
-  const message = { _id: 'voucher-sau-form', sender: 'assistant', content: 'Bạn có thể chọn mã giảm giá bên dưới.',
-    createdAt: new Date().toISOString(), confirmation: action,
-    choiceGroups: [{ label: 'Voucher có thể sử dụng', multiple: false, options: ['GIAM10 — giảm 10.000 đ', 'Không dùng voucher'] }] };
-  const sent = [];
-  const show = async (pendingActionId, overrides = {}) => {
-    const pendingConfirmation = pendingActionId ? { ...action, actionId: pendingActionId } : null;
-    previewRoot.render(<BrowserRouter><ChatbotPanel audience="CUSTOMER" messages={[message]} isReplying={false}
-      isLoading={false} error="" availabilityMessage="" userId={ids.user}
-      agentSession={{ ...session, bookingDraft: { status: 'active', revision: 1, values, summary: [], missing: [] } }}
-      pendingConfirmation={pendingConfirmation} onClose={() => {}} onRetry={() => {}} onDecision={() => {}}
-      onSend={async (content) => { sent.push(content); }} {...overrides} /></BrowserRouter>);
+  const message = { _id: 'form-voucher', sender: 'assistant', content: '', createdAt: new Date().toISOString(), confirmation: action,
+    choiceGroups: [{ label: 'Voucher có thể sử dụng', multiple: false, options: ['GIAM10PT — giảm 10%', 'Không dùng voucher'] }] };
+  const sent = []; let fail = false; let previousForm = null;
+  const field = () => container.querySelector('[aria-label="Chọn mã giảm giá"]');
+  const form = () => container.querySelector('[aria-label="Xác nhận thao tác"]');
+  const row = (label) => [...form().querySelectorAll('dt')].find((node) => node.textContent === label)?.nextElementSibling?.textContent;
+  const show = async (pendingActionId = action.actionId, overrides = {}) => {
+    previewRoot.render(<BrowserRouter><ChatbotPanel audience="CUSTOMER" messages={previousForm ? [previousForm, message] : [message]}
+      isReplying={false} isLoading={false} error="" availabilityMessage="" userId={ids.user}
+      agentSession={{ ...session, bookingDraft: { status: 'active', revision, values, availableVouchers: vouchers, summary: [], missing: [] } }}
+      pendingConfirmation={pendingActionId ? { ...action, actionId: pendingActionId } : null}
+      onClose={() => {}} onRetry={() => {}} onDecision={() => {}}
+      onSend={async (content, attachments, bookingAction) => {
+        sent.push({ content, bookingAction });
+        assert(bookingAction.type === 'update' && bookingAction.revision === revision, 'gửi mã cùng đúng phiên bản bản nháp');
+        if (fail) { fail = false; throw Error('Lỗi cập nhật mã giả lập'); }
+        const code = bookingAction.patch.voucherCode;
+        const chosen = vouchers.find((voucher) => voucher.code === code);
+        const old = structuredClone(message); old.confirmation.status = 'EXPIRED'; previousForm = old;
+        action = { ...action, actionId: crypto.randomUUID(), preview: { ...action.preview,
+          voucherCode: code || undefined, discountAmount: chosen?.discountAmount || 0, amount: 120000 - (chosen?.discountAmount || 0) } };
+        message.confirmation = action; message._id = crypto.randomUUID(); revision++;
+        await show();
+      }} {...overrides} /></BrowserRouter>);
     await pause();
   };
+  const open = async () => { field().click(); await wait(() => dialog()?.textContent.includes('Chọn mã giảm giá'), 'mở danh sách mã'); };
+  const choose = async (code) => {
+    const option = [...dialog().querySelectorAll('button')].find((node) => node.textContent.includes(code));
+    assert(option, 'có lựa chọn mã ' + code); option.click(); await pause();
+  };
   try {
-    await show(action.actionId);
-    const form = container.querySelector('[aria-label="Xác nhận thao tác"]');
-    const vouchers = container.querySelector('fieldset');
-    const feedback = [...container.querySelectorAll('p')].find((node) => node.textContent === message.content);
-    assert(form && vouchers && Boolean(form.compareDocumentPosition(vouchers) & Node.DOCUMENT_POSITION_FOLLOWING), 'form xác nhận hiển thị trước lựa chọn voucher');
-    assert(feedback && Boolean(form.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING), 'phản hồi voucher nằm sau form');
-    assert(!vouchers.disabled, 'chọn được voucher khi form đặt đơn đang chờ xác nhận');
-    for (const overrides of [{ isReplying: true }, { isLoading: true }, { taskBlocked: true }, { error: 'Chưa xử lý được' },
-      { availabilityMessage: 'Cần bắt đầu phiên mới' }, { pendingConfirmation: { ...action, tool: 'create_payment' } }]) {
-      await show(action.actionId, overrides);
-      const choices = container.querySelector('fieldset');
-      assert(!choices || choices.disabled, 'khóa chọn mã khi bận, lỗi, đối soát hoặc chờ hành động khác');
+    await show();
+    assert(field()?.textContent.includes('Không dùng voucher'), 'mặc định không áp mã');
+    const labels = [...form().querySelectorAll('dt')].map((node) => node.textContent);
+    assert(labels.indexOf('Mã giảm giá') === labels.indexOf('Đơn giá') + 1, 'mã giảm giá nằm ngay dưới đơn giá');
+    assert(!container.querySelector('fieldset'), 'không có form chọn mã riêng bên dưới');
+    await open();
+    assert(dialog().textContent.includes('Giảm 10%') && dialog().textContent.includes('Giảm 20.000 đ'), 'giữ đúng phần trăm và số tiền của mã');
+    assert(button('Xác nhận', container).disabled, 'không xác nhận đơn khi đang chọn mã');
+    await choose('GIAM10PT');
+    await wait(() => !dialog() && row('Số tiền') === '108.000 đ', 'cập nhật số tiền từ kết quả backend');
+    assert(field().textContent.includes('Giảm 10%') && !field().textContent.includes('GIAM10PT'), 'hiển thị mức ưu đãi đã chọn, không hiển thị code');
+    assert(container.querySelectorAll('[aria-label="Xác nhận thao tác"]').length === 1, 'chỉ giữ form hiện tại, không dồn form cũ');
+    assert(button('Xác nhận', container).disabled, 'giá mới cần đồng ý chính sách lại');
+    await open(); await choose('Không dùng voucher');
+    await wait(() => !dialog() && row('Số tiền') === '120.000 đ', 'bỏ mã trả lại giá chưa giảm');
+    assert(field().textContent.includes('Không dùng voucher'), 'vẫn mở lại được mã sau khi bỏ');
+    await open(); fail = true; await choose('GIAM20K');
+    await wait(() => dialog()?.textContent.includes('Chưa cập nhật được mã giảm giá'), 'hiển thị lỗi chọn mã');
+    assert(row('Số tiền') === '120.000 đ', 'lỗi cập nhật không hiển thị giá giảm giả');
+    button('Đóng', dialog())?.click();
+    if (dialog()) { document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true})); await pause(); }
+    await open(); await choose('GIAM20K');
+    await wait(() => !dialog() && row('Số tiền') === '100.000 đ', 'áp dụng mã giảm cố định');
+    assert(field().textContent.includes('Giảm 20.000 đ') && !field().textContent.includes('GIAM20K'), 'mã cố định hiển thị số tiền ưu đãi');
+    await open(); await choose('Không dùng voucher');
+    await wait(() => !dialog() && row('Số tiền') === '120.000 đ', 'bỏ mã giảm cố định');
+    for (const overrides of [{ isReplying: true }, { taskBlocked: true }, { error: 'Chưa xử lý được' }, { availabilityMessage: 'Chưa khả dụng' }]) {
+      await show(action.actionId, overrides); assert(field().disabled, 'khóa sửa mã khi bận hoặc lỗi');
     }
-    await show(action.actionId);
-    container.querySelector('input[type="radio"]').click(); await pause();
-    await click('Tiếp tục', container);
-    assert(sent.at(-1) === 'Voucher có thể sử dụng: GIAM10 — giảm 10.000 đ', 'gửi đúng mã đã chọn qua luồng voucher hiện có');
-    assert(!sent.some((content) => content.includes('Xác nhận')), 'chọn mã chưa tạo đơn hoặc thanh toán');
-    action = { ...action, actionId: 'xac-nhan-sau-giam', preview: { ...action.preview, voucherCode: 'GIAM10', discountAmount: 10000, amount: 30000 } };
-    message.confirmation = action;
-    message._id = 'form-sau-giam';
-    await show(action.actionId);
-    assert(container.querySelector('[aria-label="Xác nhận thao tác"]').textContent.includes('30.000 đ'), 'hiển thị số tiền sau giảm trong form mới');
-    assert(button('Xác nhận', container).disabled, 'form sau giảm vẫn cần đồng ý chính sách trước khi xác nhận');
-    const choices = container.querySelectorAll('input[type="radio"]');
-    choices[1].click(); await pause();
-    await click('Tiếp tục', container);
-    assert(sent.at(-1) === 'Voucher có thể sử dụng: Không dùng voucher', 'gửi được lựa chọn bỏ mã');
-    message.choiceGroups = [{ label: 'Chuyên gia đang phù hợp', multiple: false, options: ['Thợ kiểm thử'] }];
-    await show(action.actionId);
-    assert(container.querySelector('fieldset').disabled, 'không mở khóa nhóm lựa chọn khác khi đang xác nhận');
-    message.choiceGroups = [{ label: 'Kiểm tra voucher', multiple: false, options: ['Kiểm tra lại voucher', 'Không dùng voucher'] }];
-    await show(action.actionId);
-    assert(!container.querySelector('fieldset').disabled, 'cho thử lại tra mã khi form đặt đơn đang chờ');
-    await show(undefined);
-    assert(!container.querySelector('fieldset'), 'không dùng được lựa chọn voucher của bản xác nhận cũ');
+    vouchers = []; await show();
+    assert(!field() && row('Mã giảm giá') === undefined, 'không có mã hợp lệ thì ẩn trường');
+    assert(sent.every((entry) => !entry.bookingAction.confirmation), 'chọn mã chưa xác nhận đặt hoặc thanh toán');
+    vouchers = [{ code: 'GIAM10PT', name: 'Ưu đãi 10%', discountType: 'PERCENT', discountValue: 10, discountAmount: 12000 }];
+    await show(null); assert(!field(), 'không sửa được form cũ đã hết hiệu lực');
   } finally { previewRoot.unmount(); container.remove(); }
 }
 async function verifyRepairPreview() {
@@ -950,7 +1039,7 @@ async function verifyRepairPreview() {
     assert(row('Giá trước giảm') === undefined && row('Giảm giá') === undefined, 'không có mã thì ẩn hai dòng giảm giá');
     assert(row('Tiền đặt cọc') === '40.000 đ', 'cọc chưa có mã giữ đúng giá server');
     await show({ ...base, voucherCode: 'GIAM10', discountAmount: 10000, amount: 30000 });
-    assert(row('Voucher') === 'GIAM10' && row('Giảm giá') === '10.000 đ', 'có mã đã áp dụng mới hiện tiền giảm');
+    assert(row('Mã giảm giá') === 'GIAM10' && row('Giảm giá') === '10.000 đ', 'có mã đã áp dụng mới hiện tiền giảm');
     assert(row('Giá trước giảm') === undefined, 'bỏ dòng giá trước giảm cả khi có mã');
     assert(row('Tiền đặt cọc') === '30.000 đ', 'hiện cọc sau giảm, không trừ mã hai lần');
     await show({ ...base, voucherCode: 'GIAMHET', discountAmount: 40000, amount: 0 });

@@ -16,6 +16,7 @@ export const llmResponseSchema = z.discriminatedUnion("type", [
 ]);
 export type LLMResponse = z.infer<typeof llmResponseSchema>;
 export interface LLMRequest {
+  onUsage?: (usage: ModelUsage) => void;
   taskContext?: unknown;
   system: string;
   goal: string;
@@ -25,6 +26,14 @@ export interface LLMRequest {
 }
 export interface LLMProvider {
   generate(request: LLMRequest): Promise<LLMResponse>;
+}
+export interface ModelUsage {
+  provider: "gemini" | "openai" | "claude";
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
 }
 export interface ProviderConfig {
   apiKey: string;

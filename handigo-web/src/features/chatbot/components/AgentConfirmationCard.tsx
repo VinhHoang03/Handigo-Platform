@@ -6,8 +6,8 @@ import type { ReactNode } from "react";
 
 const labels: Record<string, string> = {
   service: "Dịch vụ", options: "Tùy chọn", address: "Địa chỉ", schedule: "Thời gian",
-  unitPrice: "Đơn giá", quantity: "Số lượng",
-  originalAmount: "Giá trước giảm", voucherCode: "Voucher", discountAmount: "Giảm giá", providerName: "Chuyên gia ưu tiên",
+  unitPrice: "Đơn giá", voucherCode: "Voucher", quantity: "Số lượng",
+  originalAmount: "Giá trước giảm", discountAmount: "Giảm giá", providerName: "Chuyên gia ưu tiên",
   previousAddress: "Địa chỉ trước khi sửa", recipientName: "Người nhận", recipientPhone: "Số điện thoại người nhận",
   addressNote: "Ghi chú địa chỉ",
   addressStorage: "Lưu địa chỉ", rating: "Số sao",
@@ -36,12 +36,13 @@ function formatValue(key: string, value: unknown, serviceType?: unknown) {
   return typeof value === "string" ? value : "";
 }
 
-export function AgentConfirmationCard({ action, disabled, onDecision, readOnly = false, beforeDecision, confirmDisabled = false }: {
+export function AgentConfirmationCard({ action, disabled, onDecision, readOnly = false, beforeDecision, confirmDisabled = false, voucherField }: {
   action: AgentConfirmation; disabled: boolean;
   readOnly?: boolean;
   onDecision?: (decision: "CONFIRM" | "REJECT") => void;
   beforeDecision?: ReactNode;
   confirmDisabled?: boolean;
+  voucherField?: ReactNode;
 }) {
   const [now, setNow] = useState(() => Date.now());
   const hasVoucherDiscount = typeof action.preview.voucherCode === "string" && Boolean(action.preview.voucherCode.trim())
@@ -74,10 +75,10 @@ export function AgentConfirmationCard({ action, disabled, onDecision, readOnly =
     </div>
     <dl className="px-4 py-2">
       {[...Object.entries(labels).filter(([key]) => key !== "amount"
-        && !(action.tool === "create_booking" && (key === "originalAmount" || key === "discountAmount" && !hasVoucherDiscount))), ["amount", labels.amount]].map(([key, label]) => {
-        const value = formatValue(key, action.preview[key], action.preview.serviceType);
+        && !(action.tool === "create_booking" && (key === "addressStorage" || key === "originalAmount" || key === "discountAmount" && !hasVoucherDiscount))), ["amount", labels.amount]].map(([key, label]) => {
+        const value = key === "voucherCode" && voucherField ? voucherField : formatValue(key, action.preview[key], action.preview.serviceType);
         return value ? <div key={key} className={key === "amount" ? "my-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-primary/5 px-3 py-3" : "grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-outline-variant/20 py-2.5 last:border-0 sm:grid-cols-[100px_minmax(0,1fr)]"}>
-          <dt className={`text-xs leading-5 text-on-surface-variant ${key === "amount" ? "font-medium" : ""}`}>{key === "amount" && action.preview.serviceType === "variable_price" ? "Tiền đặt cọc" : label}</dt>
+          <dt className={`text-xs leading-5 text-on-surface-variant ${key === "amount" ? "font-medium" : ""}`}>{key === "voucherCode" && action.tool === "create_booking" ? "Mã giảm giá" : key === "amount" && action.preview.serviceType === "variable_price" ? "Tiền đặt cọc" : label}</dt>
           <dd className={`min-w-0 whitespace-pre-wrap break-words leading-5 [overflow-wrap:anywhere] ${key === "amount" ? "text-2xl font-semibold leading-8 tracking-tight text-primary tabular-nums" : "text-[13px] font-medium"}`}>{value}</dd>
         </div> : null;
       })}

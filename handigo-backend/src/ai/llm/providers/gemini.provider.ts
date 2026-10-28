@@ -1,3 +1,4 @@
+import { reportModelUsage } from "../model-usage";
 import { z } from "zod";
 import type { LLMProvider, LLMRequest, ProviderConfig } from "../llm.interface";
 import { parseReply, postJson, requestContext } from "./provider-http";
@@ -36,6 +37,7 @@ export class GeminiProvider implements LLMProvider {
         toolConfig: { functionCallingConfig: { mode: "ANY" } },
         generationConfig: { temperature: this.config.temperature, maxOutputTokens: 6000 },
       }, this.config, request.signal);
+    reportModelUsage(request, "gemini", this.config.model, data);
     const parsed = z.object({ candidates: z.array(z.object({ finishReason: z.string(),
       content: z.object({ parts: z.array(z.object({ text: z.string().optional(), thought: z.boolean().optional(),
         functionCall: z.object({ name: z.string(), args: z.record(z.string(), z.unknown()).optional() }).optional() })) }),
