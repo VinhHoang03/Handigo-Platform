@@ -51,6 +51,7 @@ import { adminFeedbackListQuerySchema } from "../validations/feedback.validator"
 const router = Router();
 
 router.use(authMiddleware, roleMiddleware("ADMIN"));
+router.get("/orders/:id", validate(adminEntityIdParamSchema, "params"), adminController.getOrderDetail);
 
 router.get("/services", serviceController.listServices);
 router.get("/services/:id", serviceController.getServiceById);

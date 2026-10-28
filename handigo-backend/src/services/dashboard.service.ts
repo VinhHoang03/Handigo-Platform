@@ -279,12 +279,12 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
     providerNetRevenueByMonth,
     collectedPaymentByDay,
   ] = await Promise.all([
-    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m-%d", "$amount", "day", "paidAt"),
-    seriesAggregate(Payment, paidPaymentMatch, "%G-W%V", "$amount", "week", "paidAt"),
-    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m", "$amount", "month", "paidAt"),
-    seriesAggregate(WalletTransaction, platformFeeMatch, "%Y-%m", "$amount", "month"),
-    seriesAggregate(WalletTransaction, completedOrderRevenueMatch, "%Y-%m", completedGrossRevenueExpression, "month"),
-    seriesAggregate(Payment, depositMatch, "%Y-%m", "$amount", "month", "paidAt"),
+    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m-%d", "$amount", "day", "paidAt", "Asia/Ho_Chi_Minh"),
+    seriesAggregate(Payment, paidPaymentMatch, "%G-W%V", "$amount", "week", "paidAt", "Asia/Ho_Chi_Minh"),
+    seriesAggregate(Payment, paidPaymentMatch, "%Y-%m", "$amount", "month", "paidAt", "Asia/Ho_Chi_Minh"),
+    seriesAggregate(WalletTransaction, platformFeeMatch, "%Y-%m", "$amount", "month", "createdAt", "Asia/Ho_Chi_Minh"),
+    seriesAggregate(WalletTransaction, completedOrderRevenueMatch, "%Y-%m", completedGrossRevenueExpression, "month", "createdAt", "Asia/Ho_Chi_Minh"),
+    seriesAggregate(Payment, depositMatch, "%Y-%m", "$amount", "month", "paidAt", "Asia/Ho_Chi_Minh"),
     sumAggregate(WalletTransaction, platformFeeMatch, "$amount"),
     sumAggregate(WalletTransaction, completedOrderRevenueMatch, completedGrossRevenueExpression),
     sumAggregate(Payment, depositMatch, "$amount"),
@@ -299,8 +299,10 @@ export const getAdminRevenue = async (query: DashboardQuery) => {
       "%Y-%m",
       providerNetRevenueExpression,
       "month",
+      "createdAt",
+      "Asia/Ho_Chi_Minh",
     ),
-    seriesAggregate(Payment, collectedPaymentMatch, "%Y-%m-%d", "$amount", "day", "paidAt"),
+    seriesAggregate(Payment, collectedPaymentMatch, "%Y-%m-%d", "$amount", "day", "paidAt", "Asia/Ho_Chi_Minh"),
   ]);
 
   return {

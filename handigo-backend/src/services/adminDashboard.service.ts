@@ -8,18 +8,22 @@ import { Complaint } from "../models/complaint.model";
 import { Feedback } from "../models/feedback.model";
 import { ServiceSuggestion } from "../models/serviceSuggestion.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
+import { Report } from "../models/report.model";
+import { Refund } from "../models/refund.model";
 import { getOnlineUserIds } from "../sockets/socketServer";
 import type { AdminDashboardQuery } from "../validations/adminDashboard.validator";
-import { compareMetric, getInsightsPeriod, orderAttentionConditions } from "./adminDashboardMetrics";
+import { compareMetric, getInsightsPeriod, getMonthlyComparisonPeriod, orderAttentionConditions } from "./adminDashboardMetrics";
 
 export const getAdminUserPresence = async () => {
-  const [totalRegisteredUsers, ids] = await Promise.all([
+  const now = new Date();
+  const [totalRegisteredUsers, ids, newUsersLast7Days] = await Promise.all([
     User.countDocuments({ isDeleted: false }), getOnlineUserIds(),
+    User.countDocuments({ isDeleted: false, createdAt: { $gte: new Date(now.getTime() - 7 * 86_400_000), $lte: now } }),
   ]);
   const onlineUsers = ids === null ? null : ids.length === 0 ? 0 : await User.countDocuments({
     _id: { $in: ids }, isDeleted: false, status: "active",
   });
-  return { totalRegisteredUsers, onlineUsers, asOf: new Date() };
+  return { totalRegisteredUsers, onlineUsers, newUsersLast7Days, asOf: now };
 };
 
 type Period = ReturnType<typeof getInsightsPeriod>;
@@ -38,6 +42,18 @@ const getPendingWork = async () => {
     ]),
   ]);
   return { applications, support, complaints, suggestions, withdrawals: withdrawals[0]?.count ?? 0, withdrawalAmount: withdrawals[0]?.amount ?? 0 };
+};
+
+/** Số việc hiện tại cho sidebar, dùng chung quy tắc hàng đợi với Tổng quan. */
+export const getAdminPendingCounts = async () => {
+  const now = new Date();
+  const [work, attentionOrders, reports, refunds] = await Promise.all([
+    getPendingWork(),
+    Order.countDocuments({ isDeleted: false, $or: Object.values(orderAttentionConditions(now)) }),
+    Report.countDocuments({ isDeleted: false, status: { $in: ["pending", "under_review"] } }),
+    Refund.countDocuments({ isDeleted: false, status: { $in: ["failed", "manual_review"] } }),
+  ]);
+  return { ...work, attentionOrders, reports, refunds, asOf: now };
 };
 
 const getAttentionOrders = async (now: Date) => {
@@ -135,9 +151,50 @@ const getDeposits = async ({ fromDate, toDate }: Period) => {
   } : { heldAmount: 0, heldCount: 0, receivedAmount: 0, refundedAmount: 0, compensatedAmount: 0, pendingRefundAmount: 0 };
 };
 
-const getQuality = async ({ fromDate, toDate }: Period) => {
+export const getAdminRatingStats = async ({ fromDate, toDate, previousFromDate }: Period) => {
+  type RatingSummary = {
+    averageRating: number; ratedOrders: number; fiveStar: number; fourToFive: number;
+    belowFour: number; belowThree: number; belowTwo: number;
+  };
+  const rows = await Feedback.aggregate<RatingSummary & { _id: string }>([
+    { $match: { isDeleted: false, rating: { $gte: 1, $lte: 5 }, createdAt: { $gte: previousFromDate, $lte: toDate } } },
+    { $lookup: { from: "orders", localField: "orderId", foreignField: "_id", as: "order" } },
+    { $unwind: "$order" },
+    { $match: { "order.isDeleted": false, "order.status": "completed" } },
+    // Mỗi đơn chỉ đóng góp một đánh giá, kể cả dữ liệu cũ bị trùng.
+    { $sort: { createdAt: -1, _id: -1 } },
+    { $group: { _id: "$orderId", rating: { $first: "$rating" }, createdAt: { $first: "$createdAt" } } },
+    { $group: {
+      _id: { $cond: [{ $gte: ["$createdAt", fromDate] }, "current", "previous"] },
+      averageRating: { $avg: "$rating" }, ratedOrders: { $sum: 1 },
+      fiveStar: sumWhen({ $eq: ["$rating", 5] }),
+      fourToFive: sumWhen({ $and: [{ $gte: ["$rating", 4] }, { $lt: ["$rating", 5] }] }),
+      belowFour: sumWhen({ $lt: ["$rating", 4] }),
+      belowThree: sumWhen({ $lt: ["$rating", 3] }),
+      belowTwo: sumWhen({ $lt: ["$rating", 2] }),
+    } },
+  ]);
+  const summary = (key: string): RatingSummary => {
+    const row = rows.find((item) => item._id === key);
+    return {
+      averageRating: row?.averageRating ?? 0, ratedOrders: row?.ratedOrders ?? 0,
+      fiveStar: row?.fiveStar ?? 0, fourToFive: row?.fourToFive ?? 0,
+      belowFour: row?.belowFour ?? 0, belowThree: row?.belowThree ?? 0, belowTwo: row?.belowTwo ?? 0,
+    };
+  };
+  const current = summary("current");
+  const previous = summary("previous");
+  return {
+    current, previous,
+    changePercent: current.ratedOrders && previous.ratedOrders
+      ? compareMetric(current.averageRating, previous.averageRating).changePercent : null,
+  };
+};
+
+const getQuality = async (period: Period) => {
+  const { fromDate, toDate } = period;
   const dateMatch = { isDeleted: false, createdAt: { $gte: fromDate, $lte: toDate } };
-  const [ratings, providers] = await Promise.all([
+  const [ratings, providers, ratingStats] = await Promise.all([
     Feedback.aggregate<{ total: number; lowRatings: number }>([
       { $match: dateMatch },
       { $group: { _id: null, total: { $sum: 1 }, lowRatings: sumWhen({ $lte: ["$rating", 2] }) } },
@@ -153,15 +210,17 @@ const getQuality = async ({ fromDate, toDate }: Period) => {
       { $sort: { complaintCount: -1, _id: 1 } }, { $limit: 5 },
       { $project: { _id: 0, userId: "$_id", fullName: "$user.fullName", complaintCount: 1 } },
     ]),
+    getAdminRatingStats(period),
   ]);
-  return { totalRatings: ratings[0]?.total ?? 0, lowRatings: ratings[0]?.lowRatings ?? 0, providers };
+  return { totalRatings: ratings[0]?.total ?? 0, lowRatings: ratings[0]?.lowRatings ?? 0, providers, ratingStats };
 };
 
 export const getAdminInsights = async (query: AdminDashboardQuery) => {
   const now = new Date();
   const period = getInsightsPeriod(query, now);
-  const [pendingWork, attentionOrders, comparison, customers, deposits, quality] = await Promise.all([
+  const [pendingWork, attentionOrders, comparison, customers, deposits, quality, monthlyComparison] = await Promise.all([
     getPendingWork(), getAttentionOrders(now), getComparison(period), getCustomers(period), getDeposits(period), getQuality(period),
+    getComparison(getMonthlyComparisonPeriod(now)),
   ]);
-  return { asOf: now, period, pendingWork, attentionOrders, comparison, customers, deposits, quality };
+  return { asOf: now, period, pendingWork, attentionOrders, comparison, customers, deposits, quality, monthlyComparison };
 };

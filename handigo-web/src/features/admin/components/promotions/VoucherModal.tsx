@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
+import { AdminDatePicker } from "../shared/AdminDatePicker";
 import type { VoucherDiscountType } from "../../types/voucher.types";
 import type { VoucherFormState } from "./promotion-format";
 
@@ -90,16 +91,16 @@ export function VoucherModal({
           <FormInput label="Giới hạn mỗi khách" type="number" value={form.perUserLimit} onChange={value => onChange({ ...form, perUserLimit: value })} />
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <FormInput
+          <AdminDatePicker
             label="Bắt đầu"
-            type="datetime-local"
+            includeTime
             required
             value={form.startAt}
             onChange={(value) => onChange({ ...form, startAt: value })}
           />
-          <FormInput
+          <AdminDatePicker
             label="Kết thúc"
-            type="datetime-local"
+            includeTime
             required
             value={form.endAt}
             onChange={(value) => onChange({ ...form, endAt: value })}

@@ -1,4 +1,5 @@
 import { FloatingInput } from '@/components/common/FloatingField';
+import { AdminDatePicker } from '../shared/AdminDatePicker';
 import { FormSelect } from '@/components/common/FormSelect';
 import type { Category } from '@/features/provider-application/types/providerApplication.types';
 import type { AdminQuery } from '../../types/admin.types';
@@ -51,21 +52,19 @@ export function ApplicationFilters({ query, categories, onChange }: {
           <option key={category._id} value={category._id}>{category.name}</option>
         ))}
       </FormSelect>
-      <FloatingInput
+      <AdminDatePicker
         id="admin-application-from-date"
-        type="date"
         label="Từ ngày tạo"
         value={query.fromDate || ''}
         max={query.toDate || undefined}
-        onValueChange={(value) => onChange({ ...query, fromDate: value || undefined, page: 1 })}
+        onChange={(value) => onChange({ ...query, fromDate: value || undefined, page: 1 })}
       />
-      <FloatingInput
+      <AdminDatePicker
         id="admin-application-to-date"
-        type="date"
         label="Đến ngày tạo"
         value={query.toDate || ''}
         min={query.fromDate || undefined}
-        onValueChange={(value) => onChange({ ...query, toDate: value || undefined, page: 1 })}
+        onChange={(value) => onChange({ ...query, toDate: value || undefined, page: 1 })}
       />
     </div>
   );

@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react';
+
 export function ChartDataTable({ caption, columns, rows }: {
   caption: string;
   columns: string[];
-  rows: Array<Array<string | number>>;
+  rows: Array<Array<ReactNode>>;
 }) {
   return (
     <div role="region" aria-label={`Bảng số liệu: ${caption}`} tabIndex={0}
@@ -20,3 +22,4 @@ export function ChartDataTable({ caption, columns, rows }: {
     </div>
   );
 }
+

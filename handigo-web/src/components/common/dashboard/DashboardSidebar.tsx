@@ -5,9 +5,11 @@ import {
   dashboardHomePath,
   dashboardSubtitle,
   isNavItemActive,
+  getDashboardNavLabel,
 } from "./dashboardNavigation";
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
 import { ChevronLeft, ChevronsRight, HardHat, Home } from "lucide-react";
+import { NavPendingBadge } from "./NavPendingBadge";
 
 interface DashboardSidebarProps {
   collapsed?: boolean;
@@ -85,15 +87,17 @@ export function DashboardSidebar({
       <nav id={isAdmin ? "admin-sidebar-navigation" : undefined} onScroll={() => setTooltip(null)} className={`flex min-h-0 flex-grow flex-col gap-1.5 overflow-y-auto ${isAdmin ? "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : ""} ${isCollapsed ? "" : "pr-1"}`}>
         {navItems.map((item) => {
           const active = isNavItemActive(location.pathname, item);
+          const accessibleLabel = getDashboardNavLabel(item);
           return (
             <Link
               key={item.label}
               to={item.path}
-              aria-label={isCollapsed ? item.label : undefined}
+              aria-label={accessibleLabel}
+              title={!isCollapsed && item.pendingCount && item.pendingCount > 0 ? accessibleLabel : undefined}
               aria-current={active ? "page" : undefined}
-              onMouseEnter={(event) => showTooltip(event.currentTarget, item.label)}
+              onMouseEnter={(event) => showTooltip(event.currentTarget, accessibleLabel)}
               onMouseLeave={() => setTooltip(null)}
-              onFocus={(event) => showTooltip(event.currentTarget, item.label)}
+              onFocus={(event) => showTooltip(event.currentTarget, accessibleLabel)}
               onBlur={() => setTooltip(null)}
               onClick={() => setTooltip(null)}
               onKeyDown={(event) => { if (event.key === "Escape") setTooltip(null); }}
@@ -103,8 +107,14 @@ export function DashboardSidebar({
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
               }`}
             >
-              <item.icon aria-hidden="true" size={24} className="shrink-0" />
-              {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
+              <span className="relative inline-flex shrink-0">
+                <item.icon aria-hidden="true" size={24} />
+                {isCollapsed && <NavPendingBadge count={item.pendingCount} compact stale={item.pendingStale} />}
+              </span>
+              {!isCollapsed && <>
+                <span className="min-w-0 flex-1 text-sm font-medium">{item.label}</span>
+                <NavPendingBadge count={item.pendingCount} stale={item.pendingStale} />
+              </>}
             </Link>
           );
         })}
@@ -132,7 +142,7 @@ export function DashboardSidebar({
         </button>
       )}
       {isCollapsed && tooltip && createPortal(
-        <div role="tooltip" style={{ top: tooltip.top }} className="pointer-events-none fixed left-[5.5rem] z-[100] hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-on-surface px-3 py-2 text-sm text-surface-container-lowest shadow-lg lg:block">
+        <div role="tooltip" style={{ top: tooltip.top }} className="pointer-events-none fixed left-[5.5rem] z-[100] hidden max-w-[min(24rem,calc(100vw-6rem))] -translate-y-1/2 break-words rounded-lg bg-on-surface px-3 py-2 text-sm text-surface-container-lowest shadow-lg lg:block">
           {tooltip.label}
         </div>,
         document.body,

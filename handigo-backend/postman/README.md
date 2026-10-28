@@ -121,3 +121,15 @@ Hai API mới chỉ dành cho tài khoản ADMIN, đi qua xác thực và giới
 - Cọc đang giữ và yêu cầu hoàn chưa thành công là số hiện tại. Cọc đã thu, hoàn và bồi thường theo ngày phát sinh trong kỳ; hoàn một phần dùng metadata.refund.amount, bồi thường dùng metadata.cancellationCompensation.amount, dự phòng số tiền giao dịch cho dữ liệu cũ. Cọc thuộc đơn hoàn thành không còn nằm trong cọc đang giữ. Không cộng các dòng này thành doanh thu.
 - Cảnh báo chất lượng gồm đánh giá từ 1 đến 2 sao (kể cả đánh giá ẩn) và tối đa 5 nhà cung cấp có từ 2 khiếu nại trong kỳ, bỏ khiếu nại bị từ chối/hủy. Số khiếu nại không phải kết luận vi phạm.
 - Kiểm thử không dùng dữ liệu hoặc thanh toán thật: node --test tests/admin-dashboard.test.cjs. Các kiểm thử có giả lập lớp dữ liệu; cần đối chiếu thêm trên dữ liệu triển khai.
+
+
+### Điểm sao trên thẻ tổng quan
+
+GET /dashboard/insights bổ sung quality.ratingStats gồm current, previous và changePercent. Mỗi kỳ có averageRating, ratedOrders, fiveStar, fourToFive, belowFour, belowThree, belowTwo. Điểm là trung bình đánh giá từ đơn hoàn thành còn tồn tại; mỗi đơn tính một lần, theo ngày tạo đánh giá, gồm cả đánh giá ẩn và bỏ đánh giá đã xóa. Không lấy trung bình của điểm trung bình từng nhà cung cấp. Nếu một kỳ không có đơn được đánh giá thì changePercent = null; không coi thiếu đánh giá là 0 sao. Các ngưỡng dưới 4, dưới 3, dưới 2 là cộng dồn; ba nhóm 5 sao, 4 đến dưới 5 và dưới 4 bao phủ toàn bộ đánh giá hợp lệ. Các trường quality cũ được giữ nguyên.
+
+
+### Badge công việc trên sidebar admin
+
+GET /dashboard/pending-work chỉ dành cho ADMIN và không nhận bộ lọc thời gian. Trả applications, support, complaints, suggestions, withdrawals, withdrawalAmount, attentionOrders, reports, refunds, asOf. Năm hàng đợi đầu dùng cùng bộ lọc với Tổng quan. reports chỉ gồm pending/under_review; refunds chỉ gồm failed/manual_review; vi phạm đã áp dụng và thanh toán chờ tự động không được coi là việc chưa xử lý. attentionOrders đếm hợp các nhóm đơn cần chú ý hiện tại, không đếm trùng.
+
+Web ẩn badge bằng 0, hiện 99+ khi vượt 99 và giữ số đầy đủ trong nhãn hỗ trợ truy cập. Sidebar mở rộng, thu gọn và các mục điều hướng di động đều hỗ trợ badge. Cập nhật khi chuyển trang, sau thao tác ghi liên quan thành công (gom trong 250ms), mỗi 30 giây khi trang đang hiển thị và khi quay lại cửa sổ. Nếu cập nhật lỗi, giữ số gần nhất nhưng đánh dấu số liệu cũ; không biến lỗi tải thành số 0. Chỉ bật tải số liệu trong layout ADMIN.

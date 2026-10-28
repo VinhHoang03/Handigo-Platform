@@ -1534,9 +1534,20 @@ export const getPaymentsByOrder = async (orderId: string, user: RequestUser) => 
 
 export const getPaymentHistory = async (user: RequestUser, query: PaymentHistoryQuery) => {
   const filter: Record<string, unknown> = {};
+  if (query.fromDate || query.toDate) {
+    filter[query.dateField ?? "createdAt"] = {
+      ...(query.fromDate ? { $gte: query.fromDate } : {}),
+      ...(query.toDate ? { $lte: query.toDate } : {}),
+    };
+    filter.isDeleted = false;
+  }
 
   if (query.status) {
     filter.status = query.status;
+  } else if (query.dateField === "paidAt") {
+    filter.status = { $in: ["paid", "refunded"] };
+  } else if (query.dateField === "refundedAt") {
+    filter.status = "refunded";
   }
 
   if (query.method) {
@@ -1570,12 +1581,17 @@ export const getPaymentHistory = async (user: RequestUser, query: PaymentHistory
 
   const skip = (query.page - 1) * query.limit;
   const [items, total] = await Promise.all([
-    Payment.find(filter).sort({ createdAt: -1 }).skip(skip).limit(query.limit),
+    Payment.find(filter).sort(query.dateField ? { [query.dateField]: -1, _id: -1 } : { createdAt: -1 }).skip(skip).limit(query.limit),
     Payment.countDocuments(filter),
   ]);
 
+  const orders = user.role === "ADMIN" && items.length
+    ? await Order.find({ _id: { $in: items.map(payment => payment.orderId) }, isDeleted: false }).select("_id orderCode").lean()
+    : [];
+  const orderCodes = new Map(orders.map(order => [String(order._id), order.orderCode]));
+
   return {
-    items,
+    items: user.role === "ADMIN" ? items.map(payment => ({ ...payment.toObject(), orderCode: orderCodes.get(String(payment.orderId)) ?? null })) : items,
     pagination: {
       page: query.page,
       limit: query.limit,

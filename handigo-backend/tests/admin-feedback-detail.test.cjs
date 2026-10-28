@@ -6,6 +6,7 @@ const { Order } = require('../src/models/order.model');
 const { OrderStatus } = require('../src/models/orderStatus.model');
 const { RepairQuotation } = require('../src/models/repairQuotation.model');
 const { getAdminFeedbackDetail } = require('../src/services/feedback.service');
+const { getAdminOrderDetail } = require('../src/services/adminOrderDetail.service');
 const { roleMiddleware } = require('../src/middlewares/role.middleware');
 const id = '507f1f77bcf86cd799439011';
 
@@ -74,4 +75,19 @@ test('Middleware ADMIN từ chối khách hàng, thợ và người chưa đăng
     assert.equal(allowed, role === 'ADMIN');
     if (!allowed) assert.equal(status, 403);
   }
+});
+
+test('Mở trực tiếp đơn đang xử lý không cần có đánh giá', async (t) => {
+  t.after(() => mock.restoreAll());
+  mock.method(Feedback, 'findOne', () => { throw Error('Không được yêu cầu đánh giá để xem đơn.'); });
+  mock.method(Order, 'findOne', filter => {
+    assert.equal(filter.isDeleted, false);
+    return chain({ _id: id, orderCode: 'DH02', status: 'in_progress', currentQuotationId: null });
+  });
+  mock.method(OrderStatus, 'find', () => chain([{ _id: id, status: 'in_progress' }]));
+  const result = await getAdminOrderDetail(id);
+  assert.equal(result.order.status, 'in_progress');
+  assert.equal(result.order.statusHistory[0].status, 'in_progress');
+  assert.equal(result.quotation, null);
+  await assert.rejects(getAdminOrderDetail('sai'), error => error.statusCode === 400);
 });

@@ -1,6 +1,7 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Modal } from '@/components/common/Modal';
+import { AdminDatePicker } from '../shared/AdminDatePicker';
 import { AsyncState } from '@/components/common/AsyncState';
 import { promotionApi, type AutomaticPromotion, type PromotionPayload } from '../../api/promotion.api';
 import { categoryServiceApi } from '../../api/categoryService.api';
@@ -56,7 +57,7 @@ export function AutomaticPromotionsPanel() {
         <label className="block">Loại giảm giá<select value={form.discountType} onChange={event => setForm({ ...form, discountType: event.target.value as 'AMOUNT' | 'PERCENT' })} className="ml-3 rounded-lg border p-2"><option value="PERCENT">Phần trăm</option><option value="AMOUNT">Số tiền</option></select></label>
         <label className="block">Giá trị giảm<input required type="number" min={1} max={form.discountType === 'PERCENT' ? 100 : undefined} value={form.discountValue} onChange={event => setForm({ ...form, discountValue: Number(event.target.value) })} className="mt-1 w-full rounded-lg border p-3" /></label>
         {(['minOrderAmount', 'maxDiscountAmount', 'usageLimit', 'priority'] as const).map(key => <label key={key} className="block">{{ minOrderAmount: 'Giá trị đơn tối thiểu', maxDiscountAmount: 'Giảm tối đa', usageLimit: 'Giới hạn số đơn', priority: 'Độ ưu tiên' }[key]}<input type="number" min={0} value={form[key] ?? ''} onChange={event => setForm({ ...form, [key]: event.target.value === '' ? (key === 'priority' ? 0 : null) : Number(event.target.value) })} className="mt-1 w-full rounded-lg border p-3" /></label>)}
-        {(['startAt', 'endAt'] as const).map(key => <label key={key} className="block">{key === 'startAt' ? 'Bắt đầu' : 'Kết thúc'}<input required type="datetime-local" value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} className="mt-1 w-full rounded-lg border p-3" /></label>)}
+        {(['startAt', 'endAt'] as const).map(key => <AdminDatePicker key={key} label={key === 'startAt' ? 'Bắt đầu' : 'Kết thúc'} required includeTime value={form[key]} onChange={value => setForm({ ...form, [key]: value })} />)}
         <fieldset><legend className="font-semibold">Phạm vi dịch vụ — bỏ trống áp dụng toàn hệ thống</legend><div className="max-h-48 overflow-auto">{services.map(service => <label key={service._id} className="flex items-center gap-2 py-2"><input type="checkbox" checked={form.serviceIds.includes(service._id)} onChange={event => setForm({ ...form, serviceIds: event.target.checked ? [...form.serviceIds, service._id] : form.serviceIds.filter(id => id !== service._id) })} />{service.name}</label>)}</div></fieldset>
         <label className="flex items-center gap-2"><input type="checkbox" checked={form.allowVoucher} onChange={event => setForm({ ...form, allowVoucher: event.target.checked })} />Cho phép cộng dồn với mã giảm giá</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={form.status === 'ACTIVE'} onChange={event => setForm({ ...form, status: event.target.checked ? 'ACTIVE' : 'INACTIVE' })} />Bật chương trình</label>
