@@ -23,6 +23,7 @@ import {
 import { formatOrderAddress } from "../components/detail/bookingDetailProvider";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { RebookButton } from '../components/RebookButton';
+import { OrderReschedulePanel } from '../components/detail/OrderReschedulePanel';
 
 const BookingDetailContent = () => {
   const {
@@ -47,6 +48,7 @@ const BookingDetailContent = () => {
     canMakeInitialPayment,
     canChangePayment,
     timeline,
+    loadData,
   } = useBookingDetail();
 
   if (loading) {
@@ -130,6 +132,12 @@ const BookingDetailContent = () => {
           <BookingRecurringSeriesSection
             order={order}
             recurringOrders={recurringOrders}
+          />
+
+          <OrderReschedulePanel
+            order={order}
+            viewerRole="CUSTOMER"
+            onChanged={() => loadData()}
           />
 
           <BookingServiceSummary

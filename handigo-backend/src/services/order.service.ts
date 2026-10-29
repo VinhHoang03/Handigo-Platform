@@ -38,6 +38,7 @@ import { MatchingService } from "./matching.service";
 import { emitToUser } from "../sockets/socketServer";
 import { createNotificationRecord } from "./notification.service";
 import { requestProviderReassignment } from "./orderReassignment.service";
+import { getOrderRescheduleContext } from "./orderReschedule.service";
 import { hasProviderArrived } from "./refundPolicy.service";
 import {
   markOrderVoucherAsUsed,
@@ -956,7 +957,11 @@ export const OrderService = {
       .select("status previousStatus statusVersion changedByRole note createdAt")
       .sort({ createdAt: 1, statusVersion: 1 }).lean();
     const customerCancellationDeadline = await getCustomerCancellationDeadline(order, undefined, statusHistory);
-    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline };
+    const rescheduleContext = await getOrderRescheduleContext(order as unknown as IOrder, {
+      id: userId,
+      role: isCustomer ? "CUSTOMER" : "PROVIDER",
+    });
+    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline, ...rescheduleContext };
   },
 
   async startOrder(orderId: string, providerUserId: string): Promise<IOrder> {

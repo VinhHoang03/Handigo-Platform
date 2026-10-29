@@ -10,6 +10,12 @@ import { updateExpectedEnd } from "../services/providerSchedule.service";
 import { respondToProviderReassignment } from "../services/orderReassignment.service";
 import { getCustomerBookingPolicies } from "../services/bookingPolicy.service";
 import { markOrderArrival, checkCustomerNoShowEligibility, reportCustomerNoShow, uploadNoShowEvidence } from "../services/customerNoShow.service";
+import {
+  cancelOrderRescheduleRequest,
+  createOrderRescheduleRequest,
+  previewOrderReschedule,
+  respondOrderRescheduleRequest,
+} from "../services/orderReschedule.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
@@ -52,6 +58,40 @@ export const previewBooking = async (req: Request, res: Response, next: NextFunc
 export const updateOrderExpectedEnd = async (req: Request, res: Response, next: NextFunction) => {
   try { return ok(res, await updateExpectedEnd(String(req.params.orderId), uid(req), new Date(req.body.expectedEndAt))); }
   catch (error) { return next(error); }
+};
+
+export const previewReschedule = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    return ok(res, await previewOrderReschedule(
+      String(req.params.orderId),
+      requireRequestUser(req),
+      new Date(req.body.scheduledAt),
+    ));
+  } catch (error) { return next(error); }
+};
+
+export const createRescheduleRequest = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    return ok(res, await createOrderRescheduleRequest(
+      String(req.params.orderId), requireRequestUser(req), req.body,
+    ), 201);
+  } catch (error) { return next(error); }
+};
+
+export const respondRescheduleRequest = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    return ok(res, await respondOrderRescheduleRequest(
+      String(req.params.orderId), String(req.params.requestId), requireRequestUser(req), req.body,
+    ));
+  } catch (error) { return next(error); }
+};
+
+export const cancelRescheduleRequest = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    return ok(res, await cancelOrderRescheduleRequest(
+      String(req.params.orderId), String(req.params.requestId), requireRequestUser(req),
+    ));
+  } catch (error) { return next(error); }
 };
 
 const toOrderActorRole = (role: UserRole): "customer" | "provider" | "admin" =>

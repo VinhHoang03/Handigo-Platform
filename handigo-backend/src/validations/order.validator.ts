@@ -88,6 +88,36 @@ export const orderIdParamSchema = z.object({
 
 export const updateExpectedEndSchema = z.object({ expectedEndAt: z.string().datetime({ offset: true }) });
 
+const rescheduleReasonSchema = z.string()
+  .trim()
+  .min(3, "Lý do dời lịch phải có ít nhất 3 ký tự")
+  .max(500, "Lý do dời lịch không được vượt quá 500 ký tự");
+
+export const reschedulePreviewSchema = z.object({
+  scheduledAt: z.string().datetime({ offset: true, message: "Thời gian đề xuất không hợp lệ" }),
+}).strict();
+
+export const createRescheduleRequestSchema = z.object({
+  scheduledAt: reschedulePreviewSchema.shape.scheduledAt,
+  reason: rescheduleReasonSchema,
+  warningAcknowledged: z.boolean().optional(),
+  expectedOrderUpdatedAt: z.string().datetime({ offset: true }).optional(),
+}).strict();
+
+export const rescheduleRequestIdParamSchema = orderIdParamSchema.extend({
+  requestId: objectIdSchema,
+});
+
+export const respondRescheduleRequestSchema = z.object({
+  decision: z.enum(["accept", "reject"]),
+  reason: z.string().trim().max(500, "Lý do phản hồi không được vượt quá 500 ký tự").optional(),
+  expectedOrderUpdatedAt: z.string().datetime({ offset: true }).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.decision === "reject" && (!value.reason || value.reason.length < 3)) {
+    context.addIssue({ code: "custom", path: ["reason"], message: "Vui lòng nhập lý do từ chối có ít nhất 3 ký tự" });
+  }
+});
+
 export const customerNoShowSchema = z.object({
   description: z.string().trim().min(10, "Vui lòng mô tả việc liên hệ khách ít nhất 10 ký tự.").max(2000, "Mô tả không được vượt quá 2.000 ký tự."),
   arrivalEvidenceIds: z.array(objectIdSchema, { error: "Vui lòng tải ảnh đã đến nơi trước khi gửi báo cáo." }).min(1, "Vui lòng gửi ít nhất một ảnh đã đến nơi.").max(4, "Mỗi loại tối đa 4 ảnh, tổng cộng không quá 5 ảnh."),

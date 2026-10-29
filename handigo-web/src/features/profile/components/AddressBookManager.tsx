@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, ShieldCheck } from "lucide-react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Skeleton } from "@/components/common/Skeleton";
 import { AddressBookModal } from "./AddressBookModal";
@@ -41,6 +41,7 @@ export function AddressBookManager({
     setIsModalOpen,
     setDeleteTarget,
     handleSubmit,
+    handleSetDefault,
     confirmDelete,
   } = useAddressBookManager({
     selectedAddressId,
@@ -60,23 +61,23 @@ export function AddressBookManager({
       }
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="flex flex-wrap items-center gap-2.5">
           <h4 className="font-headline-sm text-headline-sm text-on-surface">
             {singleAddressMode ? "Địa chỉ thực hiện" : "Địa chỉ đã lưu"}
           </h4>
-          {!compact && (
-            <p className="mt-1 text-sm text-on-surface-variant">
-              Dùng cho đặt lịch và hồ sơ tài khoản.
-            </p>
+          {!singleAddressMode && !isLoading && (
+            <span className="text-xs text-on-surface-variant">
+              {addresses.length} địa chỉ
+            </span>
           )}
         </div>
         {!singleAddressMode && (
           <button
             type="button"
-            className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
             onClick={openCreate}
           >
-            <Plus size={16} />
+            <Plus aria-hidden="true" size={16} />
             Thêm địa chỉ mới
           </button>
         )}
@@ -113,7 +114,7 @@ export function AddressBookManager({
         <div
           className={
             compact
-              ? "max-h-52 space-y-2 overflow-y-auto pr-1"
+              ? "max-h-56 space-y-2 overflow-y-auto pr-1"
               : "space-y-3"
           }
         >
@@ -123,13 +124,33 @@ export function AddressBookManager({
               address={address}
               selected={selectedAddressId === address.id}
               selectable={selectable}
+              compact={compact}
               singleAddressMode={singleAddressMode}
               isSaving={isSaving}
               onSelect={() => onSelectAddress?.(address)}
               onEdit={() => openEdit(address)}
               onDelete={() => setDeleteTarget(address)}
+              onSetDefault={() => void handleSetDefault(address)}
             />
           ))}
+        </div>
+      )}
+
+      {!compact && !singleAddressMode && addresses.length > 0 && (
+        <div className="mt-4 flex items-start gap-2.5 text-xs leading-5 text-on-surface-variant">
+          <ShieldCheck
+            aria-hidden="true"
+            size={17}
+            className="mt-0.5 shrink-0 text-primary"
+          />
+          <span>
+            <strong className="font-semibold text-on-surface">
+              Bảo mật thông tin địa chỉ
+            </strong>
+            <span className="block">
+              Địa chỉ của bạn chỉ được chia sẻ với kỹ thuật viên sau khi đơn đặt dịch vụ được xác nhận.
+            </span>
+          </span>
         </div>
       )}
 

@@ -26,6 +26,7 @@ export interface AddressDefaultRecipient {
 }
 
 export const EMPTY_ADDRESS_FORM: AddressFormState = {
+  addressLabel: "",
   recipientName: "",
   recipientPhone: "",
   addressLine: "",
@@ -133,6 +134,7 @@ export const toAddressForm = (
   }
 
   return {
+    addressLabel: address.addressLabel || "",
     recipientName: address.recipientName || defaultRecipient.name,
     recipientPhone: address.recipientPhone || defaultRecipient.phone,
     addressLine: extractAddressLine(
@@ -188,6 +190,7 @@ export const prepareAddressSubmission = (
 
   return {
     payload: {
+      addressLabel: form.addressLabel?.trim() || undefined,
       recipientName: normalizedRecipientName,
       recipientPhone: normalizedRecipientPhone,
       fullAddress: composeFullAddress(currentAddressLine, form.ward, form.province),
