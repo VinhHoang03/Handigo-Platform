@@ -1,5 +1,5 @@
 import { catalogStatus, catalogStatusFilter } from "../utils/catalogStatus";
-import { QueryFilter, Types } from "mongoose";
+import { QueryFilter, Types, type ClientSession } from "mongoose";
 import { Category } from "../models/category.model";
 import { Order } from "../models/order.model";
 import { IService, IServiceProcessStep, IServiceOptionGroup, Service } from "../models/service.model";
@@ -61,12 +61,13 @@ const ensureValidId = (id: string, field = "dịch vụ") => {
   }
 };
 
-const ensureCategoryExists = async (categoryId: string, requireActive = false) => {
+const ensureCategoryExists = async (categoryId: string, requireActive = false, session?: ClientSession) => {
   ensureValidId(categoryId, "danh mục");
-  const category = await Category.findOne({
+  const query = Category.findOne({
     _id: categoryId,
     ...(requireActive ? { isDeleted: false } : {}),
   });
+  const category = await (session ? query.session(session) : query);
   if (!category) throw new AppError("Không tìm thấy danh mục.", 404);
   if (requireActive && !category.isActive) {
     throw new AppError("Không thể kích hoạt dịch vụ trong danh mục đang tạm ngừng.", 400);
@@ -107,11 +108,13 @@ const ensureUniqueSlug = async (
   categoryId: string,
   slug: string,
   excludeId?: string,
+  session?: ClientSession,
 ) => {
   const filter: QueryFilter<IService> = { categoryId, slug };
   if (excludeId) filter._id = { $ne: excludeId };
 
-  if (await Service.exists(filter)) {
+  const query = Service.exists(filter);
+  if (await (session ? query.session(session) : query)) {
     throw new AppError("Đường dẫn dịch vụ đã tồn tại trong danh mục này", 409);
   }
 };
@@ -273,21 +276,26 @@ export const getServiceById = async (id: string, admin = false) => {
   return service;
 };
 
-export const createService = async (data: ServiceInput) => {
+export const createService = async (data: ServiceInput, session?: ClientSession) => {
   const names = (data.optionGroups ?? []).map(group => group.name.trim().toLocaleLowerCase("vi"));
   if (new Set(names).size !== names.length) throw new AppError("Tên nhóm tùy chọn không được trùng nhau.", 400);
   if ((data.isActive ?? true) && data.optionGroups?.some(group => group.isRequired)) {
     throw new AppError("Hãy tạo dịch vụ tạm ngừng, gán tùy chọn cho nhóm bắt buộc rồi kích hoạt.", 400);
   }
   normalizeAndValidatePricing(data);
-  await ensureCategoryExists(data.categoryId!, data.isActive ?? true);
+  await ensureCategoryExists(data.categoryId!, data.isActive ?? true, session);
   const slug = data.slug || slugify(data.name || "");
   if (!slug) throw new AppError("Không thể tạo đường dẫn hợp lệ", 400);
-  await ensureUniqueSlug(data.categoryId!, slug);
+  await ensureUniqueSlug(data.categoryId!, slug, undefined, session);
 
   const coverImage = normalizeImageUrl(data.coverImage !== undefined ? data.coverImage : data.image) ?? null;
   await validateNewServiceImages([...(coverImage ? [coverImage] : []), ...(data.galleryImages ?? [])]);
-  return Service.create({ ...data, slug, coverImage, image: undefined });
+  const payload = { ...data, slug, coverImage, image: undefined };
+  if (session) {
+    const [service] = await Service.create([payload], { session });
+    return service;
+  }
+  return Service.create(payload);
 };
 
 export const updateService = async (id: string, data: ServiceInput) => {

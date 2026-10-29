@@ -6,6 +6,7 @@ import { getErrorMessage } from "@/utils/apiError";
 import { adminDashboardApi } from "../../api/adminDashboard.api";
 import type { AdminUserPresence } from "../../types/adminDashboard.types";
 import type { AdminProviderAnalytics } from "../../types/adminOperations.types";
+import { AdminToastNotice } from '../shared/AdminToastNotice';
 
 export function DashboardUserStats({ providers }: { providers: AdminProviderAnalytics }) {
   const [data, setData] = useState<AdminUserPresence | null>(null);
@@ -54,6 +55,6 @@ export function DashboardUserStats({ providers }: { providers: AdminProviderAnal
         <div className="flex justify-end gap-1" title="Số người dùng đăng ký mới trong 7 ngày gần nhất"><dt>Số người dùng mới:</dt><dd className="font-semibold tabular-nums text-on-surface">{data?.newUsersLast7Days == null ? "—" : chartNumber.format(data.newUsersLast7Days)}</dd></div>
       </dl>
     </div>
-    {error && <p role="alert" className="text-sm text-error">{error}{data ? " Số liệu trên là lần cập nhật thành công gần nhất." : ""}</p>}
+    <AdminToastNotice message={error} />
   </article>;
 }

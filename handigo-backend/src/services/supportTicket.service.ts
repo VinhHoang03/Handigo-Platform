@@ -245,6 +245,12 @@ export const getMySupportTickets = async (requesterId: string, query: Query = {}
   if (query.category) filter.category = query.category;
   if (query.priority) filter.priority = query.priority;
 
+  if (query.keyword?.trim()) {
+    const keyword = query.keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(keyword, "i");
+    filter.$or = [{ subject: regex }, { description: regex }];
+  }
+
   const [items, total] = await Promise.all([
     SupportTicket.find(filter)
       .sort({ createdAt: -1 })
@@ -336,8 +342,11 @@ export const getAdminSupportTickets = async (query: Query = {}) => {
   if (query.category) filter.category = query.category;
   if (query.priority) filter.priority = query.priority;
   if (query.assignedAdminId) filter.assignedAdminId = query.assignedAdminId;
-  if (query.assignment === "assigned") filter.assignedAdminId = { $ne: null };
-  if (query.assignment === "unassigned") filter.assignedAdminId = null;
+  if (query.assignment === "assigned" && !query.assignedAdminId) filter.assignedAdminId = { $ne: null };
+  if (query.assignment === "unassigned") {
+    if (query.assignedAdminId) filter.$and = [{ assignedAdminId: null }];
+    else filter.assignedAdminId = null;
+  }
   if (query.keyword?.trim()) {
     const keyword = query.keyword
       .trim()

@@ -85,3 +85,27 @@ export const reviewReport = async (req: Request, res: Response) => {
     return sendControllerError(res, error);
   }
 };
+
+export const cancelReport = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await reportService.cancelReport(user.id, req.params.id as string);
+    return res.json({ success: true, data, message: "Đã hủy báo cáo." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
+
+export const addReportEvidence = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await reportService.addReportEvidence(user.id, user.role, req.params.id as string, req.body);
+    return res.json({ success: true, data, message: "Đã bổ sung bằng chứng." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
+
+export const requestReportEvidence = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await reportService.requestReportEvidence(user.id, req.params.id as string, req.body.requestedEvidenceNote);
+    return res.json({ success: true, data, message: "Đã yêu cầu bổ sung bằng chứng." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};

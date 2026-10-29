@@ -60,7 +60,7 @@ export function NavbarAccountDropdown({
               className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
             >
               <LifeBuoy aria-hidden="true" size={20} />
-              Khiếu nại, hỗ trợ & báo cáo
+              Hỗ trợ & báo cáo
             </Link>
           </>
         )}

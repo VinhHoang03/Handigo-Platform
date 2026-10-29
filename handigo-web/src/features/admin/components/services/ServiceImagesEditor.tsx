@@ -1,4 +1,5 @@
 import { ReliableImage } from '@/components/common/ReliableImage';
+import { AdminToastNotice } from '../shared/AdminToastNotice';
 import { useEffect, useRef, useState } from 'react';
 import { categoryServiceApi } from '../../api/categoryService.api';
 import { ServiceImageCropModal } from './ServiceImageCropModal';
@@ -98,7 +99,6 @@ export function ServiceImagesEditor({ coverImage, galleryImages, disabled, onBus
     </div>
     <div>
       <p className="mb-2 font-semibold">Ảnh mô tả · {galleryImages.length} / 8</p>
-      <p className="mb-3 text-sm text-on-surface-variant">Kéo thả để đổi thứ tự, hoặc dùng nút trái / phải.</p>
       <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {galleryImages.map((url, index) => <div key={url} draggable={!locked}
           onDragStart={event => { dragged.current = index; event.dataTransfer.setData('text/plain', String(index)); event.dataTransfer.effectAllowed = 'move'; }}
@@ -117,7 +117,7 @@ export function ServiceImagesEditor({ coverImage, galleryImages, disabled, onBus
       {input('gallery')}
     </div>
     {loading && !pending && <p role="status">Đang đọc ảnh…</p>}
-    {error && <p role="alert" className="text-error">{error}</p>}
+    <AdminToastNotice message={error} />
     {pending && <ServiceImageCropModal image={pending.image} busy={loading} onCancel={cancel} onConfirm={upload} />}
   </fieldset>;
 }

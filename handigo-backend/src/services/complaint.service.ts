@@ -1,386 +1,76 @@
-import mongoose, { ClientSession, Types } from "mongoose";
-import { withTransactionRetry } from "../utils/transaction";
+import { Types } from "mongoose";
+import { ComplaintStatus } from "../models/complaint.model";
+import type { IReport } from "../models/report.model";
 import { AppError } from "../utils/appError";
-import { Complaint, ComplaintStatus } from "../models/complaint.model";
-import { ComplaintEvidence } from "../models/complaintEvidence.model";
-import { Order } from "../models/order.model";
-import { OrderStatus } from "../models/orderStatus.model";
-import { Provider } from "../models/provider.model";
+import * as reports from "./report.service";
+import { getServiceQualityReportContext } from "./reportQuality.service";
+export const getComplaintCreationContext = getServiceQualityReportContext;
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
-interface Query {
-  page?: string | number;
-  limit?: string | number;
-  status?: string;
-  keyword?: string;
-  orderId?: string;
-}
-
-interface EvidenceFilePayload {
-  fileType: "image" | "video" | "file";
-  url: string;
-  mimeType?: string | null;
-  fileName?: string | null;
-}
-
-const TERMINAL_STATUSES: ComplaintStatus[] = ["resolved", "rejected", "cancelled"];
-
-const withComplaintTransaction = async <T>(work: (session: ClientSession) => Promise<T>) => {
-  const session = await mongoose.startSession();
-  try { return await withTransactionRetry(session, work); }
-  finally { await session.endSession(); }
-};
-
-const lockComplaint = (id: string, session: ClientSession, complainantId?: string) =>
-  Complaint.findOneAndUpdate(
-    { _id: id, isDeleted: false, ...(complainantId ? { complainantId } : {}) },
-    { $inc: { __v: 1 } }, { session, new: true, runValidators: true },
-  );
-
-const assertObjectId = (id: string, fieldName: string) => {
-  if (!Types.ObjectId.isValid(id)) {
-    throw new AppError(`${fieldName} không hợp lệ`, 400);
-  }
-};
-
-const getPagination = (query: Query = {}) => {
-  const page = Math.max(Number(query.page) || 1, 1);
-  const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 50);
-  return { page, limit, skip: (page - 1) * limit };
-};
-
-const getProviderByUserId = async (userId: string, session?: ClientSession) => {
-  return Provider.findOne({ userId, isDeleted: false }).select("_id userId").session(session ?? null);
-};
-
-const resolveOrderParticipant = async (userId: string, role: UserRole, orderId: string, session?: ClientSession) => {
-  assertObjectId(userId, "User id");
-  assertObjectId(orderId, "Order id");
-
-  const order = await Order.findOne({ _id: orderId, isDeleted: false }).session(session ?? null);
-  if (!order) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
-  if (order.status !== "completed") {
-    throw new AppError("Chỉ có thể khiếu nại đơn dịch vụ đã hoàn thành", 400);
-  }
-  if (!order.providerId) {
-    throw new AppError("Đơn dịch vụ chưa có thợ thực hiện", 400);
-  }
-
-  let complainantRole: "CUSTOMER" | "PROVIDER";
-  let targetUserId: Types.ObjectId;
-
-  if (role === "CUSTOMER" && order.customerId.toString() === userId) {
-    const provider = await Provider.findOne({ _id: order.providerId, isDeleted: false }).select(
-      "userId",
-    ).session(session ?? null);
-    if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ", 404);
-    complainantRole = "CUSTOMER";
-    targetUserId = provider.userId;
-  } else if (role === "PROVIDER") {
-    const provider = await getProviderByUserId(userId, session);
-    if (!provider || order.providerId.toString() !== provider._id.toString()) {
-      throw new AppError("Bạn không có quyền khiếu nại đơn dịch vụ này", 403);
-    }
-    complainantRole = "PROVIDER";
-    targetUserId = order.customerId;
-  } else {
-    throw new AppError("Chỉ khách hàng và thợ được tạo khiếu nại", 403);
-  }
-
-  return { order, complainantRole, targetUserId };
-};
-
-const getCompletedAt = async (orderId: Types.ObjectId, fallback: Date, session?: ClientSession) => {
-  const completedStatus = await OrderStatus.findOne({
-    orderId,
-    status: "completed",
-    isDeleted: false,
-  })
-    .sort({ createdAt: -1 })
-    .select("createdAt")
-    .session(session ?? null)
-    .lean();
-
-  return completedStatus?.createdAt ?? fallback;
-};
-
-const assertComplaintWindow = async (orderId: Types.ObjectId, fallback: Date, session?: ClientSession) => {
-  const completedAt = await getCompletedAt(orderId, fallback, session);
-  const deadline = completedAt.getTime() + 3 * 24 * 60 * 60 * 1000;
-  if (Date.now() > deadline) {
-    throw new AppError("Chỉ có thể tạo khiếu nại trong vòng 3 ngày từ khi hoàn thành đơn", 400);
-  }
-};
-
-const populateComplaint = () => [
-  { path: "complainantId", select: "fullName email avatar role" },
-  { path: "targetUserId", select: "fullName email avatar role" },
-  { path: "orderId", select: "orderCode status paymentStatus" },
-  { path: "resolvedBy", select: "fullName email" },
-  { path: "reviewedBy", select: "fullName email" },
-  { path: "createdViolationId", select: "violationType severity penaltyType status" },
-];
-
-const withEvidence = async (complaint: any) => {
-  const value = typeof complaint.toObject === "function" ? complaint.toObject() : complaint;
-  const evidence = await ComplaintEvidence.find({
-    complaintId: value._id,
-    isDeleted: false,
-  })
-    .sort({ createdAt: -1 })
-    .populate("uploadedBy", "fullName email avatar role");
-
-  return { ...value, evidence };
-};
-
-export const getComplaintCreationContext = async (
-  userId: string,
-  role: UserRole,
-  orderId: string,
-  session?: ClientSession,
-) => {
-  const { order, complainantRole, targetUserId } = await resolveOrderParticipant(
-    userId,
-    role,
-    orderId,
-    session,
-  );
-  await assertComplaintWindow(order._id as Types.ObjectId, order.updatedAt, session);
-
-  const existing = await Complaint.findOne({
-    orderId: order._id,
-    complainantId: userId,
-    isDeleted: false,
-  }).session(session ?? null);
-  if (existing) {
-    throw new AppError("Bạn đã tạo khiếu nại cho đơn dịch vụ này", 400);
-  }
-
-  return { order, complainantRole, targetUserId };
+// Giữ contract API cũ; mọi thao tác ghi đi qua nghiệp vụ báo cáo chung.
+const asComplaint = (report: unknown) => {
+  if (!report) throw new AppError("Không tìm thấy khiếu nại", 404);
+  const document = report as IReport;
+  const value: IReport = typeof document.toObject === "function" ? document.toObject() : document;
+  if (value.reportType !== "service_quality") throw new AppError("Không tìm thấy khiếu nại", 404);
+  return {
+    ...value,
+    complainantId: value.reporterId,
+    complainantRole: value.reporterRole,
+    status: value.status === "confirmed" ? "resolved" : value.status,
+    resolvedBy: value.handledBy ?? null,
+    resolvedAt: value.handledAt ?? null,
+    evidence: value.evidenceFiles.filter(file => file.uploadedBy).map(file => ({
+      ...file, createdAt: file.uploadedAt,
+    })),
+  };
 };
 
 export const createComplaint = async (
-  userId: string,
-  role: UserRole,
-  payload: {
-    orderId: string;
-    title: string;
-    description: string;
-    evidenceImages?: string[];
-  },
+  userId: string, role: UserRole,
+  payload: { orderId: string; title: string; description: string; evidenceImages?: string[] },
   resourceId?: Types.ObjectId,
-) => {
-  assertObjectId(payload.orderId, "Order id");
-  const complaintId = await withComplaintTransaction(async (session) => {
-    const lockedOrder = await Order.findOneAndUpdate(
-      { _id: payload.orderId, isDeleted: false }, { $inc: { __v: 1 } },
-      { session, new: true, runValidators: true },
-    );
-    if (!lockedOrder) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
-    const { order, complainantRole, targetUserId } = await getComplaintCreationContext(userId, role, payload.orderId, session);
-    const [complaint] = await Complaint.create([{
-      ...(resourceId ? { _id: resourceId } : {}),
-      orderId: order._id,
-      complainantId: userId,
-      complainantRole,
-      targetUserId,
-      title: payload.title,
-      description: payload.description,
-      evidenceImages: payload.evidenceImages ?? [],
-    }], { session });
-    return complaint._id;
-  });
+) => asComplaint(await reports.createReport(userId, role, {
+  ...payload, targetType: "order", reportType: "service_quality",
+}, resourceId));
 
-  const populated = await Complaint.findById(complaintId).populate(populateComplaint());
-  return withEvidence(populated);
+export const getMyComplaints = async (userId: string, query: reports.Query = {}) => {
+  const result = await reports.getMyReports(userId, { ...query, reportType: "service_quality" });
+  return { ...result, items: result.items.map(asComplaint) };
 };
 
-export const getMyComplaints = async (userId: string, query: Query = {}) => {
-  assertObjectId(userId, "User id");
-  const { page, limit, skip } = getPagination(query);
-  const filter: Record<string, unknown> = { complainantId: userId, isDeleted: false };
+export const getComplaintForUser = async (userId: string, id: string) =>
+  asComplaint(await reports.getReportForUser(userId, id));
 
-  if (query.status) filter.status = query.status;
-  if (query.orderId && Types.ObjectId.isValid(query.orderId)) filter.orderId = query.orderId;
-
-  const [items, total] = await Promise.all([
-    Complaint.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate(populateComplaint()),
-    Complaint.countDocuments(filter),
-  ]);
-
-  return {
-    items,
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  };
+export const cancelComplaint = async (userId: string, id: string) => {
+  await getComplaintForUser(userId, id);
+  return asComplaint(await reports.cancelReport(userId, id));
 };
 
-export const getComplaintForUser = async (userId: string, complaintId: string) => {
-  assertObjectId(userId, "User id");
-  assertObjectId(complaintId, "Complaint id");
-  const complaint = await Complaint.findOne({
-    _id: complaintId,
-    complainantId: userId,
-    isDeleted: false,
-  }).populate(populateComplaint());
-  if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-  return withEvidence(complaint);
+export const addComplaintEvidence = async (userId: string, role: UserRole, id: string,
+  payload: { files: reports.EvidenceFilePayload[]; note?: string | null }) => {
+  if (role === "ADMIN") await getAdminComplaintById(id);
+  else await getComplaintForUser(userId, id);
+  return asComplaint(await reports.addReportEvidence(userId, role, id, payload));
 };
 
-export const cancelComplaint = async (userId: string, complaintId: string) => {
-  assertObjectId(userId, "User id");
-  assertObjectId(complaintId, "Complaint id");
-  await withComplaintTransaction(async (session) => {
-    const complaint = await lockComplaint(complaintId, session, userId);
-    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-    if (TERMINAL_STATUSES.includes(complaint.status)) {
-      throw new AppError("Khiếu nại đã kết thúc, không thể hủy", 400);
-    }
-
-    complaint.status = "cancelled";
-    complaint.resolvedAt = new Date();
-    await complaint.save({ session });
-  });
-  return getComplaintForUser(userId, complaintId);
+export const getAdminComplaints = async (query: reports.Query = {}) => {
+  const result = await reports.getAdminReports({ ...query, reportType: "service_quality" });
+  return { ...result, items: result.items.map(asComplaint) };
 };
 
+export const getAdminComplaintById = async (id: string) => asComplaint(await reports.getAdminReportById(id));
 
-export const addComplaintEvidence = async (
-  userId: string,
-  role: UserRole,
-  complaintId: string,
-  payload: { files: EvidenceFilePayload[]; note?: string | null },
-) => {
-  assertObjectId(userId, "User id");
-  assertObjectId(complaintId, "Complaint id");
-  await withComplaintTransaction(async (session) => {
-    const complaint = await lockComplaint(complaintId, session);
-    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-
-    if (role !== "ADMIN" && complaint.complainantId.toString() !== userId) {
-      throw new AppError("Bạn không có quyền bổ sung bằng chứng cho khiếu nại này", 403);
-    }
-    if (TERMINAL_STATUSES.includes(complaint.status)) {
-      throw new AppError("Khiếu nại đã kết thúc, không thể bổ sung bằng chứng", 400);
-    }
-
-    await ComplaintEvidence.insertMany(
-      payload.files.map((file) => ({
-        complaintId: complaint._id,
-        uploadedBy: userId,
-        fileType: file.fileType,
-        url: file.url,
-        mimeType: file.mimeType ?? null,
-        fileName: file.fileName ?? null,
-        note: payload.note ?? null,
-      })),
-      { session },
-    );
-
-    if (complaint.status === "evidence_requested") {
-      complaint.status = "under_review";
-    }
-    await complaint.save({ session });
-
-  });
-  const populated = await Complaint.findById(complaintId).populate(populateComplaint());
-  return withEvidence(populated);
+export const requestEvidence = async (adminId: string, id: string, note: string) => {
+  await getAdminComplaintById(id);
+  return asComplaint(await reports.requestReportEvidence(adminId, id, note));
 };
 
-
-export const getAdminComplaints = async (query: Query = {}) => {
-  const { page, limit, skip } = getPagination(query);
-  const filter: Record<string, unknown> = { isDeleted: false };
-
-  if (query.status) filter.status = query.status;
-  if (query.orderId && Types.ObjectId.isValid(query.orderId)) filter.orderId = query.orderId;
-  if (query.keyword?.trim()) {
-    const keyword = query.keyword
-      .trim()
-      .replace(/[.*+?^$()|[\]\\{}]/g, "\\$&");
-    const regex = new RegExp(keyword, "i");
-    filter.$or = [{ title: regex }, { description: regex }];
-  }
-
-  const [items, total] = await Promise.all([
-    Complaint.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate(populateComplaint()),
-    Complaint.countDocuments(filter),
-  ]);
-
-  return {
-    items,
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-  };
+export const updateComplaintStatus = async (adminId: string, id: string,
+  payload: { status: ComplaintStatus; resolutionNote?: string | null }) => {
+  const current = await getAdminComplaintById(id);
+  return asComplaint(await reports.reviewReport(adminId, id, {
+    ...payload, status: current.createdViolationId && payload.status === "resolved" ? "confirmed" : payload.status,
+  }));
 };
-
-export const getAdminComplaintById = async (complaintId: string) => {
-  assertObjectId(complaintId, "Complaint id");
-  const complaint = await Complaint.findOne({ _id: complaintId, isDeleted: false }).populate(
-    populateComplaint(),
-  );
-  if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-  return withEvidence(complaint);
-};
-
-export const requestEvidence = async (
-  adminId: string,
-  complaintId: string,
-  requestedEvidenceNote: string,
-) => {
-  assertObjectId(adminId, "Admin id");
-  assertObjectId(complaintId, "Complaint id");
-  await withComplaintTransaction(async (session) => {
-    const complaint = await lockComplaint(complaintId, session);
-    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-    if (TERMINAL_STATUSES.includes(complaint.status)) {
-      throw new AppError("Khiếu nại đã kết thúc", 400);
-    }
-
-    complaint.status = "evidence_requested";
-    complaint.reviewedBy = new Types.ObjectId(adminId);
-    complaint.reviewedAt = new Date();
-    complaint.requestedEvidenceNote = requestedEvidenceNote;
-    await complaint.save({ session });
-  });
-  return getAdminComplaintById(complaintId);
-};
-
-
-export const updateComplaintStatus = async (
-  adminId: string,
-  complaintId: string,
-  payload: { status: ComplaintStatus; resolutionNote?: string | null },
-) => {
-  assertObjectId(adminId, "Admin id");
-  assertObjectId(complaintId, "Complaint id");
-  await withComplaintTransaction(async (session) => {
-    const complaint = await lockComplaint(complaintId, session);
-    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-    if (complaint.createdViolationId && payload.status !== "resolved") {
-      throw new AppError("Khiếu nại đã tạo vi phạm, chỉ có thể giữ trạng thái đã xử lý", 400);
-    }
-
-    complaint.status = payload.status;
-    complaint.reviewedBy = new Types.ObjectId(adminId);
-    complaint.reviewedAt = new Date();
-    complaint.resolutionNote = payload.resolutionNote ?? complaint.resolutionNote ?? null;
-    if (TERMINAL_STATUSES.includes(payload.status)) {
-      complaint.resolvedBy = new Types.ObjectId(adminId);
-      complaint.resolvedAt = new Date();
-    } else {
-      complaint.resolvedBy = null;
-      complaint.resolvedAt = null;
-    }
-    await complaint.save({ session });
-  });
-  return getAdminComplaintById(complaintId);
-};
-

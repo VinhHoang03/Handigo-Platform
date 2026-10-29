@@ -93,7 +93,7 @@ export const supportFaqs: SupportFaqItem[] = [
     group: "Dịch vụ",
     question: "Công việc làm không đạt thì tôi khiếu nại ở đâu?",
     answer:
-      "Gửi yêu cầu hỗ trợ ngay trong đơn, mô tả vấn đề và đính kèm ảnh. Yêu cầu có mã theo dõi, bạn xem được tiến độ xử lý và trao đổi với bộ phận hỗ trợ trong ứng dụng.",
+      "Mở Hỗ trợ và báo cáo, chọn Báo cáo với loại Chất lượng dịch vụ, chọn đơn đã hoàn thành rồi mô tả và đính kèm ảnh. Gửi trong vòng 3 ngày từ khi hoàn thành; mỗi người chỉ gửi một báo cáo chất lượng cho mỗi đơn. Bạn có thể theo dõi kết quả và bổ sung bằng chứng tại đây.",
   },
   {
     group: "Dịch vụ",

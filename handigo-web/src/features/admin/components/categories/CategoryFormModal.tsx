@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react';
 import { CategoryIconPicker } from './CategoryIconPicker';
 import { Modal } from '@/components/common/Modal';
+import { AdminToastNotice } from '../shared/AdminToastNotice';
 import type { CategoryFormState } from './category.helpers';
 
 interface CategoryFormModalProps {
@@ -21,7 +22,7 @@ interface CategoryFormModalProps {
 /** Modal thêm/sửa danh mục — tách khỏi trang chính để giữ trang dưới 200 dòng. */
 export function CategoryFormModal({
   open, mode, form, busy, colorLoading = false, colorError,
-  unavailableIconColors = {}, onReloadColors, onChange, onClose, onSubmit,
+  unavailableIconColors = {}, onChange, onClose, onSubmit,
 }: CategoryFormModalProps) {
   const colorConflict = unavailableIconColors[form.iconColor.toLowerCase()];
   return (
@@ -56,12 +57,7 @@ export function CategoryFormModal({
           onChange={(icon, iconColor) => onChange({ ...form, icon, iconColor })}
         />
         {colorLoading && <p role="status" className="text-sm text-on-surface-variant">Đang kiểm tra màu đã dùng...</p>}
-        {colorError && (
-          <div role="alert" className="rounded-xl bg-error/10 p-3 text-sm text-error">
-            {colorError}
-            <button type="button" onClick={onReloadColors} className="ml-2 font-semibold underline">Thử lại</button>
-          </div>
-        )}
+        <AdminToastNotice message={colorError} />
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Mô tả</span>
           <textarea

@@ -1,5 +1,5 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -11,34 +11,25 @@ import { CaseListItem } from "../components/CaseListItem";
 import { CaseManagementHeader } from "../components/CaseManagementHeader";
 import { STATUS_LABELS } from "../components/caseStatusLabels.constants";
 import { CaseStatusFilter } from "../components/CaseStatusFilter";
-import { TAB_CONFIG, type CaseTab } from "../components/caseTabs.constants";
+import { type CaseTab } from "../components/caseTabs.constants";
+import { SupportTicketSection } from "../components/SupportTicketSection";
 import { CaseTabSelector } from "../components/CaseTabSelector";
 import { CreateCaseModal, type CreateCaseKind } from "../components/CreateCaseModal";
-import type { CaseListQuery, Complaint, Report, SupportTicket } from "../types/caseManagement.types";
+import type { CaseListQuery, Report } from "../types/caseManagement.types";
 
 interface CaseManagementPageProps {
   role: "CUSTOMER" | "PROVIDER";
 }
 
-export default function CaseManagementPage({ role }: CaseManagementPageProps) {
+function ReportCases({ role }: CaseManagementPageProps) {
   const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = searchParams.get("tab");
   const requestedCreateKind = searchParams.get("create");
   const requestedOrderId = searchParams.get("orderId") || undefined;
-  const initialTab: CaseTab = requestedTab === "ticket" || requestedTab === "report"
-    ? requestedTab
-    : "complaint";
-  const initialCreateKind: CreateCaseKind | null =
-    requestedCreateKind === "complaint" ||
-    requestedCreateKind === "ticket" ||
-    requestedCreateKind === "report"
-      ? requestedCreateKind
-      : null;
+  const initialCreateKind: CreateCaseKind | null = requestedCreateKind === "report" || requestedCreateKind === "complaint" ? "report" : null;
 
-  const [tab, setTab] = useState<CaseTab>(initialTab);
   const [query, setQuery] = useState<CaseListQuery>({ page: 1, limit: 10 });
-  const [items, setItems] = useState<Array<Complaint | SupportTicket | Report>>([]);
+  const [items, setItems] = useState<Report[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -52,11 +43,7 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
     try {
       setLoading(true);
       setError("");
-      const result = tab === "complaint"
-        ? await caseManagementApi.complaints(query)
-        : tab === "ticket"
-          ? await caseManagementApi.tickets(query)
-          : await caseManagementApi.reports(query);
+      const result = await caseManagementApi.reports(query);
       setItems(result.items);
       setTotalPages(result.pagination.totalPages || 1);
     } catch (requestError) {
@@ -64,7 +51,7 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [query, setError, tab]);
+  }, [query, setError]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -83,23 +70,11 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
     setSearchParams(nextParams, { replace: true });
   };
 
-  const switchTab = (nextTab: CaseTab) => {
-    setTab(nextTab);
-    setQuery({ page: 1, limit: 10 });
-    setItems([]);
-  };
-
   const openDetail = async (id: string) => {
     try {
       setDetailLoading(true);
       setActionError("");
-      if (tab === "complaint") {
-        setSelected({ kind: "complaint", item: await caseManagementApi.complaint(id) });
-      } else if (tab === "ticket") {
-        setSelected({ kind: "ticket", item: await caseManagementApi.ticket(id) });
-      } else {
-        setSelected({ kind: "report", item: await caseManagementApi.report(id) });
-      }
+      setSelected({ kind: "report", item: await caseManagementApi.report(id) });
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể tải chi tiết yêu cầu."));
     } finally {
@@ -123,44 +98,29 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
   };
 
   const cancelSelected = () => {
-    if (!selected || selected.kind === "report") return Promise.resolve(false);
+    if (!selected) return Promise.resolve(false);
     return runAction(async () => {
-      const item = selected.kind === "complaint"
-        ? await caseManagementApi.cancelComplaint(selected.item._id)
-        : await caseManagementApi.cancelTicket(selected.item._id);
-      setSelected("subject" in item ? { kind: "ticket", item } : { kind: "complaint", item });
+      const item = await caseManagementApi.cancelReport(selected.item._id);
+      setSelected({ kind: "report", item });
       await load();
     }, "Không thể cập nhật yêu cầu.");
   };
 
   const addEvidence = (files: File[], note: string) => {
-    if (!selected || selected.kind !== "complaint") return Promise.resolve(false);
+    if (!selected || selected.kind !== "report") return Promise.resolve(false);
     return runAction(async () => {
       const uploaded = await caseManagementApi.uploadImages(files);
-      const item = await caseManagementApi.addComplaintEvidence(selected.item._id, uploaded, note);
-      setSelected({ kind: "complaint", item });
+      const item = await caseManagementApi.addReportEvidence(selected.item._id, uploaded, note);
+      setSelected({ kind: "report", item });
       await load();
     }, "Không thể bổ sung bằng chứng.");
   };
 
-  const respond = (message: string, files: File[]) => {
-    if (!selected || selected.kind !== "ticket") return Promise.resolve(false);
-    return runAction(async () => {
-      const attachments = files.length ? await caseManagementApi.uploadImages(files) : undefined;
-      const item = await caseManagementApi.respondTicket(selected.item._id, message, attachments);
-      setSelected({ kind: "ticket", item });
-      await load();
-    }, "Không thể gửi phản hồi.");
-  };
-
-  const activeConfig = useMemo(() => TAB_CONFIG.find((item) => item.value === tab)!, [tab]);
-
   return (
-    <DashboardShell role={role}>
-      <CaseManagementHeader loading={loading} activeLabel={activeConfig.label} onRefresh={() => void load()} onCreate={() => setCreateKind(tab)} />
-      <CaseTabSelector active={tab} onChange={switchTab} />
-      <CaseStatusFilter tab={tab} value={query.status || ""} onChange={(status) => setQuery((current) => ({ ...current, page: 1, status: status || undefined }))} />
-      <AsyncState loading={loading} error={error} empty={!items.length} emptyMessage={`Bạn chưa có ${activeConfig.label.toLowerCase()} nào.`} onRetry={load}>
+    <>
+      <CaseManagementHeader loading={loading} activeLabel="Báo cáo" onRefresh={() => void load()} onCreate={() => setCreateKind("report")} />
+      <CaseStatusFilter tab="report" value={query.status || ""} onChange={(status) => setQuery((current) => ({ ...current, page: 1, status: status || undefined }))} />
+      <AsyncState loading={loading} error={error} empty={!items.length} emptyMessage="Bạn chưa có báo cáo nào." onRetry={load}>
         <div className="grid gap-4">
           {items.map((item) => (
             <CaseListItem key={item._id} item={item} statusLabel={STATUS_LABELS[item.status] || item.status} onOpenDetail={(id) => void openDetail(id)} />
@@ -168,8 +128,30 @@ export default function CaseManagementPage({ role }: CaseManagementPageProps) {
         </div>
       </AsyncState>
       <Pagination page={query.page || 1} totalPages={totalPages} onChange={(page) => setQuery((current) => ({ ...current, page }))} />
-      {createKind && <CreateCaseModal open kind={createKind} role={role} initialOrderId={requestedOrderId} onClose={closeCreateModal} onCreated={() => void load()} />}
-      <CaseDetailModal selected={selected} loading={detailLoading} busy={busy} actionError={actionError} onClose={() => { setSelected(null); setActionError(""); }} onCancel={cancelSelected} onAddEvidence={addEvidence} onRespond={respond} />
-    </DashboardShell>
+      {createKind && <CreateCaseModal open kind={createKind} role={role} initialOrderId={requestedOrderId} initialReportType={requestedCreateKind === "complaint" ? "service_quality" : undefined} onClose={closeCreateModal} onCreated={() => void load()} />}
+      <CaseDetailModal selected={selected} loading={detailLoading} busy={busy} actionError={actionError} onClose={() => { setSelected(null); setActionError(""); }} onCancel={cancelSelected} onAddEvidence={addEvidence} onRespond={async () => false} />
+    </>
   );
+}
+
+export default function CaseManagementPage({ role }: CaseManagementPageProps) {
+  const [params, setParams] = useSearchParams();
+  const tab: CaseTab = params.get("tab") === "ticket" || params.get("create") === "ticket" ? "ticket" : "report";
+  const switchTab = (next: CaseTab) => {
+    const updated = new URLSearchParams(params);
+    updated.set("tab", next);
+    updated.delete("create");
+    updated.delete("orderId");
+    setParams(updated);
+  };
+  const closeCreate = () => {
+    const updated = new URLSearchParams(params);
+    updated.delete("create");
+    updated.delete("orderId");
+    setParams(updated, { replace: true });
+  };
+  return <DashboardShell role={role}>
+    <CaseTabSelector active={tab} onChange={switchTab} />
+    {tab === "ticket" ? <SupportTicketSection role={role} initialCreate={params.get("create") === "ticket"} initialOrderId={params.get("orderId") || undefined} onCloseCreate={closeCreate} /> : <ReportCases role={role} />}
+  </DashboardShell>;
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createServiceSchema } from './service.validator';
 
 const objectIdSchema = z
   .string()
@@ -42,8 +43,15 @@ export const updateServiceSuggestionSchema = z.object({
   categoryId: objectIdSchema.optional().nullable(),
   createdServiceId: objectIdSchema.optional().nullable(),
   createdCategoryId: objectIdSchema.optional().nullable(),
+  serviceDraft: createServiceSchema.optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: "Cần cung cấp ít nhất một trường để cập nhật",
+}).superRefine((data, context) => {
+  if (!data.serviceDraft) return;
+  if (data.status !== 'approved') context.addIssue({ code: 'custom', path: ['status'], message: 'Chỉ tạo dịch vụ khi duyệt đề xuất.' });
+  if (data.serviceDraft.isActive !== false) context.addIssue({ code: 'custom', path: ['serviceDraft', 'isActive'], message: 'Dịch vụ từ đề xuất phải được tạo ở trạng thái tạm ngừng.' });
+  if (data.createdServiceId != null) context.addIssue({ code: 'custom', path: ['createdServiceId'], message: 'Không thể đồng thời tạo mới và gắn dịch vụ đã có.' });
+  if (data.categoryId !== undefined && data.categoryId !== data.serviceDraft.categoryId) context.addIssue({ code: 'custom', path: ['categoryId'], message: 'Danh mục đề xuất phải khớp danh mục dịch vụ mới.' });
 });
 
 export const listServiceSuggestionSchema = z.object({

@@ -147,7 +147,6 @@ const modules = {
   '../sockets/socketServer': { emitToConversation: () => {} },
   './penaltyPolicy.service': { assertFeatureAllowed: async () => {} },
 };
-const complaints = load('../services/complaint.service', modules);
 const chat = load('../services/chat.service', modules);
 function reset() {
   version = 0; hold = deferred(); reached = deferred(); pauseKind = null; failEvidence = false; failPreview = false;
@@ -156,42 +155,9 @@ function reset() {
 }
 const payload = { orderId: String(orderId), title: 'Khiếu nại đơn hàng', description: 'Nội dung cần được xử lý' };
 async function complaintCases() {
-  reset(); pauseKind = 'create';
-  const first = complaints.createComplaint(String(customer), 'CUSTOMER', payload);
-  await reached.promise;
-  await complaints.createComplaint(String(customer), 'CUSTOMER', payload);
-  hold.resolve(); await assert.rejects(first, /đã tạo khiếu nại/);
-  assert.equal(state.complaints.length, 1);
-  await complaints.createComplaint(String(providerUser), 'PROVIDER', payload);
-  assert.equal(state.complaints.length, 2, 'Khách và thợ vẫn có hồ sơ riêng.');
-  for (const target of ['resolved', 'rejected', 'cancelled']) {
-    reset();
-    state.complaints.push(new Complaint({ ...payload, orderId, complainantId: customer, targetUserId: providerUser,
-      status: 'evidence_requested', __v: 0 }).toObject());
-    const id = String(state.complaints[0]._id);
-    pauseKind = 'evidence';
-    const adding = complaints.addComplaintEvidence(String(customer), 'CUSTOMER', id,
-      { files: [{ fileType: 'image', url: 'https://example.test/bang-chung.jpg' }] });
-    await reached.promise;
-    if (target === 'cancelled') await complaints.cancelComplaint(String(customer), id);
-    else await complaints.updateComplaintStatus(String(admin), id, { status: target });
-    hold.resolve(); await assert.rejects(adding, /đã kết thúc/);
-    assert.equal(state.complaints[0].status, target); assert.equal(state.evidence.length, 0);
-    assert.ok(state.complaints[0].resolvedAt);
-  }
-  reset();
-  const created = await complaints.createComplaint(String(customer), 'CUSTOMER', payload);
-  const id = String(created._id);
-  await complaints.requestEvidence(String(admin), id, 'Vui lòng bổ sung hình ảnh');
-  await complaints.addComplaintEvidence(String(customer), 'CUSTOMER', id,
-    { files: [{ fileType: 'image', url: 'https://example.test/anh.jpg' }] });
-  assert.equal(state.complaints[0].status, 'under_review'); assert.equal(state.evidence.length, 1);
-  failEvidence = true;
-  await assert.rejects(complaints.addComplaintEvidence(String(customer), 'CUSTOMER', id,
-    { files: [{ fileType: 'image', url: 'https://example.test/anh-loi.jpg' }] }), /Lỗi lưu bằng chứng/);
-  assert.equal(state.evidence.length, 1);
-  await assert.rejects(complaints.cancelComplaint(String(admin), id), /Không tìm thấy/);
-  console.log('Đạt KH-23, KH-24: khóa trạng thái, hoàn tác bằng chứng, chống trùng và ownership.');
+  const { spawnSync } = require('node:child_process');
+  const result = spawnSync(process.execPath, ['-r', 'ts-node/register', require('node:path').join(__dirname, 'testReportConsolidation.cjs')], { stdio: 'inherit' });
+  assert.equal(result.status, 0, 'Kiểm thử khiếu nại dùng chung báo cáo phải vượt qua.');
 }
 async function chatCases() {
   reset(); pauseKind = 'preview';

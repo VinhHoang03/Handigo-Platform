@@ -30,7 +30,7 @@ export const adminOperationsApi = {
     unwrap<AdminProviderAnalytics>(await api.get("/dashboard/providers", { params: query })),
 
   payments: async (query: PaymentQuery) =>
-    unwrap<Paginated<AdminPayment>>(await api.get("/payments/history", { params: query })),
+    unwrap<Paginated<AdminPayment> & { totalOrders: number }>(await api.get("/payments/history", { params: query })),
   payment: async (id: string) =>
     unwrap<AdminPayment>(await api.get(`/payments/${id}`)),
   retryPaymentRefund: async (paymentId: string) =>

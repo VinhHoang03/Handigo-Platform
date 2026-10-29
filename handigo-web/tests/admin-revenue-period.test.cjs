@@ -47,3 +47,9 @@ test('Thẻ doanh thu hiện số tiền chênh lệch và %, không chia cho 0'
   assert.ok(render(50000, 0).includes('Chưa tính được %'));
   assert.ok(render(0, 0).includes('Không thay đổi'));
 });
+
+test('Sidebar chỉ có Tổng quan, không còn mục Doanh thu hệ thống riêng', () => {
+  const { adminNavItems } = load(path.join(__dirname, '../src/components/common/dashboard/dashboardNavigation.ts'));
+  assert.equal(adminNavItems.filter(item => item.path === '/admin').length, 1);
+  assert.equal(adminNavItems.some(item => item.path === '/admin/revenue'), false);
+});

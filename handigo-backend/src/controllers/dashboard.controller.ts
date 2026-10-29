@@ -4,9 +4,12 @@ import * as dashboardService from "../services/dashboard.service";
 import * as adminDashboardService from "../services/adminDashboard.service";
 import { adminDashboardQuerySchema } from "../validations/adminDashboard.validator";
 import { getAdminMonthlyTrend as loadAdminMonthlyTrend } from "../services/adminMonthlyTrend.service";
+import { getAdminRecentOrders as loadAdminRecentOrders } from "../services/adminRecentOrders.service";
+import { getAdminRevenueInsights as loadRevenueInsights } from "../services/adminRevenueInsights.service";
 import { AppError } from "../utils/appError";
 import {
   dashboardQuerySchema,
+  adminRecentOrdersQuerySchema,
   adminOperationsQuerySchema,
   providerAvailabilitySchema,
   providerDashboardQuerySchema,
@@ -19,10 +22,25 @@ export const getAdminInsights = async (req: Request, res: Response, next: NextFu
   } catch (error) { return next(error); }
 };
 
+export const getAdminRevenueInsights = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await loadRevenueInsights(adminDashboardQuerySchema.parse(req.query));
+    return res.json({ success: true, data, message: "Đã tải doanh thu dịch vụ và dòng tiền theo kênh." });
+  } catch (error) { return next(error); }
+};
+
 export const getAdminMonthlyTrend = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await loadAdminMonthlyTrend(adminDashboardQuerySchema.parse(req.query));
     return res.json({ success: true, data, message: "Đã tải số đơn và doanh thu theo tháng." });
+  } catch (error) { return next(error); }
+};
+
+export const getAdminRecentOrders = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const query = adminRecentOrdersQuerySchema.parse(req.query);
+    const data = await loadAdminRecentOrders(query);
+    return res.json({ success: true, data, message: "Đã tải đơn hàng mới tạo gần đây." });
   } catch (error) { return next(error); }
 };
 

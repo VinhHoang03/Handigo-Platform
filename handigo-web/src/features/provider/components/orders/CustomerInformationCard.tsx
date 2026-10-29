@@ -10,6 +10,7 @@ interface CustomerInformationCardProps {
   customer: ReturnType<typeof getCustomer>;
   addressLine: string;
   orderType: string;
+  showOrderDetails?: boolean;
 }
 
 export function CustomerInformationCard({
@@ -17,6 +18,7 @@ export function CustomerInformationCard({
   customer,
   addressLine,
   orderType,
+  showOrderDetails = true,
 }: CustomerInformationCardProps) {
   const recipient = getOrderRecipient(order);
   const contactPhone = customer?.phone?.trim()
@@ -25,9 +27,11 @@ export function CustomerInformationCard({
     { icon: User, label: 'Người liên hệ tại địa điểm', value: recipient.fullName },
     { icon: Phone, label: 'Số điện thoại liên hệ', value: contactPhone || 'Chưa cập nhật' },
     { icon: MapPin, label: 'Địa chỉ thực hiện', value: addressLine || 'Chưa cập nhật' },
-    { icon: Wrench, label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
-    { icon: CalendarDays, label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },
-    { icon: Ticket, label: 'Mã đơn hàng', value: order.orderCode },
+    ...(showOrderDetails ? [
+      { icon: Wrench, label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
+      { icon: CalendarDays, label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },
+      { icon: Ticket, label: 'Mã đơn hàng', value: order.orderCode },
+    ] : []),
   ];
 
   return (
@@ -57,12 +61,12 @@ export function CustomerInformationCard({
           </div>
         ))}
       </div>
-      {order.problemDescription && (
+      {showOrderDetails && order.problemDescription && (
         <div className="mt-md rounded-2xl bg-surface-container-low p-3 text-sm">
           <p className="whitespace-pre-wrap text-on-surface"><strong>Mô tả:</strong> {order.problemDescription}</p>
         </div>
       )}
-      {order.customerAttachments?.length ? (
+      {showOrderDetails && order.customerAttachments?.length ? (
         <div className="mt-md">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-on-surface-variant">Ảnh mô tả</p>
           <div className="grid grid-cols-3 gap-2">
