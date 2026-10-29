@@ -78,7 +78,7 @@ export default function RegisterPage() {
         email: normalizedEmail,
         otp,
       });
-      if (response.user?.role.toUpperCase() === "PROVIDER" && response.token) {
+      if (registerAsProvider && response.user && response.token) {
         navigate("/register-provider", { replace: true });
         return;
       }

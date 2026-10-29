@@ -400,7 +400,7 @@ export const createApplication = async (
       occurredAt: submittedAt,
     });
     const savedApplication = await draftApplication.save();
-    if (user.role === "PROVIDER") {
+    if (user.providerOnboardingStatus || user.role === "PROVIDER") {
       user.providerOnboardingStatus = "PENDING_REVIEW";
       user.providerOnboardingStep = 3;
       await user.save();
@@ -435,7 +435,7 @@ export const createApplication = async (
       },
     ],
   });
-  if (applicationType === "initial" && user.role === "PROVIDER") {
+  if (applicationType === "initial" && (user.providerOnboardingStatus || user.role === "PROVIDER")) {
     user.providerOnboardingStatus = "PENDING_REVIEW";
     user.providerOnboardingStep = 3;
     await user.save();
@@ -522,10 +522,10 @@ export const saveDraftApplication = async (
       isDeleted: false,
       deletedAt: null,
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
   );
 
-  if (user.role === "PROVIDER") {
+  if (user.providerOnboardingStatus || user.role === "PROVIDER") {
     user.providerOnboardingStep = payload.onboardingStep || user.providerOnboardingStep || 1;
     await user.save();
   }
@@ -677,7 +677,7 @@ export const resubmitApplication = async (
   });
 
   await application.save();
-  if (applicationType === "initial" && user.role === "PROVIDER") {
+  if (applicationType === "initial" && (user.providerOnboardingStatus || user.role === "PROVIDER")) {
     user.providerOnboardingStatus = "PENDING_REVIEW";
     user.providerOnboardingStep = 3;
     await user.save();
@@ -865,7 +865,7 @@ export const reviewApplication = async (
         await application.save({ session });
         if (!isServiceAddition) {
           await User.updateOne(
-            { _id: application.userId, role: "PROVIDER", isDeleted: false },
+            { _id: application.userId, role: { $in: ["CUSTOMER", "PROVIDER"] }, isDeleted: false },
             {
               $set: {
                 providerOnboardingStatus: "REJECTED",

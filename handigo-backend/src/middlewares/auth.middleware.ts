@@ -5,6 +5,7 @@ import type { AuthenticatedUser } from "./authContext";
 import { orderActorContext } from "../utils/orderActorContext";
 import { isTokenVersionCurrent } from "../utils/token";
 import { refreshAccountLock } from "../services/penaltyPolicy.service";
+import { getEffectiveUserRole } from "../utils/userRole";
 
 const getAccessSecret = (): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -55,9 +56,9 @@ export const authMiddleware = (
           ...decoded,
           id: user._id.toString(),
           email: user.email,
-          role: user.role,
+          role: getEffectiveUserRole(user),
         };
-        orderActorContext.run({ id: user._id.toString(), role: user.role.toLowerCase() as "customer" | "provider" | "admin" }, next);
+        orderActorContext.run({ id: user._id.toString(), role: req.user.role.toLowerCase() as "customer" | "provider" | "admin" }, next);
       })
       .catch((error) => next(error));
   } catch (error) {

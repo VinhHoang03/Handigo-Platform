@@ -20,7 +20,7 @@ export default function RegisterProviderPage() {
   const applicationId = searchParams.get("applicationId");
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
-  const isDirectProvider = user?.role.toUpperCase() === "PROVIDER";
+  const isDirectProvider = Boolean(user?.providerOnboardingStatus);
   const providerApplication = useProviderApplication(applicationId);
   const [step, setStep] = useState<1 | 2>(
     isDirectProvider ? Math.min(user?.providerOnboardingStep || 1, 2) as 1 | 2 : 1,
@@ -85,13 +85,12 @@ export default function RegisterProviderPage() {
       if (isDirectProvider && user) {
         setUser({
           ...user,
+          role: "CUSTOMER",
           providerOnboardingStatus: "PENDING_REVIEW",
           providerOnboardingStep: 3,
         });
-        navigate("/provider/profile", { replace: true });
-      } else {
-        window.setTimeout(() => navigate("/customer/profile"), 1500);
       }
+      navigate("/customer/profile?tab=applications", { replace: true });
     } catch {
       // Hook hiển thị lỗi gửi hồ sơ.
     }
@@ -105,7 +104,7 @@ export default function RegisterProviderPage() {
   if (isWaitingForReview && !success) {
     return (
       <Navigate
-        to={isDirectProvider ? "/provider/profile" : "/customer/profile"}
+        to="/customer/profile?tab=applications"
         replace
       />
     );

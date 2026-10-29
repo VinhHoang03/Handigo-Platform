@@ -7,7 +7,6 @@ import { UploadedAsset } from "./ProviderApplicationUploadControls";
 type ProviderCertificatesSectionProps = {
   certificates: ProviderApplicationCertificate[];
   uploadingKey: string;
-  ocrMessages: Record<string, string>;
   dateErrors: DateFieldErrors[];
   today: string;
   onAddCertificate: () => void;
@@ -22,7 +21,6 @@ type ProviderCertificatesSectionProps = {
 export function ProviderCertificatesSection({
   certificates,
   uploadingKey,
-  ocrMessages,
   dateErrors,
   today,
   onAddCertificate,
@@ -114,11 +112,6 @@ export function ProviderCertificatesSection({
                     <div className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-lowest p-5 text-center text-sm text-on-surface-variant">
                       Chưa có tệp chứng chỉ.
                     </div>
-                  )}
-                  {ocrMessages[key] && (
-                    <p className="rounded-lg bg-primary/5 p-3 text-sm text-on-surface-variant">
-                      {ocrMessages[key]}
-                    </p>
                   )}
                 </div>
 
