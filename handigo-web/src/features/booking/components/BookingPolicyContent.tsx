@@ -40,7 +40,7 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
       <h3 className="font-semibold text-on-surface">3. Dịch vụ cần khảo sát và báo giá</h3>
       {depositAmount != null && <p className="rounded-xl bg-primary/5 p-3 text-sm leading-6 text-on-surface">Cọc của dịch vụ đang chọn: <strong>{money(depositAmount)}</strong>. {payableDeposit != null && <>Cọc cần thanh toán sau ưu đãi: <strong>{money(payableDeposit)}</strong>.</>}</p>}
       <ul className={listClass}>
-        <li>Tiền cọc được hiển thị theo từng dịch vụ trước khi đặt đơn, thanh toán bằng ví Handigo hoặc PayOS; cọc không hỗ trợ tiền mặt. Thợ khảo sát và lưu báo giá sửa chữa. Chi phí sửa chữa còn lại được thanh toán trực tiếp cho thợ, có khấu trừ phần cọc thực trả.</li>
+        <li>Tiền cọc được hiển thị theo từng dịch vụ trước khi đặt đơn, thanh toán bằng ví Handigo hoặc PayOS; cọc không hỗ trợ tiền mặt. Thợ khảo sát và lưu báo giá sửa chữa. Sau khi hoàn thành đơn, khách thanh toán chi phí còn lại trực tiếp cho thợ hoặc bằng Ví Handigo, có khấu trừ phần cọc thực trả.</li>
         <li><strong>Khách hủy khi chưa có thợ nhận:</strong> hoàn 100% tiền cọc thực trả.</li>
         <li><strong>Thợ hủy khi chưa đến nơi và chưa báo giá:</strong> Handigo tự điều phối thợ khác, giữ nguyên cọc; thợ vừa hủy không nhận cọc. Nếu hết thời gian tìm kiếm mà không có thợ nhận, đơn được hủy, khách được hoàn 100% cọc thực trả về ví Handigo và tặng một voucher giảm 10.000đ tiền cọc cho đơn báo giá tiếp theo.</li>
         <li><strong>Khách hủy khi thợ đã nhận đơn:</strong> được hủy trong vòng 5 phút kể từ khi thợ nhận nếu thợ chưa bắt đầu làm việc, kể cả khi đã có báo giá. Hoàn 100% khoản đã thanh toán về ví Handigo, bao gồm cọc thực trả.</li>

@@ -763,36 +763,42 @@ export const DispatchService = {
           .lean();
 
         for (const order of activeOrders) {
-          const hasPendingAssignment = await OrderAssignment.exists({
-            orderId: order._id,
-            status: "pending",
-          });
-          if (hasPendingAssignment) continue;
+          try {
+            const hasPendingAssignment = await OrderAssignment.exists({
+              orderId: order._id,
+              status: "pending",
+            });
+            if (hasPendingAssignment) continue;
 
-          if (order.preferredProviderId) {
-            if (!recoverStalledOrders) continue;
-            await Order.updateOne(
-              { _id: order._id, status: "created" },
-              { $set: { matchingStartedAt: null } },
-              { runValidators: true },
+            if (order.preferredProviderId) {
+              if (!recoverStalledOrders) continue;
+              await Order.updateOne(
+                { _id: order._id, status: "created" },
+                { $set: { matchingStartedAt: null } },
+                { runValidators: true },
+              );
+              await DispatchService.dispatchReadyOrder(order._id.toString());
+              continue;
+            }
+
+            const ctx = await getDispatchContext(order._id.toString());
+            if (!ctx) continue;
+
+            const triedState = await getTriedProviderState(order._id);
+            dispatchLogger.debug("Kiểm tra lại đơn đang chờ thợ.", {
+              orderId: order._id.toString(),
+              attemptNumber: triedState.attemptNumber,
+            });
+            await DispatchService.dispatchOrder(
+              order._id.toString(),
+              ctx,
+              triedState.triedProviderIds,
             );
-            await DispatchService.dispatchReadyOrder(order._id.toString());
-            continue;
+          } catch (error: unknown) {
+            dispatchLogger.error("Không thể xử lý đơn trong lượt quét điều phối.", error, {
+              orderId: order._id.toString(),
+            });
           }
-
-          const ctx = await getDispatchContext(order._id.toString());
-          if (!ctx) continue;
-
-          const triedState = await getTriedProviderState(order._id);
-          dispatchLogger.debug("Kiểm tra lại đơn đang chờ thợ.", {
-            orderId: order._id.toString(),
-            attemptNumber: triedState.attemptNumber,
-          });
-          await DispatchService.dispatchOrder(
-            order._id.toString(),
-            ctx,
-            triedState.triedProviderIds,
-          );
         }
       }
     };

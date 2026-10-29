@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Order } from '@/types/booking';
-import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
+import { getAppliedQuotationDeposit, getDirectRepairPayment, isQuotationPaidByWallet } from '@/utils/quotationPayment';
 import type { CreateQuotationPayload, QuotationDetail } from '../../types/providerOrder.types';
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { FixedPriceActionForm } from '../FixedPriceActionForm';
@@ -101,7 +101,8 @@ export function QuotationOrderPanel({
             <dd className="ml-auto text-right tabular-nums">−{formatMoney(appliedDepositAmount)}</dd>
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-sm border-t border-primary/15 pt-3">
-            <dt className="text-base font-semibold text-primary">{quotation.quotation.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách' : 'Thu trực tiếp từ khách'}</dt>
+            <dt className="text-base font-semibold text-primary">{quotation.quotation.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách'
+              : isQuotationPaidByWallet(order, quotation.quotation) ? 'Đã thanh toán qua Ví Handigo' : 'Còn cần thanh toán'}</dt>
             <dd className="ml-auto text-right text-headline-md font-bold tabular-nums text-primary">
               {formatMoney(getDirectRepairPayment(quotation.quotation.finalAmount, appliedDepositAmount))}
             </dd>

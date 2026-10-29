@@ -609,6 +609,9 @@ export const AssignmentService = {
         if ((quotation.revision ?? 0) !== expectedRevision) {
           throw new AppError("Báo giá đã thay đổi. Vui lòng tải lại và kiểm tra số tiền trước khi xác nhận.", 409);
         }
+        if (order.paymentStatus === "paid" && !quotation.directPaymentConfirmedAt) {
+          throw new AppError("Khách đã thanh toán báo giá qua hệ thống. Không xác nhận thu trực tiếp thêm.", 409);
+        }
         const appliedDeposit = order.pricing.baseAmount !== undefined
           ? Math.max(order.pricing.totalPaidAmount, 0)
           : Math.max(order.depositAmount, 0);

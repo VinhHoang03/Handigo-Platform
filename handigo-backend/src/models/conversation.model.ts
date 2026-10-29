@@ -29,7 +29,7 @@ const LastMessageSchema = new Schema(
 
 const ConversationSchema = new Schema<IConversation>(
   {
-    orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, unique: true },
+    orderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
     customerId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     providerId: { type: Schema.Types.ObjectId, ref: "Provider", required: true },
     customerLastSeenAt: { type: Date, default: null },
@@ -39,5 +39,7 @@ const ConversationSchema = new Schema<IConversation>(
   },
   { timestamps: true },
 );
+
+ConversationSchema.index({ customerId: 1, providerId: 1, isDeleted: 1, createdAt: 1, _id: 1 });
 
 export const Conversation = model<IConversation>("Conversation", ConversationSchema, "conversations");

@@ -78,6 +78,7 @@ const ConfirmPaymentPage = () => {
                 onApplyClick={() => applyVoucherCode(voucherCode)}
                 availableVouchers={availableVouchers}
                 appliedVoucher={appliedVoucher}
+                voucherDiscountAmount={voucherDiscountAmount}
                 onRemoveVoucher={() => {
                   setVoucherCode('');
                   setAppliedVoucher(null);

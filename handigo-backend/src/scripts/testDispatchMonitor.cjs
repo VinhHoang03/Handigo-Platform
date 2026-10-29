@@ -70,6 +70,44 @@ async function testOverdueReview() {
   assert.equal(notifications.length, 12, 'Không gửi lại thông báo ở lượt quét tiếp theo');
   assert.equal(assignmentScans, 2);
 }
+async function testPendingOrderConflict() {
+  const rows = [{ _id: 'don-xung-dot', status: 'created' }, { _id: 'don-ke-tiep', status: 'created' }];
+  const processed = [];
+  const failures = [];
+  const conflict = Object.assign(new Error('Xung đột ghi giả lập sau khi hết lượt retry'), { code: 112 });
+  let nextTick;
+  let shouldFail = true;
+  const query = values => ({ select() { return this; }, sort() { return this; }, limit() { return this; }, lean: async () => values });
+  const pendingContext = { exports: {}, timeoutMonitor: null, MATCHING_TIMEOUT_SCAN_INTERVAL_MS: 10000, Date,
+    setInterval: fn => { nextTick = fn; return { unref() {} }; },
+    getNumberConfigValue: async (_key, fallback) => fallback,
+    findOverdueOrders: async () => [],
+    dispatchLogger: { debug() {}, error: (...args) => failures.push(args) },
+    Order: { find: filter => query(filter.matchingStartedAt?.$ne === null ? rows.filter(row => row.status === 'created') : []) },
+    OrderAssignment: { find: () => query([]), exists: async () => false },
+    getDispatchContext: async () => ({}),
+    getTriedProviderState: async () => ({ attemptNumber: 2, triedProviderIds: [] }),
+    DispatchService: { dispatchOrder: async id => {
+      processed.push(id);
+      if (id === 'don-xung-dot' && shouldFail) { shouldFail = false; throw conflict; }
+      rows.find(row => row._id === id).status = id === 'don-xung-dot' ? 'cancelled' : 'accepted';
+    } },
+  };
+  vm.runInNewContext(ts.transpileModule(`exports.monitor = { ${method.getText(ast)} };`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, pendingContext);
+  pendingContext.exports.monitor.startTimeoutMonitor();
+  await flush();
+  assert.deepEqual(processed, ['don-xung-dot', 'don-ke-tiep'], 'Một đơn xung đột không chặn đơn phía sau trong cùng lượt quét.');
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0][1], conflict, 'Giữ lỗi gốc để chẩn đoán.');
+  assert.equal(failures[0][2].orderId, 'don-xung-dot');
+  assert.equal(rows[0].status, 'created', 'Không tự đổi trạng thái đơn khi giao dịch thất bại.');
+  nextTick(); await flush();
+  assert.deepEqual(processed, ['don-xung-dot', 'don-ke-tiep', 'don-xung-dot'], 'Lượt quét sau xử lý lại đơn lỗi, không xử lý lại đơn đã nhận.');
+  assert.equal(rows[0].status, 'cancelled');
+  assert.equal(failures.length, 1);
+}
 (async () => {
   context.exports.monitor.startTimeoutMonitor();
   context.exports.monitor.startTimeoutMonitor();
@@ -81,5 +119,6 @@ async function testOverdueReview() {
   fail(new Error('Lỗi nguồn cấu hình giả lập')); await flush();
   assert.equal(errors.length, 2);
   await testOverdueReview();
+  await testPendingOrderConflict();
   console.log('Đạt bộ quét điều phối: không chạy chồng, không tạo timer trùng và phục hồi sau lỗi.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

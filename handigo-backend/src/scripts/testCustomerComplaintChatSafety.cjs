@@ -34,6 +34,7 @@ function set(row, key, value) {
 const matches = (row, filter) => Object.entries(filter).every(([key, value]) => {
   const actual = get(row, key);
   if (value && '$ne' in Object(value)) return String(actual) !== String(value.$ne);
+  if (value && '$in' in Object(value)) return value.$in.some(item => String(actual) === String(item));
   return value == null ? actual == null : String(actual) === String(value);
 });
 function apply(row, update) {
@@ -90,6 +91,7 @@ function model(collection) {
       return document(rows[0], collection, session);
     }),
     findById: id => query(session => document(view(session)[collection].find(row => String(row._id) === String(id)), collection, session)),
+    exists: filter => query(session => view(session)[collection].some(row => matches(row, filter)) ? { _id: orderId } : null),
     find: filter => query(session => view(session)[collection].filter(row => matches(row, filter)).map(row => document(row, collection, session))),
     findOneAndUpdate: (filter, update, options) => query(() => {
       assert.ok(options.session); assert.equal(options.runValidators, true);
@@ -102,6 +104,11 @@ function model(collection) {
       const row = view(options.session)[collection].find(item => matches(item, filter));
       if (!row) return { matchedCount: 0 };
       apply(row, update); return { matchedCount: 1 };
+    },
+    updateMany: async (filter, update, options) => {
+      assert.ok(options.session); assert.equal(options.runValidators, true);
+      const rows = view(options.session)[collection].filter(row => matches(row, filter));
+      rows.forEach(row => apply(row, update)); return { matchedCount: rows.length };
     },
     create: async (rows, { session }) => {
       assert.ok(session);
@@ -186,6 +193,15 @@ async function chatCases() {
     assert.equal(String(state.conversations[0].lastMessage.messageId), String(latest._id));
     assert.equal(state.conversations[0].lastMessage.content, latest.content);
   }
-  console.log('Đạt KH-26: gửi đồng thời, sửa/xóa tin cuối và hoàn tác khi lỗi.');
+  reset();
+  state.orders[0].status = 'accepted';
+  state.orders[0].customerNoShow = { status: 'pending' };
+  state.orders.push({ ...copy(state.orders[0]), _id: new mongoose.Types.ObjectId() });
+  state.orders.push({ ...copy(state.orders[0]), _id: new mongoose.Types.ObjectId(), providerId: new mongoose.Types.ObjectId() });
+  await chat.sendMessage(String(customer), 'CUSTOMER', String(state.conversations[0]._id), { content: 'Tôi đang có mặt' });
+  assert.ok(state.orders[0].customerNoShow.customerRepliedAt);
+  assert.ok(state.orders[1].customerNoShow.customerRepliedAt, 'Phản hồi chat chung được ghi nhận cho các đơn cùng cặp khách–thợ.');
+  assert.equal(state.orders[2].customerNoShow.customerRepliedAt, undefined, 'Không ảnh hưởng đơn do thợ khác nhận.');
+  console.log('Đạt KH-26: gửi đồng thời, sửa/xóa tin cuối, hoàn tác khi lỗi và phản hồi xác minh vắng mặt qua chat dùng chung.');
 }
 (async () => { await complaintCases(); await chatCases(); })().catch(error => { console.error(error); process.exitCode = 1; });

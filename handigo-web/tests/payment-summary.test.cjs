@@ -91,7 +91,7 @@ test('Đơn báo giá: để trống khi chưa có giá, tách tiền cọc kh�
   const quoted = render(order, quotation, 'Đã thanh toán tiền cọc');
   assert.equal(value(quoted, 'Giá trị đơn hàng'), '150.000₫');
   assert.doesNotMatch(quoted, /Cọc được khấu trừ|Thanh toán tiền sửa chữa|Đã xác nhận nhận tiền/);
-  assert.equal(value(quoted, 'Còn cần thu trực tiếp'), '120.000₫');
+  assert.equal(value(quoted, 'Còn cần thanh toán'), '120.000₫');
   assert.doesNotMatch(quoted, /Thu nhập của thợ|Thu nhập dự kiến/);
   assert.doesNotMatch(quoted, />Phí nền tảng</);
 });
@@ -102,24 +102,46 @@ test('Đơn báo giá hoàn thành hiển thị phương thức thanh toán tr�
       serviceId: { serviceType: 'variable_price' }, depositPaidAt: '2026-10-15T01:00:00Z' });
     order.pricing.totalPaidAmount = 30000;
     const html = render(order, { quotation: { finalAmount: 150000, status: 'saved', directPaymentConfirmedAt: '2026-10-15T02:00:00Z' } });
-    assert.equal(value(html, 'Phương thức thanh toán'), 'Thanhtoántrựctiếpvớithợ');
+    assert.equal(value(html, 'Phương thức thanh toán'), 'Thanhtoántrựctiếp');
     assert.doesNotMatch(html, /Phương thức thanh toán tiền cọc|QR PayOS/);
     assert.equal(value(html, 'Đã thu trực tiếp từ khách'), '120.000₫');
   }
 });
 
-test('Đơn báo giá chưa hoàn thành vẫn hiển thị phương thức trả cọc', () => {
+test('Đơn báo giá chưa thanh toán phần sửa chữa không hiển thị phương thức cọc', () => {
   const order = makeOrder({ status: 'in_progress', inspectionRequired: true, paymentMethod: 'bank' });
   const html = render(order, { quotation: { finalAmount: 150000, status: 'saved' } });
-  assert.equal(value(html, 'Phương thức thanh toán tiền cọc'), 'QRPayOS');
+  assert.doesNotMatch(html, /Phương thức thanh toán tiền cọc|>Phương thức thanh toán</);
 });
 
 test('Đơn báo giá hoàn thành không cần thu thêm hoặc thiếu báo giá không dùng phương thức cọc thay thế', () => {
   const order = makeOrder({ status: 'completed', inspectionRequired: true, paymentMethod: 'bank', depositPaidAt: '2026-10-15T01:00:00Z' });
   order.pricing.totalPaidAmount = 30000;
   const covered = render(order, { quotation: { finalAmount: 30000, status: 'saved' } });
-  assert.equal(value(covered, 'Phương thức thanh toán'), 'Khôngphátsinhthanhtoánthêm');
+  assert.doesNotMatch(covered, />Phương thức thanh toán</);
   const missing = render(order);
-  assert.equal(value(missing, 'Phương thức thanh toán'), 'Chưacóthôngtinbáogiá');
+  assert.doesNotMatch(missing, />Phương thức thanh toán</);
   assert.doesNotMatch(missing, /QR PayOS|Phương thức thanh toán tiền cọc/);
+});
+
+test('Báo giá trả bằng ví: cả khách và thợ hiển thị đã trả, không yêu cầu thu trực tiếp nữa', () => {
+  const order = makeOrder({ status: 'completed', inspectionRequired: true, paymentMethod: 'wallet', paymentStatus: 'paid',
+    serviceId: { serviceType: 'variable_price' }, depositPaidAt: '2026-10-15T01:00:00Z' });
+  order.pricing.totalPaidAmount = 30000;
+  const quotation = { quotation: { finalAmount: 150000, status: 'saved' }, items: [] };
+  const provider = render(order, quotation, 'Đã thanh toán');
+  assert.equal(value(provider, 'Phương thức thanh toán'), 'VíHandigo');
+  assert.equal(value(provider, 'Đã thanh toán qua ví'), '120.000₫');
+  assert.equal(value(provider, 'Trạng thái thanh toán'), 'Đãthanhtoán');
+  const { BookingQuotationDetails } = load(path.join(sourceRoot, 'features/booking/components/detail/BookingQuotationDetails.tsx'));
+  const customer = renderToStaticMarkup(React.createElement(BookingQuotationDetails, {
+    quotation, busy: false, appliedDepositAmount: 30000, remainingQuotationAmount: 0,
+    onReject() {}, orderStatus: 'completed', paidByWallet: true,
+  }));
+  assert.match(customer, /Đã thanh toán qua Ví Handigo/);
+  assert.doesNotMatch(customer, /Thợ xác nhận đã nhận trực tiếp|Chưa xác nhận/);
+  const { BookingSuccessPaymentSummary } = load(path.join(sourceRoot, 'features/booking/components/BookingSuccessPaymentSummary.tsx'));
+  const summary = renderToStaticMarkup(React.createElement(BookingSuccessPaymentSummary, { order, quotation, result: 'paid' }));
+  assert.doesNotMatch(summary, /Chưa xác nhận/);
+  assert.match(summary, /120.000/);
 });

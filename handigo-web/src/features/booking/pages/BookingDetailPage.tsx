@@ -36,6 +36,7 @@ const BookingDetailContent = () => {
     isWaitingForProvider,
     matchingSecondsRemaining,
     paymentFlow,
+    quotationPaymentFlow,
     cancellationFlow,
     reassignmentFlow,
     providerInfo,
@@ -145,6 +146,7 @@ const BookingDetailContent = () => {
               appliedDepositAmount={appliedDepositAmount}
               remainingQuotationAmount={remainingQuotationAmount}
               onReject={cancellationFlow.handleRejectQuotation}
+              paymentFlow={quotationPaymentFlow}
             />
           </BookingServiceSummary>
 
