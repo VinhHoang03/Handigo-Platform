@@ -31,7 +31,9 @@ export function RouteGuard({
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
   }
 
-  const normalizedRole = user.role.toUpperCase() as AppRole;
+  const isUnapprovedProvider = user.role.toUpperCase() === 'PROVIDER' &&
+    user.providerOnboardingStatus && user.providerOnboardingStatus !== 'APPROVED';
+  const normalizedRole = (isUnapprovedProvider ? 'CUSTOMER' : user.role.toUpperCase()) as AppRole;
   if (!roles.includes(normalizedRole)) {
     return <Navigate to={getRoleHomePath(user.role, user.providerOnboardingStatus)} replace />;
   }

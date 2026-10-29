@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Skeleton, SkeletonText } from "@/components/common/Skeleton";
 import { AddressBookManager } from "@/features/profile/components/AddressBookManager";
@@ -20,7 +20,10 @@ const DEFAULT_AVATAR = undefined;
 
 export default function CustomerProfilePage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<CustomerProfileTab>("profile");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<CustomerProfileTab>(() =>
+    searchParams.get("tab") === "applications" ? "applications" : "profile",
+  );
   const passwordModal = usePasswordChangeModal();
   const isGoogleAccount = useAuthStore((state) => state.user?.isGoogleAccount === true);
 

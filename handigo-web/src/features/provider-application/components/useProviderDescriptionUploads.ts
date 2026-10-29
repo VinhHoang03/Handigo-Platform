@@ -1,4 +1,4 @@
-import { useToastFeedback } from "@/components/common/Toast";
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { getErrorMessage } from "@/utils/apiError";
 import type {
@@ -26,9 +26,9 @@ export function useProviderDescriptionUploads(
     documentKind: OcrDocumentKind,
   ) => Promise<ProviderApplicationAssetUpload>,
 ) {
+  const { addToast } = useToast();
   const [uploadingKey, setUploadingKey] = useState("");
   const [uploadError, setUploadError] = useToastFeedback<string>("", "error");
-  const [ocrMessages, setOcrMessages] = useState<Record<string, string>>({});
 
   const uploadIdentity = async (
     key: string,
@@ -50,12 +50,12 @@ export function useProviderDescriptionUploads(
         return { ...current, identityDocument: nextIdentity };
       });
       const warning = uploaded.ocrSuggestion?.warnings.join(" ");
-      setOcrMessages((current) => ({
-        ...current,
-        [key]:
-          warning ||
-          "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin.",
-      }));
+      addToast(
+        warning || (uploaded.ocrSuggestion
+          ? "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin."
+          : "Đã tải giấy tờ lên nhưng chưa đọc được thông tin OCR. Vui lòng nhập thông tin thủ công."),
+        warning || !uploaded.ocrSuggestion ? "info" : "success",
+      );
     } catch (error) {
       setUploadError(getErrorMessage(error, "Không thể tải giấy tờ lên."));
     } finally {
@@ -81,12 +81,12 @@ export function useProviderDescriptionUploads(
         }),
       }));
       const warning = uploaded.ocrSuggestion?.warnings.join(" ");
-      setOcrMessages((current) => ({
-        ...current,
-        [key]:
-          warning ||
-          "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin.",
-      }));
+      addToast(
+        warning || (uploaded.ocrSuggestion
+          ? "OCR hoàn tất. Bạn có thể kiểm tra và chỉnh sửa thông tin."
+          : "Đã tải chứng chỉ lên nhưng chưa đọc được thông tin OCR. Vui lòng nhập thông tin thủ công."),
+        warning || !uploaded.ocrSuggestion ? "info" : "success",
+      );
     } catch (error) {
       setUploadError(getErrorMessage(error, "Không thể tải chứng chỉ lên."));
     } finally {
@@ -94,5 +94,5 @@ export function useProviderDescriptionUploads(
     }
   };
 
-  return { uploadingKey, uploadError, ocrMessages, uploadIdentity, uploadCertificate };
+  return { uploadingKey, uploadError, uploadIdentity, uploadCertificate };
 }

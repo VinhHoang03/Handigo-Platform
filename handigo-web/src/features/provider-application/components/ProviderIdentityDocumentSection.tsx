@@ -15,7 +15,6 @@ type ProviderIdentityDocumentSectionProps = {
   dateErrors: DateFieldErrors;
   today: string;
   uploadingKey: string;
-  ocrMessages: Record<string, string>;
   description: string;
   onUpdateIdentity: (
     value: Partial<ProviderApplicationPayload["identityDocument"]>,
@@ -33,7 +32,6 @@ export function ProviderIdentityDocumentSection({
   dateErrors,
   today,
   uploadingKey,
-  ocrMessages,
   description,
   onUpdateIdentity,
   onUploadIdentity,
@@ -89,17 +87,6 @@ export function ProviderIdentityDocumentSection({
           />
         )}
       </div>
-
-      {Object.entries(ocrMessages)
-        .filter(([key]) => key.startsWith("identity-"))
-        .map(([key, message]) => (
-          <p
-            key={key}
-            className="rounded-lg bg-primary/5 p-3 text-sm text-on-surface-variant"
-          >
-            {message}
-          </p>
-        ))}
 
       <IdentityDetailFields
         identity={identity}
