@@ -86,11 +86,9 @@ export function RegisterProviderStepPanel({
         </p>
       )}
 
-      {!success && !savingDraft && (
+      {!success && !savingDraft && isRejected && (
         <p className="mt-4 text-sm text-on-surface-variant">
-          {isRejected
-            ? "Bản chỉnh sửa được giữ trong phiên trình duyệt khi bạn tải lại trang. Hồ sơ chỉ được cập nhật khi bấm Gửi hồ sơ."
-            : "Hồ sơ được tự động lưu nháp. Nếu chưa lưu xong, bản đang nhập được giữ trong phiên trình duyệt."}
+          Bản chỉnh sửa được giữ trong phiên trình duyệt khi bạn tải lại trang. Hồ sơ chỉ được cập nhật khi bấm Gửi hồ sơ.
         </p>
       )}
       {step === 2 && !success && submissionErrors.length > 0 && (

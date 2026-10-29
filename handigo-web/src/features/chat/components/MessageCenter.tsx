@@ -12,7 +12,10 @@ import { MessageCircle, MessagesSquare, RefreshCw } from "lucide-react";
 export function MessageCenter() {
   const accountId = useAuthStore((state) => state.user?.id || state.user?._id);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  return isAuthenticated ? <AccountMessageCenter key={accountId} /> : null;
+  const user = useAuthStore((state) => state.user);
+  const isUnapprovedProvider = user?.role.toUpperCase() === "PROVIDER" &&
+    user.providerOnboardingStatus && user.providerOnboardingStatus !== "APPROVED";
+  return isAuthenticated && !isUnapprovedProvider ? <AccountMessageCenter key={accountId} /> : null;
 }
 
 function AccountMessageCenter() {

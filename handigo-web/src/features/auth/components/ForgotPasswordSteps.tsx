@@ -110,7 +110,6 @@ export function ForgotPasswordStep({
   onNewPasswordChange,
   onConfirmPasswordChange,
   onSubmit,
-  onBack,
 }: {
   newPassword: string;
   confirmPassword: string;
@@ -118,7 +117,6 @@ export function ForgotPasswordStep({
   onNewPasswordChange: (value: string) => void;
   onConfirmPasswordChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onBack: () => void;
 }) {
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
@@ -144,9 +142,6 @@ export function ForgotPasswordStep({
       />
       <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
         {isSubmitting ? "Đang cập nhật..." : "Đặt lại mật khẩu"}
-      </button>
-      <button type="button" className="btn-ghost w-full" onClick={onBack}>
-        Quay lại mã OTP
       </button>
     </form>
   );

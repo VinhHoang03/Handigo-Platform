@@ -25,6 +25,7 @@ import {
 import { markProviderOffline } from "./providerPresence.service";
 import { disconnectUserSockets } from "../sockets/socketServer";
 import { refreshAccountLock } from "./penaltyPolicy.service";
+import { getEffectiveUserRole } from "../utils/userRole";
 
 const SALT_ROUNDS = 10;
 
@@ -183,7 +184,7 @@ const toAuthUserResponse = (user: IUser): AuthUserResponse => ({
   phone: user.phone,
   avatar: user.avatar,
   gender: user.gender,
-  role: user.role,
+  role: getEffectiveUserRole(user),
   status: user.status,
   isEmailVerified: user.isEmailVerified,
   isGoogleAccount: Boolean(user.googleId),
@@ -312,7 +313,7 @@ export const verifyRegisterOtp = async (
     { _id: user._id, isDeleted: false, isEmailVerified: false,
       registerOtp: user.registerOtp, registerOtpExpire: { $gt: new Date() },
       passwordHash: user.passwordHash, registrationIntent: user.registrationIntent ?? null },
-    { $set: { isEmailVerified: true, role: isProviderRegistration ? "PROVIDER" : "CUSTOMER",
+    { $set: { isEmailVerified: true, role: "CUSTOMER",
       providerOnboardingStatus: isProviderRegistration ? "PROFILE_INCOMPLETE" : null,
       providerOnboardingStep: isProviderRegistration ? 1 : null },
       $unset: { registrationIntent: 1, registerOtp: 1, registerOtpExpire: 1 } },
@@ -322,7 +323,6 @@ export const verifyRegisterOtp = async (
 
   if (!isProviderRegistration) return null;
 
-  await markProviderOffline(user._id.toString());
   const tokens = await issueSessionTokens(verifiedUser);
   return { ...tokens, user: toAuthUserResponse(verifiedUser) };
 };
@@ -825,6 +825,7 @@ export const getCurrentUser = async (
 
   return {
     ...user.toObject(),
+    role: getEffectiveUserRole(user),
     isGoogleAccount: Boolean(user.googleId),
   };
 };

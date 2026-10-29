@@ -6,10 +6,16 @@ export const getRoleHomePath = (
 ) => {
   switch (role?.toUpperCase()) {
     case 'CUSTOMER':
+      if (providerOnboardingStatus === 'PENDING_REVIEW') {
+        return '/customer/profile?tab=applications';
+      }
+      if (providerOnboardingStatus === 'PROFILE_INCOMPLETE' || providerOnboardingStatus === 'REJECTED') {
+        return '/register-provider';
+      }
       return '/customer';
     case 'PROVIDER':
       if (providerOnboardingStatus === 'PENDING_REVIEW') {
-        return '/provider/profile';
+        return '/customer/profile?tab=applications';
       }
       return providerOnboardingStatus && providerOnboardingStatus !== 'APPROVED'
         ? '/register-provider'
