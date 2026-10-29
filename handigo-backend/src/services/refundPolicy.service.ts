@@ -103,14 +103,15 @@ export const calculateRefundPolicy = (
     && input.orderStatus === "accepted") {
     const acceptedAt = input.providerAcceptedAt?.getTime();
     const elapsed = acceptedAt === undefined ? NaN : now.getTime() - acceptedAt;
-    const canCancel = Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= CUSTOMER_CANCELLATION_WINDOW_MS;
+    const canCancel = !input.providerArrived && Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= CUSTOMER_CANCELLATION_WINDOW_MS;
     return {
       policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
       canCancel, refundRate: canCancel ? 100 : 0, paidAmount,
       refundAmount: canCancel ? paidAmount : 0,
       cancellationFee: 0, providerCompensation: 0, providerCompensationRate: 0, platformRetainedAmount: 0,
       hoursBeforeStart,
-      policyReason: canCancel
+      policyReason: input.providerArrived ? "Thợ đã xác nhận đến nơi, bạn không thể hủy đơn hàng."
+        : canCancel
         ? "Hủy trong vòng 5 phút kể từ khi thợ nhận đơn, hoàn toàn bộ khoản đã thanh toán về ví Handigo."
         : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn hoặc chưa xác minh được thời điểm nhận đơn.",
     };

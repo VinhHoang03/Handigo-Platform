@@ -338,6 +338,11 @@ export const completeOrder = async (
   }
 };
 
+export const confirmCashPayment = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await OrderService.confirmCashPayment(param(req, "orderId"), uid(req), req.body.expectedAmount)); }
+  catch (error) { return next(error); }
+};
+
 export const acceptAssignment = async (
   req: Request,
   res: Response,

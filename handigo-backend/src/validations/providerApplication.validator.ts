@@ -9,7 +9,15 @@ const objectIdSchema = z
 const dateStringSchema = z
   .string()
   .trim()
-  .refine((value) => !Number.isNaN(Date.parse(value)), {
+  .refine((value) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(value);
+    if (!match || Number.isNaN(Date.parse(value))) return false;
+    const [, year, month, day] = match;
+    const date = new Date(0);
+    date.setUTCFullYear(Number(year), Number(month) - 1, Number(day));
+    return Number(year) > 0 && date.getUTCFullYear() === Number(year)
+      && date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day);
+  }, {
     message: "Ngày không hợp lệ",
   });
 
@@ -157,7 +165,7 @@ const serviceAdditionApplicationSchema = z.object({
   description: z.string().trim().max(2000).optional().default(""),
   experienceYears: z.number().int().min(0).optional().default(0),
   serviceIds: z.array(objectIdSchema).min(1),
-  certificates: z.array(certificateSchema).min(1),
+  certificates: z.array(certificateSchema).default([]),
 });
 
 export const createProviderApplicationSchema = z.union([

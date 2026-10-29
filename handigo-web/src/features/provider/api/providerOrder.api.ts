@@ -115,6 +115,11 @@ export const providerOrderApi = {
     return response.data.data;
   },
 
+  confirmCashPayment: async (orderId: string, expectedAmount: number) => {
+    const response = await api.post<{ success: boolean; data: Order }>(`/orders/${orderId}/cash-payment/confirm`, { expectedAmount });
+    return response.data.data;
+  },
+
   cancelOrder: async (orderId: string, reason: string) => {
     const response = await api.patch<{ success: boolean; data: Order }>(
       `/orders/${orderId}/cancel`,

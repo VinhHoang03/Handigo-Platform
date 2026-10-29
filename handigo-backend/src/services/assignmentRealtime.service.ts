@@ -22,7 +22,7 @@ export const getAssignmentRealtimePayload = async (assignmentId: string) => {
           path: "serviceId",
           select: "name image coverImage serviceType depositAmount fixedPrice", transform: serviceImageResponse,
         },
-        { path: "addressId", select: "ward province" },
+        { path: "addressId", select: "fullAddress ward province" },
       ],
       transform: withAssignmentArea,
     })

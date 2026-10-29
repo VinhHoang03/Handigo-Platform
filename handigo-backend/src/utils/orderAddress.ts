@@ -8,13 +8,14 @@ export const withOrderAddress = <T extends { addressId?: unknown; addressSnapsho
   return { ...order, addressId: { _id: id, ...order.addressSnapshot } };
 };
 
-// Đề nghị chưa nhận chỉ được chứa khu vực, kể cả khi địa chỉ chỉ dùng một lần.
+// Đề nghị gửi riêng cho thợ gồm địa chỉ thực hiện, không kèm thông tin liên hệ.
 export const withAssignmentArea = <T extends { addressId?: unknown; addressSnapshot?: IOrder["addressSnapshot"] }>(order: T | null) => {
   if (!order) return order;
-  const { addressSnapshot, ...value } = order;
-  const address = order.addressId as { _id?: unknown; ward?: string; province?: string } | null;
+  const { addressSnapshot, addressId, ...value } = order;
+  const address = addressId as { _id?: unknown; fullAddress?: string; ward?: string; province?: string } | null;
   return { ...value, addressId: {
     _id: address?._id ?? null,
+    fullAddress: addressSnapshot?.fullAddress ?? address?.fullAddress,
     ward: addressSnapshot?.ward ?? address?.ward,
     province: addressSnapshot?.province ?? address?.province,
   } };

@@ -16,6 +16,7 @@ interface FixedPriceActionFormProps {
   busy?: boolean;
   quotation?: QuotationDetail | null;
   onConfirmPayment?: (quotationId: string, expectedRevision: number) => Promise<boolean>;
+  onConfirmCashPayment?: (amount: number) => Promise<boolean>;
 }
 
 const MAX_EVIDENCE_IMAGES = 5;
@@ -37,10 +38,12 @@ export function FixedPriceActionForm({
   busy,
   quotation,
   onConfirmPayment,
+  onConfirmCashPayment,
 }: FixedPriceActionFormProps) {
   const [note, setNote] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [paymentConfirmation, setPaymentConfirmation] = useState<{ quotationId: string; revision: number; amount: number } | null>(null);
+  const [cashConfirmation, setCashConfirmation] = useState<number | null>(null);
   const [, setValidationError] = useToastFeedback<string>('', "error");
   const previews = useMemo(
     () => files.map((file) => URL.createObjectURL(file)),
@@ -54,7 +57,7 @@ export function FixedPriceActionForm({
   const showStart = order.status === 'accepted' && !order.inspectionRequired
     && order.arrival?.providerId === order.providerId?._id && !!order.arrival;
   const showComplete = order.status === 'in_progress';
-  const showCancel = order.status === 'accepted';
+  const showCancel = order.status === 'accepted' && !order.currentQuotationId && !quotation;
   const repairQuotation = quotation?.quotation;
   const showPaymentConfirmation = order.inspectionRequired && onConfirmPayment && repairQuotation
     && order.status === 'completed'
@@ -187,6 +190,13 @@ export function FixedPriceActionForm({
       ) : null}
 
       <div className="space-y-sm pt-md">
+        {!order.inspectionRequired && order.status === 'completed' && order.paymentMethod === 'cash' && (
+          order.paymentStatus === 'paid' ? <p role="status" className="text-sm font-semibold text-success">Đã xác nhận nhận tiền mặt</p>
+            : order.paymentStatus === 'unpaid' && onConfirmCashPayment && <button type="button" disabled={busy}
+              className="btn-secondary w-full py-3 text-base font-bold" onClick={() => setCashConfirmation(order.pricing.totalPaidAmount)}>
+              Xác nhận đã thanh toán
+            </button>
+        )}
         {showComplete && !order.inspectionRequired && order.paymentStatus === 'paid' && ['wallet', 'bank'].includes(order.paymentMethod) && (
           <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
             <CircleCheckBig aria-hidden="true" size={20} />
@@ -236,6 +246,21 @@ export function FixedPriceActionForm({
         )}
         </div>
       </div>
+      <ConfirmDialog
+        open={cashConfirmation !== null}
+        title="Xác nhận đã nhận tiền mặt"
+        message={`Bạn xác nhận đã nhận đủ ${formatMoney(cashConfirmation ?? 0)} tiền mặt từ khách?`}
+        busy={busy}
+        onCancel={() => { if (!busy) setCashConfirmation(null); }}
+        onConfirm={() => {
+          if (cashConfirmation === null || !onConfirmCashPayment || busy) return;
+          if (cashConfirmation !== order.pricing.totalPaidAmount || order.paymentStatus !== 'unpaid') {
+            setValidationError('Trạng thái hoặc số tiền đã thay đổi. Vui lòng kiểm tra lại đơn.');
+            setCashConfirmation(null); return;
+          }
+          void onConfirmCashPayment(cashConfirmation).then((succeeded) => { if (succeeded) setCashConfirmation(null); });
+        }}
+      />
       <ConfirmDialog
         open={paymentConfirmation !== null}
         title="Xác nhận đã thanh toán báo giá"

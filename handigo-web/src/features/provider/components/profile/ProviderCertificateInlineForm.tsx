@@ -7,6 +7,8 @@ import {
 } from "./ProviderProfileFormFields";
 import { UploadedAssetPreview } from "./ProviderAssetUpload";
 import { Upload } from "lucide-react";
+import { FloatingInput } from '@/components/common/FloatingField';
+import { todayDate, validateDateFields } from '@/features/provider-application/utils/providerApplicationValidation';
 
 export function CertificateInlineForm({
   form,
@@ -29,6 +31,7 @@ export function CertificateInlineForm({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const dateErrors = validateDateFields(form.issuedAt, form.expiresAt);
 
   return (
     <form
@@ -63,19 +66,23 @@ export function CertificateInlineForm({
         value={form.issuer}
         onChange={(value) => onChange({ ...form, issuer: value })}
       />
-      <ProfileTextInput
+      <FloatingInput
         id="certificate-issued-at"
         label="Ngày cấp"
         type="date"
         value={form.issuedAt}
-        onChange={(value) => onChange({ ...form, issuedAt: value })}
+        max={todayDate()}
+        error={dateErrors.issuedAt}
+        onValueChange={(value) => onChange({ ...form, issuedAt: value })}
       />
-      <ProfileTextInput
+      <FloatingInput
         id="certificate-expires-at"
         label="Ngày hết hạn"
         type="date"
         value={form.expiresAt}
-        onChange={(value) => onChange({ ...form, expiresAt: value })}
+        min={form.issuedAt && form.issuedAt > todayDate() ? form.issuedAt : todayDate()}
+        error={dateErrors.expiresAt}
+        onValueChange={(value) => onChange({ ...form, expiresAt: value })}
       />
       <div className="space-y-3 md:col-span-2">
         <div className="flex flex-wrap items-center justify-between gap-3">

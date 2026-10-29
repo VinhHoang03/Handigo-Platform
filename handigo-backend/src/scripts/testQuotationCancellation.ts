@@ -159,8 +159,8 @@ async function run() {
     const order = new Order({ status: "accepted", orderType, inspectionRequired: true });
     mock.method(Order, "findById", () => query(order));
     const before = reassignmentRequests;
-    await OrderService.cancelOrder(order.id, new Types.ObjectId().toString(), "provider", QUOTATION_DECLINED_REASON);
-    assert.equal(reassignmentRequests, before + 1, "Thợ hủy trước báo giá phải đi qua điều phối thay thế, kể cả lý do khách không đồng ý giá.");
+    await assert.rejects(OrderService.cancelOrder(order.id, new Types.ObjectId().toString(), "provider", QUOTATION_DECLINED_REASON), /sau khi thợ xác nhận đến nơi/);
+    assert.equal(reassignmentRequests, before, "Không dùng lý do khách từ chối báo giá trước khi thợ đến nơi.");
     mock.restoreAll();
   }
   console.log("Đã kiểm tra hoàn đủ cọc, không cộng trùng, quyền hủy, điều kiện thanh toán và tổng báo giá lớn hơn cọc.");

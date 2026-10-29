@@ -45,11 +45,6 @@ export const OrderSummaryPriceDetails: React.FC<OrderSummaryPriceDetailsProps> =
     <div className="pt-md border-t border-outline-variant flex justify-between items-center">
       <div>
         <span className="font-bold">Tổng cộng</span>
-        {discountAmount > 0 && (
-          <p className="mt-1 text-sm font-semibold text-success">
-            Đã giảm {discountAmount.toLocaleString("vi-VN")}đ
-          </p>
-        )}
       </div>
       <div className="text-right">
         {discountAmount > 0 && (
