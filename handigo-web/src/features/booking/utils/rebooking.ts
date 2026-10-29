@@ -5,7 +5,7 @@ import { getCategoryId } from '@/features/customer-service/utils/serviceDisplay'
 export const canRebook = (status?: string) => status === 'completed' || status === 'cancelled';
 
 export type RebookingDraft = ReturnType<typeof prepareRebooking> & Pick<BookingState,
-  'scheduledAt' | 'problemDescription' | 'preferredProviderId' | 'preferredProviderName'>;
+  'scheduledAt' | 'problemDescription' | 'preferredProviderId' | 'preferredProviderName' | 'voucherCode'>;
 
 export interface PreparedRebooking {
   order: Order;

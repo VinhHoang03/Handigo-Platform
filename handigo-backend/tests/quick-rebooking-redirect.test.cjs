@@ -16,13 +16,13 @@ const currentId = '507f1f77bcf86cd799439011';
 const sourceId = '507f1f77bcf86cd799439012';
 const origin = 'https://handigo.example.test';
 
-test('Hủy và quay lại PayOS mở form trên danh sách dịch vụ, thành công vẫn dùng đơn mới', () => {
+test('Hủy và quay lại PayOS mở form trên lịch sử, thành công vẫn dùng đơn mới', () => {
   const urls = buildOrderPaymentRedirects(currentId, origin, {
-    clientCancelUrl: `${origin}/customer/services?quickRebook=${sourceId}&next=https://khac.example.test`,
+    clientCancelUrl: `${origin}/customer/bookings?quickRebook=${sourceId}&next=https://khac.example.test`,
   });
   const cancel = new URL(urls.cancelUrl);
   assert.equal(cancel.origin, origin);
-  assert.equal(cancel.pathname, '/customer/services');
+  assert.equal(cancel.pathname, '/customer/bookings');
   assert.equal(cancel.searchParams.get('quickRebook'), sourceId);
   assert.equal(cancel.searchParams.get('payos'), 'cancel');
   assert.equal(cancel.searchParams.has('next'), false);
@@ -30,11 +30,19 @@ test('Hủy và quay lại PayOS mở form trên danh sách dịch vụ, thành 
   assert.equal(new URL(urls.returnUrl).searchParams.get('payos'), 'success');
 });
 
-test('Đường dẫn đặt lại nhanh cũ cũng được chuyển về danh sách dịch vụ', () => {
+test('Đường dẫn đặt lại nhanh cũ tại chi tiết đơn giữ trang chi tiết đơn', () => {
   const cancel = new URL(buildOrderPaymentRedirects(currentId, origin, {
     clientCancelUrl: `${origin}/customer/bookings/${sourceId}?quickRebook=1`,
   }).cancelUrl);
-  assert.equal(cancel.pathname, '/customer/services');
+  assert.equal(cancel.pathname, `/customer/bookings/${sourceId}`);
+  assert.equal(cancel.searchParams.get('quickRebook'), sourceId);
+});
+
+test('Đặt lại nhanh từ chi tiết dịch vụ giữ đúng chi tiết dịch vụ', () => {
+  const cancel = new URL(buildOrderPaymentRedirects(currentId, origin, {
+    clientCancelUrl: `${origin}/customer/services/${sourceId}?quickRebook=${sourceId}`,
+  }).cancelUrl);
+  assert.equal(cancel.pathname, `/customer/services/${sourceId}`);
   assert.equal(cancel.searchParams.get('quickRebook'), sourceId);
 });
 

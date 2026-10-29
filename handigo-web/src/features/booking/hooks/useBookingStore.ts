@@ -112,6 +112,7 @@ export const useBookingStore = create<BookingState>()(persist((set) => ({
   setPaymentMethod: (method) => set({ paymentMethod: method }),
   reset: () =>
     set({
+      voucherCode: undefined,
       rebookSource: undefined,
       uniformQuantity: 1,
       categoryId: undefined,

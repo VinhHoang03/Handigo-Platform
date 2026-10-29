@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Modal } from '@/components/common/Modal';
+import { useToast } from '@/components/common/Toast';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import { formatCurrency } from '@/utils/currency';
 import { getErrorMessage } from '@/utils/apiError';
@@ -13,8 +15,12 @@ import { getBookingFingerprint } from '../utils/bookingFingerprint';
 import { assertNoPendingRebooking, submitQuickRebooking } from '../utils/submitQuickRebooking';
 import { groupServiceOptions, toggleServiceOption } from '../utils/serviceOptionSelection';
 import type { PreparedRebooking, RebookingDraft } from '../utils/rebooking';
-import { getDefaultScheduledAt, isWithinImmediateBookingHours } from './step2Helpers';
+import { getDefaultScheduledAt, getEarliestScheduledAt, getInitialScheduledAt, isWithinImmediateBookingHours, isWithinScheduledBookingHours } from './step2Helpers';
+import { QuickRebookingSchedulePicker } from './QuickRebookingSchedulePicker';
+import { QuickRebookingProviderPicker } from './QuickRebookingProviderPicker';
 import { BookingPolicyConsent } from './BookingPolicyConsent';
+import { ConfirmPaymentVoucherPanel } from './ConfirmPaymentVoucherPanel';
+import { useConfirmPaymentVoucher } from './useConfirmPaymentVoucher';
 import { ServiceOptionsPanel } from './ServiceOptionsPanel';
 import { ServiceQuantityPanel } from './ServiceQuantityPanel';
 import { BOOKING_CREATE_ATTEMPT_KEY, PENDING_ORDER_ID_KEY } from '../utils/bookingSessionStorage';
@@ -28,8 +34,12 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
   onBusyChange: (busy: boolean) => void;
 }) {
   const navigate = useNavigate();
+  const { addToast } = useToast();
+  const pendingVoucherToast = useRef<string | null>(null);
+  const [manualVoucherCode, setManualVoucherCode] = useState('');
   const [draft, setDraft] = useState<RebookingDraft>(() => ({ ...prepared.draft,
     orderType: prepared.restoredAfterPayment ? prepared.draft.orderType : isWithinImmediateBookingHours() ? 'normal' : 'scheduled',
+    scheduledAt: prepared.draft.scheduledAt ?? (!prepared.restoredAfterPayment && !isWithinImmediateBookingHours() ? getDefaultScheduledAt().slice(0, 16) : undefined),
     paymentMethod: prepared.service.serviceType === 'variable_price' && prepared.draft.paymentMethod === 'cash' ? 'bank' : prepared.draft.paymentMethod,
   }));
   const [busy, setBusy] = useState(false);
@@ -37,28 +47,43 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
   const [recoveryRequired, setRecoveryRequired] = useState(false);
   const [addresses, setAddresses] = useState(prepared.addresses);
   const [addressEditorOpen, setAddressEditorOpen] = useState(false);
+  const [scheduleDraft, setScheduleDraft] = useState<string | null>(null);
   const [savingAddress, setSavingAddress] = useState(false);
   const addressSaveLock = useRef(false);
   const submitLock = useRef(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const currentPrepared = { ...prepared, addresses };
-  const quote = useQuickRebookingQuote(currentPrepared, draft);
+  const isVariable = prepared.service.serviceType === 'variable_price';
+  // Giá và điều kiện số tiền tối thiểu được kiểm tra bằng bản xem trước từ server.
+  const voucher = useConfirmPaymentVoucher(undefined, isVariable, !recoveryRequired, prepared.draft.voucherCode ?? '');
+  const currentDraft = { ...draft, voucherCode: voucher.appliedVoucher?.code };
+  const quote = useQuickRebookingQuote(currentPrepared, currentDraft);
+  useEffect(() => {
+    if (pendingVoucherToast.current && pendingVoucherToast.current === currentDraft.voucherCode
+      && quote.preview && !quote.loading && !quote.error) {
+      pendingVoucherToast.current = null;
+      addToast('Áp dụng mã giảm giá thành công.', 'success');
+    }
+  }, [currentDraft.voucherCode, quote.preview, quote.loading, quote.error, addToast]);
   const fingerprint = getBookingFingerprint({ ...draft, recurrenceUnit: 'weekly', recurrenceCount: 1 });
   const consentKey = JSON.stringify([fingerprint, draft.paymentMethod, draft.problemDescription,
-    quote.preview?.bookingAmount, quote.preview?.discountedAmount, quote.key]);
+    quote.preview?.bookingAmount, quote.preview?.discountedAmount, quote.key, voucher.voucherCode, currentDraft.voucherCode]);
   const policies = useBookingPolicies(consentKey);
-  const isVariable = prepared.service.serviceType === 'variable_price';
   const isCleaning = isAirConditionerCleaning(prepared.service) && prepared.options.length === 0;
   const oldProvider = prepared.order.status === 'completed' ? prepared.order.providerId : null;
-  const oldProviderAvailable = oldProvider && quote.providers.some(provider => provider.id === oldProvider._id);
   const selectedProviderAvailable = !draft.preferredProviderId || quote.providers.some(provider => provider.id === draft.preferredProviderId);
   const address = addresses.find(item => item._id === draft.addressId);
   const inputClass = 'mt-1 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm';
   const update = (changes: Partial<RebookingDraft>) => { setDraft(current => ({ ...current, ...changes })); setError(''); };
   const showError = (message: string) => { if (alive.current) setError(message); };
   const canSubmit = quote.valid && Boolean(quote.preview) && !quote.loading && !quote.error && quote.providers.length > 0
-    && selectedProviderAvailable && policies.accepted && !recoveryRequired && !addressEditorOpen;
+    && !voucher.loading && (!voucher.voucherCode.trim() || Boolean(voucher.appliedVoucher))
+    && selectedProviderAvailable && policies.accepted && !recoveryRequired && !addressEditorOpen && scheduleDraft === null;
+  const scheduleDraftValid = Boolean(scheduleDraft
+    && new Date(scheduleDraft).getTime() >= getEarliestScheduledAt().getTime()
+    && isWithinScheduledBookingHours(scheduleDraft.split('T')[1]?.slice(0, 5) ?? ''));
+  const closeSchedulePicker = () => { setScheduleDraft(null); onBusyChange(false); };
 
   const closeAddressEditor = () => {
     if (addressSaveLock.current) return;
@@ -88,7 +113,7 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
       assertNoPendingRebooking();
       if (prepared.session !== useAuthStore.getState().sessionRevision) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng mở lại yêu cầu.');
       resetBookingSession(); invalidateBookingPreview();
-      useBookingStore.setState({ ...draft, requestedProviderId: draft.preferredProviderId,
+      useBookingStore.setState({ ...currentDraft, requestedProviderId: draft.preferredProviderId,
         requestedProviderName: draft.preferredProviderName });
       navigate('/customer/bookings/new');
     } catch (cause) { showError(getErrorMessage(cause)); }
@@ -98,7 +123,8 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
     submitLock.current = true; setBusy(true); onBusyChange(true); setError('');
     try {
       let failed = false;
-      await submitQuickRebooking({ prepared: currentPrepared, draft, preview: quote.preview, providers: quote.providers,
+      await submitQuickRebooking({ prepared: currentPrepared, draft: currentDraft, appliedVoucher: voucher.appliedVoucher,
+        preview: quote.preview, providers: quote.providers,
         policyAccepted: policies.accepted, navigate, setError: message => { if (message) failed = true; showError(message); } });
       if (alive.current && (sessionStorage.getItem(PENDING_ORDER_ID_KEY) || sessionStorage.getItem(BOOKING_CREATE_ATTEMPT_KEY))) {
         setRecoveryRequired(true);
@@ -137,22 +163,20 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
       <div className="space-y-2"><p className="font-semibold">Thời gian</p><div className="flex gap-2">
         <button type="button" aria-pressed={draft.orderType === 'normal'} onClick={() => update({ orderType: 'normal', scheduledAt: undefined })} disabled={!isWithinImmediateBookingHours()}
           className={`min-h-11 rounded-xl border px-4 ${draft.orderType === 'normal' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant'}`}>Sớm nhất</button>
-        <button type="button" aria-pressed={draft.orderType === 'scheduled'} onClick={() => update({ orderType: 'scheduled' })}
+        <button type="button" aria-pressed={draft.orderType === 'scheduled'} onClick={() => {
+          setScheduleDraft(getInitialScheduledAt(draft.scheduledAt).slice(0, 16)); onBusyChange(true);
+        }}
           className={`min-h-11 rounded-xl border px-4 ${draft.orderType === 'scheduled' ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant'}`}>Chọn giờ</button>
       </div>
-        {draft.orderType === 'scheduled' && <label className="block text-xs">Ngày và giờ hẹn<input aria-label="Ngày và giờ hẹn" type="datetime-local" min={getDefaultScheduledAt().slice(0, 16)} className={inputClass}
-          value={draft.scheduledAt?.slice(0, 16) ?? ''} onChange={event => update({ scheduledAt: event.target.value || undefined })} /></label>}
-        {!quote.scheduleValid && <p className="text-xs text-error">Vui lòng chọn thời gian thực hiện hợp lệ.</p>}
+        {draft.orderType === 'scheduled' && draft.scheduledAt && Number.isFinite(new Date(draft.scheduledAt).getTime()) &&
+          <p className="text-sm font-semibold">{new Date(draft.scheduledAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>}
+        {!quote.scheduleValid && <p role="alert" className="text-xs text-error">Vui lòng chọn thời gian hợp lệ, chưa qua và trong khung giờ từ 08:00 đến 21:00.</p>}
       </div>
-      <label className="block font-semibold">Thợ thực hiện
-        <select aria-label="Thợ thực hiện" className={inputClass} value={draft.preferredProviderId ?? ''}
-          onChange={event => update({ preferredProviderId: event.target.value || undefined, preferredProviderName: quote.providers.find(provider => provider.id === event.target.value)?.user.fullName })}>
-          <option value="">Tìm thợ phù hợp</option>
-          {oldProvider && <option value={oldProvider._id} disabled={!oldProviderAvailable}>Thợ cũ: {oldProvider.userId?.fullName || oldProvider.name || 'Thợ đã phục vụ'}{oldProviderAvailable ? '' : ' — Chưa khả dụng'}</option>}
-          {quote.providers.filter(provider => provider.id !== oldProvider?._id).map(provider => <option key={provider.id} value={provider.id}>{provider.user.fullName}</option>)}
-        </select>
-      </label>
-      {!selectedProviderAvailable && !quote.loading && <p role="alert" className="text-xs text-error">Thợ đã chọn chưa khả dụng. Vui lòng chọn thợ khác hoặc Tìm thợ phù hợp.</p>}
+      <QuickRebookingProviderPicker providers={quote.providers} selectedId={draft.preferredProviderId}
+        oldProvider={oldProvider ? { id: oldProvider._id, name: oldProvider.userId?.fullName || oldProvider.name || 'Thợ đã phục vụ' } : undefined}
+        disabled={busy || recoveryRequired} loading={quote.loading} onBusyChange={onBusyChange}
+        onChange={(preferredProviderId, preferredProviderName) => update({ preferredProviderId, preferredProviderName })} />
+      {!selectedProviderAvailable && !quote.loading && <p role="alert" className="text-xs text-error">Thợ đã chọn chưa khả dụng. Vui lòng chọn thợ khác hoặc Handigo điều phối.</p>}
       <label className="block font-semibold">Thanh toán
         <select aria-label="Phương thức thanh toán" className={inputClass} value={draft.paymentMethod} onChange={event => update({ paymentMethod: event.target.value as RebookingDraft['paymentMethod'] })}>
           <option value="wallet">Ví Handigo</option><option value="bank">Ngân hàng / PayOS</option>{!isVariable && <option value="cash">Tiền mặt</option>}
@@ -164,6 +188,16 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
           onChange={event => update({ problemDescription: event.target.value })} placeholder="Mô tả ngắn tình trạng mới để thợ chuẩn bị." />
       </label>}
     </fieldset>
+    <ConfirmPaymentVoucherPanel manualInputValue={manualVoucherCode} showAppliedVoucherNotice={false} voucherCode={voucher.voucherCode} availableVouchers={voucher.availableVouchers}
+      appliedVoucher={voucher.appliedVoucher} voucherError={voucher.voucherError}
+      isSubmitting={busy || recoveryRequired || voucher.loading}
+      onSelectVoucher={code => { pendingVoucherToast.current = code || null; setManualVoucherCode(''); voucher.setVoucherCode(code); voucher.applyVoucherCode(code); setError(''); }}
+      onManualInputChange={code => { pendingVoucherToast.current = null; setManualVoucherCode(code); voucher.setVoucherCode(code); voucher.setAppliedVoucher(null); voucher.setVoucherError(''); setError(''); }}
+      onApplyClick={() => { pendingVoucherToast.current = manualVoucherCode.trim().toUpperCase() || null; voucher.applyVoucherCode(manualVoucherCode); setError(''); }}
+      onRemoveVoucher={() => { pendingVoucherToast.current = null; setManualVoucherCode(''); voucher.setVoucherCode(''); voucher.setAppliedVoucher(null); voucher.setVoucherError(''); setError(''); }} />
+    {voucher.loading ? <p role="status" className="text-xs text-on-surface-variant">Đang tải mã giảm giá...</p>
+      : voucher.loadError ? <p role="alert" className="text-xs text-error">{voucher.loadError} <button type="button" disabled={busy || recoveryRequired} onClick={voucher.retry} className="font-semibold underline">Thử lại</button></p>
+        : !voucher.availableVouchers.length && <p className="text-xs text-on-surface-variant">Chưa có mã giảm giá khả dụng cho dịch vụ này.</p>}
     <div aria-live="polite" className="rounded-xl bg-primary/5 p-4">
       {quote.loading ? <p role="status">Đang cập nhật giá và thợ phù hợp...</p> : quote.error ? <p role="alert" className="text-error">{quote.error} <button type="button" disabled={busy || recoveryRequired} onClick={quote.retry} className="font-bold underline">Thử lại</button></p>
         : quote.preview ? <><div className="flex items-center justify-between gap-3"><span className="inline-flex items-center gap-2">{isVariable ? 'Cọc / phí kiểm tra' : 'Tổng tiền hiện tại'}
@@ -188,6 +222,19 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
         </button>
         <button type="button" disabled={busy} onClick={editFull} className="min-h-10 w-full font-semibold text-primary disabled:opacity-50">Chỉnh sửa đầy đủ</button>
       </div>}
+    <Modal open={scheduleDraft !== null} title="Chọn ngày và giờ hẹn" onClose={closeSchedulePicker} size="sm">
+      {scheduleDraft !== null && <form className="space-y-4" onSubmit={event => {
+        event.preventDefault();
+        if (!scheduleDraftValid || busy || recoveryRequired) return;
+        update({ orderType: 'scheduled', scheduledAt: scheduleDraft }); closeSchedulePicker();
+      }}>
+        <QuickRebookingSchedulePicker value={scheduleDraft} disabled={busy || recoveryRequired} onChange={setScheduleDraft} />
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={closeSchedulePicker} className="min-h-11 rounded-xl border border-outline-variant px-4 font-semibold">Hủy</button>
+          <button type="submit" disabled={!scheduleDraftValid || busy || recoveryRequired} className="min-h-11 rounded-xl bg-primary px-4 font-bold text-on-primary disabled:opacity-50">Xác nhận</button>
+        </div>
+      </form>}
+    </Modal>
     {addressEditorOpen && <AddressBookModal open addressCount={addresses.length} isSaving={savingAddress}
       defaultRecipient={{ name: useAuthStore.getState().user?.fullName || '', phone: useAuthStore.getState().user?.phone || '' }}
       onClose={closeAddressEditor} onSubmit={saveAddress} />}
