@@ -39,7 +39,6 @@ export function ServiceDetailPanel({
       <div className="flex min-h-80 flex-col items-center justify-center p-8 text-center">
         <Package aria-hidden="true" size={48} className="text-outline" />
         <h2 className="mt-3 text-title-lg font-bold text-on-surface">Chưa có dịch vụ được chọn</h2>
-        <p className="mt-1 max-w-sm text-sm text-on-surface-variant">Chọn một dịch vụ trong danh sách hoặc thêm dịch vụ mới để quản lý thông tin và tùy chọn.</p>
       </div>
     );
   }

@@ -33,6 +33,7 @@ import {
   reportIdSchema,
   reportListQuerySchema,
   reviewReportSchema,
+  requestReportEvidenceSchema,
 } from "../validations/report.validator";
 import {
   addSupportTicketResponseSchema,
@@ -218,5 +219,7 @@ router.patch(
   validate(reviewProviderApplicationSchema),
   adminController.reviewProviderApplication,
 );
+
+router.patch("/reports/:id/request-evidence", validate(reportIdSchema, "params"), validate(requestReportEvidenceSchema), reportController.requestReportEvidence);
 
 export default router;

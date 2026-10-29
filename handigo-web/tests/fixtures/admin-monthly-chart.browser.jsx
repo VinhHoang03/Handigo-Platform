@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { MonthlyOperationsChart } from '../../src/features/admin/components/dashboard/DashboardMonthlyTrend';
 import { CategoryChartView } from '../../src/components/common/chart/ChartViews';
 
-const points = Array.from({ length: 6 }, (_, index) => ({ month: `2026-${String(index + 5).padStart(2, '0')}`, orders: index * 3, platformRevenue: index * 150000 }));
+const points = Array.from({ length: 6 }, (_, index) => ({ month: `2026-${String(index + 5).padStart(2, '0')}`, orders: index * 3, completedRevenue: index * 1000000, platformRevenue: index * 150000 }));
 function App() {
   const [type, setType] = useState('composed');
   return <div style={{ width: 900 }}>
@@ -22,6 +22,7 @@ async function until(check) {
 }
 (async () => {
   await until(() => document.querySelector('.recharts-line-curve'));
+  if (!document.querySelector('.recharts-area-area') || document.querySelectorAll('.recharts-line-curve').length !== 2) throw Error('Thiếu vùng doanh thu hoặc đường thu nhập/đơn hoàn thành.');
   const text = document.body.textContent;
   if (!text.includes('Tháng 5/2026') || !text.includes('Tháng 10/2026')) throw Error('Thiếu tháng lịch sử trên trục thời gian.');
   if (document.querySelectorAll('.recharts-yAxis').length < 2) throw Error('Thiếu trục tiền hoặc số đơn.');

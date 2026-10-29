@@ -57,6 +57,9 @@ export const caseManagementApi = {
   reports: async (query: CaseListQuery) =>
     unwrap<CaseList<Report>>(await api.get("/reports/me", { params: query })),
   report: async (id: string) => unwrap<Report>(await api.get(`/reports/${id}`)),
+  cancelReport: async (id: string) => unwrap<Report>(await api.patch(`/reports/${id}/cancel`)),
+  addReportEvidence: async (id: string, files: EvidenceFile[], note?: string) =>
+    unwrap<Report>(await api.post(`/reports/${id}/evidence`, { files, note: note || undefined })),
   createReport: async (payload: CreateReportPayload) =>
     unwrap<Report>(await api.post("/reports", payload)),
 };

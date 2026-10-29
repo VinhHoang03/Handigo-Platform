@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/features/auth/store/auth.store";
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { Eye } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -14,6 +15,11 @@ import { useAdminSupportController } from "../components/support/useAdminSupport
 import { ViolationFormModal } from "../components/cases/ViolationFormModal";
 
 export default function AdminSupportPage() {
+  const revision = useAuthStore(state => state.sessionRevision);
+  return <AdminSupportWorkspace key={revision} />;
+}
+
+function AdminSupportWorkspace() {
   const support = useAdminSupportController();
 
   return (
@@ -25,6 +31,8 @@ export default function AdminSupportPage() {
         <AdminRefreshButton onRefresh={() => void support.load()} loading={support.loading} />
       </header>
 
+      {(support.refreshError || support.detailError) && <p role="status" className="rounded-xl bg-warning-container p-3 text-sm text-on-warning-container">{support.refreshError || support.detailError} Dữ liệu đang hiển thị có thể chưa cập nhật.</p>}
+      <p className="text-sm text-on-surface-variant">Thống kê toàn bộ yêu cầu hỗ trợ, không phụ thuộc bộ lọc bên dưới.</p>
       <SupportSummaryCards summary={support.summary} />
 
       <SupportFilters
@@ -80,11 +88,14 @@ export default function AdminSupportPage() {
           <div className="p-10 text-center text-on-surface-variant">Đang tải chi tiết...</div>
         ) : support.selected ? (
           <TicketDetail
-            key={support.selected._id + support.selected.updatedAt}
+            key={support.selected._id}
             ticket={support.selected}
             admins={support.admins}
+            adminsLoading={support.adminsLoading}
+            adminsError={support.adminsError}
+            onReloadAdmins={() => void support.loadAdmins()}
             busy={support.busy}
-            actionError={support.actionError}
+            actionError={support.actionError || support.detailError}
             onAssign={support.onAssign}
             onStatusChange={support.onStatusChange}
             onRespond={support.onRespond}

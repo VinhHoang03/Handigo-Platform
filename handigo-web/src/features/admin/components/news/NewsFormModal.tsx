@@ -66,7 +66,6 @@ export function NewsFormModal({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-on-surface">Ảnh bìa</h3>
-              <p className="text-sm text-on-surface-variant">Ảnh ngang, rõ nét và phù hợp với nội dung bài.</p>
             </div>
             <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-primary px-4 text-sm font-bold text-primary">
               <Upload aria-hidden="true" size={19} className="block leading-none" />

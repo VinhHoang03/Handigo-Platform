@@ -31,7 +31,6 @@ export function NewsContentBlocksEditor({ content, onChange }: NewsContentBlocks
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-bold text-on-surface">Nội dung bài viết</h3>
-          <p className="text-sm text-on-surface-variant">Chọn định dạng riêng cho từng khối nội dung.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {blockTypes.map((type) => (

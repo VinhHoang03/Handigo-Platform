@@ -37,7 +37,6 @@ export const CASE_STATUS_LABELS: Record<string, string> = {
 };
 
 export const CASE_STATUS_OPTIONS: Record<AdminCaseTab, string[]> = {
-  complaints: ["pending", "evidence_requested", "under_review", "resolved", "rejected", "cancelled"],
-  reports: ["pending", "under_review", "confirmed", "rejected", "resolved"],
+  reports: ["pending", "evidence_requested", "cancelled", "under_review", "confirmed", "rejected", "resolved"],
   violations: ["active", "resolved"],
 };

@@ -22,10 +22,10 @@ const counts = { applications: 2, support: 3, complaints: 4, suggestions: 5, wit
 const paths = ['/admin', '/admin/provider-applications', '/admin/service-suggestions', '/admin/withdrawals', '/admin/support', '/admin/cases', '/admin/payments', '/admin/news'];
 const items = paths.map(item => ({ path: item, label: item, icon: () => null }));
 
-test('Badge gắn đúng mục và cộng báo cáo với khiếu nại, không gắn số vào mục không có hàng đợi', () => {
+test('Badge dùng tổng báo cáo chung, không đếm hai lần báo cáo chất lượng hoặc gắn số vào mục không có hàng đợi', () => {
   const result = withAdminPendingCounts(items, counts);
-  assert.deepEqual(Array.from(result, item => item.pendingCount), [7, 2, 5, 6, 3, 12, 9, undefined]);
-  assert.match(result[5].pendingLabel, /4 khiếu nại.*8 báo cáo/);
+  assert.deepEqual(Array.from(result, item => item.pendingCount), [7, 2, 5, 6, 3, 8, 9, undefined]);
+  assert.match(result[5].pendingLabel, /8 báo cáo chờ xem xét/);
   assert.equal(result[7], items[7]);
   assert.equal(withAdminPendingCounts(items, null), items);
   assert.equal(withAdminPendingCounts(items, counts, true)[0].pendingStale, true);

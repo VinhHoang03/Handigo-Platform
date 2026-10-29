@@ -1,5 +1,5 @@
 import { catalogStatus, catalogStatusFilter } from "../utils/catalogStatus";
-import { QueryFilter, Types } from "mongoose";
+import { QueryFilter, Types, type ClientSession } from "mongoose";
 import { randomInt } from "node:crypto";
 import { Category, ICategory } from "../models/category.model";
 import { Service } from "../models/service.model";
@@ -45,26 +45,29 @@ const ensureValidId = (id: string) => {
   }
 };
 
-const ensureUniqueSlug = async (slug: string, excludeId?: string) => {
+const ensureUniqueSlug = async (slug: string, excludeId?: string, session?: ClientSession) => {
   const filter: QueryFilter<ICategory> = { slug };
   if (excludeId) filter._id = { $ne: excludeId };
 
-  if (await Category.exists(filter)) {
+  const query = Category.exists(filter);
+  if (await (session ? query.session(session) : query)) {
     throw new AppError("Đường dẫn danh mục đã tồn tại", 409);
   }
 };
 
-const resolveUniqueIconColor = async (value?: string | null, excludeId?: string) => {
+const resolveUniqueIconColor = async (value?: string | null, excludeId?: string, session?: ClientSession) => {
   const filter: QueryFilter<ICategory> = { isDeleted: false };
   if (excludeId) filter._id = { $ne: excludeId };
   if (value) {
     const iconColor = value.trim().toLowerCase();
-    if (await Category.exists({ ...filter, iconColor }).collation({ locale: "en", strength: 2 })) {
+    const query = Category.exists({ ...filter, iconColor }).collation({ locale: "en", strength: 2 });
+    if (await (session ? query.session(session) : query)) {
       throw new AppError("Mã màu này đã được dùng cho danh mục khác. Vui lòng chọn màu khác.", 409);
     }
     return iconColor;
   }
-  const categories = await Category.find(filter).select("iconColor").lean();
+  const query = Category.find(filter).select("iconColor");
+  const categories = await (session ? query.session(session) : query).lean();
   const usedColors = new Set(categories.map((category) => category.iconColor?.toLowerCase()));
   let iconColor = "#3525cd";
   while (usedColors.has(iconColor)) {
@@ -121,13 +124,17 @@ export const getCategoryById = async (id: string, admin = false) => {
   return { ...catalogStatus(category.toObject()), services: services.map(item => catalogStatus(item.toObject())) };
 };
 
-export const createCategory = async (data: CategoryInput) => {
+export const createCategory = async (data: CategoryInput, session?: ClientSession) => {
   await Category.init();
   const slug = data.slug || slugify(data.name || "");
   if (!slug) throw new AppError("Không thể tạo đường dẫn hợp lệ", 400);
-  await ensureUniqueSlug(slug);
-  const iconColor = await resolveUniqueIconColor(data.iconColor);
+  await ensureUniqueSlug(slug, undefined, session);
+  const iconColor = await resolveUniqueIconColor(data.iconColor, undefined, session);
   try {
+    if (session) {
+      const [category] = await Category.create([{ ...data, slug, iconColor }], { session });
+      return category;
+    }
     return await Category.create({ ...data, slug, iconColor });
   } catch (error) {
     return rethrowCategoryWriteError(error);

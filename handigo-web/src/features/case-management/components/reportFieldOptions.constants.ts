@@ -1,6 +1,7 @@
 import type { ReportType } from "../types/caseManagement.types";
 
 export const REPORT_TYPES: Array<{ value: ReportType; label: string }> = [
+  { value: "service_quality", label: "Chất lượng dịch vụ" },
   { value: "harassment", label: "Quấy rối" },
   { value: "insulting_language", label: "Ngôn từ xúc phạm" },
   { value: "fraud", label: "Gian lận" },

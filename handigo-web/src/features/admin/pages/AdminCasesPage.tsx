@@ -1,6 +1,7 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Eye } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
@@ -8,9 +9,8 @@ import { Pagination } from "@/components/common/Pagination";
 import { DataTable } from "@/components/common/dashboard/DataTable";
 import { TableSkeleton } from "@/components/common/dashboard/TableSkeleton";
 import { TableToolbar } from "@/components/common/dashboard/TableToolbar";
-import type { CaseListQuery } from "@/features/case-management/types/caseManagement.types";
 import { getErrorMessage } from "@/utils/apiError";
-import { adminCasesApi, type ViolationQuery } from "../api/adminCases.api";
+import { adminCasesApi, type AdminReportQuery, type ViolationQuery } from "../api/adminCases.api";
 import { CaseDetailModal } from "../components/cases/CaseDetailModal";
 import { CaseTabs } from "../components/cases/CaseTabs";
 import { caseTableColumns } from "../components/cases/case-table-columns";
@@ -20,8 +20,9 @@ import { useCaseDetailController } from "../components/cases/useCaseDetailContro
 import { ViolationFormModal } from "../components/cases/ViolationFormModal";
 
 export default function AdminCasesPage() {
-  const [tab, setTab] = useState<AdminCaseTab>("complaints");
-  const [query, setQuery] = useState<CaseListQuery>({ page: 1, limit: 10 });
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<AdminCaseTab>(() => params.get('tab') === 'violations' ? 'violations' : 'reports');
+  const [query, setQuery] = useState<AdminReportQuery>({ page: 1, limit: 10, reportType: params.get("reportType") === "service_quality" ? "service_quality" : undefined });
   const [items, setItems] = useState<CaseRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -31,9 +32,7 @@ export default function AdminCasesPage() {
     try {
       setLoading(true);
       setError("");
-      const result = tab === "complaints"
-        ? await adminCasesApi.complaints(query)
-        : tab === "reports"
+      const result = tab === "reports"
           ? await adminCasesApi.reports(query)
           : await adminCasesApi.violations(query as ViolationQuery);
       setItems(result.items);
@@ -51,6 +50,15 @@ export default function AdminCasesPage() {
   }, [load]);
 
   const detail = useCaseDetailController(tab, load, setError);
+  const openInitialDetail = useRef(detail.openDetail);
+  const [initialReportId] = useState(() => params.get('tab') === 'reports' ? params.get('reportId') : null);
+  useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active && initialReportId && /^[a-f\d]{24}$/i.test(initialReportId)) return openInitialDetail.current(initialReportId);
+    });
+    return () => { active = false; };
+  }, [initialReportId]);
 
   const switchTab = (nextTab: AdminCaseTab) => {
     setTab(nextTab);
@@ -63,7 +71,7 @@ export default function AdminCasesPage() {
     <DashboardShell role="ADMIN">
       <header className="admin-page-header">
         <div>
-          <AdminPageTitle title="Khiếu nại, báo cáo và vi phạm" />
+          <AdminPageTitle title="Báo cáo và vi phạm" />
         </div>
         <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
       </header>
@@ -78,12 +86,15 @@ export default function AdminCasesPage() {
           disabled: tab === "violations",
         }}
         filters={
+          <>
+          {tab === "reports" && <select aria-label="Loại báo cáo" value={query.reportType || ""} onChange={(event) => setQuery(current => ({ ...current, page: 1, reportType: event.target.value || undefined }))} className="min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3"><option value="">Tất cả loại báo cáo</option><option value="service_quality">Chất lượng dịch vụ</option></select>}
           <select value={query.status || ""} onChange={(event) => setQuery((current) => ({ ...current, page: 1, status: event.target.value || undefined }))} className="min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3">
             <option value="">Tất cả trạng thái</option>
             {CASE_STATUS_OPTIONS[tab].map((status) => (
               <option key={status} value={status}>{CASE_STATUS_LABELS[status] || status}</option>
             ))}
           </select>
+          </>
         }
       />
 
@@ -127,7 +138,6 @@ export default function AdminCasesPage() {
         onReviewNoteChange={detail.setReviewNote}
         resolutionNote={detail.resolutionNote}
         onResolutionNoteChange={detail.setResolutionNote}
-        onUpdateComplaint={detail.onUpdateComplaint}
         onReviewReport={detail.onReviewReport}
         onReverifyReport={detail.onReverifyReport}
         onOpenViolationForm={detail.openViolationForm}

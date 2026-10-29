@@ -5,7 +5,7 @@ type BookingComplaintPanelProps = {
   orderId: string;
 };
 
-/** Liên kết báo cáo vấn đề đơn hàng, dẫn tới form khiếu nại của trung tâm hỗ trợ. */
+/** Liên kết báo cáo vấn đề đơn hàng, dẫn tới form báo cáo chất lượng dịch vụ của trung tâm hỗ trợ. */
 export const BookingComplaintPanel = ({ orderId }: BookingComplaintPanelProps) => (
   <Link
     to={`/customer/support?tab=report&create=report&orderId=${encodeURIComponent(orderId)}`}

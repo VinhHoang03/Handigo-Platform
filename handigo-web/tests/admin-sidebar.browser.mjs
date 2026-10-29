@@ -13,14 +13,23 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const datePicker = process.argv.includes('--date-picker');
 const monthlyChart = process.argv.includes('--monthly-chart');
 const revenue = process.argv.includes('--revenue');
+const overviewRevenue = process.argv.includes('--overview-revenue');
+const applications = process.argv.includes('--applications');
+const recentOrders = process.argv.includes('--recent-orders');
+const suggestions = process.argv.includes('--suggestions');
 const folder = await mkdtemp(path.join(tmpdir(), 'handigo-sidebar-'));
 let server;
 try {
-  const bundle = await rolldown({ input: path.join(root, revenue ? 'tests/fixtures/admin-revenue.browser.jsx' : monthlyChart ? 'tests/fixtures/admin-monthly-chart.browser.jsx' : datePicker ? 'tests/fixtures/admin-date-picker.browser.jsx' : 'tests/fixtures/admin-sidebar.browser.jsx'), cwd: root,
+  const bundle = await rolldown({ input: path.join(root, suggestions ? 'tests/fixtures/admin-suggestions.browser.jsx' : recentOrders ? 'tests/fixtures/admin-recent-orders.browser.jsx' : applications ? 'tests/fixtures/admin-applications.browser.jsx' : overviewRevenue ? 'tests/fixtures/admin-overview-revenue.browser.jsx' : revenue ? 'tests/fixtures/admin-revenue.browser.jsx' : monthlyChart ? 'tests/fixtures/admin-monthly-chart.browser.jsx' : datePicker ? 'tests/fixtures/admin-date-picker.browser.jsx' : 'tests/fixtures/admin-sidebar.browser.jsx'), cwd: root,
     transform: { jsx: 'react-jsx' }, plugins: [{ name: 'du-lieu-kiem-thu', resolveId(id) {
       if (id.endsWith('.css')) return '\0style';
-      if (revenue && (id.includes('adminRevenue.api') || id.includes('adminOperations.api'))) return path.join(root, 'tests/fixtures/admin-revenue.mock.js');
-      if (revenue && id.includes('AdminFeedbackDetailModal')) return '\0revenue-detail';
+      if (suggestions && (id.includes('serviceSuggestion.api') || id.includes('categoryService.api'))) return path.join(root, 'tests/fixtures/admin-suggestions.mock.js');
+      if (suggestions && id === '@/components/common/DashboardShell') return '\0revenue-shell';
+      if (recentOrders && id.includes('adminDashboard.api')) return '\0recent-orders-api';
+      if (recentOrders && id.includes('AdminFeedbackDetailModal')) return '\0revenue-detail';
+      if (applications && id === '@/api/client') return '\0application-client';
+      if ((revenue || overviewRevenue) && (id.includes('adminRevenue.api') || id.includes('adminOperations.api') || id.includes('adminDashboard.api'))) return path.join(root, 'tests/fixtures/admin-revenue.mock.js');
+      if ((revenue || overviewRevenue) && id.includes('AdminFeedbackDetailModal')) return '\0revenue-detail';
       if (revenue && id === '@/components/common/DashboardShell') return '\0revenue-shell';
       if (id.includes('admin-lazy-pages')) return '\0pages';
       if (monthlyChart && id.includes('adminDashboard.api')) return '\0monthly-api';
@@ -34,6 +43,16 @@ try {
       }
     }, load(id) {
       if (id === '\0style') return '';
+      if (id === '\0recent-orders-api') return `export const adminDashboardApi = { recentOrders: async ({page,limit}) => ({
+        items:Array.from({length:Math.min(limit,25-(page-1)*limit)},(_,index)=> {const n=25-(page-1)*limit-index;return {_id:'order-'+n,orderCode:'ORD-'+n,serviceId:{name:'Vệ sinh máy lạnh'},customerId:{fullName:'Nguyễn An'},pricing:{totalPaidAmount:350000},status:n%2?'created':'completed',createdAt:'2026-10-29T07:30:00Z'};}),
+        pagination:{page,limit,total:25,totalPages:Math.ceil(25/limit)}
+      })};`;
+      if (id === '\0application-client') return `export default {get: async (url,{params}={}) => {
+        if(url === '/categories/active') return {data:{data:[]}};
+        if(params?.limit === 1 && window.__failApplicationSummary) throw Error('Lỗi tải số lượng giả lập');
+        if(params?.status === '' || params?.applicationType === '' || params?.categoryId === '') throw Error('Bộ lọc rỗng không hợp lệ');
+        return {data:{data:{items:[],pagination:{page:1,total:params?.applicationType === 'service_addition' ? (params.status === 'pending' ? 0 : 4) : params?.status === 'pending' ? 15 : 173,totalPages:1}}}};
+      }};`;
       if (id === '\0revenue-shell') return 'export const DashboardShell = ({children}) => children;';
       if (id === '\0revenue-detail') return `import {createElement} from 'react'; export const AdminFeedbackDetailModal = ({orderId,onClose}) => createElement('div',{role:'dialog'},orderId,createElement('button',{onClick:onClose},'Đóng'));`;
       if (id === '\0monthly-api') return 'export const adminDashboardApi = {};';
@@ -74,7 +93,8 @@ try {
   const failure = /data-sidebar-error="([^"]*)"/.exec(output)?.[1];
   assert.equal(failure, undefined, failure);
   assert.match(output, /data-sidebar-passed="true"/, output.slice(-2000));
-  console.log(revenue ? 'Đạt: trang doanh thu giữ khoảng ngày, so sánh tiền và %, bảng thu/hoàn, phân trang và mở đơn.' : monthlyChart ? 'Đạt: biểu đồ lịch sử hiển thị sáu tháng, hai trục số đơn/doanh thu, đổi hai cột và ẩn dropdown số liệu.' : datePicker ? 'Đạt: xoay ngày/giờ, năm nhuận, áp dụng/hủy/xóa, giới hạn ngày, xác thực bắt buộc và Escape trong modal lồng nhau.' : 'Đạt: sidebar giữ DOM, vị trí cuộn và trạng thái thu gọn khi chuyển mục, chờ tải trang và quay lại.');
+  if (applications) console.log('Đạt: thẻ hồ sơ điền đúng bộ lọc, giữ tìm kiếm/lĩnh vực/ngày, đặt lại trang và đồng bộ khi chọn thủ công.');
+  console.log(suggestions ? 'Đạt: form dịch vụ dùng chung điền sẵn, hủy giữ ghi chú, khóa hiển thị, giữ dữ liệu khi lỗi, tạo/duyệt một request và khôi phục sau 409.' : overviewRevenue ? 'Đạt: doanh thu đã gộp vào Tổng quan, liên kết cũ chuyển đúng và bộ lọc dùng chung cho báo cáo/giao dịch.' : revenue ? 'Đạt: trang doanh thu giữ khoảng ngày, so sánh tiền và %, bảng thu/hoàn, phân trang và mở đơn.' : monthlyChart ? 'Đạt: biểu đồ lịch sử hiển thị sáu tháng, hai trục số đơn/doanh thu, đổi hai cột và ẩn dropdown số liệu.' : datePicker ? 'Đạt: xoay ngày/giờ, năm nhuận, áp dụng/hủy/xóa, giới hạn ngày, xác thực bắt buộc và Escape trong modal lồng nhau.' : 'Đạt: sidebar giữ DOM, vị trí cuộn và trạng thái thu gọn khi chuyển mục, chờ tải trang và quay lại.');
 } finally {
   server?.closeAllConnections();
   await new Promise(resolve => server ? server.close(resolve) : resolve());

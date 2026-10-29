@@ -24,8 +24,8 @@ export const supportTableColumns: Array<DataTableColumn<AdminSupportTicket>> = [
     header: "Người gửi",
     render: (ticket) => (
       <>
-        <p className="font-semibold">{ticket.requesterId.fullName}</p>
-        <p className="text-xs text-on-surface-variant">{ticket.requesterId.email}</p>
+        <p className="font-semibold">{(ticket.requesterId?.fullName || "Người dùng không còn khả dụng")}</p>
+        <p className="text-xs text-on-surface-variant">{ticket.requesterId?.email}</p>
       </>
     ),
   },

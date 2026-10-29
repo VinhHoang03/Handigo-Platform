@@ -18,6 +18,7 @@ interface ApiResponse<T> {
 }
 
 export const serviceSuggestionApi = {
+  detail: async (id: string) => unwrap<ServiceSuggestion>(await api.get(`/service-suggestions/${id}`)),
   create: async (payload: CreateServiceSuggestionPayload) =>
     unwrap<ServiceSuggestion>(await api.post("/service-suggestions", payload)),
 

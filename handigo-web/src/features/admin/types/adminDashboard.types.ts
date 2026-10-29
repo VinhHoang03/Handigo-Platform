@@ -21,7 +21,20 @@ export interface AdminPendingCounts {
 export interface AdminMonthlyTrend {
   fromDate: string;
   toDate: string;
-  points: Array<{ month: string; orders: number; platformRevenue: number }>;
+  points: Array<{ month: string; orders: number; completedRevenue: number; platformRevenue: number }>;
+}
+
+export interface AdminRecentOrders {
+  items: Array<{
+    _id: string;
+    orderCode: string;
+    serviceId: { _id: string; name: string } | null;
+    customerId: { _id: string; fullName: string } | null;
+    pricing: { totalPaidAmount: number };
+    status: string;
+    createdAt: string;
+  }>;
+  pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
 export interface DashboardComparison {

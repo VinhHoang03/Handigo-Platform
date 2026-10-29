@@ -60,7 +60,6 @@ export function ConfigList({
             <div className={`whitespace-pre-wrap break-words rounded-lg bg-surface-container-low px-3 py-2 text-sm leading-6 tabular-nums text-on-surface ${item.group === "policy" ? "line-clamp-3" : "block max-h-24 overflow-auto"}`}>
               {formatConfigValue(item, item.currentValue, item.group === "policy")}
             </div>
-            {item.group === "policy" && <p className="text-xs text-on-surface-variant">Bấm Sửa để xem đầy đủ.</p>}
             {item.existing && (
               <p className="text-xs tabular-nums text-on-surface-variant">
                 Cập nhật: {dateTime.format(new Date(item.existing.updatedAt))}

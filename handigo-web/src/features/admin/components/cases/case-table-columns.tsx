@@ -5,7 +5,7 @@ import { CaseTitle } from "@/features/case-management/components/CaseTitle";
 
 export const caseDateTime = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
 
-/** Cột dùng chung cho cả 3 tab (khiếu nại/báo cáo/vi phạm) — trang tự thêm cột "Thao tác". */
+/** Cột dùng chung cho báo cáo và vi phạm — trang tự thêm cột "Thao tác". */
 export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
   {
     key: "case",
@@ -28,9 +28,7 @@ export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
     render: (item) =>
       "violationType" in item
         ? VIOLATION_SOURCE_LABELS[item.sourceType]
-        : "complainantId" in item
-          ? item.complainantId.fullName
-          : item.reporterId.fullName,
+        : item.reporterId.fullName,
   },
   {
     key: "status",

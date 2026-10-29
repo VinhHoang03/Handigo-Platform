@@ -3,7 +3,8 @@ import { CatalogStatusPill } from "../components/categories/CatalogStatusPill";
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useRef, useState, type FormEvent } from "react";
-import { CircleAlert, Image as ImageIcon, ListPlus, Pencil, PlusCircle, Wrench } from "lucide-react";
+import { Image as ImageIcon, ListPlus, Pencil, PlusCircle, Wrench } from "lucide-react";
+import { CatalogTooltip } from "../components/shared/CatalogTooltip";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
@@ -55,14 +56,9 @@ function CategoryServicesDropdown({
                   {(service.coverImage === undefined ? service.image : service.coverImage) && isImageUrl((service.coverImage === undefined ? service.image : service.coverImage)) ? <ReliableImage src={(service.coverImage === undefined ? service.image : service.coverImage) || undefined} alt="" aria-hidden="true" className="h-full w-full object-contain" /> : <Wrench aria-hidden="true" size={22} />}
                 </div>
                 <div className="w-64 min-w-0 shrink-0">
-                  <span className="group/description relative inline-flex min-w-0 items-center gap-1">
+                  <span className="inline-flex min-w-0 items-center gap-1">
                     <p className="truncate font-semibold text-on-surface">{service.name}</p>
-                    <span className="shrink-0 rounded-full p-0.5 text-on-surface-variant" aria-label={`Xem mô tả dịch vụ ${service.name}`}>
-                      <CircleAlert aria-hidden="true" size={16} />
-                    </span>
-                    <span className="pointer-events-none absolute bottom-full right-8 z-30 mb-2 hidden w-max whitespace-pre-wrap rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-950 shadow-lg group-hover/description:block">
-                      {service.description || 'Chưa có mô tả'}
-                    </span>
+                    <CatalogTooltip label={`Xem mô tả dịch vụ ${service.name}`} content={service.description || 'Chưa có mô tả'} />
                   </span>
                 </div>
                 <div className="-ml-2 grid min-w-0 flex-1 grid-cols-[1.15fr_1fr_1fr_1.5fr_1fr] items-center gap-4 text-center text-sm text-on-surface-variant">
@@ -347,7 +343,6 @@ export default function AdminCategoriesPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-on-surface">Tùy chọn dịch vụ</h3>
-                <p className="text-xs text-on-surface-variant">Thiết lập các gói, đơn vị tính và mức giá khách hàng có thể chọn.</p>
               </div>
               <button type="button" onClick={openCreateOption} className="inline-flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5">
                 <PlusCircle size={18} aria-hidden="true" /> Thêm tùy chọn
@@ -371,9 +366,8 @@ export default function AdminCategoriesPage() {
                         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low text-on-surface-variant">
                           {option.image && isImageUrl(option.image) ? <ReliableImage src={option.image} alt="" aria-hidden="true" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" size={20} />}
                         </div>
-                        <div className="group/option relative min-w-0">
-                          <div className="flex min-w-0 items-center gap-1"><p className="truncate font-semibold">{option.name}</p><span className="rounded-full p-0.5 text-on-surface-variant" aria-label={`Mô tả tùy chọn ${option.name}`}><CircleAlert aria-hidden="true" size={15} /></span></div>
-                          <span className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-auto whitespace-pre-wrap rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-950 shadow-lg group-hover/option:block">{option.description || 'Chưa có mô tả'}</span>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-1"><p className="truncate font-semibold">{option.name}</p><CatalogTooltip label={`Mô tả tùy chọn ${option.name}`} content={option.description || 'Chưa có mô tả'} /></div>
                           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant"><span>{OPTION_TYPE_LABELS[option.optionType]}</span><span>Chọn nhiều: {option.selectionMode === 'multiple' ? 'Có' : 'Không'}</span><span>Cho phép số lượng: {option.allowsQuantity ? 'Có' : 'Không'}</span></div>
                         </div>
                         <div className="col-span-2 flex shrink-0 items-center justify-end gap-3 sm:col-span-1">
