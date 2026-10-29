@@ -10,6 +10,7 @@ import { RepairQuotation } from "../models/repairQuotation.model";
 import { Refund } from "../models/refund.model";
 import { SupportTicket } from "../models/supportTicket.model";
 import { Report } from "../models/report.model";
+import { Complaint } from "../models/complaint.model";
 import * as socketServer from "../sockets/socketServer";
 import { combineAgentBookingPayment, describeOrderProgress, mergeAgentOrderMessages, publishAgentOrderChange, restoreAgentProgressTracking, restoreAgentSessionTracking, safelyTrackAgentBooking, safelyTrackAgentCase, trackAgentBooking } from "../services/agentOrderProgress.service";
 import { newSession } from "../ai/agent/agent-state";
