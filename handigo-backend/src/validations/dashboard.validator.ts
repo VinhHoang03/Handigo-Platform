@@ -38,6 +38,11 @@ export const dashboardQuerySchema = z
 
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
 
+export const adminRecentOrdersQuerySchema = z.object({
+  page: dashboardQuerySchema.shape.page,
+  limit: dashboardQuerySchema.shape.limit,
+});
+
 export const adminOperationsQuerySchema = dashboardQuerySchema.safeExtend({
   fromDate: adminDashboardQuerySchema.shape.fromDate,
   toDate: adminDashboardQuerySchema.shape.toDate,

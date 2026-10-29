@@ -75,34 +75,33 @@ test('Bộ lọc tổng quan mặc định lấy trọn tháng theo giờ Việt
   }
 });
 
-test('Cảnh báo đứng trước phân tích, hàng đợi ưu tiên việc có dữ liệu và mã đơn có nút mở', () => {
+test('Tổng quan bỏ đơn cần chú ý và cảnh báo chất lượng, giữ hàng đợi ưu tiên', () => {
   const load = loader(data);
   const { DashboardInsights } = load('DashboardInsights');
   const html = render(React.createElement(DashboardInsights));
-  assert.ok(html.indexOf('Đơn cần chú ý') < html.indexOf('Cảnh báo chất lượng'));
+  assert.ok(!html.includes('Đơn cần chú ý'));
+  assert.ok(!html.includes('Cảnh báo chất lượng'));
   assert.ok(!html.includes('So sánh với kỳ trước'));
   assert.ok(html.indexOf('Hỗ trợ chưa phản hồi') < html.indexOf('Hồ sơ chờ xét duyệt'));
   assert.ok(html.includes('bg-warning-container'));
-  assert.match(html, /<button[^>]*>DH01<\/button>/);
-  assert.ok(html.includes('<details'));
-  for (const route of ['/admin/support', '/admin/withdrawals', '/admin/feedbacks']) assert.ok(html.includes(`href="${route}"`));
+  for (const route of ['/admin/support', '/admin/withdrawals', '/admin/cases']) assert.ok(html.includes(`href="${route}"`));
 });
 
-test('Tổng quan chỉ tóm tắt phí nền tảng; liên kết báo cáo giữ khoảng ngày', () => {
+test('Thẻ phí nền tảng dẫn đến báo cáo doanh thu ngay trong Tổng quan', () => {
   const { DashboardMetricGrid } = loader(data)('DashboardMetricGrid');
   const html = render(React.createElement(DashboardMetricGrid, {
     overview: { platformRevenue: 7587150, totalRevenue: 39696000, totalDeposits: 3366000 },
     providers: { averageProviderRating: 3.14, totalProviders: 12 },
     periodComparison: comparison, periodLabel: '1/10 – 31/10', overviewScope: 'lũy kế', monthly: true,
-    revenuePath: '/admin/revenue?fromDate=2026-10-01&toDate=2026-10-31',
   }));
   assert.ok(html.includes('989.200'));
   assert.ok(!html.includes('7.587.150'));
   assert.ok(!html.includes('Ghi nhận lũy kế:'));
   assert.ok(!html.includes('39.696.000'));
   assert.ok(!html.includes('Tổng nạp ví'));
-  assert.ok(html.includes('fromDate=2026-10-01&amp;toDate=2026-10-31'));
-  const revenueCard = html.match(/<a[^>]*href="\/admin\/revenue\?[^\"]*"[^>]*>[\s\S]*?<\/a>/)[0];
+  assert.ok(html.includes('href="#admin-revenue"'));
+  assert.ok(!html.includes('href="/admin/revenue'));
+  const revenueCard = html.match(/<a[^>]*href="#admin-revenue"[^>]*>[\s\S]*?<\/a>/)[0];
   assert.ok(revenueCard.includes('Tháng trước:'));
   assert.ok(revenueCard.includes('479.000'));
   assert.match(revenueCard, /Tăng 106,5% \(510\.200[^)]*\) so với tháng trước/);

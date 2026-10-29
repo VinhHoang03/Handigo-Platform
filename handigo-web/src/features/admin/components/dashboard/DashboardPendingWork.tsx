@@ -8,7 +8,7 @@ export function DashboardPendingWork({ data, children }: { data?: AdminDashboard
   const items = [
     { label: "Hồ sơ chờ xét duyệt", value: data?.applications, path: "/admin/provider-applications", icon: ShieldCheck, note: "Mới / gửi lại" },
     { label: "Hỗ trợ chưa phản hồi", value: data?.support, path: "/admin/support", icon: LifeBuoy, note: "Chờ phản hồi" },
-    { label: "Khiếu nại chưa giải quyết", value: data?.complaints, path: "/admin/cases", icon: Gavel, note: "Chờ xử lý" },
+    { label: "Báo cáo chất lượng chưa giải quyết", value: data?.complaints, path: "/admin/cases?reportType=service_quality", icon: Gavel, note: "Chờ xử lý" },
     { label: "Đề xuất chờ duyệt", value: data?.suggestions, path: "/admin/service-suggestions", icon: Lightbulb, note: "Danh mục / dịch vụ" },
     { label: "Yêu cầu rút chờ duyệt", value: data?.withdrawals, path: "/admin/withdrawals", icon: Wallet, note: data ? chartMoney.format(data.withdrawalAmount) : "—" },
   ];

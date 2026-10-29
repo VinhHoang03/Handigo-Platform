@@ -7,7 +7,7 @@ import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { Refund } from "../models/refund.model";
 import { SupportTicket } from "../models/supportTicket.model";
-import { Complaint } from "../models/complaint.model";
+import { Report } from "../models/report.model";
 import type { AgentSession } from "../ai/agent/agent-state";
 import type { SessionEngine } from "../ai/session/session.service";
 import type { AgentPaymentResult } from "./agentPayment.service";
@@ -180,18 +180,18 @@ export async function safelyTrackAgentCase(userId: string, sessionId: string, ca
   try {
     let owned = kind === "ticket"
       ? await SupportTicket.findOne({ _id: caseId, requesterId: userId, isDeleted: false }).lean()
-      : await Complaint.findOne({ _id: caseId, complainantId: userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
+      : await Report.findOne({ _id: caseId, reporterId: userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
     if (!owned) return;
     await AgentCaseSubscription.updateOne({ caseId, kind }, { $setOnInsert: { userId, sessionId, createdAt: owned.createdAt } },
       { upsert: true, runValidators: true });
     owned = kind === "ticket"
       ? await SupportTicket.findOne({ _id: caseId, requesterId: userId, isDeleted: false }).lean()
-      : await Complaint.findOne({ _id: caseId, complainantId: userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
+      : await Report.findOne({ _id: caseId, reporterId: userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
     if (!owned) return;
     // Nếu đăng ký trễ, bổ sung trạng thái/phản hồi hiện tại đã phát sinh trước khi theo dõi.
     if (owned.status !== (kind === "ticket" ? "open" : "pending")
       || ("responses" in owned && owned.responses.some((response) => response.responderRole === "ADMIN"))) {
-      await publishAgentOrderChange(snapshotChange(kind === "ticket" ? SupportTicket.collection.collectionName : Complaint.collection.collectionName,
+      await publishAgentOrderChange(snapshotChange(kind === "ticket" ? SupportTicket.collection.collectionName : Report.collection.collectionName,
         owned as unknown as Document));
     }
     await AgentCaseSubscription.updateOne({ caseId, kind, userId, sessionId }, { $set: { initializedAt: new Date() } },
@@ -282,8 +282,8 @@ async function publishCaseChange(change: ChangeStreamDocument<Document>, doc: Do
   if (!recipient && doc.orderId) recipient = await AgentOrderSubscription.findOne({ orderId: doc.orderId }).lean();
   if (!recipient || (change.wallTime && change.wallTime < recipient.createdAt)) return;
   // Một đơn có thể có hồ sơ của cả thợ và khách; chỉ gửi hồ sơ do chính khách tạo.
-  if (String(ticket ? doc.requesterId : doc.complainantId) !== recipient.userId
-    || (!ticket && doc.complainantRole !== "CUSTOMER")) return;
+  if (String(ticket ? doc.requesterId : doc.reporterId) !== recipient.userId
+    || (!ticket && (doc.reporterRole !== "CUSTOMER" || doc.reportType !== "service_quality"))) return;
   if (doc.orderId && !await Order.exists({ _id: doc.orderId, customerId: recipient.userId, isDeleted: false })) return;
   const title = String(ticket ? doc.subject : doc.title).slice(0, 200);
   const lines: string[] = [];
@@ -292,7 +292,7 @@ async function publishCaseChange(change: ChangeStreamDocument<Document>, doc: Do
       waiting_user: "Bộ phận hỗ trợ đang chờ bạn phản hồi.", resolved: "Yêu cầu hỗ trợ đã được xử lý.",
       closed: "Yêu cầu hỗ trợ đã đóng.", cancelled: "Yêu cầu hỗ trợ đã hủy." }
     : { pending: "Đã tiếp nhận khiếu nại.", evidence_requested: "Khiếu nại cần bổ sung bằng chứng.",
-      under_review: "Khiếu nại đang được xem xét.", resolved: "Khiếu nại đã được xử lý.",
+      under_review: "Khiếu nại đang được xem xét.", resolved: "Báo cáo chất lượng dịch vụ đã được xử lý.", confirmed: "Báo cáo đã xác nhận vi phạm.",
       rejected: "Khiếu nại đã bị từ chối.", cancelled: "Khiếu nại đã hủy." };
   if (typeof fields.status === "string" && labels[fields.status]) lines.push(labels[fields.status]);
   for (const [key, label] of [["resolutionNote", "Kết quả xử lý"], ["requestedEvidenceNote", "Yêu cầu bổ sung"]]) {
@@ -320,7 +320,7 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
   const doc = change.fullDocument;
   if (!doc || doc.isDeleted) return;
   const fields = change.operationType === "update" ? change.updateDescription.updatedFields ?? {} : doc;
-  if ([SupportTicket.collection.collectionName, Complaint.collection.collectionName].includes(change.ns.coll)) {
+  if ([SupportTicket.collection.collectionName, Report.collection.collectionName].includes(change.ns.coll)) {
     await publishCaseChange(change, doc, fields);
     return;
   }
@@ -419,8 +419,8 @@ async function recoverOrderDetails(userId: string, orderId: string) {
   for (const payment of refundedPayments) await publishAgentOrderChange(snapshotChange(Payment.collection.collectionName, payment));
   const tickets = await SupportTicket.find({ orderId, requesterId: userId, isDeleted: false }).lean();
   for (const ticket of tickets) await publishAgentOrderChange(snapshotChange(SupportTicket.collection.collectionName, ticket));
-  const complaints = await Complaint.find({ orderId, complainantId: userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
-  for (const complaint of complaints) await publishAgentOrderChange(snapshotChange(Complaint.collection.collectionName, complaint));
+  const complaints = await Report.find({ orderId, reporterId: userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
+  for (const complaint of complaints) await publishAgentOrderChange(snapshotChange(Report.collection.collectionName, complaint));
 }
 
 async function restoreSavedTracking() {
@@ -457,9 +457,9 @@ async function recoverProgress() {
   for await (const subscription of AgentCaseSubscription.find().cursor()) {
     const item = subscription.kind === "ticket"
       ? await SupportTicket.findOne({ _id: subscription.caseId, requesterId: subscription.userId, isDeleted: false }).lean()
-      : await Complaint.findOne({ _id: subscription.caseId, complainantId: subscription.userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
+      : await Report.findOne({ _id: subscription.caseId, reporterId: subscription.userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
     if (item) await publishAgentOrderChange(snapshotChange(subscription.kind === "ticket"
-      ? SupportTicket.collection.collectionName : Complaint.collection.collectionName, item));
+      ? SupportTicket.collection.collectionName : Report.collection.collectionName, item));
   }
   await AgentOrderCursor.deleteOne({ _id: CURSOR_ID });
 }
@@ -472,7 +472,7 @@ async function watchProgress() {
     // Change stream chỉ phát sự kiện sau khi transaction commit, kể cả thanh toán qua webhook.
     const active = db.watch([{ $match: {
       "ns.coll": { $in: [Order.collection.collectionName, Payment.collection.collectionName, RepairQuotation.collection.collectionName,
-        Refund.collection.collectionName, SupportTicket.collection.collectionName, Complaint.collection.collectionName] },
+        Refund.collection.collectionName, SupportTicket.collection.collectionName, Report.collection.collectionName] },
       operationType: { $in: ["insert", "update", "replace"] },
     } }], { fullDocument: "updateLookup", ...(cursor ? { resumeAfter: cursor.token as ResumeToken } : {}) });
     stream = active;

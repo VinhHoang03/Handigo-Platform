@@ -64,10 +64,10 @@ export function ApplicationList({
 
             <div className="mt-auto flex w-full items-center justify-between gap-2 border-t border-outline-variant/30 pt-2">
               <span
-                title={isServiceAddition ? "Bổ sung dịch vụ" : "Đăng ký nhà cung cấp"}
+                title={isServiceAddition ? "Loại hồ sơ: Bổ sung dịch vụ" : "Loại hồ sơ: Đăng ký nhà cung cấp"}
                 className="min-w-0 truncate rounded-md bg-surface-container-low px-2 py-1 text-[11px] font-medium leading-4 text-on-surface-variant"
               >
-                {isServiceAddition ? "Bổ sung dịch vụ" : "Đăng ký mới"}
+                {isServiceAddition ? "Loại hồ sơ: Bổ sung dịch vụ" : "Loại hồ sơ: Đăng ký mới"}
               </span>
               <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary">
                 Xem hồ sơ <ArrowUpRight aria-hidden="true" size={14} />

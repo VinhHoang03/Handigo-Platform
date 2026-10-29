@@ -9,7 +9,7 @@ export const withAdminPendingCounts = (items: DashboardNavItem[], counts: AdminP
     "/admin/service-suggestions": { count: counts.suggestions, label: `${counts.suggestions} đề xuất chờ duyệt` },
     "/admin/withdrawals": { count: counts.withdrawals, label: `${counts.withdrawals} yêu cầu rút tiền chờ duyệt` },
     "/admin/support": { count: counts.support, label: `${counts.support} yêu cầu hỗ trợ chưa được phản hồi` },
-    "/admin/cases": { count: counts.complaints + counts.reports, label: `${counts.complaints} khiếu nại chưa giải quyết và ${counts.reports} báo cáo chờ xem xét` },
+    "/admin/cases": { count: counts.reports, label: `${counts.reports} báo cáo chờ xem xét` },
     "/admin/payments": { count: counts.refunds, label: `${counts.refunds} giao dịch hoàn tiền lỗi hoặc cần xử lý thủ công` },
   };
   return items.map((item) => {

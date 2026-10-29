@@ -20,7 +20,7 @@ export function TicketThread({ ticket, busy, onRespond }: TicketThreadProps) {
   const submitReply = async (event: FormEvent) => {
     event.preventDefault();
     const message = reply.trim();
-    if (!message) return;
+    if (!message || !canRespond || busy) return;
     const succeeded = await onRespond(message);
     if (succeeded) setReply("");
   };
@@ -35,7 +35,7 @@ export function TicketThread({ ticket, busy, onRespond }: TicketThreadProps) {
         </div>
         <h3 className="mt-3 text-headline-sm font-bold">{ticket.subject}</h3>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-on-surface-variant">
-          <span>{ticket.requesterId.fullName} · {ticket.requesterId.email}</span>
+          <span>{(ticket.requesterId?.fullName || "Người dùng không còn khả dụng")} · {ticket.requesterId?.email}</span>
           <span>Tạo lúc {dateTime.format(new Date(ticket.createdAt))}</span>
           <span>Đã chờ {ticketAge(ticket.createdAt)}</span>
         </div>
@@ -50,7 +50,7 @@ export function TicketThread({ ticket, busy, onRespond }: TicketThreadProps) {
         <h3 className="font-bold">Trao đổi</h3>
         <article className="mr-8 rounded-2xl rounded-tl-sm border border-outline-variant/40 bg-surface p-4">
           <div className="flex items-center justify-between gap-3 text-xs text-on-surface-variant">
-            <b className="text-on-surface">{ticket.requesterId.fullName}</b>
+            <b className="text-on-surface">{(ticket.requesterId?.fullName || "Người dùng không còn khả dụng")}</b>
             <span>{dateTime.format(new Date(ticket.createdAt))}</span>
           </div>
           <p className="mt-3 whitespace-pre-wrap text-sm leading-6">{ticket.description}</p>
@@ -76,12 +76,14 @@ export function TicketThread({ ticket, busy, onRespond }: TicketThreadProps) {
         })}
       </section>
 
-      {canRespond && (
+      {(canRespond || reply.length > 0) && (
         <form onSubmit={submitReply} className="rounded-2xl border border-outline-variant/40 p-4">
+          {!canRespond && <p role="status" className="mb-2 text-sm text-on-surface-variant">Yêu cầu đã kết thúc. Bản nháp được giữ để bạn xem lại, không thể gửi thêm.</p>}
           <label htmlFor="support-reply" className="font-bold">Phản hồi người dùng</label>
           <textarea
             id="support-reply"
             value={reply}
+            disabled={busy || !canRespond}
             onChange={(event) => setReply(event.target.value)}
             rows={4}
             maxLength={3000}
@@ -90,7 +92,7 @@ export function TicketThread({ ticket, busy, onRespond }: TicketThreadProps) {
           />
           <div className="mt-3 flex items-center justify-between gap-3">
             <span className="text-xs text-on-surface-variant">{reply.length}/3000 ký tự</span>
-            <button type="submit" disabled={busy || !reply.trim()} className="btn-primary">
+            <button type="submit" disabled={busy || !canRespond || !reply.trim()} className="btn-primary">
               <Send size={17} /> {busy ? "Đang gửi..." : "Gửi phản hồi"}
             </button>
           </div>

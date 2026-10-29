@@ -4,7 +4,6 @@ import { Payment } from "../models/payment.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { ProviderApplication } from "../models/providerApplication.model";
 import { SupportTicket } from "../models/supportTicket.model";
-import { Complaint } from "../models/complaint.model";
 import { Feedback } from "../models/feedback.model";
 import { ServiceSuggestion } from "../models/serviceSuggestion.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
@@ -34,7 +33,7 @@ const getPendingWork = async () => {
   const [applications, support, complaints, suggestions, withdrawals] = await Promise.all([
     ProviderApplication.countDocuments({ isDeleted: false, status: { $in: ["pending", "resubmitted"] } }),
     SupportTicket.countDocuments({ isDeleted: false, status: { $in: ["open", "in_progress"] }, responses: { $not: { $elemMatch: { responderRole: "ADMIN" } } } }),
-    Complaint.countDocuments({ isDeleted: false, status: { $in: ["pending", "evidence_requested", "under_review"] } }),
+    Report.countDocuments({ isDeleted: false, reportType: "service_quality", status: { $in: ["pending", "evidence_requested", "under_review"] } }),
     ServiceSuggestion.countDocuments({ isDeleted: false, status: "pending" }),
     WithdrawRequest.aggregate<{ count: number; amount: number }>([
       { $match: { isDeleted: false, status: "pending" } },
@@ -50,7 +49,7 @@ export const getAdminPendingCounts = async () => {
   const [work, attentionOrders, reports, refunds] = await Promise.all([
     getPendingWork(),
     Order.countDocuments({ isDeleted: false, $or: Object.values(orderAttentionConditions(now)) }),
-    Report.countDocuments({ isDeleted: false, status: { $in: ["pending", "under_review"] } }),
+    Report.countDocuments({ isDeleted: false, status: { $in: ["pending", "evidence_requested", "under_review"] } }),
     Refund.countDocuments({ isDeleted: false, status: { $in: ["failed", "manual_review"] } }),
   ]);
   return { ...work, attentionOrders, reports, refunds, asOf: now };
@@ -199,8 +198,8 @@ const getQuality = async (period: Period) => {
       { $match: dateMatch },
       { $group: { _id: null, total: { $sum: 1 }, lowRatings: sumWhen({ $lte: ["$rating", 2] }) } },
     ]),
-    Complaint.aggregate<{ userId: string; fullName: string; complaintCount: number }>([
-      { $match: { ...dateMatch, status: { $nin: ["rejected", "cancelled"] } } },
+    Report.aggregate<{ userId: string; fullName: string; complaintCount: number }>([
+      { $match: { ...dateMatch, reportType: "service_quality", status: { $nin: ["rejected", "cancelled"] } } },
       { $group: { _id: "$targetUserId", complaintCount: { $sum: 1 } } },
       { $match: { complaintCount: { $gte: 2 } } },
       { $lookup: { from: "providers", localField: "_id", foreignField: "userId", as: "provider" } },

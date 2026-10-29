@@ -1,16 +1,15 @@
 import type { LucideIcon } from "lucide-react";
-import { FileWarning, Flag, Gavel } from "lucide-react";
+import { Flag, Gavel } from "lucide-react";
 import type { AdminCaseTab } from "./case-detail.types";
 
 const TABS: Array<{ value: AdminCaseTab; label: string; icon: LucideIcon }> = [
-  { value: "complaints", label: "Khiếu nại", icon: FileWarning },
   { value: "reports", label: "Báo cáo", icon: Flag },
   { value: "violations", label: "Vi phạm", icon: Gavel },
 ];
 
 export function CaseTabs({ tab, onSwitch }: { tab: AdminCaseTab; onSwitch: (tab: AdminCaseTab) => void }) {
   return (
-    <section className="grid gap-3 sm:grid-cols-3">
+    <section className="grid gap-3 sm:grid-cols-2">
       {TABS.map((item) => {
         const Icon = item.icon;
         const active = tab === item.value;

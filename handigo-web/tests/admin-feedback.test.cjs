@@ -39,6 +39,30 @@ const render = (overrides = {}) => renderToStaticMarkup(
   React.createElement(AdminFeedbackList, { items: [{ ...feedback, ...overrides }], onToggle() {} }),
 );
 
+test('Card chỉ ghi chú phản hồi từ thợ, nội dung đầy đủ không xuất hiện trên card', () => {
+  const html = render({ providerReply: { content: 'Nội dung riêng trong chi tiết', repliedAt: feedback.createdAt } });
+  assert.ok(html.includes('Có phản hồi từ thợ'));
+  assert.ok(!html.includes('Nội dung riêng trong chi tiết'));
+});
+
+test('Tab thống kê đặt đúng bộ lọc và quay về trang đầu', () => {
+  const { AdminFeedbackStats } = load(path.join(sourceRoot, 'features/admin/components/feedback/AdminFeedbackStats.tsx'));
+  let selected;
+  const tree = AdminFeedbackStats({ query: { page: 3, limit: 30, keyword: 'cũ' },
+    onChange: value => { selected = value; } });
+  const cards = tree.props.children;
+  cards[3].props.onClick();
+  assert.equal(selected.ratingBelow, 4);
+  assert.equal(selected.page, 1);
+  assert.equal(selected.limit, 30);
+  assert.equal(selected.keyword, undefined);
+  cards[2].props.onClick();
+  assert.equal(selected.isVisible, true);
+  assert.equal(selected.ratingBelow, undefined);
+  cards[0].props.onClick();
+  assert.equal(selected.isVisible, undefined);
+});
+
 test('Đánh giá đầy đủ thông tin vẫn hiển thị tên, mã đơn và thao tác', () => {
   const html = render();
   for (const text of ['Khách A', 'Thợ A', 'DH01', 'Vệ sinh nhà', 'Ẩn đánh giá']) {
@@ -90,6 +114,11 @@ function loadPageQuery() {
   vm.runInNewContext(code, { exports, require(name) {
     if (name === 'react') return {
       useCallback: callback => callback,
+      useRef(initial) {
+        const index = cursor++;
+        if (!(index in state)) state[index] = { current: initial };
+        return state[index];
+      },
       useState(initial) {
         const index = cursor++;
         if (!(index in state)) state[index] = initial;
@@ -97,6 +126,7 @@ function loadPageQuery() {
       },
     };
     if (name === 'react/jsx-runtime') return require(name);
+    if (name === '@/components/common/Toast') return { useToast: () => ({ addToast() {} }) };
     if (name === '../hooks/useFeedback') return {
       useFeedbackList(mode, query, onLoaded) {
         request = { mode, query, onLoaded };
@@ -107,7 +137,8 @@ function loadPageQuery() {
   } });
   return () => {
     cursor = 0;
-    exports.default();
+    const tree = exports.default();
+    request.changeQuery = tree.props.children.find(child => child?.props?.onChange)?.props.onChange;
     return request;
   };
 }
@@ -131,6 +162,15 @@ test('Giữ bộ lọc dưới 4 sao khi tổng kết quả lớn hơn 0 kể c�
   const request = renderPage();
   request.onLoaded({ items: [], pagination: { total: 31 } });
   assert.equal(renderPage().query, request.query);
+});
+
+test('Không tự bỏ bộ lọc dưới 4 sao do người dùng chọn khi không có kết quả', () => {
+  const renderPage = loadPageQuery();
+  const request = renderPage();
+  request.changeQuery({ page: 1, limit: 30, ratingBelow: 4, keyword: 'không có' });
+  const filtered = renderPage();
+  filtered.onLoaded({ items: [], pagination: { total: 0 } });
+  assert.equal(renderPage().query.ratingBelow, 4);
 });
 
 test('Bấm card mở chi tiết; bấm ẩn đánh giá chỉ gọi thao tác kiểm duyệt', () => {

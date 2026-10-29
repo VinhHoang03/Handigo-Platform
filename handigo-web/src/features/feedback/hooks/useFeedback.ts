@@ -70,36 +70,28 @@ export function useFeedbackList(mode: 'provider' | 'admin', query: FeedbackQuery
   const [result, setResult] = useState<FeedbackList | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>('', "error");
+  const requestRevision = useRef(0);
+  const invalidateRequests = useCallback(() => { requestRevision.current++; }, []);
   const load = useCallback(async () => {
+    const revision = ++requestRevision.current;
     try {
       setLoading(true);
       setError('');
       const value = await (mode === 'provider' ? feedbackService.loadProvider(query) : feedbackService.loadAdmin(query));
-      setResult(value);
-      onLoaded?.(value);
+      if (revision === requestRevision.current) {
+        setResult(value);
+        onLoaded?.(value);
+      }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Không thể tải danh sách đánh giá.');
+      if (revision === requestRevision.current) setError(requestError instanceof Error ? requestError.message : 'Không thể tải danh sách đánh giá.');
     } finally {
-      setLoading(false);
+      if (revision === requestRevision.current) setLoading(false);
     }
   }, [mode, query, setError, onLoaded]);
   useEffect(() => {
     let active = true;
-    const request = mode === 'provider'
-      ? feedbackService.loadProvider(query)
-      : feedbackService.loadAdmin(query);
-    request
-      .then((value) => {
-        if (active) {
-          setResult(value);
-          onLoaded?.(value);
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (active) setError(requestError instanceof Error ? requestError.message : 'Không thể tải danh sách đánh giá.');
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [mode, query, setError, onLoaded]);
+    void Promise.resolve().then(() => { if (active) return load(); });
+    return () => { active = false; invalidateRequests(); };
+  }, [invalidateRequests, load]);
   return { result, loading, error, load };
 }

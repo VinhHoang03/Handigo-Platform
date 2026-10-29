@@ -23,6 +23,8 @@ export interface EvidenceFile {
   mimeType?: string | null;
   fileName?: string | null;
   uploadedAt?: string;
+  uploadedBy?: CaseUser | null;
+  note?: string | null;
 }
 
 export interface ComplaintEvidence extends EvidenceFile {
@@ -77,7 +79,7 @@ export type SupportTicketCategory =
 export type SupportTicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export interface SupportTicketResponse {
-  responderId: CaseUser;
+  responderId: CaseUser | null;
   responderRole: "USER" | "ADMIN";
   message: string;
   attachments: EvidenceFile[];
@@ -86,7 +88,10 @@ export interface SupportTicketResponse {
 
 export interface SupportTicket {
   _id: string;
-  requesterId: CaseUser;
+  requesterId: CaseUser | null;
+  assignedAdminId?: CaseUser | null;
+  resolvedBy?: CaseUser | null;
+  resolvedAt?: string | null;
   orderId?: CaseOrder | null;
   category: SupportTicketCategory;
   priority: SupportTicketPriority;
@@ -111,6 +116,7 @@ export type ReportTargetType =
   | "app";
 
 export type ReportType =
+  | "service_quality"
   | "spam_chat"
   | "harassment"
   | "insulting_language"
@@ -130,6 +136,8 @@ export type ReportType =
   | "other";
 
 export type ReportStatus =
+  | "evidence_requested"
+  | "cancelled"
   | "pending"
   | "under_review"
   | "confirmed"
@@ -187,6 +195,7 @@ export interface Report {
   targetUserId?: CaseUser | null;
   orderId?: CaseOrder | null;
   reportType: ReportType;
+  requestedEvidenceNote?: string | null;
   title: string;
   description: string;
   evidenceImages: string[];
@@ -235,6 +244,7 @@ export interface CreateReportPayload {
   targetFeedbackId?: string;
   conversationId?: string;
   reportType: ReportType;
+  requestedEvidenceNote?: string | null;
   title: string;
   description: string;
   evidenceImages?: string[];

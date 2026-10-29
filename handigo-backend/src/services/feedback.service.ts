@@ -7,6 +7,7 @@ import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { OrderStatus } from "../models/orderStatus.model";
 import { Service } from "../models/service.model";
+import User from "../models/user.model";
 import { getAdminOrderDetail } from "./adminOrderDetail.service";
 
 interface FeedbackPayload {
@@ -31,6 +32,7 @@ interface PaginationQuery {
   replied?: string | boolean;
   keyword?: string;
   isVisible?: string | boolean;
+  categoryId?: string;
 }
 
 const assertObjectId = (id: string, fieldName: string) => {
@@ -614,20 +616,33 @@ export const upsertProviderReply = async (
   return feedback.populate("providerReply.repliedBy", "fullName avatar");
 };
 
-export const getAdminFeedbacks = async (query: PaginationQuery = {}) => {
+export const getAdminFeedbacks = async (query: PaginationQuery & { sort?: "attention" | "newest" } = {}) => {
   const { page, limit, skip } = getPagination(query);
   const base: Record<string, unknown> = {};
   const isVisible = parseBoolean(query.isVisible);
   if (isVisible !== undefined) base.isVisible = isVisible;
   const filter = buildFeedbackFilter(query, base);
+  if (query.categoryId) {
+    const services = await Service.find({ categoryId: query.categoryId, isDeleted: false }).select("_id").lean();
+    filter.serviceId = { $in: services.map((service) => service._id) };
+  }
+  if (query.keyword?.trim()) {
+    const expression = { $regex: query.keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+    const [customers, orders] = await Promise.all([
+      User.find({ fullName: expression, isDeleted: false }).select("_id").lean(),
+      Order.find({ orderCode: expression, isDeleted: false }).select("_id").lean(),
+    ]);
+    delete filter.comment;
+    filter.$or = [{ comment: expression }, { customerId: { $in: customers.map((customer) => customer._id) } }, { orderId: { $in: orders.map((order) => order._id) } }];
+  }
   const ratingBelow = Number(query.ratingBelow);
   if (filter.rating === undefined && Number.isFinite(ratingBelow) && ratingBelow >= 1 && ratingBelow <= 5) {
     filter.rating = { $lt: ratingBelow };
   }
 
-  const [items, total] = await Promise.all([
+  const [items, total, statistics] = await Promise.all([
     Feedback.find(filter)
-      .sort({ rating: 1, createdAt: -1, _id: -1 })
+      .sort(query.sort === "newest" ? { createdAt: -1, _id: -1 } : { rating: 1, createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .populate("customerId", "fullName email avatar")
@@ -640,6 +655,22 @@ export const getAdminFeedbacks = async (query: PaginationQuery = {}) => {
       .populate({ path: "serviceId", select: "name image coverImage", transform: serviceImageResponse })
       .populate("providerReply.repliedBy", "fullName avatar"),
     Feedback.countDocuments(filter),
+    Feedback.aggregate<{
+      total: number; averageRating: number; visible: number; hidden: number;
+      lowRating: number; hasImages: number; replied: number; fiveStars: number;
+    }>([
+      { $match: { isDeleted: false } },
+      { $group: {
+        _id: null, total: { $sum: 1 }, averageRating: { $avg: "$rating" },
+        visible: { $sum: { $cond: ["$isVisible", 1, 0] } },
+        hidden: { $sum: { $cond: ["$isVisible", 0, 1] } },
+        lowRating: { $sum: { $cond: [{ $lt: ["$rating", 4] }, 1, 0] } },
+        hasImages: { $sum: { $cond: [{ $gt: [{ $size: { $ifNull: ["$images", []] } }, 0] }, 1, 0] } },
+        replied: { $sum: { $cond: [{ $ne: [{ $ifNull: ["$providerReply", null] }, null] }, 1, 0] } },
+        fiveStars: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
+      } },
+      { $project: { _id: 0 } },
+    ]),
   ]);
 
   const orderIds = items.flatMap((item) => item.orderId?._id ? [item.orderId._id] : []);
@@ -650,6 +681,7 @@ export const getAdminFeedbacks = async (query: PaginationQuery = {}) => {
   const performedAtByOrder = new Map(startedOrders.map((item) => [item._id.toString(), item.performedAt]));
 
   return {
+    moderationStats: statistics[0] ?? { total: 0, averageRating: 0, visible: 0, hidden: 0, lowRating: 0, hasImages: 0, replied: 0, fiveStars: 0 },
     items: items.map((item) => {
       const value = item.toObject();
       const order = value.orderId as unknown as { _id: Types.ObjectId; performedAt?: Date | null } | null;
@@ -672,5 +704,5 @@ export const getAdminFeedbackDetail = async (feedbackId: string) => {
   if (!feedback) throw new AppError("Không tìm thấy đánh giá.", 404);
 
   const context = feedback.orderId ? await getAdminOrderDetail(String(feedback.orderId)) : { order: null, quotation: null };
-  return { feedback, ...context };
+  return { ...context, feedback };
 };

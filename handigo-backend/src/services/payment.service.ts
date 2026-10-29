@@ -1580,9 +1580,12 @@ export const getPaymentHistory = async (user: RequestUser, query: PaymentHistory
   }
 
   const skip = (query.page - 1) * query.limit;
-  const [items, total] = await Promise.all([
+  const [items, total, orderTotals] = await Promise.all([
     Payment.find(filter).sort(query.dateField ? { [query.dateField]: -1, _id: -1 } : { createdAt: -1 }).skip(skip).limit(query.limit),
     Payment.countDocuments(filter),
+    user.role === "ADMIN" ? Payment.aggregate<{ total: number }>([
+      { $match: filter }, { $group: { _id: "$orderId" } }, { $count: "total" },
+    ]) : Promise.resolve([]),
   ]);
 
   const orders = user.role === "ADMIN" && items.length
@@ -1591,6 +1594,7 @@ export const getPaymentHistory = async (user: RequestUser, query: PaymentHistory
   const orderCodes = new Map(orders.map(order => [String(order._id), order.orderCode]));
 
   return {
+    ...(user.role === "ADMIN" ? { totalOrders: orderTotals[0]?.total ?? 0 } : {}),
     items: user.role === "ADMIN" ? items.map(payment => ({ ...payment.toObject(), orderCode: orderCodes.get(String(payment.orderId)) ?? null })) : items,
     pagination: {
       page: query.page,

@@ -1,6 +1,5 @@
 import mongoose, { ClientSession, Types } from "mongoose";
 import { AppError } from "../utils/appError";
-import { Complaint } from "../models/complaint.model";
 import { Report } from "../models/report.model";
 import { Session } from "../models/session.model";
 import { SupportTicket } from "../models/supportTicket.model";
@@ -60,8 +59,12 @@ const resolveSource = async (payload: CreateViolationPayload, session: ClientSes
   assertObjectId(payload.sourceId, "Source id");
 
   if (payload.sourceType === "REPORT") {
-    const report = await Report.findOne({ _id: payload.sourceId, isDeleted: false }).session(session);
+    const report = await Report.findOneAndUpdate(
+      { _id: payload.sourceId, isDeleted: false }, { $inc: { __v: 1 } },
+      { session, new: true, runValidators: true },
+    );
     if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+    if (["cancelled", "rejected"].includes(report.status)) throw new AppError("Báo cáo đã hủy hoặc từ chối, không thể tạo vi phạm", 400);
     if (report.isCustomerNoShow && report.status !== "confirmed") {
       throw new AppError("Vui lòng chấp thuận báo cáo khách vắng mặt và xử lý hỗ trợ trước khi tạo vi phạm.", 409);
     }
@@ -74,22 +77,6 @@ const resolveSource = async (payload: CreateViolationPayload, session: ClientSes
       orderId: payload.orderId ?? report.orderId?.toString(),
       relatedReportId: report._id as Types.ObjectId,
       relatedComplaintId: null,
-      relatedSupportTicketId: null,
-    };
-  }
-
-  if (payload.sourceType === "COMPLAINT") {
-    const complaint = await Complaint.findOne({ _id: payload.sourceId, isDeleted: false }).session(session);
-    if (!complaint) throw new AppError("Không tìm thấy khiếu nại", 404);
-    if (complaint.createdViolationId) {
-      throw new AppError("Khiếu nại đã có bản ghi vi phạm", 400);
-    }
-    return {
-      source: complaint,
-      userId: payload.userId ?? complaint.targetUserId.toString(),
-      orderId: payload.orderId ?? complaint.orderId.toString(),
-      relatedReportId: null,
-      relatedComplaintId: complaint._id as Types.ObjectId,
       relatedSupportTicketId: null,
     };
   }
@@ -141,6 +128,11 @@ export const createViolation = async (adminId: string, payload: CreateViolationP
     if (!feature) throw new AppError("Chức năng bị hạn chế không được hỗ trợ.", 400);
     payload = { ...payload, penalty: { ...payload.penalty, feature } };
   }
+  if (payload.sourceType === "COMPLAINT") {
+    const report = await Report.findOne({ _id: payload.sourceId, reportType: "service_quality", isDeleted: false });
+    if (!report) throw new AppError("Không tìm thấy khiếu nại", 404);
+    payload = { ...payload, sourceType: "REPORT" };
+  }
   const result = await mongoose.connection.transaction(async (session) => {
     const source = await resolveSource(payload, session);
     const userId = source.userId;
@@ -188,21 +180,6 @@ export const createViolation = async (adminId: string, payload: CreateViolationP
           handledBy: adminId,
           handledAt: now,
           reviewNote: payload.reason,
-          resolutionNote: payload.adminDecision,
-          createdViolationId: violation._id,
-        },
-        { runValidators: true, session },
-      );
-    } else if (payload.sourceType === "COMPLAINT") {
-      await Complaint.findByIdAndUpdate(
-        payload.sourceId,
-        {
-          $inc: { __v: 1 },
-          status: "resolved",
-          reviewedBy: adminId,
-          reviewedAt: now,
-          resolvedBy: adminId,
-          resolvedAt: now,
           resolutionNote: payload.adminDecision,
           createdViolationId: violation._id,
         },

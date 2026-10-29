@@ -1,4 +1,5 @@
 import type { SupportTicketCategory, SupportTicketPriority } from "../types/caseManagement.types";
+import { SUPPORT_PRIORITY_LABELS } from "./supportLabels.constants";
 import { CATEGORY_OPTIONS } from "./ticketFieldOptions.constants";
 
 interface TicketExtraFieldsProps {
@@ -39,10 +40,7 @@ export function TicketExtraFields({
           disabled={disabled}
           className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
         >
-          <option value="LOW">Thấp</option>
-          <option value="MEDIUM">Trung bình</option>
-          <option value="HIGH">Cao</option>
-          <option value="URGENT">Khẩn cấp</option>
+          {Object.entries(SUPPORT_PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </label>
     </div>

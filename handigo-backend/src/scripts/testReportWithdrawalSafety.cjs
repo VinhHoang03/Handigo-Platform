@@ -5,7 +5,7 @@ const ts = require('typescript');
 const { Types } = require('mongoose');
 const { AppError } = require('../utils/appError');
 const { withTransactionRetry } = require('../utils/transaction');
-const { createReportSchema } = require('../validations/report.validator');
+const reportValidators = require('../validations/report.validator');
 
 // Chạy service thật với database giao dịch giả lập, không đọc cấu hình hoặc gọi dịch vụ ngoài.
 const id = () => new Types.ObjectId().toString();
@@ -160,7 +160,10 @@ function load(file) {
       '../models/feedback.model': { Feedback: models.feedbacks },
       '../models/conversation.model': { Conversation: models.conversations },
       '../models/report.model': { Report: models.reports },
-      '../validations/report.validator': { createReportSchema },
+      '../validations/report.validator': reportValidators,
+      './reportQuality.service': { getServiceQualityReportContext: async () => assert.fail('Báo cáo thông thường không dùng điều kiện chất lượng.') },
+      './customerNoShow.service': {},
+      './customerNoShowVerification.service': {},
       '../utils/appError': { AppError },
       '../utils/logger': { createLogger: () => ({ warn() {} }) },
       '../utils/transaction': { withTransactionRetry, buildTransactionCode: () => 'RÚT-THỬ' },
