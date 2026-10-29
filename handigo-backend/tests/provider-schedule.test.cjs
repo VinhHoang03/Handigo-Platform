@@ -115,13 +115,13 @@ test('Bỏ qua chính đơn đang kiểm tra và hỗ trợ lịch cũ chưa có
     { excludeOrderIds: [context.order._id] })).size, 1);
 });
 
-test('Đơn từ tuần trước bắt đầu và hoàn thành hôm nay giải phóng giờ dự kiến còn lại sau khoảng đệm', async () => {
+test('Đơn từ tuần trước hoàn thành hôm nay chỉ giữ thời gian di chuyển sau giờ hoàn thành thực tế', async () => {
   const context = setup({
     createdAt: at('09', '10:00'), scheduledAt: at('09', '10:00'),
     confirmation: { providerConfirmedAt: at('16', '08:05') },
   });
-  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '08:49')])).size, 0);
-  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '08:50')])).size, 1);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '08:34')])).size, 0);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '08:35')])).size, 1);
 });
 
 test('Hoàn thành sớm giải phóng khung giờ hẹn gốc ở tương lai', async () => {
@@ -129,10 +129,33 @@ test('Hoàn thành sớm giải phóng khung giờ hẹn gốc ở tương lai',
   assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('17', '10:00')])).size, 1);
 });
 
-test('Hoàn thành trễ vẫn giữ lịch đến giờ hoàn thành thực tế và hết khoảng đệm', async () => {
+test('Hoàn thành trễ vẫn giữ lịch đến giờ hoàn thành thực tế và đủ thời gian di chuyển', async () => {
   const context = setup({ confirmation: { providerConfirmedAt: at('16', '10:00') } });
-  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '10:44')])).size, 0);
-  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '10:45')])).size, 1);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '10:29')])).size, 0);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [interval('16', '10:30')])).size, 1);
+});
+
+test('Đặt ngay sau khi hoàn thành nhận lại được thợ khi đã tính thời gian di chuyển', async () => {
+  const completedAt = at('16', '10:00');
+  const context = setup({ scheduledAt: null, confirmation: { providerConfirmedAt: completedAt } });
+  const start = completedAt.getTime() + policy.travelMinutes * 60000;
+  const next = { start, end: start + policy.defaultDurationMinutes * 60000,
+    bufferMinutes: policy.bufferMinutes, travelMinutes: policy.travelMinutes };
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [next])).size, 1);
+  const order = { _id: new Types.ObjectId(), serviceId: context.order.serviceId, status: 'created',
+    scheduledAt: null, inspectionRequired: false, selectedOptionsSnapshot: [],
+    schedule: { durationMinutes: policy.defaultDurationMinutes, bufferMinutes: policy.bufferMinutes,
+      travelMinutes: policy.travelMinutes, expectedStartAt: new Date(start), expectedEndAt: new Date(next.end) } };
+  order.toObject = () => ({ ...order });
+  await context.assertProviderSchedule(context.providerId, [order], {}, policy);
+});
+
+test('Đơn mới vẫn chừa thời gian di chuyển dài hơn sau đơn đã hoàn thành', async () => {
+  const context = setup({ confirmation: { providerConfirmedAt: at('16', '10:00') } });
+  const early = { ...interval('16', '10:59'), travelMinutes: 60 };
+  const ready = { ...interval('16', '11:00'), travelMinutes: 60 };
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [early])).size, 0);
+  assert.equal((await context.getAvailableProviderIds([context.providerId], [ready])).size, 1);
 });
 
 test('Đơn hoàn thành cũ thiếu giờ xác nhận dùng giờ kết thúc dự kiến', async () => {
