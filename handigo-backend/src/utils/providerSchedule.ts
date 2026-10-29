@@ -8,11 +8,12 @@ export const getOrderInterval = (order: ScheduleOrder, policy: BookingPolicy, no
   const duration = order.schedule?.durationMinutes ?? calculateDuration(order.serviceId.toString(), order.inspectionRequired, order.selectedOptionsSnapshot ?? [], policy);
   const start = order.schedule?.expectedStartAt?.getTime() ?? order.scheduledAt?.getTime() ?? order.createdAt?.getTime() ?? now;
   let end = order.schedule?.expectedEndAt?.getTime() ?? start + duration * 60000;
-  // Đơn đã hoàn thành chỉ giữ lịch đến giờ hoàn thành thực tế, kèm khoảng đệm bên dưới.
-  if (order.status === "completed") end = order.confirmation?.providerConfirmedAt?.getTime() ?? end;
+  const completedAt = order.status === "completed" ? order.confirmation?.providerConfirmedAt?.getTime() : undefined;
+  // Đã hoàn thành thực tế thì bỏ dự phòng, chỉ giữ thời gian di chuyển sang đơn tiếp theo.
+  if (completedAt !== undefined) end = completedAt;
   // Chưa hoàn tất thực tế thì không tự giải phóng lịch đã quá giờ dự kiến.
   if (["accepted", "in_progress"].includes(order.status) && end <= now) end = Infinity;
-  return { start, end, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes };
+  return { start, end, bufferMinutes: completedAt !== undefined ? 0 : order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes };
 };
 
 export const isWithinWorkingCalendar = (providerId: string, interval: ScheduleInterval, policy: BookingPolicy) => {

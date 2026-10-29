@@ -3,7 +3,7 @@ import type {
   ChatbotAudience,
   ChatbotMessage,
 } from "../types/chatbot.types";
-import { ArrowUpRight, Bot, CalendarDays, Wrench } from "lucide-react";
+import { ArrowUpRight, Bot, Search, Wrench } from "lucide-react";
 import { AgentChoiceGroups } from "./AgentChoiceGroups";
 import { AgentConfirmationCard } from "./AgentConfirmationCard";
 import type { AgentConfirmation } from "../types/agent.types";
@@ -72,6 +72,8 @@ export function ChatbotMessageList({
   const latestDialogue = audience === "CUSTOMER"
     ? messages.findLast((message) => !message._id.startsWith("order-event:") && !message._id.startsWith("booking:"))
     : messages.at(-1);
+  const hasBookingForm = Boolean(renderConfirmation && messages.some((message) => message.confirmation?.tool === "create_booking"
+    && message.confirmation.actionId === pendingActionId));
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -111,7 +113,7 @@ export function ChatbotMessageList({
           </p>
           {audience === "CUSTOMER" && onSend && <div className="mt-6 grid gap-2">
             {[{ icon: Wrench, label: "Tìm dịch vụ phù hợp", message: "Giúp tôi chọn dịch vụ tại nhà." },
-              { icon: CalendarDays, label: "Hướng dẫn đặt lịch", message: "Hướng dẫn tôi cách đặt lịch." }].map(({ icon: Icon, label, message }) => <button
+              { icon: Search, label: "Tìm đơn cũ", message: "Tôi muốn tìm đơn cũ." }].map(({ icon: Icon, label, message }) => <button
                 key={label} type="button" disabled={choicesDisabled} onClick={() => void onSend(message).catch(() => undefined)}
                 className="group flex min-h-14 items-center gap-3 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest px-4 py-3 text-left text-sm font-medium text-on-surface transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50">
                 <Icon size={18} aria-hidden="true" className="shrink-0 text-primary" /><span className="flex-1">{label}</span><ArrowUpRight size={16} aria-hidden="true" className="text-on-surface-variant group-hover:text-primary" />
@@ -137,13 +139,16 @@ export function ChatbotMessageList({
       {messages.map((message) => {
         const isUser = message.sender === "user";
         const isBookingConfirmation = !isUser && message.confirmation?.tool === "create_booking";
+        if (hasBookingForm && isBookingConfirmation && message.confirmation?.status === "EXPIRED") return null;
+        const visibleChoiceGroups = hasBookingForm && isBookingConfirmation
+          ? message.choiceGroups?.filter((group) => group.label !== "Voucher có thể sử dụng") : message.choiceGroups;
         const confirmation = !isUser && message.confirmation ? <div className={!isBookingConfirmation && message.content ? "mt-3" : ""}>
           {renderConfirmation ? renderConfirmation(message.confirmation, message.confirmation.actionId !== pendingActionId) : <AgentConfirmationCard action={message.confirmation}
             readOnly={message.confirmation.actionId !== pendingActionId}
             disabled={isReplying || confirmationsDisabled} onDecision={onDecision} />}
         </div> : null;
         const showChoices = !isUser && (message._id === latestDialogue?._id || message._id === messages.at(-1)?._id)
-          && (!message.confirmation || message.confirmation.actionId === pendingActionId) && Boolean(message.choiceGroups?.length) && onSend;
+          && (!message.confirmation || message.confirmation.actionId === pendingActionId) && Boolean(visibleChoiceGroups?.length) && onSend;
         const canChooseBookingVouchers = bookingVoucherChoicesEnabled && isBookingConfirmation
           && message.confirmation?.actionId === pendingActionId
           && message.choiceGroups?.every((group) => ["Voucher có thể sử dụng", "Kiểm tra voucher"].includes(group.label));
@@ -173,7 +178,7 @@ export function ChatbotMessageList({
                 </a>)}
               </div>}
               {showChoices && (
-                <AgentChoiceGroups key={message._id} groups={message.choiceGroups!}
+                <AgentChoiceGroups key={message._id} groups={visibleChoiceGroups!}
                   disabled={isReplying || (choicesDisabled && !canChooseBookingVouchers)} onSend={onSend!} />
               )}
               </div>}

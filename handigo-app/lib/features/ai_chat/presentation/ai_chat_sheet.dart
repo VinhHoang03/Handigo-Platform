@@ -11,6 +11,7 @@ import '../../auth/domain/app_user.dart';
 import 'ai_chat_controller.dart';
 import 'ai_chat_history.dart';
 import 'ai_chat_composer.dart';
+import '../../booking/presentation/booking_policy_panel.dart';
 
 Future<void> showAiChatSheet(BuildContext context) =>
     showModalBottomSheet<void>(
@@ -586,7 +587,11 @@ class _AiChatSheetState extends ConsumerState<AiChatSheet> {
                               ),
                             if (confirmation != null)
                               _ConfirmationCard(
+                                key: ValueKey(
+                                  '${confirmation['actionId']}:${(confirmation['preview'] as Map?)?['policyVersion']}',
+                                ),
                                 action: confirmation,
+                                policies: controller.bookingPolicies,
                                 enabled: canInteract && _attachments == null,
                                 onDecision: controller.decide,
                               ),
@@ -925,6 +930,7 @@ const _previewLabels = {
   'schedule': 'Thời gian',
   'unitPrice': 'Đơn giá',
   'quantity': 'Số lượng',
+  'rating': 'Số sao',
   'originalAmount': 'Giá trước giảm',
   'voucherCode': 'Voucher',
   'discountAmount': 'Giảm giá',
@@ -954,8 +960,8 @@ const _previewLabels = {
 
 String _previewValue(String key, dynamic value) {
   if (value is num) {
-    return key == 'quantity'
-        ? '$value'
+    return key == 'quantity' || key == 'rating'
+        ? NumberFormat.decimalPattern('vi_VN').format(value)
         : '${NumberFormat.decimalPattern('vi_VN').format(value)} đ';
   }
   if (value is List) return value.whereType<String>().join('\n');
@@ -977,19 +983,31 @@ String _previewValue(String key, dynamic value) {
   return value;
 }
 
-class _ConfirmationCard extends StatelessWidget {
+class _ConfirmationCard extends StatefulWidget {
   const _ConfirmationCard({
     required this.action,
+    required this.policies,
     required this.enabled,
     required this.onDecision,
+    super.key,
   });
   final Map<String, dynamic> action;
+  final Map<String, dynamic>? policies;
   final bool enabled;
-  final Future<void> Function(String) onDecision;
+  final Future<void> Function(String, {bool policyAccepted}) onDecision;
+
+  @override
+  State<_ConfirmationCard> createState() => _ConfirmationCardState();
+}
+
+class _ConfirmationCardState extends State<_ConfirmationCard> {
+  bool _accepted = false;
 
   @override
   Widget build(BuildContext context) {
+    final action = widget.action;
     final preview = action['preview'] as Map<String, dynamic>? ?? {};
+    final needsConsent = action['tool'] == 'create_booking';
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1020,18 +1038,43 @@ class _ConfirmationCard extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 12),
+            if (needsConsent) ...[
+              IgnorePointer(
+                ignoring: !widget.enabled,
+                child: BookingPolicyConsent(
+                  accepted: _accepted,
+                  policies: widget.policies,
+                  onChanged: (value) => setState(() => _accepted = value),
+                ),
+              ),
+              if (widget.policies == null)
+                const Text(
+                  'Chưa có chính sách hợp lệ cho bản xác nhận này. Vui lòng kiểm tra lại thông tin đặt đơn.',
+                ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: enabled ? () => onDecision('REJECT') : null,
+                    onPressed: widget.enabled
+                        ? () => widget.onDecision('REJECT')
+                        : null,
                     child: const Text('Từ chối'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton(
-                    onPressed: enabled ? () => onDecision('CONFIRM') : null,
+                    onPressed:
+                        widget.enabled &&
+                            (!needsConsent ||
+                                _accepted && widget.policies != null)
+                        ? () => widget.onDecision(
+                            'CONFIRM',
+                            policyAccepted: needsConsent && _accepted,
+                          )
+                        : null,
                     child: const Text('Xác nhận'),
                   ),
                 ),

@@ -21,11 +21,12 @@ interface BookingProviderPickerProps {
   zIndex?: number;
   initialProviderId?: string;
   showAutoAssignNote?: boolean;
+  allowAutoAssignWhenEmpty?: boolean;
 }
 
 export const BookingProviderPicker = ({
   anchorRef, providers, preferredProviderId, requestedProviderId, canSearch, requireSelection,
-  isLoading, loadError, error, onClose, onConfirm, zIndex, initialProviderId, showAutoAssignNote,
+  isLoading, loadError, error, onClose, onConfirm, zIndex, initialProviderId, showAutoAssignNote, allowAutoAssignWhenEmpty,
 }: BookingProviderPickerProps) => {
   const [viewingId, setViewingId] = useState<string | null>(initialProviderId ?? null);
   const canChoose = Boolean(canSearch && !isLoading && !loadError && providers.length > 0);
@@ -57,9 +58,12 @@ export const BookingProviderPicker = ({
       ) : loadError ? (
         <p role="alert" className="py-sm text-sm text-error">{loadError}</p>
       ) : providers.length === 0 ? (
-        <p className="py-sm text-sm text-on-surface-variant">
-          {requireSelection ? 'Chưa có thợ đang nhận đơn phù hợp với dịch vụ, địa chỉ và lịch đã chọn.' : 'Chưa tìm thấy thợ phù hợp với dịch vụ và địa chỉ đã chọn.'}
-        </p>
+        <div>
+          {allowAutoAssignWhenEmpty && <NearbyProviderAutoAssignOption isSelected={!preferredProviderId} onSelect={() => onConfirm(undefined)} />}
+          <p className="py-sm text-sm text-on-surface-variant">
+            {requireSelection ? 'Chưa có thợ đang nhận đơn phù hợp với dịch vụ, địa chỉ và lịch đã chọn.' : 'Chưa tìm thấy thợ phù hợp với dịch vụ và địa chỉ đã chọn.'}
+          </p>
+        </div>
       ) : (
         <div className="space-y-sm">
           {requestedProviderId && !providers.some((item) => item.id === requestedProviderId) && (

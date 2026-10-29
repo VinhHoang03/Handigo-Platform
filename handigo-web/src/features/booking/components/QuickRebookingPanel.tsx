@@ -29,7 +29,7 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
 }) {
   const navigate = useNavigate();
   const [draft, setDraft] = useState<RebookingDraft>(() => ({ ...prepared.draft,
-    orderType: isWithinImmediateBookingHours() ? 'normal' : 'scheduled',
+    orderType: prepared.restoredAfterPayment ? prepared.draft.orderType : isWithinImmediateBookingHours() ? 'normal' : 'scheduled',
     paymentMethod: prepared.service.serviceType === 'variable_price' && prepared.draft.paymentMethod === 'cash' ? 'bank' : prepared.draft.paymentMethod,
   }));
   const [busy, setBusy] = useState(false);

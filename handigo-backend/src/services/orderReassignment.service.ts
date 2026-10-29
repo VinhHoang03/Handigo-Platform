@@ -9,6 +9,7 @@ import { createNotificationRecord } from "./notification.service";
 import { DispatchService, getMaxMatchingDurationSeconds } from "./dispatch.service";
 import { emitToUser } from "../sockets/socketServer";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
+import { hasProviderArrived } from "./refundPolicy.service";
 
 export type ReassignmentDecision = "accept" | "decline";
 
@@ -36,9 +37,11 @@ export const requestProviderReassignment = async (
   const session = await mongoose.startSession();
   let updatedOrder: IOrder | null = null;
   let shouldNotify = false;
+  let cancelAfterArrival = false;
 
   try {
     await session.withTransaction(async () => {
+      cancelAfterArrival = false;
       const provider = await Provider.findOne({
         userId: providerUserId,
         isDeleted: false,
@@ -69,6 +72,11 @@ export const requestProviderReassignment = async (
       }
       if (order.customerNoShow?.status === "pending") {
         throw new AppError("Báo cáo khách không có mặt đang chờ xử lý, chưa thể yêu cầu đổi thợ.", 409);
+      }
+      // Kiểm tra lại trong transaction nếu thợ vừa xác nhận đến nơi sau lượt đọc ngoài.
+      if (hasProviderArrived(order)) {
+        cancelAfterArrival = true;
+        return;
       }
       if (order.currentQuotationId) {
         throw new AppError("Không thể tự động đổi kỹ thuật viên khi đơn đã phát sinh báo giá.", 409);
@@ -132,6 +140,9 @@ export const requestProviderReassignment = async (
     await session.endSession();
   }
 
+  if (cancelAfterArrival) {
+    return cancelOrderWithSettlement({ orderId, actorId: providerUserId, role: "provider", reason });
+  }
   const result = await Order.findById(orderId);
   if (!updatedOrder || !result) {
     throw new AppError("Không thể tạo yêu cầu đổi kỹ thuật viên.", 500);
@@ -143,7 +154,7 @@ export const requestProviderReassignment = async (
       type: "ORDER",
       title: "Kỹ thuật viên không thể tiếp tục đơn hàng",
       content: result.inspectionRequired
-        ? `Kỹ thuật viên đã hủy nhận đơn ${result.orderCode}. Handigo đang tự động tìm kỹ thuật viên thay thế và giữ nguyên tiền cọc. Nếu hết thời gian tìm kiếm mà không có người nhận, tiền cọc thực trả được hoàn 100% về ví Handigo.`
+        ? `Kỹ thuật viên đã hủy nhận đơn ${result.orderCode}. Handigo đang tự động tìm kỹ thuật viên thay thế và giữ nguyên tiền cọc. Nếu hết thời gian tìm kiếm mà không có người nhận, tiền cọc thực trả được hoàn 100% về ví Handigo và bạn được tặng voucher giảm 10.000đ tiền cọc cho đơn báo giá tiếp theo.`
         : `Kỹ thuật viên đã hủy đơn ${result.orderCode}. Handigo đang tự động tìm kỹ thuật viên thay thế. Nếu hết thời gian tìm kiếm, đơn sẽ được hủy và bạn được tặng voucher giảm 10%; khoản đã thanh toán qua ví hoặc QR được hoàn về ví Handigo.`,
       data: {
         orderId: result._id,

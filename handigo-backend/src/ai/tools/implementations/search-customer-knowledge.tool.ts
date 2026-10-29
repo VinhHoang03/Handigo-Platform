@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AgentTool } from "../tool.interface";
-import { knowledgeTopics, searchCustomerKnowledge } from "../../knowledge/customer-knowledge";
+import { knowledgeTopics } from "../../knowledge/customer-knowledge";
+import { searchKnowledge } from "../../knowledge/knowledge.service";
 
 const inputSchema = z.object({ query: z.string().trim().min(1).max(200), topic: z.enum(knowledgeTopics).optional() }).strict();
 
@@ -11,5 +12,5 @@ export const searchCustomerKnowledgeTool: AgentTool<z.infer<typeof inputSchema>>
   roles: ["CUSTOMER"],
   mutates: false,
   requiresConfirmation: false,
-  execute: async (_context, args) => searchCustomerKnowledge(args.query, args.topic),
+  execute: async (context, args) => searchKnowledge(args.query, args.topic, context.signal),
 };

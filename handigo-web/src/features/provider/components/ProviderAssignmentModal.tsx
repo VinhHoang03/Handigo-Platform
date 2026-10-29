@@ -1,5 +1,5 @@
 import { Modal } from '@/components/common/Modal';
-import { formatDateTime, shortAddress } from '../utils/providerOrder.utils';
+import { formatDateTime, formatMoney, shortAddress } from '../utils/providerOrder.utils';
 import { useProviderAssignmentGate } from './useProviderAssignmentGate';
 import { BellRing, Shield } from "lucide-react";
 
@@ -56,6 +56,15 @@ export function ProviderAssignmentModal() {
         </div>
 
         {isAppointment && <InfoTile label="Thời gian thực hiện" value={formatDateTime(order.scheduledAt)} />}
+
+        {order.serviceId?.serviceType === 'fixed_price' && (
+          <InfoTile
+            label="Giá trị đơn hàng"
+            value={typeof order.pricing?.totalPaidAmount === 'number' && Number.isFinite(order.pricing.totalPaidAmount)
+              ? formatMoney(order.pricing.totalPaidAmount)
+              : 'Chưa có thông tin giá'}
+          />
+        )}
 
         {order.orderType === 'recurring' && (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-sm text-sm text-on-surface">

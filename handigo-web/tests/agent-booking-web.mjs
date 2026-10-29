@@ -17,6 +17,9 @@ const scroll = process.argv.includes('--scroll');
 const historyActions = process.argv.includes('--history-actions');
 const paymentCancellation = process.argv.includes('--payment-cancellation');
 const flowExtensions = process.argv.includes('--flow-extensions');
+const modelRecovery = process.argv.includes('--model-recovery');
+const newSession = process.argv.includes('--new-session');
+const voucherForm = process.argv.includes('--voucher-form');
 const screenshot = visual ? path.join(tmpdir(), `handigo-agent-${visual}-${viewport.replace(',', 'x')}.png`) : null;
 const folder = await mkdtemp(path.join(tmpdir(), 'handigo-agent-booking-'));
 const mocks = ['booking.api', 'feedback.api', 'customerService.api', 'wallet.api', 'agent.api', 'chatbot.api', 'authenticatedSocket', 'tokenStorage', 'auth.store'];
@@ -61,7 +64,7 @@ try {
         options: async () => []
       };`;
       if (id.includes('wallet.api')) return `export const walletApi = { getMine: async () => ({balance: location.pathname === '/customer/wallet' ? 1000000 : 1000}), createDeposit: async (input) => window.__agentFixture.deposit(input) };`;
-      if (id.includes('agent.api')) return `export const agentApi = { uploadAttachment: (id, file) => window.__agentFixture.upload(id, file), list: async () => window.__agentFixture.history, get: (id) => window.__agentFixture.get(id), latest: () => window.__agentFixture.get(window.__agentFixture.ids.session), send: (input) => window.__agentFixture.send(input) };`;
+      if (id.includes('agent.api')) return `export const agentApi = { uploadAttachment: (id, file) => window.__agentFixture.upload(id, file), reset: (id) => window.__agentFixture.reset(id), list: async () => window.__agentFixture.history, get: (id) => window.__agentFixture.get(id), latest: () => window.__agentFixture.get(window.__agentFixture.ids.session), send: (input) => window.__agentFixture.send(input) };`;
       if (id.includes('chatbot.api')) return `export const chatbotApi = {history: async () => ({items:[]})};`;
       if (id.includes('authenticatedSocket')) return `export const createAuthenticatedSocket = () => { const f = window.__agentFixture; f.socketHandlers ??= {}; return {socket:{on(event, handler){f.socketHandlers[event] = handler;},off(event){delete f.socketHandlers[event];}},dispose(){}}; };`;
       if (id.includes('tokenStorage')) return `export const tokenStorage = {prepareExternalRedirect(){window.__agentFixture.redirectCaptured = true; throw Error('Đã ghi nhận chuyển hướng ngoài trong kiểm thử.');}};`;
@@ -133,7 +136,7 @@ try {
   });
   const [width, height] = viewport.split(',').map(Number);
   await invoke('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
-  await invoke('Page.navigate', { url: `http://127.0.0.1:${port}/agent-check${visual ? `?visual=${encodeURIComponent(visual)}` : flowExtensions ? '?flow-extensions=true' : paymentCancellation ? '?payment-cancellation=true' : historyActions ? '?history-actions=true' : scroll ? '?scroll=true' : business ? '?business=true' : ''}` });
+  await invoke('Page.navigate', { url: `http://127.0.0.1:${port}/agent-check${voucherForm ? '?voucher-form=true' : newSession ? '?new-session=true' : modelRecovery ? '?model-recovery=true' : visual ? `?visual=${encodeURIComponent(visual)}` : flowExtensions ? '?flow-extensions=true' : paymentCancellation ? '?payment-cancellation=true' : historyActions ? '?history-actions=true' : scroll ? '?scroll=true' : business ? '?business=true' : ''}` });
   let output = '';
   const deadline = Date.now() + 45000;
   while (Date.now() < deadline) {
@@ -155,9 +158,12 @@ try {
     await writeFile(screenshot, Buffer.from(capture.data, 'base64'));
   }
   if (screenshot) console.log(`Ảnh kiểm tra giao diện: ${screenshot}`);
+  if (modelRecovery) console.log(`Đạt phục hồi model (${viewport}): không khóa ô nhập/lựa chọn, thử lại đúng lượt, đổi yêu cầu với mã mới và không lặp tin nhắn khách.`);
+  if (newSession) console.log(`Đạt tạo phiên (${viewport}): phiên trống, chờ xác nhận/đối soát, chuyển khi AI đang chạy, giữ trạng thái cũ và bỏ qua phản hồi/lỗi muộn.`);
+  if (voucherForm) console.log(`Đạt voucher trong form (${viewport}): vị trí, mặc định, phần trăm, chọn/bỏ mã, giá backend, lỗi và khóa form cũ.`);
   if (flowExtensions) console.log(`Đạt mở rộng agent (${viewport}): địa chỉ một lần, thợ thực tế/gọi/chat/bản đồ, thử lại lỗi, đánh giá mới/sửa/từ chối và gửi ảnh hỗ trợ sau đặt đơn.`);
   if (paymentCancellation) console.log(`Đạt hủy QR (${viewport}): xác nhận/từ chối, giữ đơn, lỗi hủy giữ QR, ẩn QR sau xác minh và nhận tiền đồng thời.`);
-  if (!paymentCancellation && !flowExtensions) console.log(historyActions ? `Đạt tìm đơn/thợ cũ (${viewport}): thao tác đúng đơn, chọn đúng thợ trùng tên, giữ bản nháp, phân trang, rỗng và thử lại.` : scroll ? `Đạt cuộn chat (${viewport}): giữ tin vừa gửi khi chờ phản hồi và khi có bản xác nhận dài.` : visual ? `Đạt kiểm tra bố cục (${viewport}, ${visual}).` : business ? `Đạt 9–14 trên web (${viewport}): kiểm tra ảnh/giới hạn/lỗi upload, ảnh trong tin nhắn và xác nhận, bỏ ảnh, xác nhận lại và nút tra cứu đúng đơn.` : `Đạt 1–6 (${viewport}): sửa form và thử lại an toàn, chọn lịch UTC+7, hồ sơ thợ, nạp ví quay lại đúng đơn, chính sách và hành động theo trạng thái.`);
+  if (!voucherForm && !newSession && !modelRecovery && !paymentCancellation && !flowExtensions) console.log(historyActions ? `Đạt tìm đơn/thợ cũ (${viewport}): thao tác đúng đơn, chọn đúng thợ trùng tên, giữ bản nháp, phân trang, rỗng và thử lại.` : scroll ? `Đạt cuộn chat (${viewport}): giữ tin vừa gửi khi chờ phản hồi và khi có bản xác nhận dài.` : visual ? `Đạt kiểm tra bố cục (${viewport}, ${visual}).` : business ? `Đạt 9–14 trên web (${viewport}): kiểm tra ảnh/giới hạn/lỗi upload, ảnh trong tin nhắn và xác nhận, bỏ ảnh, xác nhận lại và nút tra cứu đúng đơn.` : `Đạt 1–6 (${viewport}): sửa form và thử lại an toàn, chọn lịch UTC+7, hồ sơ thợ, nạp ví quay lại đúng đơn, chính sách và hành động theo trạng thái.`);
 } finally {
   connection?.close();
   if (browser && browser.exitCode === null) {

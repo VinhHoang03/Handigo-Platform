@@ -5,7 +5,7 @@ import { bookingSchema, priceSchema } from "./booking.schemas";
 import type { AgentTool } from "../tool.interface";
 
 export const getBookingVouchersTool: AgentTool<z.infer<typeof priceSchema>> = {
-  name: "get_booking_vouchers", description: "Xem voucher của khách và mã công khai dùng được cho giá/gói dịch vụ đang đặt, gồm số tiền giảm và số tiền còn lại. Không áp dụng hoặc giữ mã. Dùng update_booking_draft để chọn voucherCode sau khi khách đồng ý; null để không dùng.",
+  name: "get_booking_vouchers", description: "Xem voucher của khách và mã công khai dùng được cho giá/gói dịch vụ đang đặt. Hiển thị ưu đãi theo discountType/discountValue: PERCENT ghi phần trăm, AMOUNT ghi số tiền; không đổi nhãn mã phần trăm thành số tiền giảm đã tính. discountAmount và finalAmount dùng kiểm tra giá thực tế. Không áp dụng hoặc giữ mã. Dùng update_booking_draft để chọn voucherCode sau khi khách đồng ý; null để không dùng.",
   inputSchema: priceSchema, roles: ["CUSTOMER"], mutates: false, requiresConfirmation: false,
   execute: (context, args) => AgentBookingService.vouchers(context.user.id, args),
 };
@@ -31,5 +31,16 @@ export const saveBookingAddressTool: AgentTool<AgentAddressArguments> = {
     return { ...result, nextStep: args.useForBooking
       ? "Địa chỉ đã lưu và được chọn cho bản nháp. Gọi update_booking_draft với mode resume để kiểm tra lại voucher, thợ và hiển thị form đặt đơn. Không lưu lại địa chỉ."
       : "Địa chỉ đã lưu; không thay đổi bản nháp đặt đơn." };
+  },
+  reconcile: async (context, args) => {
+    const result = await AgentAddressService.reconcile(context.user.id, args, context.confirmedPreview, context.actionCreatedAt);
+    if (result && args.useForBooking && context.session?.bookingDraft
+      && ["active", "paused"].includes(context.session.bookingDraft.status)) {
+      context.session.bookingDraft.values.addressId = result.addressId;
+      context.session.bookingDraft.sources.addressId = "customer";
+      context.session.bookingDraft.addressPreference = undefined;
+      context.session.bookingDraft.status = "active";
+    }
+    return result;
   },
 };

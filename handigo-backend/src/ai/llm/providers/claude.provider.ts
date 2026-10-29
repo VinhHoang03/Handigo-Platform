@@ -1,3 +1,4 @@
+import { reportModelUsage } from "../model-usage";
 import { z } from "zod";
 import type { LLMProvider, LLMRequest, ProviderConfig } from "../llm.interface";
 import { parseReply, postJson, requestContext } from "./provider-http";
@@ -17,6 +18,7 @@ export class ClaudeProvider implements LLMProvider {
         tools: nativeTools(request).map((tool) => ({ name: tool.name, description: tool.description, input_schema: tool.inputSchema })),
         tool_choice: { type: "auto", disable_parallel_tool_use: true },
       }, this.config, request.signal);
+    reportModelUsage(request, "claude", this.config.model, data);
     const parsed = z.object({ stop_reason: z.string(), content: z.array(z.object({ type: z.string(), text: z.string().optional(),
       name: z.string().optional(), input: z.unknown().optional() })) }).parse(data);
     const calls = parsed.content.filter((block) => block.type === "tool_use");

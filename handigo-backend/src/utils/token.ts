@@ -1,5 +1,6 @@
 import jwt, { SignOptions } from "jsonwebtoken";
 import { IUser } from "../models/user.model";
+import { getEffectiveUserRole } from "./userRole";
 
 // Token và tài khoản cũ chưa có phiên bản được xem là phiên bản 0.
 export const isTokenVersionCurrent = (
@@ -37,7 +38,7 @@ export const signAccessToken = (user: IUser): string => {
     {
       id: user._id.toString(),
       email: user.email,
-      role: user.role,
+      role: getEffectiveUserRole(user),
       tokenVersion: user.tokenVersion ?? 0,
     },
     getAccessSecret(),

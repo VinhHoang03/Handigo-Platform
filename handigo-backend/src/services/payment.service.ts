@@ -924,11 +924,11 @@ export const createPayment = async (user: RequestUser, input: CreatePaymentInput
     paymentLink = await payos.paymentRequests.create({
       orderCode,
       amount: reservedAmount,
-      description: reservedPaymentType === "inspection_deposit" ? "Dat coc FixNow" : "Thanh toan FixNow",
+      description: reservedPaymentType === "inspection_deposit" ? "Dat coc Handigo" : "Thanh toan Handigo",
       ...redirectUrls,
       items: [
         {
-          name: reservedPaymentType === "inspection_deposit" ? "Đặt cọc dịch vụ FixNow" : "Thanh toán dịch vụ FixNow",
+          name: reservedPaymentType === "inspection_deposit" ? "Đặt cọc dịch vụ Handigo" : "Thanh toán dịch vụ Handigo",
           quantity: 1,
           price: reservedAmount,
         },

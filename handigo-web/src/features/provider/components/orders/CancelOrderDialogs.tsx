@@ -52,7 +52,6 @@ export function CancellationDialog({
         <span className="mt-1 block text-right text-xs text-on-surface-variant">{explanation.length}/500</span>
       </label>
       <div className="mt-md flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
-        <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50"><TriangleAlert aria-hidden="true" size={24} />Tiếp tục hủy đơn</button>
       </div>
     </Modal>
@@ -78,7 +77,6 @@ export function CancelConfirmationDialog({ reason, busy, onBack, onConfirm }: Ca
         <p className="mt-1 text-sm font-medium text-on-surface">{reason}</p>
       </div>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button type="button" onClick={onBack} disabled={busy} className="btn-secondary min-h-12">Kiểm tra lại</button>
         <button type="button" onClick={onConfirm} disabled={busy} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-error px-5 py-3 font-bold text-on-error shadow-md transition hover:brightness-95 active:scale-[0.98] disabled:opacity-50">
           <Trash aria-hidden="true" size={24} />
           {busy ? 'Đang xử lý...' : 'Hủy đơn'}

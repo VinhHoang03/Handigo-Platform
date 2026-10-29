@@ -9,6 +9,7 @@ import { Refund } from "../models/refund.model";
 import { SupportTicket } from "../models/supportTicket.model";
 import { Report } from "../models/report.model";
 import type { AgentSession } from "../ai/agent/agent-state";
+import type { SessionEngine } from "../ai/session/session.service";
 import type { AgentPaymentResult } from "./agentPayment.service";
 import { emitToUser } from "../sockets/socketServer";
 import { AppError } from "../utils/appError";
@@ -16,6 +17,7 @@ import { createLogger } from "../utils/logger";
 
 const logger = createLogger("AgentOrderProgress");
 const CURSOR_ID = "booking-progress";
+const intermediateRefundMessageId = /^order-event:refund:[a-f\d]{24}:(?:requested|processing|failed)$/i;
 const orderLabels: Record<string, string> = {
   created: "Đã tạo đơn, đang chờ xử lý.", accepted: "Thợ đã nhận đơn.",
   in_progress: "Thợ đang thực hiện dịch vụ.", completed: "Đơn hàng đã hoàn tất.",
@@ -121,7 +123,7 @@ async function updateBookingPayment(subscription: Recipient, orderId: string, me
   return false;
 }
 
-// Chỉ gộp kết quả thanh toán tự động trong cùng lượt tạo đơn; tra cứu riêng vẫn có phản hồi riêng.
+// Gộp kết quả tự động vào tiến độ đơn; tra cứu bằng tin nhắn vẫn có phản hồi riêng.
 export async function combineAgentBookingPayment(session: AgentSession, result: unknown) {
   const payment = result as AgentPaymentResult | undefined;
   if (!payment?.orderId || !["paid", "deposit_paid", "pending", "cash_pending"].includes(payment.status)) return;
@@ -217,12 +219,29 @@ export async function restoreAgentProgressTracking(session: AgentSession) {
   }
 }
 
+// Directory chỉ định nguồn đọc; kết quả graph phải lấy từ checkpoint, không dùng cache dự phòng.
+export async function restoreAgentSessionTracking(document: {
+  _id: string; userId: string; engine?: SessionEngine; deletedAt?: Date | null; data?: AgentSession;
+}, loadCustomerSession: (id: string, userId: string) => Promise<AgentSession> = async (id, userId) =>
+  (await (await import("../ai/runtime/graph-host")).getCustomerGraphHost()).get(id, userId)) {
+  if (document.deletedAt || document.engine === "langgraph-readonly") return;
+  const session = document.engine === "langgraph-customer"
+    ? await loadCustomerSession(document._id, document.userId) : document.data;
+  if (!session || session.id !== document._id || session.userId !== document.userId) {
+    throw new AppError("Nguồn phiên không khớp để khôi phục theo dõi tiến độ.", 409);
+  }
+  await restoreAgentProgressTracking(session);
+}
+
 export async function mergeAgentOrderMessages(session: AgentSession) {
+  // Ẩn thông báo trung gian cũ khỏi chat, giữ nguyên bản ghi lịch sử trong database.
+  session.conversation = session.conversation.filter((message) => message.role !== "assistant" || !intermediateRefundMessageId.test(message.id));
   try {
     const updates = await AgentOrderMessage.find({ sessionId: session.id, userId: session.userId })
       .sort({ createdAt: 1, _id: 1 }).lean();
     const existing = new Map(session.conversation.map((message) => [message.id, message]));
     for (const update of updates) {
+      if (intermediateRefundMessageId.test(update._id)) continue;
       const previous = existing.get(update._id);
       if (previous) { previous.content = update.content; previous.choiceGroups = update.choiceGroups; continue; }
       session.conversation.push({
@@ -355,13 +374,11 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
     }
   } else if (change.ns.coll === Refund.collection.collectionName) {
     if (String(doc.customerId) !== subscription.userId) return;
+    // Khách chỉ cần kết quả cuối hoặc mốc cần hỗ trợ; không phát từng lần xử lý/thử lại.
+    if (!["succeeded", "manual_review"].includes(String(fields.status))) return;
     lines = describeRefundProgress(doc, fields.status);
     if (!lines.length) return;
-    const policy = order.cancellation?.refundPolicy;
-    if (policy && fields.status === "requested") {
-      lines.push(`Đã thanh toán: ${money(policy.paidAmount)}. Phí hủy: ${money(policy.cancellationFee)}.`);
-    }
-    const stage = ["requesting", "pending"].includes(String(fields.status)) ? "processing" : String(fields.status);
+    const stage = String(fields.status);
     await deliver(subscription, `order-event:refund:${stage === "succeeded" ? doc.paymentId ?? doc._id : doc._id}:${stage}`,
       `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date(), undefined, stage === "succeeded");
     return;
@@ -410,14 +427,18 @@ async function restoreSavedTracking() {
   if (restoring || !running) return;
   restoring = true;
   try {
-    // Kết quả thành công trong checkpoint là nguồn bền vững để thử lại sau restart.
+    // Cache graph có thể cũ sau crash; luôn nạp checkpoint cho các phiên nghiệp vụ còn hiệu lực.
     const sessions = mongoose.models.AiAgentSession;
     if (!sessions) return;
-    for await (const document of sessions.find({ "data.actions": { $elemMatch: {
-      tool: { $in: ["create_booking", "create_support_ticket", "create_complaint"] }, status: "SUCCEEDED",
-    } } }).select("data").lean().cursor()) {
+    for await (const document of sessions.find({ deletedAt: null, $or: [
+      { engine: "langgraph-customer" },
+      { engine: { $in: [null, "legacy"] }, "data.actions": { $elemMatch: {
+        tool: { $in: ["create_booking", "create_support_ticket", "create_complaint"] }, status: "SUCCEEDED",
+      } } },
+    ] }).select("userId engine deletedAt data").lean().cursor()) {
       if (!running) break;
-      await restoreAgentProgressTracking(document.data as AgentSession);
+      try { await restoreAgentSessionTracking(document); }
+      catch { logger.warn("Chưa thể khôi phục theo dõi của một phiên; sẽ thử lại ở chu kỳ tiếp theo."); }
     }
   } catch { logger.warn("Chưa thể khôi phục đăng ký theo dõi; sẽ thử lại ở chu kỳ tiếp theo."); }
   finally { restoring = false; }

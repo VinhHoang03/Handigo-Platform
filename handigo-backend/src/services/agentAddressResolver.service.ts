@@ -1,22 +1,16 @@
+import { normalizeAgentAddressPart as normalize, agentAdministrativeUnitName as unitName, agentProvinceAliases as provinceAliases, extractAgentAddressDetail } from "../utils/agentAddressFormatting";
 import { getProvinces, getWardsByProvince, type AdministrativeUnit } from "./vietnamAddress.service";
 import { searchAddressLocations, type AddressSearchCandidate } from "./reverseGeocoding.service";
 import { AppError } from "../utils/appError";
 
 export const AGENT_AREA_PLACE_PREFIX = "agent-area:";
-export const AGENT_AREA_LOCATION_NOTE = "Vị trí trên bản đồ là vị trí tham chiếu của phường/xã. Thợ cần liên hệ người nhận để xác định điểm đến cụ thể.";
+export const AGENT_AREA_LOCATION_NOTE = "Thợ sẽ liên hệ bạn để xác nhận vị trí cụ thể trước khi đến.";
 export const AGENT_UNLOCATED_NOTE = "Phường/xã và tỉnh/thành phố đã được xác thực. Địa chỉ vẫn được lưu khi chưa tra được tọa độ; cần tra lại vị trí hoặc chọn ghim trên bản đồ trước khi tìm thợ.";
 type AddressInput = { addressText?: string; fullAddress?: string; province?: string; ward?: string };
 
-const normalize = (value: string) => value.toLocaleLowerCase("vi-VN").normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9]+/g, " ").trim();
-const unitName = (value: string) => normalize(value).replace(/^(?:thanh pho|tinh|tp|phuong|xa|thi tran|quan|huyen|p|tt)\s+/, "");
 export const normalizeAgentAdministrativeName = (value: string) => {
   const name = unitName(value);
   return ["hcm", "tphcm", "sai gon"].includes(name) ? "ho chi minh" : name;
-};
-const provinceAliases = (name: string) => {
-  const base = unitName(name);
-  return base === "ho chi minh" ? [base, "tp hcm", "tphcm", "hcm", "sai gon"] : [base];
 };
 const sameUnit = (name: string, value: string) => unitName(name) === unitName(value);
 const unique = (units: AdministrativeUnit[]) => units.filter((unit, index) => units.findIndex((item) => item.code === unit.code) === index);
@@ -111,8 +105,8 @@ export async function resolveAgentAddress(input: AddressInput) {
     ? `Mình tìm thấy nhiều phường/xã trong ${province.name}: ${wardMatches.slice(0, 6).map((unit) => unit.name).join(", ")}. Bạn chọn phường/xã nào?`
     : `Chưa xác định được phường/xã của địa chỉ trong ${province.name}. Bạn bổ sung tên phường/xã giúp mình nhé; không cần số nhà.`, 422);
   const ward = wardMatches[0];
-  const parts = (input.fullAddress?.trim() || text).split(/[,;\n]/).map((part) => part.trim()).filter(Boolean)
-    .filter((part) => !sameUnit(part, ward.name) && !provinceAliases(province.name).includes(unitName(part)) && normalize(part) !== "viet nam");
+  const detail = extractAgentAddressDetail(input.fullAddress?.trim() || text, ward.name, province.name);
+  const parts = detail.split(",").map(part => part.trim()).filter(Boolean);
   const description = parts.join(", ");
   const fullAddress = description.length >= 5 ? description : [description, ward.name, province.name].filter(Boolean).join(", ");
   const query = [fullAddress, ward.name, province.name, "Việt Nam"].join(", ");

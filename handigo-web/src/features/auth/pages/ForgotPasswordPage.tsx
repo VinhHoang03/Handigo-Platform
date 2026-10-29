@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
 
   const requestOtp = async () => {
     await authService.forgotPassword({ email: normalizedEmail });
-    setNotice('Nếu email tồn tại, mã OTP đã được gửi đến hộp thư của bạn.');
+    setNotice('Mã OTP đã được gửi đến hộp thư của bạn.');
   };
 
   const handleSendOtp = async (event: FormEvent<HTMLFormElement>) => {
@@ -153,7 +153,6 @@ export default function ForgotPasswordPage() {
           onNewPasswordChange={setNewPassword}
           onConfirmPasswordChange={setConfirmPassword}
           onSubmit={handleResetPassword}
-          onBack={() => setStep('otp')}
         />
       )}
 

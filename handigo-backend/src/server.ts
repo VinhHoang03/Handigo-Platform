@@ -90,6 +90,7 @@ const startServer = async () => {
             resolve();
           });
         });
+        await import("./ai/runtime/graph-host").then((host) => host.closeGraphHost());
         await mongoose.connection.close();
         clearTimeout(forceShutdownTimer);
         serverLogger.info("Đã đóng máy chủ an toàn.");

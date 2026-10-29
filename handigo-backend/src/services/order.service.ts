@@ -38,6 +38,7 @@ import { MatchingService } from "./matching.service";
 import { emitToUser } from "../sockets/socketServer";
 import { createNotificationRecord } from "./notification.service";
 import { requestProviderReassignment } from "./orderReassignment.service";
+import { hasProviderArrived } from "./refundPolicy.service";
 import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
@@ -219,7 +220,7 @@ export const OrderService = {
         || !isWithinAppointmentHours(scheduledAt))
     ) {
       throw new AppError(
-        "Vui lòng chọn giờ hợp lệ và không sớm hơn phút hiện tại.",
+        "Vui lòng chọn giờ từ 08:00 đến 21:00 theo giờ Việt Nam và không sớm hơn phút hiện tại.",
         400,
       );
     }
@@ -984,14 +985,10 @@ export const OrderService = {
         }
         if (await Order.exists({ providerId: provider._id, _id: { $ne: order._id }, status: "in_progress", isDeleted: false }).session(session)) throw new AppError("Bạn đang thực hiện một đơn khác.", 409);
         const now = new Date();
-        const isEarlyFixedAppointment = order.orderType === "scheduled"
-          && !order.inspectionRequired
-          && order.scheduledAt != null
-          && order.scheduledAt.getTime() > now.getTime();
         order.schedule = { durationMinutes: duration, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes, expectedStartAt: now, expectedEndAt: new Date(now.getTime() + duration * 60000) };
-        // Lịch hẹn đã xác nhận cho phép thợ chủ động bắt đầu sớm ngoài khung lịch dự kiến.
-        if (!isEarlyFixedAppointment) {
-          await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy);
+        // Đơn giá cố định đã nhận được bắt đầu theo thực tế; đơn khảo sát cần kiểm tra thời lượng báo giá mới.
+        if (order.inspectionRequired) {
+          await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy, { checkWorkingCalendar: false });
         }
         order.status = "in_progress";
         provider.availabilityStatus = "busy";
@@ -1207,13 +1204,13 @@ export const OrderService = {
     confirmedExpectation?: CancellationExpectation,
   ): Promise<IOrder> {
     if (role === "provider") {
-      const order = await Order.findById(orderId).select("status currentQuotationId reassignment customerNoShow");
+      const order = await Order.findById(orderId).select("status currentQuotationId reassignment customerNoShow providerId arrival");
       if (order?.customerNoShow?.status === "pending") {
         throw new AppError("Báo cáo khách không có mặt đang chờ xử lý, chưa thể hủy nhận đơn.", 409);
       }
       if (
         order && (order.status === "accepted" || order.reassignment?.automatic) &&
-        !order.currentQuotationId
+        !order.currentQuotationId && !hasProviderArrived(order)
       ) {
         return requestProviderReassignment(orderId, userId, reason);
       }

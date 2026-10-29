@@ -16,6 +16,7 @@ import { markProviderOffline, restoreProviderAfterReconnect } from "../services/
 import { createLogger } from "../utils/logger";
 import { isTokenVersionCurrent } from "../utils/token";
 import { refreshAccountLock } from "../services/penaltyPolicy.service";
+import { getEffectiveUserRole } from "../utils/userRole";
 
 const PROVIDER_OFFLINE_GRACE_MS = 30_000;
 const socketLogger = createLogger("SocketServer");
@@ -80,7 +81,7 @@ export const initSocket = (server: HttpServer) => {
       socket.user = {
         id: user._id.toString(),
         email: user.email,
-        role: user.role,
+        role: getEffectiveUserRole(user),
         tokenVersion: decoded.tokenVersion ?? 0,
       };
       next();
@@ -96,8 +97,8 @@ export const initSocket = (server: HttpServer) => {
     });
     socket.use(async (_packet, next) => {
       try {
-        const current = await User.findOne({ _id: socketUser.id, isDeleted: false }).select("status role tokenVersion").lean();
-        if (!current || current.status === "locked" || current.role !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
+        const current = await User.findOne({ _id: socketUser.id, isDeleted: false }).select("status role tokenVersion providerOnboardingStatus").lean();
+        if (!current || current.status === "locked" || getEffectiveUserRole(current) !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
           next(new Error("Tài khoản không còn quyền sử dụng kết nối này."));
           socket.disconnect(true);
           return;
@@ -111,10 +112,10 @@ export const initSocket = (server: HttpServer) => {
     socket.join(userRoom);
     // Kiểm tra lại sau khi vào room để chặn phiên đổi mật khẩu giữa lúc bắt tay và kết nối.
     void User.findOne({ _id: socketUser.id, isDeleted: false })
-      .select("status role tokenVersion")
+      .select("status role tokenVersion providerOnboardingStatus")
       .lean()
       .then((current) => {
-        if (!current || current.status === "locked" || current.role !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
+        if (!current || current.status === "locked" || getEffectiveUserRole(current) !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
           socket.disconnect(true);
         }
       })

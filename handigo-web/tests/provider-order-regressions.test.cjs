@@ -159,6 +159,27 @@ test('KH-43: trang tạo lại trạng thái biểu mẫu và hộp thoại theo
 
 const children = element => element == null || typeof element !== 'object' ? [] : [element, ...[element.props?.children].flat(Infinity).flatMap(children)];
 
+test('Đơn báo giá đã nhận, chưa đến nơi có thao tác hủy bên cạnh xác nhận đến nơi', () => {
+  const app = fixture();
+  let opened = false;
+  const Arrival = () => null;
+  app.modules['react-router-dom'].useParams = () => ({ orderId: 'A' });
+  app.modules['../utils/providerOrder.utils'] = { getCustomer: () => ({}) };
+  app.modules['../utils/providerOrderDetailLabels'] = app.load('features/provider/utils/providerOrderDetailLabels.ts');
+  app.modules['../components/orders/OrderArrivalPanel'] = { OrderArrivalPanel: Arrival };
+  app.modules['../hooks/useProviderOrderDetail'] = { useProviderOrderDetail: () => ({
+    order: { ...order('A'), inspectionRequired: true, serviceId: { serviceType: 'variable_price' },
+      addressId: { fullAddress: 'Địa chỉ kiểm thử' } },
+    setCancelOpen: value => { opened = value; },
+  }) };
+  const Page = app.load('features/provider/pages/ProviderOrderDetailPage.tsx').default;
+  const page = Page();
+  const panel = children(page.type(page.props)).find(item => item.type === Arrival);
+  assert.equal(typeof panel.props.onCancel, 'function');
+  panel.props.onCancel();
+  assert.equal(opened, true);
+});
+
 for (const provider of [false, true]) {
   test(`KH-40: hồ sơ ${provider ? 'thợ' : 'khách'} A trả muộn không sửa hồ sơ hoặc thông tin tài khoản B`, async () => {
     const app = fixture(); const pending = deferred();
@@ -259,4 +280,13 @@ test('KH-41: thẻ và popup không lỗi khi địa chỉ null và chỉ hiển
       assert.match(text + props, addressId ? /Phường thử, Tỉnh thử/ : /Chưa có thông tin khu vực/);
     }
   }
+});
+
+test('Nhãn khoản hoàn sau khi đến nơi dùng đúng số tiền, không hiện phần trăm dài', () => {
+  const app = fixture();
+  const labels = app.load('features/provider/utils/providerOrderDetailLabels.ts');
+  const value = { ...order('A'), status: 'cancelled', paymentStatus: 'refunded',
+    cancellation: { refundPolicy: { policyVersion: 'HANDIGO_PROVIDER_ARRIVAL_CANCEL_V1', refundAmount: 115000,
+      paidAmount: 120000, refundRate: 115000 / 120000 * 100 } } };
+  assert.equal(labels.getPaymentStatusLabel(value), 'Đã hoàn 115.000đ về ví khách');
 });

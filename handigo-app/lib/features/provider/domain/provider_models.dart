@@ -43,6 +43,7 @@ class ProviderAssignment {
     this.serviceImage,
     this.orderType,
     this.totalAmount,
+    this.serviceType,
   });
 
   factory ProviderAssignment.fromJson(Map<String, dynamic> json) {
@@ -58,6 +59,9 @@ class ProviderAssignment {
       serviceName: service is Map<String, dynamic>
           ? service['name'] as String? ?? 'Dịch vụ'
           : 'Dịch vụ',
+      serviceType: service is Map<String, dynamic>
+          ? service['serviceType'] as String?
+          : null,
       scheduledAt: _date(order['scheduledAt']),
       addressLabel: address is Map<String, dynamic>
           ? formatAddressData(address)
@@ -85,6 +89,7 @@ class ProviderAssignment {
   final String? serviceImage;
   final String? orderType;
   final double? totalAmount;
+  final String? serviceType;
 }
 
 String _id(Map<String, dynamic> json) => (json['_id'] ?? json['id']).toString();

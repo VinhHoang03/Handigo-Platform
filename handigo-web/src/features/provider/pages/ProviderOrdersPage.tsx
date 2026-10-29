@@ -1,4 +1,4 @@
-import { useToast, useToastFeedback } from "@/components/common/Toast";
+import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
@@ -7,7 +7,6 @@ import { DashboardShell } from '@/components/common/DashboardShell';
 import { Pagination } from '@/components/common/Pagination';
 import { providerOrderApi } from '../api/providerOrder.api';
 import { ProviderOrderCard } from '../components/ProviderOrderCard';
-import { PendingAssignmentsSection } from '../components/orders/PendingAssignmentsSection';
 import { ProviderOrdersListSkeleton } from '../components/orders/ProviderOrdersListSkeleton';
 import type { OrderAssignment } from '../types/providerOrder.types';
 import type { Order, Pagination as PaginationData } from '@/types/booking';
@@ -27,7 +26,6 @@ export default function ProviderOrdersPage() {
   const navigate = useNavigate();
   const requestedAssignment = searchParams.get('assignmentId');
   const requestedOrder = searchParams.get('orderId');
-  const { addToast } = useToast();
   const [assignments, setAssignments] = useState<OrderAssignment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [page, setPage] = useState(1);
@@ -46,7 +44,6 @@ export default function ProviderOrdersPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [actionBusy, setActionBusy] = useState(false);
   const [error, setError] = useToastFeedback<string | null>(null, "error");
 
   useEffect(() => {
@@ -125,50 +122,11 @@ export default function ProviderOrdersPage() {
     void Promise.resolve().then(loadOrders);
   }, [loadOrders]);
 
-  const handleAccept = async (assignmentId: string) => {
-    try {
-      setActionBusy(true);
-      await providerOrderApi.acceptAssignment(assignmentId);
-      addToast("Đã nhận đơn dịch vụ.", "success");
-      await Promise.all([loadAssignments(), loadOrders()]);
-    } catch (err: unknown) {
-      const message =
-        typeof err === 'object' &&
-        err !== null &&
-        'response' in err &&
-        typeof err.response === 'object' &&
-        err.response !== null &&
-        'data' in err.response
-          ? ((err.response.data as { message?: string }).message ?? 'Không thể nhận đơn.')
-          : 'Không thể nhận đơn.';
-      setError(message);
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const handleReject = async (assignmentId: string) => {
-    const reason = window.prompt('Lý do từ chối (tùy chọn):') ?? undefined;
-    try {
-      setActionBusy(true);
-      await providerOrderApi.rejectAssignment(assignmentId, reason);
-      addToast("Đã từ chối đơn dịch vụ.", "success");
-      await loadAssignments();
-    } catch {
-      setError('Không thể từ chối đơn.');
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
   return (
     <DashboardShell role="PROVIDER">
       <div className="space-y-gutter">
         <header className="space-y-2">
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Đơn dịch vụ</h1>
-          <p className="text-on-surface-variant">
-            Nhận đơn mới, theo dõi tiến độ và xử lý các yêu cầu được phân công.
-          </p>
         </header>
 
         {error && (
@@ -184,15 +142,6 @@ export default function ProviderOrdersPage() {
           </div>
         )}
 
-        <PendingAssignmentsSection
-          visible={Boolean(requestedAssignment)}
-          assignments={requestedAssignment ? assignments.filter(item => item._id === requestedAssignment) : assignments}
-          loading={loadingAssignments || loadedAssignment !== requestedAssignment}
-          busy={actionBusy}
-          onRefresh={loadAssignments}
-          onAccept={handleAccept}
-          onReject={handleReject}
-        />
         {requestedAssignment && (assignmentError || notificationMessage?.assignmentId === requestedAssignment) && (
           <div className="rounded-2xl bg-surface-container-low p-md text-on-surface-variant" role="status">
             {assignmentError || notificationMessage?.text}

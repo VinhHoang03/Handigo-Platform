@@ -5,6 +5,11 @@ export const REFUND_POLICY_VERSION = "HANDIGO_REFUND_V1";
 export const CUSTOMER_CANCELLATION_POLICY_VERSION = "HANDIGO_CUSTOMER_CANCEL_5M_V1";
 export const CUSTOMER_CANCELLATION_WINDOW_MS = 5 * 60 * 1000;
 export const QUOTATION_DEPOSIT_POLICY_VERSION = "HANDIGO_QUOTATION_DEPOSIT_V1";
+export const PROVIDER_ARRIVAL_CANCELLATION_POLICY_VERSION = "HANDIGO_PROVIDER_ARRIVAL_CANCEL_V1";
+export const PROVIDER_ARRIVAL_CANCELLATION_SUPPORT = 5_000;
+export const hasProviderArrived = (order: Pick<IOrder, "providerId" | "arrival">) =>
+  Boolean(order.providerId && order.arrival?.arrivedAt
+    && order.arrival.providerId.toString() === order.providerId.toString());
 export const QUOTATION_DECLINED_REASON = "Khách hàng không đồng ý báo giá";
 export const isQuotationDeclinedReason = (reason = "") =>
   reason.trim() === QUOTATION_DECLINED_REASON || reason.trim().startsWith(`${QUOTATION_DECLINED_REASON}:`);
@@ -26,6 +31,7 @@ export interface RefundPolicyInput {
   paidInspectionDeposit?: number;
   cancellationReason?: string;
   providerAcceptedAt?: Date | null;
+  providerArrived?: boolean;
 }
 
 export interface RefundPolicyResult {
@@ -55,6 +61,19 @@ export const calculateRefundPolicy = (
     : null;
 
   const canCancel = ["created", "accepted"].includes(input.orderStatus);
+  if (input.role === "provider" && input.orderStatus === "accepted"
+    && input.hasAssignedProvider && input.providerArrived) {
+    const cancellationFee = Math.min(paidAmount, PROVIDER_ARRIVAL_CANCELLATION_SUPPORT);
+    const refundAmount = paidAmount - cancellationFee;
+    return {
+      policyVersion: PROVIDER_ARRIVAL_CANCELLATION_POLICY_VERSION,
+      canCancel: true, refundRate: paidAmount ? refundAmount / paidAmount * 100 : 100,
+      paidAmount, refundAmount, cancellationFee,
+      providerCompensation: PROVIDER_ARRIVAL_CANCELLATION_SUPPORT,
+      providerCompensationRate: 100, platformRetainedAmount: 0, hoursBeforeStart,
+      policyReason: "Thợ hủy sau khi đã đến nơi: thợ nhận 5.000đ vào ví; tiền đã thanh toán được hoàn về ví khách sau khi trừ khoản hỗ trợ. Tiền mặt chưa thu do Handigo hỗ trợ. Không tìm thợ thay thế.",
+    };
+  }
   if (canCancel && input.inspectionRequired && input.orderStatus === "accepted"
     && input.hasAssignedProvider && input.role === "provider" && input.hasRepairQuotation) {
     const deposit = Math.min(paidAmount, roundMoney(input.paidInspectionDeposit || 0));
