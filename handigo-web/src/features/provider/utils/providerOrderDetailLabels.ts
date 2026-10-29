@@ -16,6 +16,10 @@ export const orderTypeLabels: Record<Order['orderType'], string> = {
 };
 
 export function getPaymentStatusLabel(order: Order) {
+  if (order.status === 'cancelled' && order.paymentStatus === 'refunded'
+    && order.cancellation?.refundPolicy?.policyVersion === 'HANDIGO_PROVIDER_ARRIVAL_CANCEL_V1') {
+    return `Đã hoàn ${order.cancellation.refundPolicy.refundAmount.toLocaleString('vi-VN')}đ về ví khách`;
+  }
   if (order.status === 'cancelled' && order.cancellation?.refundPolicy?.policyVersion === 'HANDIGO_QUOTATION_DEPOSIT_V1') {
     return '';
   }

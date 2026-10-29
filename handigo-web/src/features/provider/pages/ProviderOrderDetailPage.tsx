@@ -146,7 +146,7 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
 
         <OrderTrackingMap order={order} viewerRole="PROVIDER" />
         {!quotation && !order.currentQuotationId && <OrderArrivalPanel order={order} busy={busy} onArrival={handleArrival}
-          onCancel={!isQuotationOrder ? () => setCancelOpen(true) : undefined} checkNoShow={checkNoShow} onNoShow={handleNoShow} />}
+          onCancel={() => setCancelOpen(true)} checkNoShow={checkNoShow} onNoShow={handleNoShow} />}
 
         <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-2">
           {isQuotationOrder ? (

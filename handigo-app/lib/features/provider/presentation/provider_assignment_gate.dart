@@ -249,6 +249,13 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
   @override
   Widget build(BuildContext context) {
     final item = _foreground ? _current : null;
+    final amountLabel = item?.totalAmount?.isFinite == true
+        ? NumberFormat.currency(
+            locale: 'vi_VN',
+            symbol: 'đ',
+            decimalDigits: 0,
+          ).format(item!.totalAmount)
+        : null;
     return Stack(
       children: [
         ExcludeFocus(
@@ -325,6 +332,16 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                             ],
                           ),
                         ),
+                        if (item.serviceType == 'fixed_price') ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Giá trị đơn hàng: ${amountLabel ?? 'Chưa có thông tin giá'}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
                         if ((_fullAddress ?? item.addressLabel)?.isNotEmpty ==
                             true) ...[
                           const SizedBox(height: 8),
@@ -411,16 +428,12 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                                     style: const TextStyle(fontSize: 13),
                                   ),
                                 ),
-                                if (item.totalAmount != null) ...[
+                                if (amountLabel != null) ...[
                                   const SizedBox(height: 4),
                                   FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
-                                      NumberFormat.currency(
-                                        locale: 'vi_VN',
-                                        symbol: 'đ',
-                                        decimalDigits: 0,
-                                      ).format(item.totalAmount),
+                                      amountLabel,
                                       style: const TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.w600,

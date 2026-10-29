@@ -135,7 +135,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
             ? 'INSPECTION_DEPOSIT'
             : 'FULL',
         returnUrl: `${window.location.origin}/customer/bookings/result?orderId=${orderId}&payos=success`,
-        cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
+        cancelUrl: `${window.location.origin}${params.paymentCancelPath ?? '/customer/bookings/new/payment'}`,
       });
 
       if (!isCurrentSession()) return;
@@ -152,6 +152,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       }
 
       if (payment.checkoutUrl) {
+        params.beforeExternalRedirect?.();
         sessionStorage.setItem('latestBookingOrderId', orderId);
         tokenStorage.prepareExternalRedirect();
         window.location.href = payment.checkoutUrl;

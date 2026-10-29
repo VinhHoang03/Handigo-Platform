@@ -12,7 +12,7 @@ export function BusinessPolicyFields({ configKey, value, onChange }: {
   const fields = isRefund ? refundPolicyFields : rewardPolicyFields;
   return <div className="space-y-4">
     <p className="text-sm text-on-surface-variant">{isRefund
-      ? 'Các tỷ lệ dưới đây áp dụng cho đơn giá cố định. Với đơn báo giá: khách hủy khi đã có thợ nhận hoặc khách/thợ hủy sau báo giá thì cọc chuyển vào ví thợ. Thợ hủy trước báo giá sẽ tự tìm thợ thay thế; nếu không tìm được thì khách được hoàn 100% cọc.'
+      ? 'Thợ đã xác nhận đến nơi rồi hủy trước khi làm việc, với mọi lý do: thợ nhận 5.000đ vào ví, tiền đã trả/cọc trừ 5.000đ được hoàn về ví khách và không tìm thợ thay thế. Tiền mặt chưa thu do Handigo hỗ trợ 5.000đ. Quy tắc cố định này không phụ thuộc các tỷ lệ bên dưới. Thợ chưa đến nơi và chưa báo giá hủy thì giữ luồng tìm thợ thay thế; khách hủy trong thời hạn cho phép được hoàn 100% về ví.'
       : 'Điểm được làm tròn xuống theo từng đơn hoàn thành, đã thanh toán đủ. Hạn dùng áp dụng cho mã đổi mới; mã đã cấp giữ nguyên ngày hết hạn.'}</p>
     <div className="grid gap-4 sm:grid-cols-2">
       {fields.map(([key, label, min, max]) => <label key={key} className="block space-y-1 text-sm font-medium text-on-surface">

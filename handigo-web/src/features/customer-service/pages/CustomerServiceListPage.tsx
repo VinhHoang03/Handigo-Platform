@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { RebookButton } from "@/features/booking/components/RebookButton";
 import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import { ServiceCategoryFilter } from "../components/ServiceCategoryFilter";
 import { ServiceFilterSheet } from "../components/ServiceFilterSheet";
@@ -16,6 +17,7 @@ import {
 export default function CustomerServiceListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedCategoryId = searchParams.get("categoryId") || "";
+  const quickRebookOrderId = searchParams.get("quickRebook") || "";
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [sortBy, setSortBy] = useState<ServiceSortKey>("name");
   const [isFilterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -38,6 +40,9 @@ export default function CustomerServiceListPage() {
 
   return (
     <CustomerServiceLayout>
+      {/^[a-f\d]{24}$/i.test(quickRebookOrderId) && (
+        <RebookButton key={quickRebookOrderId} orderId={quickRebookOrderId} restoreOnly />
+      )}
       <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-4">
         {/* Sidebar chỉ tồn tại từ `md` trở lên. Ở màn hình hẹp, bộ lọc nằm trong
             tấm trượt mở từ toolbar để không chắn mất danh sách dịch vụ. */}

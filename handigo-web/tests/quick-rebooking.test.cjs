@@ -50,7 +50,7 @@ function submissionRuntime({ existing = false, session = 1, pending = false, cre
     discardUnpaidOrder: async () => { calls.push(['discard']); },
   };
   const modules = {
-    '@/features/auth/store/auth.store': { useAuthStore: { getState: () => ({ sessionRevision: session }) } },
+    '@/features/auth/store/auth.store': { useAuthStore: { getState: () => ({ sessionRevision: session, user: { id: 'khach' } }) } },
     '../hooks/useBookingStore': { useBookingStore: { getState: () => state, setState: value => { state = { ...state, ...value }; } },
       resetBookingSession: () => { calls.push(['reset']); revision++; reset(); saved.clear(); } },
     '../hooks/useBookingPreview': { invalidateBookingPreview: () => {} },
@@ -60,10 +60,11 @@ function submissionRuntime({ existing = false, session = 1, pending = false, cre
       PENDING_ORDER_ID_KEY: 'pendingBookingOrderId', PENDING_ORDER_FINGERPRINT_KEY: 'pendingBookingFingerprint', PENDING_ORDER_VOUCHER_KEY: 'pendingBookingVoucherCode',
       clearPendingBooking: () => saved.clear(), recoverPendingBooking: async () => ({}),
     },
-    '../utils/bookingSessionStorage': { getBookingSessionRevision: () => revision },
+    '../utils/bookingSessionStorage': { getBookingSessionRevision: () => revision, QUICK_REBOOKING_RETURN_KEY: 'quickRebookingReturn' },
   };
   const location = { origin: 'https://handigo.test', href: '' };
-  const { submitQuickRebooking } = load('features/booking/utils/submitQuickRebooking.ts', modules, { sessionStorage, window: { location } });
+  const { submitQuickRebooking } = load('features/booking/utils/submitQuickRebooking.ts', modules, { sessionStorage,
+    window: { location, history: { state: {}, replaceState: (_, __, path) => calls.push(['return-path', path]) } } });
   const input = { prepared: serviceType ? { ...prepared, service: { ...service, serviceType } } : prepared,
     draft, preview, providers, policyAccepted: true,
     navigate: (...args) => calls.push(['navigate', ...args]), setError: message => calls.push(['error', message]),
@@ -111,7 +112,7 @@ test('Không đồng ý chính sách, thiếu địa chỉ, lịch hoặc thợ 
   }
 });
 
-test('Đặt nhanh PayOS lưu bản nháp và dấu vết để quay lại đúng bước thanh toán', async () => {
+test('Đặt nhanh PayOS lưu nháp, chủ sở hữu và địa chỉ quay về form đặt lại nhanh', async () => {
   const runtime = submissionRuntime({ payment: async () => ({ payment: { status: 'pending' }, checkoutUrl: 'https://pay.payos.vn/thanh-toan-thu' }) });
   await runtime.submit({ draft: { ...draft, paymentMethod: 'bank', orderType: 'scheduled', scheduledAt: '2099-01-01T10:00' } });
   assert.equal(runtime.location.href, 'https://pay.payos.vn/thanh-toan-thu');
@@ -121,6 +122,11 @@ test('Đặt nhanh PayOS lưu bản nháp và dấu vết để quay lại đún
   assert.equal(fingerprint.recurrenceUnit, 'weekly');
   assert.equal(fingerprint.scheduledAt, runtime.state().scheduledAt);
   assert.equal(runtime.calls.find(([type]) => type === 'payment')[1].method, 'PAYOS');
+  assert.equal(runtime.calls.find(([type]) => type === 'payment')[1].cancelUrl,
+    'https://handigo.test/customer/services?quickRebook=don-cu');
+  assert.equal(JSON.parse(runtime.saved.get('quickRebookingReturn')).orderId, 'don-cu');
+  assert.equal(JSON.parse(runtime.saved.get('quickRebookingReturn')).userId, 'khach');
+  assert.equal(runtime.calls.find(([type]) => type === 'return-path')[1], '/customer/services?quickRebook=don-cu');
 });
 
 test('Giá thay đổi ở server không tạo đơn hoặc thanh toán; hiển thị lỗi để khách kiểm tra lại', async () => {
@@ -197,7 +203,7 @@ function find(node, predicate) {
 const confirmButton = tree => find(tree, node => node.type === 'button' && typeof node.props.children === 'string'
   && /Xác nhận đặt|Đang xác nhận/.test(node.props.children));
 
-function panelRuntime({ existing = false, createAddress } = {}) {
+function panelRuntime({ existing = false, createAddress, restoredDraft } = {}) {
   const runtime = hooksRuntime();
   const calls = [];
   const keys = [];
@@ -222,9 +228,21 @@ function panelRuntime({ existing = false, createAddress } = {}) {
     './ServiceOptionsPanel': { ServiceOptionsPanel: 'options' },
     './ServiceQuantityPanel': { ServiceQuantityPanel: 'quantity' },
   }, { sessionStorage: { getItem: key => storage.get(key) ?? null } });
-  return { render: () => runtime.render(() => QuickRebookingPanel({ prepared, onBusyChange: value => calls.push(value) })),
+  const panelPrepared = restoredDraft ? { ...prepared, draft: restoredDraft, restoredAfterPayment: true } : prepared;
+  return { render: () => runtime.render(() => QuickRebookingPanel({ prepared: panelPrepared, onBusyChange: value => calls.push(value) })),
     calls, keys, quote, gate, storage, draft: () => currentDraft, setPolicy: value => { policyAccepted = value; } };
 }
+
+test('Form được phục hồi sau QR giữ lịch đã chọn, không đổi sang Sớm nhất', () => {
+  const restoredDraft = { ...draft, orderType: 'scheduled', scheduledAt: '2099-01-01T14:30',
+    paymentMethod: 'bank', selectedOptionQuantities: { 'tuy-chon': 5 } };
+  const runtime = panelRuntime({ restoredDraft });
+  const tree = runtime.render();
+  assert.equal(runtime.draft().orderType, 'scheduled');
+  assert.equal(runtime.draft().scheduledAt, restoredDraft.scheduledAt);
+  assert.equal(runtime.draft().selectedOptionQuantities['tuy-chon'], 5);
+  assert.equal(find(tree, node => node.type === 'input' && node.props.type === 'datetime-local').props.value, '2099-01-01T14:30');
+});
 
 test('Bảng nhanh mặc định Sớm nhất, hiện giá xác nhận; bấm liên tiếp chỉ gửi một lần và giữ thông tin mới', async () => {
   const runtime = panelRuntime();

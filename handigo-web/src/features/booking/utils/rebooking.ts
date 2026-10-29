@@ -12,8 +12,9 @@ export interface PreparedRebooking {
   service: Service;
   options: ServiceOption[];
   addresses: Address[];
-  draft: ReturnType<typeof prepareRebooking>;
+  draft: RebookingDraft;
   session: number;
+  restoredAfterPayment?: boolean;
 }
 
 /** Chỉ lấy thông tin còn hợp lệ; giá và quyền tạo đơn do luồng đặt mới kiểm tra lại. */

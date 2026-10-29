@@ -42,9 +42,10 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
       <ul className={listClass}>
         <li>Tiền cọc được hiển thị theo từng dịch vụ trước khi đặt đơn, thanh toán bằng ví Handigo hoặc PayOS; cọc không hỗ trợ tiền mặt. Thợ khảo sát và lưu báo giá sửa chữa. Chi phí sửa chữa còn lại được thanh toán trực tiếp cho thợ, có khấu trừ phần cọc thực trả.</li>
         <li><strong>Khách hủy khi chưa có thợ nhận:</strong> hoàn 100% tiền cọc thực trả.</li>
-        <li><strong>Thợ hủy trước khi báo giá:</strong> Handigo tự điều phối thợ khác, giữ nguyên cọc; thợ vừa hủy không nhận cọc. Nếu không có thợ khác nhận trong vòng tìm kiếm, khách được hoàn 100% cọc.</li>
+        <li><strong>Thợ hủy khi chưa đến nơi và chưa báo giá:</strong> Handigo tự điều phối thợ khác, giữ nguyên cọc; thợ vừa hủy không nhận cọc. Nếu hết thời gian tìm kiếm mà không có thợ nhận, đơn được hủy, khách được hoàn 100% cọc thực trả về ví Handigo và tặng một voucher giảm 10.000đ tiền cọc cho đơn báo giá tiếp theo.</li>
         <li><strong>Khách hủy khi thợ đã nhận đơn:</strong> được hủy trong vòng 5 phút kể từ khi thợ nhận nếu thợ chưa bắt đầu làm việc, kể cả khi đã có báo giá. Hoàn 100% khoản đã thanh toán về ví Handigo, bao gồm cọc thực trả.</li>
-        <li><strong>Thợ hủy sau khi đã báo giá:</strong> toàn bộ cọc thực trả được tự động cộng vào ví thợ, không phụ thuộc lý do hủy. Khoản thanh toán thêm được hệ thống ghi nhận sẽ được hoàn cho khách.</li>
+        <li><strong>Thợ đã xác nhận đến nơi rồi hủy, với mọi lý do:</strong> thợ nhận 5.000đ vào ví, khách được hoàn tiền cọc thực trả trừ 5.000đ về ví Handigo; không tìm thợ thay thế. Quy tắc này áp dụng cả khi đã lưu báo giá và chưa bắt đầu làm việc.</li>
+        <li>Với đơn báo giá cũ chưa có xác nhận đến nơi, thợ hủy sau khi đã báo giá vẫn áp dụng chính sách chuyển cọc thực trả vào ví thợ.</li>
         <li>Thời hạn hủy của khách áp dụng cho cả đặt ngay, hẹn giờ và lịch định kỳ. Hết 5 phút hoặc thợ đã bắt đầu làm việc thì khách không được hủy.</li>
       </ul>
     </section>
@@ -52,6 +53,7 @@ export function BookingPolicyContent({ policies, depositAmount, payableDeposit }
     <section className="space-y-3">
       <h3 className="font-semibold text-on-surface">4. Ưu đãi, lịch định kỳ và hoàn thành đơn</h3>
       <ul className={listClass}>
+        <li>Với dịch vụ giá cố định, thợ đã xác nhận đến nơi rồi hủy trước khi bắt đầu làm việc sẽ nhận 5.000đ vào ví, không phụ thuộc lý do. Khách thanh toán ví hoặc QR được hoàn khoản đã trả trừ 5.000đ về ví Handigo; tiền mặt chưa thu do Handigo chi 5.000đ hỗ trợ thợ. Đơn bị hủy và không ghép thợ mới.</li>
         <li>Ưu đãi và mã giảm giá áp dụng theo điều kiện của từng chương trình. Với mã giảm cọc, khoản hoàn hoặc chuyển cho thợ được tính theo cọc thực trả sau ưu đãi. Không hoàn tiền cho phần giá trị được miễn hoặc giảm.</li>
         <li>Mỗi buổi định kỳ được theo dõi và xử lý thanh toán, hủy, hoàn tiền riêng. Khi chọn hủy các buổi còn lại, hệ thống tính theo trạng thái thực tế của từng buổi.</li>
         <li>Đơn đã bắt đầu thực hiện hoặc đã hoàn thành không thể hủy theo luồng thông thường. Khách cần liên hệ thợ hoặc gửi yêu cầu hỗ trợ/khiếu nại trong hệ thống khi có vấn đề.</li>
