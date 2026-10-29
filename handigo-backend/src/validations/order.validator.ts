@@ -256,6 +256,11 @@ export const confirmQuotationPaymentSchema = z.object({
     .nonnegative("Phiên bản báo giá không được âm."),
 });
 
+export const confirmCashPaymentSchema = z.object({
+  expectedAmount: z.number({ error: "Số tiền xác nhận phải là số." })
+    .int("Số tiền xác nhận phải là số nguyên.").nonnegative("Số tiền xác nhận không được âm."),
+});
+
 export const rejectRepairQuotationSchema = z.object({
   rejectionReason: optionalTextSchema(
     500,

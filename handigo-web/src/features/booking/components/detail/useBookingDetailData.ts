@@ -162,6 +162,7 @@ export const useBookingDetailData = (id: string | undefined) => {
       }
     };
     socket.on('quotation:updated', onUpdated);
+    socket.on('payment:status', onUpdated);
     socket.on('order:updated', onOrderUpdated);
     socket.on('connect', refreshOrder);
     const onPageShow = (event: PageTransitionEvent) => {
@@ -176,6 +177,7 @@ export const useBookingDetailData = (id: string | undefined) => {
     return () => {
       disposed = true;
       socket.off('quotation:updated', onUpdated);
+      socket.off('payment:status', onUpdated);
       socket.off('order:updated', onOrderUpdated);
       socket.off('connect', refreshOrder);
       window.removeEventListener('focus', refreshOrder);

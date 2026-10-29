@@ -44,7 +44,7 @@ export const ConfirmPaymentVoucherPanel = ({
             <option value="">Không sử dụng voucher</option>
             {availableVouchers.map((voucher) => (
               <option key={voucher.id} value={voucher.code}>
-                {voucher.code} · {voucher.discountType === 'PERCENT'
+                {voucher.discountType === 'PERCENT'
                   ? `Giảm ${voucher.discountValue}%`
                   : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}đ`}
                 {voucher.maxDiscountAmount != null ? ` · Tối đa ${voucher.maxDiscountAmount.toLocaleString('vi-VN')}đ` : ''}

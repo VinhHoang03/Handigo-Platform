@@ -97,7 +97,7 @@ export function ProviderAssignmentModal() {
               trong index.html được cắt gọn theo tên, `shield_lock` không có
               trong đó nên sẽ render ra đúng chữ "shield_lock". */}
           <Shield aria-hidden="true" size={16} className="text-primary" />
-          <span>Thông tin liên hệ và địa chỉ chi tiết sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
+          <span>Thông tin liên hệ sẽ hiển thị sau khi bạn nhận đơn thành công.</span>
         </div>
 
         {error && (

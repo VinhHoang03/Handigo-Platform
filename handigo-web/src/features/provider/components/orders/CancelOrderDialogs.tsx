@@ -1,17 +1,10 @@
 import { Modal } from '@/components/common/Modal';
 import { Trash, TriangleAlert } from "lucide-react";
-
-const cancellationReasons = [
-  'Khách hàng không đồng ý báo giá',
-  'Không thể sửa chữa hoặc thực hiện dịch vụ',
-  'Khách hàng cung cấp thông tin chưa đầy đủ',
-  'Không thể liên hệ với khách hàng',
-  'Lịch hẹn không còn phù hợp',
-  'Lý do khác',
-];
+import type { Order } from '@/types/booking';
+import { getProviderCancellationReasons } from '../../utils/providerOrder.utils';
 
 interface CancellationDialogProps {
-  canDeclineQuotation: boolean;
+  order: Order;
   reason: string;
   explanation: string;
   error: string;
@@ -23,7 +16,7 @@ interface CancellationDialogProps {
 }
 
 export function CancellationDialog({
-  canDeclineQuotation,
+  order,
   reason,
   explanation,
   error,
@@ -37,7 +30,7 @@ export function CancellationDialog({
     <Modal open title="Hủy đơn dịch vụ" onClose={onClose} size="lg" closeOnOverlayClick={!busy} closeOnEsc={!busy} danger>
       <p className="text-sm text-on-surface-variant">Lý do hủy sẽ được lưu cùng đơn hàng và thông báo cho khách hàng.</p>
       <div className="mt-md space-y-2">
-        {cancellationReasons.filter((item) => canDeclineQuotation || item !== cancellationReasons[0]).map((item) => (
+        {getProviderCancellationReasons(order).map((item) => (
           <label key={item} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${reason === item ? 'border-error bg-error/5' : 'border-outline-variant/40 hover:bg-surface-container-low'}`}>
             <input type="radio" name="cancel-reason" value={item} checked={reason === item} onChange={() => onReasonChange(item)} className="mt-1 text-error focus:ring-error" />
             <span className="min-w-0">

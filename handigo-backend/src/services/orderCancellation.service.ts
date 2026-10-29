@@ -209,8 +209,8 @@ const calculateOrderRefundPolicy = async (
   const quotationDeclined = role === "provider" && isQuotationDeclinedReason(cancellationReason);
   const hasRepairQuotation = Boolean(order.currentQuotationId);
   const deadline = role === "customer" ? await getCustomerCancellationDeadline(order, session) : null;
-  if (!providerArrived && quotationDeclined && (!order.inspectionRequired || order.status !== "accepted")) {
-    throw new AppError("Chỉ được hủy do khách không đồng ý báo giá khi đơn sửa chữa đã được nhận và chưa bắt đầu thực hiện.", 409);
+  if (quotationDeclined && (!providerArrived || !order.inspectionRequired || order.status !== "accepted")) {
+    throw new AppError("Chỉ được hủy do khách không đồng ý báo giá khi thợ đã đến nơi, đơn sửa chữa chưa bắt đầu thực hiện.", 409);
   }
   const deposits = !providerArrived && role === "provider" && order.inspectionRequired && order.status === "accepted"
     ? await Payment.find({ orderId: order._id, paymentType: "inspection_deposit", status: "paid", isDeleted: false }).session(session || null)
@@ -227,7 +227,7 @@ const calculateOrderRefundPolicy = async (
     hasRepairQuotation,
     inspectionRequired: order.inspectionRequired,
     cancellationReason,
-    providerArrived,
+    providerArrived: hasProviderArrived(order),
     paidInspectionDeposit: deposits.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0),
     providerAcceptedAt: deadline ? new Date(deadline.getTime() - CUSTOMER_CANCELLATION_WINDOW_MS) : null,
   }, policy);

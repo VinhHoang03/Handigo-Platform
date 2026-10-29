@@ -15,6 +15,12 @@ const localDate = (date: Date) => {
 
 export const todayDate = () => localDate(new Date());
 
+const isValidDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number(value.slice(0, 4)) > 0 && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+
 export const validateDateFields = (
   issuedAt?: string,
   expiresAt?: string,
@@ -22,13 +28,16 @@ export const validateDateFields = (
   const errors: DateFieldErrors = {};
   const today = todayDate();
 
-  if (issuedAt && issuedAt > today) {
+  if (issuedAt && !isValidDate(issuedAt)) errors.issuedAt = 'Ngày cấp không hợp lệ.';
+  if (expiresAt && !isValidDate(expiresAt)) errors.expiresAt = 'Ngày hết hạn không hợp lệ.';
+
+  if (issuedAt && !errors.issuedAt && issuedAt > today) {
     errors.issuedAt = 'Ngày cấp không được sau ngày hiện tại.';
   }
-  if (expiresAt && expiresAt < today) {
+  if (expiresAt && !errors.expiresAt && expiresAt < today) {
     errors.expiresAt = 'Tài liệu đã hết hạn.';
   }
-  if (issuedAt && expiresAt && expiresAt <= issuedAt) {
+  if (issuedAt && expiresAt && !errors.issuedAt && !errors.expiresAt && expiresAt <= issuedAt) {
     errors.expiresAt = 'Ngày hết hạn phải sau ngày cấp.';
   }
 
@@ -44,8 +53,8 @@ export const getProviderApplicationDateErrors = (
       form.identityDocument.expiresAt,
     ),
     ...(form.identityDocument.dateOfBirth &&
-    form.identityDocument.dateOfBirth > todayDate()
-      ? { dateOfBirth: 'Ngày sinh không được sau ngày hiện tại.' }
+    (!isValidDate(form.identityDocument.dateOfBirth) || form.identityDocument.dateOfBirth > todayDate())
+      ? { dateOfBirth: !isValidDate(form.identityDocument.dateOfBirth) ? 'Ngày sinh không hợp lệ.' : 'Ngày sinh không được sau ngày hiện tại.' }
       : {}),
   },
   certificates: form.certificates.map((certificate) =>

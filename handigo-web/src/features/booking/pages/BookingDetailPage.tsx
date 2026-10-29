@@ -37,7 +37,7 @@ const BookingDetailContent = () => {
     isWaitingForProvider,
     matchingSecondsRemaining,
     paymentFlow,
-    quotationPaymentFlow,
+    canPayQuotation,
     cancellationFlow,
     reassignmentFlow,
     providerInfo,
@@ -114,6 +114,7 @@ const BookingDetailContent = () => {
             busy={busy}
             canMakeInitialPayment={canMakeInitialPayment}
             canChangePayment={canChangePayment}
+            quotationAmount={canPayQuotation ? remainingQuotationAmount : undefined}
             paymentError={paymentFlow.paymentError}
             paymentMethodModalOpen={paymentFlow.paymentMethodModalOpen}
             initialPaymentMethod={paymentFlow.initialPaymentMethod}
@@ -154,7 +155,6 @@ const BookingDetailContent = () => {
               appliedDepositAmount={appliedDepositAmount}
               remainingQuotationAmount={remainingQuotationAmount}
               onReject={cancellationFlow.handleRejectQuotation}
-              paymentFlow={quotationPaymentFlow}
             />
           </BookingServiceSummary>
 

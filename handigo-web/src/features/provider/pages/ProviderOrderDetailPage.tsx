@@ -50,6 +50,7 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
     handleNoShow,
     handleComplete,
     handleConfirmQuotationPayment,
+    handleConfirmCashPayment,
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,
@@ -174,6 +175,7 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
             <div className="lg:col-span-2">
             <FixedPriceActionForm
               order={order}
+              onConfirmCashPayment={handleConfirmCashPayment}
               onStart={handleStart}
               onComplete={handleComplete}
               onCancel={() => setCancelOpen(true)}
@@ -186,9 +188,9 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
         {order.status === 'completed' && <ProviderOrderFeedbackThread orderId={order._id} />}
       </div>
 
-      {cancelOpen && !cancelConfirmOpen && (
+      {cancelOpen && !cancelConfirmOpen && !quotation && !order.currentQuotationId && order.status === 'accepted' && (
         <CancellationDialog
-          canDeclineQuotation={Boolean(order.status === 'accepted' && order.inspectionRequired)}
+          order={order}
           reason={cancelReason}
           explanation={cancelExplanation}
           error={cancelError}
@@ -199,7 +201,7 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
           onConfirm={requestCancelConfirmation}
         />
       )}
-      {cancelConfirmOpen && (
+      {cancelConfirmOpen && !quotation && !order.currentQuotationId && order.status === 'accepted' && (
         <CancelConfirmationDialog
           reason={cancelReason}
           busy={busy}

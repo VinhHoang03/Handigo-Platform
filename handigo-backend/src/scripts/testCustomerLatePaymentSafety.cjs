@@ -78,6 +78,7 @@ const dependencies = {
   mongoose,
   '../utils/appError': { AppError },
   '../models/order.model': { Order }, '../models/payment.model': { Payment },
+  '../models/repairQuotation.model': {}, './quotationWalletPayment.service': {},
   '../models/promotion.model': {}, '../models/provider.model': {}, '../models/service.model': {},
   '../models/wallet.model': { Wallet: { findOneAndUpdate: async (filter, update, options) => {
     assert.equal(options.runValidators, true); assert.equal(filter.userId, 'khach');

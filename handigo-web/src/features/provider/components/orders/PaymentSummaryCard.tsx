@@ -1,5 +1,5 @@
 import type { Order } from '@/types/booking';
-import { getAppliedQuotationDeposit, getDirectRepairPayment, isQuotationPaidByWallet } from '@/utils/quotationPayment';
+import { getAppliedQuotationDeposit, getDirectRepairPayment, isQuotationPaidOnline } from '@/utils/quotationPayment';
 import type { QuotationDetail } from '../../types/providerOrder.types';
 import { formatMoney, getPaymentMethodLabel } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
@@ -25,15 +25,15 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
     ? order.paymentStatus === 'paid' ? 'Đã thu tiền mặt' : 'Chưa thu tiền'
     : paymentStatus;
   const paymentMethod = order.paymentMethod === 'bank' ? 'QR PayOS' : getPaymentMethodLabel(order.paymentMethod);
-  const isQuotationWalletPaid = isQuotationPaidByWallet(order, repairQuotation);
+  const isQuotationOnlinePaid = isQuotationPaidOnline(order, repairQuotation);
   const quotationPaymentMethod = repairQuotation?.directPaymentConfirmedAt ? 'Thanh toán trực tiếp'
-    : isQuotationWalletPaid ? 'Ví Handigo' : null;
+    : isQuotationOnlinePaid ? order.paymentMethod === 'bank' ? 'QR PayOS' : 'Ví Handigo' : null;
 
   return (
     <section className="order-3 h-full rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg md:col-span-2 lg:order-2 lg:col-span-1">
       <CardTitle icon={Wallet} title="Thanh toán đơn hàng" />
       <dl className="mt-md space-y-3 text-sm">
-        {displayedPaymentStatus && <FinancialRow label={isQuotationOrder && !isQuotationWalletPaid && !repairQuotation?.directPaymentConfirmedAt ? 'Trạng thái tiền cọc' : 'Trạng thái thanh toán'} value={displayedPaymentStatus} />}
+        {displayedPaymentStatus && <FinancialRow label={isQuotationOrder && !isQuotationOnlinePaid && !repairQuotation?.directPaymentConfirmedAt ? 'Trạng thái tiền cọc' : 'Trạng thái thanh toán'} value={displayedPaymentStatus} />}
         {isQuotationOrder && (
           <>
             <FinancialRow label="Tiền cọc đã thanh toán" value={formatMoney(appliedDepositAmount)} />
@@ -42,7 +42,7 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
               <>
                 <FinancialRow
                   label={repairQuotation?.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách'
-                    : isQuotationWalletPaid ? 'Đã thanh toán qua ví' : 'Còn cần thanh toán'}
+                    : isQuotationOnlinePaid ? order.paymentMethod === 'bank' ? 'Đã thanh toán qua QR PayOS' : 'Đã thanh toán qua ví' : 'Còn cần thanh toán'}
                   value={formatMoney(directRepairAmount)}
                   total
                 />
