@@ -1,4 +1,5 @@
-import { LocateFixed, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { Building2, House, LocateFixed, MapPin, RefreshCw } from "lucide-react";
 import { LocationPickerMap } from "@/components/common/LocationPickerMap";
 import {
   SearchableSelect,
@@ -6,6 +7,16 @@ import {
 } from "@/components/common/SearchableSelect";
 import { FloatingTextarea } from "@/components/common/FloatingField";
 import type { AddressFormState } from "@/features/profile/utils/addressBookForm.utils";
+import {
+  getAddressLabelSelectionKind,
+  type AddressLabelKind,
+} from "@/features/profile/utils/addressLabelPresentation";
+
+const ADDRESS_LABEL_OPTIONS = [
+  { value: "Nhà riêng", label: "Nhà riêng", icon: House, kind: "home" },
+  { value: "Văn phòng", label: "Văn phòng", icon: Building2, kind: "office" },
+  { value: "Địa chỉ khác", label: "Khác", icon: MapPin, kind: "other" },
+] as const;
 
 interface AddressBookFormFieldsProps {
   addressForm: AddressFormState;
@@ -40,6 +51,12 @@ export function AddressBookFormFields({
   onUseCurrentLocation,
   onPositionChange,
 }: AddressBookFormFieldsProps) {
+  const [selectedAddressKind, setSelectedAddressKind] =
+    useState<AddressLabelKind>(() =>
+      getAddressLabelSelectionKind(addressForm.addressLabel),
+    );
+  const isCustomAddressLabel = selectedAddressKind === "other";
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <label className="order-1 block space-y-2">
@@ -68,6 +85,57 @@ export function AddressBookFormFields({
           onChange={(event) => onInputChange("recipientPhone", event.target.value)}
         />
       </label>
+
+      <fieldset className="order-3 space-y-2 md:col-span-2">
+        <legend className="ml-1 text-label-sm font-medium text-on-surface-variant">
+          Loại địa chỉ
+        </legend>
+        <div className="grid grid-cols-3 gap-2" aria-label="Loại địa chỉ">
+          {ADDRESS_LABEL_OPTIONS.map(({ value, label, icon: Icon, kind }) => {
+            const selected = selectedAddressKind === kind;
+
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={selected}
+                className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 ${
+                  selected
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-outline-variant/40 bg-surface text-on-surface-variant hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                }`}
+                onClick={() => {
+                  setSelectedAddressKind(kind);
+                  onInputChange(
+                    "addressLabel",
+                    kind === "other"
+                      ? selectedAddressKind === "other"
+                        ? addressForm.addressLabel || ""
+                        : ""
+                      : value,
+                  );
+                }}
+              >
+                <Icon aria-hidden="true" size={18} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {isCustomAddressLabel && (
+          <input
+            type="text"
+            name="addressLabel"
+            value={addressForm.addressLabel || ""}
+            maxLength={60}
+            autoComplete="off"
+            aria-label="Tên địa chỉ khác"
+            placeholder="Ví dụ: Nhà bố mẹ, Kho hàng…"
+            className="form-field__input pb-2 pt-2"
+            onChange={(event) => onInputChange("addressLabel", event.target.value)}
+          />
+        )}
+      </fieldset>
 
       <SearchableSelect
         id="address-province"
