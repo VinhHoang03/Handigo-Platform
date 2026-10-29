@@ -111,6 +111,7 @@ function buttonRuntime({ status = 'completed', existingDraft = true, pending = f
       return [slots[index], next => { slots[index] = typeof next === 'function' ? next(slots[index]) : next; }];
     },
     useRef(initial) { const index = cursor++; return slots[index] ??= { current: initial }; },
+    useCallback(callback) { cursor++; return callback; },
     useEffect() {},
   };
   const useBookingStore = Object.assign(selector => selector(state), {
@@ -137,6 +138,7 @@ function buttonRuntime({ status = 'completed', existingDraft = true, pending = f
     '../hooks/useBookingPreview': { invalidateBookingPreview: () => calls.push('refresh-price') },
     '../utils/rebooking': { prepareRebooking, canRebook },
     '../utils/submitQuickRebooking': { assertNoPendingRebooking: () => { if (pending) throw new Error('Cần kiểm tra lần đặt trước.'); } },
+    '../utils/quickRebookingReturn': { getQuickRebookingReturn: () => null },
     './QuickRebookingPanel': { QuickRebookingPanel: 'quick-panel' },
   }, { sessionStorage: { getItem: () => pending ? 'dang-doi-ket-qua' : null } });
   const render = () => { cursor = 0; return RebookButton({ orderId: order._id, status }); };

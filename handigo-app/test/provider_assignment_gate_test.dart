@@ -88,6 +88,7 @@ class _Harness {
     scheduledAt: scheduledAt,
     orderType: scheduledAt == null ? 'immediate' : 'scheduled',
     totalAmount: 200000,
+    serviceType: 'fixed_price',
     responseDeadline: now.add(Duration(seconds: seconds)),
   );
   Map<String, dynamic> payload(ProviderAssignment item) => {
@@ -99,7 +100,10 @@ class _Harness {
       'orderId': {
         '_id': item.orderId,
         'orderCode': item.orderCode,
-        'serviceId': {'name': item.serviceName},
+        'serviceId': {
+          'name': item.serviceName,
+          'serviceType': item.serviceType,
+        },
         'addressId': {
           'fullAddress': item.addressLabel,
           'ward': 'Hòa Hải',
@@ -257,6 +261,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(find.text('Vệ sinh máy lạnh 1'), findsOneWidget);
       expect(find.text('Mã đơn: HD-1', findRichText: true), findsOneWidget);
+      expect(find.textContaining('Giá trị đơn hàng: 200.000'), findsOneWidget);
       expect(find.text('Còn 01:00'), findsOneWidget);
       expect(find.text('Bạn có đơn hàng mới'), findsOneWidget);
       expect(find.text('Thời gian thực hiện: Bây giờ'), findsOneWidget);

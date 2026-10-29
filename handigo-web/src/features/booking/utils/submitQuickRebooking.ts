@@ -10,6 +10,7 @@ import type { PreparedRebooking, RebookingDraft } from './rebooking';
 import type { NearbyProvider } from '@/features/customer-service/api/customerService.api';
 import { isRequiredOptionSelectionMissing } from './serviceOptionSelection';
 import { getEarliestScheduledAt, isWithinImmediateBookingHours } from '../components/step2Helpers';
+import { quickRebookingReturnPath, rememberQuickRebookingReturn } from './quickRebookingReturn';
 
 export const assertNoPendingRebooking = () => {
   if (sessionStorage.getItem(PENDING_ORDER_ID_KEY) || sessionStorage.getItem(BOOKING_CREATE_ATTEMPT_KEY)) {
@@ -53,5 +54,7 @@ export async function submitQuickRebooking(input: {
     isAppointment: draft.orderType === 'scheduled', isOptionSelectionMissing: missingOptions,
     showSystemAlert: setError, setPaymentError: setError, setVoucherError: setError,
     setIsSubmitting: () => {}, setPendingOrderId: () => {}, reset: booking.reset, navigate,
+    paymentCancelPath: quickRebookingReturnPath(prepared.order._id),
+    beforeExternalRedirect: () => rememberQuickRebookingReturn(prepared.order._id),
   });
 }

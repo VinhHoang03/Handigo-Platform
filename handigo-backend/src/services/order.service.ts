@@ -38,6 +38,7 @@ import { MatchingService } from "./matching.service";
 import { emitToUser } from "../sockets/socketServer";
 import { createNotificationRecord } from "./notification.service";
 import { requestProviderReassignment } from "./orderReassignment.service";
+import { hasProviderArrived } from "./refundPolicy.service";
 import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
@@ -1203,13 +1204,13 @@ export const OrderService = {
     confirmedExpectation?: CancellationExpectation,
   ): Promise<IOrder> {
     if (role === "provider") {
-      const order = await Order.findById(orderId).select("status currentQuotationId reassignment customerNoShow");
+      const order = await Order.findById(orderId).select("status currentQuotationId reassignment customerNoShow providerId arrival");
       if (order?.customerNoShow?.status === "pending") {
         throw new AppError("Báo cáo khách không có mặt đang chờ xử lý, chưa thể hủy nhận đơn.", 409);
       }
       if (
         order && (order.status === "accepted" || order.reassignment?.automatic) &&
-        !order.currentQuotationId
+        !order.currentQuotationId && !hasProviderArrived(order)
       ) {
         return requestProviderReassignment(orderId, userId, reason);
       }

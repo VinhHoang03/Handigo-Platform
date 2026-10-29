@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
@@ -10,8 +10,11 @@ import { bookingApi } from '../api/booking.api';
 import { canRebook, prepareRebooking, type PreparedRebooking } from '../utils/rebooking';
 import { assertNoPendingRebooking } from '../utils/submitQuickRebooking';
 import { QuickRebookingPanel } from './QuickRebookingPanel';
+import { useBookingStore } from '../hooks/useBookingStore';
+import { getQuickRebookingReturn, quickRebookingReturnPath, restoreQuickRebookingDraft } from '../utils/quickRebookingReturn';
+import { PENDING_ORDER_ID_KEY, clearPendingBooking, recoverPendingBooking } from './pendingBookingRecovery';
 
-export function RebookButton({ orderId, status }: { orderId: string; status?: string }) {
+export function RebookButton({ orderId, status, restoreOnly = false }: { orderId: string; status?: string; restoreOnly?: boolean }) {
   const navigate = useNavigate();
   const sessionRevision = useAuthStore(state => state.sessionRevision);
   const [openedSession, setOpenedSession] = useState(sessionRevision);
@@ -32,13 +35,28 @@ export function RebookButton({ orderId, status }: { orderId: string; status?: st
     if (submitting.current && openedSession === sessionRevision) return;
     request.current++; setOpen(false); setLoading(false); setPrepared(null);
   };
-  const load = async () => {
+  const load = useCallback(async () => {
     if (submitting.current && openedSession === sessionRevision) return;
     submitting.current = false; setBusy(false);
     const revision = ++request.current;
     const session = useAuthStore.getState().sessionRevision;
     setOpenedSession(session); setOpen(true); setLoading(true); setError(''); setPrepared(null);
     try {
+      const saved = getQuickRebookingReturn(orderId);
+      if (saved) {
+        const pendingId = sessionStorage.getItem(PENDING_ORDER_ID_KEY);
+        if (pendingId) {
+          const recovery = await recoverPendingBooking(pendingId);
+          if (revision !== request.current || session !== useAuthStore.getState().sessionRevision) return;
+          if (recovery.paidOrder) {
+            clearPendingBooking(); useBookingStore.getState().reset(); setOpen(false);
+            navigate('/customer/bookings/success', { state: { order: recovery.paidOrder } });
+            return;
+          }
+          // Giữ dấu quay về đến khi tải lại dịch vụ thành công để nút Thử lại vẫn phục hồi đúng nháp.
+          clearPendingBooking(true);
+        }
+      }
       assertNoPendingRebooking();
       const order = await bookingApi.getOrderById(orderId);
       if (!canRebook(order.status)) throw new Error('Đơn này vẫn đang được xử lý. Vui lòng theo dõi trong trang chi tiết đơn.');
@@ -52,18 +70,40 @@ export function RebookButton({ orderId, status }: { orderId: string; status?: st
       }
       const draft = prepareRebooking(order, service, options, addresses);
       if (revision !== request.current || session !== useAuthStore.getState().sessionRevision) return;
-      setPrepared({ order, draft, service, options: options.filter(option => option.isActive), addresses, session });
+      const next = { order, draft, service, options: options.filter(option => option.isActive), addresses, session };
+      if (saved) {
+        next.draft = restoreQuickRebookingDraft(next, saved);
+        clearPendingBooking();
+      }
+      setPrepared({ ...next, restoredAfterPayment: Boolean(saved) });
     } catch (cause) {
       if (revision === request.current) setError(getErrorMessage(cause, 'Không thể chuẩn bị đơn đặt lại. Vui lòng thử lại.'));
     } finally {
       if (revision === request.current) setLoading(false);
     }
-  };
-  if (!canRebook(status)) return null;
+  }, [openedSession, orderId, sessionRevision, navigate]);
+
+  useEffect(() => {
+    const resume = () => {
+      if (!getQuickRebookingReturn(orderId)) return;
+      if (restoreOnly) void load();
+      else if (canRebook(status)) navigate(quickRebookingReturnPath(orderId), { replace: true });
+    };
+    const timer = window.setTimeout(resume, 0);
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && getQuickRebookingReturn(orderId)) {
+        submitting.current = false;
+        resume();
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => { window.clearTimeout(timer); window.removeEventListener('pageshow', onPageShow); };
+  }, [load, navigate, orderId, status, restoreOnly]);
+  if (!restoreOnly && !canRebook(status)) return null;
   return <>
-    <button type="button" disabled={busy && openedSession === sessionRevision} onClick={() => void load()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/40 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/5 disabled:opacity-50">
+    {!restoreOnly && <button type="button" disabled={busy && openedSession === sessionRevision} onClick={() => void load()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/40 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/5 disabled:opacity-50">
       <RotateCcw size={16} aria-hidden="true" />Đặt lại
-    </button>
+    </button>}
     <Modal open={open && openedSession === sessionRevision} title="Đặt lại nhanh" onClose={close} size="sm" closeOnEsc={!busy} closeOnOverlayClick={!busy}>
       {loading && <p role="status">Đang kiểm tra dịch vụ và thông tin lần đặt trước...</p>}
       {error && <div role="alert" className="space-y-3 text-sm"><p className="text-error">{error}</p>
