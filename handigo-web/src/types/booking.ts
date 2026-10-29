@@ -89,6 +89,7 @@ export interface CreatePaymentResult {
 export interface Address {
   _id: string;
   userId: string;
+  addressLabel?: string;
   recipientName?: string;
   recipientPhone?: string;
   label?: string;
@@ -145,6 +146,57 @@ export interface OrderReassignment {
   requestedAt: string;
   expiresAt: string;
   respondedAt?: string | null;
+}
+
+export type OrderRescheduleStatus =
+  | "pending"
+  | "applied"
+  | "rejected"
+  | "cancelled"
+  | "expired"
+  | "conflicted";
+
+export interface OrderRescheduleRequest {
+  _id: string;
+  orderId: string;
+  initiatorId: string;
+  initiatorRole: "customer" | "provider";
+  approvalRole: "customer" | "provider" | null;
+  oldScheduledAt: string;
+  proposedScheduledAt: string;
+  reason: string;
+  status: OrderRescheduleStatus;
+  warningCode?: "PROVIDER_MONTHLY_RESCHEDULE_THRESHOLD" | null;
+  warningAcknowledged: boolean;
+  monthlyAppliedCountAtRequest?: number | null;
+  responseReason?: string | null;
+  requestedAt: string;
+  expiresAt?: string | null;
+  respondedAt?: string | null;
+  appliedAt?: string | null;
+}
+
+export interface OrderRescheduleEligibility {
+  canRequest: boolean;
+  appliedCount: number;
+  remainingCount: number;
+  minAdvanceMinutes: number;
+  responseMinutes: number;
+  providerMonthlyAppliedCount: number | null;
+  warningThreshold: number | null;
+}
+
+export interface OrderReschedulePreview {
+  currentScheduledAt: string;
+  proposedScheduledAt: string;
+  approvalRequired: boolean;
+  approvalRole: "customer" | "provider" | null;
+  remainingReschedulesForRole: number;
+  minAdvanceMinutes: number;
+  responseMinutes: number;
+  providerMonthlyAppliedCount: number | null;
+  warningRequired: boolean;
+  warningCode?: "PROVIDER_MONTHLY_RESCHEDULE_THRESHOLD" | null;
 }
 
 export interface Order {
@@ -234,6 +286,8 @@ export interface Order {
     refundPolicy?: CancellationRefundPolicy | null;
   } | null;
   reassignment?: OrderReassignment | null;
+  latestRescheduleRequest?: OrderRescheduleRequest | null;
+  rescheduleEligibility?: OrderRescheduleEligibility;
   createdAt: string;
   updatedAt: string;
 }

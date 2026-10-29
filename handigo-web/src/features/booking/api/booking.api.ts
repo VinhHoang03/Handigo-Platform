@@ -9,6 +9,8 @@ import type {
   OrderQuotation,
   Pagination,
   Payment,
+  OrderReschedulePreview,
+  OrderRescheduleRequest,
 } from "@/types/booking";
 import type { WalletTransaction } from "@/features/wallet/types/wallet.types";
 import type { BookingPolicies } from "../types/bookingPolicy.types";
@@ -196,6 +198,43 @@ export const bookingApi = {
   getOrderById: async (orderId: string) => {
     const response = await api.get<{ success: boolean; data: Order }>(
       `/orders/${orderId}`,
+    );
+    return response.data.data;
+  },
+
+  previewReschedule: async (orderId: string, scheduledAt: string) => {
+    const response = await api.post<{ success: boolean; data: OrderReschedulePreview }>(
+      `/orders/${orderId}/reschedule-preview`, { scheduledAt },
+    );
+    return response.data.data;
+  },
+
+  createRescheduleRequest: async (orderId: string, payload: {
+    scheduledAt: string;
+    reason: string;
+    warningAcknowledged?: boolean;
+    expectedOrderUpdatedAt?: string;
+  }) => {
+    const response = await api.post<{ success: boolean; data: OrderRescheduleRequest }>(
+      `/orders/${orderId}/reschedule-requests`, payload,
+    );
+    return response.data.data;
+  },
+
+  respondRescheduleRequest: async (orderId: string, requestId: string, payload: {
+    decision: "accept" | "reject";
+    reason?: string;
+    expectedOrderUpdatedAt?: string;
+  }) => {
+    const response = await api.patch<{ success: boolean; data: OrderRescheduleRequest }>(
+      `/orders/${orderId}/reschedule-requests/${requestId}/respond`, payload,
+    );
+    return response.data.data;
+  },
+
+  cancelRescheduleRequest: async (orderId: string, requestId: string) => {
+    const response = await api.patch<{ success: boolean; data: OrderRescheduleRequest }>(
+      `/orders/${orderId}/reschedule-requests/${requestId}/cancel`,
     );
     return response.data.data;
   },

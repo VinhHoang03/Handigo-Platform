@@ -123,10 +123,10 @@ export const setDefaultAddress = async (req: Request, res: Response) => {
     return res.json({
       success: true,
       data: address,
-      message: "Default address updated",
+      message: "Đã đặt địa chỉ mặc định",
     });
   } catch (error: any) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message,
     });

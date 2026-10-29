@@ -19,6 +19,8 @@ export const bookingPolicySchema = z.object({
   bufferMinutes: minutes.default(15),
   travelMinutes: minutes.default(30),
   paymentHoldMinutes: z.number().int().min(1).max(1440).default(15),
+  rescheduleResponseMinutes: z.number().int().min(1).max(1440).default(30),
+  providerMonthlyRescheduleWarningThreshold: z.number().int().min(1).max(100).default(3),
   workdayStart: minutes.default(0),
   workdayEnd: minutes.default(1440),
   services: z.record(id, z.object({

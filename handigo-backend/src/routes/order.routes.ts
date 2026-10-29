@@ -38,6 +38,10 @@ import {
   selectAppointmentProviderSchema,
   rejectRepairQuotationSchema,
   trackingRouteQuerySchema,
+  reschedulePreviewSchema,
+  createRescheduleRequestSchema,
+  rescheduleRequestIdParamSchema,
+  respondRescheduleRequestSchema,
 } from "../validations/order.validator";
 import {
   createOrder,
@@ -71,6 +75,10 @@ import {
   rejectRepairQuotation,
   selectAppointmentProvider,
   respondToReassignment,
+  previewReschedule,
+  createRescheduleRequest,
+  respondRescheduleRequest,
+  cancelRescheduleRequest,
 } from "../controllers/order.controller";
 import { getOrderMatchingProviders, getOrderTrackingRoute } from "../controllers/orderTracking.controller";
 import { scanQuotationItems } from "../controllers/quotationImageAnalysis.controller";
@@ -91,6 +99,14 @@ router.post("/:orderId/customer-no-show/evidence", roleMiddleware("PROVIDER"), a
 router.get("/booking-policies", roleMiddleware("CUSTOMER"), getBookingPolicies);
 router.post("/preview", roleMiddleware("CUSTOMER"), validate(previewBookingSchema), previewBooking);
 router.patch("/:orderId/expected-end", roleMiddleware("PROVIDER"), approvedProviderMiddleware, validate(orderIdParamSchema, "params"), validate(updateExpectedEndSchema), updateOrderExpectedEnd);
+router.post("/:orderId/reschedule-preview", roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(orderIdParamSchema, "params"), validate(reschedulePreviewSchema), previewReschedule);
+router.post("/:orderId/reschedule-requests", roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(orderIdParamSchema, "params"), validate(createRescheduleRequestSchema), createRescheduleRequest);
+router.patch("/:orderId/reschedule-requests/:requestId/respond", roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(rescheduleRequestIdParamSchema, "params"), validate(respondRescheduleRequestSchema), respondRescheduleRequest);
+router.patch("/:orderId/reschedule-requests/:requestId/cancel", roleMiddleware("CUSTOMER", "PROVIDER"),
+  validate(rescheduleRequestIdParamSchema, "params"), cancelRescheduleRequest);
 
 router.get("/:orderId/quotation-agent/history", roleMiddleware("PROVIDER"), approvedProviderMiddleware,
   resourceIntensiveRateLimit, validate(orderIdParamSchema, "params"), validate(quotationHistoryQuerySchema, "query"), quotationAgentHistory);

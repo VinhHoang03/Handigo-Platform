@@ -16,6 +16,7 @@ import { useProviderOrderDetail } from '../hooks/useProviderOrderDetail';
 import { getPaymentStatusLabel, orderTypeLabels } from '../utils/providerOrderDetailLabels';
 import { ArrowLeft, CircleAlert } from "lucide-react";
 import { OrderArrivalPanel } from '../components/orders/OrderArrivalPanel';
+import { OrderReschedulePanel } from '@/features/booking/components/detail/OrderReschedulePanel';
 
 export default function ProviderOrderDetailPage() {
   const { orderId } = useParams();
@@ -128,6 +129,12 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
         )}
 
         <OrderDetailHeader order={order} />
+
+        <OrderReschedulePanel
+          order={order}
+          viewerRole="PROVIDER"
+          onChanged={() => reload(false)}
+        />
 
         <div className="grid grid-cols-1 items-start gap-gutter md:grid-cols-2 lg:grid-cols-3">
           <CustomerInformationCard
