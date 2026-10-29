@@ -20,6 +20,7 @@ import { markOrderVoucherAsUsed } from "./voucher.service";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { publishPaymentStatus } from "./paymentStatus.service";
 import { buildOrderPaymentRedirects, resolvePaymentFrontendOrigin } from "../utils/paymentRedirect";
+import { payQuotationByWallet } from "./quotationWalletPayment.service";
 
 export interface ConfirmedPaymentExpectation {
   amount: number;
@@ -747,6 +748,7 @@ export const createAgentOrderPayment = async (user: RequestUser, input: CreatePa
 };
 
 export const createOrderPayment = async (user: RequestUser, input: CreatePaymentInput) => {
+  if (input.paymentType === "REMAINING") return payQuotationByWallet(user, input);
   const order = await Order.findById(input.orderId);
   if (!order || order.isDeleted) throw new AppError("Không tìm thấy đơn hàng", 404);
   if (order.customerId.toString() !== user.id) {
@@ -782,6 +784,7 @@ export const createOrderPayment = async (user: RequestUser, input: CreatePayment
 };
 
 export const createPayment = async (user: RequestUser, input: CreatePaymentInput, expected?: ConfirmedPaymentExpectation, previousCashPaymentId?: string) => {
+  if (input.paymentType === "REMAINING") return payQuotationByWallet(user, input);
   const order = await Order.findById(input.orderId);
 
   if (!order || order.isDeleted) {

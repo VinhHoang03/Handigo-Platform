@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { getAppliedQuotationDeposit, getRemainingQuotationPayment } from '@/utils/quotationPayment';
+import { getAppliedQuotationDeposit, getRemainingQuotationPayment, isQuotationPaidByWallet } from '@/utils/quotationPayment';
+import { useBookingQuotationPayment } from './useBookingQuotationPayment';
 import { useParams } from "react-router-dom";
 import { useBookingDetailData } from "./useBookingDetailData";
 import { useMatchingCountdown } from "./useMatchingCountdown";
@@ -72,8 +73,10 @@ export const useBookingDetail = () => {
     .reduce((total, payment) => total + payment.amount, 0);
   const appliedDepositAmount = order ? getAppliedQuotationDeposit(order, paidDepositAmount) : paidDepositAmount;
   const remainingQuotationAmount = quotation
-    ? getRemainingQuotationPayment(quotation.quotation, appliedDepositAmount, order?.status)
+    ? getRemainingQuotationPayment(quotation.quotation, appliedDepositAmount, order?.status,
+      order ? isQuotationPaidByWallet(order, quotation.quotation) : false)
     : 0;
+  const quotationPaymentFlow = useBookingQuotationPayment(order, quotation, remainingQuotationAmount, busy, setBusy, loadData);
   const canMakeInitialPayment = Boolean(
     order &&
       !hasPaidInitialPayment &&
@@ -92,6 +95,7 @@ export const useBookingDetail = () => {
     isWaitingForProvider,
     matchingSecondsRemaining,
     paymentFlow,
+    quotationPaymentFlow,
     cancellationFlow,
     reassignmentFlow,
     providerInfo,

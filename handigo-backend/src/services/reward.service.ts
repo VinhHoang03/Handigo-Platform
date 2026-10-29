@@ -5,6 +5,7 @@ import { Voucher } from "../models/voucher.model";
 import { findStoredVoucher, listStoredVouchers } from "./voucherStore.service";
 import { IOrder, Order } from "../models/order.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
+import { Payment } from "../models/payment.model";
 import { REWARD_POLICY, calculateRewardPoints } from "../configs/rewards";
 import { AppError } from "../utils/appError";
 import { assertFeatureAllowed } from "./penaltyPolicy.service";
@@ -22,7 +23,14 @@ export const earnOrderRewards = async (order: IOrder, session: ClientSession) =>
       providerId: order.providerId, isDeleted: false,
       $or: [{ status: "saved" }, { status: "approved", customerConfirmed: true }],
     }).session(session);
-    if (!quotation?.directPaymentConfirmedAt || quotation.directPaymentConfirmedAmount == null) return;
+    if (!quotation) return;
+    if (!quotation.directPaymentConfirmedAt || quotation.directPaymentConfirmedAmount == null) {
+      const paidByWallet = order.paymentMethod === "wallet" && await Payment.exists({
+        orderId: order._id, customerId: order.customerId, paymentType: "remaining", method: "wallet", status: "paid",
+        "metadata.quotationId": quotation.id, "metadata.quotationRevision": quotation.revision ?? 0, isDeleted: false,
+      }).session(session);
+      if (!paidByWallet) return;
+    }
     // Tổng cuối cùng đã bao gồm phần cọc được khấu trừ, không cộng cọc lần nữa.
     rewardAmount = quotation.finalAmount;
   }
@@ -65,7 +73,7 @@ export const getRewardHistory = async (userId: string, page: number) => {
 };
 
 export const getMyRewardVouchers = async (userId: string, page: number) => {
-  const filter = { ownerId: new Types.ObjectId(userId), isDeleted: false };
+  const filter = { ownerId: new Types.ObjectId(userId), isDeleted: false, usedCount: { $not: { $gt: 0 } } };
   const all = await listStoredVouchers(filter);
   const total = all.length;
   const items = all.slice((page - 1) * 12, page * 12).map((voucher) => ({
