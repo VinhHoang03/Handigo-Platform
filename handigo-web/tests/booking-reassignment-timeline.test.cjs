@@ -13,6 +13,19 @@ const exportsObject = {};
 vm.runInNewContext(code, { exports: exportsObject, require });
 const { buildOrderTimeline, formatTimelineTime } = exportsObject;
 
+test('Thời gian tiến độ thống nhất theo giờ Việt Nam và không hiển thị ngày không hợp lệ', () => {
+  assert.equal(formatTimelineTime('2026-10-23T13:09:17Z'), '20:09:17 23/10/2026');
+  assert.equal(formatTimelineTime('không phải ngày'), '');
+  assert.equal(formatTimelineTime(null), '');
+});
+
+test('Mốc hoàn thành ưu tiên thời điểm xác nhận khi chưa có lịch sử, không lấy lần sửa đơn sau đó', () => {
+  const steps = buildOrderTimeline({ orderCode: 'DH01', status: 'completed', paymentStatus: 'paid', serviceId: { name: 'Vệ sinh' },
+    createdAt: '2026-10-23T01:00:00Z', updatedAt: '2026-10-29T01:00:00Z', confirmation: { providerConfirmedAt: '2026-10-23T03:00:00Z' } });
+  assert.equal(steps.at(-1).time, '10:00:00 23/10/2026');
+  assert.ok(steps.every(step => step.state === 'done'));
+});
+
 const event = (status, previousStatus, createdAt) => ({ status, previousStatus, createdAt, changedByRole: 'system' });
 const created = event('created', null, '2026-10-15T16:10:47Z');
 const accepted = event('accepted', 'created', '2026-10-15T16:11:39Z');

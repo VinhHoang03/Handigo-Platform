@@ -192,7 +192,6 @@ const formatPendingProviderProfile = async (
       verified: false,
       serviceIds: application.serviceIds.map(toIdString),
       services,
-      workingAreas: application.workingAreas || [],
       averageRating: 0,
       totalFeedbacks: 0,
       totalCompletedOrders: 0,
@@ -235,8 +234,6 @@ const formatProviderProfile = async (provider: IProvider) => {
       verified: provider.verified,
       serviceIds: (provider.serviceIds as unknown[]).map(toIdString),
       services: formatServices(provider),
-      workingAreas: provider.workingAreas || [],
-      serviceArea: provider.serviceArea,
       averageRating: provider.averageRating,
       totalFeedbacks: provider.totalFeedbacks,
       totalCompletedOrders: provider.totalCompletedOrders,
@@ -262,7 +259,7 @@ export const getFeaturedProviders = async (origin?: {
   })
     .sort({ averageRating: -1, totalFeedbacks: -1, createdAt: -1 })
     .limit(12)
-    .populate({ path: "userId", select: "fullName avatar" })
+    .populate({ path: "userId", select: "fullName avatar gender" })
     .populate(servicePopulate)
     .lean();
 
@@ -293,7 +290,7 @@ export const getFeaturedProviders = async (origin?: {
   const featuredProviders = providers
     .filter((provider) => provider.userId)
     .map((provider) => {
-      const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string };
+      const user = provider.userId as unknown as { _id: Types.ObjectId; fullName: string; avatar?: string; gender?: "male" | "female" | "other" };
       const services = provider.serviceIds as unknown as Array<{ _id: Types.ObjectId; name?: string }>;
       return {
         id: provider._id.toString(),
@@ -301,9 +298,8 @@ export const getFeaturedProviders = async (origin?: {
           id: user._id.toString(),
           fullName: user.fullName,
           avatar: user.avatar,
+          gender: user.gender ?? provider.identityDocument?.gender ?? null,
         },
-        workingAreas: provider.workingAreas || [],
-        serviceArea: provider.serviceArea,
         services: services.map((service) => ({
           id: service._id.toString(),
           name: service.name || "",
@@ -330,15 +326,20 @@ export const getNearbyProvidersForCustomer = async (
   serviceId: string,
   addressId: string,
   scheduledAtValue?: string,
-  recurrenceUnitValue?: string,
-  recurrenceCountValue?: number,
   orderIdValue?: string,
   selectedOptions?: unknown,
 ) => {
   assertObjectId(userId, "user id");
   assertObjectId(serviceId, "service id");
-  assertObjectId(addressId, "address id");
+  if (addressId) assertObjectId(addressId, "address id");
   if (orderIdValue) assertObjectId(orderIdValue, "order id");
+
+  // Đơn dùng địa chỉ một lần lấy vị trí từ bản chụp đã xác thực của chính khách.
+  const ownedOrder = orderIdValue ? await Order.findOne({ _id: orderIdValue,
+    customerId: new Types.ObjectId(userId), isDeleted: false }).lean() : null;
+  if (orderIdValue && (!ownedOrder || String(ownedOrder.serviceId) !== serviceId)) {
+    throw new AppError("Không tìm thấy đơn hàng phù hợp của bạn.", 404);
+  }
 
   const [service, address] = await Promise.all([
     Service.findOne({
@@ -346,7 +347,7 @@ export const getNearbyProvidersForCustomer = async (
       isActive: true,
       isDeleted: false,
     }),
-    Address.findOne({
+    ownedOrder?.addressSnapshot ?? Address.findOne({
       _id: addressId,
       userId: new Types.ObjectId(userId),
     }).lean(),
@@ -364,70 +365,25 @@ export const getNearbyProvidersForCustomer = async (
   if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt < getEarliestScheduledAt() || !isWithinAppointmentHours(scheduledAt))) {
     throw new AppError("Thời gian lịch hẹn không hợp lệ.", 400);
   }
-  const recurrenceUnit = ["weekly", "monthly"].includes(recurrenceUnitValue || "")
-    ? (recurrenceUnitValue as "weekly" | "monthly")
-    : undefined;
-  const validRecurrenceCounts = recurrenceUnit === "weekly"
-    ? [1, 2, 3, 4]
-    : recurrenceUnit === "monthly"
-      ? [4, 8, 12]
-      : [];
-  const recurrenceCount = validRecurrenceCounts.includes(recurrenceCountValue || 0)
-    ? recurrenceCountValue
-    : undefined;
-  const occurrenceDates = scheduledAt
-    ? recurrenceUnit && recurrenceCount
-      ? Array.from({ length: recurrenceCount }, (_, index) => {
-          const occurrence = new Date(scheduledAt);
-          if (recurrenceUnit === "weekly") {
-            occurrence.setDate(scheduledAt.getDate() + index * 7);
-          } else {
-            const targetDay = scheduledAt.getDate();
-            occurrence.setDate(1);
-            occurrence.setMonth(scheduledAt.getMonth() + index);
-            const lastDay = new Date(
-              occurrence.getFullYear(),
-              occurrence.getMonth() + 1,
-              0,
-            ).getDate();
-            occurrence.setDate(Math.min(targetDay, lastDay));
-          }
-          return occurrence;
-        })
-      : [scheduledAt]
-    : [];
+  const occurrenceDates = scheduledAt ? [scheduledAt] : [];
 
   let excludeProviderIds: Types.ObjectId[] = [];
   let savedIntervals: ScheduleInterval[] | undefined;
   if (orderIdValue) {
-    const order = await Order.findOne({
-      _id: orderIdValue,
-      customerId: new Types.ObjectId(userId),
-      isDeleted: false,
-    })
-      .lean();
+    const order = ownedOrder;
     if (!order) {
       throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
     }
 
-    const relatedOrders = order.recurringGroupId
-      ? await Order.find({
-          recurringGroupId: order.recurringGroupId,
-          customerId: new Types.ObjectId(userId),
-          status: "created",
-          isDeleted: false,
-        }).lean()
-      : [order];
     const policy = await getBookingPolicy();
-    savedIntervals = relatedOrders.map((item) => {
+    savedIntervals = [order].map((item) => {
       const interval = getOrderInterval(item, policy);
       if (item.scheduledAt) return interval;
       const start = Date.now() + interval.travelMinutes * 60000;
       return { ...interval, start, end: start + (interval.end - interval.start) };
     });
-    const relatedOrderIds = relatedOrders.map((item) => item._id);
     excludeProviderIds = await OrderAssignment.find({
-      orderId: { $in: relatedOrderIds },
+      orderId: order._id,
       status: { $in: ["rejected", "timeout"] },
       isDeleted: false,
     }).distinct("providerId");
@@ -462,7 +418,7 @@ export const getNearbyProvidersForCustomer = async (
     _id: { $in: providerIds },
     isDeleted: false,
   })
-    .populate({ path: "userId", select: "fullName avatar" })
+    .populate({ path: "userId", select: "fullName avatar gender" })
     .populate(servicePopulate)
     .lean();
 
@@ -474,6 +430,7 @@ export const getNearbyProvidersForCustomer = async (
         _id: Types.ObjectId;
         fullName?: string;
         avatar?: string | null;
+        gender?: "male" | "female" | "other" | null;
       };
       const services = provider.serviceIds as unknown as Array<{
         _id: Types.ObjectId;
@@ -486,13 +443,12 @@ export const getNearbyProvidersForCustomer = async (
           id: user?._id?.toString() || "",
           fullName: user?.fullName || "Chuyên gia Handigo",
           avatar: user?.avatar || null,
+          gender: user?.gender ?? provider.identityDocument?.gender ?? null,
         },
         services: services.map((item) => ({
           id: item._id.toString(),
           name: item.name || "",
         })),
-        workingAreas: provider.workingAreas || [],
-        serviceArea: provider.serviceArea,
         availabilityStatus: provider.availabilityStatus,
         averageRating: provider.averageRating,
         totalFeedbacks: provider.totalFeedbacks,
@@ -515,7 +471,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
     isDeleted: false,
     verified: true,
   })
-    .populate({ path: "userId", select: "fullName avatar createdAt" })
+    .populate({ path: "userId", select: "fullName avatar gender createdAt" })
     .populate(servicePopulate)
     .lean();
 
@@ -527,6 +483,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
     _id: Types.ObjectId;
     fullName?: string;
     avatar?: string | null;
+    gender?: "male" | "female" | "other" | null;
     createdAt?: Date;
   };
   const services = provider.serviceIds as unknown as Array<{
@@ -565,6 +522,7 @@ export const getPublicProviderProfile = async (providerId: string) => {
       id: user._id.toString(),
       fullName: user.fullName || "Chuyên gia Handigo",
       avatar: user.avatar || null,
+      gender: user.gender ?? provider.identityDocument?.gender ?? null,
       joinedAt: user.createdAt,
     },
     provider: {
@@ -598,8 +556,6 @@ export const getPublicProviderProfile = async (providerId: string) => {
             slug: service.slug || "",
           })),
       })),
-      workingAreas: provider.workingAreas || [],
-      serviceArea: provider.serviceArea,
       averageRating: provider.averageRating,
       totalFeedbacks: provider.totalFeedbacks,
       totalCompletedOrders: provider.totalCompletedOrders,
@@ -697,15 +653,6 @@ export const updateMyProviderProfile = async (
   if (payload.bio !== undefined) provider.bio = payload.bio;
   if (payload.mainServiceText !== undefined) {
     provider.mainServiceText = payload.mainServiceText;
-  }
-  if (payload.serviceArea !== undefined) {
-    provider.serviceArea = {
-      province: payload.serviceArea.province,
-      ward: payload.serviceArea.ward,
-    };
-  }
-  if (payload.workingAreas !== undefined) {
-    provider.workingAreas = [...new Set(payload.workingAreas)];
   }
   await provider.save();
   await provider.populate(servicePopulate);

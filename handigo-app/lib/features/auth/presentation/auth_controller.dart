@@ -1,3 +1,5 @@
+import '../../booking/data/pending_booking_store.dart';
+import '../../booking/data/booking_draft_store.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
@@ -87,7 +89,14 @@ class AuthController extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      await _repository.logout();
+      try {
+        if (user != null) {
+          await const PendingBookingStore().clear(user!.id);
+          await const BookingDraftStore().clear(user!.id);
+        }
+      } finally {
+        await _repository.logout();
+      }
     } finally {
       user = null;
       status = AuthStatus.unauthenticated;

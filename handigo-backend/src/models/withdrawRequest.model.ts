@@ -28,5 +28,6 @@ const WithdrawRequestSchema = new Schema<IWithdrawRequest>(
 );
 
 WithdrawRequestSchema.index({ status: 1, createdAt: -1 });
+WithdrawRequestSchema.index({ bankAccountId: 1, status: 1 });
 
 export const WithdrawRequest = model<IWithdrawRequest>("WithdrawRequest", WithdrawRequestSchema, "withdrawrequests");

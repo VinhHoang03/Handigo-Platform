@@ -6,10 +6,16 @@ export const getRoleHomePath = (
 ) => {
   switch (role?.toUpperCase()) {
     case 'CUSTOMER':
+      if (providerOnboardingStatus === 'PENDING_REVIEW') {
+        return '/customer/profile?tab=applications';
+      }
+      if (providerOnboardingStatus === 'PROFILE_INCOMPLETE' || providerOnboardingStatus === 'REJECTED') {
+        return '/register-provider';
+      }
       return '/customer';
     case 'PROVIDER':
       if (providerOnboardingStatus === 'PENDING_REVIEW') {
-        return '/provider/profile';
+        return '/customer/profile?tab=applications';
       }
       return providerOnboardingStatus && providerOnboardingStatus !== 'APPROVED'
         ? '/register-provider'
@@ -35,10 +41,25 @@ export const getRoleProfilePath = (role?: User['role'] | string | null) => {
 };
 
 export const getPostLoginPath = (role: User['role'], providerOnboardingStatus: User['providerOnboardingStatus'], from: unknown) => {
-  if (role.toUpperCase() === 'CUSTOMER' && typeof from === 'string') {
+  const normalizedRole = role.toUpperCase();
+
+  if (['CUSTOMER', 'PROVIDER'].includes(normalizedRole) && typeof from === 'string') {
     try {
       const url = new URL(from, 'https://handigo.invalid');
-      if (url.origin === 'https://handigo.invalid' && ['/payment/success', '/payment/cancel', '/customer/bookings/result', '/customer/bookings/success'].includes(url.pathname)) {
+
+      if (
+        url.origin === 'https://handigo.invalid' &&
+        url.pathname === '/ho-tro' &&
+        url.searchParams.get('focus') === 'tao-yeu-cau'
+      ) {
+        return '/ho-tro?focus=tao-yeu-cau';
+      }
+
+      if (
+        normalizedRole === 'CUSTOMER' &&
+        url.origin === 'https://handigo.invalid' &&
+        ['/payment/success', '/payment/cancel', '/customer/bookings/result', '/customer/bookings/success'].includes(url.pathname)
+      ) {
         return url.pathname + url.search + url.hash;
       }
     } catch { /* Đường dẫn không hợp lệ quay về trang theo vai trò. */ }

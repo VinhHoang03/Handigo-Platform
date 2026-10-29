@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { personNameSchema, vietnamesePhoneSchema } from "./user.validator";
-import { providerWorkingAreasSchema } from "./providerApplication.validator";
 
 const dateStringSchema = z
   .string()
@@ -56,11 +55,6 @@ const validateDateRange = (
   }
 };
 
-export const providerServiceAreaSchema = z.object({
-  province: optionalText(120),
-  ward: optionalText(120),
-});
-
 export const featuredProviderQuerySchema = z
   .object({
     latitude: z.coerce.number().min(-90).max(90).optional(),
@@ -81,8 +75,6 @@ export const updateProviderProfileSchema = z.object({
   description: optionalText(2000),
   bio: optionalText(2000),
   mainServiceText: optionalText(200),
-  serviceArea: providerServiceAreaSchema.optional(),
-  workingAreas: providerWorkingAreasSchema.optional(),
 }).superRefine((payload, context) => {
   if (payload.birthday && new Date(payload.birthday) > endOfToday()) {
     context.addIssue({

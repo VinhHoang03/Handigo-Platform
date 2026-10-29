@@ -26,6 +26,7 @@ function loadService(name, modules, internals = []) {
       if (name === '../utils/logger') return { createLogger: () => ({ info() {}, warn() {}, error() {}, debug() {} }) };
       if (name === '../validations/refundPolicy.validator') return { DEFAULT_REFUND_POLICY: { providerCompensationPercent: 80 } };
       if (name === './systemConfig.service') return { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }) };
+      if (name === './penaltyPolicy.service') return { assertFeatureAllowed: async () => {} };
       // Chỉ nạp các module được giả lập, không chạm cấu hình hoặc database thật.
       return {};
     },
@@ -57,6 +58,7 @@ function reassignmentSetup(orderType = 'normal') {
     matchingStartedAt: new Date(0), matchingSearch: { expiresAt: new Date(0) } };
   const session = { async withTransaction(fn) { await fn(); events.push('commit'); }, async endSession() {} };
   const service = loadService('orderReassignment.service', {
+    './refundPolicy.service': loadService('refundPolicy.service', {}),
     mongoose: { __esModule: true, default: { startSession: async () => session }, Types },
     '../models/order.model': { Order: {
       findById: () => query(order),
@@ -113,6 +115,23 @@ test('Đơn báo giá đã lưu không tìm thợ thay thế và thợ khác kh�
   await assert.rejects(stranger.cancel(), /quyền/);
 });
 
+test('Thợ chưa đến nơi hủy đơn báo giá: giữ cọc, tìm thợ khác và không cộng hỗ trợ', async () => {
+  const context = reassignmentSetup();
+  context.order.inspectionRequired = true;
+  context.order.depositPaidAt = new Date();
+  context.order.paymentStatus = 'partially_paid';
+  context.order.depositAmount = 20000;
+  await context.cancel();
+  assert.equal(context.order.status, 'created');
+  assert.equal(context.order.providerId, null);
+  assert.equal(context.order.paymentStatus, 'partially_paid');
+  assert.equal(context.order.depositAmount, 20000);
+  assert.equal(context.order.reassignment.status, 'matching');
+  assert.ok(context.order.reassignment.previousProviderIds.includes(context.providerId));
+  assert.equal(context.events.filter(event => event === 'dispatch').length, 1);
+  assert.match(context.events.find(event => typeof event === 'object').content, /10.000đ/);
+});
+
 function cancellationSetup(method = 'wallet', { automatic = true, unavailable = true, status = 'created',
   customer = false, inspectionRequired = false, acceptedAt = new Date(Date.now() - 60000) } = {}) {
   const order = { _id: new Types.ObjectId(), customerId: new Types.ObjectId(), orderCode: 'ORD-HOANTIEN',
@@ -167,6 +186,7 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
     } } },
     '../models/orderAssignment.model': { OrderAssignment: { async updateMany() {}, findOne: () => query(null) } },
     '../models/refund.model': { Refund: {
+      findOne: () => query(refund ?? null),
       async findOneAndUpdate(_, update) {
         refund ??= { _id: new Types.ObjectId(), ...update.$setOnInsert };
         setFields(refund, update.$set); return refund;
@@ -176,7 +196,7 @@ function cancellationSetup(method = 'wallet', { automatic = true, unavailable = 
     './voucher.service': { async releaseVoucherReservation() {} },
     './promotion.service': { async releaseOrderPromotion() {} },
     './refundPolicy.service': loadService('refundPolicy.service', {}),
-    '../utils/transaction': { buildTransactionCode: () => 'REFUND-THU-NGHIEM' },
+    '../utils/transaction': { buildTransactionCode: () => 'REFUND-THU-NGHIEM', withTransactionRetry: (currentSession, operation) => currentSession.withTransaction(operation) },
     './notification.service': { async createNotificationRecord(value) { notifications.push(value); } },
     '../sockets/socketServer': { emitToUser() {} },
     '../configs/payos.config': {
@@ -215,6 +235,50 @@ for (const method of ['wallet', 'payos', 'cash']) {
     assert.equal(context.wallet.balance, method === 'cash' ? 20000 : 200000);
   });
 }
+
+for (const method of ['wallet', 'payos']) {
+  test(`Hết thời gian thay thợ báo giá ${method}: hoàn toàn bộ cọc và cấp đúng một voucher 10.000đ`, async () => {
+    const context = cancellationSetup(method, { inspectionRequired: true });
+    context.payment.amount = 20000;
+    context.payment.paymentType = 'inspection_deposit';
+    await context.cancel();
+    assert.equal(context.order.status, 'cancelled');
+    assert.equal(context.order.reassignment.status, 'failed');
+    assert.equal(context.wallet.balance, 40000);
+    assert.equal(context.payment.status, 'refunded');
+    assert.equal(context.order.cancellation.refundPolicy.refundAmount, 20000);
+    assert.equal(context.order.cancellation.refundPolicy.providerCompensation, 0);
+    const voucher = context.vouchers[0];
+    assert.equal(context.vouchers.length, 1);
+    assert.equal(voucher.ownerId, context.order.customerId);
+    assert.equal(voucher.discountType, 'AMOUNT');
+    assert.equal(voucher.discountValue, 10000);
+    assert.equal(voucher.applicableOrderType, 'variable_price');
+    assert.equal(voucher.usageLimit, 1);
+    assert.equal(voucher.neverExpires, true);
+    assert.match(context.notifications[0].content, /10.000đ/);
+    await context.cancel();
+    assert.equal(context.vouchers.length, 1);
+    assert.equal(context.wallet.balance, 40000);
+  });
+}
+
+test('Voucher 10.000đ do hết thời gian thay thợ dùng được cho cọc báo giá, đúng chủ và một lần', async () => {
+  const context = cancellationSetup('wallet', { inspectionRequired: true });
+  context.payment.paymentType = 'inspection_deposit';
+  await context.cancel();
+  const voucher = { _id: new Types.ObjectId(), usedCount: 0, reservedCount: 0, ...context.vouchers[0] };
+  const service = loadService('voucher.service', {
+    mongoose: { Types },
+    './voucherStore.service': { findStoredVoucher: async () => voucher },
+    '../models/voucherUsage.model': { VoucherUsage: { countDocuments: () => query(0) } },
+  });
+  const result = await service.resolveVoucherForAmount(voucher.code, 20000, undefined, context.order.customerId.toString(), true);
+  assert.equal(result.discountAmount, 10000);
+  await assert.rejects(service.resolveVoucherForAmount(voucher.code, 20000, undefined, new Types.ObjectId().toString(), true), /thuộc tài khoản/);
+  voucher.usedCount = 1;
+  await assert.rejects(service.resolveVoucherForAmount(voucher.code, 20000, undefined, context.order.customerId.toString(), true), /hết lượt/);
+});
 
 test('Không tặng mã cho lần tìm thợ ban đầu hoặc khách chủ động hủy', async () => {
   for (const options of [{ automatic: false }, { unavailable: false }]) {

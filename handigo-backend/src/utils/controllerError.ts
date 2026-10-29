@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { ZodError } from "zod";
 import { AppError } from "./appError";
+import { httpErrorMessage } from "./httpErrorMessages";
 
 type ErrorWithStatusCode = {
   statusCode?: number;
@@ -35,6 +36,8 @@ const getErrorMessage = (
   statusCode: number,
 ) => {
   if (statusCode >= 500) {
+    // Chỉ công khai thông báo nghiệp vụ có mã rõ ràng, không đưa lỗi kỹ thuật ra client.
+    if (error instanceof AppError && error.code) return error.message;
     return fallbackMessage;
   }
 
@@ -64,7 +67,7 @@ const getErrorStatusCode = (error: unknown) => {
     statusCode = error.statusCode as number;
   }
 
-  return statusCode >= 400 && statusCode <= 599 ? statusCode : 500;
+  return Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599 ? statusCode : 500;
 };
 
 export const sendControllerError = (
@@ -74,7 +77,7 @@ export const sendControllerError = (
 ) => {
   const {
     includeCode = false,
-    fallbackMessage = "Lỗi máy chủ nội bộ",
+    fallbackMessage,
     invalidDataMessage = "Dữ liệu không hợp lệ",
   } = options;
 
@@ -82,6 +85,7 @@ export const sendControllerError = (
     return res.status(400).json({
       success: false,
       message: invalidDataMessage,
+      code: "VALIDATION_ERROR",
       errors: error.issues,
     });
   }
@@ -94,10 +98,11 @@ export const sendControllerError = (
     code?: unknown;
   } = {
     success: false,
-    message: getErrorMessage(error, fallbackMessage, statusCode),
+    message: getErrorMessage(error, fallbackMessage ?? httpErrorMessage(statusCode), statusCode),
+    code: error instanceof AppError && error.code ? error.code : `HTTP_${statusCode}`,
   };
 
-  if (includeCode && statusCode < 500 && hasCode(error)) {
+  if (includeCode && statusCode < 500 && hasCode(error) && error.code !== undefined) {
     body.code = error.code;
   }
 

@@ -1,5 +1,8 @@
-import { Route } from "react-router-dom";
+import { Suspense } from "react";
+import { Outlet, Route } from "react-router-dom";
 import { RouteGuard } from "@/components/common/RouteGuard";
+import { DashboardShell } from "@/components/common/DashboardShell";
+import { AdminLayoutContext } from "@/components/common/dashboard/adminLayout.context";
 import {
   AdminUsersPage,
   AdminProviderApplicationsPage,
@@ -19,12 +22,24 @@ import {
   NotificationsPage,
 } from "./admin-lazy-pages";
 
-/** Admin-area routes (all guarded by RouteGuard roles={["ADMIN"]}). Called
- * as a function inside <Routes> so the returned Fragment's <Route> children
- * are hoisted to the top level exactly like inline JSX would be. */
+function AdminRouteLayout() {
+  return (
+    <RouteGuard roles={["ADMIN"]}>
+      <DashboardShell role="ADMIN">
+        <AdminLayoutContext.Provider value={true}>
+          <Suspense fallback={<div role="status" className="rounded-xl bg-surface-container-low p-6 text-on-surface-variant">Đang tải trang…</div>}>
+            <Outlet />
+          </Suspense>
+        </AdminLayoutContext.Provider>
+      </DashboardShell>
+    </RouteGuard>
+  );
+}
+
+// Giữ layout admin trên route cha để sidebar không bị dựng lại khi chuyển mục.
 export function AdminRoutes() {
   return (
-    <>
+    <Route element={<AdminRouteLayout />}>
       <Route
         path="/admin"
         element={
@@ -153,6 +168,6 @@ export function AdminRoutes() {
           </RouteGuard>
         }
       />
-    </>
+    </Route>
   );
 }

@@ -7,7 +7,9 @@ import { dateKey, getOrderDate, getOrderLoadError } from "./providerHome.utils";
 /** Booking gần nhất + lịch hôm nay — dùng chung nguồn dữ liệu `getProviderOrders`. */
 export function useProviderOrdersSchedule() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [totalOrders, setTotalOrders] = useState(0);
+  const [totalOrders, setTotalOrders] = useState<number | null>(null);
+  const [activeOrders, setActiveOrders] = useState<number | null>(null);
+  const [isLoadingActiveOrders, setIsLoadingActiveOrders] = useState(true);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useToastFeedback<string | null>(null, "error");
   const [todaySchedule, setTodaySchedule] = useState<Order[]>([]);
@@ -16,6 +18,11 @@ export function useProviderOrdersSchedule() {
 
   useEffect(() => {
     let cancelled = false;
+
+    providerOrderApi.getProviderOrders(1, 1, "in_progress")
+      .then((result) => { if (!cancelled) setActiveOrders(result.pagination.total); })
+      .catch(() => { /* Giữ null để không hiển thị nhầm 0 đơn khi nguồn lỗi. */ })
+      .finally(() => { if (!cancelled) setIsLoadingActiveOrders(false); });
 
     providerOrderApi
       .getRecentOrders(5)
@@ -76,6 +83,8 @@ export function useProviderOrdersSchedule() {
   return {
     recentOrders,
     totalOrders,
+    activeOrders,
+    isLoadingActiveOrders,
     isLoadingOrders,
     ordersError,
     todaySchedule,

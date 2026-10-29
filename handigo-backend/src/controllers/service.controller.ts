@@ -67,7 +67,7 @@ export const listServices = async (
   next: NextFunction,
 ) => {
   try {
-    const data = await serviceService.listServices(req.query);
+    const data = await serviceService.listServices(req.query, req.user?.role === "ADMIN");
     return res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -80,7 +80,7 @@ export const getServiceById = async (
   next: NextFunction,
 ) => {
   try {
-    const data = await serviceService.getServiceById(req.params.id as string);
+    const data = await serviceService.getServiceById(req.params.id as string, req.user?.role === "ADMIN");
     return res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -164,7 +164,7 @@ export const deleteService = async (
     await serviceService.deleteService(req.params.id as string);
     return res.json({
       success: true,
-      message: "Service deleted successfully",
+      message: "Đã ngừng hoạt động dịch vụ",
       data: null,
     });
   } catch (error) {

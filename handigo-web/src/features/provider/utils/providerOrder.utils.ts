@@ -38,6 +38,14 @@ export function getCustomer(order: Order): OrderCustomer | null {
   return typeof order.customerId === 'object' ? order.customerId : null;
 }
 
+export function getOrderRecipient(order: Order) {
+  const customer = getCustomer(order);
+  return {
+    fullName: order.addressId?.recipientName?.trim() || customer?.fullName || 'Khách hàng',
+    phone: order.addressId?.recipientPhone?.trim() || customer?.phone || '',
+  };
+}
+
 export function shortAddress(order: Order) {
   const address = order.addressId;
   if (!address) return '';

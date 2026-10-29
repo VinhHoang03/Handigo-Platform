@@ -63,7 +63,7 @@ export function NearbyProviderSelector({
     );
   };
 
-  const canSearch = enabled && serviceId && addressId && (!requireSelection || scheduledAt);
+  const canSearch = enabled && serviceId && (addressId || orderId) && (!requireSelection || scheduledAt);
 
   return (
     <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
@@ -96,7 +96,7 @@ export function NearbyProviderSelector({
       ) : providers.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 py-3 text-sm text-on-surface-variant">
           {requireSelection
-            ? "Chưa có thợ nào trống trong khung giờ này. Thử chọn giờ khác."
+            ? "Chưa có thợ đang nhận đơn phù hợp với dịch vụ, địa chỉ và lịch đã chọn."
             : "Chưa tìm thấy thợ trong bán kính phục vụ quanh địa chỉ này. Hãy thử kiểm tra lại địa chỉ hoặc chọn dịch vụ vào thời điểm khác."}
         </p>
       ) : (

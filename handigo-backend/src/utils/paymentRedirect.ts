@@ -29,7 +29,15 @@ export const buildOrderPaymentRedirects = (orderId: string, frontendUrl: string,
   configured: { returnUrl?: string; cancelUrl?: string; clientCancelUrl?: string } = {}) => {
   const frontend = parseRedirectUrl(frontendUrl);
   const requestedCancel = configured.clientCancelUrl ? parseRedirectUrl(configured.clientCancelUrl) : undefined;
-  const cancelPath = requestedCancel?.origin === frontend.origin && requestedCancel.pathname === '/customer/bookings/new/payment'
+  const isLegacyQuickRebooking = requestedCancel?.origin === frontend.origin
+    && /^\/customer\/bookings\/[a-f\d]{24}$/i.test(requestedCancel.pathname)
+    && requestedCancel.searchParams.get('quickRebook') === '1';
+  const quickRebookOrderId = isLegacyQuickRebooking ? requestedCancel.pathname.split('/').pop()
+    : requestedCancel?.origin === frontend.origin && requestedCancel.pathname === '/customer/services'
+      && /^[a-f\d]{24}$/i.test(requestedCancel.searchParams.get('quickRebook') ?? '')
+    ? requestedCancel.searchParams.get('quickRebook') : undefined;
+  const cancelPath = quickRebookOrderId ? '/customer/services'
+    : requestedCancel?.origin === frontend.origin && requestedCancel.pathname === '/customer/bookings/new/payment'
     ? '/customer/bookings/new/payment'
     : `/customer/bookings/${orderId}`;
   const path = '/customer/bookings/result';
@@ -40,10 +48,12 @@ export const buildOrderPaymentRedirects = (orderId: string, frontendUrl: string,
     url.searchParams.set("frontendOrigin", frontend.origin);
     return url.href;
   };
+  const cancelUrl = new URL(`${cancelPath}?payos=cancel`, frontend.origin);
+  if (quickRebookOrderId) cancelUrl.searchParams.set('quickRebook', quickRebookOrderId);
   return {
     returnUrl: configuredUrl(configured.returnUrl, "success"),
     // Hủy QR quay thẳng về web, tránh đi qua địa chỉ callback backend.
-    cancelUrl: new URL(`${cancelPath}?payos=cancel`, frontend.origin).href,
+    cancelUrl: cancelUrl.href,
   };
 };
 

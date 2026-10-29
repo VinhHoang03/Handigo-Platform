@@ -6,6 +6,37 @@ class AccountRepository {
   const AccountRepository(this._api);
   final ApiClient _api;
 
+  Future<List<Map<String, dynamic>>> bankAccounts() async {
+    final data = (await _api.request(
+      '/bank-accounts',
+      authenticated: true,
+    ))['data'];
+    return (data as List<dynamic>? ?? [])
+        .map((item) => item as Map<String, dynamic>)
+        .toList();
+  }
+
+  Future<void> createBankAccount(Map<String, dynamic> data) async {
+    await _api.request(
+      '/bank-accounts',
+      method: 'POST',
+      data: data,
+      authenticated: true,
+    );
+  }
+
+  Future<PagedResult<PaymentHistoryItem>> paymentHistory({int page = 1}) async {
+    final data = (await _api.request(
+      '/payments/history',
+      query: {'page': page, 'limit': 20},
+      authenticated: true,
+    ))['data'];
+    return PagedResult.fromJson(
+      data as Map<String, dynamic>,
+      PaymentHistoryItem.fromJson,
+    );
+  }
+
   Future<Map<String, dynamic>> profile() async => (await _api.request('/users/me', authenticated: true))['user'] as Map<String, dynamic>;
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async => (await _api.request('/users/profile', method: 'PUT', data: data, authenticated: true))['data'] as Map<String, dynamic>;
   Future<List<AddressItem>> addresses() async { final data = (await _api.request('/addresses', authenticated: true))['data']; return (data as List<dynamic>? ?? []).map((e) => AddressItem.fromJson(e as Map<String, dynamic>)).toList(); }

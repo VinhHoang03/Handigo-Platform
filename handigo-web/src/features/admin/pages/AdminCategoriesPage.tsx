@@ -1,10 +1,11 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
+import { CatalogStatusPill } from "../components/categories/CatalogStatusPill";
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useMemo, useState, type FormEvent } from "react";
-import { CircleAlert, Image as ImageIcon, ListPlus, Pencil, PlusCircle, Trash2, Wrench } from "lucide-react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { Image as ImageIcon, ListPlus, Pencil, PlusCircle, Wrench } from "lucide-react";
+import { CatalogTooltip } from "../components/shared/CatalogTooltip";
 import { AsyncState } from "@/components/common/AsyncState";
-import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { DataTable } from "@/components/common/dashboard/DataTable";
@@ -28,21 +29,26 @@ function CategoryServicesDropdown({
   optionCounts,
   optionsLoading,
   onEditService,
-  onDeleteService,
+  onToggleService,
+  statusBusy,
+  categoryActive,
 }: {
   services: Service[];
   optionCounts: Record<string, number>;
   optionsLoading: boolean;
   onEditService: (service: Service) => void;
-  onDeleteService: (service: Service) => void;
+  onToggleService: (service: Service) => void;
+  statusBusy: string[];
+  categoryActive: boolean;
 }) {
   return (
     <div className="-mt-2 space-y-2">
+      {!categoryActive && <p className="px-3 py-2 text-sm text-on-surface-variant">Danh mục đang ngừng hoạt động. Dịch vụ bên dưới giữ trạng thái riêng nhưng chưa hiển thị cho khách hàng và chưa thể đặt mới.</p>}
       {services.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant p-4 text-sm text-on-surface-variant">Danh mục chưa có dịch vụ.</p>
       ) : (
         <div className="space-y-3">
-          {services.map((service) => {
+          {[...services].sort((a, b) => Number(b.isActive) - Number(a.isActive)).map((service) => {
             const price = service.fixedPrice ?? service.minOptionPrice ?? service.depositAmount;
             return (
               <div key={service._id} onClick={() => onEditService(service)} className="group relative mx-3 flex w-full min-w-[62rem] cursor-pointer items-center gap-5 rounded-xl border border-outline-variant bg-surface-container-lowest px-5 py-3 shadow-sm transition-colors hover:border-primary/50 hover:bg-surface-container-high sm:mx-5">
@@ -50,30 +56,22 @@ function CategoryServicesDropdown({
                   {(service.coverImage === undefined ? service.image : service.coverImage) && isImageUrl((service.coverImage === undefined ? service.image : service.coverImage)) ? <ReliableImage src={(service.coverImage === undefined ? service.image : service.coverImage) || undefined} alt="" aria-hidden="true" className="h-full w-full object-contain" /> : <Wrench aria-hidden="true" size={22} />}
                 </div>
                 <div className="w-64 min-w-0 shrink-0">
-                  <span className="group/description relative inline-flex min-w-0 items-center gap-1">
+                  <span className="inline-flex min-w-0 items-center gap-1">
                     <p className="truncate font-semibold text-on-surface">{service.name}</p>
-                    <span className="shrink-0 rounded-full p-0.5 text-on-surface-variant" aria-label={`Xem mô tả dịch vụ ${service.name}`}>
-                      <CircleAlert aria-hidden="true" size={16} />
-                    </span>
-                    <span className="pointer-events-none absolute bottom-full right-8 z-30 mb-2 hidden w-max whitespace-pre-wrap rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-950 shadow-lg group-hover/description:block">
-                      {service.description || 'Chưa có mô tả'}
-                    </span>
+                    <CatalogTooltip label={`Xem mô tả dịch vụ ${service.name}`} content={service.description || 'Chưa có mô tả'} />
                   </span>
                 </div>
                 <div className="-ml-2 grid min-w-0 flex-1 grid-cols-[1.15fr_1fr_1fr_1.5fr_1fr] items-center gap-4 text-center text-sm text-on-surface-variant">
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Loại giá</small><strong className="font-semibold text-on-surface">{service.serviceType === 'fixed_price' ? 'Giá cố định' : 'Giá linh hoạt'}</strong></span>
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Giá</small><strong className="font-semibold text-on-surface">{price == null ? 'Chưa có giá' : serviceMoney.format(price)}</strong></span>
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Tùy chọn</small><strong className="font-semibold text-on-surface">{optionsLoading ? 'Đang tải…' : optionCounts[service._id] ?? 0}</strong></span>
-                    <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Slug</small><strong className="break-all whitespace-normal font-medium text-on-surface-variant">/{service.slug}</strong></span>
+                    <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Đường dẫn định danh</small><strong className="break-all whitespace-normal font-medium text-on-surface-variant">/{service.slug}</strong></span>
                     <span className="flex min-w-0 flex-col gap-0.5"><small className="text-[10px] uppercase tracking-wide">Cập nhật</small><strong className="font-medium text-on-surface-variant">{service.updatedAt ? serviceDateFormatter.format(new Date(service.updatedAt)) : '—'}</strong></span>
                 </div>
                 <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-                  <StatusBadge value={service.isActive ? 'active' : 'hidden'} />
+                  <CatalogStatusPill name={service.name} active={service.isActive} busy={statusBusy.includes(`service:${service._id}`)} onToggle={() => onToggleService(service)} />
                   <button type="button" onClick={(event) => { event.stopPropagation(); onEditService(service); }} className="rounded-lg p-2 text-on-surface-variant hover:bg-primary/10 hover:text-primary" aria-label="Sửa dịch vụ">
                     <Pencil aria-hidden="true" size={20} />
-                  </button>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); onDeleteService(service); }} className="rounded-lg p-2 text-on-surface-variant hover:bg-error/10 hover:text-error" aria-label="Xóa dịch vụ">
-                    <Trash2 aria-hidden="true" size={20} />
                   </button>
                 </div>
               </div>
@@ -96,8 +94,9 @@ export default function AdminCategoriesPage() {
   const [optionForm, setOptionForm] = useState<OptionForm>(emptyOptionForm);
   const [editingOption, setEditingOption] = useState<ServiceOption | null>(null);
   const [optionFormError, setOptionFormError] = useToastFeedback<string>('', "error");
-  const [serviceDeleteTarget, setServiceDeleteTarget] = useState<Service | null>(null);
   const [serviceBusy, setServiceBusy] = useState(false);
+  const optionStatusRequests = useRef(new Set<string>());
+  const [optionStatusBusy, setOptionStatusBusy] = useState<string[]>([]);
 
   const openEditService = (service: Service) => {
     setEditingService(service);
@@ -130,6 +129,7 @@ export default function AdminCategoriesPage() {
 
   const saveService = async (event: FormEvent) => {
     event.preventDefault();
+    if (optionStatusRequests.current.size > 0) return;
     setServiceBusy(true);
     try {
       if (editingService) {
@@ -190,25 +190,26 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const confirmDeleteService = async () => {
-    if (!serviceDeleteTarget) return;
-    const target = serviceDeleteTarget;
-    setServiceDeleteTarget(null);
-    setServiceBusy(true);
+  const toggleOptionStatus = async (option: ServiceOption) => {
+    if (serviceBusy || optionStatusRequests.current.has(option._id)) return;
+    optionStatusRequests.current.add(option._id);
+    setOptionStatusBusy([...optionStatusRequests.current]);
     try {
-      await categoryServiceApi.deleteService(target._id);
-      addToast('Đã xóa dịch vụ.', 'success');
-      await c.reload();
+      const updated = await categoryServiceApi.updateServiceOption(option._id, { isActive: !option.isActive });
+      setServiceOptions(current => current.map(item => item._id === updated._id ? updated : item));
+      addToast(updated.isActive ? 'Đã bật hiển thị tùy chọn.' : 'Đã tắt hiển thị tùy chọn.', 'success');
     } catch (error) {
-      addToast(error instanceof Error ? error.message : 'Không thể xóa dịch vụ.', 'error');
+      addToast(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái tùy chọn. Vui lòng thử lại.', 'error');
     } finally {
-      setServiceBusy(false);
+      optionStatusRequests.current.delete(option._id);
+      setOptionStatusBusy([...optionStatusRequests.current]);
     }
   };
 
   const sortedCategories = useMemo(
     () =>
       [...c.categories].sort((a, b) => {
+        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
         const aPinned = c.pinnedIds.includes(a._id);
         const bPinned = c.pinnedIds.includes(b._id);
         if (aPinned !== bPinned) return aPinned ? -1 : 1;
@@ -219,32 +220,26 @@ export default function AdminCategoriesPage() {
     [c.categories, c.pinnedIds, c.sortOrder],
   );
 
-  const columns = useMemo(
-    () =>
-      buildCategoryTableColumns({
+  const columns = buildCategoryTableColumns({
         serviceCounts: c.serviceCounts,
         onEdit: c.openEdit,
-        onDelete: c.setDeleteTarget,
+        onToggleStatus: (category) => void c.toggleStatus(category, 'category'),
+        statusBusy: c.statusBusy,
         pinnedIds: c.pinnedIds,
         onTogglePin: c.togglePinned,
         onCreateService: openCreateService,
         expandedId: c.expandedId,
         onToggleExpand: c.toggleExpanded,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [c.serviceCounts, c.pinnedIds, c.expandedId],
-  );
+      });
 
   return (
     <DashboardShell role="ADMIN">
       <div className="space-y-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="admin-page-header">
           <div>
-            <h1 className="font-headline-lg text-headline-lg font-bold text-on-surface">
-              Quản lý danh mục dịch vụ
-            </h1>
+            <AdminPageTitle title="Quản lý danh mục dịch vụ" />
           </div>
-          <div className="text-left sm:text-right">
+          <div className="admin-header-summary">
             <p className="flex items-center justify-start gap-2 text-sm font-semibold text-on-surface-variant sm:justify-end">
               <span
                 aria-hidden="true"
@@ -257,7 +252,8 @@ export default function AdminCategoriesPage() {
               {c.serviceStats.total}
             </p>
           </div>
-        </header>
+        <AdminRefreshButton onRefresh={() => void c.reload()} loading={c.loading} />
+      </header>
 
 
         <CategoryFilterBar
@@ -289,7 +285,9 @@ export default function AdminCategoriesPage() {
                 optionCounts={c.optionCounts}
                 optionsLoading={c.optionsLoadingId === category._id}
                 onEditService={openEditService}
-                onDeleteService={setServiceDeleteTarget}
+                onToggleService={(service) => void c.toggleStatus(service, 'service')}
+                statusBusy={c.statusBusy}
+                categoryActive={category.isActive}
               />
             )}
             emptyState={
@@ -333,8 +331,8 @@ export default function AdminCategoriesPage() {
         mode={editingService ? "edit" : "create"}
         categories={c.categories}
         form={serviceForm}
-        busy={serviceBusy}
-        blockClose={serviceBusy || Boolean(optionModal)}
+        busy={serviceBusy || optionStatusBusy.length > 0}
+        blockClose={serviceBusy || optionStatusBusy.length > 0 || Boolean(optionModal)}
         onChange={setServiceForm}
         onClose={() => setServiceModal(false)}
         onSubmit={saveService}
@@ -345,7 +343,6 @@ export default function AdminCategoriesPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-on-surface">Tùy chọn dịch vụ</h3>
-                <p className="text-xs text-on-surface-variant">Thiết lập các gói, đơn vị tính và mức giá khách hàng có thể chọn.</p>
               </div>
               <button type="button" onClick={openCreateOption} className="inline-flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/5">
                 <PlusCircle size={18} aria-hidden="true" /> Thêm tùy chọn
@@ -365,18 +362,18 @@ export default function AdminCategoriesPage() {
                   <div key={group} className="space-y-2">
                     <h4 className="border-b border-outline-variant/40 pb-1 text-xs font-bold uppercase tracking-wide text-primary">{group}</h4>
                     {options.map((option) => (
-                      <div key={option._id} className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-outline-variant/60 px-4 py-3 text-sm">
+                      <div key={option._id} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3 rounded-lg border border-outline-variant/60 px-4 py-3 text-sm sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
                         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low text-on-surface-variant">
                           {option.image && isImageUrl(option.image) ? <ReliableImage src={option.image} alt="" aria-hidden="true" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" size={20} />}
                         </div>
-                        <div className="group/option relative min-w-0">
-                          <div className="flex min-w-0 items-center gap-1"><p className="truncate font-semibold">{option.name}</p><span className="rounded-full p-0.5 text-on-surface-variant" aria-label={`Mô tả tùy chọn ${option.name}`}><CircleAlert aria-hidden="true" size={15} /></span></div>
-                          <span className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-auto whitespace-pre-wrap rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs text-amber-950 shadow-lg group-hover/option:block">{option.description || 'Chưa có mô tả'}</span>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-1"><p className="truncate font-semibold">{option.name}</p><CatalogTooltip label={`Mô tả tùy chọn ${option.name}`} content={option.description || 'Chưa có mô tả'} /></div>
                           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-on-surface-variant"><span>{OPTION_TYPE_LABELS[option.optionType]}</span><span>Chọn nhiều: {option.selectionMode === 'multiple' ? 'Có' : 'Không'}</span><span>Cho phép số lượng: {option.allowsQuantity ? 'Có' : 'Không'}</span></div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-3">
-                          <span className="inline-flex items-center gap-1.5 text-xs text-on-surface-variant"><span className={`h-2.5 w-2.5 rounded-full ${option.isActive ? 'bg-success' : 'bg-outline'}`} aria-hidden="true" />{option.price.toLocaleString('vi-VN')} đ</span>
-                          <button type="button" onClick={() => openEditOption(option)} className="rounded p-1 text-primary hover:bg-primary/10" aria-label={`Sửa tùy chọn ${option.name}`}><Pencil size={16} /></button>
+                        <div className="col-span-2 flex shrink-0 items-center justify-end gap-3 sm:col-span-1">
+                          <span className="text-xs text-on-surface-variant">{option.price.toLocaleString('vi-VN')} đ</span>
+                          <CatalogStatusPill name={`tùy chọn ${option.name}`} active={option.isActive} busy={serviceBusy || optionStatusBusy.includes(option._id)} onToggle={() => void toggleOptionStatus(option)} />
+                          <button type="button" disabled={serviceBusy || optionStatusBusy.includes(option._id)} onClick={() => openEditOption(option)} className="rounded p-1 text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60" aria-label={`Sửa tùy chọn ${option.name}`}><Pencil aria-hidden="true" size={16} /></button>
                         </div>
                       </div>
                     ))}
@@ -402,23 +399,6 @@ export default function AdminCategoriesPage() {
         onSubmit={saveOption}
       />
 
-      <ConfirmDialog
-        open={Boolean(serviceDeleteTarget)}
-        title="Xóa dịch vụ"
-        message={`Bạn chắc chắn muốn xóa dịch vụ "${serviceDeleteTarget?.name || ''}"?`}
-        busy={serviceBusy}
-        onCancel={() => setServiceDeleteTarget(null)}
-        onConfirm={confirmDeleteService}
-      />
-
-      <ConfirmDialog
-        open={Boolean(c.deleteTarget)}
-        title="Xóa danh mục"
-        message={`Bạn chắc chắn muốn xóa danh mục "${c.deleteTarget?.name}"? Hành động này không thể khôi phục.`}
-        busy={c.busy}
-        onCancel={() => c.setDeleteTarget(null)}
-        onConfirm={c.confirmDelete}
-      />
     </DashboardShell>
   );
 }

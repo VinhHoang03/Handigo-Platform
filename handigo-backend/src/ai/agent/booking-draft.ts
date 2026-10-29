@@ -1,9 +1,12 @@
+import { formatAgentAddress } from "../../utils/agentAddressFormatting";
 import { z } from "zod";
 import { AppError } from "../../utils/appError";
 import { bookingSchema, idSchema } from "../tools/implementations/booking.schemas";
 import type { AgentChoiceGroup } from "../llm/llm.interface";
 import { getUniformServicePrice } from "../../utils/uniformServicePrice";
-import { getEarliestScheduledAt } from "../../utils/bookingPolicy";
+import { getEarliestScheduledAt, isWithinAppointmentHours } from "../../utils/bookingPolicy";
+import { bookingAttachmentsSchema } from "./booking-attachments";
+import type { DraftBookingAddress } from "../../services/agentAddress.service";
 
 const selectedOptionsSchema = z.array(z.object({
   optionId: idSchema,
@@ -18,6 +21,7 @@ export const bookingDraftPatchSchema = z.object({
   quantity: z.number().int().min(1).max(99).optional(),
   optionPreference: z.string().trim().max(300).nullable().optional(),
   addressId: idSchema.nullable().optional(),
+  saveAddressToBook: z.boolean().optional(),
   addressPreference: z.string().trim().max(300).nullable().optional(),
   voucherCode: z.string().trim().min(1).max(50).nullable().optional(),
   voucherPreference: z.enum(["best", "choose"]).nullable().optional(),
@@ -31,10 +35,14 @@ export const bookingDraftPatchSchema = z.object({
   timeWindow: z.enum(["morning", "afternoon", "evening"]).nullable().optional(),
   paymentMethod: z.enum(["bank", "wallet", "cash"]).optional(),
   problemDescription: z.string().trim().max(2000).optional(),
+  customerAttachments: bookingAttachmentsSchema.optional(),
 }).strict();
 export type BookingDraftPatch = z.infer<typeof bookingDraftPatchSchema>;
-type DraftFields = "serviceId" | "selectedOptions" | "uniformQuantity" | "addressId" | "orderType" | "scheduledAt" | "paymentMethod" | "problemDescription" | "voucherCode" | "preferredProviderId";
+type DraftFields = "serviceId" | "selectedOptions" | "uniformQuantity" | "addressId" | "orderType" | "scheduledAt" | "paymentMethod" | "problemDescription" | "customerAttachments" | "voucherCode" | "preferredProviderId";
 export interface BookingDraft {
+  lookupFailures?: Array<"providers" | "vouchers">;
+  draftAddress?: DraftBookingAddress;
+  rebookNeedsOptionReview?: boolean;
   revision: number;
   status: "active" | "paused" | "discarded" | "booked";
   values: Partial<z.infer<typeof bookingSchema>>;
@@ -46,8 +54,10 @@ export interface BookingDraft {
   providerPreference?: string;
   voucherDecision?: "selected" | "declined";
   voucherPreference?: "best" | "choose";
+  voucherFeedback?: string;
   providerCriteria?: "nearest" | "highest_rating" | "most_completed" | "choose";
-  availableVouchers?: Array<{ code: string; name: string; discountAmount: number; finalAmount: number; endAt?: string }>;
+  availableVouchers?: Array<{ code: string; name: string; discountAmount: number; finalAmount: number; endAt?: string;
+    discountType?: "PERCENT" | "AMOUNT"; discountValue?: number }>;
   providerCandidates?: Array<{ id: string; name: string; distanceMeters?: number; averageRating?: number; totalCompletedOrders?: number }>;
   requestedQuantity?: number;
   scheduleDate?: string;
@@ -56,11 +66,14 @@ export interface BookingDraft {
   summary: string[];
   choiceGroups: AgentChoiceGroup[];
   orderId?: string;
-  /** Internal flag: true khi scheduledAt được tự động chuyển sang ngày hôm sau vì đã qua giờ */
-  _autoAdvancedDay?: boolean;
 }
+const voucherDiscountLabel = (voucher: NonNullable<BookingDraft["availableVouchers"]>[number]) =>
+  voucher.discountType === "PERCENT" && typeof voucher.discountValue === "number"
+    ? `${voucher.discountValue.toLocaleString("vi-VN")}%`
+    : `${(voucher.discountValue ?? voucher.discountAmount).toLocaleString("vi-VN")} đ`;
+
 export interface DraftService {
-  id: string; name: string; serviceType: string; requiresOptionSelection: boolean;
+  id: string; name: string; slug?: string; serviceType: string; requiresOptionSelection: boolean;
   fixedPrice?: number | null;
   optionGroups?: Array<{ _id: unknown; name: string; selectionMode: string; isRequired: boolean }>;
   options: Array<{
@@ -74,13 +87,8 @@ export interface DraftAddress { id: string; fullAddress: string; ward: string; p
 const normalizeAddress = (text: string) => text.toLocaleLowerCase("vi-VN").normalize("NFD")
   .replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[,.;\s]+/g, " ").trim();
 
-export function bookingAddressLabel(address: DraftAddress) {
-  const parts = [address.fullAddress.trim(), address.ward.trim(), address.province.trim()].filter(Boolean);
-  if (normalizeAddress(address.fullAddress).endsWith(normalizeAddress(`${address.ward}, ${address.province}`))) return address.fullAddress.trim();
-  return parts.reduce<string[]>((result, part) => {
-    if (!normalizeAddress(result.join(", ")).endsWith(normalizeAddress(part))) result.push(part);
-    return result;
-  }, []).join(", ");
+export function bookingAddressLabel<T extends Pick<DraftAddress, "fullAddress" | "ward" | "province">>(address: T) {
+  return formatAgentAddress(address);
 }
 
 export function uniqueBookingAddresses<T extends DraftAddress>(addresses: T[], selectedId?: string): T[] {
@@ -106,20 +114,75 @@ export interface BookingDraftDependencies {
   service(id: string): Promise<DraftService>;
   addresses(userId: string): Promise<DraftAddress[]>;
   vouchers?(userId: string, args: Pick<z.infer<typeof bookingSchema>, "serviceId" | "selectedOptions" | "uniformQuantity">): Promise<NonNullable<BookingDraft["availableVouchers"]>>;
-  providers?(userId: string, args: z.infer<typeof bookingSchema> & { providerQuery?: string }): Promise<{
+  voucherFeedback?(userId: string, args: Pick<z.infer<typeof bookingSchema>, "serviceId" | "selectedOptions" | "uniformQuantity" | "voucherCode">): Promise<string>;
+  providers?(userId: string, args: z.infer<typeof bookingSchema> & { providerQuery?: string }, draftAddress?: DraftBookingAddress): Promise<{
     available: NonNullable<BookingDraft["providerCandidates"]>;
     requested: Array<{ id: string; name: string; eligible: boolean; reason: string }>;
   }>;
 }
 
+const optionGroupKey = (option: DraftService["options"][number]) => option.groupId
+  ? String(option.groupId) : option.selectionGroup?.trim().toLocaleLowerCase("vi-VN") || "";
+const normalizeOptionName = (value: string) => normalizeAddress(value).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+export function parseBookingVoucherRequest(message: string): Pick<BookingDraftPatch, "voucherCode" | "voucherPreference"> | undefined {
+  let text = normalizeAddress(message).replace(/[!?]+$/, "").trim();
+  const group = /^(?:voucher co the su dung|kiem tra voucher):\s*(.+)$/.exec(text);
+  if (group) {
+    text = group[1].split(/\s*[—–]\s*/)[0].trim();
+    if (/^[a-z0-9][a-z0-9_-]{1,49}$/.test(text)) return { voucherCode: text.toUpperCase() };
+  }
+  if (text === "kiem tra lai voucher") return { voucherPreference: "choose" };
+  const prefix = "(?:(?:toi|minh|em) (?:muon|can) |cho toi |giup toi )?";
+  const object = "(?:ma giam gia|voucher|ma)";
+  const action = "(?:ap(?: dung)?|su dung|dung|chon|xem|kiem tra)";
+  const tail = "(?: (?:cho don nay|vao don nay|giup toi|nhe|voi))?";
+  if (new RegExp(`^${prefix}(?:bo|go|khong (?:su )?dung) ${object}${tail}$`).test(text)) return { voucherCode: null };
+  if (new RegExp(`^${prefix}${action} ${object} (?:tot nhat|giam nhieu nhat|co loi nhat)${tail}$`).test(text)) return { voucherPreference: "best" };
+  if (new RegExp(`^${prefix}${action} ${object}${tail}$`).test(text)
+    || /^(?:toi|minh|em) co (?:ma giam gia|voucher|ma) nao (?:dung duoc|khong)$/.test(text)) return { voucherPreference: "choose" };
+  const code = new RegExp(`^${prefix}${action} ${object} ([a-z0-9][a-z0-9_-]{1,49})${tail}$`).exec(text);
+  return code ? { voucherCode: code[1].toUpperCase() } : undefined;
+}
+
+export const isGeneralRepairBookingRequest = (message: string) =>
+  /^(?:(?:toi|minh|em|anh|chi) (?:muon|can) )?dat (?:dich vu )?(?:sua chua|sua) (?:dieu hoa|may lanh)(?: (?:cho toi|giup toi|nhe|voi))*$/.test(normalizeOptionName(message));
+
+export function isAirConditionerRepair(service: Pick<DraftService, "name" | "slug" | "serviceType">) {
+  return service.serviceType === "variable_price" && [service.name, service.slug ?? ""]
+    .some((name) => /^(?:sua chua|sua) (?:dieu hoa|may lanh)$/.test(normalizeOptionName(name)));
+}
+
+export function defaultRepairOption(service: DraftService) {
+  if (!isAirConditionerRepair(service)) return undefined;
+  const options = service.options.filter((option) => option.optionType !== "add_on" && /\btreo tuong\b/.test(normalizeOptionName(option.name)));
+  const exact = options.filter((option) => /^(?:(?:dieu hoa|may lanh) )?treo tuong$/.test(normalizeOptionName(option.name)));
+  return exact.length === 1 ? exact[0] : options.length === 1 ? options[0] : undefined;
+}
+
+function resolveOptionPreference(preference: string, options: DraftService["options"]) {
+  const parts = preference.split(/[\n;,]/).map((part) => part.trim()).filter(Boolean);
+  const selected: DraftService["options"] = [];
+  for (const part of parts) {
+    const value = part.slice(part.indexOf(":") + 1).replace(/\s*[—–]\s*[\d.,]+\s*(?:đ|vnd)\s*$/i, "");
+    const normalized = normalizeOptionName(value).replace(/^(?:toi (?:muon )?)?(?:chon|doi(?: loai)? sang|doi thanh)\s+/, "");
+    if (!normalized) return [];
+    const matches = options.filter((option) => normalizeOptionName(option.name) === normalized);
+    if (matches.length !== 1) return [];
+    if (!selected.some((option) => String(option._id) === String(matches[0]._id))) selected.push(matches[0]);
+  }
+  return selected;
+}
+
 export async function updateBookingDraft(previous: BookingDraft | undefined, input: BookingDraftPatch,
-  userId: string, deps: BookingDraftDependencies): Promise<BookingDraft> {
+  userId: string, deps: BookingDraftDependencies, customerMessage?: string): Promise<BookingDraft> {
   if ((previous?.status === "booked" || previous?.orderId) && (!input.startNew || input.mode !== "update")) {
     throw new AppError("Bản nháp này đã tạo đơn. Chỉ bắt đầu đơn mới khi khách yêu cầu đặt thêm; không tạo lại đơn cũ.", 409);
   }
   if (input.mode === "pause" || input.mode === "discard") {
     if (!previous) throw new AppError("Chưa có bản nháp đặt lịch.", 400);
-    return { ...previous, status: input.mode === "pause" ? "paused" : "discarded", revision: previous.revision + 1 };
+    return { ...previous, status: input.mode === "pause" ? "paused" : "discarded", revision: previous.revision + 1,
+      ...(input.mode === "discard" ? { draftAddress: undefined } : {}) };
   }
   const draft: BookingDraft = !previous || input.startNew || previous.status === "discarded"
     ? { revision: 0, status: "active", values: {}, sources: {}, missing: [], summary: [], choiceGroups: [] }
@@ -127,8 +190,23 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   draft.status = "active";
   draft.revision += 1;
   draft.missing = []; draft.summary = []; draft.choiceGroups = [];
+  draft.lookupFailures = [];
   draft.availableVouchers = []; draft.providerCandidates = [];
+  draft.voucherFeedback = undefined;
   const values = draft.values;
+  const addressStorageRequest = customerMessage ? normalizeAddress(customerMessage) : "";
+  const oneTimeAddress = /(?:khong|dung) (?:can )?luu dia chi|(?:khong|dung) (?:can )?luu (?:vao )?so dia chi|chi dung dia chi(?: nay)? (?:mot|1) lan|dia chi(?: nay)? (?:chi )?dung (?:mot|1) lan/.test(addressStorageRequest);
+  if (oneTimeAddress) values.saveAddressToBook = false;
+  else if (input.saveAddressToBook !== undefined) values.saveAddressToBook = input.saveAddressToBook;
+  if (draft.draftAddress && ((input.addressId !== undefined && input.addressId !== draft.draftAddress.id)
+    || input.addressPreference)) draft.draftAddress = undefined;
+  if (input.selectedOptions !== undefined || input.quantity !== undefined || input.serviceId && input.serviceId !== values.serviceId) {
+    draft.rebookNeedsOptionReview = undefined;
+  }
+  if (input.customerAttachments !== undefined) {
+    values.customerAttachments = input.customerAttachments;
+    draft.sources.customerAttachments = "customer";
+  }
   const oldServiceId = values.serviceId;
   if (input.serviceQuery !== undefined) {
     if (input.serviceQuery !== draft.serviceQuery && !input.serviceId) delete values.serviceId;
@@ -155,7 +233,6 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   }
   if (input.optionPreference !== undefined) {
     draft.optionPreference = input.optionPreference || undefined;
-    if (draft.optionPreference && !input.selectedOptions) { delete values.selectedOptions; delete draft.sources.selectedOptions; }
   }
   if (input.selectedOptions?.length) draft.optionPreference = undefined;
   if (input.quantity !== undefined) draft.requestedQuantity = input.quantity;
@@ -186,6 +263,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   }
   if (input.voucherCode !== undefined) {
     draft.voucherDecision = input.voucherCode === null ? "declined" : "selected";
+    if (input.voucherCode === null) draft.voucherFeedback = "Đã bỏ mã giảm giá. Xem số tiền mới bên dưới.";
     draft.voucherPreference = undefined;
     if (input.voucherCode) values.voucherCode = input.voucherCode.trim().toUpperCase();
   } else if (input.voucherPreference !== undefined) {
@@ -234,14 +312,7 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   if (input.scheduledAt === null) {
     delete values.scheduledAt; delete draft.sources.scheduledAt;
   } else if (input.scheduledAt) {
-    let scheduledMs = Date.parse(input.scheduledAt);
-    // Nếu giờ đã qua, tự chuyển sang ngày hôm sau cùng giờ thay vì báo lỗi
-    if (scheduledMs <= Date.now()) {
-      scheduledMs += 24 * 3600 * 1000;
-      draft._autoAdvancedDay = true;
-    } else {
-      draft._autoAdvancedDay = false;
-    }
+    const scheduledMs = Date.parse(input.scheduledAt);
     // Tính giờ địa phương tại Asia/Ho_Chi_Minh (+07:00) để format ISO với offset đúng
     const localMs = scheduledMs + 7 * 3600 * 1000; // UTC → +07:00 chỉ dùng để lấy các thành phần local
     const d = new Date(localMs);
@@ -262,7 +333,9 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   const [service, savedAddresses] = await Promise.all([
     values.serviceId ? deps.service(values.serviceId) : Promise.resolve(null), deps.addresses(userId),
   ]);
-  const addresses = uniqueBookingAddresses(savedAddresses, values.addressId);
+  const temporary = draft.draftAddress;
+  const addresses = uniqueBookingAddresses([...savedAddresses,
+    ...(temporary ? [{ ...temporary.payload, id: temporary.id }] : [])], values.addressId);
   if (values.addressId && !addresses.some((address) => address.id === values.addressId)) {
     delete values.addressId; delete draft.sources.addressId;
     draft.addressPreference = "Địa chỉ đã chọn không còn khả dụng";
@@ -289,6 +362,50 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
   }
   if (!service && !draft.missing.some((item) => item.includes("dịch vụ"))) draft.missing.push("Chọn dịch vụ cần đặt");
   if (service) {
+    const repair = isAirConditionerRepair(service);
+    const wall = defaultRepairOption(service);
+    if (wall && customerMessage && isGeneralRepairBookingRequest(customerMessage)) {
+      // Yêu cầu đặt chung dùng loại mặc định, không hỏi lại vì optionPreference do model tự thêm.
+      if (!input.startNew && previous && previous.values.serviceId === values.serviceId && previous.values.selectedOptions?.length) {
+        values.selectedOptions = previous.values.selectedOptions.map((option) => ({ ...option }));
+        draft.sources.selectedOptions = previous.sources.selectedOptions;
+      } else {
+        delete values.selectedOptions; delete draft.sources.selectedOptions;
+      }
+      draft.optionPreference = undefined;
+    }
+    if (draft.optionPreference) {
+      const matches = resolveOptionPreference(draft.optionPreference, service.options);
+      if (matches.length) {
+        const previous = values.selectedOptions ?? [];
+        const replaces = (option: DraftService["options"][number], current: DraftService["options"][number]) => {
+          const group = optionGroupKey(option);
+          const single = option.selectionMode === "single"
+            || service.optionGroups?.some((item) => String(item._id) === group && item.selectionMode === "single");
+          return String(option._id) === String(current._id)
+            || group === optionGroupKey(current) && (Boolean(group) && single
+              || Boolean(repair && wall && group === optionGroupKey(wall) && option.optionType !== "add_on" && current.optionType !== "add_on"));
+        };
+        const retained = previous.filter((item) => {
+          const current = service.options.find((option) => String(option._id) === item.optionId);
+          return !current || !matches.some((option) => replaces(option, current));
+        });
+        values.selectedOptions = [...retained, ...matches.map((option) => {
+          const replaced = previous.find((item) => {
+            const current = service.options.find((candidate) => String(candidate._id) === item.optionId);
+            return current && replaces(option, current);
+          });
+          return { optionId: String(option._id), quantity: option.allowsQuantity ? draft.requestedQuantity ?? replaced?.quantity ?? 1 : 1 };
+        })];
+        draft.sources.selectedOptions = "customer";
+        draft.optionPreference = undefined;
+      }
+    }
+    if (wall && !draft.optionPreference && !values.selectedOptions?.some((item) => service.options.some((option) =>
+      String(option._id) === item.optionId && option.optionType !== "add_on" && optionGroupKey(option) === optionGroupKey(wall)))) {
+      if (!values.selectedOptions?.length) draft.sources.selectedOptions = "default";
+      values.selectedOptions = [...(values.selectedOptions ?? []), { optionId: String(wall._id), quantity: draft.requestedQuantity ?? 1 }];
+    }
     const needsOptions = service.requiresOptionSelection || service.serviceType === "fixed_price";
     const uniform = getUniformServicePrice(service.serviceType, service.options, service.fixedPrice);
     if (uniform && service.options.length === 0) {
@@ -326,11 +443,13 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       }
     }
     const requiredGroups = service.optionGroups ?? [];
+    const missingOptionGroups = new Set<string>();
     for (const group of requiredGroups) {
       const members = service.options.filter(option => String(option.groupId ?? "") === String(group._id));
       const count = members.filter(option => ids.has(String(option._id))).length;
       if (group.selectionMode === "single" && count > 1) throw new AppError(`Nhóm “${group.name}” chỉ được chọn một tùy chọn.`, 400);
       if (group.isRequired && count === 0) {
+        missingOptionGroups.add(String(group._id));
         draft.missing.push(`Chọn tùy chọn trong nhóm “${group.name}”`);
         draft.choiceGroups.push({ label: `${group.name} · Bắt buộc`, multiple: group.selectionMode === "multiple",
           options: members.slice(0, 12).map(option => option.name) });
@@ -340,8 +459,11 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       && !service.options.some((option) => ids.has(String(option._id)) && option.price > 0))))) {
       draft.missing.push(`Chọn gói hoặc loại dịch vụ${draft.optionPreference ? ` (${draft.optionPreference})` : ""}`);
       for (const [group, options] of groups) {
+        if (missingOptionGroups.has(group)) continue;
+        if (repair && wall && draft.optionPreference && /\b(?:loai|dieu hoa|may lanh|treo tuong|am tran|tu dung)\b/.test(normalizeOptionName(draft.optionPreference))
+          && group !== optionGroupKey(wall)) continue;
         draft.choiceGroups.push({
-          label: options[0].selectionGroup || "Gói dịch vụ",
+          label: service.optionGroups?.find((item) => String(item._id) === group)?.name || options[0].selectionGroup || "Gói dịch vụ",
           multiple: !group || options.some((option) => option.selectionMode !== "single"),
           options: options.slice(0, 12).map((option) => `${option.name}${service.serviceType === "fixed_price" ? ` — ${option.price.toLocaleString("vi-VN")} đ` : ""}`)
         });
@@ -360,11 +482,16 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
       draft.summary.push(`${option.name} × ${item.quantity}`);
     }
   }
+  if (values.orderType === "normal" && !isWithinAppointmentHours(new Date())) {
+    draft.missing.push("Đặt ngay chỉ khả dụng từ 08:00 đến 21:00 theo giờ Việt Nam. Vui lòng chọn Hẹn giờ.");
+  }
   if (values.orderType === "scheduled") {
-    if (!values.scheduledAt || Date.parse(values.scheduledAt) < getEarliestScheduledAt().getTime()) {
-      // scheduledAt bị thiếu hoặc vẫn nằm trong quá khứ (sau khi đã thử auto-advance)
+    const outsideHours = values.scheduledAt && !isWithinAppointmentHours(new Date(values.scheduledAt));
+    if (!values.scheduledAt || Date.parse(values.scheduledAt) <= Date.now()
+      || Date.parse(values.scheduledAt) < getEarliestScheduledAt().getTime() || outsideHours) {
+      // Giờ hẹn không hợp lệ phải được khách chọn lại, không tự đổi ngày.
       if (values.scheduledAt) { delete values.scheduledAt; delete draft.sources.scheduledAt; }
-      draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
+      draft.missing.push(`Chọn ngày và giờ hẹn trong tương lai, từ 08:00 đến 21:00 theo giờ Việt Nam${draft.schedulePreference ? ` (${draft.schedulePreference})` : ""}`);
       if (draft.scheduleDate) {
         const hours = draft.timeWindow === "morning" ? [8, 9, 10] : draft.timeWindow === "afternoon" ? [13, 14, 15]
           : draft.timeWindow === "evening" ? [18, 19, 20] : [9, 14, 18];
@@ -373,23 +500,23 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
           .map((time) => new Date(time).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }));
         if (options.length) draft.choiceGroups.push({ label: "Giờ hẹn mong muốn (chưa giữ chỗ)", multiple: false, options });
       }
-    } else if (draft._autoAdvancedDay) {
-      // Đã tự chuyển sang hôm sau, thêm ghi chú vào summary
-      const displayTime = new Date(Date.parse(values.scheduledAt!)).toLocaleString("vi-VN",
-        { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
-      draft.summary.push(`⚠️ Giờ bạn chọn đã qua, đã tự chuyển lịch sang ${displayTime} (ngày mai). Bạn có thể nhắn để đổi lại.`);
     }
   }
   const address = addresses.find((item) => item.id === values.addressId);
   if (address) draft.summary.push(`Địa chỉ: ${bookingAddressLabel(address)}`);
+  if (values.saveAddressToBook === false) draft.summary.push("Địa chỉ chỉ dùng cho đơn này, không thêm vào sổ địa chỉ.");
+  if (draft.rebookNeedsOptionReview) {
+    draft.missing.push("Gói cũ đã thay đổi. Vui lòng chọn lại gói và số lượng trước khi đặt lại");
+  }
   // Chỉ gợi ý sau khi giá/gói và lịch đã đủ rõ; không áp dụng mã hoặc đổi thợ thay khách.
   if (service && !draft.missing.length) {
-    if (deps.providers && (values.preferredProviderId || draft.providerPreference || draft.providerCriteria) && values.addressId) {
-      const lookup = await deps.providers(userId, { ...bookingSchema.parse(values), providerQuery: draft.providerPreference })
+    if (deps.providers && (values.preferredProviderId || draft.providerPreference || draft.providerCriteria || draft.draftAddress) && values.addressId) {
+      const lookup = await deps.providers(userId, { ...bookingSchema.parse(values), providerQuery: draft.providerPreference }, draft.draftAddress)
         .then((result) => ({ result, failed: false })).catch(() => ({ result: { available: [], requested: [] }, failed: true }));
       if (lookup.failed) {
+        draft.lookupFailures.push("providers");
         draft.missing.push("Tạm thời chưa thể kiểm tra thợ. Bạn có thể thử lại hoặc bỏ yêu cầu chọn thợ");
-        draft.summary.push("Yêu cầu chọn thợ và các thông tin vừa sửa vẫn được giữ; chưa xác nhận thợ đang phù hợp.");
+        draft.summary.push("Chưa kiểm tra được thợ đã chọn.");
         draft.choiceGroups.push({ label: "Kiểm tra chuyên gia", multiple: false, options: ["Kiểm tra lại thợ", "Để hệ thống tự tìm thợ"] });
       } else {
         const result = lookup.result;
@@ -412,12 +539,12 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
           draft.providerPreference = undefined;
           draft.summary.push(`Chuyên gia ưu tiên: ${chosen.name}`);
         }
-        else {
+        else if (values.preferredProviderId || draft.providerPreference || draft.providerCriteria) {
           draft.missing.push("Chọn chuyên gia phù hợp hoặc để hệ thống tự tìm");
           draft.summary.push(...result.requested.filter((item) => !item.eligible).map((item) => `${item.name}: ${item.reason}`));
           if (draft.providerPreference && !result.requested.length) draft.summary.push(`Chưa tìm thấy chuyên gia “${draft.providerPreference}”.`);
-          if (values.preferredProviderId && !result.requested.length) draft.summary.push("Chuyên gia đã chọn không còn trong danh sách khả dụng. Bạn có thể chọn thợ khác hoặc tạm dừng để đổi lịch/địa chỉ.");
-          if (!draft.providerCandidates.length) draft.summary.push("Hiện chưa có chuyên gia đang phù hợp. Bạn có thể đổi lịch, kiểm tra lại địa chỉ hoặc tạm dừng; chưa giữ chỗ cho thợ.");
+          if (values.preferredProviderId && !result.requested.length) draft.summary.push("Thợ đã chọn hiện không khả dụng. Bạn có thể đổi thợ hoặc lịch hẹn.");
+          if (!draft.providerCandidates.length) draft.summary.push("Chưa có thợ phù hợp. Bạn có thể đổi lịch hoặc địa chỉ.");
           draft.choiceGroups.push({ label: "Chuyên gia đang phù hợp", multiple: false,
             options: [...draft.providerCandidates.slice(0, 10).map((item) => {
               const details = [item.averageRating && item.averageRating > 0 ? `${item.averageRating.toLocaleString("vi-VN")} sao` : "",
@@ -430,12 +557,17 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
     } else if (!deps.providers && (values.preferredProviderId || draft.providerPreference || draft.providerCriteria)) {
       draft.missing.push("Chưa thể kiểm tra chuyên gia đã yêu cầu. Vui lòng thử lại hoặc chọn để hệ thống tự tìm thợ");
     }
-    if (deps.vouchers && draft.voucherDecision !== "declined") {
+    const canCheckVouchers = !draft.missing.length;
+    if (canCheckVouchers && deps.vouchers) {
       const lookup = await deps.vouchers(userId, bookingSchema.parse(values))
         .then((vouchers) => ({ vouchers, failed: false })).catch(() => ({ vouchers: [], failed: true }));
       if (lookup.failed) {
-        draft.missing.push("Tạm thời chưa thể kiểm tra voucher. Bạn có thể thử lại hoặc chọn không dùng voucher");
-        draft.summary.push("Lựa chọn voucher và các thông tin vừa sửa vẫn được giữ; chưa xác nhận mức giảm.");
+        draft.lookupFailures.push("vouchers");
+        if (values.voucherCode || draft.voucherPreference) {
+          draft.missing.push("Tạm thời chưa thể kiểm tra voucher. Bạn có thể thử lại hoặc chọn không dùng voucher");
+        }
+        draft.voucherFeedback = "Tạm thời chưa thể kiểm tra voucher. Bạn có thể thử lại hoặc chọn không dùng voucher.";
+        draft.summary.push("Chưa xác nhận được mức giảm giá.");
         draft.choiceGroups.push({ label: "Kiểm tra voucher", multiple: false, options: ["Kiểm tra lại voucher", "Không dùng voucher"] });
       } else {
         draft.availableVouchers = lookup.vouchers;
@@ -445,36 +577,49 @@ export async function updateBookingDraft(previous: BookingDraft | undefined, inp
             || a.code.localeCompare(b.code))[0];
           if (best) {
             values.voucherCode = best.code; draft.sources.voucherCode = "customer"; draft.voucherDecision = "selected";
-            draft.summary.push("Đã chọn mã giảm nhiều nhất theo yêu cầu của bạn; mã giảm bằng nhau ưu tiên mã hết hạn sớm hơn.");
+            draft.summary.push("Đã chọn mã giảm nhiều nhất cho bạn.");
           } else {
             delete values.voucherCode; delete draft.sources.voucherCode; draft.voucherDecision = undefined;
-            draft.summary.push("Hiện không có voucher dùng được cho đơn này; form sẽ hiển thị giá chưa giảm.");
+            draft.voucherFeedback = "Hiện chưa có mã giảm giá phù hợp với đơn này. Bạn có thể tiếp tục đặt với giá chưa giảm.";
           }
         }
         const selected = draft.availableVouchers.find((voucher) => voucher.code === values.voucherCode);
         if (values.voucherCode && !selected) {
           draft.missing.push("Voucher đã chọn không còn phù hợp; chọn mã khác hoặc không dùng voucher");
         } else if (selected) {
-          draft.summary.push(`Voucher ${selected.code}: giảm ${selected.discountAmount.toLocaleString("vi-VN")} đ; còn ${selected.finalAmount.toLocaleString("vi-VN")} đ.`);
-        } else if (draft.availableVouchers.length && !draft.voucherDecision) {
-          draft.missing.push("Bạn có voucher dùng được cho đơn này. Bạn có muốn sử dụng không?");
+          draft.summary.push(`Voucher ${selected.code}: giảm ${voucherDiscountLabel(selected)}; còn ${selected.finalAmount.toLocaleString("vi-VN")} đ.`);
         }
         if ((!draft.voucherDecision && draft.availableVouchers.length) || (values.voucherCode && !selected)) {
+          if (!draft.voucherDecision) {
+            draft.voucherFeedback = `Có ${draft.availableVouchers.length} mã giảm giá dùng được cho đơn này. Bạn có thể chọn mã trong form trước khi xác nhận.`;
+          }
           draft.choiceGroups.push({ label: "Voucher có thể sử dụng", multiple: false,
-            options: [...draft.availableVouchers.slice(0, 10).map((voucher) => `${voucher.code} — giảm ${voucher.discountAmount.toLocaleString("vi-VN")} đ`), "Không dùng voucher"] });
+            options: [...draft.availableVouchers.slice(0, 10).map((voucher) => `${voucher.code} — giảm ${voucherDiscountLabel(voucher)}`), "Không dùng voucher"] });
+        }
+        if ((draft.voucherPreference && !draft.availableVouchers.length) || (values.voucherCode && !selected)) {
+          try {
+            draft.voucherFeedback = deps.voucherFeedback ? await deps.voucherFeedback(userId, bookingSchema.parse(values))
+              : values.voucherCode ? "Mã giảm giá này chưa dùng được cho đơn hiện tại. Bạn có thể chọn mã khác hoặc không dùng mã."
+                : "Hiện bạn chưa có mã giảm giá phù hợp với đơn này. Bạn có thể tiếp tục đặt với giá chưa giảm.";
+          } catch {
+            draft.lookupFailures.push("vouchers");
+            draft.voucherFeedback = "Tạm thời chưa thể kiểm tra điều kiện mã giảm giá. Vui lòng thử lại hoặc chọn không dùng mã.";
+            draft.missing.push("Kiểm tra lại điều kiện mã giảm giá");
+          }
         }
       }
-    } else if (values.voucherCode || draft.voucherPreference) {
+    } else if (canCheckVouchers && (values.voucherCode || draft.voucherPreference)) {
       draft.missing.push("Chưa thể kiểm tra voucher. Vui lòng thử lại hoặc chọn không dùng voucher");
     }
   }
-  draft.summary.push(`Thời gian: ${values.orderType === "normal" ? "Đặt ngay" : values.scheduledAt || draft.schedulePreference || "Chưa chọn"}`);
+  draft.summary.push(`Thời gian: ${values.orderType === "normal" ? "Đặt ngay" : values.scheduledAt ? new Date(values.scheduledAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : draft.schedulePreference || "Chưa chọn"}`);
   draft.summary.push(`Thanh toán: ${{ bank: "Chuyển khoản", wallet: "Ví Handigo", cash: "Tiền mặt" }[values.paymentMethod]}`);
+  if (values.customerAttachments?.length) draft.summary.push(`Ảnh hiện trạng: ${values.customerAttachments.length} ảnh sẽ được gửi kèm đơn.`);
   draft.choiceGroups = draft.choiceGroups.slice(0, 6);
   return draft;
 }
 
 export function readyBookingArguments(draft: BookingDraft) {
-  if (draft.status !== "active" || draft.missing.length) return null;
+  if (draft.status !== "active" || draft.missing.length || draft.rebookNeedsOptionReview) return null;
   return bookingSchema.parse(draft.values);
 }

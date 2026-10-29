@@ -1,4 +1,5 @@
-import { QueryFilter, Types } from "mongoose";
+import { catalogStatus, catalogStatusFilter } from "../utils/catalogStatus";
+import { QueryFilter, Types, type ClientSession } from "mongoose";
 import { Category } from "../models/category.model";
 import { Order } from "../models/order.model";
 import { IService, IServiceProcessStep, IServiceOptionGroup, Service } from "../models/service.model";
@@ -60,12 +61,13 @@ const ensureValidId = (id: string, field = "dịch vụ") => {
   }
 };
 
-const ensureCategoryExists = async (categoryId: string, requireActive = false) => {
+const ensureCategoryExists = async (categoryId: string, requireActive = false, session?: ClientSession) => {
   ensureValidId(categoryId, "danh mục");
-  const category = await Category.findOne({
+  const query = Category.findOne({
     _id: categoryId,
-    isDeleted: false,
+    ...(requireActive ? { isDeleted: false } : {}),
   });
+  const category = await (session ? query.session(session) : query);
   if (!category) throw new AppError("Không tìm thấy danh mục.", 404);
   if (requireActive && !category.isActive) {
     throw new AppError("Không thể kích hoạt dịch vụ trong danh mục đang tạm ngừng.", 400);
@@ -106,19 +108,21 @@ const ensureUniqueSlug = async (
   categoryId: string,
   slug: string,
   excludeId?: string,
+  session?: ClientSession,
 ) => {
   const filter: QueryFilter<IService> = { categoryId, slug };
   if (excludeId) filter._id = { $ne: excludeId };
 
-  if (await Service.exists(filter)) {
+  const query = Service.exists(filter);
+  if (await (session ? query.session(session) : query)) {
     throw new AppError("Đường dẫn dịch vụ đã tồn tại trong danh mục này", 409);
   }
 };
 
-export const listServices = async (query: ListServicesQuery) => {
+export const listServices = async (query: ListServicesQuery, admin = false) => {
   const page = Math.max(Number(query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
-  const filter: QueryFilter<IService> = { isDeleted: false };
+  const filter: QueryFilter<IService> = admin ? { $and: [catalogStatusFilter(query.isActive)] } : { isDeleted: false, isActive: true };
 
   if (query.search?.trim()) {
     const search = query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -137,8 +141,10 @@ export const listServices = async (query: ListServicesQuery) => {
   ) {
     filter.serviceType = query.serviceType;
   }
-  if (query.isActive === "true" || query.isActive === "false") {
-    filter.isActive = query.isActive === "true";
+  if (!admin) {
+    const categories = await Category.find({ isActive: true, isDeleted: false }).select("_id");
+    const ids = categories.map(category => category._id);
+    filter.categoryId = { $in: query.categoryId ? ids.filter(id => id.toString() === query.categoryId) : ids };
   }
   if (query.bookedOnly === "true") {
     const bookedServiceIds = await Order.distinct("serviceId", {
@@ -150,7 +156,7 @@ export const listServices = async (query: ListServicesQuery) => {
   const [items, total] = await Promise.all([
     Service.find(filter)
       .populate("categoryId", "name slug isActive")
-      .sort({ createdAt: -1 })
+      .sort(admin ? { isDeleted: 1, isActive: -1, createdAt: -1 } : { createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
     Service.countDocuments(filter),
@@ -208,7 +214,7 @@ export const listServices = async (query: ListServicesQuery) => {
 
   return {
     items: items.map((item) => ({
-      ...item.toObject(),
+      ...catalogStatus(item.toObject()),
       minOptionPrice:
         isAirConditionerCleaning(item)
           ? null
@@ -223,13 +229,18 @@ export const listServices = async (query: ListServicesQuery) => {
   };
 };
 
-export const getServiceById = async (id: string) => {
+export const getServiceById = async (id: string, admin = false) => {
   ensureValidId(id);
-  const service = await Service.findOne({ _id: id, isDeleted: false }).populate(
+  const service = await Service.findOne({ _id: id, ...(admin ? {} : { isDeleted: false, isActive: true }) }).populate(
     "categoryId",
     "name slug isActive",
   );
   if (!service) throw new AppError("Không tìm thấy dịch vụ", 404);
+
+  if (!admin && !await Category.exists({ _id: service.categoryId, isActive: true, isDeleted: false })) {
+    throw new AppError("Danh mục dịch vụ đang ngừng hoạt động.", 404);
+  }
+  if (admin && service.isDeleted) service.isActive = false;
 
   const [ratingStats, totalCompletedOrders] = await Promise.all([
     Feedback.aggregate<{ averageRating: number; totalFeedbacks: number }>([
@@ -265,27 +276,34 @@ export const getServiceById = async (id: string) => {
   return service;
 };
 
-export const createService = async (data: ServiceInput) => {
+export const createService = async (data: ServiceInput, session?: ClientSession) => {
   const names = (data.optionGroups ?? []).map(group => group.name.trim().toLocaleLowerCase("vi"));
   if (new Set(names).size !== names.length) throw new AppError("Tên nhóm tùy chọn không được trùng nhau.", 400);
   if ((data.isActive ?? true) && data.optionGroups?.some(group => group.isRequired)) {
     throw new AppError("Hãy tạo dịch vụ tạm ngừng, gán tùy chọn cho nhóm bắt buộc rồi kích hoạt.", 400);
   }
   normalizeAndValidatePricing(data);
-  await ensureCategoryExists(data.categoryId!, data.isActive ?? true);
+  await ensureCategoryExists(data.categoryId!, data.isActive ?? true, session);
   const slug = data.slug || slugify(data.name || "");
   if (!slug) throw new AppError("Không thể tạo đường dẫn hợp lệ", 400);
-  await ensureUniqueSlug(data.categoryId!, slug);
+  await ensureUniqueSlug(data.categoryId!, slug, undefined, session);
 
   const coverImage = normalizeImageUrl(data.coverImage !== undefined ? data.coverImage : data.image) ?? null;
   await validateNewServiceImages([...(coverImage ? [coverImage] : []), ...(data.galleryImages ?? [])]);
-  return Service.create({ ...data, slug, coverImage, image: undefined });
+  const payload = { ...data, slug, coverImage, image: undefined };
+  if (session) {
+    const [service] = await Service.create([payload], { session });
+    return service;
+  }
+  return Service.create(payload);
 };
 
 export const updateService = async (id: string, data: ServiceInput) => {
   ensureValidId(id);
-  const service = await Service.findOne({ _id: id, isDeleted: false });
+  const service = await Service.findOne({ _id: id });
   if (!service) throw new AppError("Không tìm thấy dịch vụ", 404);
+
+  if (service.isDeleted && data.isActive === undefined) data = { ...data, isActive: false };
 
   if (data.optionGroups !== undefined || data.isActive === true) {
     const groups = data.optionGroups ?? service.optionGroups ?? [];
@@ -332,6 +350,9 @@ export const updateService = async (id: string, data: ServiceInput) => {
     || data.depositAmount !== undefined && data.depositAmount !== service.depositAmount) {
     normalizeAndValidatePricing(nextData, service.isActive);
   }
+  if (data.isActive === true && nextData.serviceType === "variable_price" && nextData.depositAmount == null) {
+    throw new AppError("Dịch vụ giá linh hoạt đang hoạt động phải có tiền đặt cọc.", 400);
+  }
   await ensureCategoryExists(categoryId, nextData.isActive);
 
   const slug = data.slug || (data.name ? slugify(data.name) : service.slug);
@@ -339,6 +360,8 @@ export const updateService = async (id: string, data: ServiceInput) => {
 
   Object.assign(service, {
     ...nextData,
+    isDeleted: false,
+    deletedAt: null,
     categoryId,
     slug,
 
@@ -348,15 +371,9 @@ export const updateService = async (id: string, data: ServiceInput) => {
 
 export const deleteService = async (id: string) => {
   ensureValidId(id);
-  const service = await Service.findOne({ _id: id, isDeleted: false });
+  const service = await Service.findOne({ _id: id });
   if (!service) throw new AppError("Không tìm thấy dịch vụ", 404);
 
-  service.isDeleted = true;
-  service.deletedAt = new Date();
   service.isActive = false;
   await service.save();
-  await ServiceOption.updateMany(
-    { serviceId: service._id, isDeleted: false },
-    { $set: { isActive: false } },
-  );
 };

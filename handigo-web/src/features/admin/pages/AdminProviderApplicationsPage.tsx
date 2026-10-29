@@ -1,8 +1,10 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { ApplicationDetailModal } from "../components/applications/ApplicationDetailModal";
 import { ApplicationFilters } from "../components/applications/ApplicationFilters";
+import { ApplicationSummary } from '../components/applications/ApplicationSummary';
 import { ApplicationList } from "../components/applications/ApplicationList";
 import { useAdminApplicationsController } from "../components/applications/useAdminApplicationsController";
 
@@ -11,12 +13,15 @@ export default function AdminProviderApplicationsPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <div className="space-y-8">
-        <header className="space-y-2">
-          <h1 className="text-headline-lg font-bold text-on-surface">Duyệt hồ sơ thợ</h1>
+      <div className="space-y-4">
+        <header className="admin-page-header">
+          <AdminPageTitle title="Duyệt hồ sơ thợ" />
+          <AdminRefreshButton onRefresh={() => void applications.load()} loading={applications.loading} />
         </header>
 
-        <section>
+        <ApplicationSummary query={applications.query} {...applications.summary} onChange={applications.setQuery} />
+
+        <section aria-label="Bộ lọc hồ sơ">
           <ApplicationFilters query={applications.query} categories={applications.categories} onChange={applications.setQuery} />
         </section>
 

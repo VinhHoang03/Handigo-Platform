@@ -3,6 +3,7 @@ import http from "http";
 import mongoose from "mongoose";
 import { validateProductionConfig } from "./configs/production";
 import { createLogger } from "./utils/logger";
+import { startTemporaryLockMonitor, stopTemporaryLockMonitor } from "./services/penaltyPolicy.service";
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ const startServer = async () => {
     startRefundReconciliationMonitor();
     startReassignmentMonitor();
     startAgentOrderProgressMonitor();
+    startTemporaryLockMonitor();
 
     server.listen(PORT, "0.0.0.0", () => {
       serverLogger.info("Máy chủ đang chạy.", { port: PORT });
@@ -66,6 +68,7 @@ const startServer = async () => {
       DispatchService.stopTimeoutMonitor();
       stopRefundReconciliationMonitor();
       stopReassignmentMonitor();
+      stopTemporaryLockMonitor();
       io.disconnectSockets(true);
 
       const forceShutdownTimer = setTimeout(() => {
@@ -87,6 +90,7 @@ const startServer = async () => {
             resolve();
           });
         });
+        await import("./ai/runtime/graph-host").then((host) => host.closeGraphHost());
         await mongoose.connection.close();
         clearTimeout(forceShutdownTimer);
         serverLogger.info("Đã đóng máy chủ an toàn.");

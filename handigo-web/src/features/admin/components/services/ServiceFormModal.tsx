@@ -1,5 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { CircleAlert } from 'lucide-react';
+import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { Modal } from '@/components/common/Modal';
 import type { Category } from '../../types/categoryService.types';
@@ -7,6 +6,7 @@ import { ServiceImagesEditor } from './ServiceImagesEditor';
 import { FormActions, FormInput, FormTextArea, ToggleRow } from './service-form-fields';
 import type { ServiceForm } from './service.helpers';
 import { ServiceProcessEditor } from './ServiceProcessEditor';
+import { CatalogTooltip } from '../shared/CatalogTooltip';
 
 interface ServiceFormModalProps {
   open: boolean;
@@ -20,14 +20,17 @@ interface ServiceFormModalProps {
   onClose: () => void;
   onSubmit: (event: FormEvent) => void;
   children?: ReactNode;
+  allowActivation?: boolean;
+  submitLabel?: string;
 }
 
 /** Modal thêm/sửa dịch vụ, dùng ở trang quản lý dịch vụ (master-detail). */
-export function ServiceFormModal({ open, mode, categories, form, busy, blockClose, onChange, onClose, onSubmit, children }: ServiceFormModalProps) {
+export function ServiceFormModal({ open, mode, categories, form, busy, blockClose, onChange, onClose, onSubmit, children, allowActivation = true, submitLabel }: ServiceFormModalProps) {
   const [mediaBusy, setMediaBusy] = useState(false);
+  const priceTypeId = useId();
   return (
-    <Modal open={open} title={mode === 'edit' ? 'Sửa dịch vụ' : 'Thêm dịch vụ mới'} onClose={() => { if (!mediaBusy) onClose(); }} closeOnEsc={!blockClose && !mediaBusy} closeOnOverlayClick={!blockClose && !mediaBusy} size="lg">
-      <form onSubmit={event => { if (mediaBusy) event.preventDefault(); else onSubmit(event); }} className="space-y-5">
+    <Modal open={open} title={mode === 'edit' ? 'Sửa dịch vụ' : 'Thêm dịch vụ mới'} onClose={() => { if (!mediaBusy && !blockClose) onClose(); }} closeOnEsc={!blockClose && !mediaBusy} closeOnOverlayClick={!blockClose && !mediaBusy} size="lg">
+      <form onSubmit={event => { if (mediaBusy || busy) event.preventDefault(); else onSubmit(event); }} className="space-y-5">
         <fieldset className="rounded-xl border border-outline-variant/40 p-4">
           <legend className="px-2 text-sm font-bold text-primary">Thông tin cơ bản</legend>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,6fr)]">
@@ -54,7 +57,7 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
                 </select>
               </label>
               <FormInput label="Tên dịch vụ" name="service-name" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} />
-              <FormInput label="Slug" name="service-slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống…" />
+              <FormInput label="Đường dẫn định danh" name="service-slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống…" />
             </div>
             <div className="lg:col-span-2">
               <FormTextArea label="Mô tả" name="service-description" value={form.description} onChange={(value) => onChange({ ...form, description: value })} />
@@ -65,17 +68,15 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
         <fieldset className="rounded-xl border border-outline-variant/40 p-4">
           <legend className="px-2 text-sm font-bold text-primary">Giá và vận hành</legend>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="group/price relative mb-1 inline-flex items-center gap-1 text-sm font-semibold">
-                Loại giá
-                <span className="rounded-full p-0.5 text-on-surface-variant" aria-label="Giải thích loại giá">
-                  <CircleAlert aria-hidden="true" size={16} />
-                </span>
-                <span className="pointer-events-none absolute bottom-full left-0 z-30 mb-2 hidden w-max max-w-sm rounded-md border border-amber-300 bg-amber-100 px-3 py-2 text-xs font-normal text-amber-950 shadow-lg group-hover/price:block">
-                  {form.serviceType === 'fixed_price' ? 'Giá dịch vụ được tính từ các tùy chọn bên dưới, không sử dụng giá cơ bản.' : 'Giá linh hoạt sử dụng tiền đặt cọc và không áp dụng giá cố định.'}
-                </span>
-              </span>
+            <div>
+              <div className="mb-1 flex items-center gap-1 text-sm font-semibold">
+                <label htmlFor={priceTypeId}>Loại giá</label>
+                <CatalogTooltip label="Giải thích loại giá" content={isAirConditionerCleaning(form)
+                  ? 'Tổng giá bằng đơn giá mỗi máy nhân với số lượng.'
+                  : form.serviceType === 'fixed_price' ? 'Giá được tính theo các tùy chọn dịch vụ.' : 'Khách đặt cọc trước, giá được xác định sau khi khảo sát.'} />
+              </div>
               <select
+                id={priceTypeId}
                 name="service-price-type"
                 value={isAirConditionerCleaning(form) ? 'fixed_price' : form.serviceType}
                 disabled={isAirConditionerCleaning(form)}
@@ -85,15 +86,10 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
                 <option value="fixed_price">Giá cố định</option>
                 <option value="variable_price">Giá linh hoạt</option>
               </select>
-            </label>
+            </div>
             {isAirConditionerCleaning(form) && (
               <FormInput label="Đơn giá mỗi máy (VNĐ)" name="service-fixed-price" type="number" required
                 value={form.fixedPrice} onChange={(value) => onChange({ ...form, fixedPrice: value, serviceType: 'fixed_price' })} />
-            )}
-            {!isAirConditionerCleaning(form) && form.serviceType === 'fixed_price' && (
-              <p className="rounded-lg bg-surface-container-low px-3 py-2 text-xs text-on-surface-variant">
-                Giá dịch vụ được tính từ các tùy chọn bên dưới, không sử dụng giá cơ bản.
-              </p>
             )}
             {form.serviceType === 'variable_price' && (
               <FormInput
@@ -107,7 +103,8 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
             )}
           </div>
           <div className="mt-4">
-            <ToggleRow compact checked={form.isActive} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị dịch vụ" name="service-active" />
+            <ToggleRow compact checked={allowActivation && form.isActive} disabled={!allowActivation || busy} onChange={(value) => onChange({ ...form, isActive: value })} label="Hiển thị dịch vụ" name="service-active" />
+            {!allowActivation && <p className="mt-2 text-xs text-on-surface-variant">Dịch vụ được tạo ở trạng thái tạm ngừng.</p>}
           </div>
         </fieldset>
 
@@ -121,7 +118,7 @@ export function ServiceFormModal({ open, mode, categories, form, busy, blockClos
         )}
         <ServiceProcessEditor steps={form.processSteps} disabled={busy} onChange={(processSteps) => onChange({ ...form, processSteps })} />
         {children}
-        <FormActions busy={busy || mediaBusy} onCancel={onClose} />
+        <FormActions busy={busy || mediaBusy} onCancel={onClose} submitLabel={submitLabel} />
       </form>
     </Modal>
   );

@@ -18,13 +18,17 @@ interface BookingProviderPickerProps {
   error?: string;
   onClose: () => void;
   onConfirm: (providerId?: string, providerName?: string) => void;
+  zIndex?: number;
+  initialProviderId?: string;
+  showAutoAssignNote?: boolean;
+  allowAutoAssignWhenEmpty?: boolean;
 }
 
 export const BookingProviderPicker = ({
   anchorRef, providers, preferredProviderId, requestedProviderId, canSearch, requireSelection,
-  isLoading, loadError, error, onClose, onConfirm,
+  isLoading, loadError, error, onClose, onConfirm, zIndex, initialProviderId, showAutoAssignNote, allowAutoAssignWhenEmpty,
 }: BookingProviderPickerProps) => {
-  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(initialProviderId ?? null);
   const canChoose = Boolean(canSearch && !isLoading && !loadError && providers.length > 0);
   const viewingProvider = providers.find((provider) => provider.id === viewingId);
 
@@ -41,7 +45,7 @@ export const BookingProviderPicker = ({
   }
 
   return (
-    <BookingPickerPopover id="booking-provider-picker" title="Chọn chuyên gia" anchorRef={anchorRef} onClose={onClose}>
+    <BookingPickerPopover id="booking-provider-picker" title="Chọn chuyên gia" anchorRef={anchorRef} onClose={onClose} zIndex={zIndex}>
       {!canSearch ? (
         <p className="py-sm text-sm text-on-surface-variant">
           {requireSelection ? 'Chọn ngày và khung giờ để xem thợ còn lịch trống.' : 'Chọn địa chỉ để xem thợ phù hợp.'}
@@ -54,9 +58,12 @@ export const BookingProviderPicker = ({
       ) : loadError ? (
         <p role="alert" className="py-sm text-sm text-error">{loadError}</p>
       ) : providers.length === 0 ? (
-        <p className="py-sm text-sm text-on-surface-variant">
-          {requireSelection ? 'Chưa có thợ trống trong khung giờ này. Vui lòng chọn giờ khác.' : 'Chưa tìm thấy thợ phù hợp với dịch vụ và địa chỉ đã chọn.'}
-        </p>
+        <div>
+          {allowAutoAssignWhenEmpty && <NearbyProviderAutoAssignOption isSelected={!preferredProviderId} onSelect={() => onConfirm(undefined)} />}
+          <p className="py-sm text-sm text-on-surface-variant">
+            {requireSelection ? 'Chưa có thợ đang nhận đơn phù hợp với dịch vụ, địa chỉ và lịch đã chọn.' : 'Chưa tìm thấy thợ phù hợp với dịch vụ và địa chỉ đã chọn.'}
+          </p>
+        </div>
       ) : (
         <div className="space-y-sm">
           {requestedProviderId && !providers.some((item) => item.id === requestedProviderId) && (
@@ -69,6 +76,7 @@ export const BookingProviderPicker = ({
                 isSelected={provider.id === preferredProviderId} allowSelection requireSelection={requireSelection}
                 onViewProfile={(item) => setViewingId(item.id)}
                 onSelect={(item) => onConfirm(item.id, item.user.fullName)}
+                showAutoAssignNote={showAutoAssignNote}
               />
             ))}
           </div>

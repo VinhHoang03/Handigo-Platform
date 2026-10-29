@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Skeleton, SkeletonText } from "@/components/common/Skeleton";
 import { AddressBookManager } from "@/features/profile/components/AddressBookManager";
@@ -13,7 +13,6 @@ import {
   type CustomerProfileTab,
 } from "@/features/customer/components/ProfileTabsNav";
 import { SecurityTabSection } from "@/features/customer/components/SecurityTabSection";
-import { NotificationSettingsSection } from "@/features/customer/components/NotificationSettingsSection";
 import { PasswordSecurityModals } from "@/features/customer/components/PasswordSecurityModals";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 
@@ -21,7 +20,10 @@ const DEFAULT_AVATAR = undefined;
 
 export default function CustomerProfilePage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<CustomerProfileTab>("profile");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<CustomerProfileTab>(() =>
+    searchParams.get("tab") === "applications" ? "applications" : "profile",
+  );
   const passwordModal = usePasswordChangeModal();
   const isGoogleAccount = useAuthStore((state) => state.user?.isGoogleAccount === true);
 
@@ -123,8 +125,6 @@ export default function CustomerProfilePage() {
             canChangePassword={!isGoogleAccount}
           />
         )}
-
-        {activeTab === "profile" && <NotificationSettingsSection />}
 
         {activeTab === "applications" && (
           <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm sm:p-6 md:p-8">

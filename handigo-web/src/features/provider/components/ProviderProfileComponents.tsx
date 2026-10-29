@@ -11,7 +11,6 @@ export {
 export { ProviderHero } from "./profile/ProviderHeroCard";
 export { PerformanceStats } from "./profile/ProviderPerformanceStats";
 export { VerificationPanel } from "./profile/ProviderVerificationPanel";
-export { ServiceAreaPanel } from "./profile/ProviderServiceAreaPanel";
 export {
   AccountFunctionsPanel,
   BankAccountPanel,

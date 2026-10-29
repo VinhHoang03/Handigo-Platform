@@ -7,7 +7,6 @@ import type { UserAddress } from '@/features/profile/types/profile.types';
 import type { ProviderAvailabilityStatus } from '@/features/customer-service/components/NearbyProviderSelector';
 import {
   type Step2FormErrors,
-  MIN_DESCRIPTION_LENGTH,
   getEarliestScheduledAt,
   getDefaultScheduledAt,
   getInitialScheduledAt,
@@ -29,6 +28,7 @@ export const useCreateBookingStep2Form = () => {
     orderType, setOrderType,
     scheduledAt, setScheduledAt, isScheduleAutomatic, problemDescription, setProblemDescription,
     customerAttachments, setCustomerAttachments,
+    rebookSource,
   } = useBookingStore();
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useToastFeedback<string | null>(null, "error");
@@ -82,6 +82,7 @@ export const useCreateBookingStep2Form = () => {
 
   useEffect(() => {
     if (scheduleInitialized.current || orderType !== 'scheduled') return;
+    if (rebookSource && !scheduledAt) return;
     scheduleInitialized.current = true;
     if (scheduledAt && !isScheduleAutomatic) return;
     const initialScheduledAt = getInitialScheduledAt(scheduledAt);
@@ -89,7 +90,7 @@ export const useCreateBookingStep2Form = () => {
       setScheduledAt(initialScheduledAt, true);
       setPreferredProviderId(undefined);
     }
-  }, [orderType, scheduledAt, isScheduleAutomatic, setScheduledAt, setPreferredProviderId]);
+  }, [orderType, scheduledAt, isScheduleAutomatic, setScheduledAt, setPreferredProviderId, rebookSource]);
 
   const handleUploadImages = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -175,7 +176,6 @@ export const useCreateBookingStep2Form = () => {
   );
 
   const validateStep = () => {
-    const description = (problemDescription || '').trim();
     const scheduleDate = scheduledAt ? scheduledAt.split('T')[0] : '';
     const nextErrors: Step2FormErrors = {};
 
@@ -183,13 +183,6 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.addressId = 'Vui lòng chọn địa chỉ thực hiện dịch vụ.';
     }
 
-    if (description.length < MIN_DESCRIPTION_LENGTH) {
-      nextErrors.problemDescription = 'Vui lòng mô tả tình trạng tối thiểu ' + MIN_DESCRIPTION_LENGTH + ' ký tự.';
-    }
-
-    if (orderType === 'normal' && !isWithinImmediateBookingHours(new Date())) {
-      nextErrors.scheduledAt = 'Đặt ngay chỉ khả dụng từ 08:00 đến 21:00. Vui lòng chọn Hẹn giờ.';
-    }
 
     if (shouldShowSchedulePicker && !scheduleDate) {
       nextErrors.scheduledAt = 'Vui lòng chọn ngày thực hiện dịch vụ.';
@@ -199,15 +192,9 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.scheduledAt = 'Ngày thực hiện không được nhỏ hơn ngày hiện tại.';
     }
     if (shouldShowSchedulePicker && scheduledAt?.includes('T')
-      && (new Date(scheduledAt).getHours() < 8
-        || new Date(scheduledAt).getHours() > 21
-        || (new Date(scheduledAt).getHours() === 21 && (
-          new Date(scheduledAt).getMinutes() > 0
-          || new Date(scheduledAt).getSeconds() > 0
-          || new Date(scheduledAt).getMilliseconds() > 0
-        ))
+      && (!Number.isFinite(new Date(scheduledAt).getTime())
         || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())) {
-      nextErrors.scheduledAt = 'Vui lòng chọn giờ từ 08:00 đến 21:00 và không sớm hơn phút hiện tại.';
+      nextErrors.scheduledAt = 'Vui lòng chọn thời gian hợp lệ và không sớm hơn phút hiện tại.';
     }
     // Đơn có lịch hẹn không còn bắt buộc khách tự chọn chuyên gia — hệ thống tự
     // điều phối. Chỉ cần có chuyên gia phù hợp là qua được bước này.
@@ -215,10 +202,13 @@ export const useCreateBookingStep2Form = () => {
       nextErrors.preferredProviderId = providerAvailability === 'loading' || providerAvailability === 'idle'
         ? 'Vui lòng chờ hệ thống kiểm tra chuyên gia phù hợp.'
         : shouldShowSchedulePicker
-          ? 'Chưa có chuyên gia phù hợp và còn trống trong thời gian đã chọn.'
+          ? 'Chưa có thợ đang nhận đơn phù hợp với dịch vụ, địa chỉ và lịch đã chọn.'
           : 'Chưa có chuyên gia phù hợp với dịch vụ và địa chỉ đã chọn.';
     }
 
+    if (rebookSource && requestedProviderId && preferredProviderId !== requestedProviderId) {
+      nextErrors.preferredProviderId = 'Thợ cũ chưa khả dụng với lựa chọn hiện tại. Vui lòng chọn thợ khác hoặc chọn Handigo tự điều phối.';
+    }
     setFormErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };

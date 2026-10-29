@@ -59,7 +59,7 @@ export const providerNavItems: DashboardNavItem[] = [
   },
   {
     icon: LifeBuoy,
-    label: "Khiếu nại, hỗ trợ & báo cáo",
+    label: "Hỗ trợ & báo cáo",
     path: "/provider/support",
   },
   { icon: Settings, label: "Hồ sơ dịch vụ", path: "/provider/profile" },
@@ -87,12 +87,11 @@ export const adminNavItems: DashboardNavItem[] = [
     path: "/admin/withdrawals",
   },
   { icon: LifeBuoy, label: "Yêu cầu hỗ trợ", path: "/admin/support" },
-  { icon: Gavel, label: "Khiếu nại & vi phạm", path: "/admin/cases" },
+  { icon: Gavel, label: "Báo cáo & vi phạm", path: "/admin/cases" },
   { icon: ReceiptText, label: "Thanh toán", path: "/admin/payments" },
-  { icon: Wallet, label: "Ví provider", path: "/admin/wallets" },
+  { icon: Wallet, label: "Ví nhà cung cấp", path: "/admin/wallets" },
   { icon: Bell, label: "Thông báo", path: "/admin/notifications" },
   { icon: Newspaper, label: "Tin tức", path: "/admin/news" },
-  { icon: Banknote, label: "Doanh thu hệ thống", path: "/admin/revenue" },
   {
     icon: Settings,
     label: "Cấu hình hệ thống",
@@ -134,3 +133,8 @@ export function isNavItemActive(
     ? pathname.startsWith(item.path)
     : pathname === item.path;
 }
+
+export const getDashboardNavLabel = (item: DashboardNavItem) =>
+  item.pendingCount && item.pendingCount > 0 && item.pendingLabel
+    ? `${item.label}. ${item.pendingLabel}${item.pendingStale ? ". Số liệu lần cập nhật thành công gần nhất" : ""}`
+    : item.label;

@@ -9,11 +9,34 @@ import { previewServiceBooking } from "../services/servicePricing.service";
 import { updateExpectedEnd } from "../services/providerSchedule.service";
 import { respondToProviderReassignment } from "../services/orderReassignment.service";
 import { getCustomerBookingPolicies } from "../services/bookingPolicy.service";
+import { markOrderArrival, checkCustomerNoShowEligibility, reportCustomerNoShow, uploadNoShowEvidence } from "../services/customerNoShow.service";
 
 const ok = (res: Response, data: unknown, status = 200) =>
   res.status(status).json({ success: true, data });
 
 const uid = (req: Request): string => requireRequestUser(req).id;
+
+export const arriveOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await markOrderArrival(String(req.params.orderId), uid(req))); }
+  catch (error) { return next(error); }
+};
+
+export const customerNoShowEligibility = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await checkCustomerNoShowEligibility(String(req.params.orderId), uid(req))); }
+  catch (error) { return next(error); }
+};
+
+export const createCustomerNoShowReport = async (req: Request, res: Response, next: NextFunction) => {
+  try { return ok(res, await reportCustomerNoShow(String(req.params.orderId), uid(req), req.body), 201); }
+  catch (error) { return next(error); }
+};
+
+export const createCustomerNoShowEvidence = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.file) throw new AppError("Vui lòng chọn ảnh bằng chứng.", 400);
+    return ok(res, await uploadNoShowEvidence(String(req.params.orderId), uid(req), req.body.kind, req.file), 201);
+  } catch (error) { return next(error); }
+};
 
 export const getBookingPolicies = async (_req: Request, res: Response, next: NextFunction) => {
   try { return ok(res, await getCustomerBookingPolicies()); }
@@ -53,10 +76,10 @@ export const createOrder = async (
   next: NextFunction,
 ) => {
   try {
-    const order = await OrderService.createOrder({
+    const order = await OrderService.createOrderOnce({
       customerId: uid(req),
       ...req.body,
-    });
+    }, req.get("Idempotency-Key"));
     return ok(res, order, 201);
   } catch (error) {
     return next(error);
@@ -127,22 +150,6 @@ export const getOrderById = async (
   try {
     const order = await OrderService.getOrderById(param(req, "orderId"), uid(req));
     return ok(res, order);
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const getRecurringSeries = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const orders = await OrderService.getRecurringSeries(
-      param(req, "orderId"),
-      uid(req),
-    );
-    return ok(res, { items: orders });
   } catch (error) {
     return next(error);
   }
@@ -231,33 +238,12 @@ export const previewCancellation = async (
 ) => {
   try {
     const role = toOrderActorRole(requireRequestUser(req).role);
-    const scope = req.query.scope === "series" ? "series" : "single";
     const preview = await OrderService.previewCancellation(
       param(req, "orderId"),
       uid(req),
       role,
-      scope,
     );
     return ok(res, preview);
-  } catch (error) {
-    return next(error);
-  }
-};
-
-export const cancelRecurringSeries = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { reason } = req.body;
-    const result = await OrderService.cancelRecurringSeries(
-      param(req, "orderId"),
-      uid(req),
-      reason,
-      req.body.confirmedExpectations,
-    );
-    return ok(res, result);
   } catch (error) {
     return next(error);
   }

@@ -1,8 +1,10 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
@@ -11,10 +13,12 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/utils/media_url.dart';
+import '../../../shared/widgets/provider_avatar.dart';
 import '../../../shared/widgets/service_images.dart';
 import '../../orders/domain/order_summary.dart';
 import '../../orders/presentation/order_screens.dart';
 import '../data/provider_repository.dart';
+import '../data/provider_location_service.dart';
 import '../domain/provider_models.dart';
 import 'provider_schedule_preview.dart';
 import 'provider_history_widgets.dart';
@@ -29,6 +33,27 @@ void setSchedulePreviewForDebug(bool enabled) {
 
 final providerRepositoryProvider = Provider<ProviderRepository>(
   (ref) => ProviderRepository(ref.watch(apiClientProvider)),
+);
+final providerLocationServiceProvider =
+    ChangeNotifierProvider<ProviderLocationService>((ref) {
+      ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+      return ProviderLocationService(ref.watch(apiClientProvider));
+    });
+final providerCurrentLocationProvider = FutureProvider<void>(
+  retry: (_, _) => null,
+  (ref) async {
+    final userId = ref.watch(
+      authControllerProvider.select((auth) => auth.user?.id),
+    );
+    if (userId == null || ref.watch(providerUiPreviewProvider) != null) return;
+    await ref
+        .watch(providerLocationServiceProvider.notifier)
+        .synchronize(
+          shouldUpload: () =>
+              ref.mounted &&
+              ref.read(authControllerProvider).user?.id == userId,
+        );
+  },
 );
 final providerOverviewProvider = FutureProvider.autoDispose<ProviderOverview>((
   ref,
@@ -54,6 +79,37 @@ final providerOrdersProvider =
       }
       return ref.watch(providerRepositoryProvider).orders();
     });
+final providerOrderPageProvider = FutureProvider.autoDispose
+    .family<PagedResult<OrderSummary>, (int, String, String)>((ref, query) {
+      final preview = ref.watch(providerUiPreviewProvider);
+      if (preview != null)
+        return PagedResult(
+          items: preview
+              .where((item) => query.$2 == 'all' || item.status == query.$2)
+              .toList(),
+          page: 1,
+          totalPages: 1,
+        );
+      return ref
+          .watch(providerRepositoryProvider)
+          .orders(page: query.$1, status: query.$2, search: query.$3);
+    });
+
+final providerScheduleOrdersProvider =
+    FutureProvider.autoDispose<PagedResult<OrderSummary>>((ref) async {
+      final first = await ref.watch(providerOrdersProvider.future);
+      if (first.totalPages <= 1) return first;
+      final items = [...first.items];
+      for (var page = 2; page <= first.totalPages; page++) {
+        if (!ref.mounted) return first;
+        final next = await ref
+            .read(providerRepositoryProvider)
+            .orders(page: page);
+        items.addAll(next.items);
+      }
+      return PagedResult(items: items, page: 1, totalPages: 1);
+    });
+
 final providerAssignmentsProvider =
     FutureProvider.autoDispose<List<ProviderAssignment>>((ref) {
       if (ref.watch(providerUiPreviewProvider) != null) {
@@ -74,7 +130,8 @@ final providerAssignmentsProvider =
     });
 
 class ProviderShell extends StatefulWidget {
-  const ProviderShell({super.key});
+  const ProviderShell({this.navigationShell, super.key});
+  final StatefulNavigationShell? navigationShell;
   @override
   State<ProviderShell> createState() => _ProviderShellState();
 }
@@ -85,19 +142,23 @@ class _ProviderShellState extends State<ProviderShell> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final activeIndex = widget.navigationShell?.currentIndex ?? index;
     return Scaffold(
-      body: IndexedStack(
-        index: index,
-        children: [
-          ProviderDashboardScreen(
-            onOrders: () => setState(() => index = 1),
-            onSchedule: _showSchedule,
+      resizeToAvoidBottomInset: false,
+      body:
+          widget.navigationShell ??
+          IndexedStack(
+            index: index,
+            children: [
+              ProviderDashboardScreen(
+                onOrders: () => setState(() => index = 1),
+                onSchedule: _showSchedule,
+              ),
+              const ProviderOrdersScreen(),
+              ProviderScheduleScreen(isActive: index == 2),
+              const ProviderAccountScreen(),
+            ],
           ),
-          const ProviderOrdersScreen(),
-          ProviderScheduleScreen(isActive: index == 2),
-          const ProviderAccountScreen(),
-        ],
-      ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
@@ -113,18 +174,24 @@ class _ProviderShellState extends State<ProviderShell> {
               ])
                 Expanded(
                   child: Semantics(
-                    selected: index == tabIndex,
+                    selected: activeIndex == tabIndex,
                     button: true,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
                       child: Material(
-                        color: index == tabIndex
+                        color: activeIndex == tabIndex
                             ? scheme.primaryContainer
                             : scheme.surfaceContainerLowest,
                         borderRadius: BorderRadius.circular(12),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: () => setState(() => index = tabIndex),
+                          onTap: () {
+                            if (widget.navigationShell case final shell?) {
+                              shell.goBranch(tabIndex);
+                            } else {
+                              setState(() => index = tabIndex);
+                            }
+                          },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             child: Column(
@@ -133,7 +200,7 @@ class _ProviderShellState extends State<ProviderShell> {
                                 Icon(
                                   icon,
                                   size: 22,
-                                  color: index == tabIndex
+                                  color: activeIndex == tabIndex
                                       ? scheme.onPrimary
                                       : scheme.onSurfaceVariant,
                                 ),
@@ -143,11 +210,11 @@ class _ProviderShellState extends State<ProviderShell> {
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.labelSmall
                                       ?.copyWith(
-                                        color: index == tabIndex
+                                        color: activeIndex == tabIndex
                                             ? scheme.onPrimary
                                             : scheme.onSurfaceVariant,
-                                        fontWeight: index == tabIndex
-                                            ? FontWeight.w700
+                                        fontWeight: activeIndex == tabIndex
+                                            ? FontWeight.w600
                                             : FontWeight.w500,
                                       ),
                                 ),
@@ -190,7 +257,7 @@ class ProviderDashboardScreen extends ConsumerWidget {
               'Handigo',
               style: TextStyle(
                 color: scheme.primary,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -222,7 +289,7 @@ class ProviderDashboardScreen extends ConsumerWidget {
               _ProviderHero(data: data),
               const SizedBox(height: 16),
               _SectionHeading(
-                title: 'Đơn cần phản hồi',
+                title: 'Đơn cần xử lý',
                 icon: Icons.assignment_outlined,
                 action: onOrders == null
                     ? null
@@ -231,7 +298,53 @@ class ProviderDashboardScreen extends ConsumerWidget {
                         child: const Text('Xem tất cả'),
                       ),
               ),
-              const _PendingAssignmentList(),
+              ref
+                  .watch(providerOrdersProvider)
+                  .when(
+                    loading: () => const LinearProgressIndicator(),
+                    error: (error, _) => AppMessage(
+                      message: _message(error),
+                      onRetry: () => ref.invalidate(providerOrdersProvider),
+                    ),
+                    data: (page) {
+                      final active =
+                          page.items
+                              .where(
+                                (order) =>
+                                    order.status == 'accepted' ||
+                                    order.status == 'in_progress',
+                              )
+                              .toList()
+                            ..sort((a, b) {
+                              if (a.status != b.status) {
+                                return a.status == 'in_progress' ? -1 : 1;
+                              }
+                              return (a.scheduledAt ?? DateTime(9999))
+                                  .compareTo(b.scheduledAt ?? DateTime(9999));
+                            });
+                      if (active.isEmpty) {
+                        return const AppMessage(
+                          message: 'Chưa có đơn đang xử lý.',
+                          icon: Icons.assignment_turned_in_outlined,
+                        );
+                      }
+                      return Column(
+                        children: [
+                          for (final order in active.take(3))
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _AppointmentCard(
+                                order: order,
+                                showDate: true,
+                                isPreview:
+                                    ref.watch(providerUiPreviewProvider) !=
+                                    null,
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
               const SizedBox(height: 16),
               _WalletSummary(data: data),
               const SizedBox(height: 16),
@@ -288,64 +401,6 @@ class ProviderDashboardScreen extends ConsumerWidget {
                   );
                 },
               ),
-              const SizedBox(height: 16),
-              _SectionHeading(
-                title: 'Đơn hàng hiện tại',
-                icon: Icons.assignment_outlined,
-                action: onOrders == null
-                    ? null
-                    : TextButton(
-                        onPressed: onOrders,
-                        child: const Text('Xem tất cả'),
-                      ),
-              ),
-              ref
-                  .watch(providerOrdersProvider)
-                  .when(
-                    loading: () => const LinearProgressIndicator(),
-                    error: (error, _) => AppMessage(
-                      message: _message(error),
-                      onRetry: () => ref.invalidate(providerOrdersProvider),
-                    ),
-                    data: (page) {
-                      final active =
-                          page.items
-                              .where(
-                                (order) =>
-                                    order.status == 'accepted' ||
-                                    order.status == 'in_progress',
-                              )
-                              .toList()
-                            ..sort((a, b) {
-                              if (a.status != b.status) {
-                                return a.status == 'in_progress' ? -1 : 1;
-                              }
-                              return (a.scheduledAt ?? DateTime(9999))
-                                  .compareTo(b.scheduledAt ?? DateTime(9999));
-                            });
-                      if (active.isEmpty) {
-                        return const AppMessage(
-                          message: 'Chưa có đơn đang xử lý.',
-                          icon: Icons.assignment_turned_in_outlined,
-                        );
-                      }
-                      return Column(
-                        children: [
-                          for (final order in active.take(3))
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _AppointmentCard(
-                                order: order,
-                                showDate: true,
-                                isPreview:
-                                    ref.watch(providerUiPreviewProvider) !=
-                                    null,
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
               const SizedBox(height: 16),
               _SectionHeading(
                 title: 'Lịch hẹn hôm nay',
@@ -407,51 +462,135 @@ class _AvailabilityCard extends ConsumerStatefulWidget {
 
 class _AvailabilityCardState extends ConsumerState<_AvailabilityCard> {
   bool busy = false;
+
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: Theme.of(context).colorScheme.surfaceContainerLow,
-    child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Icon(
-        Icons.circle,
-        size: 12,
-        color: widget.data.availabilityStatus == 'online'
-            ? AppTheme.successGreen
-            : Theme.of(context).colorScheme.outline,
+  Widget build(BuildContext context) {
+    final location = widget.data.availabilityStatus == 'online'
+        ? ref.watch(providerCurrentLocationProvider)
+        : null;
+    final trackingError = widget.data.availabilityStatus == 'online'
+        ? ref.watch(providerLocationServiceProvider).error
+        : null;
+    return ColoredBox(
+      color: Colors.white,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Icon(
+          Icons.circle,
+          size: 12,
+          color: widget.data.availabilityStatus == 'online'
+              ? AppTheme.successGreen
+              : Theme.of(context).colorScheme.outline,
+        ),
+        title: const Text(
+          'Trạng thái nhận việc',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _availabilityLabel(widget.data.availabilityStatus),
+              style: const TextStyle(fontSize: 13),
+            ),
+            if (location?.isLoading == true)
+              const Text(
+                'Đang cập nhật vị trí...',
+                style: TextStyle(fontSize: 13),
+              ),
+            if (location?.isLoading != true &&
+                (location?.hasError == true || trackingError != null))
+              Text(
+                'Chưa lấy được vị trí hiện tại.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.data.availabilityStatus == 'online') ...[
+              IconButton.outlined(
+                tooltip: 'Tải lại vị trí',
+                style: IconButton.styleFrom(shape: const CircleBorder()),
+                onPressed: busy || location?.isLoading == true
+                    ? null
+                    : () async {
+                        try {
+                          ref.invalidate(providerCurrentLocationProvider);
+                          await ref.read(
+                            providerCurrentLocationProvider.future,
+                          );
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(_message(error))),
+                            );
+                          }
+                        }
+                      },
+                icon: location?.isLoading == true
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Switch(
+              value: widget.data.availabilityStatus == 'online',
+              onChanged: busy || location?.isLoading == true
+                  ? null
+                  : (value) async {
+                      if (ref.read(providerUiPreviewProvider) != null) return;
+                      final userId = ref.read(authControllerProvider).user?.id;
+                      setState(() => busy = true);
+                      try {
+                        if (value) {
+                          ref.invalidate(providerCurrentLocationProvider);
+                          await ref.read(
+                            providerCurrentLocationProvider.future,
+                          );
+                        }
+                        if (!mounted ||
+                            ref.read(authControllerProvider).user?.id !=
+                                userId) {
+                          return;
+                        }
+                        await ref
+                            .read(providerRepositoryProvider)
+                            .setAvailability(value ? 'online' : 'offline');
+                        if (!value) {
+                          ref.read(providerLocationServiceProvider).stop();
+                        }
+                        ref.invalidate(providerOverviewProvider);
+                      } catch (error) {
+                        if (context.mounted) {
+                          final failure = value
+                              ? ref
+                                        .read(providerCurrentLocationProvider)
+                                        .error ??
+                                    error
+                              : error;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(_message(failure))),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => busy = false);
+                      }
+                    },
+            ),
+          ],
+        ),
       ),
-      title: const Text(
-        'Trạng thái nhận việc',
-        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        _availabilityLabel(widget.data.availabilityStatus),
-        style: const TextStyle(fontSize: 12),
-      ),
-      trailing: Switch(
-        value: widget.data.availabilityStatus == 'online',
-        onChanged: busy
-            ? null
-            : (value) async {
-                if (ref.read(providerUiPreviewProvider) != null) return;
-                setState(() => busy = true);
-                try {
-                  await ref
-                      .read(providerRepositoryProvider)
-                      .setAvailability(value ? 'online' : 'offline');
-                  ref.invalidate(providerOverviewProvider);
-                } catch (error) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(_message(error))));
-                  }
-                } finally {
-                  if (mounted) setState(() => busy = false);
-                }
-              },
-      ),
-    ),
-  );
+    );
+  }
 }
 
 class _ProviderHero extends ConsumerWidget {
@@ -469,7 +608,7 @@ class _ProviderHero extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                ProviderAvatar(url: user?.avatar),
+                ProviderAvatar(url: user?.avatar, gender: user?.gender),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -480,7 +619,7 @@ class _ProviderHero extends ConsumerWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -505,36 +644,9 @@ class _ProviderHero extends ConsumerWidget {
               ],
             ),
           ),
+          const Divider(height: 1, thickness: 1, color: Colors.black),
           _AvailabilityCard(data: data),
         ],
-      ),
-    );
-  }
-}
-
-class ProviderAvatar extends StatelessWidget {
-  const ProviderAvatar({this.url, super.key});
-  final String? url;
-  @override
-  Widget build(BuildContext context) {
-    final image = usableMediaUrl(url);
-    final scheme = Theme.of(context).colorScheme;
-    final placeholder = ColoredBox(
-      color: scheme.primaryFixed,
-      child: Icon(Icons.handyman_outlined, color: scheme.primary),
-    );
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: SizedBox(
-        width: 48,
-        height: 48,
-        child: image == null
-            ? placeholder
-            : Image.network(
-                image,
-                fit: BoxFit.cover,
-                errorBuilder: (_, error, stack) => placeholder,
-              ),
       ),
     );
   }
@@ -565,7 +677,7 @@ class _WalletSummary extends StatelessWidget {
                   child: Text(
                     'Ví Handigo',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -581,44 +693,42 @@ class _WalletSummary extends StatelessWidget {
                 final stacked =
                     constraints.maxWidth < 280 ||
                     MediaQuery.textScalerOf(context).scale(1) > 1.3;
-                Widget balance(
-                  String label,
-                  double amount,
-                  String caption,
-                  Color color,
-                ) => Container(
-                  constraints: const BoxConstraints(minHeight: 116),
-                  width: stacked
-                      ? constraints.maxWidth
-                      : (constraints.maxWidth - 12) / 2,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label, style: Theme.of(context).textTheme.bodySmall),
-                      const SizedBox(height: 4),
-                      Text(
-                        _money(amount),
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: color,
-                              fontWeight: FontWeight.w700,
+                Widget balance(String label, double amount, Color color) =>
+                    Container(
+                      constraints: const BoxConstraints(minHeight: 116),
+                      width: stacked
+                          ? constraints.maxWidth
+                          : (constraints.maxWidth - 12) / 2,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _money(amount),
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      color: color,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
                             ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        caption,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+                    );
                 return Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -626,13 +736,11 @@ class _WalletSummary extends StatelessWidget {
                     balance(
                       'Số dư khả dụng',
                       data.walletBalance,
-                      'Có thể sử dụng trong ví',
                       scheme.primary,
                     ),
                     balance(
                       'Số dư chờ xử lý',
                       data.pendingBalance,
-                      'Đang chờ đối soát',
                       scheme.onSurface,
                     ),
                   ],
@@ -683,7 +791,7 @@ class _MetricCard extends StatelessWidget {
             value,
             style: Theme.of(
               context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -708,44 +816,13 @@ class _SectionHeading extends StatelessWidget {
             title,
             style: Theme.of(
               context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
         ?action,
       ],
     ),
   );
-}
-
-class _PendingAssignmentList extends ConsumerWidget {
-  const _PendingAssignmentList();
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => ref
-      .watch(providerAssignmentsProvider)
-      .when(
-        loading: () => const LinearProgressIndicator(),
-        error: (error, _) => AppMessage(
-          message: _message(error),
-          onRetry: () => ref.invalidate(providerAssignmentsProvider),
-        ),
-        data: (items) {
-          if (items.isEmpty) {
-            return const AppMessage(
-              message: 'Hiện không có đơn chờ phản hồi.',
-              icon: Icons.assignment_turned_in_outlined,
-            );
-          }
-          return Column(
-            children: [
-              for (final item in items.take(3))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _AssignmentCard(key: ValueKey(item.id), item: item),
-                ),
-            ],
-          );
-        },
-      );
 }
 
 class _AssignmentCard extends ConsumerStatefulWidget {
@@ -760,16 +837,47 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
   Future<void> _respond(bool accept) async {
     if (ref.read(providerUiPreviewProvider) != null) return;
     if (busy) return;
+    if (widget.item.responseDeadline?.isBefore(DateTime.now()) == true) {
+      ref.invalidate(providerAssignmentsProvider);
+      return;
+    }
+    String reason = '';
+    if (!accept) {
+      final controller = TextEditingController();
+      final value = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Từ chối đề nghị'),
+          content: TextField(
+            controller: controller,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              labelText: 'Lý do (không bắt buộc)',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Quay lại'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Từ chối'),
+            ),
+          ],
+        ),
+      );
+      controller.dispose();
+      if (value == null || !mounted) return;
+      reason = value;
+    }
     setState(() => busy = true);
     try {
       final repository = ref.read(providerRepositoryProvider);
       if (accept) {
         await repository.acceptAssignment(widget.item.id);
       } else {
-        await repository.rejectAssignment(
-          widget.item.id,
-          'Đối tác chưa thể nhận đơn.',
-        );
+        await repository.rejectAssignment(widget.item.id, reason);
       }
       ref.invalidate(providerAssignmentsProvider);
       ref.invalidate(providerOrdersProvider);
@@ -858,7 +966,7 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -905,7 +1013,7 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
                       _money(item.totalAmount!),
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: scheme.primary,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -915,11 +1023,21 @@ class _AssignmentCardState extends ConsumerState<_AssignmentCard> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final reject = OutlinedButton(
-                  onPressed: busy ? null : () => _respond(false),
+                  onPressed:
+                      busy ||
+                          item.responseDeadline?.isBefore(DateTime.now()) ==
+                              true
+                      ? null
+                      : () => _respond(false),
                   child: const Text('Từ chối'),
                 );
                 final accept = FilledButton.icon(
-                  onPressed: busy ? null : () => _respond(true),
+                  onPressed:
+                      busy ||
+                          item.responseDeadline?.isBefore(DateTime.now()) ==
+                              true
+                      ? null
+                      : () => _respond(true),
                   icon: busy
                       ? const SizedBox(
                           width: 18,
@@ -959,41 +1077,39 @@ class ProviderOrdersScreen extends ConsumerStatefulWidget {
 }
 
 class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
-  String filter = 'all';
+  String filter = 'all', search = '';
+  int pageIndex = 1;
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(providerOrdersProvider);
+    final query = (pageIndex, filter == 'pending' ? 'all' : filter, search);
+    final state = ref.watch(providerOrderPageProvider(query));
     final assignments = ref.watch(providerAssignmentsProvider);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: scheme.surfaceContainerLowest,
-        shape: Border(bottom: BorderSide(color: scheme.surfaceContainer)),
+        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
         title: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerLowest,
-                border: Border.all(color: scheme.primaryContainer),
-                borderRadius: BorderRadius.circular(10),
+                color: scheme.primaryFixed,
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.receipt_long_outlined,
-                color: scheme.primaryContainer,
-                size: 22,
+                color: scheme.primary,
+                size: 24,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Lịch sử đơn hàng',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: scheme.primaryContainer,
-                  fontWeight: FontWeight.w700,
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -1004,14 +1120,26 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
             tooltip: 'Tải lại đơn hàng',
             onPressed: () {
               ref.invalidate(providerOrdersProvider);
+              ref.invalidate(providerOrderPageProvider);
               ref.invalidate(providerAssignmentsProvider);
             },
-            icon: Icon(Icons.refresh_rounded, color: scheme.primaryContainer),
+            icon: Icon(Icons.refresh_rounded, color: scheme.primary),
           ),
         ],
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: AppSearchField(
+              maxLength: 100,
+              hintText: 'Tìm đơn hàng',
+              onSubmitted: (value) => setState(() {
+                search = value.trim();
+                pageIndex = 1;
+              }),
+            ),
+          ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1039,7 +1167,10 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
                                 )
                                 .length,
                       selected: filter == entry.key,
-                      onSelected: () => setState(() => filter = entry.key),
+                      onSelected: () => setState(() {
+                        filter = entry.key;
+                        pageIndex = 1;
+                      }),
                     ),
                   ),
               ],
@@ -1049,7 +1180,7 @@ class _ProviderOrdersScreenState extends ConsumerState<ProviderOrdersScreen> {
             child: RefreshIndicator(
               onRefresh: () {
                 ref.invalidate(providerAssignmentsProvider);
-                return ref.refresh(providerOrdersProvider.future);
+                return ref.refresh(providerOrderPageProvider(query).future);
               },
               child: filter == 'pending'
                   ? assignments.when(
@@ -1181,6 +1312,24 @@ class _ProviderScheduleScreenState
     _scrollToStart();
   }
 
+  Future<void> _pickDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: selected,
+      firstDate: DateTime(1),
+      lastDate: DateTime(9999, 12, 31),
+      helpText: 'Chọn ngày xem lịch hẹn',
+      cancelText: 'Hủy',
+      confirmText: 'Chọn',
+    );
+    if (date == null || !mounted) return;
+    setState(() {
+      selected = DateUtils.dateOnly(date);
+      weekStart = selected;
+    });
+    _scrollToStart();
+  }
+
   void _scrollToStart() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && dayScrollController.hasClients) {
@@ -1220,7 +1369,7 @@ class _ProviderScheduleScreenState
   Widget build(BuildContext context) {
     previewOrders = ref.watch(providerUiPreviewProvider);
     final state = previewOrders == null
-        ? ref.watch(providerOrdersProvider)
+        ? ref.watch(providerScheduleOrdersProvider)
         : AsyncData(PagedResult(items: previewOrders!, page: 1, totalPages: 1));
     final orders = state.asData?.value.items ?? <OrderSummary>[];
     // Chỉ ghi nhận các đơn đã tải và hiển thị trong ngày đang mở.
@@ -1229,7 +1378,7 @@ class _ProviderScheduleScreenState
     );
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72 * MediaQuery.textScalerOf(context).scale(1),
+        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
         title: Row(
           children: [
             Container(
@@ -1252,15 +1401,13 @@ class _ProviderScheduleScreenState
                 children: [
                   Text(
                     'Lịch làm việc',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    DateFormat(
-                      "'Hôm nay, ngày' d 'tháng' M 'năm' yyyy",
-                    ).format(DateTime.now()),
+                    DateFormat('dd-MM-yyyy').format(DateTime.now()),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -1285,26 +1432,42 @@ class _ProviderScheduleScreenState
             ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: 'Tuần trước',
-                  onPressed: () => _changeWeek(-7),
-                  icon: const Icon(Icons.chevron_left),
+            child: Material(
+              color: Colors.white,
+              shape: const StadiumBorder(side: BorderSide(color: Colors.black)),
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Tuần trước',
+                      onPressed: () => _changeWeek(-7),
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _pickDate,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          side: BorderSide.none,
+                          shape: const StadiumBorder(),
+                          minimumSize: const Size(48, 48),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          textStyle: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        child: Text(DateFormat('MM/yyyy').format(selected)),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Tuần sau',
+                      onPressed: () => _changeWeek(7),
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: Text(
-                    DateFormat('MM/yyyy').format(selected),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Tuần sau',
-                  onPressed: () => _changeWeek(7),
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
+              ),
             ),
           ),
           Padding(
@@ -1322,14 +1485,14 @@ class _ProviderScheduleScreenState
             child: RefreshIndicator(
               onRefresh: () async {
                 if (previewOrders != null) return;
-                ref.invalidate(providerOrdersProvider);
-                await ref.read(providerOrdersProvider.future);
+                ref.invalidate(providerScheduleOrdersProvider);
+                await ref.read(providerScheduleOrdersProvider.future);
               },
               child: state.when(
                 loading: () => const AppLoading(),
                 error: (error, _) => AppMessage(
                   message: _message(error),
-                  onRetry: () => ref.invalidate(providerOrdersProvider),
+                  onRetry: () => ref.invalidate(providerScheduleOrdersProvider),
                 ),
                 data: (page) {
                   final scheduled = _ordersOnDay(page.items, selected);
@@ -1368,7 +1531,7 @@ class _ProviderScheduleScreenState
                             title: Text(
                               '${scheduled.length} lịch hẹn',
                               style: const TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             subtitle: scheduled.isEmpty
@@ -1386,7 +1549,7 @@ class _ProviderScheduleScreenState
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
-                                            fontWeight: FontWeight.w700,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       if (scheduled.any(
@@ -1445,7 +1608,7 @@ class ProviderStatusBadge extends StatelessWidget {
         label ?? orderStatusLabel(status),
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -1514,32 +1677,25 @@ class _WeekStrip extends StatelessWidget {
                           ),
                           backgroundColor: isSelected
                               ? scheme.primaryContainer
-                              : scheme.surfaceContainerLowest,
+                              : scheme.surfaceContainer,
                           foregroundColor: isSelected
                               ? scheme.onPrimary
                               : scheme.onSurfaceVariant,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: isSelected
-                                  ? scheme.primary
-                                  : scheme.outlineVariant.withValues(alpha: .3),
-                            ),
-                          ),
+                          shape: const StadiumBorder(),
                         ),
                         onPressed: () => onSelected(day),
                         child: Column(
                           children: [
                             Text(
                               labels[day.weekday - 1],
-                              style: const TextStyle(fontSize: 12),
+                              style: const TextStyle(fontSize: 13),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               DateFormat('d/M').format(day),
                               style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1553,8 +1709,8 @@ class _WeekStrip extends StatelessWidget {
                                         label,
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       )
                                     : Container(
@@ -1619,7 +1775,7 @@ class _AppointmentCard extends StatelessWidget {
                       : DateFormat(
                           showDate ? 'dd/MM • HH:mm' : 'HH:mm',
                         ).format(order.scheduledAt!.toLocal()),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 ProviderStatusBadge(status: order.status),
               ],
@@ -1631,7 +1787,7 @@ class _AppointmentCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: Theme.of(
                 context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             if (order.totalAmount != null) ...[
               const SizedBox(height: 6),
@@ -1639,7 +1795,7 @@ class _AppointmentCard extends StatelessWidget {
                 _money(order.totalAmount!),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -1688,7 +1844,34 @@ class ProviderAccountScreen extends ConsumerWidget {
     final user = ref.watch(authControllerProvider).user;
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tài khoản')),
+      appBar: AppBar(
+        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryFixed,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.person_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Tài khoản',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -1696,12 +1879,12 @@ class ProviderAccountScreen extends ConsumerWidget {
             margin: EdgeInsets.zero,
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
-              leading: ProviderAvatar(url: user?.avatar),
+              leading: ProviderAvatar(url: user?.avatar, gender: user?.gender),
               title: Text(
                 user?.fullName ?? 'Đối tác Handigo',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
                 user?.email ?? '',
@@ -1794,7 +1977,7 @@ class ProviderAccountScreen extends ConsumerWidget {
     String route,
   ) => ListTile(
     leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-    title: Text(title, style: const TextStyle(fontSize: 14)),
+    title: Text(title, style: const TextStyle(fontSize: 16)),
     trailing: const Icon(Icons.chevron_right, size: 20),
     onTap: () => context.push(route),
   );

@@ -12,10 +12,13 @@ import {
 } from "../validations/chat.validator";
 import { currentLocationSchema } from "../validations/location.validator";
 import { orderIdParamSchema } from "../validations/order.validator";
-import { markProviderOffline } from "../services/providerPresence.service";
+import { markProviderOffline, restoreProviderAfterReconnect } from "../services/providerPresence.service";
 import { createLogger } from "../utils/logger";
+import { isTokenVersionCurrent } from "../utils/token";
+import { refreshAccountLock } from "../services/penaltyPolicy.service";
+import { getEffectiveUserRole } from "../utils/userRole";
 
-const PROVIDER_OFFLINE_GRACE_MS = 5_000;
+const PROVIDER_OFFLINE_GRACE_MS = 30_000;
 const socketLogger = createLogger("SocketServer");
 
 const getAccessSecret = (): string => {
@@ -29,6 +32,7 @@ const getAccessSecret = (): string => {
 };
 
 interface SocketUser {
+  tokenVersion?: number;
   id: string;
   email: string;
   role: "CUSTOMER" | "PROVIDER" | "ADMIN";
@@ -40,6 +44,7 @@ type AuthedSocket = Socket & {
 
 export const initSocket = (server: HttpServer) => {
   const providerOfflineTimers = new Map<string, NodeJS.Timeout>();
+  const disconnectedProviders = new Map<string, Promise<Date | null>>();
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
@@ -63,15 +68,21 @@ export const initSocket = (server: HttpServer) => {
 
       const decoded = jwt.verify(token, getAccessSecret()) as SocketUser;
       const user = await User.findOne({ _id: decoded.id, isDeleted: false });
+      if (user) await refreshAccountLock(user);
 
       if (!user || user.status === "locked") {
         return next(new Error("Người dùng không được phép kết nối socket"));
       }
 
+      if (!isTokenVersionCurrent(decoded, user)) {
+        return next(new Error("Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại."));
+      }
+
       socket.user = {
         id: user._id.toString(),
         email: user.email,
-        role: user.role,
+        role: getEffectiveUserRole(user),
+        tokenVersion: decoded.tokenVersion ?? 0,
       };
       next();
     } catch (error) {
@@ -86,8 +97,8 @@ export const initSocket = (server: HttpServer) => {
     });
     socket.use(async (_packet, next) => {
       try {
-        const current = await User.findOne({ _id: socketUser.id, isDeleted: false }).select("status role").lean();
-        if (!current || current.status === "locked" || current.role !== socketUser.role) {
+        const current = await User.findOne({ _id: socketUser.id, isDeleted: false }).select("status role tokenVersion providerOnboardingStatus").lean();
+        if (!current || current.status === "locked" || getEffectiveUserRole(current) !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
           next(new Error("Tài khoản không còn quyền sử dụng kết nối này."));
           socket.disconnect(true);
           return;
@@ -99,6 +110,16 @@ export const initSocket = (server: HttpServer) => {
     });
     const userRoom = `user:${socketUser.id}`;
     socket.join(userRoom);
+    // Kiểm tra lại sau khi vào room để chặn phiên đổi mật khẩu giữa lúc bắt tay và kết nối.
+    void User.findOne({ _id: socketUser.id, isDeleted: false })
+      .select("status role tokenVersion providerOnboardingStatus")
+      .lean()
+      .then((current) => {
+        if (!current || current.status === "locked" || getEffectiveUserRole(current) !== socketUser.role || !isTokenVersionCurrent(socketUser, current)) {
+          socket.disconnect(true);
+        }
+      })
+      .catch(() => socket.disconnect(true));
 
     if (socketUser.role === "PROVIDER") {
       const pendingOfflineTimer = providerOfflineTimers.get(socketUser.id);
@@ -106,21 +127,51 @@ export const initSocket = (server: HttpServer) => {
         clearTimeout(pendingOfflineTimer);
         providerOfflineTimers.delete(socketUser.id);
       }
+      const offlineChange = disconnectedProviders.get(socketUser.id);
+      if (offlineChange) {
+        disconnectedProviders.delete(socketUser.id);
+        void offlineChange.then(async (disconnectedAt) => {
+          if (!disconnectedAt) return;
+          const activeSockets = await io.in(userRoom).fetchSockets();
+          if (!activeSockets.length) {
+            if (!disconnectedProviders.has(socketUser.id)) disconnectedProviders.set(socketUser.id, offlineChange);
+            return;
+          }
+          if (await restoreProviderAfterReconnect(socketUser.id, disconnectedAt)) {
+            io.to(userRoom).emit("provider:availability", { availabilityStatus: "online" });
+            socketLogger.info("Đã khôi phục nhận việc sau khi provider kết nối lại.", { userId: socketUser.id });
+          }
+        }).catch((error) => {
+          socketLogger.error("Không thể khôi phục trạng thái nhận việc sau khi kết nối lại.", error, { userId: socketUser.id });
+        });
+      }
     }
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       if (socketUser.role !== "PROVIDER") return;
 
       const existingTimer = providerOfflineTimers.get(socketUser.id);
       if (existingTimer) clearTimeout(existingTimer);
 
       const timer = setTimeout(async () => {
-        providerOfflineTimers.delete(socketUser.id);
-
         try {
           const activeSockets = await io.in(userRoom).fetchSockets();
-          if (activeSockets.length === 0) {
-            await markProviderOffline(socketUser.id);
+          if (activeSockets.length === 0 && providerOfflineTimers.get(socketUser.id) === timer) {
+            const offlineChange = markProviderOffline(socketUser.id, true);
+            disconnectedProviders.set(socketUser.id, offlineChange);
+            try {
+              const disconnectedAt = await offlineChange;
+              if (disconnectedAt) {
+                socketLogger.info("Tạm ngừng nhận việc vì provider mất toàn bộ kết nối quá thời gian chờ.", {
+                  userId: socketUser.id, reason, graceMs: PROVIDER_OFFLINE_GRACE_MS,
+                });
+              } else if (disconnectedProviders.get(socketUser.id) === offlineChange) {
+                disconnectedProviders.delete(socketUser.id);
+              }
+            } catch (error) {
+              if (disconnectedProviders.get(socketUser.id) === offlineChange) disconnectedProviders.delete(socketUser.id);
+              throw error;
+            }
           }
         } catch (error) {
           socketLogger.error(
@@ -128,6 +179,8 @@ export const initSocket = (server: HttpServer) => {
             error,
             { userId: socketUser.id },
           );
+        } finally {
+          if (providerOfflineTimers.get(socketUser.id) === timer) providerOfflineTimers.delete(socketUser.id);
         }
       }, PROVIDER_OFFLINE_GRACE_MS);
 
@@ -209,7 +262,13 @@ export const initSocket = (server: HttpServer) => {
           socket.user!.role as "CUSTOMER" | "PROVIDER",
           coordinates,
         );
-        io.to(`order:${orderId}`).emit("order:location", location);
+        // Kiểm tra lại phân công sau khi lưu vị trí; room đơn có thể còn socket của thợ cũ.
+        const recipients = await orderTrackingService.getOrderTrackingRecipientIds(orderId, socket.user!.id);
+        const sockets = await io.in(`order:${orderId}`).fetchSockets();
+        const recipientRooms = recipients.map((userId) => `user:${userId}`);
+        const socketIds = sockets.filter((member) =>
+          recipientRooms.some((room) => member.rooms.has(room))).map((member) => member.id);
+        if (socketIds.length) io.to(socketIds).emit("order:location", location);
         callback?.({ success: true, data: location });
       } catch (error: any) {
         callback?.({ success: false, message: error.message });

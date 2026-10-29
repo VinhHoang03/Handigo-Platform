@@ -11,11 +11,14 @@ Tài liệu đối chiếu với bản nháp, công cụ voucher, địa chỉ v
 | “Dùng mã giảm nhiều nhất giúp tôi” | `voucherPreference: best`; ưu tiên mã hết hạn sớm nếu giảm bằng nhau, hiển thị mã và tổng tiền trong form. |
 | “Không dùng mã” rồi đổi gói/dịch vụ | Giữ quyết định từ chối trong cùng bản nháp. |
 | “Cho chọn lại mã” | `voucherPreference: choose`; mở lại các lựa chọn hiện tại. |
+| “Tôi muốn áp mã giảm giá” nhưng chưa nhập mã | `voucherPreference: choose`; kiểm tra lại mã khả dụng và cho chọn, kể cả trước đó không dùng mã. Không tự áp mã giảm nhiều nhất. |
+| Không có mã dùng được | Nêu `voucherFeedback`: chưa có mã còn hiệu lực/còn lượt, sai loại đơn hoặc chưa đạt mức tối thiểu. Cho tiếp tục với giá chưa giảm; không bịa mã. |
+| Mã chỉ áp dụng một loại đơn | Phân biệt đơn giá cố định và đơn báo giá/giảm phí cọc; không nhầm với đặt ngay/lịch hẹn. Chỉ hiển thị mã dùng được cho đơn đang đặt. |
 | “Dùng hai mã này” | Giải thích mỗi đơn chỉ có một voucher và hỏi chọn một mã. |
 | Mã hết hạn, hết lượt, thuộc người khác hoặc đang giữ cho đơn khác | Không áp dụng; đưa mã còn phù hợp hoặc lựa chọn bỏ mã. |
 | Khách sửa giá/gói/số lượng | Kiểm tra lại mã đã chọn; nếu đang yêu cầu mã tốt nhất thì tính lại theo yêu cầu đó. |
 | Mã không đủ điều kiện đơn tối thiểu | Giải thích dựa trên công cụ; không tự tăng số lượng hoặc thêm dịch vụ. |
-| Mã giảm hết số tiền phải trả | Nêu giới hạn hiện tại: thanh toán qua agent yêu cầu số tiền lớn hơn 0. |
+| Mã giảm hết số tiền phải trả | Hệ thống ghi nhận thanh toán 0đ sau xác nhận; không yêu cầu chuyển khoản hoặc trừ tiền ví. |
 | Khách muốn đổi mã trên đơn đã tạo hoặc đã có giao dịch | Không sửa bản nháp cũ hoặc tạo lại đơn; hướng dẫn xem chức năng khả dụng trong chi tiết đơn. |
 | Khách hỏi hủy đơn có lấy lại mã không | Không bảo đảm; kiểm tra danh sách mã hiện tại và điều kiện còn hạn/còn lượt. |
 | Tra cứu mã lỗi | Giữ yêu cầu và thông tin vừa sửa; đưa nút kiểm tra lại hoặc không dùng voucher. Khách đã từ chối mã thì không chặn đặt đơn vì lỗi tra mã. |
@@ -52,11 +55,13 @@ Tài liệu đối chiếu với bản nháp, công cụ voucher, địa chỉ v
 | “Đặt cho mẹ” | Xác định địa chỉ, người nhận và điện thoại; không sửa hồ sơ của khách. |
 | “Đổi số điện thoại người nhận lần này” | Nêu rõ công cụ hiện sửa bản ghi trong sổ; không hứa thay tạm cho một lần. |
 | “Dùng địa chỉ khác” | Chọn/thêm địa chỉ mới; không sửa đè địa chỉ cũ nếu khách chưa yêu cầu. |
-| “Đừng lưu địa chỉ mới” | Giải thích luồng đặt hiện cần địa chỉ lưu; không tự lưu trái ý khách. |
+| “Đừng lưu địa chỉ mới” | Gửi `saveAddressToBook: false` vào bản nháp; địa chỉ chỉ gắn với đơn, không thêm vào sổ. Giữ lựa chọn qua các lần sửa; chỉ bật lưu lại khi khách yêu cầu. |
 | “Đặt tại vị trí hiện tại” hoặc gửi ảnh địa chỉ | Không tự lấy vị trí hoặc suy ra tọa độ từ ảnh; hướng dẫn chọn/ghim trong Hồ sơ. |
-| Tra tọa độ không chính xác | Yêu cầu bổ sung địa chỉ hoặc ghim bản đồ, không lưu tọa độ giả. |
+| Khách nhập tên trường/tòa nhà hoặc chỉ phường/xã, tỉnh/thành phố | Gửi `addressText` cho `save_booking_address`; hệ thống tự xác thực khu vực, không yêu cầu số nhà/tên đường. Địa chỉ mới chỉ được giữ tạm cho bản nháp, chỉ hiện form xác nhận đơn hàng có địa chỉ mới. Lưu địa chỉ và đơn trong cùng giao dịch sau xác nhận; lỗi hoặc từ chối đặt thì không lưu địa chỉ mới. |
+| Đổi địa chỉ khi đang có form đặt đơn | Vô hiệu form cũ, giữ dịch vụ/số lượng/lịch/thanh toán/voucher/yêu cầu thợ; kiểm tra lại rồi gửi form đặt đơn mới. Không có bước xác nhận lưu địa chỉ riêng. |
+| Tra tọa độ không chính xác | Ưu tiên vị trí tham chiếu phường/xã và ghi rõ. Khu vực hợp lệ vẫn được giữ tạm cho bản nháp nếu chưa có tọa độ; tra lại/chọn ghim trước khi tìm thợ, không lưu tọa độ giả. |
 | “Đặt ở đây nhưng giữ mặc định cũ” | Chọn địa chỉ cho bản nháp, giữ mặc định cũ. |
-| “Bỏ bản nháp/xóa địa chỉ vừa thêm” | Phân biệt hai thao tác; bỏ bản nháp không xóa địa chỉ. Chưa có công cụ xóa địa chỉ, hướng dẫn Hồ sơ. |
+| “Bỏ bản nháp/xóa địa chỉ vừa thêm” | Phân biệt hai thao tác; bỏ bản nháp bỏ địa chỉ tạm, không xóa địa chỉ có sẵn trong sổ. Chưa có công cụ xóa địa chỉ, hướng dẫn Hồ sơ. |
 | Sửa sổ địa chỉ khi đã có đơn | Không dùng thao tác sửa sổ để đổi nơi thực hiện của đơn; ưu tiên thêm địa chỉ mới. Không cam kết thông tin đơn cũ không bị ảnh hưởng; hướng dẫn kiểm tra chi tiết đơn hoặc hỗ trợ. |
 
 ## Nhiều yêu cầu trong cùng lượt
@@ -69,3 +74,28 @@ Tài liệu đối chiếu với bản nháp, công cụ voucher, địa chỉ v
 ## Kiểm tra
 
 Chạy `npx ts-node src/scripts/testAgentBookingExtras.ts` và `npx ts-node src/scripts/testAgentBookingVoucher.ts` tại `handigo-backend`. Các kiểm thử dùng dữ liệu giả lập; cần kiểm tra thêm hội thoại thật với LLM để đánh giá việc ánh xạ lời khách sang công cụ.
+
+## Kiểm tra P1 với model và môi trường thật
+
+`npx ts-node src/scripts/testAgentBookingP1.ts` kiểm tra các nút có dữ liệu cấu trúc khi model cố tình lỗi, đồng ý chính sách, giữ/khôi phục bản nháp, bước lỗi và hành động theo đúng đơn.
+
+`npx ts-node src/scripts/testAgentBookingConversations.ts --live` dùng model theo cấu hình tiến trình kiểm thử hiện có. Có thể thêm `--case=khong-dau` để chạy riêng một tình huống. Bộ chạy không tự tải tệp môi trường, không in khóa API và chỉ dùng dữ liệu nghiệp vụ giả lập; không kết nối database, tạo đơn hoặc thanh toán thật. Kết quả là từng dòng JSON gồm mã tình huống, kết quả, thời lượng và bước công cụ cuối khi lỗi. Lệnh thiếu `--live` báo chưa chạy và trả mã thoát khác 0 để phân biệt với đạt kiểm thử.
+
+Bộ hội thoại gồm câu không dấu, tên rút gọn, sửa nhiều trường, đổi ý liên tục, hai thợ trùng tên, đồng ý bằng lời và mở lại trạng thái đã lưu. Chạy bộ này chưa thay thế kiểm tra tài khoản CUSTOMER và các tích hợp thật bên dưới.
+
+| Mã | Tình huống trên môi trường kiểm thử | Kết quả cần đạt | Trạng thái ngày 16/10/2026 |
+| --- | --- | --- | --- |
+| P1-01 | Bấm sửa số lượng/địa chỉ/lịch/thanh toán/thợ khi model trả sai JSON | Đúng giá trị đã chọn, đúng thợ dù trùng tên; không tạo đơn | Đã kiểm tra bằng backend và trình duyệt giả lập |
+| P1-02 | Xem báo giá hoặc hoàn tiền khi AI không diễn giải được | Có kết quả nghiệp vụ, giữ nguyên bản nháp, không cộng khoản hoàn hai lần | Đã kiểm tra bằng giả lập |
+| P1-03 | Voucher cá nhân có loại giảm phí cọc; mã cũ thiếu loại | Theo loại backend, mã cũ vẫn theo mặc định; không trừ giảm hai lần | Đã kiểm tra logic backend; cần đối chiếu model thật |
+| P1-04 | Bỏ checkbox, gửi thiếu đồng ý hoặc dùng phiên bản cũ | Backend chặn; thay đổi chính sách/form yêu cầu xác nhận mới | Đã kiểm tra bằng giả lập |
+| P1-05 | Đặt lại đơn B khi đang soạn A, chọn giữ/chuyển/quay lại | Không mất địa chỉ tạm, ảnh, lịch, số lượng, thanh toán; chưa tạo đơn | Đã kiểm tra logic backend; cần đối chiếu dữ liệu thật |
+| P1-06 | Thợ A bận, thợ B rảnh cùng giờ | Không báo A rảnh; không tự thay người; chưa giữ chỗ | Đã kiểm tra bộ lọc thợ/thời lượng bằng giả lập; cần lịch thật |
+| P1-07 | Đang xem B trong khi phiên giữ bản nháp/đơn A | Nút ghi rõ mã B, đúng thao tác theo trạng thái mới; câu mơ hồ phải hỏi lại | Đã kiểm tra logic và giao diện giả lập |
+| P1-08 | Ngắt kết nối sau checkpoint, gửi lại đúng request | Tiếp tục từ kết quả đã lưu, không sửa/tạo đơn hoặc thu tiền lặp | Đã kiểm tra logic khôi phục và thử lại trên trình duyệt |
+| P1-09 | Mở hai tab, sửa bản nháp ở tab A rồi gửi lựa chọn cũ từ B | Từ chối phiên bản cũ, không ghi đè thay đổi ở A | Đã kiểm tra phiên bản trên backend; cần đối chiếu hai tab thật |
+| P1-10 | Mất mạng khi thanh toán PayOS/ví, sau đó mở lại chat | Đối soát đúng đơn, không tự chạy lại giao dịch hoặc đổi phương thức | Đã kiểm tra bằng giả lập; chưa chạy cổng thanh toán kiểm thử |
+| P1-11 | Chạy hội thoại bằng model thật với các cách diễn đạt | Đối chiếu giá trị bản nháp, bước công cụ và điều kiện không ghi/thu tiền | Chưa chạy; cần cấu hình model của tiến trình kiểm thử |
+| P1-12 | Mở lại phiên thật, thay trạng thái đơn qua thợ và nhận realtime | Nút hành động được tải lại từ backend, không dựa vào thẻ lịch sử cũ | Chưa chạy; cần môi trường và tài khoản kiểm thử |
+
+Khi thực hiện P1-11/P1-12, ghi thêm môi trường, model, mã tình huống, kết quả mong đợi/thực tế và bước lỗi. Không đưa mật khẩu, token, khóa API hoặc dữ liệu khách thật vào báo cáo.

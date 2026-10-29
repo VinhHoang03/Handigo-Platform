@@ -5,7 +5,7 @@ const ts = require('typescript');
 const { Types } = require('mongoose');
 const { calculateRefundPolicy } = require('../services/refundPolicy.service');
 const { ActionPreconditionError } = require('../utils/actionPreconditionError');
-const { cancelOrderSchema, cancelRecurringSeriesSchema } = require('../validations/order.validator');
+const { cancelOrderSchema } = require('../validations/order.validator');
 
 // Chạy nguyên hàm giao dịch hủy với database và dịch vụ tiền được cô lập.
 const source = fs.readFileSync(require.resolve('../services/orderCancellation.service'), 'utf8');
@@ -23,6 +23,9 @@ let ledger = [];
 let settled = [];
 let notified = [];
 let active = false;
+let conflictOrderId = null;
+let conflictsRemaining = 0;
+let afterRollback = null;
 const actorId = String(new Types.ObjectId());
 const session = {
   withTransaction: async callback => {
@@ -30,13 +33,19 @@ const session = {
     const previousLedger = [...ledger];
     active = true;
     try { return await callback(); }
-    catch (error) { orders.forEach((order, index) => { for (const key of Object.keys(order)) delete order[key]; Object.assign(order, snapshots[index]); }); ledger = previousLedger; throw error; }
+    catch (error) {
+      orders.forEach((order, index) => { for (const key of Object.keys(order)) delete order[key]; Object.assign(order, snapshots[index]); });
+      ledger = previousLedger;
+      if (afterRollback) { const callback = afterRollback; afterRollback = null; callback(); }
+      throw error;
+    }
     finally { active = false; }
   },
   endSession: async () => {},
 };
 const context = {
   exports: {}, Types, Date, AppError: require('../utils/appError').AppError, ActionPreconditionError,
+  withTransactionRetry: require('../utils/transaction').withTransactionRetry,
   mongoose: { startSession: async () => session }, CANCELLABLE_STATUSES: ['created', 'accepted'],
   assertObjectId: value => assert.equal(Types.ObjectId.isValid(value), true),
   assertCancellationAccess: async order => assert.equal(String(order.customerId), actorId),
@@ -53,15 +62,20 @@ const context = {
     },
     findOneAndUpdate: async (query, update, options) => {
       assert.equal(active, true); assert.equal(options.session, session);
+      if (String(query._id) === conflictOrderId && conflictsRemaining-- > 0) {
+        throw Object.assign(new Error('Xung đột ghi giả lập'), { code: 112, codeName: 'WriteConflict' });
+      }
       const order = orders.find(item => String(item._id) === String(query._id) && item.status === query.status);
       return order ? Object.assign(order, update.$set) : null;
     },
   },
   OrderAssignment: { updateMany: async () => {} }, Payment: { updateMany: async () => {} },
   Provider: { updateOne: async () => {} }, releaseVoucherReservation: async () => {}, releaseOrderPromotion: async () => {},
+  Voucher: { updateOne: async (_filter, _update, options) => { assert.equal(options.session, session); } },
   refundWalletPayments: async order => { ledger.push({ orderId: String(order._id), refund: order.cancellation.refundPolicy.refundAmount }); return []; },
   compensateProviderPayments: async order => { ledger.push({ orderId: String(order._id), compensation: order.cancellation.refundPolicy.providerCompensation }); },
   refreshCancelledOrderPaymentStatus: async () => {},
+  prepareArrivalCancellationSettlement: async () => {},
   settleCancelledOrderPayments: async id => { assert.equal(active, false); settled.push(id); },
   notifyCancellation: async order => { assert.equal(active, false); notified.push(String(order._id)); },
   emitToUser: () => { assert.equal(active, false); },
@@ -81,7 +95,6 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
 (async () => {
   assert.equal(cancelOrderSchema.parse({ reason: 'Thay đổi lịch', confirmedExpectation: fullRefund }).confirmedExpectation.refundAmount, 40000);
   assert.equal(cancelOrderSchema.safeParse({ reason: 'Thay đổi lịch', confirmedExpectation: { ...fullRefund, refundAmount: -1 } }).success, false);
-  assert.equal(cancelRecurringSeriesSchema.safeParse({ reason: 'Thay đổi lịch', confirmedExpectations: [{ orderId: String(new Types.ObjectId()), ...fullRefund }] }).success, true);
   orders = [makeOrder(true)];
   await assert.rejects(cancelOrderWithSettlement(input(orders[0], fullRefund)), error => error instanceof ActionPreconditionError);
   assert.equal(orders[0].status, 'accepted');
@@ -111,5 +124,23 @@ const input = (order, confirmedExpectation) => ({ orderId: String(order._id), ac
   await cancelOrderWithSettlement({ ...timeoutInput, orderId: String(orders[0]._id) });
   assert.equal(orders[0].status, 'accepted', 'Thợ mới đã nhận thì không hủy bởi tác vụ hết hạn tìm kiếm.');
   assert.equal(ledger.length, 0);
-  console.log('Đã kiểm tra xác nhận tiền hoàn, chặn dữ liệu cũ, xác nhận lại và hoàn tác cả chuỗi lịch.');
+  orders = [makeOrder(false), makeOrder(false)]; ledger = []; settled = []; notified = [];
+  conflictOrderId = String(orders[1]._id); conflictsRemaining = 2;
+  await cancelOrdersWithSettlement(orders.map(order => input(order, fullRefund)));
+  assert.equal(orders.every(order => order.status === 'cancelled'), true);
+  assert.equal(ledger.filter(entry => entry.refund !== undefined).length, 2, 'Thử lại toàn bộ transaction không hoàn ví trùng');
+  assert.equal(settled.length, 2, 'Chỉ quyết toán sau transaction thành công');
+  assert.equal(notified.length, 2, 'Không gửi thông báo trong các lượt rollback');
+  orders = [makeOrder(false)]; ledger = []; settled = []; notified = [];
+  conflictOrderId = String(orders[0]._id); conflictsRemaining = 1;
+  afterRollback = () => { orders[0].status = 'accepted'; orders[0].providerId = new Types.ObjectId(); };
+  await cancelOrderWithSettlement({ ...timeoutInput, orderId: conflictOrderId });
+  assert.equal(orders[0].status, 'accepted', 'Đọc lại trạng thái sau xung đột; không hủy đơn thợ vừa nhận.');
+  assert.equal(ledger.length, 0); assert.equal(settled.length, 0); assert.equal(notified.length, 0);
+  orders = [makeOrder(false), makeOrder(false)]; ledger = []; settled = []; notified = [];
+  conflictOrderId = String(orders[1]._id); conflictsRemaining = 3;
+  await assert.rejects(cancelOrdersWithSettlement(orders.map(order => input(order, fullRefund))), error => error.code === 112);
+  assert.equal(orders.every(order => order.status === 'created'), true, 'Hết lượt retry phải hoàn tác toàn bộ giao dịch.');
+  assert.equal(ledger.length, 0); assert.equal(settled.length, 0); assert.equal(notified.length, 0);
+  console.log('Đã kiểm tra xác nhận tiền hoàn, chặn dữ liệu cũ, xác nhận lại và hoàn tác giao dịch nhiều đơn.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

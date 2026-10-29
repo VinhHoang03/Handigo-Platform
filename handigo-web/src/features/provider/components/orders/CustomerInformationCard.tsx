@@ -2,7 +2,7 @@ import { InitialsAvatar } from '@/components/common/InitialsAvatar';
 import { ReliableImage } from '@/components/common/ReliableImage';
 import { normalizeImageUrl } from '@/utils/imageUrl';
 import type { Order } from '@/types/booking';
-import { formatDateTime, getCustomer } from '../../utils/providerOrder.utils';
+import { formatDateTime, getCustomer, getOrderRecipient } from '../../utils/providerOrder.utils';
 import { CardTitle } from './CardTitle';
 import { CalendarDays, MapPin, Phone, Ticket, User, Wrench } from "lucide-react";
 interface CustomerInformationCardProps {
@@ -10,6 +10,7 @@ interface CustomerInformationCardProps {
   customer: ReturnType<typeof getCustomer>;
   addressLine: string;
   orderType: string;
+  showOrderDetails?: boolean;
 }
 
 export function CustomerInformationCard({
@@ -17,13 +18,20 @@ export function CustomerInformationCard({
   customer,
   addressLine,
   orderType,
+  showOrderDetails = true,
 }: CustomerInformationCardProps) {
+  const recipient = getOrderRecipient(order);
+  const contactPhone = customer?.phone?.trim()
+    || (order.addressSnapshot ? order.addressSnapshot.recipientPhone : order.addressId?.recipientPhone);
   const details = [
-    { icon: Phone, label: 'Số điện thoại', value: customer?.phone || 'Chưa cập nhật' },
+    { icon: User, label: 'Người liên hệ tại địa điểm', value: recipient.fullName },
+    { icon: Phone, label: 'Số điện thoại liên hệ', value: contactPhone || 'Chưa cập nhật' },
     { icon: MapPin, label: 'Địa chỉ thực hiện', value: addressLine || 'Chưa cập nhật' },
-    { icon: Wrench, label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
-    { icon: CalendarDays, label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },
-    { icon: Ticket, label: 'Mã đơn hàng', value: order.orderCode },
+    ...(showOrderDetails ? [
+      { icon: Wrench, label: 'Loại dịch vụ', value: order.serviceId?.name || 'Chưa cập nhật' },
+      { icon: CalendarDays, label: 'Thời gian đặt lịch', value: formatDateTime(order.scheduledAt || order.createdAt) },
+      { icon: Ticket, label: 'Mã đơn hàng', value: order.orderCode },
+    ] : []),
   ];
 
   return (
@@ -37,7 +45,7 @@ export function CustomerInformationCard({
           rounded="rounded-2xl"
         />
         <div className="min-w-0">
-          <p className="text-xs font-medium text-on-surface-variant">Khách hàng</p>
+          <p className="text-xs font-medium text-on-surface-variant">Người đặt dịch vụ</p>
           <p className="truncate text-lg font-bold text-on-surface">{customer?.fullName || 'Khách hàng'}</p>
           <span className="mt-1 inline-flex rounded-full bg-surface-container-lowest px-2 py-0.5 text-[11px] font-semibold text-primary">{orderType}</span>
         </div>
@@ -53,12 +61,12 @@ export function CustomerInformationCard({
           </div>
         ))}
       </div>
-      {order.problemDescription && (
+      {showOrderDetails && order.problemDescription && (
         <div className="mt-md rounded-2xl bg-surface-container-low p-3 text-sm">
           <p className="whitespace-pre-wrap text-on-surface"><strong>Mô tả:</strong> {order.problemDescription}</p>
         </div>
       )}
-      {order.customerAttachments?.length ? (
+      {showOrderDetails && order.customerAttachments?.length ? (
         <div className="mt-md">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-on-surface-variant">Ảnh mô tả</p>
           <div className="grid grid-cols-3 gap-2">

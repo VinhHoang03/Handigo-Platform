@@ -23,7 +23,7 @@ export function ServiceFormModal({ open, mode, form, busy, onChange, onClose, on
     <Modal open={open} title={mode === 'edit' ? 'Sửa dịch vụ' : 'Thêm dịch vụ'} onClose={() => { if (!mediaBusy) onClose(); }} closeOnEsc={!mediaBusy} closeOnOverlayClick={!mediaBusy}>
       <form onSubmit={event => { if (mediaBusy) event.preventDefault(); else onSubmit(event); }} className="space-y-4">
         <FormInput label="Tên dịch vụ" name="service-name" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} />
-        <FormInput label="Slug" name="service-slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" />
+        <FormInput label="Đường dẫn định danh" name="service-slug" value={form.slug} onChange={(value) => onChange({ ...form, slug: value })} placeholder="Tự sinh nếu bỏ trống" />
         <ServiceImagesEditor coverImage={form.coverImage} galleryImages={form.galleryImages} disabled={busy} onBusyChange={setMediaBusy} onChange={(coverImage, galleryImages) => onChange({ ...form, coverImage, galleryImages })} />
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Loại giá</span>

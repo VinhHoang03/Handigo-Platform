@@ -57,7 +57,6 @@ interface CreateProviderApplicationPayload {
   description?: string;
   experienceYears?: number;
   serviceIds: string[];
-  workingAreas?: string[];
   identityDocument?: IdentityDocumentPayload;
   certificates?: CertificatePayload[];
 }
@@ -66,7 +65,6 @@ interface SaveProviderApplicationDraftPayload {
   description?: string;
   experienceYears?: number;
   serviceIds?: string[];
-  workingAreas?: string[];
   identityDocument?: Partial<IdentityDocumentPayload>;
   certificates?: Array<Partial<CertificatePayload>>;
   onboardingStep?: 1 | 2 | 3;
@@ -79,6 +77,8 @@ interface ReviewProviderApplicationPayload {
 }
 
 interface ApplicationQuery {
+  fromDate?: Date;
+  toDate?: Date;
   status?: string;
   keyword?: string;
   categoryId?: string;
@@ -377,14 +377,13 @@ export const createApplication = async (
 
   if (draftApplication) {
     const submittedAt = new Date();
-    if (!payload.identityDocument || !payload.workingAreas) {
+    if (!payload.identityDocument) {
       throw new AppError("Hồ sơ đăng ký provider chưa đầy đủ", 400);
     }
     draftApplication.applicationType = "initial";
     draftApplication.description = payload.description || "";
     draftApplication.experienceYears = payload.experienceYears || 0;
     draftApplication.serviceIds = serviceIds.map((id) => new Types.ObjectId(id));
-    draftApplication.workingAreas = payload.workingAreas;
     draftApplication.identityDocument = buildPendingIdentityDocument(payload.identityDocument);
     draftApplication.certificates = buildPendingCertificates(payload.certificates);
     draftApplication.status = "pending";
@@ -401,7 +400,7 @@ export const createApplication = async (
       occurredAt: submittedAt,
     });
     const savedApplication = await draftApplication.save();
-    if (user.role === "PROVIDER") {
+    if (user.providerOnboardingStatus || user.role === "PROVIDER") {
       user.providerOnboardingStatus = "PENDING_REVIEW";
       user.providerOnboardingStep = 3;
       await user.save();
@@ -420,7 +419,6 @@ export const createApplication = async (
     description: payload.description || "",
     experienceYears: payload.experienceYears || 0,
     serviceIds,
-    workingAreas: payload.workingAreas || [],
     identityDocument: payload.identityDocument
       ? buildPendingIdentityDocument(payload.identityDocument)
       : undefined,
@@ -437,7 +435,7 @@ export const createApplication = async (
       },
     ],
   });
-  if (applicationType === "initial" && user.role === "PROVIDER") {
+  if (applicationType === "initial" && (user.providerOnboardingStatus || user.role === "PROVIDER")) {
     user.providerOnboardingStatus = "PENDING_REVIEW";
     user.providerOnboardingStep = 3;
     await user.save();
@@ -514,7 +512,6 @@ export const saveDraftApplication = async (
       description: payload.description || "",
       experienceYears: payload.experienceYears ?? 0,
       serviceIds: serviceIds.map((id) => new Types.ObjectId(id)),
-      workingAreas: payload.workingAreas || [],
       identityDocument: buildDraftIdentityDocument(payload.identityDocument),
       certificates: buildDraftCertificates(payload.certificates),
       status: "draft",
@@ -525,10 +522,10 @@ export const saveDraftApplication = async (
       isDeleted: false,
       deletedAt: null,
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
   );
 
-  if (user.role === "PROVIDER") {
+  if (user.providerOnboardingStatus || user.role === "PROVIDER") {
     user.providerOnboardingStep = payload.onboardingStep || user.providerOnboardingStep || 1;
     await user.save();
   }
@@ -658,14 +655,13 @@ export const resubmitApplication = async (
   if (applicationType === "service_addition") {
     await assertNewProviderServices(userId, serviceIds);
   }
-  if (applicationType === "initial" && (!payload.identityDocument || !payload.workingAreas)) {
+  if (applicationType === "initial" && (!payload.identityDocument)) {
     throw new AppError("Hồ sơ đăng ký provider chưa đầy đủ", 400);
   }
 
   application.description = payload.description || "";
   application.experienceYears = payload.experienceYears || 0;
   application.serviceIds = serviceIds.map((id) => new Types.ObjectId(id));
-  application.workingAreas = payload.workingAreas || [];
   application.identityDocument = payload.identityDocument
     ? buildPendingIdentityDocument(payload.identityDocument)
     : undefined;
@@ -681,7 +677,7 @@ export const resubmitApplication = async (
   });
 
   await application.save();
-  if (applicationType === "initial" && user.role === "PROVIDER") {
+  if (applicationType === "initial" && (user.providerOnboardingStatus || user.role === "PROVIDER")) {
     user.providerOnboardingStatus = "PENDING_REVIEW";
     user.providerOnboardingStep = 3;
     await user.save();
@@ -698,6 +694,13 @@ export const resubmitApplication = async (
 export const getApplications = async (query: ApplicationQuery = {}) => {
   const { page, limit, skip } = getPagination(query);
   const filter: Record<string, unknown> = { isDeleted: false };
+
+  if (query.fromDate || query.toDate) {
+    filter.createdAt = {
+      ...(query.fromDate ? { $gte: query.fromDate } : {}),
+      ...(query.toDate ? { $lte: query.toDate } : {}),
+    };
+  }
 
   if (
     query.status &&
@@ -739,17 +742,31 @@ export const getApplications = async (query: ApplicationQuery = {}) => {
       : query.applicationType;
   }
 
-  const [items, total] = await Promise.all([
-    ProviderApplication.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
+  const [rankedItems, total] = await Promise.all([
+    ProviderApplication.aggregate<{ _id: Types.ObjectId }>([
+      { $match: filter },
+      { $project: { _id: 1, createdAt: 1, status: 1 } },
+      { $addFields: { reviewPriority: { $cond: [{ $in: ["$status", ["pending", "resubmitted"]] }, 0, 1] } } },
+      { $sort: { reviewPriority: 1, createdAt: -1, _id: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      { $project: { _id: 1 } },
+    ]),
+    ProviderApplication.countDocuments(filter),
+  ]);
+
+  const applications = rankedItems.length
+    ? await ProviderApplication.find({ ...filter, _id: { $in: rankedItems.map((item) => item._id) } })
       .populate("userId", "fullName email phone avatar role status")
       .populate(servicePopulate)
       .populate("reviewedBy", "fullName email")
-      .populate("reviewHistory.actorId", "fullName email role"),
-    ProviderApplication.countDocuments(filter),
-  ]);
+      .populate("reviewHistory.actorId", "fullName email role")
+    : [];
+  const applicationsById = new Map(applications.map((item) => [String(item._id), item]));
+  const items = rankedItems.flatMap((item) => {
+    const application = applicationsById.get(String(item._id));
+    return application ? [application] : [];
+  });
 
   return {
     items,
@@ -848,7 +865,7 @@ export const reviewApplication = async (
         await application.save({ session });
         if (!isServiceAddition) {
           await User.updateOne(
-            { _id: application.userId, role: "PROVIDER", isDeleted: false },
+            { _id: application.userId, role: { $in: ["CUSTOMER", "PROVIDER"] }, isDeleted: false },
             {
               $set: {
                 providerOnboardingStatus: "REJECTED",
@@ -910,7 +927,6 @@ export const reviewApplication = async (
             description: application.description,
             experienceYears: application.experienceYears,
             serviceIds: application.serviceIds,
-            workingAreas: application.workingAreas,
             identityDocument,
             certificates,
             availabilityStatus: "offline",

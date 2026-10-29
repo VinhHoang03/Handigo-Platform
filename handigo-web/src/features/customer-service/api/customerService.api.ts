@@ -18,11 +18,6 @@ export interface NearbyProvider {
     id: string;
     name: string;
   }>;
-  workingAreas: string[];
-  serviceArea?: {
-    province?: string;
-    ward?: string;
-  };
   availabilityStatus: "online" | "offline" | "busy";
   averageRating: number;
   totalFeedbacks: number;
@@ -63,11 +58,6 @@ export interface PublicProviderProfile {
         slug?: string;
       }>;
     }>;
-    workingAreas: string[];
-    serviceArea?: {
-      province?: string;
-      ward?: string;
-    };
     averageRating: number;
     totalFeedbacks: number;
     totalCompletedOrders: number;
@@ -113,7 +103,7 @@ export const customerServiceApi = {
 
   nearbyProviders: async (
     serviceId: string,
-    addressId: string,
+    addressId: string | undefined,
     scheduledAt?: string,
     recurrenceUnit?: "weekly" | "monthly",
     recurrenceCount?: number,

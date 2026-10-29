@@ -7,31 +7,34 @@ import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { Refund } from "../models/refund.model";
 import { SupportTicket } from "../models/supportTicket.model";
-import { Complaint } from "../models/complaint.model";
+import { Report } from "../models/report.model";
 import type { AgentSession } from "../ai/agent/agent-state";
+import type { SessionEngine } from "../ai/session/session.service";
+import type { AgentPaymentResult } from "./agentPayment.service";
 import { emitToUser } from "../sockets/socketServer";
 import { AppError } from "../utils/appError";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("AgentOrderProgress");
 const CURSOR_ID = "booking-progress";
+const intermediateRefundMessageId = /^order-event:refund:[a-f\d]{24}:(?:requested|processing|failed)$/i;
 const orderLabels: Record<string, string> = {
-  created: "Đã tạo đơn, đang chờ xử lý.", accepted: "Nhà cung cấp đã nhận đơn.",
-  in_progress: "Nhà cung cấp đang thực hiện dịch vụ.", completed: "Đơn hàng đã hoàn tất.",
+  created: "Đã tạo đơn, đang chờ xử lý.", accepted: "Thợ đã nhận đơn.",
+  in_progress: "Thợ đang thực hiện dịch vụ.", completed: "Đơn hàng đã hoàn tất.",
   cancelled: "Đơn hàng đã được hủy.",
 };
 const bookingLabels: Record<string, string> = {
-  awaiting_provider: "Đang chờ nhà cung cấp xác nhận lịch hẹn.",
-  awaiting_payment: "Nhà cung cấp đã nhận lịch hẹn. Vui lòng thanh toán để xác nhận lịch.",
+  awaiting_provider: "Đang chờ thợ xác nhận lịch hẹn.",
+  awaiting_payment: "Thợ đã nhận lịch. Vui lòng thanh toán để xác nhận.",
   reserved: "Lịch hẹn đang được giữ chỗ.", confirmed: "Lịch hẹn đã được xác nhận.",
-  rejected: "Thợ đã từ chối hoặc chưa phản hồi yêu cầu. Bạn có thể chọn thợ khác ngay trong chat.", expired: "Lịch hẹn đã hết thời hạn xác nhận.",
+  rejected: "Thợ đã từ chối hoặc chưa phản hồi. Bạn có thể chọn thợ khác.", expired: "Lịch hẹn đã hết thời hạn xác nhận.",
 };
 const paymentLabels: Record<string, string> = {
   unpaid: "Đơn hàng chưa thanh toán.", partially_paid: "Đã nhận thanh toán một phần của đơn hàng.",
   paid: "Đã thanh toán đơn hàng thành công.", refunded: "Đã hoàn tiền cho đơn hàng.",
 };
 const reassignmentLabels: Record<string, string> = {
-  awaiting_customer: "Đơn đang chờ bạn chọn thợ thay thế hoặc phản hồi yêu cầu đổi thợ ngay trong chat.",
+  awaiting_customer: "Vui lòng chọn thợ thay thế hoặc phản hồi yêu cầu đổi thợ.",
   matching: "Đang tìm kỹ thuật viên thay thế.", matched: "Đã tìm được kỹ thuật viên thay thế.",
   declined: "Bạn đã từ chối tìm kỹ thuật viên thay thế.", expired: "Yêu cầu đổi kỹ thuật viên đã hết hạn.",
   failed: "Chưa tìm được kỹ thuật viên thay thế.",
@@ -46,19 +49,27 @@ export function describeOrderProgress(fields: Record<string, unknown>) {
   };
   label("status", orderLabels);
   label("bookingStatus", bookingLabels);
-  label("paymentStatus", paymentLabels);
-  if (fields.depositPaidAt) lines.push("Đã nhận tiền cọc khảo sát.");
+  if (fields.paymentStatus !== "refunded") {
+    if (fields.depositPaidAt) lines.push("Đã thanh toán tiền cọc.");
+    else label("paymentStatus", paymentLabels);
+  }
+  if (fields.status === "cancelled") {
+    const cancellation = fields.cancellation as { reason?: unknown } | undefined;
+    const reason = fields["cancellation.reason"] ?? cancellation?.reason;
+    lines.push(`Lý do: ${typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 500) : "Chưa có thông tin."}`);
+  }
   if ("providerId" in fields) lines.push(fields.providerId
-    ? "Đã phân công nhà cung cấp cho đơn hàng." : "Đang tìm nhà cung cấp cho đơn hàng.");
-  if (fields.readyForMatching === true) lines.push("Đơn hàng đã sẵn sàng tìm nhà cung cấp.");
-  if (fields.currentQuotationId) lines.push("Nhà cung cấp đã gửi báo giá. Vui lòng xem trong chi tiết đơn hàng.");
+    ? "Đã phân công thợ cho đơn." : "Đang tìm thợ cho đơn.");
+  if (fields.readyForMatching === true) lines.push("Đơn đã sẵn sàng tìm thợ.");
+  if (fields.currentQuotationId) lines.push("Thợ đã gửi báo giá. Bạn có thể xem trong chi tiết đơn.");
   if (fields.scheduledAt) {
     const date = new Date(String(fields.scheduledAt));
-    if (Number.isFinite(date.getTime())) lines.push(`Lịch thực hiện: ${date.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}.`);
+    if (Number.isFinite(date.getTime())) lines.push(`Lịch thực hiện: ${date.toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })} lúc ${date.toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit" })}.`);
   }
   if (fields["confirmation.providerConfirmedAt"]) lines.push("Nhà cung cấp đã xác nhận hoàn thành dịch vụ.");
   if (fields["confirmation.customerConfirmedAt"]) lines.push("Bạn đã xác nhận hoàn thành dịch vụ.");
-  if (fields["overdueReview.escalatedAt"]) lines.push("Đơn hàng quá thời gian dự kiến và đang cần xác nhận tiến độ.");
+  const overdueReview = fields.overdueReview as { escalatedAt?: unknown } | null | undefined;
+  if (fields["overdueReview.escalatedAt"] || overdueReview?.escalatedAt) lines.push("Đơn hàng quá thời gian dự kiến và đang cần xác nhận tiến độ.");
   label("reassignment.status", reassignmentLabels);
   const confirmation = fields.confirmation as Record<string, unknown> | undefined;
   if (confirmation?.providerConfirmedAt) lines.push("Nhà cung cấp đã xác nhận hoàn thành dịch vụ.");
@@ -77,17 +88,55 @@ type Recipient = { sessionId: string; userId: string; orderId?: mongoose.Types.O
 
 async function deliver(subscription: Recipient,
   id: string, content: string, createdAt: Date,
-  choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>) {
-  const result = await AgentOrderMessage.updateOne({ _id: id }, { $setOnInsert: {
+  choiceGroups?: Array<{ label: string; multiple: boolean; options: string[] }>, replaceContent = false, expectedContent?: string) {
+  const value = {
     sessionId: subscription.sessionId, userId: subscription.userId,
     ...(subscription.orderId ? { orderId: subscription.orderId } : {}), content, createdAt,
     ...(choiceGroups?.length ? { choiceGroups } : {}),
-  } }, { upsert: true, runValidators: true });
-  if (result.upsertedCount) emitToUser(subscription.userId, "agent:order:message", {
+  };
+  const { content: updatedContent, choiceGroups: updatedChoices, ...identity } = value;
+  const result = await AgentOrderMessage.updateOne({ _id: id, ...(expectedContent !== undefined ? { content: expectedContent } : {}) }, replaceContent ? {
+    $setOnInsert: identity, $set: { content: updatedContent, ...(updatedChoices ? { choiceGroups: updatedChoices } : {}) },
+  } : { $setOnInsert: value }, { upsert: expectedContent === undefined, runValidators: true });
+  if (result.upsertedCount || replaceContent && result.modifiedCount) emitToUser(subscription.userId, "agent:order:message", {
     sessionId: subscription.sessionId,
     message: { _id: id, sender: "assistant", content, createdAt: createdAt.toISOString(),
       ...(choiceGroups?.length ? { choiceGroups } : {}) },
   });
+  return result;
+}
+
+async function updateBookingPayment(subscription: Recipient, orderId: string, message: string) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const initial = await AgentOrderMessage.findOne({ _id: `booking:${orderId}`, sessionId: subscription.sessionId,
+      userId: subscription.userId, orderId }).lean();
+    if (!initial) return false;
+    const succeeded = /Đã thanh toán (?:tiền cọc|thành công)|Đã thanh toán đơn hàng thành công|Đã nhận tiền cọc khảo sát/;
+    // Phản hồi chờ QR đến muộn không được ghi đè mốc thanh toán thành công từ webhook.
+    if (!succeeded.test(message) && succeeded.test(initial.content)) return true;
+    const lines = initial.content.split("\n").filter((line) => !Object.values(paymentLabels).includes(line)
+      && !/^(?:Đã (?:nhận|thanh toán) tiền cọc|Đã thanh toán thành công\.|Đang chờ thanh toán\.|Đã chọn tiền mặt)/.test(line));
+    lines.splice(2, 0, message);
+    const result = await deliver(subscription, initial._id, lines.join("\n"), initial.createdAt, initial.choiceGroups, true, initial.content);
+    if (result.matchedCount) return true;
+  }
+  return false;
+}
+
+// Gộp kết quả tự động vào tiến độ đơn; tra cứu bằng tin nhắn vẫn có phản hồi riêng.
+export async function combineAgentBookingPayment(session: AgentSession, result: unknown) {
+  const payment = result as AgentPaymentResult | undefined;
+  if (!payment?.orderId || !["paid", "deposit_paid", "pending", "cash_pending"].includes(payment.status)) return;
+  if (!session.conversation.some((item) => item.id === `booking:${payment.orderId}`)) return;
+  try {
+    const merged = await updateBookingPayment({ sessionId: session.id, userId: session.userId, createdAt: new Date() }, payment.orderId, payment.message);
+    if (!merged) return;
+    const reply = [...session.conversation].reverse().find((item) => item.role === "assistant"
+      && !item.id.startsWith("booking:") && !item.id.startsWith("order-event:")
+      && !item.confirmationActionId && !item.choiceGroups?.length && item.content === payment.message);
+    if (reply) session.conversation = session.conversation.filter((item) => item.id !== reply.id);
+    await mergeAgentOrderMessages(session);
+  } catch { logger.warn("Chưa gộp được thông báo đặt đơn và thanh toán; giữ phản hồi thanh toán trong phiên."); }
 }
 
 export async function orderProviderChoices(userId: string, orderId: string) {
@@ -131,18 +180,18 @@ export async function safelyTrackAgentCase(userId: string, sessionId: string, ca
   try {
     let owned = kind === "ticket"
       ? await SupportTicket.findOne({ _id: caseId, requesterId: userId, isDeleted: false }).lean()
-      : await Complaint.findOne({ _id: caseId, complainantId: userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
+      : await Report.findOne({ _id: caseId, reporterId: userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
     if (!owned) return;
     await AgentCaseSubscription.updateOne({ caseId, kind }, { $setOnInsert: { userId, sessionId, createdAt: owned.createdAt } },
       { upsert: true, runValidators: true });
     owned = kind === "ticket"
       ? await SupportTicket.findOne({ _id: caseId, requesterId: userId, isDeleted: false }).lean()
-      : await Complaint.findOne({ _id: caseId, complainantId: userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
+      : await Report.findOne({ _id: caseId, reporterId: userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
     if (!owned) return;
     // Nếu đăng ký trễ, bổ sung trạng thái/phản hồi hiện tại đã phát sinh trước khi theo dõi.
     if (owned.status !== (kind === "ticket" ? "open" : "pending")
       || ("responses" in owned && owned.responses.some((response) => response.responderRole === "ADMIN"))) {
-      await publishAgentOrderChange(snapshotChange(kind === "ticket" ? SupportTicket.collection.collectionName : Complaint.collection.collectionName,
+      await publishAgentOrderChange(snapshotChange(kind === "ticket" ? SupportTicket.collection.collectionName : Report.collection.collectionName,
         owned as unknown as Document));
     }
     await AgentCaseSubscription.updateOne({ caseId, kind, userId, sessionId }, { $set: { initializedAt: new Date() } },
@@ -170,15 +219,36 @@ export async function restoreAgentProgressTracking(session: AgentSession) {
   }
 }
 
+// Directory chỉ định nguồn đọc; kết quả graph phải lấy từ checkpoint, không dùng cache dự phòng.
+export async function restoreAgentSessionTracking(document: {
+  _id: string; userId: string; engine?: SessionEngine; deletedAt?: Date | null; data?: AgentSession;
+}, loadCustomerSession: (id: string, userId: string) => Promise<AgentSession> = async (id, userId) =>
+  (await (await import("../ai/runtime/graph-host")).getCustomerGraphHost()).get(id, userId)) {
+  if (document.deletedAt || document.engine === "langgraph-readonly") return;
+  const session = document.engine === "langgraph-customer"
+    ? await loadCustomerSession(document._id, document.userId) : document.data;
+  if (!session || session.id !== document._id || session.userId !== document.userId) {
+    throw new AppError("Nguồn phiên không khớp để khôi phục theo dõi tiến độ.", 409);
+  }
+  await restoreAgentProgressTracking(session);
+}
+
 export async function mergeAgentOrderMessages(session: AgentSession) {
+  // Ẩn thông báo trung gian cũ khỏi chat, giữ nguyên bản ghi lịch sử trong database.
+  session.conversation = session.conversation.filter((message) => message.role !== "assistant" || !intermediateRefundMessageId.test(message.id));
   try {
     const updates = await AgentOrderMessage.find({ sessionId: session.id, userId: session.userId })
       .sort({ createdAt: 1, _id: 1 }).lean();
-    const ids = new Set(session.conversation.map((message) => message.id));
-    for (const update of updates) if (!ids.has(update._id)) session.conversation.push({
-      id: update._id, role: "assistant", content: update.content, createdAt: update.createdAt.toISOString(),
-      ...(update.choiceGroups?.length ? { choiceGroups: update.choiceGroups } : {}),
-    });
+    const existing = new Map(session.conversation.map((message) => [message.id, message]));
+    for (const update of updates) {
+      if (intermediateRefundMessageId.test(update._id)) continue;
+      const previous = existing.get(update._id);
+      if (previous) { previous.content = update.content; previous.choiceGroups = update.choiceGroups; continue; }
+      session.conversation.push({
+        id: update._id, role: "assistant", content: update.content, createdAt: update.createdAt.toISOString(),
+        ...(update.choiceGroups?.length ? { choiceGroups: update.choiceGroups } : {}),
+      });
+    }
     session.conversation.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   } catch { logger.warn("Chưa thể nạp cập nhật tiến độ; kết quả thao tác trong phiên vẫn được giữ nguyên.", { sessionId: session.id }); }
   return session;
@@ -212,8 +282,8 @@ async function publishCaseChange(change: ChangeStreamDocument<Document>, doc: Do
   if (!recipient && doc.orderId) recipient = await AgentOrderSubscription.findOne({ orderId: doc.orderId }).lean();
   if (!recipient || (change.wallTime && change.wallTime < recipient.createdAt)) return;
   // Một đơn có thể có hồ sơ của cả thợ và khách; chỉ gửi hồ sơ do chính khách tạo.
-  if (String(ticket ? doc.requesterId : doc.complainantId) !== recipient.userId
-    || (!ticket && doc.complainantRole !== "CUSTOMER")) return;
+  if (String(ticket ? doc.requesterId : doc.reporterId) !== recipient.userId
+    || (!ticket && (doc.reporterRole !== "CUSTOMER" || doc.reportType !== "service_quality"))) return;
   if (doc.orderId && !await Order.exists({ _id: doc.orderId, customerId: recipient.userId, isDeleted: false })) return;
   const title = String(ticket ? doc.subject : doc.title).slice(0, 200);
   const lines: string[] = [];
@@ -222,7 +292,7 @@ async function publishCaseChange(change: ChangeStreamDocument<Document>, doc: Do
       waiting_user: "Bộ phận hỗ trợ đang chờ bạn phản hồi.", resolved: "Yêu cầu hỗ trợ đã được xử lý.",
       closed: "Yêu cầu hỗ trợ đã đóng.", cancelled: "Yêu cầu hỗ trợ đã hủy." }
     : { pending: "Đã tiếp nhận khiếu nại.", evidence_requested: "Khiếu nại cần bổ sung bằng chứng.",
-      under_review: "Khiếu nại đang được xem xét.", resolved: "Khiếu nại đã được xử lý.",
+      under_review: "Khiếu nại đang được xem xét.", resolved: "Báo cáo chất lượng dịch vụ đã được xử lý.", confirmed: "Báo cáo đã xác nhận vi phạm.",
       rejected: "Khiếu nại đã bị từ chối.", cancelled: "Khiếu nại đã hủy." };
   if (typeof fields.status === "string" && labels[fields.status]) lines.push(labels[fields.status]);
   for (const [key, label] of [["resolutionNote", "Kết quả xử lý"], ["requestedEvidenceNote", "Yêu cầu bổ sung"]]) {
@@ -250,7 +320,7 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
   const doc = change.fullDocument;
   if (!doc || doc.isDeleted) return;
   const fields = change.operationType === "update" ? change.updateDescription.updatedFields ?? {} : doc;
-  if ([SupportTicket.collection.collectionName, Complaint.collection.collectionName].includes(change.ns.coll)) {
+  if ([SupportTicket.collection.collectionName, Report.collection.collectionName].includes(change.ns.coll)) {
     await publishCaseChange(change, doc, fields);
     return;
   }
@@ -260,36 +330,57 @@ export async function publishAgentOrderChange(change: ChangeStreamDocument<Docum
   const subscription = await AgentOrderSubscription.findOne({ orderId }).lean();
   if (!subscription || (change.wallTime && change.wallTime < subscription.createdAt)) return;
   const order = await Order.findOne({ _id: orderId, customerId: subscription.userId, isDeleted: false })
-    .select("orderCode cancellation.refundPolicy").lean();
+    .select("orderCode status cancellation.reason cancellation.refundPolicy").lean();
   if (!order) return;
   let lines: string[] = [];
-  if (orderEvent) lines = describeOrderProgress(fields);
-  else if (change.ns.coll === Payment.collection.collectionName) {
-    if (fields.status === "paid") lines = [doc.paymentType === "inspection_deposit"
-      ? "Thanh toán tiền cọc khảo sát đã thành công."
-      : doc.paymentType === "remaining" ? "Thanh toán phần còn lại đã thành công." : "Giao dịch thanh toán đã thành công."];
-    if (fields.status === "refunded") {
-      const refund = doc.metadata?.refund;
-      lines = ["Giao dịch đã được hoàn tiền."];
-      if (money(refund?.amount)) lines.push(`Số tiền hoàn: ${money(refund.amount)}.`);
-      if (doc.method === "wallet" || refund?.destination === "handigo_wallet") lines.push("Nơi nhận tiền: ví Handigo.");
-      if (refund?.destination === "source_account") lines.push("Nơi nhận tiền: tài khoản nguồn thanh toán.");
+  if (orderEvent) {
+    // Thanh toán và hoàn tiền lấy từ giao dịch, tránh lặp cùng mốc từ Order.
+    const { paymentStatus: _payment, depositPaidAt: _deposit, ...progress } = fields;
+    if (progress.status === "cancelled" || order.status === "cancelled" && (fields.cancellation || fields["cancellation.reason"])) {
+      progress.status = "cancelled";
+      progress.cancellation = fields.cancellation ?? order.cancellation;
     }
-    if (fields.status === "failed") lines = ["Giao dịch thanh toán đã thất bại hoặc hết hạn. Vui lòng kiểm tra thanh toán trong chi tiết đơn hàng."];
-    if (change.operationType === "insert" && doc.status === "pending") lines = [doc.method === "cash"
-      ? "Đã ghi nhận phương thức tiền mặt. Bạn thanh toán trực tiếp cho nhà cung cấp sau khi sử dụng dịch vụ."
-      : "Giao dịch thanh toán đang chờ xử lý. Mình sẽ thông báo khi có kết quả."];
+    lines = describeOrderProgress(progress);
+    if (progress.status === "cancelled") {
+      await deliver(subscription, `order-event:cancelled:${orderId}`, `Cập nhật đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date(), undefined, true);
+      return;
+    }
+  } else if (change.ns.coll === Payment.collection.collectionName) {
+    if (fields.status === "paid") {
+      const message = doc.paymentType === "inspection_deposit"
+        ? "Đã thanh toán tiền cọc. Chi phí sau khảo sát trả trực tiếp cho thợ."
+        : doc.paymentType === "remaining" ? "Thanh toán phần còn lại đã thành công." : "Đã thanh toán thành công.";
+      if (doc.paymentType !== "remaining" && await updateBookingPayment(subscription, String(orderId), message)) return;
+      await deliver(subscription, `order-event:payment:${doc._id}:paid`, `Cập nhật đơn ${order.orderCode}:\n${message}`, change.wallTime ?? new Date());
+      return;
+    }
+    if (fields.status === "refunded") {
+      // Chung ID với Refund theo paymentId; bản đầy đủ từ Refund sẽ bổ sung vào cùng tin.
+      const refund = doc.metadata?.refund;
+      lines = describeRefundProgress({ amount: refund?.amount,
+        destination: refund?.destination ?? (doc.method === "wallet" ? "handigo_wallet" : undefined) }, "succeeded");
+      await deliver(subscription, `order-event:refund:${doc._id}:succeeded`, `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date());
+      return;
+    }
+    if (fields.status === "failed" && doc.metadata?.customerCancelledQr !== true
+      && doc.failureReason === "Đã hủy PayOS để đổi phương thức thanh toán") return;
+    if (fields.status === "failed") lines = [doc.metadata?.customerCancelledQr === true
+      ? "Đã hủy giao dịch QR thanh toán. Đơn hàng được giữ theo thời hạn hiện tại; bạn có thể chọn thanh toán lại."
+      : "Giao dịch thanh toán đã thất bại hoặc hết hạn. Vui lòng kiểm tra thanh toán trong chi tiết đơn hàng."];
+    if (change.operationType === "insert" && doc.status === "pending") {
+      const message = doc.method === "cash" ? "Đã chọn tiền mặt, chưa thanh toán. Bạn trả trực tiếp cho thợ." : "Đang chờ thanh toán.";
+      if (await updateBookingPayment(subscription, String(orderId), message)) return;
+      lines = [message];
+    }
   } else if (change.ns.coll === Refund.collection.collectionName) {
     if (String(doc.customerId) !== subscription.userId) return;
+    // Khách chỉ cần kết quả cuối hoặc mốc cần hỗ trợ; không phát từng lần xử lý/thử lại.
+    if (!["succeeded", "manual_review"].includes(String(fields.status))) return;
     lines = describeRefundProgress(doc, fields.status);
     if (!lines.length) return;
-    const policy = order.cancellation?.refundPolicy;
-    if (policy && fields.status === "requested") {
-      lines.push(`Đã thanh toán: ${money(policy.paidAmount)}. Phí hủy: ${money(policy.cancellationFee)}.`);
-    }
-    const stage = ["requesting", "pending"].includes(String(fields.status)) ? "processing" : String(fields.status);
-    await deliver(subscription, `order-event:refund:${doc._id}:${stage}`,
-      `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date());
+    const stage = String(fields.status);
+    await deliver(subscription, `order-event:refund:${stage === "succeeded" ? doc.paymentId ?? doc._id : doc._id}:${stage}`,
+      `Cập nhật hoàn tiền đơn ${order.orderCode}:\n${lines.join("\n")}`, change.wallTime ?? new Date(), undefined, stage === "succeeded");
     return;
   } else if (change.ns.coll === RepairQuotation.collection.collectionName) {
     const labels: Record<string, string> = { pending: "Có báo giá mới đang chờ bạn xác nhận.",
@@ -323,24 +414,31 @@ function snapshotChange(collection: string, doc: Document): ChangeStreamDocument
 async function recoverOrderDetails(userId: string, orderId: string) {
   const refunds = await Refund.find({ orderId, customerId: userId, isDeleted: false }).lean();
   for (const refund of refunds) await publishAgentOrderChange(snapshotChange(Refund.collection.collectionName, refund));
+  // Hoàn về ví và giao dịch cũ có thể chỉ lưu trên Payment, không có bản ghi Refund.
+  const refundedPayments = await Payment.find({ orderId, customerId: userId, status: "refunded", isDeleted: false }).lean();
+  for (const payment of refundedPayments) await publishAgentOrderChange(snapshotChange(Payment.collection.collectionName, payment));
   const tickets = await SupportTicket.find({ orderId, requesterId: userId, isDeleted: false }).lean();
   for (const ticket of tickets) await publishAgentOrderChange(snapshotChange(SupportTicket.collection.collectionName, ticket));
-  const complaints = await Complaint.find({ orderId, complainantId: userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
-  for (const complaint of complaints) await publishAgentOrderChange(snapshotChange(Complaint.collection.collectionName, complaint));
+  const complaints = await Report.find({ orderId, reporterId: userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
+  for (const complaint of complaints) await publishAgentOrderChange(snapshotChange(Report.collection.collectionName, complaint));
 }
 
 async function restoreSavedTracking() {
   if (restoring || !running) return;
   restoring = true;
   try {
-    // Kết quả thành công trong checkpoint là nguồn bền vững để thử lại sau restart.
+    // Cache graph có thể cũ sau crash; luôn nạp checkpoint cho các phiên nghiệp vụ còn hiệu lực.
     const sessions = mongoose.models.AiAgentSession;
     if (!sessions) return;
-    for await (const document of sessions.find({ "data.actions": { $elemMatch: {
-      tool: { $in: ["create_booking", "create_support_ticket", "create_complaint"] }, status: "SUCCEEDED",
-    } } }).select("data").lean().cursor()) {
+    for await (const document of sessions.find({ deletedAt: null, $or: [
+      { engine: "langgraph-customer" },
+      { engine: { $in: [null, "legacy"] }, "data.actions": { $elemMatch: {
+        tool: { $in: ["create_booking", "create_support_ticket", "create_complaint"] }, status: "SUCCEEDED",
+      } } },
+    ] }).select("userId engine deletedAt data").lean().cursor()) {
       if (!running) break;
-      await restoreAgentProgressTracking(document.data as AgentSession);
+      try { await restoreAgentSessionTracking(document); }
+      catch { logger.warn("Chưa thể khôi phục theo dõi của một phiên; sẽ thử lại ở chu kỳ tiếp theo."); }
     }
   } catch { logger.warn("Chưa thể khôi phục đăng ký theo dõi; sẽ thử lại ở chu kỳ tiếp theo."); }
   finally { restoring = false; }
@@ -359,9 +457,9 @@ async function recoverProgress() {
   for await (const subscription of AgentCaseSubscription.find().cursor()) {
     const item = subscription.kind === "ticket"
       ? await SupportTicket.findOne({ _id: subscription.caseId, requesterId: subscription.userId, isDeleted: false }).lean()
-      : await Complaint.findOne({ _id: subscription.caseId, complainantId: subscription.userId, complainantRole: "CUSTOMER", isDeleted: false }).lean();
+      : await Report.findOne({ _id: subscription.caseId, reporterId: subscription.userId, reporterRole: "CUSTOMER", reportType: "service_quality", isDeleted: false }).lean();
     if (item) await publishAgentOrderChange(snapshotChange(subscription.kind === "ticket"
-      ? SupportTicket.collection.collectionName : Complaint.collection.collectionName, item));
+      ? SupportTicket.collection.collectionName : Report.collection.collectionName, item));
   }
   await AgentOrderCursor.deleteOne({ _id: CURSOR_ID });
 }
@@ -374,7 +472,7 @@ async function watchProgress() {
     // Change stream chỉ phát sự kiện sau khi transaction commit, kể cả thanh toán qua webhook.
     const active = db.watch([{ $match: {
       "ns.coll": { $in: [Order.collection.collectionName, Payment.collection.collectionName, RepairQuotation.collection.collectionName,
-        Refund.collection.collectionName, SupportTicket.collection.collectionName, Complaint.collection.collectionName] },
+        Refund.collection.collectionName, SupportTicket.collection.collectionName, Report.collection.collectionName] },
       operationType: { $in: ["insert", "update", "replace"] },
     } }], { fullDocument: "updateLookup", ...(cursor ? { resumeAfter: cursor.token as ResumeToken } : {}) });
     stream = active;

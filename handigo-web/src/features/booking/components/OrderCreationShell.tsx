@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { Navbar } from '@/components/common/Navbar';
 import styles from './OrderCreationShell.module.css';
+import { RebookingNotice } from './RebookingNotice';
 
 interface OrderCreationShellProps {
   children: ReactNode;
@@ -11,6 +12,7 @@ export const OrderCreationShell: React.FC<OrderCreationShellProps> = ({ children
     <Navbar role="CUSTOMER" />
     <main id="main-content" className={`${styles.content} relative min-h-dvh pb-10 pt-28 text-body-md`}>
       <div className="mx-auto max-w-[1200px] space-y-6 px-4 sm:px-5 lg:px-8">
+        <RebookingNotice />
         {children}
       </div>
     </main>

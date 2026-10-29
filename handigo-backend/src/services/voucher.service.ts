@@ -9,6 +9,7 @@ import { Voucher } from "../models/voucher.model";
 import { VoucherUsage } from "../models/voucherUsage.model";
 import { findStoredVoucher, listStoredVouchers, updateStoredVoucher } from "./voucherStore.service";
 import { AppError } from "../utils/appError";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 import type {
   AdminVoucherQuery,
   ApplyVoucherInput,
@@ -80,6 +81,7 @@ export const resolveVoucherForAmount = async (
   inspectionRequired?: boolean,
 ) => {
   const normalizedCode = normalizeCode(code);
+  if (customerId) await assertFeatureAllowed(customerId, "voucher", session);
   const promotion = await findStoredVoucher({ code: normalizedCode }, session);
 
   if (!promotion) {
@@ -127,7 +129,7 @@ const assertVoucherOrderType = (promotion: IPromotion, inspectionRequired?: bool
     (applicableOrderType === "variable_price") !== inspectionRequired)) {
     throw new AppError(applicableOrderType === "variable_price"
       ? "Mã giảm phí cọc chỉ áp dụng cho đơn báo giá."
-      : "Mã đổi điểm này chỉ áp dụng cho đơn giá cố định.", 400);
+      : "Mã giảm giá này chỉ áp dụng cho đơn giá cố định.", 400);
   }
 };
 

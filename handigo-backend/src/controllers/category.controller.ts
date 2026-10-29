@@ -7,7 +7,7 @@ export const listCategories = async (
   next: NextFunction,
 ) => {
   try {
-    const data = await categoryService.listCategories(req.query);
+    const data = await categoryService.listCategories(req.query, req.user?.role === "ADMIN");
     return res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -21,7 +21,7 @@ export const getCategoryById = async (
 ) => {
   try {
     const category = await categoryService.getCategoryById(
-      req.params.id as string,
+      req.params.id as string, req.user?.role === "ADMIN",
     );
     res.json({ success: true, data: category });
   } catch (error) {
@@ -115,7 +115,7 @@ export const deleteCategory = async (
     res.json({
       success: true,
       data: null,
-      message: "Category deleted successfully",
+      message: "Đã ngừng hoạt động danh mục",
     });
   } catch (error) {
     next(error);

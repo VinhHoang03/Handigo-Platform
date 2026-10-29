@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { ClientSession, Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import { Conversation } from "../models/conversation.model";
 import { Feedback } from "../models/feedback.model";
@@ -11,10 +11,16 @@ import {
   ReportType,
 } from "../models/report.model";
 import User from "../models/user.model";
+import { reviewCustomerNoShowReport } from "./customerNoShow.service";
+import { getAdminNoShowDetails } from "./customerNoShowVerification.service";
+import { getServiceQualityReportContext } from "./reportQuality.service";
+import { withTransactionRetry } from "../utils/transaction";
+import { createReportSchema, addReportEvidenceSchema, requestReportEvidenceSchema, reviewReportSchema } from "../validations/report.validator";
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 
-interface Query {
+export interface Query {
+  orderId?: string;
   page?: string | number;
   limit?: string | number;
   status?: string;
@@ -23,7 +29,7 @@ interface Query {
   keyword?: string;
 }
 
-interface EvidenceFilePayload {
+export interface EvidenceFilePayload {
   fileType: "image" | "video" | "file";
   url: string;
   mimeType?: string | null;
@@ -82,65 +88,57 @@ const resolveReportTarget = async (
   role: UserRole,
   payload: CreateReportPayload,
 ) => {
-  let targetUserId = payload.targetUserId ? new Types.ObjectId(payload.targetUserId) : null;
-  let orderId = payload.orderId ? new Types.ObjectId(payload.orderId) : null;
-  let targetFeedbackId = payload.targetFeedbackId
-    ? new Types.ObjectId(payload.targetFeedbackId)
-    : null;
-  let conversationId = payload.conversationId ? new Types.ObjectId(payload.conversationId) : null;
+  let targetUserId: Types.ObjectId | null = null;
+  let orderId: Types.ObjectId | null = null;
+  let targetFeedbackId: Types.ObjectId | null = null;
+  let conversationId: Types.ObjectId | null = null;
 
-  if (targetUserId) {
-    await assertUserExists(targetUserId.toString());
-  }
-
-  if (payload.targetType === "provider" && !targetUserId && payload.targetProviderId) {
-    targetUserId = await resolveProviderUserId(payload.targetProviderId);
+  const provider = role === "PROVIDER" ? await getProviderByUserId(reporterId) : null;
+  if (role === "PROVIDER" && !provider) {
+    throw new AppError("Không tìm thấy hồ sơ thợ", 404);
   }
 
   if (payload.targetType === "user" || payload.targetType === "provider") {
-    if (!targetUserId) {
-      throw new AppError("Thiếu người dùng bị báo cáo", 400);
-    }
-  }
-
-  if (payload.targetType === "order") {
-    if (!orderId) throw new AppError("Thiếu đơn dịch vụ bị báo cáo", 400);
-    const order = await Order.findOne({ _id: orderId, isDeleted: false });
-    if (!order) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
-
-    if (role === "CUSTOMER" && order.customerId.toString() === reporterId) {
-      if (order.providerId) targetUserId = await resolveProviderUserId(order.providerId.toString());
-    } else if (role === "PROVIDER") {
-      const provider = await getProviderByUserId(reporterId);
-      if (!provider || order.providerId?.toString() !== provider._id.toString()) {
-        throw new AppError("Bạn không có quyền báo cáo đơn dịch vụ này", 403);
+    if (payload.targetProviderId) targetUserId = await resolveProviderUserId(payload.targetProviderId);
+    if (payload.targetUserId) {
+      await assertUserExists(payload.targetUserId);
+      if (targetUserId && targetUserId.toString() !== payload.targetUserId) {
+        throw new AppError("Người dùng và hồ sơ thợ bị báo cáo không khớp", 400);
       }
-      targetUserId = order.customerId;
-    } else {
-      throw new AppError("Chỉ khách hàng và thợ được tạo báo cáo", 403);
+      targetUserId = new Types.ObjectId(payload.targetUserId);
+    }
+    if (!targetUserId) throw new AppError("Thiếu người dùng bị báo cáo", 400);
+    if (payload.targetType === "provider" && !payload.targetProviderId) {
+      const targetProvider = await getProviderByUserId(targetUserId.toString());
+      if (!targetProvider) throw new AppError("Không tìm thấy hồ sơ thợ", 404);
     }
   }
 
   if (payload.targetType === "feedback") {
-    if (!targetFeedbackId) throw new AppError("Thiếu đánh giá bị báo cáo", 400);
-    const feedback = await Feedback.findOne({ _id: targetFeedbackId, isDeleted: false }).select(
-      "customerId orderId",
+    const feedback = await Feedback.findOne({
+      _id: payload.targetFeedbackId, isDeleted: false, isVisible: true,
+    }).select(
+      "customerId orderId providerId",
     );
     if (!feedback) throw new AppError("Không tìm thấy đánh giá", 404);
+    if (feedback.customerId.toString() !== reporterId &&
+      feedback.providerId.toString() !== provider?._id.toString()) {
+      throw new AppError("Bạn không có quyền báo cáo đánh giá này", 403);
+    }
     targetUserId = feedback.customerId;
     orderId = feedback.orderId;
+    targetFeedbackId = feedback._id;
   }
 
   if (payload.targetType === "chat_conversation") {
-    if (!conversationId) throw new AppError("Thiếu cuộc trò chuyện bị báo cáo", 400);
-    const conversation = await Conversation.findOne({ _id: conversationId, isDeleted: false });
+    const conversation = await Conversation.findOne({ _id: payload.conversationId, isDeleted: false });
     if (!conversation) throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
     orderId = conversation.orderId;
+    conversationId = conversation._id;
 
     if (role === "CUSTOMER" && conversation.customerId.toString() === reporterId) {
       targetUserId = await resolveProviderUserId(conversation.providerId.toString());
     } else if (role === "PROVIDER") {
-      const provider = await getProviderByUserId(reporterId);
       if (!provider || conversation.providerId.toString() !== provider._id.toString()) {
         throw new AppError("Bạn không có quyền báo cáo cuộc trò chuyện này", 403);
       }
@@ -148,6 +146,31 @@ const resolveReportTarget = async (
     } else {
       throw new AppError("Chỉ khách hàng và thợ được tạo báo cáo", 403);
     }
+  }
+
+  if (payload.orderId && orderId && payload.orderId !== orderId.toString()) {
+    throw new AppError("Đơn dịch vụ không khớp với tài nguyên bị báo cáo", 400);
+  }
+  orderId = orderId ?? (payload.orderId ? new Types.ObjectId(payload.orderId) : null);
+  if (orderId) {
+    const order = await Order.findOne({ _id: orderId, isDeleted: false });
+    if (!order) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
+    let participantId: Types.ObjectId | null = null;
+    if (role === "CUSTOMER" && order.customerId.toString() === reporterId) {
+      if (order.providerId) participantId = await resolveProviderUserId(order.providerId.toString());
+    } else if (provider && order.providerId?.toString() === provider._id.toString()) {
+      participantId = order.customerId;
+    } else {
+      throw new AppError("Bạn không có quyền báo cáo đơn dịch vụ này", 403);
+    }
+    if (targetUserId && targetUserId.toString() !== participantId?.toString()) {
+      throw new AppError("Đối tượng bị báo cáo không thuộc ngữ cảnh đơn dịch vụ", 400);
+    }
+    targetUserId = participantId;
+  }
+
+  if (payload.targetUserId && payload.targetUserId !== targetUserId?.toString()) {
+    throw new AppError("Người dùng không khớp với đối tượng bị báo cáo", 400);
   }
 
   if (targetUserId?.toString() === reporterId) {
@@ -172,22 +195,46 @@ const populateReport = () => [
   { path: "orderId", select: "orderCode status" },
   { path: "targetFeedbackId", select: "rating comment images providerReply" },
   { path: "handledBy", select: "fullName email" },
+  { path: "reviewedBy", select: "fullName email" },
+  { path: "evidenceFiles.uploadedBy", select: "fullName email avatar role" },
   { path: "createdViolationId", select: "violationType severity penaltyType status" },
 ];
+
+const populateReportForUser = async (reporterId: string) => {
+  const provider = await getProviderByUserId(reporterId);
+  const participants: Record<string, unknown>[] = [{ customerId: reporterId }];
+  if (provider) participants.push({ providerId: provider._id });
+  return populateReport().map((entry) => {
+    if (entry.path === "orderId") {
+      return { ...entry, match: { isDeleted: false, $or: participants } };
+    }
+    if (entry.path === "targetFeedbackId") {
+      return { ...entry, match: { isDeleted: false, isVisible: true, $or: participants } };
+    }
+    return entry;
+  });
+};
 
 export const createReport = async (
   reporterId: string,
   role: UserRole,
   payload: CreateReportPayload,
+  resourceId?: Types.ObjectId,
 ) => {
   assertObjectId(reporterId, "User id");
   if (!["CUSTOMER", "PROVIDER"].includes(role)) {
     throw new AppError("Chỉ khách hàng và thợ được tạo báo cáo", 403);
   }
 
+  const parsed = createReportSchema.safeParse(payload);
+  if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+  payload = parsed.data;
+
   const target = await resolveReportTarget(reporterId, role, payload);
 
-  const report = await Report.create({
+  const create = (session?: ClientSession) => Report.create([{
+    ...(resourceId ? { _id: resourceId } : {}),
+    reporterRole: role as "CUSTOMER" | "PROVIDER",
     reporterId,
     targetType: payload.targetType,
     targetUserId: target.targetUserId,
@@ -199,9 +246,23 @@ export const createReport = async (
     description: payload.description,
     evidenceImages: payload.evidenceImages ?? [],
     evidenceFiles: normalizeEvidenceFiles(payload.evidenceFiles),
-  });
+  }], { session });
 
-  return Report.findById(report._id).populate(populateReport());
+  const reportId = payload.reportType === "service_quality"
+    ? await withReportTransaction(async (session) => {
+      const order = await Order.findOneAndUpdate(
+        { _id: payload.orderId, isDeleted: false }, { $inc: { __v: 1 } },
+        { session, new: true, runValidators: true },
+      );
+      if (!order) throw new AppError("Không tìm thấy đơn dịch vụ", 404);
+      const context = await getServiceQualityReportContext(reporterId, role, payload.orderId!, session);
+      target.targetUserId = context.targetUserId;
+      const [report] = await create(session);
+      return report._id;
+    })
+    : (await create())[0]._id;
+
+  return Report.findById(reportId).populate(await populateReportForUser(reporterId));
 };
 
 export const getMyReports = async (reporterId: string, query: Query = {}) => {
@@ -209,12 +270,16 @@ export const getMyReports = async (reporterId: string, query: Query = {}) => {
   const { page, limit, skip } = getPagination(query);
   const filter: Record<string, unknown> = { reporterId, isDeleted: false };
 
-  if (query.status) filter.status = query.status;
+  if (query.status) filter.status = query.reportType === "service_quality" && query.status === "resolved"
+    ? { $in: ["resolved", "confirmed"] } : query.status;
+  if (query.orderId) filter.orderId = query.orderId;
   if (query.reportType) filter.reportType = query.reportType;
   if (query.targetType) filter.targetType = query.targetType;
 
+  const populate = await populateReportForUser(reporterId);
+
   const [items, total] = await Promise.all([
-    Report.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate(populateReport()),
+    Report.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).populate(populate),
     Report.countDocuments(filter),
   ]);
 
@@ -231,7 +296,7 @@ export const getReportForUser = async (reporterId: string, reportId: string) => 
     _id: reportId,
     reporterId,
     isDeleted: false,
-  }).populate(populateReport());
+  }).populate(await populateReportForUser(reporterId));
   if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
   return report;
 };
@@ -240,7 +305,9 @@ export const getAdminReports = async (query: Query = {}) => {
   const { page, limit, skip } = getPagination(query);
   const filter: Record<string, unknown> = { isDeleted: false };
 
-  if (query.status) filter.status = query.status;
+  if (query.status) filter.status = query.reportType === "service_quality" && query.status === "resolved"
+    ? { $in: ["resolved", "confirmed"] } : query.status;
+  if (query.orderId) filter.orderId = query.orderId;
   if (query.reportType) filter.reportType = query.reportType;
   if (query.targetType) filter.targetType = query.targetType;
   if (query.keyword?.trim()) {
@@ -297,6 +364,9 @@ export const getAdminReportById = async (reportId: string) => {
     populateReport(),
   );
   if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+  if (report.isCustomerNoShow) {
+    return { ...report.toObject(), noShowDetails: await getAdminNoShowDetails(report) };
+  }
   return report;
 };
 
@@ -314,16 +384,110 @@ export const reviewReport = async (
 
   const report = await Report.findOne({ _id: reportId, isDeleted: false });
   if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+  if (report.isCustomerNoShow) {
+    await reviewCustomerNoShowReport(reportId, adminId, payload);
+    return getAdminReportById(reportId);
+  }
   if (report.createdViolationId && payload.status !== "confirmed") {
     throw new AppError("Báo cáo đã có bản ghi vi phạm, không thể đổi sang trạng thái khác", 400);
   }
 
-  report.status = payload.status;
-  report.handledBy = new Types.ObjectId(adminId);
-  report.handledAt = new Date();
-  report.reviewNote = payload.reviewNote ?? report.reviewNote ?? null;
-  report.resolutionNote = payload.resolutionNote ?? report.resolutionNote ?? null;
-  await report.save();
+  const parsed = reviewReportSchema.safeParse(payload);
+  if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+  if (payload.status === "evidence_requested") {
+    throw new AppError("Vui lòng sử dụng chức năng yêu cầu bổ sung bằng chứng", 400);
+  }
+  await withReportTransaction(async (session) => {
+    const current = await lockReport(reportId, session);
+    if (!current) throw new AppError("Không tìm thấy báo cáo", 404);
+    if (current.createdViolationId && payload.status !== "confirmed") {
+      throw new AppError("Báo cáo đã có bản ghi vi phạm, không thể đổi sang trạng thái khác", 400);
+    }
+    if (current.status === "cancelled") throw new AppError("Báo cáo đã hủy, không thể cập nhật", 400);
+    current.status = payload.status;
+    current.reviewedBy = new Types.ObjectId(adminId);
+    current.reviewedAt = new Date();
+    current.handledBy = REPORT_TERMINAL_STATUSES.includes(payload.status) ? new Types.ObjectId(adminId) : null;
+    current.handledAt = REPORT_TERMINAL_STATUSES.includes(payload.status) ? new Date() : null;
+    current.reviewNote = payload.reviewNote ?? current.reviewNote ?? null;
+    current.resolutionNote = payload.resolutionNote ?? current.resolutionNote ?? null;
+    await current.save({ session });
+  });
+  return getAdminReportById(reportId);
+};
 
+export const REPORT_TERMINAL_STATUSES: ReportStatus[] = ["confirmed", "resolved", "rejected", "cancelled"];
+
+const withReportTransaction = async <T>(work: (session: ClientSession) => Promise<T>) => {
+  const session = await mongoose.startSession();
+  try { return await withTransactionRetry(session, work); }
+  finally { await session.endSession(); }
+};
+
+const lockReport = (id: string, session: ClientSession, reporterId?: string) =>
+  Report.findOneAndUpdate(
+    { _id: id, isDeleted: false, ...(reporterId ? { reporterId } : {}) },
+    { $inc: { __v: 1 } }, { session, new: true, runValidators: true },
+  );
+
+const assertReportAcceptsEvidence = (report: { status: ReportStatus; isCustomerNoShow?: boolean }) => {
+  if (REPORT_TERMINAL_STATUSES.includes(report.status)) {
+    throw new AppError("Báo cáo đã kết thúc, không thể cập nhật", 400);
+  }
+  if (report.isCustomerNoShow) {
+    throw new AppError("Báo cáo khách vắng mặt phải được xử lý qua quy trình xác minh riêng", 400);
+  }
+};
+
+export const cancelReport = async (userId: string, reportId: string) => {
+  assertObjectId(userId, "User id");
+  assertObjectId(reportId, "Report id");
+  await withReportTransaction(async (session) => {
+    const report = await lockReport(reportId, session, userId);
+    if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+    assertReportAcceptsEvidence(report);
+    report.status = "cancelled";
+    report.handledAt = new Date();
+    await report.save({ session });
+  });
+  return getReportForUser(userId, reportId);
+};
+
+export const addReportEvidence = async (
+  userId: string, role: UserRole, reportId: string,
+  payload: { files: EvidenceFilePayload[]; note?: string | null },
+) => {
+  assertObjectId(userId, "User id");
+  assertObjectId(reportId, "Report id");
+  const parsed = addReportEvidenceSchema.safeParse(payload);
+  if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+  await withReportTransaction(async (session) => {
+    const report = await lockReport(reportId, session, role === "ADMIN" ? undefined : userId);
+    if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+    assertReportAcceptsEvidence(report);
+    report.evidenceFiles.push(...normalizeEvidenceFiles(parsed.data.files).map(file => ({
+      ...file, _id: new Types.ObjectId(), uploadedBy: new Types.ObjectId(userId), note: parsed.data.note ?? null,
+    })));
+    if (report.status === "evidence_requested") report.status = "under_review";
+    await report.save({ session });
+  });
+  return role === "ADMIN" ? getAdminReportById(reportId) : getReportForUser(userId, reportId);
+};
+
+export const requestReportEvidence = async (adminId: string, reportId: string, requestedEvidenceNote: string) => {
+  assertObjectId(adminId, "Admin id");
+  assertObjectId(reportId, "Report id");
+  const parsed = requestReportEvidenceSchema.safeParse({ requestedEvidenceNote });
+  if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+  await withReportTransaction(async (session) => {
+    const report = await lockReport(reportId, session);
+    if (!report) throw new AppError("Không tìm thấy báo cáo", 404);
+    assertReportAcceptsEvidence(report);
+    report.status = "evidence_requested";
+    report.requestedEvidenceNote = parsed.data.requestedEvidenceNote;
+    report.reviewedBy = new Types.ObjectId(adminId);
+    report.reviewedAt = new Date();
+    await report.save({ session });
+  });
   return getAdminReportById(reportId);
 };

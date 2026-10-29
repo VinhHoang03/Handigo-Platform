@@ -22,7 +22,7 @@ export const getMyVouchers = async (req: Request, res: Response) => {
 };
 export const redeem = async (req: Request, res: Response) => {
   try {
-    const data = await rewards.redeemReward(requireRequestUser(req).id, req.body.offerId, req.body.requestId);
+    const data = await rewards.redeemReward(requireRequestUser(req).id, req.body.offerId, req.body.requestId, req.body.termsVersion);
     return res.json({ success: true, data, message: "Đổi mã giảm giá thành công." });
   } catch (error) { return sendControllerError(res, error); }
 };

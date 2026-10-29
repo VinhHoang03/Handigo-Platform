@@ -1,3 +1,5 @@
+import '../../../shared/utils/address_format.dart';
+
 class AddressItem {
   const AddressItem({
     required this.id,
@@ -9,6 +11,7 @@ class AddressItem {
     required this.ward,
     this.isDefault = false,
     this.note,
+    this.placeId,
   });
   factory AddressItem.fromJson(Map<String, dynamic> json) => AddressItem(
     id: _id(json),
@@ -20,6 +23,7 @@ class AddressItem {
     ward: '${json['ward'] ?? ''}',
     isDefault: json['isDefault'] == true,
     note: json['note'] as String?,
+    placeId: json['placeId'] as String?,
   );
   final String id,
       addressLabel,
@@ -30,6 +34,14 @@ class AddressItem {
       ward;
   final bool isDefault;
   final String? note;
+  final String? placeId;
+
+  String get displayAddress => formatAddress(
+    fullAddress,
+    ward: ward,
+    province: province,
+    fromMap: isMapAddress(placeId),
+  );
 }
 
 class WalletInfo {
@@ -72,6 +84,29 @@ class WalletTransactionItem {
   final String? status, description, createdAt;
 }
 
+class PaymentHistoryItem {
+  const PaymentHistoryItem({
+    required this.id,
+    required this.amount,
+    required this.method,
+    required this.status,
+    this.createdAt,
+  });
+
+  factory PaymentHistoryItem.fromJson(Map<String, dynamic> json) =>
+      PaymentHistoryItem(
+        id: _id(json),
+        amount: _num(json['amount']),
+        method: '${json['method'] ?? ''}',
+        status: '${json['status'] ?? ''}',
+        createdAt: json['createdAt'] as String?,
+      );
+
+  final String id, method, status;
+  final double amount;
+  final String? createdAt;
+}
+
 class VoucherItem {
   const VoucherItem({
     required this.code,
@@ -82,6 +117,7 @@ class VoucherItem {
     this.minOrderAmount = 0,
     this.startAt,
     this.endAt,
+    this.applicableOrderType,
   });
   factory VoucherItem.fromJson(Map<String, dynamic> json) => VoucherItem(
     code: '${json['code'] ?? ''}',
@@ -92,9 +128,11 @@ class VoucherItem {
     minOrderAmount: _num(json['minOrderAmount']),
     startAt: json['startAt'] as String?,
     endAt: json['endAt'] as String?,
+    applicableOrderType: json['applicableOrderType'] as String?,
   );
   final String code, name;
   final String? description, discountType, startAt, endAt;
+  final String? applicableOrderType;
   final double discountValue, minOrderAmount;
 }
 
@@ -111,7 +149,7 @@ class FeedbackItem {
     final provider = json['providerId'];
     return FeedbackItem(
       id: _id(json),
-      rating: _num(json['rating']).toInt(),
+      rating: _num(json['rating']),
       comment: json['comment'] as String?,
       createdAt: json['createdAt'] as String?,
       providerName: provider is Map ? provider['fullName'] as String? : null,
@@ -119,7 +157,7 @@ class FeedbackItem {
     );
   }
   final String id;
-  final int rating;
+  final double rating;
   final String? comment, createdAt, providerName, orderId;
 }
 

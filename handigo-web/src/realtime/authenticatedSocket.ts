@@ -10,10 +10,12 @@ import { tokenStorage } from '@/api/tokenStorage';
 type AuthenticatedSocketOptions = Partial<ManagerOptions & SocketOptions>;
 
 const SOCKET_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  import.meta.env.DEV ? window.location.origin : import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const AUTH_ERROR_MESSAGES = new Set([
   'Missing socket token',
   'Invalid socket token',
+  'Thiếu mã xác thực kết nối socket',
+  'Mã xác thực kết nối socket không hợp lệ',
 ]);
 
 export const createAuthenticatedSocket = (
@@ -21,6 +23,7 @@ export const createAuthenticatedSocket = (
 ): { socket: Socket; dispose: () => void } => {
   let refreshing = false;
   let authRefreshAttempted = false;
+  let disposed = false;
   const socket = io(SOCKET_URL, {
     ...options,
     autoConnect: false,
@@ -33,6 +36,7 @@ export const createAuthenticatedSocket = (
   const handleConnectError = (error: Error) => {
     if (
       refreshing ||
+      disposed ||
       authRefreshAttempted ||
       !AUTH_ERROR_MESSAGES.has(error.message)
     ) {
@@ -43,7 +47,7 @@ export const createAuthenticatedSocket = (
     authRefreshAttempted = true;
     void refreshAccessToken()
       .then(() => {
-        if (!socket.connected) socket.connect();
+        if (!disposed && !socket.connected) socket.connect();
       })
       .catch(() => undefined)
       .finally(() => {
@@ -62,6 +66,7 @@ export const createAuthenticatedSocket = (
   return {
     socket,
     dispose: () => {
+      disposed = true;
       socket.off('connect', handleConnect);
       socket.off('connect_error', handleConnectError);
       socket.disconnect();

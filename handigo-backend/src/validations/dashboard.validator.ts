@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { adminDashboardQuerySchema } from "./adminDashboard.validator";
 
 const dateStringSchema = z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: "Ngày không hợp lệ",
@@ -36,6 +37,29 @@ export const dashboardQuerySchema = z
   });
 
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
+export const adminRecentOrdersQuerySchema = z.object({
+  page: dashboardQuerySchema.shape.page,
+  limit: dashboardQuerySchema.shape.limit,
+});
+
+export const adminOperationsQuerySchema = dashboardQuerySchema.safeExtend({
+  fromDate: adminDashboardQuerySchema.shape.fromDate,
+  toDate: adminDashboardQuerySchema.shape.toDate,
+});
+
+const providerDayBoundary = (value: string, end: boolean) => {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(value));
+  return new Date(`${day}T${end ? "23:59:59.999" : "00:00:00.000"}+07:00`);
+};
+
+// Bộ lọc provider dùng ngày Việt Nam, độc lập với múi giờ máy chủ.
+export const providerDashboardQuerySchema = dashboardQuerySchema.safeExtend({
+  fromDate: dateStringSchema.optional().transform((value) => value ? providerDayBoundary(value, false) : undefined),
+  toDate: dateStringSchema.optional().transform((value) => value ? providerDayBoundary(value, true) : undefined),
+});
 
 export const providerAvailabilitySchema = z.object({
   availabilityStatus: z.enum(["online", "offline", "busy"]),

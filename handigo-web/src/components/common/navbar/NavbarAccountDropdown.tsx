@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { User } from "@/features/auth/types/auth.types";
+import { maskEmail } from "@/features/profile/utils/userProfileForm.utils";
 import { getProfilePath, getRoleLabel, getWalletPath, type AppRole } from "./navbar.types";
 import { Gift, LifeBuoy, LogOut, ReceiptText, ShieldUser, User as UserIcon, Wallet } from "lucide-react";
 
@@ -24,7 +25,7 @@ export function NavbarAccountDropdown({
           {user.fullName || "Người dùng"}
         </p>
         <p className="truncate text-sm text-on-surface-variant">
-          {user.email || "N/A"}
+          {user.email ? maskEmail(user.email, true) : "Chưa cập nhật"}
         </p>
         <p className="mt-1 text-xs font-semibold text-primary">
           {getRoleLabel(currentRole)}
@@ -59,7 +60,7 @@ export function NavbarAccountDropdown({
               className="flex w-full items-center gap-3 px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
             >
               <LifeBuoy aria-hidden="true" size={20} />
-              Khiếu nại, hỗ trợ & báo cáo
+              Hỗ trợ & báo cáo
             </Link>
           </>
         )}

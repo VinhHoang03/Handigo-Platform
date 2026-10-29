@@ -2,7 +2,7 @@ import { useMemo, useState, type RefObject } from 'react';
 import { Zap } from 'lucide-react';
 import { BookingPickerPopover } from './BookingPickerPopover';
 import { BookingTimeWheel } from './BookingTimeWheel';
-import { getEarliestScheduledAt, getInitialScheduledAt, timeSlots } from './step2Helpers';
+import { getEarliestScheduledAt, getInitialScheduledAt, isWithinScheduledBookingHours, timeSlots } from './step2Helpers';
 
 interface UpcomingDate {
   value: string;
@@ -20,15 +20,17 @@ interface BookingDateTimeDialogProps {
   onCancel: () => void;
   onImmediate: () => void;
   onConfirm: (dateValue: string, startTime: string) => void;
+  zIndex?: number;
+  description?: string;
+  disabled?: boolean;
 }
 
 const hours = timeSlots.map((slot) => slot.slice(0, 2));
 const minutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
 
 const isTimeUnavailable = (time: string, date: string, earliest: number) => {
-  const [hour, minute] = time.split(':').map(Number);
   const timestamp = new Date(`${date}T${time}:00`).getTime();
-  return !Number.isFinite(timestamp) || timestamp < earliest || hour > 21 || (hour === 21 && minute > 0);
+  return !isWithinScheduledBookingHours(time) || !Number.isFinite(timestamp) || timestamp < earliest;
 };
 
 const findFirstAvailableTime = (date: string, earliest: number) => {
@@ -40,7 +42,7 @@ const findFirstAvailableTime = (date: string, earliest: number) => {
 };
 
 export const BookingDateTimeDialog = ({
-  anchorRef, scheduledAt, upcomingDates, currentTimestamp, error, onCancel, onImmediate, onConfirm,
+  anchorRef, scheduledAt, upcomingDates, currentTimestamp, error, onCancel, onImmediate, onConfirm, zIndex, description, disabled = false,
 }: BookingDateTimeDialogProps) => {
   const initialScheduledAt = getInitialScheduledAt(scheduledAt, new Date(currentTimestamp));
   const suggestedDate = initialScheduledAt.split('T')[0];
@@ -76,7 +78,8 @@ export const BookingDateTimeDialog = ({
   const selectedTime = `${hour}:${minute}`;
 
   return (
-    <BookingPickerPopover id="booking-date-time-picker" title="Chọn ngày và giờ hẹn" anchorRef={anchorRef} onClose={onCancel}>
+    <BookingPickerPopover id="booking-date-time-picker" title="Chọn ngày và giờ hẹn" anchorRef={anchorRef} onClose={onCancel} zIndex={zIndex}>
+        {description && <p className="mb-3 text-xs leading-5 text-on-surface-variant">{description}</p>}
         <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] gap-xs rounded-2xl bg-surface-container-low px-sm py-sm">
           <BookingTimeWheel
             height={176}
@@ -114,13 +117,13 @@ export const BookingDateTimeDialog = ({
         {error && <p role="alert" className="mt-sm text-center text-sm font-medium text-error">{error}</p>}
 
         <div className="sticky bottom-0 mt-sm grid grid-cols-2 gap-xs bg-surface-container-lowest pt-sm">
-        <button type="button" onClick={onImmediate}
+        <button type="button" onClick={onImmediate} disabled={disabled || !isWithinScheduledBookingHours(`${String(new Date(currentTimestamp).getHours()).padStart(2, '0')}:${String(new Date(currentTimestamp).getMinutes()).padStart(2, '0')}`)}
           className="flex min-h-11 items-center justify-center gap-xs rounded-xl border border-primary/30 px-xs text-sm font-bold text-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15">
           <Zap aria-hidden="true" size={18} />
           Đặt ngay
         </button>
 
-          <button type="button" disabled={!selectedDate || !firstAvailableTime || isUnavailable(selectedTime)}
+          <button type="button" disabled={disabled || !selectedDate || !firstAvailableTime || isUnavailable(selectedTime)}
             onClick={() => onConfirm(dateValue, selectedTime)}
             className="min-h-11 rounded-xl bg-primary px-xs text-sm font-bold text-on-primary hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50">
             Xác nhận

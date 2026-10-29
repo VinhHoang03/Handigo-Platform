@@ -2,6 +2,7 @@ import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState, type FormEvent } from "react";
 import { Modal } from "@/components/common/Modal";
 import type { Order } from "@/types/booking";
+import { useCaseOrders } from "../hooks/useCaseOrders";
 import { getErrorMessage } from "@/utils/apiError";
 import { caseManagementApi } from "../api/caseManagement.api";
 import type {
@@ -14,20 +15,19 @@ import { EvidenceImagePicker } from "./EvidenceImagePicker";
 import { ReportExtraFields } from "./ReportExtraFields";
 import { TicketExtraFields } from "./TicketExtraFields";
 
-export type CreateCaseKind = "complaint" | "ticket" | "report";
+export type CreateCaseKind = "ticket" | "report";
 
 interface CreateCaseModalProps {
   open: boolean;
   kind: CreateCaseKind;
   role: "CUSTOMER" | "PROVIDER";
-  orders: Order[];
   initialOrderId?: string;
+  initialReportType?: ReportType;
   onClose: () => void;
   onCreated: () => void;
 }
 
 const KIND_TITLES: Record<CreateCaseKind, string> = {
-  complaint: "Tạo khiếu nại",
   ticket: "Tạo yêu cầu hỗ trợ",
   report: "Gửi báo cáo",
 };
@@ -39,18 +39,19 @@ export function CreateCaseModal({
   open,
   kind,
   role,
-  orders,
   initialOrderId,
+  initialReportType,
   onClose,
   onCreated,
 }: CreateCaseModalProps) {
   const { addToast } = useToast();
+  const { orders, loading: ordersLoading, error: ordersError, hasMore, loadMore } = useCaseOrders(role, initialOrderId);
   const [orderId, setOrderId] = useState(initialOrderId ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<SupportTicketCategory>("ORDER");
   const [priority, setPriority] = useState<SupportTicketPriority>("MEDIUM");
-  const [reportType, setReportType] = useState<ReportType>("user_behavior");
+  const [reportType, setReportType] = useState<ReportType>(initialReportType ?? "user_behavior");
   const [reportTarget, setReportTarget] = useState<"participant" | "order">(
     initialOrderId ? "order" : "participant",
   );
@@ -59,16 +60,21 @@ export function CreateCaseModal({
   const [, setError] = useToastFeedback<string>("", "error");
 
   const availableOrders = useMemo(
-    () => (kind === "complaint" ? orders.filter((order) => order.status === "completed") : orders),
-    [kind, orders],
+    () => (kind === "report" && reportType === "service_quality" ? orders.filter((order) => order.status === "completed") : orders),
+    [kind, orders, reportType],
   );
 
   const selectedOrder = orders.find((order) => order._id === orderId);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if ((kind === "complaint" || kind === "report") && !selectedOrder) {
+    if (kind === "report" && !selectedOrder) {
       setError("Vui lòng chọn đơn dịch vụ liên quan.");
+      return;
+    }
+
+    if (kind === "report" && reportType === "service_quality" && selectedOrder?.status !== "completed") {
+      setError("Báo cáo chất lượng dịch vụ chỉ áp dụng cho đơn đã hoàn thành.");
       return;
     }
 
@@ -78,14 +84,7 @@ export function CreateCaseModal({
       const uploadedFiles = files.length ? await caseManagementApi.uploadImages(files) : [];
       const imageUrls = uploadedFiles.map((file) => file.url);
 
-      if (kind === "complaint") {
-        await caseManagementApi.createComplaint({
-          orderId,
-          title: title.trim(),
-          description: description.trim(),
-          evidenceImages: imageUrls,
-        });
-      } else if (kind === "ticket") {
+      if (kind === "ticket") {
         await caseManagementApi.createTicket({
           orderId: orderId || undefined,
           category,
@@ -96,7 +95,7 @@ export function CreateCaseModal({
         });
       } else if (selectedOrder) {
         const payload: CreateReportPayload = {
-          targetType: reportTarget === "order" ? "order" : role === "CUSTOMER" ? "provider" : "user",
+          targetType: reportType === "service_quality" || reportTarget === "order" ? "order" : role === "CUSTOMER" ? "provider" : "user",
           reportType,
           title: title.trim(),
           description: description.trim(),
@@ -104,7 +103,7 @@ export function CreateCaseModal({
           evidenceFiles: uploadedFiles,
         };
 
-        if (reportTarget === "order") {
+        if (reportType === "service_quality" || reportTarget === "order") {
           payload.orderId = selectedOrder._id;
         } else if (role === "CUSTOMER") {
           if (!selectedOrder.providerId?._id) {
@@ -138,7 +137,7 @@ export function CreateCaseModal({
             value={orderId}
             onChange={(event) => setOrderId(event.target.value)}
             required={kind !== "ticket"}
-            disabled={busy}
+            disabled={busy || ordersLoading}
             className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
           >
             <option value="">Chọn đơn dịch vụ</option>
@@ -149,6 +148,10 @@ export function CreateCaseModal({
             ))}
           </select>
         </label>
+        {ordersLoading && <p role="status" className="text-sm text-on-surface-variant">Đang tải danh sách đơn...</p>}
+        {ordersError && <p role="alert" className="text-sm text-error">{ordersError}</p>}
+        {(hasMore || ordersError) && <button type="button" onClick={() => void loadMore()} disabled={busy || ordersLoading} className="text-sm font-semibold text-primary">{ordersError ? "Thử tải lại đơn" : "Tải thêm đơn cũ"}</button>}
+        {!ordersLoading && !ordersError && !orders.length && <p className="text-sm text-on-surface-variant">Bạn chưa có đơn dịch vụ.</p>}
         {kind === "ticket" && (
           <TicketExtraFields
             category={category}
@@ -158,6 +161,7 @@ export function CreateCaseModal({
             onPriorityChange={setPriority}
           />
         )}
+        {kind === "report" && reportType === "service_quality" && <p className="text-sm text-on-surface-variant">Gửi trong vòng 3 ngày từ khi hoàn thành đơn. Mỗi người chỉ được gửi một báo cáo chất lượng cho mỗi đơn.</p>}
         {kind === "report" && (
           <ReportExtraFields
             role={role}
@@ -185,7 +189,7 @@ export function CreateCaseModal({
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
-          <button type="submit" disabled={busy} className="btn-primary">
+          <button type="submit" disabled={busy || ordersLoading} className="btn-primary">
             {busy ? "Đang gửi..." : "Gửi yêu cầu"}
           </button>
         </div>

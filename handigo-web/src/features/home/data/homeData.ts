@@ -55,7 +55,7 @@ export const howItWorksSteps = [
 export const reasons = [
   {
     title: 'Bạn biết ai sắp bước vào nhà mình',
-    desc: 'Mỗi thợ có trang hồ sơ công khai: dịch vụ nhận làm, khu vực hoạt động và nhận xét của khách trước.',
+    desc: 'Mỗi thợ có trang hồ sơ công khai: dịch vụ nhận làm và nhận xét của khách trước.',
   },
   {
     title: 'Giá thống nhất trước, không phát sinh giữa chừng',

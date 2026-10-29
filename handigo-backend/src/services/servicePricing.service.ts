@@ -1,3 +1,4 @@
+import { Category } from "../models/category.model";
 import { Types } from "mongoose";
 import { Service, type IService } from "../models/service.model";
 import { ServiceOption } from "../models/serviceOption.model";
@@ -19,6 +20,9 @@ const normalizeGroup = (value?: string | null) =>
 export const previewServiceBooking = async (payload: { serviceId: string; selectedOptionIds?: string[]; selectedOptions?: unknown; uniformQuantity?: number; orderType?: string; voucherCode?: string }, customerId?: string) => {
   const service = await Service.findOne({ _id: payload.serviceId, isActive: true, isDeleted: false });
   if (!service) throw new AppError("Dịch vụ không còn khả dụng.", 404);
+  if (!await Category.exists({ _id: service.categoryId, isActive: true, isDeleted: false })) {
+    throw new AppError("Danh mục dịch vụ đang ngừng hoạt động.", 404);
+  }
   const pricing = await buildServicePricingSnapshot(service, payload.selectedOptionIds, payload.selectedOptions, payload.uniformQuantity, payload.orderType ?? "normal");
   const promotion = await resolveAutomaticPromotion(service._id, pricing.baseAmount, Boolean(payload.voucherCode));
   const voucher = payload.voucherCode ? await resolveVoucherForAmount(payload.voucherCode, pricing.baseAmount - (promotion?.discountAmount ?? 0), undefined, customerId, service.serviceType === "variable_price") : null;
@@ -34,6 +38,9 @@ export const buildServicePricingSnapshot = async (
   uniformQuantity?: number,
   _orderType = "normal",
 ) => {
+  if (_orderType !== "normal" && _orderType !== "scheduled") {
+    throw new AppError("Chỉ hỗ trợ đặt ngay hoặc hẹn giờ.", 400);
+  }
   if (
     !Array.isArray(selectedOptionIdsInput) ||
     selectedOptionIdsInput.some((id) => typeof id !== "string")

@@ -7,6 +7,7 @@ import type {
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import { ProviderFeedbackSection } from "../ProviderFeedbackSection";
+import { ProviderWorkingAreaSection } from "../ProviderWorkingAreaSection";
 import {
   ProfessionalSummarySection,
   ProviderCertificatesSection,
@@ -16,14 +17,12 @@ import {
   PerformanceStats,
   ProfileSection,
   ProviderHero,
-  ServiceAreaPanel,
   VerificationPanel,
 } from "../ProviderProfileComponents";
 import type {
   ProviderCertificate,
   ProviderProfile,
   PerformanceStat,
-  ServiceArea,
   VerificationItem,
 } from "../../types/provider.types";
 import type { CertificateForm } from "../../utils/providerProfilePage";
@@ -59,8 +58,6 @@ export function ProviderProfileMainGrid({
   verificationItems,
   onPasswordClick,
   canChangePassword,
-  serviceArea,
-  onEditServiceArea,
   applicationHistoryKey,
   onEditApplication,
 }: {
@@ -92,8 +89,6 @@ export function ProviderProfileMainGrid({
   verificationItems: VerificationActionItem[];
   onPasswordClick: () => void;
   canChangePassword: boolean;
-  serviceArea: ServiceArea;
-  onEditServiceArea: () => void;
   applicationHistoryKey: number;
   onEditApplication: (application: ProviderApplication) => void;
 }) {
@@ -154,11 +149,11 @@ export function ProviderProfileMainGrid({
 
       <div className="col-span-12 flex min-w-0 flex-col gap-gutter xl:col-span-5">
         <VerificationPanel items={verificationItems} />
+        {canReceiveJobs && <ProviderWorkingAreaSection />}
         <AccountFunctionsPanel
           onPasswordClick={onPasswordClick}
           canChangePassword={canChangePassword}
         />
-        <ServiceAreaPanel area={serviceArea} onEdit={onEditServiceArea} />
 
         <ProfileSection title="Lịch sử đơn/hồ sơ">
           <ProviderApplicationHistory

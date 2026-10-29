@@ -2,7 +2,7 @@ export interface PersonRef { _id?: string; id?: string; fullName?: string; avata
 export interface Feedback {
   _id: string;
   id?: string;
-  orderId: string | { _id: string; orderCode?: string; status?: string; scheduledAt?: string; createdAt?: string; performedAt?: string };
+  orderId: string | { _id: string; orderCode?: string; status?: string; scheduledAt?: string; createdAt?: string; performedAt?: string | null };
   customerId: string | PersonRef;
   providerId: string | (PersonRef & { userId?: PersonRef });
   serviceId: string | { _id: string; name?: string; image?: string };
@@ -15,6 +15,10 @@ export interface Feedback {
 }
 export interface Pagination { page: number; limit: number; total: number; totalPages: number }
 export interface FeedbackList {
+  moderationStats?: {
+    total: number; averageRating: number; visible: number; hidden: number;
+    lowRating: number; hasImages: number; replied: number; fiveStars: number;
+  };
   items: Feedback[];
   pagination: Pagination;
   summary?: {
@@ -24,9 +28,12 @@ export interface FeedbackList {
   };
 }
 export interface FeedbackQuery {
+  categoryId?: string;
+  sort?: 'attention' | 'newest';
   page?: number;
   limit?: number;
   rating?: number | '';
+  ratingBelow?: number;
   hasImages?: boolean | '';
   replied?: boolean | '';
   keyword?: string;

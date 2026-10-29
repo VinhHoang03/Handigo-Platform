@@ -1,10 +1,14 @@
-import { Types } from "mongoose";
+import mongoose, { type ClientSession, Types } from "mongoose";
+import { withTransactionRetry } from "../utils/transaction";
 import { AppError } from "../utils/appError";
 import { Conversation } from "../models/conversation.model";
 import { Message } from "../models/message.model";
 import { Order, type IOrder } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { Report } from "../models/report.model";
+import User from "../models/user.model";
+import { emitToConversation } from "../sockets/socketServer";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 
 type UserRole = "CUSTOMER" | "PROVIDER" | "ADMIN";
 type SenderRole = "customer" | "provider";
@@ -21,6 +25,103 @@ interface SendMessagePayload {
 }
 
 const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress", "completed"];
+
+const getOrCreateParticipantConversation = async (
+  order: IOrder, providerId: Types.ObjectId, session: ClientSession, updateOrder = false,
+) => {
+  // Khóa cùng hồ sơ thợ để hai đơn đồng thời không tạo hai chat cho cùng một cặp.
+  const lock = await Provider.updateOne(
+    { _id: providerId, isDeleted: false }, { $inc: { __v: 1 } }, { session, runValidators: true },
+  );
+  if (!lock.matchedCount) throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+  const filter = { customerId: order.customerId, providerId, isDeleted: false };
+  const previous = await Conversation.findOne(filter).sort({ createdAt: 1, _id: 1 }).session(session);
+  if (previous) {
+    if (updateOrder) {
+      previous.orderId = order._id as Types.ObjectId;
+      await previous.save({ session });
+    }
+    return previous;
+  }
+  const [conversation] = await Conversation.create([{ ...filter, orderId: order._id }], { session });
+  return conversation!;
+};
+
+export const buildAssignmentWelcomeContent = (
+  providerName: string,
+  order: Pick<IOrder, "orderCode" | "createdAt" | "scheduledAt">,
+) => {
+  const format = (date: Date) => {
+    const parts = new Intl.DateTimeFormat("vi-VN", {
+      timeZone: "Asia/Ho_Chi_Minh", hourCycle: "h23",
+      hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric",
+    }).formatToParts(date);
+    const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+    return `${value("hour")}:${value("minute")} ngày ${value("day")}/${value("month")}/${value("year")}`;
+  };
+  const name = providerName.trim() || "thợ Handigo";
+  const greeting = `Chào bạn, tôi là ${name}, thợ đã nhận đơn ${order.orderCode} của bạn được đặt lúc ${format(order.createdAt)}.`;
+  return `${greeting} ${order.scheduledAt
+    ? `Tôi sẽ đến đúng lịch hẹn lúc ${format(order.scheduledAt)}.`
+    : "Tôi sẽ sớm đến địa chỉ thực hiện và liên hệ với bạn trước khi đến."} Hẹn gặp bạn!`;
+};
+
+// Lưu cùng giao dịch nhận đơn; mã assignment là khóa duy nhất cho lời chào này.
+export const createAssignmentWelcome = async (
+  order: IOrder,
+  providerId: Types.ObjectId,
+  providerUserId: string,
+  assignmentId: Types.ObjectId,
+  session: ClientSession,
+) => {
+  const existing = await Message.findById(assignmentId).session(session);
+  if (existing) return;
+  const user = await User.findById(providerUserId).select("fullName").session(session);
+  const conversation = await getOrCreateParticipantConversation(order, providerId, session, true);
+  const content = buildAssignmentWelcomeContent(user?.fullName ?? "", order);
+  const [message] = await Message.create([{
+    _id: assignmentId, conversationId: conversation._id,
+    senderId: providerUserId, senderRole: "provider", messageType: "text", content,
+  }], { session });
+  conversation.lastMessage = {
+    messageId: message!._id as Types.ObjectId, senderId: new Types.ObjectId(providerUserId),
+    messageType: "text", content, sentAt: message!.createdAt,
+  };
+  await conversation.save({ session });
+};
+
+export const publishAssignmentWelcome = async (assignmentId: Types.ObjectId) => {
+  const message = await Message.findById(assignmentId).populate("senderId", "fullName avatar role");
+  if (message) emitToConversation(message.conversationId.toString(), "message:new", message);
+};
+
+const withConversationWrite = async <T>(
+  conversationId: string,
+  work: (conversation: InstanceType<typeof Conversation>, session: ClientSession) => Promise<T>,
+) => {
+  const session = await mongoose.startSession();
+  try {
+    return await withTransactionRetry(session, async () => {
+      const conversation = await Conversation.findOneAndUpdate(
+        { _id: conversationId, isDeleted: false }, { $inc: { __v: 1 } },
+        { new: true, session, runValidators: true },
+      );
+      if (!conversation) throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
+      return work(conversation, session);
+    });
+  } finally { await session.endSession(); }
+};
+
+const refreshConversationPreview = async (conversation: InstanceType<typeof Conversation>, session: ClientSession) => {
+  const latest = await Message.findOne({ conversationId: conversation._id, isDeleted: false })
+    .sort({ createdAt: -1, _id: -1 }).session(session);
+  conversation.lastMessage = latest ? {
+    messageId: latest._id as Types.ObjectId, senderId: latest.senderId,
+    messageType: latest.messageType as "text" | "image",
+    content: latest.content || latest.imageUrl || "", sentAt: latest.createdAt,
+  } : null;
+  await conversation.save({ session });
+};
 
 const assertObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -54,10 +155,10 @@ const resolveParticipant = async (userId: string, role: UserRole, conversation: 
   throw new AppError("Bạn không thuộc cuộc trò chuyện này", 403);
 };
 
-const assertOrderCanChat = async (userId: string, role: UserRole, orderId: string, requireChatEnabled = true) => {
+const assertOrderCanChat = async (userId: string, role: UserRole, orderId: string, requireChatEnabled = true, session?: ClientSession) => {
   assertObjectId(orderId, "order id");
 
-  const order = await Order.findOne({ _id: orderId, isDeleted: false });
+  const order = await Order.findOne({ _id: orderId, isDeleted: false }).session(session ?? null);
 
   if (!order) {
     throw new AppError("Không tìm thấy đơn hàng", 404);
@@ -103,12 +204,6 @@ const getConversationForParticipant = async (
     throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
   }
 
-  const order = await assertOrderCanChat(userId, role, conversation.orderId.toString(), false);
-  if (order.providerId && conversation.providerId.toString() !== order.providerId.toString()) {
-    conversation.providerId = order.providerId!;
-    conversation.providerLastSeenAt = null;
-    await conversation.save();
-  }
   const participant = await resolveParticipant(userId, role, conversation);
 
   return { conversation, participant };
@@ -126,11 +221,7 @@ export const getMyConversations = async (userId: string, role: UserRole, query: 
     if (!provider) {
       throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
     }
-    const orderIds = await Order.find({ providerId: provider._id, isDeleted: false }).distinct("_id");
-    await Conversation.updateMany({ orderId: { $in: orderIds }, providerId: { $ne: provider._id }, isDeleted: false },
-      { $set: { providerId: provider._id, providerLastSeenAt: null } }, { runValidators: true });
     filter.providerId = provider._id;
-    filter.orderId = { $in: orderIds };
   } else {
     throw new AppError("Chỉ khách hàng và nhà cung cấp có thể truy cập trò chuyện", 403);
   }
@@ -166,21 +257,16 @@ export const getOrCreateConversationByOrder = async (
   role: UserRole,
   orderId: string,
 ) => {
-  const order = await assertOrderCanChat(userId, role, orderId);
-  const previous = await Conversation.findOne({ orderId: order._id, isDeleted: false }).select("providerId");
-
-  const conversation = await Conversation.findOneAndUpdate(
-    { orderId: order._id },
-    {
-      $set: {
-        customerId: order.customerId,
-        providerId: order.providerId,
-        ...(previous && previous.providerId.toString() !== order.providerId!.toString() ? { providerLastSeenAt: null } : {}),
-      },
-      $setOnInsert: { orderId: order._id },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
-  )
+  const session = await mongoose.startSession();
+  let conversationId: Types.ObjectId;
+  try {
+    conversationId = await withTransactionRetry(session, async () => {
+      const order = await assertOrderCanChat(userId, role, orderId, true, session);
+      const conversation = await getOrCreateParticipantConversation(order, order.providerId!, session);
+      return conversation._id as Types.ObjectId;
+    });
+  } finally { await session.endSession(); }
+  const conversation = await Conversation.findById(conversationId)
     .populate("orderId", "orderCode status")
     .populate("customerId", "fullName avatar")
     .populate({
@@ -227,13 +313,18 @@ export const sendMessage = async (
   conversationId: string,
   payload: SendMessagePayload,
 ) => {
+  await assertFeatureAllowed(userId, "chat");
   const { conversation, participant } = await getConversationForParticipant(
     userId,
     role,
     conversationId,
   );
 
-  await assertOrderCanChat(userId, role, conversation.orderId.toString());
+  const activeOrder = await Order.exists({
+    customerId: conversation.customerId, providerId: conversation.providerId,
+    status: { $in: chatEnabledStatuses }, isDeleted: false,
+  });
+  if (!activeOrder) throw new AppError("Đơn hàng chưa sẵn sàng để trò chuyện", 400);
 
   const messageType = payload.messageType || "text";
   const content = messageType === "text" ? payload.content : payload.imageUrl;
@@ -242,25 +333,28 @@ export const sendMessage = async (
     throw new AppError("Vui lòng nhập nội dung tin nhắn", 400);
   }
 
-  const message = await Message.create({
-    conversationId: conversation._id,
-    senderId: userId,
-    senderRole: participant.senderRole,
-    messageType,
-    content: payload.content ?? null,
-    imageUrl: payload.imageUrl ?? null,
+  const messageId = await withConversationWrite(conversationId, async (current, session) => {
+    if (participant.senderRole === "customer") {
+      // Ghi cùng giao dịch để tự duyệt phát hiện phản hồi đồng thời và thử lại.
+      await Order.updateMany({ customerId: conversation.customerId, providerId: conversation.providerId,
+        status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
+        { $set: { "customerNoShow.customerRepliedAt": new Date() } }, { session, runValidators: true });
+    }
+    const [message] = await Message.create([{
+      conversationId: conversation._id,
+      senderId: userId,
+      senderRole: participant.senderRole,
+      messageType,
+      content: payload.content ?? null,
+      imageUrl: payload.imageUrl ?? null,
+    }], { session });
+
+    await refreshConversationPreview(current, session);
+    return message._id;
   });
 
-  conversation.lastMessage = {
-    messageId: message._id as Types.ObjectId,
-    senderId: new Types.ObjectId(userId),
-    messageType,
-    content,
-    sentAt: message.createdAt,
-  };
-  await conversation.save();
 
-  return Message.findById(message._id).populate("senderId", "fullName avatar role");
+  return Message.findById(messageId).populate("senderId", "fullName avatar role");
 };
 
 export const markConversationSeen = async (
@@ -304,6 +398,7 @@ export const updateMessage = async (
   messageId: string,
   content: string,
 ) => {
+  await assertFeatureAllowed(userId, "chat");
   assertObjectId(messageId, "message id");
   const message = await Message.findOne({ _id: messageId, isDeleted: false });
   if (!message) throw new AppError("Không tìm thấy tin nhắn.", 404);
@@ -320,12 +415,16 @@ export const updateMessage = async (
     throw new AppError("Chỉ có thể chỉnh sửa tin nhắn văn bản.", 400);
   }
 
-  message.content = content.trim();
-  await message.save();
-  if (conversation.lastMessage?.messageId.toString() === messageId) {
-    conversation.lastMessage.content = message.content;
-    await conversation.save();
-  }
+  await withConversationWrite(conversation._id.toString(), async (current, session) => {
+    const latest = await Message.findOne({ _id: messageId, senderId: userId, isDeleted: false }).session(session);
+    if (!latest) throw new AppError("Không tìm thấy tin nhắn.", 404);
+    latest.content = content.trim();
+    await latest.save({ session });
+    if (current.lastMessage?.messageId.toString() === messageId) {
+      current.lastMessage.content = latest.content;
+      await current.save({ session });
+    }
+  });
   return Message.findById(message._id).populate("senderId", "fullName avatar role");
 };
 
@@ -347,24 +446,18 @@ export const deleteMessage = async (
     throw new AppError("Bạn chỉ có thể xóa tin nhắn của mình.", 403);
   }
 
-  message.isDeleted = true;
-  message.deletedAt = new Date();
-  await message.save();
+  await withConversationWrite(conversation._id.toString(), async (current, session) => {
+    const latest = await Message.findOne({ _id: messageId, senderId: userId, isDeleted: false }).session(session);
+    if (!latest) throw new AppError("Không tìm thấy tin nhắn.", 404);
+    latest.isDeleted = true;
+    latest.deletedAt = new Date();
+    await latest.save({ session });
 
-  if (conversation.lastMessage?.messageId.toString() === messageId) {
-    const latestMessage = await Message.findOne({
-      conversationId: conversation._id,
-      isDeleted: false,
-    }).sort({ createdAt: -1, _id: -1 });
-    conversation.lastMessage = latestMessage ? {
-      messageId: latestMessage._id as Types.ObjectId,
-      senderId: latestMessage.senderId,
-      messageType: latestMessage.messageType as "text" | "image",
-      content: latestMessage.content || latestMessage.imageUrl || "",
-      sentAt: latestMessage.createdAt,
-    } : null;
-    await conversation.save();
-  }
+    if (current.lastMessage?.messageId.toString() === messageId) {
+      await refreshConversationPreview(current, session);
+    }
+  });
+
 
   return { _id: message._id, conversationId: message.conversationId };
 };

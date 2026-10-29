@@ -28,11 +28,14 @@ export const REPORT_TYPES = [
   "ui_issue",
   "user_behavior",
   "payment_issue",
+  "service_quality",
   "other",
 ] as const;
 
 export const REPORT_STATUSES = [
   "pending",
+  "evidence_requested",
+  "cancelled",
   "under_review",
   "confirmed",
   "rejected",
@@ -47,6 +50,9 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
 export type EvidenceFileType = (typeof EVIDENCE_FILE_TYPES)[number];
 
 export interface IReportEvidenceFile {
+  _id?: Types.ObjectId;
+  uploadedBy?: Types.ObjectId | null;
+  note?: string | null;
   fileType: EvidenceFileType;
   url: string;
   mimeType?: string | null;
@@ -55,7 +61,26 @@ export interface IReportEvidenceFile {
 }
 
 export interface IReport extends Document, IBaseDocument {
+  noShowVerification?: {
+    decision: "auto_eligible" | "manual_review";
+    reasons: string[];
+    checkedAt: Date;
+    policyVersion: string;
+    checks?: {
+      location: { passed: boolean; distanceMeters: number | null; radiusMeters: number };
+      waiting: { passed: boolean; skippedForTesting: boolean; waitStartedAt: Date; requiredMinutes: number };
+      calls: { passed: boolean; validCount: number; requiredCount: number };
+      chat: { passed: boolean; messageCount: number; customerReplied: boolean };
+    } | null;
+  } | null;
+  reviewedByType?: "system" | "admin" | null;
+  isCustomerNoShow?: boolean;
   reporterId: Types.ObjectId;
+  reporterRole?: "CUSTOMER" | "PROVIDER";
+  legacyComplaintId?: Types.ObjectId;
+  requestedEvidenceNote?: string | null;
+  reviewedBy?: Types.ObjectId | null;
+  reviewedAt?: Date | null;
   targetType: ReportTargetType;
   targetUserId?: Types.ObjectId | null;
   orderId?: Types.ObjectId | null;
@@ -76,6 +101,9 @@ export interface IReport extends Document, IBaseDocument {
 
 const ReportEvidenceFileSchema = new Schema<IReportEvidenceFile>(
   {
+    _id: { type: Schema.Types.ObjectId, default: undefined },
+    uploadedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    note: { type: String, default: null },
     fileType: {
       type: String,
       enum: EVIDENCE_FILE_TYPES,
@@ -91,7 +119,36 @@ const ReportEvidenceFileSchema = new Schema<IReportEvidenceFile>(
 
 const ReportSchema = new Schema<IReport>(
   {
+    noShowVerification: { type: new Schema({
+      decision: { type: String, enum: ["auto_eligible", "manual_review"], required: true },
+      reasons: { type: [String], required: true },
+      checkedAt: { type: Date, required: true },
+      policyVersion: { type: String, required: true },
+      checks: { type: new Schema({
+        location: {
+          passed: { type: Boolean, required: true }, distanceMeters: { type: Number, default: null },
+          radiusMeters: { type: Number, required: true },
+        },
+        waiting: {
+          passed: { type: Boolean, required: true }, skippedForTesting: { type: Boolean, required: true },
+          waitStartedAt: { type: Date, required: true }, requiredMinutes: { type: Number, required: true },
+        },
+        calls: {
+          passed: { type: Boolean, required: true }, validCount: { type: Number, required: true }, requiredCount: { type: Number, required: true },
+        },
+        chat: {
+          passed: { type: Boolean, required: true }, messageCount: { type: Number, required: true }, customerReplied: { type: Boolean, required: true },
+        },
+      }, { _id: false }), default: null },
+    }, { _id: false }), default: null },
+    reviewedByType: { type: String, enum: ["system", "admin"], default: null },
+    isCustomerNoShow: { type: Boolean, default: false },
     reporterId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    reporterRole: { type: String, enum: ["CUSTOMER", "PROVIDER"], default: undefined },
+    legacyComplaintId: { type: Schema.Types.ObjectId, default: undefined },
+    requestedEvidenceNote: { type: String, default: null },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedAt: { type: Date, default: null },
     targetType: {
       type: String,
       enum: REPORT_TARGET_TYPES,
@@ -121,6 +178,8 @@ const ReportSchema = new Schema<IReport>(
   { timestamps: true },
 );
 
+ReportSchema.index({ legacyComplaintId: 1 }, { unique: true, sparse: true });
+ReportSchema.index({ orderId: 1, reporterId: 1, reportType: 1, isDeleted: 1 });
 ReportSchema.index({ status: 1, createdAt: -1 });
 ReportSchema.index({ reporterId: 1, createdAt: -1 });
 ReportSchema.index({ targetUserId: 1, status: 1 });

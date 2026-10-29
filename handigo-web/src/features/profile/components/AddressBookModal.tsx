@@ -5,6 +5,7 @@ import type {
 } from "@/features/profile/types/profile.types";
 import { useAddressBookForm } from "@/features/profile/hooks/useAddressBookForm";
 import { AddressBookFormFields } from "./AddressBookFormFields";
+import { LocationPickerMap } from "@/components/common/LocationPickerMap";
 
 interface AddressBookModalProps {
   open: boolean;
@@ -33,6 +34,9 @@ export function AddressBookModal({
 }: AddressBookModalProps) {
   const {
     addressForm,
+    step,
+    isSubmitting,
+    backToDetails,
     addressFormError,
     administrativeError,
     locationError,
@@ -57,11 +61,12 @@ export function AddressBookModal({
     onSubmit,
     onClose,
   });
+  const saving = Boolean(isSaving || isSubmitting);
 
   return (
     <Modal
       open={open}
-      title={address ? "Cập nhật địa chỉ" : "Thêm địa chỉ mới"}
+      title={step === 'location' ? "Xác nhận vị trí địa chỉ" : address ? "Cập nhật địa chỉ" : "Thêm địa chỉ mới"}
       onClose={onClose}
       size="lg"
     >
@@ -78,7 +83,7 @@ export function AddressBookModal({
           </div>
         )}
 
-        <AddressBookFormFields
+        {step === 'details' ? <AddressBookFormFields
           addressForm={addressForm}
           provinceOptions={provinceOptions}
           wardOptions={wardOptions}
@@ -86,21 +91,29 @@ export function AddressBookModal({
           isWardLoading={isWardLoading}
           isLocating={isLocating}
           isResolvingMapAddress={isResolvingMapAddress}
-          isSaving={isSaving}
+          isSaving={saving}
+          showLocationPicker={false}
           onInputChange={handleAddressInputChange}
           onProvinceChange={handleProvinceChange}
           onWardChange={handleWardChange}
           onUseCurrentLocation={handleUseCurrentLocation}
-          onPositionChange={(latitude, longitude) =>
-            void updateAddressFromCoordinate(
-              latitude,
-              longitude,
-              "Đã cập nhật địa chỉ theo vị trí ghim trên bản đồ.",
-            )
-          }
-        />
+          onPositionChange={updateAddressFromCoordinate}
+        /> : <div className="space-y-4">
+          <div className="rounded-xl bg-surface-container-low p-4 text-sm">
+            <p className="font-bold">{addressForm.recipientName} · {addressForm.recipientPhone}</p>
+            <p className="mt-2">{[addressForm.addressLine, addressForm.ward, addressForm.province].filter(Boolean).join(', ')}</p>
+            <p className="mt-2 text-xs text-on-surface-variant">Kiểm tra ghim và kéo đến đúng điểm thực hiện dịch vụ. Phần địa chỉ bạn nhập được giữ nguyên.</p>
+          </div>
+          {isResolvingMapAddress && !Number.isFinite(addressForm.latitude) ? (
+            <div role="status" className="grid h-64 place-items-center rounded-2xl bg-surface-container-low text-sm text-on-surface-variant sm:h-72">
+              Đang tìm vị trí theo địa chỉ và phường/xã đã chọn...
+            </div>
+          ) : <LocationPickerMap latitude={addressForm.latitude} longitude={addressForm.longitude}
+            disabled={saving} isResolvingAddress={isResolvingMapAddress}
+            onPositionChange={updateAddressFromCoordinate} />}
+        </div>}
 
-        <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-surface-container-low p-4">
+        {step === 'details' && <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-surface-container-low p-4">
           <input
             type="checkbox"
             checked={Boolean(addressForm.isDefault)}
@@ -112,23 +125,21 @@ export function AddressBookModal({
           <span className="font-label-md text-on-surface">
             Đặt làm địa chỉ mặc định
           </span>
-        </label>
+        </label>}
 
         <div className="flex flex-col justify-end gap-3 pt-2 sm:flex-row">
           <button
             type="button"
-            onClick={onClose}
-            disabled={isSaving}
+            onClick={step === 'location' ? backToDetails : onClose}
+            disabled={saving}
             className="btn-secondary"
           >
-            Hủy
+            {step === 'location' ? 'Quay lại chỉnh sửa' : 'Hủy'}
           </button>
-          <button type="submit" disabled={isSaving} className="btn-primary">
-            {isSaving
+          <button type="submit" disabled={saving || (step === 'location' && (isLocating || isResolvingMapAddress))} className="btn-primary">
+            {saving
               ? "Đang lưu..."
-              : address
-                ? "Cập nhật địa chỉ"
-                : "Lưu địa chỉ"}
+              : step === 'details' ? "Tiếp tục xác nhận vị trí" : "Xác nhận vị trí và lưu"}
           </button>
         </div>
       </form>

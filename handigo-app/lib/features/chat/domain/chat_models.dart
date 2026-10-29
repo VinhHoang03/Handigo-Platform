@@ -17,6 +17,10 @@ class Conversation {
             ? providerUser
             : customer;
     final lastMessage = json['lastMessage'] as Map<String, dynamic>?;
+    final sender = lastMessage?['senderId'];
+    final senderId = sender is Map<String, dynamic>
+        ? sender['_id'] ?? sender['id']
+        : sender;
     return Conversation(
       id: (json['_id'] ?? json['id']) as String,
       orderId: order is Map<String, dynamic> ? (order['_id'] ?? order['id']) as String : order.toString(),
@@ -26,7 +30,7 @@ class Conversation {
       lastMessage: lastMessage?['content'] as String?,
       updatedAt: json['updatedAt'] is String ? DateTime.tryParse(json['updatedAt'] as String) : null,
       lastMessageAt: lastMessage?['sentAt'] is String ? DateTime.tryParse(lastMessage!['sentAt'] as String) : null,
-      lastMessageSenderId: lastMessage?['senderId']?.toString(),
+      lastMessageSenderId: senderId?.toString(),
     );
   }
   final String id, orderId, orderCode, title;

@@ -1,8 +1,8 @@
 import type { ServiceSuggestion, SuggestionType } from "../types/serviceSuggestion.types";
 
 export const suggestionTypeLabel: Record<SuggestionType, string> = {
-  service: "Service",
-  category: "Category",
+  service: "Dịch vụ",
+  category: "Danh mục",
 };
 
 export const getSuggestionErrorMessage = (error: unknown) => {
@@ -28,5 +28,5 @@ export const getSuggestionProviderName = (suggestion: ServiceSuggestion) => {
   if (typeof suggestion.providerId === "string") return suggestion.providerId;
   const user = suggestion.providerId.userId;
   if (typeof user === "object" && user?.fullName) return user.fullName;
-  return "Provider";
+  return "Nhà cung cấp";
 };

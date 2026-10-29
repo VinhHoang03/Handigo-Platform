@@ -12,6 +12,10 @@ const usePreviewState = create<{
   loading: boolean;
 }>(() => ({ key: '', request: 0, loading: false }));
 
+export const invalidateBookingPreview = () => {
+  usePreviewState.setState(state => ({ key: '', request: state.request + 1, data: undefined, error: undefined, loading: false }));
+};
+
 const loadPreview = async (key: string, force = false) => {
   const current = usePreviewState.getState();
   if (current.key === key && (current.loading || (!force && (current.data || current.error)))) return;

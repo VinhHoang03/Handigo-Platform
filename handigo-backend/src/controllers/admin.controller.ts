@@ -83,6 +83,24 @@ export const reviewProviderApplication = async (
   }
 };
 
+export const getFeedbackDetail = async (req: Request, res: Response) => {
+  try {
+    const result = await adminService.getFeedbackDetail(String(req.params.id));
+    return res.json({ success: true, data: result, message: "Đã tải chi tiết đánh giá." });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
+export const getOrderDetail = async (req: Request, res: Response) => {
+  try {
+    const result = await adminService.getOrderDetail(String(req.params.id));
+    return res.json({ success: true, data: result, message: "Đã tải chi tiết đơn hàng." });
+  } catch (error: unknown) {
+    return sendControllerError(res, error);
+  }
+};
+
 export const getFeedbacks = async (req: Request, res: Response) => {
   try {
     const result = await adminService.getFeedbacks(req.query);

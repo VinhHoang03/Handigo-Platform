@@ -4,7 +4,6 @@ import type { ServiceSuggestion } from "../types/serviceSuggestion.types";
 import {
   formatSuggestionDate,
   getSuggestionName,
-  getSuggestionProviderName,
   suggestionTypeLabel,
 } from "./service-suggestion.utils";
 
@@ -14,19 +13,8 @@ export const serviceSuggestionTableColumns: Array<DataTableColumn<ServiceSuggest
     key: "suggestion",
     header: "Đề xuất",
     render: (suggestion) => (
-      <>
-        <p className="font-bold text-on-surface">{getSuggestionName(suggestion)}</p>
-        <p className="mt-1 line-clamp-2 max-w-md text-on-surface-variant">
-          {suggestion.description || "Không có mô tả."}
-        </p>
-      </>
+      <p className="font-bold text-on-surface">{getSuggestionName(suggestion)}</p>
     ),
-  },
-  {
-    key: "provider",
-    header: "Provider",
-    className: "font-medium",
-    render: (suggestion) => getSuggestionProviderName(suggestion),
   },
   {
     key: "type",

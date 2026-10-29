@@ -2,6 +2,7 @@ import mongoose, { Types, type ClientSession } from "mongoose";
 import { BankAccount } from "../models/bankAccount.model";
 import type { RequestUser } from "../middlewares/authContext";
 import { Provider } from "../models/provider.model";
+import { WithdrawRequest } from "../models/withdrawRequest.model";
 import { AppError } from "../utils/appError";
 import type {
   CreateBankAccountInput,
@@ -67,6 +68,35 @@ const getOwnedBankAccount = async (userId: string, bankAccountId: string, sessio
   return bankAccount;
 };
 
+const assertWithdrawalBankAccountChanges = async (
+  bankAccount: Awaited<ReturnType<typeof getOwnedBankAccount>>,
+  payload: UpdateBankAccountInput,
+  session: ClientSession,
+) => {
+  const identityFields = ["bankName", "bankCode", "accountNumber", "accountHolderName"] as const;
+  const changesIdentity = identityFields.some((field) =>
+    payload[field] !== undefined && payload[field] !== bankAccount[field]);
+  if (changesIdentity && await WithdrawRequest.exists({ bankAccountId: bankAccount._id }).session(session)) {
+    throw new AppError("Tài khoản đã dùng để rút tiền không thể đổi thông tin nhận tiền. Vui lòng thêm tài khoản ngân hàng mới", 409);
+  }
+  if (payload.status === "inactive" && await WithdrawRequest.exists({
+    bankAccountId: bankAccount._id, status: "pending", isDeleted: false,
+  }).session(session)) {
+    throw new AppError("Không thể vô hiệu hóa hoặc xóa tài khoản đang có yêu cầu rút tiền chờ xử lý", 409);
+  }
+};
+
+const lockOwnedBankAccount = async (userId: string, bankAccountId: string, session: ClientSession) => {
+  // Cùng ghi một document với tạo/duyệt rút tiền để tránh kiểm tra trên snapshot cũ.
+  const account = await BankAccount.findOneAndUpdate(
+    { _id: bankAccountId, userId, isDeleted: false },
+    { $inc: { __v: 1 } },
+    { new: true, session, runValidators: true },
+  );
+  if (!account) throw new AppError("Không tìm thấy tài khoản ngân hàng", 404);
+  return account;
+};
+
 export const listMyBankAccounts = async (user: RequestUser) => {
   await assertBankAccountAccess(user);
 
@@ -84,6 +114,28 @@ export const createMyBankAccount = async (
 
   try {
     return await mongoose.connection.transaction(async (session) => {
+      const existing = await BankAccount.findOne({
+        userId: user.id, bankCode: input.bankCode, accountNumber: input.accountNumber,
+      }).session(session);
+      if (existing && !existing.isDeleted) {
+        throw new AppError("Tài khoản ngân hàng này đã tồn tại", 409);
+      }
+      if (existing) {
+        // Khôi phục đúng bản ghi cũ để giữ nguyên liên kết với lịch sử rút tiền.
+        const account = await BankAccount.findOneAndUpdate(
+          { _id: existing._id, userId: user.id, isDeleted: true },
+          { $inc: { __v: 1 } },
+          { returnDocument: "after", session, runValidators: true },
+        );
+        if (!account) throw new AppError("Tài khoản ngân hàng này đã tồn tại", 409);
+        await assertWithdrawalBankAccountChanges(account, input, session);
+        const activeCount = await BankAccount.countDocuments({ userId: user.id, isDeleted: false }).session(session);
+        const shouldBeDefault = input.isDefault === true || activeCount === 0;
+        if (shouldBeDefault) await unsetOtherDefaults(user.id, undefined, session);
+        account.set({ ...input, isDeleted: false, deletedAt: null, isDefault: shouldBeDefault, status: "active" });
+        await account.save({ session });
+        return account;
+      }
       const activeCount = await BankAccount.countDocuments({ userId: user.id, isDeleted: false }).session(session);
       const shouldBeDefault = input.isDefault === true || activeCount === 0;
       if (shouldBeDefault) await unsetOtherDefaults(user.id, undefined, session);
@@ -110,7 +162,9 @@ export const updateMyBankAccount = async (
   const payload = pickPayload(input);
   try {
     return await mongoose.connection.transaction(async (session) => {
-      await getOwnedBankAccount(user.id, bankAccountId, session);
+      const account = await getOwnedBankAccount(user.id, bankAccountId, session);
+      await lockOwnedBankAccount(user.id, bankAccountId, session);
+      await assertWithdrawalBankAccountChanges(account, payload, session);
       if (payload.isDefault === true) {
         payload.status = "active";
         await unsetOtherDefaults(user.id, bankAccountId, session);
@@ -141,32 +195,35 @@ export const setDefaultMyBankAccount = async (
 
 export const deleteMyBankAccount = async (user: RequestUser, bankAccountId: string) => {
   await assertBankAccountAccess(user);
-  const bankAccount = await getOwnedBankAccount(user.id, bankAccountId);
+  return mongoose.connection.transaction(async (session) => {
+    const bankAccount = await lockOwnedBankAccount(user.id, bankAccountId, session);
+    await assertWithdrawalBankAccountChanges(bankAccount, { status: "inactive" }, session);
 
-  bankAccount.isDeleted = true;
-  bankAccount.deletedAt = new Date();
-  bankAccount.isDefault = false;
-  bankAccount.status = "inactive";
-  await bankAccount.save();
+    bankAccount.isDeleted = true;
+    bankAccount.deletedAt = new Date();
+    bankAccount.isDefault = false;
+    bankAccount.status = "inactive";
+    await bankAccount.save({ session });
 
-  const remainingDefault = await BankAccount.findOne({
-    userId: user.id,
-    isDeleted: false,
-    isDefault: true,
-  });
-
-  if (!remainingDefault) {
-    const latestActive = await BankAccount.findOne({
+    const remainingDefault = await BankAccount.findOne({
       userId: user.id,
       isDeleted: false,
-      status: "active",
-    }).sort({ createdAt: -1 });
+      isDefault: true,
+    }).session(session);
 
-    if (latestActive) {
-      latestActive.isDefault = true;
-      await latestActive.save();
+    if (!remainingDefault) {
+      const latestActive = await BankAccount.findOne({
+        userId: user.id,
+        isDeleted: false,
+        status: "active",
+      }).sort({ createdAt: -1 }).session(session);
+
+      if (latestActive) {
+        latestActive.isDefault = true;
+        await latestActive.save({ session });
+      }
     }
-  }
 
-  return bankAccount;
+    return bankAccount;
+  });
 };

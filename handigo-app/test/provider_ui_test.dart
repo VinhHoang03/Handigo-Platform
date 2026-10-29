@@ -1,3 +1,5 @@
+import 'package:handigo_app/features/orders/presentation/order_detail_overview.dart';
+import 'package:handigo_app/features/provider/presentation/provider_order_directions_sheet.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -24,6 +26,8 @@ import 'package:handigo_app/features/provider/domain/provider_models.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_account_screens.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_detail_screen.dart';
+import 'package:handigo_app/features/provider/presentation/quotation_editor_screen.dart';
+import 'package:handigo_app/features/provider/presentation/provider_order_feedback_panel.dart';
 
 final previewKey = GlobalKey();
 const overview = ProviderOverview(
@@ -84,6 +88,13 @@ final assignment = ProviderAssignment(
 class _Repository extends ProviderRepository {
   _Repository(super.api);
   int acceptCount = 0;
+  int availabilityCount = 0;
+  @override
+  Future<ProviderOverview> setAvailability(String status) async {
+    availabilityCount++;
+    return overview;
+  }
+
   final pending = Completer<void>();
   @override
   Future<void> acceptAssignment(String id) {
@@ -101,6 +112,8 @@ Future<void> _showScreen(
   bool assignmentError = false,
   String status = 'in_progress',
   _Repository? repository,
+  ProviderOverview currentOverview = overview,
+  Future<void> Function()? syncLocation,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -138,6 +151,9 @@ Future<void> _showScreen(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        providerCurrentLocationProvider.overrideWith((ref) async {
+          await syncLocation?.call();
+        }),
         authControllerProvider.overrideWith(
           (ref) => AuthController(AuthRepository(api), api)
             ..user = const AppUser(
@@ -151,10 +167,23 @@ Future<void> _showScreen(
         ),
         if (repository != null)
           providerRepositoryProvider.overrideWithValue(repository),
-        providerOverviewProvider.overrideWith((ref) async => overview),
+        providerOverviewProvider.overrideWith((ref) async => currentOverview),
         providerOrdersProvider.overrideWith(
           (ref) async => PagedResult(items: orders, page: 1, totalPages: 1),
         ),
+        providerOrderPageProvider.overrideWith(
+          (ref, query) async => PagedResult(
+            items: orders
+                .where((item) => query.$2 == 'all' || item.status == query.$2)
+                .toList(),
+            page: 1,
+            totalPages: 1,
+          ),
+        ),
+        orderQuotationProvider('detail').overrideWith((ref) async => null),
+        providerOrderFeedbackProvider(
+          'detail',
+        ).overrideWith((ref) async => null),
         providerAssignmentsProvider.overrideWith((ref) async {
           if (assignmentError) {
             throw const ApiException('Không thể tải đơn cần phản hồi.');
@@ -211,8 +240,11 @@ Future<void> _showScreen(
             status: status,
             paymentStatus: 'paid',
             paymentMethod: 'bank',
+            inspectionRequired: true,
+            depositPaidAt: today,
             totalAmount: 270000,
             customerName: 'Khách hàng kiểm tra',
+            customerPhone: '0901234567',
             addressLabel: 'Địa chỉ kiểm tra bố cục trên thiết bị nhỏ',
             scheduledAt: today.add(const Duration(hours: 14)),
             problemDescription: 'Kiểm tra đường ống và khắc phục rò rỉ.',
@@ -267,6 +299,87 @@ Future<void> savePreview(WidgetTester tester, String name) async {
 }
 
 void main() {
+  testWidgets('Tải lại vị trí thất bại hiển thị nguyên nhân cụ thể', (
+    tester,
+  ) async {
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      syncLocation: () async {
+        throw const ApiException('Quyền vị trí đang bị chặn.');
+      },
+    );
+    await tester.tap(find.byTooltip('Tải lại vị trí'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quyền vị trí đang bị chặn.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Thông báo vị trí ngắn gọn và tải lại bên trái công tắc', (
+    tester,
+  ) async {
+    var attempts = 0;
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      size: const Size(320, 640),
+      syncLocation: () async {
+        attempts++;
+        if (attempts == 1) {
+          throw const ApiException('Vị trí chưa đủ chính xác hoặc đã cũ.');
+        }
+      },
+    );
+    expect(find.text('Chưa lấy được vị trí hiện tại.'), findsOneWidget);
+    expect(find.text('Thử lại vị trí'), findsNothing);
+    final reload = find.byTooltip('Tải lại vị trí');
+    expect(
+      tester.getCenter(reload).dx,
+      lessThan(tester.getCenter(find.byType(Switch)).dx),
+    );
+    await tester.tap(reload);
+    await tester.pumpAndSettle();
+    expect(attempts, 2);
+    expect(find.text('Chưa lấy được vị trí hiện tại.'), findsNothing);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Chỉ bật nhận việc sau khi lưu vị trí, GPS lỗi cho thử lại', (
+    tester,
+  ) async {
+    final api = ApiClient(Dio(), CookieJar());
+    addTearDown(api.close);
+    final repository = _Repository(api);
+    var failLocation = true;
+    var synchronized = false;
+    await _showScreen(
+      tester,
+      const ProviderDashboardScreen(),
+      repository: repository,
+      currentOverview: ProviderOverview.fromJson({
+        'availabilityStatus': 'offline',
+      }),
+      syncLocation: () async {
+        expect(repository.availabilityCount, 0);
+        if (failLocation) {
+          throw const ApiException('Chưa lấy được vị trí thử nghiệm.');
+        }
+        synchronized = true;
+      },
+    );
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    expect(repository.availabilityCount, 0);
+    expect(find.text('Chưa lấy được vị trí thử nghiệm.'), findsOneWidget);
+    failLocation = false;
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    expect(synchronized, isTrue);
+    expect(repository.availabilityCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Form báo giá cuộn được khi mở bàn phím và phóng lớn chữ', (
     tester,
   ) async {
@@ -276,17 +389,30 @@ void main() {
       size: const Size(320, 640),
       scale: 2,
     );
-    await tester.tap(find.text('Gửi báo giá vật tư'));
-    await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsNWidgets(4));
+    await tester.scrollUntilVisible(
+      find.byType(QuotationEditorScreen),
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Lập báo giá sửa chữa'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('Thời lượng sửa chữa (phút)'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).last,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.text('Thời lượng sửa chữa (phút)'), findsOneWidget);
     tester.view.viewInsets = const FakeViewPadding(bottom: 260);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byType(TextField).last);
+    await tester.ensureVisible(find.byType(TextFormField).last);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.tap(find.text('Hủy'));
-    await tester.pumpAndSettle();
+    expect(find.byType(QuotationEditorScreen), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -304,7 +430,7 @@ void main() {
     await savePreview(tester, 'home');
     await tester.tap(find.text('Đơn hàng').last);
     await tester.pumpAndSettle();
-    expect(find.text('HDG-001'), findsOneWidget);
+    expect(find.text('Mã đơn HDG-001'), findsOneWidget);
     await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     expect(find.text('2 lịch hẹn'), findsOneWidget);
@@ -375,6 +501,45 @@ void main() {
     expect(find.text('Hôm nay'), findsOneWidget);
   });
 
+  testWidgets('Nút tháng mở lịch, hủy giữ ngày và chọn được tháng khác', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderScheduleScreen());
+    final month = '${today.month.toString().padLeft(2, '0')}/${today.year}';
+    await tester.tap(find.widgetWithText(OutlinedButton, month));
+    await tester.pumpAndSettle();
+    expect(find.byType(CalendarDatePicker), findsOneWidget);
+    await tester.tap(find.text('Hủy'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 lịch hẹn'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, month));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Next month'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CalendarDatePicker),
+        matching: find.text('15'),
+      ),
+    );
+    await tester.tap(find.text('Chọn'));
+    await tester.pumpAndSettle();
+
+    final next = DateTime(today.year, today.month + 1, 15);
+    expect(
+      find.widgetWithText(
+        OutlinedButton,
+        '${next.month.toString().padLeft(2, '0')}/${next.year}',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('${next.day}/${next.month}'), findsOneWidget);
+    expect(find.text('0 lịch hẹn'), findsOneWidget);
+    expect(find.text('Không có lịch hẹn trong ngày này.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Lịch chọn đúng ngày và loại đơn hủy', (tester) async {
     await _showScreen(tester, const ProviderScheduleScreen());
     expect(find.text('2 lịch hẹn'), findsOneWidget);
@@ -431,8 +596,8 @@ void main() {
     await tester.ensureVisible(progressFilter);
     await tester.tap(progressFilter);
     await tester.pumpAndSettle();
-    expect(find.text('HDG-002'), findsOneWidget);
-    expect(find.text('HDG-001'), findsNothing);
+    expect(find.text('Mã đơn HDG-002'), findsOneWidget);
+    expect(find.text('Mã đơn HDG-001'), findsNothing);
     await tester.ensureVisible(find.text('Chờ phản hồi').first);
     await tester.tap(find.text('Chờ phản hồi').first);
     await tester.pumpAndSettle();
@@ -449,7 +614,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Lỗi đơn chờ phản hồi có thử lại và giữ phần tổng quan', (
+  testWidgets('Tổng quan hiển thị đơn đã nhận trong mục Đơn cần xử lý', (
     tester,
   ) async {
     await _showScreen(
@@ -457,9 +622,58 @@ void main() {
       const ProviderDashboardScreen(),
       assignmentError: true,
     );
-    expect(find.text('Không thể tải đơn cần phản hồi.'), findsOneWidget);
-    expect(find.text('Thử lại'), findsOneWidget);
-    expect(find.text('Ví Handigo'), findsOneWidget);
+    expect(find.text('Đơn cần xử lý'), findsOneWidget);
+    expect(find.text('Đơn cần phản hồi'), findsNothing);
+    expect(find.text('HDG-005'), findsNothing);
+    expect(find.text(orders.first.serviceName), findsWidgets);
+  });
+
+  testWidgets(
+    'Chi tiết provider dùng lại thông tin dịch vụ và thẻ địa chỉ mở chỉ đường',
+    (tester) async {
+      await _showScreen(
+        tester,
+        const ProviderOrderDetailScreen(orderId: 'detail'),
+      );
+      expect(find.text('Trạng thái công việc'), findsNothing);
+      expect(
+        tester
+            .widget<OrderDetailOverview>(find.byType(OrderDetailOverview))
+            .providerView,
+        isTrue,
+      );
+      expect(find.text('Theo dõi và chia sẻ vị trí'), findsNothing);
+      await tester.tap(find.text('Địa chỉ').first);
+      await tester.pumpAndSettle();
+      expect(find.byType(ProviderOrderDirectionsSheet), findsOneWidget);
+      expect(
+        find.text('Địa chỉ đơn chưa có tọa độ để chỉ đường.'),
+        findsOneWidget,
+      );
+      expect(find.text('Thử lại'), findsOneWidget);
+      await tester.tap(find.byTooltip('Đóng chỉ đường'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProviderOrderDirectionsSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Menu chi tiết provider có tải lại, báo cáo và hủy đơn', (
+    tester,
+  ) async {
+    await _showScreen(
+      tester,
+      const ProviderOrderDetailScreen(orderId: 'detail'),
+    );
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    expect(find.text('Tải lại đơn'), findsOneWidget);
+    expect(find.text('Báo cáo đơn'), findsOneWidget);
+    expect(find.text('Hủy đơn'), findsOneWidget);
+    await tester.tap(find.text('Báo cáo đơn'));
+    await tester.pumpAndSettle();
+    expect(find.text('Báo cáo vấn đề'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   for (final status in ['accepted', 'in_progress', 'completed', 'cancelled']) {
@@ -470,17 +684,24 @@ void main() {
         status: status,
       );
       expect(
-        find.text('Bắt đầu thực hiện'),
+        find.text('Trượt để bắt đầu xử lý'),
         status == 'accepted' ? findsOneWidget : findsNothing,
       );
       expect(
         find.text('Hoàn tất & nghiệm thu'),
         status == 'in_progress' ? findsOneWidget : findsNothing,
       );
-      expect(
-        find.text('Gửi báo giá vật tư'),
-        status == 'in_progress' ? findsOneWidget : findsNothing,
-      );
+      expect(find.text('Lập báo giá sửa chữa'), findsNothing);
+      if (['accepted', 'in_progress'].contains(status)) {
+        await tester.scrollUntilVisible(
+          find.byType(QuotationEditorScreen),
+          180,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.byType(QuotationEditorScreen), findsOneWidget);
+      } else {
+        expect(find.byType(QuotationEditorScreen), findsNothing);
+      }
       if (status == 'in_progress') await savePreview(tester, 'detail');
       expect(tester.takeException(), isNull);
     });

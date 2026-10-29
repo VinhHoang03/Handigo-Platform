@@ -40,7 +40,7 @@ export interface FindNearestProvidersOptions {
   onlyProviderId?: Types.ObjectId;
   /** Lịch hẹn có thể chọn provider đang ngoại tuyến, miễn là không trùng lịch. */
   requireOnline?: boolean;
-  /** Các thời điểm phải còn trống khi tự điều phối lịch hẹn hoặc lịch định kỳ. */
+  /** Các thời điểm phải còn trống khi tự điều phối lịch hẹn. */
   scheduledDates?: Date[];
 }
 

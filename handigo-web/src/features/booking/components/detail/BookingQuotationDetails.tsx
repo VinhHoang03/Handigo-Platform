@@ -1,4 +1,4 @@
-import type { OrderQuotation } from "@/types/booking";
+import type { Order, OrderQuotation } from "@/types/booking";
 import {
   formatCurrency,
   getQuotationStatusClass,
@@ -12,7 +12,8 @@ type BookingQuotationDetailsProps = {
   appliedDepositAmount: number;
   remainingQuotationAmount: number;
   onReject: () => void;
-  orderStatus?: string;
+  orderStatus?: Order['status'];
+  paidByWallet?: boolean;
 };
 
 /** Hiển thị bản báo giá đã lưu gần nhất của chuyên gia. */
@@ -22,6 +23,8 @@ export const BookingQuotationDetails = ({
   appliedDepositAmount,
   remainingQuotationAmount,
   onReject,
+  orderStatus,
+  paidByWallet = false,
 }: BookingQuotationDetailsProps) => (
   <>
     <div className="flex flex-col gap-3 mb-lg sm:flex-row sm:items-center sm:justify-between">
@@ -116,19 +119,42 @@ export const BookingQuotationDetails = ({
           <div className="flex items-end justify-between gap-4 border-t border-primary/10 pt-3">
             <div>
               <p className="text-xs font-bold uppercase text-on-surface-variant">
-                Còn cần thanh toán
+                {orderStatus === "cancelled" || ["rejected", "cancelled", "expired"].includes(quotation.quotation.status)
+                  ? "Không còn khoản phải thu theo báo giá này"
+                  : "Còn cần thanh toán"}
               </p>
               <p className="mt-1 text-xs text-on-surface-variant">
-                Thanh toán trực tiếp theo thỏa thuận với chuyên gia
+                {orderStatus === "cancelled" || ["rejected", "cancelled", "expired"].includes(quotation.quotation.status)
+                  ? "Đơn hoặc báo giá đã kết thúc hiệu lực. Liên hệ hỗ trợ nếu cần đối soát khoản đã trả."
+                  : paidByWallet ? "Khoản thanh toán đã được chuyển vào ví thợ."
+                    : quotation.quotation.directPaymentConfirmedAt ? "Thợ đã xác nhận nhận tiền trực tiếp."
+                      : orderStatus === "completed" ? "Trả trực tiếp cho thợ hoặc thanh toán bằng Ví Handigo."
+                        : "Thanh toán sau khi thợ hoàn thành dịch vụ."}
               </p>
             </div>
             <p className="shrink-0 text-headline-sm font-bold leading-tight text-primary tabular-nums">
               {formatCurrency(remainingQuotationAmount)}
             </p>
           </div>
+          {paidByWallet && <div className="flex items-center justify-between gap-4 text-sm text-success">
+            <span>Đã thanh toán qua Ví Handigo</span>
+            <span className="font-bold tabular-nums">{formatCurrency(Math.max(quotation.quotation.finalAmount - appliedDepositAmount, 0))}</span>
+          </div>}
+          {!paidByWallet && <div className="flex items-center justify-between gap-4 text-sm">
+            <span className="text-on-surface-variant">Thợ xác nhận đã nhận trực tiếp</span>
+            <span className="font-bold tabular-nums">
+              {quotation.quotation.directPaymentConfirmedAt
+                ? formatCurrency(quotation.quotation.directPaymentConfirmedAmount ?? 0) : "Chưa xác nhận"}
+            </span>
+          </div>}
+          {quotation.quotation.directPaymentConfirmedAt && (
+            <p className="text-xs text-on-surface-variant">
+              Đây là ghi nhận của thợ, không phải xác minh giao dịch tiền mặt hoặc chuyển khoản của Handigo.
+            </p>
+          )}
         </div>
       </div>
-      {quotation.quotation.status === "pending" && (
+      {quotation.quotation.status === "pending" && orderStatus !== "cancelled" && (
         <div className="flex flex-col gap-sm sm:flex-row">
           <button
             disabled={busy}

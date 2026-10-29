@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Skeleton } from "@/components/common/Skeleton";
+import { useAdminErrorToast } from '../Toast/useAdminErrorToast';
 
 interface ChartCardProps {
   title: string;
@@ -35,21 +36,22 @@ export function ChartCard({
   height = 260,
   children,
 }: ChartCardProps) {
+  const admin = useAdminErrorToast(error);
   return (
-    <article className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-title-lg font-bold text-on-surface">{title}</h2>
-          {description && (
+    <article className="min-w-0 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-title-lg font-bold text-on-surface" title={admin ? description : undefined}>{title}</h2>
+          {description && !admin && (
             <p className="mt-1 text-sm text-on-surface-variant">{description}</p>
           )}
         </div>
-        {action}
+        {action && <div className="shrink-0">{action}</div>}
       </div>
 
       {loading ? (
         <Skeleton className="w-full" rounded="rounded-xl" style={{ height }} />
-      ) : error ? (
+      ) : error ? admin ? null : (
         <div
           role="alert"
           className="flex flex-col items-center justify-center gap-3 rounded-xl border border-error/20 bg-error/10 p-6 text-center text-error"

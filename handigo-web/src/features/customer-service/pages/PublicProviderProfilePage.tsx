@@ -1,5 +1,5 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useBookingStore } from "@/features/booking/hooks/useBookingStore";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -7,7 +7,6 @@ import { CustomerServiceLayout } from "../components/CustomerServiceLayout";
 import { ProviderProfileSkeleton } from "../components/ProviderProfileSkeleton";
 import { ProviderProfileHeader } from "../components/ProviderProfileHeader";
 import { ProviderAboutSection } from "../components/ProviderAboutSection";
-import { ProviderServiceAreas } from "../components/ProviderServiceAreas";
 import { ProviderFeedbackSection } from "../components/ProviderFeedbackSection";
 import { ProviderBookingPanel } from "../components/ProviderBookingPanel";
 import { ProviderCategoriesPanel } from "../components/ProviderCategoriesPanel";
@@ -16,21 +15,6 @@ import {
   type PublicProviderProfile,
 } from "../api/customerService.api";
 import { ArrowLeft } from "lucide-react";
-
-const getAreaText = (profile: PublicProviderProfile) => {
-  const serviceArea = [
-    profile.provider.serviceArea?.ward,
-    profile.provider.serviceArea?.province,
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  if (profile.provider.workingAreas.length) {
-    return profile.provider.workingAreas;
-  }
-
-  return serviceArea ? [serviceArea] : [];
-};
 
 export default function PublicProviderProfilePage() {
   const { providerId } = useParams();
@@ -74,7 +58,6 @@ export default function PublicProviderProfilePage() {
     };
   }, [providerId, setError]);
 
-  const areas = useMemo(() => (profile ? getAreaText(profile) : []), [profile]);
   const effectiveSelectedServiceId = profile?.provider.services.some(
     (service) => service.id === selectedServiceId,
   )
@@ -128,7 +111,6 @@ export default function PublicProviderProfilePage() {
                     certificates={profile.provider.certificates}
                   />
 
-                  <ProviderServiceAreas areas={areas} />
 
                   <ProviderFeedbackSection
                     feedbacks={profile.feedbacks}

@@ -31,7 +31,7 @@ export function ConfigList({
               <span
                 className={`rounded-md px-2 py-0.5 text-xs font-semibold ${item.isEffective ? "bg-success-container text-on-success-container" : "bg-warning-container text-on-warning-container"}`}
               >
-                {item.isEffective ? "Đã nối logic" : "Chưa nối logic"}
+                {item.isEffective ? "Đang áp dụng" : "Chưa áp dụng"}
               </span>
             </div>
             <p className={`mt-1 text-sm leading-5 text-on-surface-variant ${item.group === "policy" ? "line-clamp-2" : ""}`}>
@@ -60,7 +60,6 @@ export function ConfigList({
             <div className={`whitespace-pre-wrap break-words rounded-lg bg-surface-container-low px-3 py-2 text-sm leading-6 tabular-nums text-on-surface ${item.group === "policy" ? "line-clamp-3" : "block max-h-24 overflow-auto"}`}>
               {formatConfigValue(item, item.currentValue, item.group === "policy")}
             </div>
-            {item.group === "policy" && <p className="text-xs text-on-surface-variant">Bấm Sửa để xem đầy đủ.</p>}
             {item.existing && (
               <p className="text-xs tabular-nums text-on-surface-variant">
                 Cập nhật: {dateTime.format(new Date(item.existing.updatedAt))}

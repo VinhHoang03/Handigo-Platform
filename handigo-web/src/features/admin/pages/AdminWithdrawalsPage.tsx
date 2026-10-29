@@ -1,3 +1,4 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye } from "lucide-react";
@@ -110,11 +111,9 @@ export default function AdminWithdrawalsPage() {
 
   return (
     <DashboardShell role="ADMIN">
-      <header>
-        <h1 className="text-headline-lg font-bold">Duyệt rút tiền</h1>
-        <p className="text-on-surface-variant">
-          Kiểm tra tài khoản nhận tiền, xử lý yêu cầu chờ duyệt và xem lịch sử các đơn đã duyệt.
-        </p>
+      <header className="admin-page-header">
+        <AdminPageTitle title="Duyệt rút tiền" />
+      <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
       </header>
 
       <WithdrawalStatsAndFilters

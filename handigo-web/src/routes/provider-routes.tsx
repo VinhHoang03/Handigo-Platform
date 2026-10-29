@@ -73,7 +73,7 @@ export function ProviderRoutes() {
       <Route
         path="/provider/profile"
         element={
-          <RouteGuard roles={["PROVIDER"]} allowUnapprovedProvider>
+          <RouteGuard roles={["PROVIDER"]}>
             <ProviderProfilePage />
           </RouteGuard>
         }

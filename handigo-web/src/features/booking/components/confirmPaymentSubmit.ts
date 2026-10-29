@@ -2,6 +2,7 @@ import { bookingApi, type CreateOrderPayload } from '@/features/booking/api/book
 import { tokenStorage } from '@/api/tokenStorage';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
 import { getEarliestScheduledAt } from './step2Helpers';
+import { getBookingSessionRevision } from '../utils/bookingSessionStorage';
 import {
   type ConfirmPaymentSubmitParams,
   getConfirmPaymentErrorMessage,
@@ -16,6 +17,8 @@ export { PENDING_ORDER_ID_KEY, PENDING_ORDER_FINGERPRINT_KEY } from './pendingBo
  * Tách khỏi hook để giữ file dưới 200 dòng — logic, API call, redirect giữ nguyên 1:1.
  */
 export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams) => {
+  const sessionRevision = getBookingSessionRevision();
+  const isCurrentSession = () => sessionRevision === getBookingSessionRevision();
   const {
     serviceId, addressId, orderType, scheduledAt, service,
     selectedOptionIds, selectedOptionQuantities, uniformQuantity, preferredProviderId,
@@ -49,15 +52,8 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   }
   if (
     (orderType === 'scheduled' || orderType === 'recurring') &&
-    (!scheduledAt
-      || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime()
-      || new Date(scheduledAt).getHours() < 8
-      || new Date(scheduledAt).getHours() > 21
-      || (new Date(scheduledAt).getHours() === 21 && (
-        new Date(scheduledAt).getMinutes() > 0
-        || new Date(scheduledAt).getSeconds() > 0
-        || new Date(scheduledAt).getMilliseconds() > 0
-      )))
+    (!scheduledAt || !Number.isFinite(new Date(scheduledAt).getTime())
+      || new Date(scheduledAt).getTime() < getEarliestScheduledAt().getTime())
   ) {
     setPaymentError('Vui lòng chọn thời gian thực hiện trong tương lai.');
     return;
@@ -82,6 +78,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
   try {
     if (orderId) {
       const recovery = await recoverPendingBooking(orderId);
+      if (!isCurrentSession()) return;
       clearPendingBooking();
       setPendingOrderId('');
       if (recovery.paidOrder) {
@@ -117,6 +114,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
 
     if (!orderId) {
       const createdOrder = await bookingApi.createOrder(payload);
+      if (!isCurrentSession()) return;
       orderId = createdOrder._id;
       setPendingOrderId(orderId);
       sessionStorage.setItem(PENDING_ORDER_ID_KEY, orderId);
@@ -137,11 +135,13 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
             ? 'INSPECTION_DEPOSIT'
             : 'FULL',
         returnUrl: `${window.location.origin}/customer/bookings/result?orderId=${orderId}&payos=success`,
-        cancelUrl: `${window.location.origin}/customer/bookings/new/payment`,
+        cancelUrl: `${window.location.origin}${params.paymentCancelPath ?? '/customer/bookings/new/payment'}`,
       });
 
+      if (!isCurrentSession()) return;
       if (payment.payment.status === 'paid') {
         const orderDetail = await bookingApi.getOrderById(orderId);
+        if (!isCurrentSession()) return;
         clearPendingBooking();
         reset();
         navigate('/customer/bookings/result', { state: { order: orderDetail } });
@@ -152,6 +152,7 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       }
 
       if (payment.checkoutUrl) {
+        params.beforeExternalRedirect?.();
         sessionStorage.setItem('latestBookingOrderId', orderId);
         tokenStorage.prepareExternalRedirect();
         window.location.href = payment.checkoutUrl;
@@ -178,16 +179,27 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
           },
     );
 
+    if (!isCurrentSession()) return;
     const orderDetail = await bookingApi.getOrderById(orderId);
+    if (!isCurrentSession()) return;
 
     clearPendingBooking();
     reset();
     navigate('/customer/bookings/result', { state: { order: orderDetail } });
   } catch (error) {
+    if (!isCurrentSession()) return;
+    const recoveredOrderId = (error as { createdOrderId?: string }).createdOrderId;
+    if (recoveredOrderId) {
+      clearPendingBooking();
+      setPendingOrderId('');
+      navigate(`/customer/bookings/${recoveredOrderId}`);
+      return;
+    }
     const message = getConfirmPaymentErrorMessage(error);
     if (orderId && (!isAppointment || service?.serviceType === 'variable_price')) {
       try {
         await bookingApi.discardUnpaidOrder(orderId);
+        if (!isCurrentSession()) return;
         setPendingOrderId('');
         clearPendingBooking();
       } catch {
@@ -201,6 +213,6 @@ export const runConfirmPaymentSubmit = async (params: ConfirmPaymentSubmitParams
       setPaymentError(message);
     }
   } finally {
-    setIsSubmitting(false);
+    if (isCurrentSession()) setIsSubmitting(false);
   }
 };

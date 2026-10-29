@@ -2,7 +2,6 @@ import type { Dispatch, SetStateAction } from "react";
 import { ArrowLeft, ArrowRight, Send } from "lucide-react";
 import { CategorySelectionStep } from "./CategorySelectionStep";
 import { ProviderDescriptionStep } from "./ProviderDescriptionStep";
-import { WorkingAreasStep } from "./WorkingAreasStep";
 import type {
   Category,
   OcrDocumentKind,
@@ -11,14 +10,12 @@ import type {
 } from "../types/providerApplication.types";
 
 type RegisterProviderStepPanelProps = {
-  step: 1 | 2 | 3;
+  step: 1 | 2;
   form: ProviderApplicationPayload;
   categories: Category[];
   onFormChange: Dispatch<SetStateAction<ProviderApplicationPayload>>;
   onToggleService: (id: string) => void;
   onExperienceChange: (years: number) => void;
-  onAddArea: (area: string) => void;
-  onRemoveArea: (value: string) => void;
   onUploadAsset: (
     file: File,
     purpose: "identity" | "certificate",
@@ -46,8 +43,6 @@ export function RegisterProviderStepPanel({
   onFormChange,
   onToggleService,
   onExperienceChange,
-  onAddArea,
-  onRemoveArea,
   onUploadAsset,
   savingDraft,
   submitError,
@@ -76,13 +71,6 @@ export function RegisterProviderStepPanel({
           />
         )}
         {step === 2 && (
-          <WorkingAreasStep
-            areas={form.workingAreas}
-            onAdd={onAddArea}
-            onRemove={onRemoveArea}
-          />
-        )}
-        {step === 3 && (
           <ProviderDescriptionStep
             form={form}
             categories={categories}
@@ -98,14 +86,12 @@ export function RegisterProviderStepPanel({
         </p>
       )}
 
-      {!success && !savingDraft && (
+      {!success && !savingDraft && isRejected && (
         <p className="mt-4 text-sm text-on-surface-variant">
-          {isRejected
-            ? "Bản chỉnh sửa được giữ trong phiên trình duyệt khi bạn tải lại trang. Hồ sơ chỉ được cập nhật khi bấm Gửi hồ sơ."
-            : "Hồ sơ được tự động lưu nháp. Nếu chưa lưu xong, bản đang nhập được giữ trong phiên trình duyệt."}
+          Bản chỉnh sửa được giữ trong phiên trình duyệt khi bạn tải lại trang. Hồ sơ chỉ được cập nhật khi bấm Gửi hồ sơ.
         </p>
       )}
-      {step === 3 && !success && submissionErrors.length > 0 && (
+      {step === 2 && !success && submissionErrors.length > 0 && (
         <div className="mt-5 rounded-2xl bg-warning-container p-4 text-sm text-on-warning-container" aria-live="polite">
           <p className="font-semibold">Thông tin cần hoàn thành trước khi gửi:</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
@@ -131,7 +117,7 @@ export function RegisterProviderStepPanel({
         <button type="button" onClick={onBack} disabled={submitting || Boolean(success) || uploading} className="btn-secondary">
           <ArrowLeft size={18} /> {step === 1 ? "Hủy" : "Quay lại"}
         </button>
-        {step < 3 ? (
+        {step < 2 ? (
           <button
             type="button"
             disabled={!canContinue || submitting || Boolean(success)}

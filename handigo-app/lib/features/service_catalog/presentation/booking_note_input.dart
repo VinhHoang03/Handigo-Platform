@@ -6,7 +6,12 @@ import 'service_catalog_provider.dart';
 import '../../../shared/widgets/app_feedback.dart';
 
 class BookingNoteInput extends ConsumerStatefulWidget {
-  const BookingNoteInput({required this.controller, super.key});
+  const BookingNoteInput({
+    required this.controller,
+    this.onUploadingChanged,
+    super.key,
+  });
+  final ValueChanged<bool>? onUploadingChanged;
   final TextEditingController controller;
 
   @override
@@ -20,10 +25,33 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
     if (_uploading || ref.read(bookingDraftProvider).attachments.length >= 4) {
       return;
     }
+    final source = await showModalBottomSheet<ImageSource>(
+      useRootNavigator: true,
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Chụp ảnh'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Chọn từ thư viện'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
     setState(() => _uploading = true);
+    widget.onUploadingChanged?.call(true);
     try {
       final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 80,
       );
       if (file == null || !mounted) return;
@@ -41,10 +69,17 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
       }
     } catch (_) {
       if (mounted) {
-        AppToast.show(context, 'Không thể tải ảnh sự cố. Vui lòng thử lại.', type: AppToastType.error);
+        AppToast.show(
+          context,
+          'Không thể tải ảnh sự cố. Vui lòng thử lại.',
+          type: AppToastType.error,
+        );
       }
     } finally {
-      if (mounted) setState(() => _uploading = false);
+      if (mounted) {
+        setState(() => _uploading = false);
+        widget.onUploadingChanged?.call(false);
+      }
     }
   }
 
@@ -123,8 +158,8 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
               children: [
                 for (var index = 0; index < attachments.length; index++)
                   SizedBox(
-                    width: 76,
-                    height: 76,
+                    width: 112,
+                    height: 112,
                     child: Stack(
                       children: [
                         Positioned.fill(
@@ -149,8 +184,8 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
                           top: 2,
                           right: 2,
                           child: SizedBox(
-                            width: 28,
-                            height: 28,
+                            width: 48,
+                            height: 48,
                             child: IconButton(
                               tooltip: 'Xóa ảnh sự cố ${index + 1}',
                               onPressed: () {
@@ -169,7 +204,7 @@ class _BookingNoteInputState extends ConsumerState<BookingNoteInput> {
                                 shape: const CircleBorder(
                                   side: BorderSide(color: Colors.black),
                                 ),
-                                minimumSize: const Size(28, 28),
+                                minimumSize: const Size(48, 48),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
                             ),

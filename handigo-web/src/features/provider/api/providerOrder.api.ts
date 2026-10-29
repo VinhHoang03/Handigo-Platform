@@ -9,6 +9,46 @@ import type {
 } from '../types/providerOrder.types';
 
 export const providerOrderApi = {
+  arrive: async (orderId: string) => {
+    const response = await api.post<{ success: boolean; data: Order }>(`/orders/${orderId}/arrival`);
+    return response.data.data;
+  },
+  checkNoShow: async (orderId: string) => {
+    await api.get(`/orders/${orderId}/customer-no-show/eligibility`);
+  },
+  uploadNoShowEvidence: async (orderId: string, file: File, kind: 'arrival' | 'contact') => {
+    const form = new FormData();
+    form.append('kind', kind);
+    form.append('image', file);
+    const response = await api.post<{ success: boolean; data: { id: string; url: string; kind: 'arrival' | 'contact' } }>(`/orders/${orderId}/customer-no-show/evidence`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 110_000,
+    });
+    return response.data.data;
+  },
+  uploadNoShowEvidenceBatch: async (orderId: string, arrivalFiles: File[], contactFiles: File[]) => {
+    const files = [...arrivalFiles.map(file => ({ file, kind: 'arrival' as const })),
+      ...contactFiles.map(file => ({ file, kind: 'contact' as const }))];
+    const receipts: Array<{ id: string; url: string; kind: 'arrival' | 'contact' }> = new Array(files.length);
+    let nextIndex = 0;
+    let failed = false;
+    await Promise.all(Array.from({ length: Math.min(2, files.length) }, async () => {
+      while (!failed && nextIndex < files.length) {
+        const index = nextIndex++;
+        try {
+          receipts[index] = await providerOrderApi.uploadNoShowEvidence(orderId, files[index].file, files[index].kind);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    }));
+    return { arrival: receipts.slice(0, arrivalFiles.length), contact: receipts.slice(arrivalFiles.length) };
+  },
+  reportNoShow: async (orderId: string, payload: { description: string; arrivalEvidenceIds: string[]; contactEvidenceIds: string[]; contactedCustomer: true }) => {
+    const response = await api.post<{ success: boolean; data: Order }>(`/orders/${orderId}/customer-no-show`, payload);
+    return response.data.data;
+  },
   confirmQuotationPayment: async (orderId: string, quotationId: string, expectedRevision: number) => {
     const response = await api.post<{ success: boolean; data: QuotationDetail['quotation'] }>(
       `/orders/${orderId}/quotation/payment/confirm`, { quotationId, expectedRevision },

@@ -2,6 +2,16 @@ import { Request, Response } from "express";
 import { requireRequestUser } from "../middlewares/authContext";
 import * as reportService from "../services/report.service";
 import { sendControllerError } from "../utils/controllerError";
+import { reverifyCustomerNoShowCalls } from "../services/customerNoShowReverification.service";
+
+export const reverifyCustomerNoShow = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    await reverifyCustomerNoShowCalls(user.id, req.params.id as string);
+    const report = await reportService.getAdminReportById(req.params.id as string);
+    return res.json({ success: true, data: report, message: "Đã xác minh lại cuộc gọi và lưu lịch sử kiểm tra." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
 
 export const createReport = async (req: Request, res: Response) => {
   try {
@@ -74,4 +84,28 @@ export const reviewReport = async (req: Request, res: Response) => {
   } catch (error: unknown) {
     return sendControllerError(res, error);
   }
+};
+
+export const cancelReport = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await reportService.cancelReport(user.id, req.params.id as string);
+    return res.json({ success: true, data, message: "Đã hủy báo cáo." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
+
+export const addReportEvidence = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await reportService.addReportEvidence(user.id, user.role, req.params.id as string, req.body);
+    return res.json({ success: true, data, message: "Đã bổ sung bằng chứng." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
+};
+
+export const requestReportEvidence = async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req);
+    const data = await reportService.requestReportEvidence(user.id, req.params.id as string, req.body.requestedEvidenceNote);
+    return res.json({ success: true, data, message: "Đã yêu cầu bổ sung bằng chứng." });
+  } catch (error: unknown) { return sendControllerError(res, error); }
 };

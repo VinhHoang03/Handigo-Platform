@@ -18,6 +18,7 @@ import type {
   VerifyRegisterOtpRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
+  User,
 } from '../types/auth.types';
 import { useAuthStore } from '../store/auth.store';
 import axios from 'axios';
@@ -26,31 +27,42 @@ const isNetworkError = (error: unknown) => {
   return axios.isAxiosError(error) && !error.response;
 };
 
+let restorePromise: Promise<User | null> | null = null;
+let restoreRevision: number | undefined;
+
+const restoreUserSession = async (): Promise<User | null> => {
+  const revision = useAuthStore.getState().sessionRevision;
+  const isCurrent = () => revision === useAuthStore.getState().sessionRevision;
+  try {
+    if (!useAuthStore.getState().token) await refreshAccessToken();
+    if (!isCurrent()) return null;
+    const user = await getMeApi();
+    if (!isCurrent()) return null;
+    useAuthStore.getState().setUser(user);
+    return user;
+  } catch (error) {
+    if (!isCurrent() || axios.isCancel(error)) return null;
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    if (isNetworkError(error) || status === 429 || (status !== undefined && status >= 500)) {
+      useAuthStore.getState().finishInitialization();
+      return useAuthStore.getState().user;
+    }
+
+    useAuthStore.getState().logout();
+    return null;
+  }
+};
+
 export const authService = {
-  restoreSession: async () => {
-    const store = useAuthStore.getState();
-    if (!store.token) {
-      try {
-        await refreshAccessToken();
-      } catch {
-        store.finishInitialization();
-        return null;
-      }
+  restoreSession: () => {
+    // Các lời gọi đồng thời dùng chung một lần khôi phục phiên.
+    const revision = useAuthStore.getState().sessionRevision;
+    if (!restorePromise || restoreRevision !== revision) {
+      restoreRevision = revision;
+      const task = restoreUserSession().finally(() => { if (restorePromise === task) restorePromise = null; });
+      restorePromise = task;
     }
-
-    try {
-      const user = await getMeApi();
-      useAuthStore.getState().setUser(user);
-      return user;
-    } catch (error) {
-      if (isNetworkError(error)) {
-        useAuthStore.getState().finishInitialization();
-        return store.user;
-      }
-
-      useAuthStore.getState().logout();
-      return null;
-    }
+    return restorePromise;
   },
 
   login: async (credentials: LoginRequest, remember = true) => {
@@ -147,12 +159,12 @@ export const authService = {
   },
 
   logout: async () => {
+    useAuthStore.getState().logout();
     try {
       await logoutApi();
     } catch (error) {
+      if (axios.isCancel(error)) return;
       console.warn("API đăng xuất thất bại, tiếp tục xóa phiên đăng nhập trên thiết bị:", error);
-    } finally {
-      useAuthStore.getState().logout();
     }
   }
 };

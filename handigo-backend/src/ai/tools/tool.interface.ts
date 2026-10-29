@@ -7,6 +7,11 @@ export interface ToolContext {
   sessionId: string;
   signal: AbortSignal;
   confirmedPreview?: unknown;
+  actionId?: string;
+  actionCreatedAt?: string;
+  bookingPaymentActionId?: string;
+  readOnly?: boolean;
+  replaceBookingDraft?: boolean;
   bookingAddressLookup?: { value?: Promise<import("../agent/booking-draft").DraftAddress[]> };
 }
 
@@ -19,7 +24,8 @@ export interface AgentTool<T = unknown> {
   roles: RequestUser["role"][];
   preview?: (context: ToolContext, args: T) => Promise<unknown>;
   execute(context: ToolContext, args: T): Promise<unknown>;
-  reply?: (result: unknown) => { message: string; state: "COMPLETED" | "WAITING_USER_INPUT"; retryable?: boolean };
+  reconcile?: (context: ToolContext, args: T) => Promise<unknown | null>;
+  reply?: (result: unknown) => { message: string; state: "COMPLETED" | "WAITING_USER_INPUT"; retryable?: boolean } | undefined;
 }
 
 export interface ToolPolicy {

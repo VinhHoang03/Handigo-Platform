@@ -38,6 +38,10 @@ export const getPaymentStatusDisplay = (
     }
     if (currentOrder.paymentStatus === "refunded") {
       const refundPolicy = currentOrder.cancellation?.refundPolicy;
+      if (refundPolicy?.policyVersion === "HANDIGO_PROVIDER_ARRIVAL_CANCEL_V1") {
+        return { label: `Đã hoàn ${formatCurrency(refundPolicy.refundAmount)} về ví Handigo`,
+          className: toneTextClasses.success };
+      }
       return {
         label:
           refundPolicy && refundPolicy.paidAmount > refundPolicy.refundAmount

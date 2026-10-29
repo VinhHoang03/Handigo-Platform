@@ -148,6 +148,8 @@ export interface OrderReassignment {
 }
 
 export interface Order {
+  arrival?: { providerId: string; arrivedAt: string; latitude: number; longitude: number } | null;
+  customerNoShow?: { reportId: string; status: 'pending' | 'approved' | 'rejected'; reportedAt: string; reviewedAt?: string | null; compensationAmount: number } | null;
   customerCancellationDeadline?: string | null;
   statusHistory?: Array<{ _id: string; status: string; previousStatus?: string | null; changedByRole: string; note?: string | null; createdAt: string }>;
   schedule?: { durationMinutes: number; bufferMinutes: number; travelMinutes: number; expectedStartAt?: string | null; expectedEndAt?: string | null } | null;
@@ -158,6 +160,7 @@ export interface Order {
   customerAttachments?: string[];
   completionEvidenceImages?: string[];
   completionNote?: string | null;
+  confirmation?: { customerConfirmedAt?: string | null; providerConfirmedAt?: string | null };
   providerId?: {
     _id: string;
     userId?: {
@@ -170,8 +173,6 @@ export interface Order {
     completedOrders?: number;
     totalCompletedOrders?: number;
     avatar?: string | null;
-    serviceArea?: { province?: string; ward?: string };
-    workingAreas?: string[];
     averageRating?: number;
     totalFeedbacks?: number;
     experienceYears?: number;
@@ -188,7 +189,8 @@ export interface Order {
     quantity?: number;
     subtotal?: number;
   }>;
-  addressId: Address;
+  addressId: (Omit<Address, "_id"> & { _id: string | null }) | null;
+  addressSnapshot?: Partial<Address> | null;
   orderType: "normal" | "urgent" | "scheduled" | "recurring";
   scheduledAt?: string | null;
   bookingStatus?:
@@ -289,6 +291,7 @@ export interface QuotationItem {
 
 export interface OrderQuotation {
   quotation: {
+    customerConfirmed?: boolean;
     estimatedDurationMinutes?: number;
     _id: string;
     quotationCode?: string;
@@ -311,6 +314,7 @@ export interface OrderQuotation {
 }
 
 export interface BookingState {
+  rebookSource?: { orderId: string; orderCode: string; notices: string[] };
   categoryId?: string;
   serviceId?: string;
   selectedOptionIds: string[];

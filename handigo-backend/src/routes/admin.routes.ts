@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as adminController from "../controllers/admin.controller";
+import * as serviceController from "../controllers/service.controller";
 import * as categoryController from "../controllers/category.controller";
 import * as complaintController from "../controllers/complaint.controller";
 import * as reportController from "../controllers/report.controller";
@@ -32,6 +33,7 @@ import {
   reportIdSchema,
   reportListQuerySchema,
   reviewReportSchema,
+  requestReportEvidenceSchema,
 } from "../validations/report.validator";
 import {
   addSupportTicketResponseSchema,
@@ -45,11 +47,15 @@ import {
   violationIdSchema,
   violationListQuerySchema,
 } from "../validations/violation.validator";
-import { feedbackListQuerySchema } from "../validations/feedback.validator";
+import { adminFeedbackListQuerySchema } from "../validations/feedback.validator";
 
 const router = Router();
 
 router.use(authMiddleware, roleMiddleware("ADMIN"));
+router.get("/orders/:id", validate(adminEntityIdParamSchema, "params"), adminController.getOrderDetail);
+
+router.get("/services", serviceController.listServices);
+router.get("/services/:id", serviceController.getServiceById);
 
 router.get(
   "/users",
@@ -69,8 +75,14 @@ router.patch(
 );
 
 router.get(
+  "/feedbacks/:id",
+  validate(adminEntityIdParamSchema, "params"),
+  adminController.getFeedbackDetail,
+);
+
+router.get(
   "/feedbacks",
-  validate(feedbackListQuerySchema, "query"),
+  validate(adminFeedbackListQuerySchema, "query"),
   adminController.getFeedbacks,
 );
 
@@ -83,6 +95,11 @@ router.get(
   "/reports/:id",
   validate(reportIdSchema, "params"),
   reportController.getAdminReportById,
+);
+router.post(
+  "/reports/:id/reverify",
+  validate(reportIdSchema, "params"),
+  reportController.reverifyCustomerNoShow,
 );
 router.patch(
   "/reports/:id/review",
@@ -202,5 +219,7 @@ router.patch(
   validate(reviewProviderApplicationSchema),
   adminController.reviewProviderApplication,
 );
+
+router.patch("/reports/:id/request-evidence", validate(reportIdSchema, "params"), validate(requestReportEvidenceSchema), reportController.requestReportEvidence);
 
 export default router;

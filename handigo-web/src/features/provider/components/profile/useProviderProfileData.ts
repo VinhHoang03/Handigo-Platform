@@ -1,5 +1,5 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import type { UserProfileData } from "@/features/profile/types/profile.types";
 import { getErrorMessage } from "@/utils/apiError";
@@ -11,7 +11,6 @@ import type {
 import {
   buildPerformanceStats,
   buildProviderProfileView,
-  buildServiceArea,
   emptyProfessionalForm,
   optional,
   toProfessionalForm,
@@ -27,6 +26,11 @@ import { useProviderProfileSave } from "./useProviderProfileSave";
  */
 export function useProviderProfileData(availabilityStatus: string) {
   const { addToast } = useToast();
+  const sessionRevision = useAuthStore((state) => state.sessionRevision);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const isCurrent = useCallback(() => mounted.current
+    && useAuthStore.getState().sessionRevision === sessionRevision, [sessionRevision]);
   const [profile, setProfile] = useState<ProviderProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useToastFeedback<string | null>(null, "error");
@@ -38,7 +42,7 @@ export function useProviderProfileData(availabilityStatus: string) {
 
   const syncAuthUser = useCallback((nextUser: UserProfileData) => {
     const { user, setUser } = useAuthStore.getState();
-    if (!user) return;
+    if (!isCurrent() || !user || nextUser.id !== (user.id || user._id)) return;
 
     const syncedUser = {
       ...user,
@@ -57,7 +61,7 @@ export function useProviderProfileData(availabilityStatus: string) {
       (user.gender ?? null) !== (syncedUser.gender ?? null);
 
     if (hasChanged) setUser(syncedUser);
-  }, []);
+  }, [isCurrent]);
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
@@ -65,15 +69,16 @@ export function useProviderProfileData(availabilityStatus: string) {
 
     try {
       const nextProfile = await providerProfileApi.getProfile();
+      if (!isCurrent()) return;
       setProfile(nextProfile);
       setProfessionalForm(toProfessionalForm(nextProfile));
       syncAuthUser(toUserProfileData(nextProfile));
     } catch {
-      setError("Không thể tải hồ sơ provider.");
+      if (isCurrent()) setError("Không thể tải hồ sơ provider.");
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
-  }, [setError, syncAuthUser]);
+  }, [isCurrent, setError, syncAuthUser]);
 
   useEffect(() => {
     // Initial remote loads are intentionally started from this effect.
@@ -91,7 +96,6 @@ export function useProviderProfileData(availabilityStatus: string) {
     [availabilityStatus, profile],
   );
 
-  const serviceArea = useMemo(() => buildServiceArea(profile), [profile]);
 
   const { handleUserProfileSave, handleAvatarSave } = useProviderProfileSave({
     profile,
@@ -99,10 +103,12 @@ export function useProviderProfileData(availabilityStatus: string) {
     setIsSaving,
     setError,
     syncAuthUser,
+    isCurrent,
   });
 
   async function handleProfessionalSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isCurrent()) return;
 
     setIsSaving(true);
     setError(null);
@@ -110,12 +116,13 @@ export function useProviderProfileData(availabilityStatus: string) {
       const nextProfile = await providerProfileApi.updateProfile({
         bio: optional(professionalForm.bio),
       });
-
+      if (!isCurrent()) return;
       setProfile(nextProfile);
       setProfessionalForm(toProfessionalForm(nextProfile));
       setIsEditingProfessional(false);
       addToast("Đã cập nhật hồ sơ nghề nghiệp.", "success");
     } catch (saveError) {
+      if (!isCurrent()) return;
       setError(
         getErrorMessage(
           saveError,
@@ -123,7 +130,7 @@ export function useProviderProfileData(availabilityStatus: string) {
         ),
       );
     } finally {
-      setIsSaving(false);
+      if (isCurrent()) setIsSaving(false);
     }
   }
 
@@ -147,7 +154,6 @@ export function useProviderProfileData(availabilityStatus: string) {
     loadProfile,
     profileView,
     performanceStats,
-    serviceArea,
     handleUserProfileSave,
     handleAvatarSave,
     handleProfessionalSubmit,

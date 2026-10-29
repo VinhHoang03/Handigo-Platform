@@ -30,6 +30,10 @@ export const createReportSchema = z
     evidenceFiles: z.array(evidenceFileSchema).max(10).optional(),
   })
   .refine(
+    (data) => data.reportType !== "service_quality" || (data.targetType === "order" && Boolean(data.orderId)),
+    "Báo cáo chất lượng dịch vụ phải gắn với đơn dịch vụ",
+  )
+  .refine(
     (data) => {
       if (data.targetType === "user") return Boolean(data.targetUserId);
       if (data.targetType === "provider") return Boolean(data.targetUserId || data.targetProviderId);
@@ -39,6 +43,12 @@ export const createReportSchema = z
       return true;
     },
     "Thiếu thông tin đối tượng bị báo cáo",
+  )
+  .refine(
+    (data) => (!data.targetProviderId || data.targetType === "provider") &&
+      (!data.targetFeedbackId || data.targetType === "feedback") &&
+      (!data.conversationId || data.targetType === "chat_conversation"),
+    "Liên kết tài nguyên không phù hợp với loại báo cáo",
   );
 
 export const reviewReportSchema = z.object({
@@ -57,5 +67,15 @@ export const reportListQuerySchema = z.object({
   status: z.enum(REPORT_STATUSES).optional(),
   reportType: z.enum(REPORT_TYPES).optional(),
   targetType: z.enum(REPORT_TARGET_TYPES).optional(),
+  orderId: objectIdSchema.optional(),
   keyword: z.string().trim().max(100).optional(),
+});
+
+export const addReportEvidenceSchema = z.object({
+  files: z.array(evidenceFileSchema).min(1).max(10),
+  note: z.string().trim().max(1000).nullable().optional(),
+});
+
+export const requestReportEvidenceSchema = z.object({
+  requestedEvidenceNote: z.string().trim().min(5).max(3000),
 });

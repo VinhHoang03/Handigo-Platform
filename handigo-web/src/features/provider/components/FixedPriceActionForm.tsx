@@ -51,7 +51,8 @@ export function FixedPriceActionForm({
     return () => previews.forEach((url) => URL.revokeObjectURL(url));
   }, [previews]);
 
-  const showStart = order.status === 'accepted' && !order.inspectionRequired;
+  const showStart = order.status === 'accepted' && !order.inspectionRequired
+    && order.arrival?.providerId === order.providerId?._id && !!order.arrival;
   const showComplete = order.status === 'in_progress';
   const showCancel = order.status === 'accepted';
   const repairQuotation = quotation?.quotation;
@@ -99,12 +100,14 @@ export function FixedPriceActionForm({
     void onComplete(files, note.trim());
   };
 
+  if (order.customerNoShow?.status === 'pending' || order.customerNoShow?.status === 'approved') return null;
+
   return (
     <div className="flex h-full flex-col space-y-md rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg">
       <div>
         <div className="flex items-center gap-2">
           <CircleCheckBig aria-hidden="true" size={24} className="text-primary" />
-          <h3 className="font-headline-md text-on-surface">Thao tác đơn hàng</h3>
+          <h3 className="font-headline-md font-bold text-on-surface">Thao tác đơn hàng</h3>
         </div>
         <p className="mt-1 text-sm text-on-surface-variant">
           Cập nhật trạng thái và bằng chứng thực hiện dịch vụ.
@@ -190,10 +193,10 @@ export function FixedPriceActionForm({
             {order.paymentMethod === 'wallet' ? 'Đã thanh toán qua ví' : 'Đã thanh toán qua QR'}
           </p>
         )}
-        {showPaymentConfirmation && (repairQuotation.directPaymentConfirmedAt && order.paymentStatus === 'paid' ? (
+        {showPaymentConfirmation && (order.paymentStatus === 'paid' ? (
           <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
             <CircleCheckBig aria-hidden="true" size={20} />
-            Đã xác nhận thanh toán báo giá
+            {repairQuotation.directPaymentConfirmedAt ? 'Đã xác nhận thanh toán báo giá' : 'Khách đã thanh toán bằng Ví Handigo'}
           </p>
         ) : (
           <button
@@ -209,9 +212,10 @@ export function FixedPriceActionForm({
             Xác nhận đã thanh toán
           </button>
         ))}
+        <div className={showStart ? 'mx-auto flex w-full max-w-2xl flex-col gap-3' : 'space-y-sm'}>
         {showStart && (
-          <button type="button" disabled={busy} onClick={onStart} className="btn-primary w-full py-3 text-base font-bold">
-            {busy ? 'Đang xử lý...' : 'Bắt đầu thực hiện'}
+          <button type="button" disabled={busy || !order.arrival || order.arrival.providerId !== order.providerId?._id} onClick={onStart} className="btn-primary w-full px-4 py-3 text-base font-bold">
+            {busy ? 'Đang xử lý...' : 'Bắt đầu làm việc'}
           </button>
         )}
         {showComplete && (
@@ -224,11 +228,12 @@ export function FixedPriceActionForm({
             type="button"
             disabled={busy}
             onClick={onCancel}
-            className="w-full rounded-xl border border-error/30 py-2.5 text-sm font-bold text-error transition-colors hover:bg-error/5"
+            className="w-full rounded-xl border border-error/30 px-4 py-3 text-sm font-bold text-error transition-colors hover:bg-error/5"
           >
             Hủy đơn dịch vụ
           </button>
         )}
+        </div>
       </div>
       <ConfirmDialog
         open={paymentConfirmation !== null}

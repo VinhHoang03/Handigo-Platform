@@ -1,3 +1,4 @@
+import { reportModelUsage } from "../model-usage";
 import { z } from "zod";
 import type { LLMProvider, LLMRequest, ProviderConfig } from "../llm.interface";
 import { parseReply, postJson, requestContext } from "./provider-http";
@@ -17,6 +18,7 @@ export class OpenAIProvider implements LLMProvider {
         } })),
         messages: [{ role: "system", content: request.system + NATIVE_TOOL_INSTRUCTION }, { role: "user", content: requestContext(request) }],
       }, this.config, request.signal);
+    reportModelUsage(request, "openai", this.config.model, data);
     const parsed = z.object({ choices: z.array(z.object({
       finish_reason: z.string(), message: z.object({ content: z.string().nullable().optional(),
         tool_calls: z.array(z.object({ type: z.literal("function"), function: z.object({ name: z.string(), arguments: z.string() }) })).optional() }),

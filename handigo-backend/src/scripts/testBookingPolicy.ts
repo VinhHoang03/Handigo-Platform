@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Types } from 'mongoose';
 import { bookingPolicySchema, DEFAULT_BOOKING_POLICY } from '../validations/bookingPolicy.validator';
-import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, intervalsConflict } from '../utils/bookingPolicy';
+import { calculateBookingSettlement, calculateDuration, getEarliestScheduledAt, intervalsConflict, isWithinAppointmentHours } from '../utils/bookingPolicy';
 import { getOrderInterval, isWithinWorkingCalendar } from '../utils/providerSchedule';
 import { createOrderSchema, previewBookingSchema } from '../validations/order.validator';
 
@@ -48,16 +48,21 @@ for (const uniformQuantity of [0, -1, 1.5, 100]) {
 assert.equal(previewBookingSchema.parse({ serviceId }).uniformQuantity, undefined);
 
 const at = (time: string) => Date.parse(`2026-09-28T${time}:00+07:00`);
-// Cho phép đặt sát thời gian hiện tại từ 08:00, không cần đặt trước 2 tiếng.
-assert.equal(getEarliestScheduledAt(new Date(at('05:00'))).getTime(), at('08:00'));
-assert.equal(getEarliestScheduledAt(new Date(at('06:00'))).getTime(), at('08:00'));
+// Khung giờ Việt Nam không phụ thuộc múi giờ máy chủ; vẫn làm tròn về phút hiện tại.
+for (const [time, expected] of [['07:59', false], ['08:00', true], ['12:30', true], ['20:59', true], ['21:00', true], ['21:01', false], ['23:59', false]] as const) {
+  assert.equal(isWithinAppointmentHours(new Date(at(time))), expected, time);
+  assert.equal(isWithinAppointmentHours(new Date(new Date(at(time)).toISOString())), expected, `UTC ${time}`);
+}
+assert.equal(isWithinAppointmentHours(new Date('không hợp lệ')), false);
+assert.equal(getEarliestScheduledAt(new Date(at('05:00'))).getTime(), at('05:00'));
+assert.equal(getEarliestScheduledAt(new Date(at('06:00'))).getTime(), at('06:00'));
 assert.equal(getEarliestScheduledAt(new Date(at('09:30'))).getTime(), at('09:30'));
 assert.equal(getEarliestScheduledAt(new Date('2026-09-28T09:30:47+07:00')).getTime(), at('09:30'));
 assert.equal(getEarliestScheduledAt(new Date('2026-09-28T09:30:59+07:00')).getTime(), at('09:30'));
 assert.equal(getEarliestScheduledAt(new Date('2026-09-28T09:31:00+07:00')).getTime(), at('09:31'));
 assert.equal(getEarliestScheduledAt(new Date(at('15:00'))).getTime(), at('15:00'));
 assert.equal(getEarliestScheduledAt(new Date(at('23:30'))).getTime(), at('23:30'));
-assert.equal(getEarliestScheduledAt(new Date('2026-09-29T00:30:00+07:00')).getTime(), Date.parse('2026-09-29T08:00:00+07:00'));
+assert.equal(getEarliestScheduledAt(new Date('2026-09-29T00:30:00+07:00')).getTime(), Date.parse('2026-09-29T00:30:00+07:00'));
 const earliest = getEarliestScheduledAt(new Date(at('09:30'))).getTime();
 assert.equal(at('09:00') >= earliest, false);
 assert.equal(at('10:00') >= earliest, true);

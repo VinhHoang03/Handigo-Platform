@@ -103,15 +103,6 @@ export const ProvidersSection = () => {
                       rating={provider.averageRating}
                       totalFeedbacks={provider.totalFeedbacks}
                       services={provider.services.map((service) => service.name)}
-                      area={
-                        provider.workingAreas.join(", ") ||
-                        [
-                          provider.serviceArea?.ward,
-                          provider.serviceArea?.province,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")
-                      }
                     />
                   </div>
                 )),

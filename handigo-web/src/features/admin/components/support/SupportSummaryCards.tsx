@@ -30,7 +30,7 @@ function SummaryCard({
 
 export function SupportSummaryCards({ summary }: { summary: SupportSummary }) {
   const cards = [
-    { icon: Inbox, label: "Đang tồn", value: summary.active, description: "Ticket cần tiếp tục xử lý" },
+    { icon: Inbox, label: "Đang tồn", value: summary.active, description: "Yêu cầu hỗ trợ cần tiếp tục xử lý" },
     { icon: AlertCircle, label: "Khẩn cấp", value: summary.urgentActive, description: "Ưu tiên xử lý ngay" },
     { icon: UserX, label: "Chưa phân công", value: summary.unassignedActive, description: "Chưa có người phụ trách" },
     { icon: CircleCheckBig, label: "Hoàn tất hôm nay", value: summary.resolvedToday, description: "Đã xử lý hoặc đóng" },
@@ -38,7 +38,7 @@ export function SupportSummaryCards({ summary }: { summary: SupportSummary }) {
   ];
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <section aria-label="Thống kê hỗ trợ toàn hệ thống, không phụ thuộc bộ lọc danh sách" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       {cards.map((card) => (
         <SummaryCard key={card.label} {...card} />
       ))}

@@ -7,6 +7,9 @@ import { STATUS_LABELS, STATUS_TRANSITIONS } from "./support.constants";
 interface TicketSidebarProps {
   ticket: AdminSupportTicket;
   admins: AdminUser[];
+  adminsLoading: boolean;
+  adminsError: string;
+  onReloadAdmins: () => void;
   busy: boolean;
   actionError: string;
   onAssign: (adminId: string) => Promise<boolean>;
@@ -14,14 +17,17 @@ interface TicketSidebarProps {
   onCreateViolation: () => void;
 }
 
-export function TicketSidebar({ ticket, admins, busy, onAssign, onStatusChange, onCreateViolation }: TicketSidebarProps) {
-  const [assignedAdminId, setAssignedAdminId] = useState(ticket.assignedAdminId?._id ?? "");
+export function TicketSidebar({ ticket, admins, adminsLoading, adminsError, onReloadAdmins, busy, onAssign, onStatusChange, onCreateViolation }: TicketSidebarProps) {
+  const [assignedAdminId, setAssignedAdminId] = useState<string | null>(null);
   const [nextStatus, setNextStatus] = useState<SupportTicketStatus | "">("");
   const [resolutionNote, setResolutionNote] = useState("");
-  const isTerminal = ["closed", "cancelled"].includes(ticket.status);
+  const isTerminal = ["resolved", "closed", "cancelled"].includes(ticket.status);
+
+  const assignment = assignedAdminId ?? ticket.assignedAdminId?._id ?? "";
+  const transitions = ticket.createdViolationId ? [] : STATUS_TRANSITIONS[ticket.status];
 
   const submitStatus = async () => {
-    if (!nextStatus) return;
+    if (!nextStatus || !transitions.includes(nextStatus)) return;
     const succeeded = await onStatusChange(nextStatus, resolutionNote.trim() || undefined);
     if (succeeded) {
       setNextStatus("");
@@ -34,7 +40,7 @@ export function TicketSidebar({ ticket, admins, busy, onAssign, onStatusChange, 
 
       {!ticket.createdViolationId && ticket.status !== "cancelled" && (
         <button type="button" onClick={onCreateViolation} className="w-full rounded-xl bg-error px-4 py-3 font-bold text-on-error">
-          Tạo vi phạm và áp dụng penalty
+          Tạo vi phạm và áp dụng hình phạt
         </button>
       )}
 
@@ -44,20 +50,24 @@ export function TicketSidebar({ ticket, admins, busy, onAssign, onStatusChange, 
           <h3 className="font-bold">Phân công xử lý</h3>
         </div>
         <select
-          value={assignedAdminId}
+          value={assignment}
           onChange={(event) => setAssignedAdminId(event.target.value)}
-          disabled={isTerminal || busy}
+          disabled={isTerminal || busy || adminsLoading || Boolean(adminsError)}
           className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3"
         >
           <option value="">Chọn quản trị viên</option>
+          {assignment && !admins.some(admin => admin._id === assignment) && <option value={assignment}>{ticket.assignedAdminId?.fullName || "Quản trị viên không còn khả dụng"}</option>}
           {admins.map((admin) => (
             <option key={admin._id} value={admin._id}>{admin.fullName} · {admin.email}</option>
           ))}
         </select>
+        {adminsLoading && <p role="status" className="mt-2 text-sm">Đang tải quản trị viên...</p>}
+        {adminsError && <p role="alert" className="mt-2 text-sm text-error">{adminsError} <button type="button" onClick={onReloadAdmins} disabled={busy} className="font-semibold underline">Thử lại</button></p>}
+        {!adminsLoading && !adminsError && !admins.length && <p className="mt-2 text-sm">Chưa có quản trị viên hoạt động.</p>}
         <button
           type="button"
-          onClick={() => assignedAdminId && void onAssign(assignedAdminId)}
-          disabled={isTerminal || busy || !assignedAdminId || assignedAdminId === ticket.assignedAdminId?._id}
+          onClick={() => assignment && void onAssign(assignment).then(success => { if (success) setAssignedAdminId(null); })}
+          disabled={isTerminal || busy || adminsLoading || Boolean(adminsError) || !admins.some(admin => admin._id === assignment) || assignment === ticket.assignedAdminId?._id}
           className="mt-3 w-full rounded-xl border border-primary px-4 py-2.5 font-semibold text-primary disabled:opacity-40"
         >
           Xác nhận phân công
@@ -70,13 +80,13 @@ export function TicketSidebar({ ticket, admins, busy, onAssign, onStatusChange, 
           <h3 className="font-bold">Cập nhật trạng thái</h3>
         </div>
         <select
-          value={nextStatus}
+          value={nextStatus && transitions.includes(nextStatus) ? nextStatus : ""}
           onChange={(event) => setNextStatus(event.target.value as SupportTicketStatus | "")}
-          disabled={busy || !STATUS_TRANSITIONS[ticket.status].length}
+          disabled={busy || !transitions.length}
           className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant bg-surface px-3"
         >
           <option value="">Chọn trạng thái tiếp theo</option>
-          {STATUS_TRANSITIONS[ticket.status].map((status) => (
+          {transitions.map((status) => (
             <option key={status} value={status}>{STATUS_LABELS[status]}</option>
           ))}
         </select>
@@ -93,7 +103,7 @@ export function TicketSidebar({ ticket, admins, busy, onAssign, onStatusChange, 
         <button
           type="button"
           onClick={() => void submitStatus()}
-          disabled={busy || !nextStatus || (nextStatus === "resolved" && resolutionNote.trim().length < 10)}
+          disabled={busy || !nextStatus || !transitions.includes(nextStatus) || (nextStatus === "resolved" && resolutionNote.trim().length < 10)}
           className="mt-3 w-full btn-primary disabled:opacity-40"
         >
           {busy ? "Đang cập nhật..." : "Cập nhật trạng thái"}

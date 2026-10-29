@@ -1,7 +1,4 @@
 import type {
-  SupportTicketCategory,
-  SupportTicketPriority,
-  SupportTicketStatus,
   SupportSummary,
 } from "../../types/adminSupport.types";
 
@@ -10,40 +7,12 @@ export const dateTime = new Intl.DateTimeFormat("vi-VN", {
   timeStyle: "short",
 });
 
-export const STATUS_LABELS: Record<SupportTicketStatus, string> = {
-  open: "Mới tiếp nhận",
-  in_progress: "Đang xử lý",
-  waiting_user: "Chờ người dùng",
-  resolved: "Đã xử lý",
-  closed: "Đã đóng",
-  cancelled: "Đã hủy",
-};
-
-export const CATEGORY_LABELS: Record<SupportTicketCategory, string> = {
-  ACCOUNT: "Tài khoản",
-  PAYMENT: "Thanh toán",
-  ORDER: "Đơn dịch vụ",
-  TECHNICAL: "Kỹ thuật",
-  SECURITY: "Bảo mật",
-  APPEAL: "Khiếu nại",
-  OTHER: "Khác",
-};
-
-export const PRIORITY_LABELS: Record<SupportTicketPriority, string> = {
-  LOW: "Thấp",
-  MEDIUM: "Trung bình",
-  HIGH: "Cao",
-  URGENT: "Khẩn cấp",
-};
-
-export const STATUS_TRANSITIONS: Record<SupportTicketStatus, SupportTicketStatus[]> = {
-  open: ["in_progress", "waiting_user", "resolved"],
-  in_progress: ["waiting_user", "resolved"],
-  waiting_user: ["in_progress", "resolved"],
-  resolved: ["in_progress", "closed"],
-  closed: [],
-  cancelled: [],
-};
+export {
+  SUPPORT_STATUS_LABELS as STATUS_LABELS,
+  SUPPORT_CATEGORY_LABELS as CATEGORY_LABELS,
+  SUPPORT_PRIORITY_LABELS as PRIORITY_LABELS,
+  SUPPORT_STATUS_TRANSITIONS as STATUS_TRANSITIONS,
+} from "@/features/case-management/components/supportLabels.constants";
 
 export const EMPTY_SUMMARY: SupportSummary = {
   total: 0,

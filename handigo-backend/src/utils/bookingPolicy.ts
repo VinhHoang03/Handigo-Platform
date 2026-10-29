@@ -1,27 +1,15 @@
 import type { BookingPolicy } from "../validations/bookingPolicy.validator";
 
-const VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000;
-
 export const isWithinAppointmentHours = (scheduledAt: Date) => {
-  const vietnamTime = new Date(scheduledAt.getTime() + VIETNAM_OFFSET_MS);
-  const hour = vietnamTime.getUTCHours();
-  const minute = vietnamTime.getUTCMinutes();
-  return hour >= 8 && (hour < 21 || (
-    hour === 21
-    && minute === 0
-    && vietnamTime.getUTCSeconds() === 0
-    && vietnamTime.getUTCMilliseconds() === 0
-  ));
+  if (!Number.isFinite(scheduledAt.getTime())) return false;
+  const vietnamTime = new Date(scheduledAt.getTime() + 7 * 60 * 60000);
+  const minute = vietnamTime.getUTCHours() * 60 + vietnamTime.getUTCMinutes();
+  return minute >= 8 * 60 && minute <= 21 * 60;
 };
 
 export const getEarliestScheduledAt = (now = new Date()) => {
   const earliest = new Date(now);
   earliest.setSeconds(0, 0);
-  const vietnamTime = new Date(earliest.getTime() + VIETNAM_OFFSET_MS);
-  if (vietnamTime.getUTCHours() < 8) {
-    vietnamTime.setUTCHours(8, 0, 0, 0);
-    return new Date(vietnamTime.getTime() - VIETNAM_OFFSET_MS);
-  }
   return earliest;
 };
 

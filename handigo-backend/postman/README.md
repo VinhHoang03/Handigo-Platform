@@ -107,3 +107,29 @@ Ví dụ gói giảm phí cọc:
 Cấu hình gói được lưu trong `system_configs`, dùng các gói mặc định khi chưa có cấu hình. Gói tạm dừng không xuất hiện trong danh sách đổi của khách. Thử lại yêu cầu đổi đã thành công vẫn trả mã cũ và không trừ điểm thêm, kể cả khi gói đã tạm dừng.
 
 Response mã quản lý bổ sung `ownerId`, `reservedOrderId`, `applicableOrderType`. Mã đổi điểm đã cấp giữ nguyên quyền lợi; không sửa trực tiếp qua `PATCH /vouchers/:id`. ADMIN có thể bật/tắt hoặc xóa bằng API hiện có, nhưng không được tạm dừng/xóa mã đang giữ cho đơn còn hiệu lực, hoặc xóa mã đã sử dụng. Thay đổi trạng thái và cấu hình được ghi nhật ký quản trị.
+
+
+## Tổng quan vận hành quản trị
+
+Hai API mới chỉ dành cho tài khoản ADMIN, đi qua xác thực và giới hạn tần suất của dashboard. Không thay đổi contract các API dashboard đang có.
+
+- GET /dashboard/presence: trả totalRegisteredUsers, onlineUsers và asOf. Tổng đăng ký gồm mọi vai trò, không tính tài khoản đã xóa. Online chỉ đếm tài khoản hoạt động còn tồn tại và có kết nối Socket.IO đã xác thực; nhiều tab/thiết bị tính một lần. onlineUsers là null nếu socket chưa được khởi tạo. Web cập nhật mỗi 30 giây khi trang hiển thị, lỗi tải giữ số liệu gần nhất và có thông báo.
+- GET /dashboard/insights: nhận fromDate, toDate dạng YYYY-MM-DD theo giờ Việt Nam. Mặc định 30 ngày kết thúc hôm nay; kỳ trước có cùng độ dài và kết thúc ngay trước kỳ hiện tại. Trả period, pendingWork, attentionOrders, comparison, customers, deposits, quality và asOf.
+- Hàng đợi chờ duyệt/chưa phản hồi và đơn cần chú ý là trạng thái hiện tại toàn hệ thống. Danh sách đơn tối đa 5 đơn tạo lâu nhất; quá giờ dựa trên lịch dự kiến hoặc dấu cảnh báo quá hạn hiện có, không tạo chính sách tự hủy mới.
+- Số đơn và tỷ lệ hủy so sánh theo ngày tạo; phí nền tảng theo ngày tạo giao dịch phí thành công. Kỳ trước bằng 0 trả changePercent = null; tỷ lệ hủy so sánh theo điểm phần trăm.
+- Khách đặt đơn đếm theo tài khoản với đơn không bị hủy. Khách đặt lại có ít nhất 2 đơn đến cuối kỳ và ít nhất 1 đơn trong kỳ. Tài khoản khách hàng mới dựa trên vai trò CUSTOMER hiện tại.
+- Cọc đang giữ và yêu cầu hoàn chưa thành công là số hiện tại. Cọc đã thu, hoàn và bồi thường theo ngày phát sinh trong kỳ; hoàn một phần dùng metadata.refund.amount, bồi thường dùng metadata.cancellationCompensation.amount, dự phòng số tiền giao dịch cho dữ liệu cũ. Cọc thuộc đơn hoàn thành không còn nằm trong cọc đang giữ. Không cộng các dòng này thành doanh thu.
+- Cảnh báo chất lượng gồm đánh giá từ 1 đến 2 sao (kể cả đánh giá ẩn) và tối đa 5 nhà cung cấp có từ 2 khiếu nại trong kỳ, bỏ khiếu nại bị từ chối/hủy. Số khiếu nại không phải kết luận vi phạm.
+- Kiểm thử không dùng dữ liệu hoặc thanh toán thật: node --test tests/admin-dashboard.test.cjs. Các kiểm thử có giả lập lớp dữ liệu; cần đối chiếu thêm trên dữ liệu triển khai.
+
+
+### Điểm sao trên thẻ tổng quan
+
+GET /dashboard/insights bổ sung quality.ratingStats gồm current, previous và changePercent. Mỗi kỳ có averageRating, ratedOrders, fiveStar, fourToFive, belowFour, belowThree, belowTwo. Điểm là trung bình đánh giá từ đơn hoàn thành còn tồn tại; mỗi đơn tính một lần, theo ngày tạo đánh giá, gồm cả đánh giá ẩn và bỏ đánh giá đã xóa. Không lấy trung bình của điểm trung bình từng nhà cung cấp. Nếu một kỳ không có đơn được đánh giá thì changePercent = null; không coi thiếu đánh giá là 0 sao. Các ngưỡng dưới 4, dưới 3, dưới 2 là cộng dồn; ba nhóm 5 sao, 4 đến dưới 5 và dưới 4 bao phủ toàn bộ đánh giá hợp lệ. Các trường quality cũ được giữ nguyên.
+
+
+### Badge công việc trên sidebar admin
+
+GET /dashboard/pending-work chỉ dành cho ADMIN và không nhận bộ lọc thời gian. Trả applications, support, complaints, suggestions, withdrawals, withdrawalAmount, attentionOrders, reports, refunds, asOf. Năm hàng đợi đầu dùng cùng bộ lọc với Tổng quan. reports chỉ gồm pending/under_review; refunds chỉ gồm failed/manual_review; vi phạm đã áp dụng và thanh toán chờ tự động không được coi là việc chưa xử lý. attentionOrders đếm hợp các nhóm đơn cần chú ý hiện tại, không đếm trùng.
+
+Web ẩn badge bằng 0, hiện 99+ khi vượt 99 và giữ số đầy đủ trong nhãn hỗ trợ truy cập. Sidebar mở rộng, thu gọn và các mục điều hướng di động đều hỗ trợ badge. Cập nhật khi chuyển trang, sau thao tác ghi liên quan thành công (gom trong 250ms), mỗi 30 giây khi trang đang hiển thị và khi quay lại cửa sổ. Nếu cập nhật lỗi, giữ số gần nhất nhưng đánh dấu số liệu cũ; không biến lỗi tải thành số 0. Chỉ bật tải số liệu trong layout ADMIN.

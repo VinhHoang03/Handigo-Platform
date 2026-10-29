@@ -13,6 +13,7 @@ import { useConfirmPaymentVoucher } from './useConfirmPaymentVoucher';
 import { useBookingPreview } from '../hooks/useBookingPreview';
 import { runConfirmPaymentSubmit } from './confirmPaymentSubmit';
 import { useBookingPolicies } from '../hooks/useBookingPolicies';
+import { getBookingFingerprint } from '../utils/bookingFingerprint';
 import { PENDING_ORDER_ID_KEY, PENDING_ORDER_FINGERPRINT_KEY, PENDING_ORDER_VOUCHER_KEY,
   clearPendingBooking, recoverPendingBooking } from './pendingBookingRecovery';
 
@@ -35,9 +36,9 @@ export const useConfirmPaymentFlow = () => {
     paymentMethod, setPaymentMethod, reset, uniformQuantity,
   } = useBookingStore();
 
-  const bookingFingerprint = JSON.stringify({
+  const bookingFingerprint = getBookingFingerprint({
     serviceId,
-    selectedOptionIds: [...selectedOptionIds].sort(),
+    selectedOptionIds,
     selectedOptionQuantities,
     uniformQuantity,
     addressId,
@@ -154,6 +155,11 @@ export const useConfirmPaymentFlow = () => {
   const { preview, error: previewError, retry: retryPreview } = useBookingPreview(previewVoucherCode, !needsRecovery);
 
   const handleConfirm = () => {
+    const booking = useBookingStore.getState();
+    if (booking.rebookSource && booking.requestedProviderId && booking.preferredProviderId !== booking.requestedProviderId) {
+      setPaymentError('Vui lòng quay lại bước chọn lịch để kiểm tra thợ cũ hoặc chọn thợ khác.');
+      return;
+    }
     if (needsRecovery) { setPaymentError(pendingError || 'Vui lòng chờ kiểm tra thanh toán QR trước khi tiếp tục.'); return; }
     if (!preview) { setPaymentError(previewError ?? 'Vui lòng chờ cập nhật giá.'); retryPreview(); return; }
     return runConfirmPaymentSubmit({

@@ -6,6 +6,9 @@ export interface DashboardNavItem {
   label: string;
   path: string;
   matchPrefix?: boolean;
+  pendingCount?: number;
+  pendingLabel?: string;
+  pendingStale?: boolean;
 }
 
 export interface DashboardSwitchConfig {

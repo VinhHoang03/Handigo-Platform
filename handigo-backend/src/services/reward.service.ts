@@ -1,12 +1,14 @@
 import mongoose, { ClientSession, Types } from "mongoose";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { RewardAccount, RewardTransaction } from "../models/reward.model";
 import { Voucher } from "../models/voucher.model";
 import { findStoredVoucher, listStoredVouchers } from "./voucherStore.service";
 import { IOrder, Order } from "../models/order.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
+import { Payment } from "../models/payment.model";
 import { REWARD_POLICY, calculateRewardPoints } from "../configs/rewards";
 import { AppError } from "../utils/appError";
+import { assertFeatureAllowed } from "./penaltyPolicy.service";
 import type { RequestUser } from "../middlewares/authContext";
 import { createConfig, getConfigByKey, getRewardOffers, getRewardPolicy, updateConfig } from "./systemConfig.service";
 import { rewardOfferSchema, type AdminRewardOfferInput } from "../validations/reward.validator";
@@ -21,7 +23,14 @@ export const earnOrderRewards = async (order: IOrder, session: ClientSession) =>
       providerId: order.providerId, isDeleted: false,
       $or: [{ status: "saved" }, { status: "approved", customerConfirmed: true }],
     }).session(session);
-    if (!quotation?.directPaymentConfirmedAt || quotation.directPaymentConfirmedAmount == null) return;
+    if (!quotation) return;
+    if (!quotation.directPaymentConfirmedAt || quotation.directPaymentConfirmedAmount == null) {
+      const paidByWallet = order.paymentMethod === "wallet" && await Payment.exists({
+        orderId: order._id, customerId: order.customerId, paymentType: "remaining", method: "wallet", status: "paid",
+        "metadata.quotationId": quotation.id, "metadata.quotationRevision": quotation.revision ?? 0, isDeleted: false,
+      }).session(session);
+      if (!paidByWallet) return;
+    }
     // Tổng cuối cùng đã bao gồm phần cọc được khấu trừ, không cộng cọc lần nữa.
     rewardAmount = quotation.finalAmount;
   }
@@ -43,10 +52,13 @@ export const earnOrderRewards = async (order: IOrder, session: ClientSession) =>
 
 export const getRewardOverview = async (userId: string) => {
   const account = await RewardAccount.findById(userId).lean();
+  const policy = await getRewardPolicy();
+  const offers = await getRewardOffers();
   return {
     balance: account?.balance ?? 0, totalEarned: account?.totalEarned ?? 0,
     totalRedeemed: account?.totalRedeemed ?? 0,
-    policy: { ...REWARD_POLICY, ...await getRewardPolicy(), offers: (await getRewardOffers()).filter((offer) => offer.isActive) },
+    policy: { ...REWARD_POLICY, ...policy, offers: offers.filter((offer) => offer.isActive)
+      .map((offer) => ({ ...offer, termsVersion: rewardTermsVersion(offer, policy.validityDays) })) },
   };
 };
 
@@ -61,7 +73,7 @@ export const getRewardHistory = async (userId: string, page: number) => {
 };
 
 export const getMyRewardVouchers = async (userId: string, page: number) => {
-  const filter = { ownerId: new Types.ObjectId(userId), isDeleted: false };
+  const filter = { ownerId: new Types.ObjectId(userId), isDeleted: false, usedCount: { $not: { $gt: 0 } } };
   const all = await listStoredVouchers(filter);
   const total = all.length;
   const items = all.slice((page - 1) * 12, page * 12).map((voucher) => ({
@@ -85,7 +97,14 @@ export const getMyRewardVouchers = async (userId: string, page: number) => {
   };
 };
 
-export const redeemReward = async (userId: string, offerId: string, requestId: string) => {
+export const rewardTermsVersion = (offer: AdminRewardOfferInput, validityDays: number) =>
+  createHash("sha256").update(JSON.stringify([
+    offer.id, offer.name, offer.points, offer.discountType ?? "AMOUNT", offer.discountValue,
+    offer.minOrderAmount, offer.maxDiscountAmount ?? null, offer.applicableOrderType ?? "fixed_price",
+    offer.isActive, validityDays,
+  ])).digest("hex");
+
+export const redeemReward = async (userId: string, offerId: string, requestId: string, termsVersion?: string) => {
   const key = `redeem:${userId}:${requestId}`;
   return mongoose.connection.transaction(async (session) => {
     const previous = await RewardTransaction.findById(key).session(session);
@@ -93,8 +112,13 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
       if (previous.offerId !== offerId) throw new AppError("Yêu cầu này đã được dùng cho ưu đãi khác.", 409);
       return findStoredVoucher({ _id: previous.voucherId ?? previous.promotionId }, session);
     }
+    await assertFeatureAllowed(userId, "voucher", session);
     const offer = (await getRewardOffers(session)).find((item) => item.id === offerId && item.isActive);
     if (!offer) throw new AppError("Ưu đãi đổi điểm không tồn tại hoặc đã ngừng áp dụng.", 404);
+    const policy = await getRewardPolicy(session);
+    if (!termsVersion || termsVersion !== rewardTermsVersion(offer, policy.validityDays)) {
+      throw new AppError("Điều kiện ưu đãi đã thay đổi. Vui lòng tải lại và xác nhận ưu đãi mới.", 409);
+    }
     const account = await RewardAccount.findOneAndUpdate(
       { _id: userId, balance: { $gte: offer.points } },
       { $inc: { balance: -offer.points, totalRedeemed: offer.points } },
@@ -102,7 +126,6 @@ export const redeemReward = async (userId: string, offerId: string, requestId: s
     );
     if (!account) throw new AppError("Bạn chưa đủ điểm để đổi ưu đãi này.", 409);
     const now = new Date();
-    const policy = await getRewardPolicy(session);
     const [voucher] = await Voucher.create([{
       ownerId: userId, code: `HD${randomUUID().replace(/-/g, "").toUpperCase()}`,
       name: offer.name, description: "Ưu đãi dành riêng cho khách hàng đổi điểm Handigo",

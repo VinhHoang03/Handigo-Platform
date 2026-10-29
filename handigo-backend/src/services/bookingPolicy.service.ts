@@ -1,5 +1,6 @@
 import { getBookingPolicy, getNumberConfigValue, getRefundPolicy } from "./systemConfig.service";
 import { getProviderResponseTimeoutSeconds } from "../utils/matchingSearch";
+import { createHash } from "node:crypto";
 
 /** Chỉ trả các điều khoản dành cho khách, không công khai lịch riêng hoặc cấu hình nội bộ. */
 export const getCustomerBookingPolicies = async () => {
@@ -11,7 +12,7 @@ export const getCustomerBookingPolicies = async () => {
     getNumberConfigValue("MATCHING_EXPANDED_DURATION_MINUTES", 3),
     getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", 60),
   ]);
-  return {
+  const policies = {
     paymentHoldMinutes: booking.paymentHoldMinutes,
     matching: {
       initialRadiusKm: Math.max(initialRadius, 0.1),
@@ -28,4 +29,7 @@ export const getCustomerBookingPolicies = async () => {
       lateRefundPercent: refund.lateRefundPercent, lastMinuteRefundPercent: refund.lastMinuteRefundPercent,
     },
   };
+  // Tăng phiên bản nội dung khi thay đổi cách diễn đạt/điều khoản trong BookingPolicyContent.
+  const version = createHash("sha256").update(JSON.stringify({ contentVersion: 2, policies })).digest("hex");
+  return { ...policies, version };
 };

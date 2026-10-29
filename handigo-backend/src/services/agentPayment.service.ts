@@ -20,6 +20,8 @@ export type AgentPaymentArguments = { orderId: string; method: CreatePaymentInpu
 export const paymentExpectationSchema = z.object({ amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]),
   previousPaymentId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   previousPaymentMethod: z.enum(["cash", "payos"]).optional() });
+export const paymentCancellationExpectationSchema = z.object({ paymentId: z.string().regex(/^[a-f\d]{24}$/i),
+  amount: z.number().nonnegative(), paymentType: z.enum(["full", "inspection_deposit"]) });
 
 // Liên kết chỉ lấy từ giao dịch backend, không lấy từ nội dung LLM.
 export const safePayosUrl = (value: unknown) => {
@@ -42,7 +44,14 @@ const dependencies = {
     (await import("./payment.service")).reconcilePayosPaymentForOrder(orderId, user),
 };
 
-export function createAgentPaymentService(deps = dependencies) {
+const cancellationDependencies = {
+  preview: async (user: RequestUser, orderId: string, paymentId?: string) =>
+    (await import("./payment.service")).previewAgentPaymentCancellation(user, orderId, paymentId),
+  cancel: async (user: RequestUser, orderId: string, expected: z.infer<typeof paymentCancellationExpectationSchema>, actionId: string, signal?: AbortSignal) =>
+    (await import("./payment.service")).cancelAgentPendingPayment(user, orderId, expected, actionId, signal),
+};
+
+export function createAgentPaymentService(deps = dependencies, cancellation = cancellationDependencies) {
   const ownedOrder = async (user: RequestUser, orderId: string) => {
     if (user.role !== "CUSTOMER") throw new AppError("Thanh toán qua trợ lý chỉ dành cho khách hàng.", 403);
     const order = await deps.order(user, orderId);
@@ -63,28 +72,69 @@ export function createAgentPaymentService(deps = dependencies) {
     if (payment?.status === "paid") return { ...base,
       status: payment.paymentType === "inspection_deposit" ? "deposit_paid" : "paid",
       message: payment.paymentType === "inspection_deposit"
-        ? "Đã xác minh thanh toán tiền cọc. Chi phí báo giá sau khảo sát được thanh toán trực tiếp với nhà cung cấp."
-        : "Đã xác minh thanh toán thành công cho đơn hàng." };
+        ? "Đã thanh toán tiền cọc. Chi phí sau khảo sát trả trực tiếp cho thợ."
+        : "Đã thanh toán thành công." };
     if (payment?.status === "refunded") return { ...base, status: "refunded", message: "Giao dịch đã được hoàn tiền. Xem chi tiết trong đơn hàng." };
     if (order.status === "cancelled" || order.status === "completed") return { ...base, status: "blocked",
-      message: "Đơn đã kết thúc hoặc bị hủy. Không tạo thanh toán mới; kiểm tra chi tiết đơn nếu cần đối soát." };
+      message: "Đơn đã kết thúc hoặc bị hủy, không thể thanh toán thêm. Bạn có thể xem chi tiết đơn." };
+    if (payment?.status === "failed" && payment.metadata?.customerCancelledQr === true) return { ...base, status: "failed",
+      message: "Đã hủy giao dịch QR thanh toán. Đơn hàng được giữ theo thời hạn hiện tại. Bạn có thể chọn thanh toán lại hoặc phương thức khác." };
     if (payment?.status === "pending") {
-      if (payment.method === "cash") return { ...base, status: "cash_pending", message: "Đã ghi nhận thanh toán tiền mặt. Bạn thanh toán trực tiếp cho nhà cung cấp; đơn chưa được đánh dấu đã thanh toán." };
+      if (payment.method === "cash") return { ...base, status: "cash_pending", message: "Đã chọn tiền mặt, chưa thanh toán. Bạn trả trực tiếp cho thợ." };
       const link = payment.gatewayResponse?.paymentLink as { checkoutUrl?: unknown } | undefined;
       return { ...base, status: "pending", checkoutUrl: safePayosUrl(link?.checkoutUrl),
-        message: "Giao dịch đang chờ thanh toán. Quét mã QR trong khung thanh toán ngay tại đây. Hệ thống sẽ xác minh kết quả thanh toán cho bạn." };
+        message: "Đang chờ thanh toán. Bạn quét mã QR bên dưới để thanh toán." };
     }
-    if (["scheduled", "recurring"].includes(order.orderType)
-      && !(order.status === "created" && !order.providerId && order.bookingStatus !== "reserved")
+    if (order.orderType === "scheduled"
+      && !(order.status === "in_progress" && !order.inspectionRequired && order.paymentStatus === "unpaid")
+      && !(order.status === "created" && !order.providerId)
       && (order.status !== "accepted" || order.bookingStatus !== "awaiting_payment" || !order.providerId)) {
-      return { ...base, status: "blocked", message: "Lịch hẹn đang chờ chuyên gia xác nhận. Chỉ thanh toán khi đơn chuyển sang chờ thanh toán." };
+      return { ...base, status: "blocked", message: "Lịch hẹn đang chờ thợ xác nhận, chưa đến bước thanh toán." };
     }
     return { ...base, status: payment?.status === "failed" ? "failed" : "unpaid",
-      message: payment?.status === "failed" ? "Giao dịch cũ đã hủy, hết hạn hoặc thất bại. Bạn có thể chọn phương thức thanh toán lại trên cùng đơn."
-        : "Đơn chưa có giao dịch thanh toán. Bạn có thể chọn chuyển khoản, ví hoặc tiền mặt nếu dịch vụ cho phép." };
+      message: payment?.status === "failed" ? "Giao dịch cũ không thành công. Bạn có thể chọn phương thức để thanh toán lại."
+        : "Đơn chưa thanh toán. Vui lòng chọn phương thức phù hợp." };
   };
   return {
     status,
+    async previewCancellation(user: RequestUser, orderId: string, paymentId?: string) {
+      await ownedOrder(user, orderId);
+      return cancellation.preview(user, orderId, paymentId);
+    },
+    async cancel(user: RequestUser, orderId: string, confirmed: unknown, actionId: string, signal?: AbortSignal): Promise<AgentPaymentResult> {
+      await ownedOrder(user, orderId);
+      const expected = paymentCancellationExpectationSchema.parse(confirmed);
+      try {
+        await cancellation.cancel(user, orderId, expected, actionId, signal);
+      } catch (error) {
+        if (!(error instanceof ActionPreconditionError) && !(error instanceof AppError && error.statusCode < 500)) throw error;
+        const current = await status(user, orderId, false);
+        return { ...current, message: [error.message, current.message].join(" ") };
+      }
+      return status(user, orderId, false);
+    },
+    async cancellationConfirmed(user: RequestUser, result: AgentPaymentResult, paymentId: string) {
+      await ownedOrder(user, result.orderId);
+      if (result.paymentId !== paymentId || result.method !== "payos") return false;
+      const payment = (await deps.payments(result.orderId)).find((item) => String(item._id) === paymentId);
+      if (!payment || payment.amount !== result.amount || payment.paymentType !== result.paymentType) return false;
+      if (payment.status === "paid" || payment.status === "refunded") return true;
+      const gateway = z.object({ status: z.string(), amountPaid: z.number() }).safeParse(
+        payment.gatewayResponse?.statusCheck ?? payment.gatewayResponse?.reconciliation);
+      return payment.status === "failed" && (payment.metadata?.customerCancelledQr === true
+        || gateway.success && ["CANCELLED", "EXPIRED", "FAILED"].includes(gateway.data.status) && gateway.data.amountPaid === 0);
+    },
+    async failureConfirmed(user: RequestUser, result: AgentPaymentResult, startedAt: string) {
+      if (!result.paymentId || !["failed", "refunded"].includes(result.status)) return false;
+      await ownedOrder(user, result.orderId);
+      const payments = await deps.payments(result.orderId);
+      const payment = payments.find((item) => String(item._id) === result.paymentId);
+      // Không dùng giao dịch thất bại của lượt cũ để mở khóa một thao tác vẫn chưa rõ kết quả.
+      return Boolean(payment && payment.status === result.status && payment.amount === result.amount
+        && payment.method === result.method && payment.paymentType === result.paymentType
+        && payment.createdAt && payment.createdAt.getTime() >= Date.parse(startedAt)
+        && !payments.some((item) => item.status === "pending" || item.status === "paid"));
+    },
     async preview(user: RequestUser, args: AgentPaymentArguments) {
       await ownedOrder(user, args.orderId);
       return deps.preview(user, args);

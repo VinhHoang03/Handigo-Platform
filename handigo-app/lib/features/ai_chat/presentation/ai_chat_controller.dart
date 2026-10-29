@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_exception.dart';
 import '../data/ai_chat_repository.dart';
@@ -39,11 +40,44 @@ class AiChatController extends ChangeNotifier {
   bool busy = false;
   bool _disposed = false;
   String? error;
+  String get sessionId => _sessionId;
+  bool get canSwitchSession =>
+      !busy && _pendingRequest == null && !needsReconciliation;
+  List<String> get attachments {
+    final values = (session?['bookingDraft'] as Map?)?['values'] as Map?;
+    return (values?['customerAttachments'] as List? ?? [])
+        .whereType<String>()
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> history(int page) => _repository.history(page);
+  Future<String> uploadAttachment(XFile file) =>
+      _repository.uploadAttachment(_sessionId, file);
+  Future<bool> selectSession(String id) async {
+    if (!canSwitchSession) return false;
+    await _run(() async => _apply(await _repository.getSession(id)));
+    return error == null && _sessionId == id;
+  }
 
   List<Map<String, dynamic>> get messages =>
       (session?['messages'] as List? ?? []).cast<Map<String, dynamic>>();
   Map<String, dynamic>? get confirmation =>
       session?['pendingConfirmation'] as Map<String, dynamic>?;
+  Map<String, dynamic>? get bookingPolicies {
+    final action = confirmation;
+    if (action?['tool'] != 'create_booking') return null;
+    final preview = action?['preview'] as Map?;
+    final version = preview?['policyVersion'];
+    final policies = preview?['bookingPolicies'];
+    if (version is! String ||
+        !RegExp(r'^[a-f\d]{64}$').hasMatch(version) ||
+        policies is! Map ||
+        policies['version'] != version) {
+      return null;
+    }
+    return Map<String, dynamic>.from(policies);
+  }
+
   Map<String, dynamic>? get payment =>
       session?['payment'] as Map<String, dynamic>?;
   bool get needsReconciliation => session?['requiresReconciliation'] == true;
@@ -60,6 +94,23 @@ class AiChatController extends ChangeNotifier {
       confirmation == null &&
       !needsReconciliation &&
       _pendingRequest == null;
+  bool get canCheckPayment =>
+      !busy &&
+      error == null &&
+      _pendingRequest == null &&
+      confirmation == null &&
+      payment != null &&
+      (!needsNewSession || needsReconciliation);
+  bool get canReconcileBooking =>
+      !busy &&
+      error == null &&
+      _pendingRequest == null &&
+      needsReconciliation &&
+      messages.any((message) {
+        final action = message['confirmation'] as Map<String, dynamic>?;
+        return action?['tool'] == 'create_booking' &&
+            ['UNKNOWN', 'EXECUTING'].contains(action?['status']);
+      });
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -99,40 +150,58 @@ class AiChatController extends ChangeNotifier {
     if (latest != null) _apply(latest);
   });
 
-  Future<void> send(String text) async {
+  Future<void> send(String text, {List<String>? attachments}) async {
     final content = text.trim();
     if (!canSend || content.isEmpty || content.length > 4000) return;
     _pendingRequest = {
       'sessionId': _sessionId,
       'requestId': _newId(),
       'message': content,
+      if (attachments != null)
+        'customerAttachments': List<String>.of(attachments),
     };
     await _submit();
   }
 
-  Future<void> decide(String decision) async {
+  Future<void> decide(String decision, {bool policyAccepted = false}) async {
     if (!canSend ||
         confirmation == null ||
         !['CONFIRM', 'REJECT'].contains(decision)) {
       return;
     }
+    final needsConsent =
+        decision == 'CONFIRM' && confirmation!['tool'] == 'create_booking';
+    final policies = bookingPolicies;
+    if (needsConsent && (!policyAccepted || policies == null)) return;
     _pendingRequest = {
       'sessionId': _sessionId,
       'requestId': _newId(),
       'confirmation': {
         'actionId': confirmation!['actionId'],
         'decision': decision,
+        if (needsConsent)
+          'policyConsent': {'accepted': true, 'version': policies!['version']},
       },
     };
     await _submit();
   }
 
   Future<void> checkPayment() async {
-    if (!canSend || payment == null) return;
+    if (!canCheckPayment) return;
     _pendingRequest = {
       'sessionId': _sessionId,
       'requestId': _newId(),
       'paymentStatus': {'orderId': payment!['orderId']},
+    };
+    await _submit();
+  }
+
+  Future<void> checkBooking() async {
+    if (!canReconcileBooking) return;
+    _pendingRequest = {
+      'sessionId': _sessionId,
+      'requestId': _newId(),
+      'message': 'Kiểm tra kết quả tạo đơn đã xác nhận; không tạo lại đơn.',
     };
     await _submit();
   }

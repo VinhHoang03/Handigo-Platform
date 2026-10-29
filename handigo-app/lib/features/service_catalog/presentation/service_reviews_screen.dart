@@ -1,3 +1,4 @@
+import '../../../shared/widgets/app_search_field.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,7 +35,7 @@ class ServiceReviewPreview extends ConsumerWidget {
                 'Đánh giá thực tế',
                 style: Theme.of(
                   context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             TextButton(
@@ -174,22 +175,18 @@ class _ServiceReviewsScreenState extends ConsumerState<ServiceReviewsScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    TextField(
+                    AppSearchField(
                       controller: _search,
                       maxLength: 100,
                       onChanged: _searchChanged,
-                      decoration: InputDecoration(
-                        hintText: 'Tìm trong nội dung đánh giá',
-                        counterText: '',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: IconButton(
-                          tooltip: 'Xóa tìm kiếm',
-                          icon: const Icon(Icons.close),
-                          onPressed: () {
-                            _search.clear();
-                            _searchChanged('');
-                          },
-                        ),
+                      hintText: 'Tìm trong nội dung đánh giá',
+                      suffixIcon: IconButton(
+                        tooltip: 'Xóa tìm kiếm',
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _search.clear();
+                          _searchChanged('');
+                        },
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -216,8 +213,19 @@ class _ServiceReviewsScreenState extends ConsumerState<ServiceReviewsScreen> {
                     ),
                     FilterChip(
                       label: const Text('Có hình ảnh'),
-                      avatar: const Icon(Icons.photo_outlined, size: 18),
+                      avatar: Icon(
+                        Icons.photo_outlined,
+                        size: 18,
+                        color: _hasImages
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       selected: _hasImages,
+                      labelStyle: TextStyle(
+                        fontWeight: _hasImages
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
                       onSelected: (value) => setState(() {
                         _hasImages = value;
                         _page = 1;
@@ -370,7 +378,7 @@ class ServiceReviewCard extends StatelessWidget {
                         Icon(
                           star <= review.rating
                               ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
+                              : star - .5 <= review.rating ? Icons.star_half_rounded : Icons.star_outline_rounded,
                           size: 16,
                           color: AppTheme.starGold,
                         ),

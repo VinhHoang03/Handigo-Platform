@@ -10,7 +10,6 @@ import {
 import { useProviderProfileData } from "../components/profile/useProviderProfileData";
 import { useProviderIdentityFlow } from "../components/profile/useProviderIdentityFlow";
 import { useProviderCertificateFlow } from "../components/profile/useProviderCertificateFlow";
-import { useProviderServiceAreaFlow } from "../components/profile/useProviderServiceAreaFlow";
 import { useProviderPasswordFlow } from "../components/profile/useProviderPasswordFlow";
 import { useProviderProfileUiState } from "../components/profile/useProviderProfileUiState";
 import { ProviderProfilePageSkeleton } from "../components/profile/ProviderProfilePageSkeleton";
@@ -46,11 +45,6 @@ function ProviderProfileContent() {
     setProfile: data.setProfile,
     setIsSaving: data.setIsSaving,
     setUploadingAsset,
-  });
-  const serviceAreaFlow = useProviderServiceAreaFlow({
-    profile: data.profile,
-    setProfile: data.setProfile,
-    setIsSaving: data.setIsSaving,
   });
   const password = useProviderPasswordFlow();
   const ui = useProviderProfileUiState({
@@ -126,8 +120,6 @@ function ProviderProfileContent() {
         verificationItems={verificationItems}
         onPasswordClick={() => password.setIsPwdConfirmOpen(true)}
         canChangePassword={!isGoogleAccount}
-        serviceArea={data.serviceArea}
-        onEditServiceArea={serviceAreaFlow.openServiceAreaEdit}
         applicationHistoryKey={ui.applicationHistoryKey}
         onEditApplication={ui.openServiceApplication}
       />
@@ -147,14 +139,6 @@ function ProviderProfileContent() {
         editingServiceApplication={ui.editingServiceApplication}
         onServiceApplicationClose={ui.closeServiceApplication}
         onServiceApplicationSubmitted={ui.bumpApplicationHistoryKey}
-        isServiceAreaModalOpen={serviceAreaFlow.isServiceAreaModalOpen}
-        workingAreasForm={serviceAreaFlow.workingAreasForm}
-        serviceAreaError={serviceAreaFlow.serviceAreaError}
-        onServiceAreaChange={serviceAreaFlow.setWorkingAreasForm}
-        onServiceAreaClose={() =>
-          serviceAreaFlow.setIsServiceAreaModalOpen(false)
-        }
-        onServiceAreaSave={() => void serviceAreaFlow.handleServiceAreaSave()}
         isIdentityModalOpen={identity.isIdentityModalOpen}
         identityForm={identity.identityForm}
         identityError={identity.identityError}

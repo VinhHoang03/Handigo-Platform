@@ -3,13 +3,15 @@ import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
 import { BankAccount } from "../models/bankAccount.model";
 import { Provider } from "../models/provider.model";
-import { createNotificationRecord } from "./notification.service";
+import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
+import { createLogger } from "../utils/logger";
 import { toObjectId } from "../utils/mongo";
-import { buildTransactionCode } from "../utils/transaction";
+import { buildTransactionCode, withTransactionRetry } from "../utils/transaction";
 import { Wallet } from "../models/wallet.model";
 import { WalletTransaction } from "../models/walletTransaction.model";
 import { WithdrawRequest } from "../models/withdrawRequest.model";
 import { getNumberConfigValue } from "./systemConfig.service";
+const withdrawalLogger = createLogger("WithdrawalService");
 import type {
   CreateWithdrawalInput,
   WithdrawalListQuery,
@@ -52,6 +54,20 @@ const getActiveBankAccount = async (
   }
 
   return bankAccount;
+};
+
+const lockWithdrawalBankAccount = async (
+  userId: string | Types.ObjectId,
+  bankAccountId: string | Types.ObjectId,
+  session: ClientSession,
+) => {
+  const account = await BankAccount.findOneAndUpdate(
+    { _id: bankAccountId, userId, status: "active", isDeleted: false },
+    { $inc: { __v: 1 } },
+    { new: true, session, runValidators: true },
+  );
+  if (!account) throw new AppError("Tài khoản nhận tiền không còn hợp lệ hoặc không thuộc chủ yêu cầu rút tiền", 409);
+  return account;
 };
 
 const buildListResult = async (filter: Record<string, unknown>, query: WithdrawalListQuery) => {
@@ -108,7 +124,8 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
   try {
     let createdRequest = null;
 
-    await session.withTransaction(async () => {
+    await withTransactionRetry(session, async () => {
+      await lockWithdrawalBankAccount(user.id, bankAccount._id, session);
       const wallet = await Wallet.findOneAndUpdate(
         {
           userId: user.id,
@@ -121,7 +138,7 @@ export const createWithdrawal = async (user: RequestUser, input: CreateWithdrawa
             pendingBalance: input.amount,
           },
         },
-        { new: true, session },
+        { new: true, session, runValidators: true },
       );
 
       if (!wallet) {
@@ -218,8 +235,10 @@ export const approveWithdrawal = async (
 
   try {
     let approvedRequest = null;
+    let notification: Awaited<ReturnType<typeof createNotificationRecord>> | undefined;
 
-    await session.withTransaction(async () => {
+    await withTransactionRetry(session, async () => {
+      notification = undefined;
       const withdrawal = await WithdrawRequest.findOne({
         _id: withdrawalId,
         status: "pending",
@@ -230,6 +249,8 @@ export const approveWithdrawal = async (
         throw new AppError("Không tìm thấy yêu cầu rút tiền đang chờ xử lý", 404);
       }
 
+      await lockWithdrawalBankAccount(withdrawal.userId, withdrawal.bankAccountId, session);
+
       const wallet = await Wallet.findOneAndUpdate(
         {
           _id: withdrawal.walletId,
@@ -238,7 +259,7 @@ export const approveWithdrawal = async (
           pendingBalance: { $gte: withdrawal.amount },
         },
         { $inc: { pendingBalance: -withdrawal.amount } },
-        { new: true, session },
+        { new: true, session, runValidators: true },
       );
 
       if (!wallet) {
@@ -274,7 +295,7 @@ export const approveWithdrawal = async (
       withdrawal.adminNote = input.adminNote || null;
       await withdrawal.save({ session });
 
-      await createNotificationRecord(
+      notification = await createNotificationRecord(
         {
           userId: withdrawal.userId,
           type: "WITHDRAWAL",
@@ -286,12 +307,16 @@ export const approveWithdrawal = async (
             status: "approved",
           },
         },
-        { session },
+        { session, deferRealtime: true },
       );
 
       approvedRequest = withdrawal;
     });
 
+    if (notification) {
+      try { emitRealtimeNotification(notification); }
+      catch { withdrawalLogger.warn("Đã duyệt rút tiền; chưa phát được thông báo tức thời."); }
+    }
     return approvedRequest;
   } finally {
     await session.endSession();
@@ -307,8 +332,10 @@ export const rejectWithdrawal = async (
 
   try {
     let rejectedRequest = null;
+    let notification: Awaited<ReturnType<typeof createNotificationRecord>> | undefined;
 
     await session.withTransaction(async () => {
+      notification = undefined;
       const withdrawal = await WithdrawRequest.findOne({
         _id: withdrawalId,
         status: "pending",
@@ -332,7 +359,7 @@ export const rejectWithdrawal = async (
             balance: withdrawal.amount,
           },
         },
-        { new: true, session },
+        { new: true, session, runValidators: true },
       );
 
       if (!wallet) {
@@ -345,7 +372,7 @@ export const rejectWithdrawal = async (
       withdrawal.adminNote = input.adminNote || null;
       await withdrawal.save({ session });
 
-      await createNotificationRecord(
+      notification = await createNotificationRecord(
         {
           userId: withdrawal.userId,
           type: "WITHDRAWAL",
@@ -358,12 +385,16 @@ export const rejectWithdrawal = async (
             adminNote: input.adminNote || null,
           },
         },
-        { session },
+        { session, deferRealtime: true },
       );
 
       rejectedRequest = withdrawal;
     });
 
+    if (notification) {
+      try { emitRealtimeNotification(notification); }
+      catch { withdrawalLogger.warn("Đã từ chối rút tiền; chưa phát được thông báo tức thời."); }
+    }
     return rejectedRequest;
   } finally {
     await session.endSession();

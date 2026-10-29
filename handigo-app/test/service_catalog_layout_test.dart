@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/paged_result.dart';
+import 'package:handigo_app/features/service_catalog/domain/automatic_promotion.dart';
 import 'package:handigo_app/features/account/domain/account_models.dart';
 import 'package:handigo_app/features/account/presentation/account_screens.dart';
 import 'package:handigo_app/features/service_catalog/presentation/service_catalog_provider.dart';
@@ -96,6 +97,24 @@ Future<void> showCatalog(
                 : items.where((item) => item.id == id).toList(),
             page: 1,
             totalPages: 1,
+          );
+        }),
+        serviceCatalogPromotionProvider.overrideWith((ref) async {
+          if (voucherError) throw StateError('Không thể tải ưu đãi');
+          final now = DateTime.now();
+          final active = vouchers.where(
+            (item) =>
+                DateTime.parse(item.startAt!).isBefore(now) &&
+                DateTime.parse(item.endAt!).isAfter(now),
+          );
+          if (active.isEmpty) return null;
+          final item = active.first;
+          return AutomaticPromotion(
+            name: item.name,
+            discountType: item.discountType ?? 'PERCENT',
+            discountValue: item.discountValue,
+            endAt: DateTime.parse(item.endAt!),
+            description: item.description,
           );
         }),
         accountVouchersProvider.overrideWith((ref) async {
@@ -216,9 +235,7 @@ void main() {
     expect(find.text('Sửa đường nước'), findsNothing);
   });
 
-  testWidgets('Banner chỉ hiện ưu đãi đang hiệu lực và mở kho ưu đãi', (
-    tester,
-  ) async {
+  testWidgets('Banner hiển thị ưu đãi tự động đang hiệu lực', (tester) async {
     final now = DateTime.now();
     await showCatalog(
       tester,
@@ -258,7 +275,8 @@ void main() {
     }
     await tester.tap(find.text('Ưu đãi đang diễn ra'));
     await tester.pumpAndSettle();
-    expect(find.text('Kho ưu đãi'), findsOneWidget);
+    expect(find.text('Ưu đãi đang diễn ra'), findsOneWidget);
+    expect(find.text('Kho ưu đãi'), findsNothing);
   });
 
   testWidgets('Ưu đãi tương lai, hết hạn hoặc thiếu ngày không tạo banner', (

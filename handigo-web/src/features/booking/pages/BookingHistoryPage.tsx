@@ -1,35 +1,53 @@
 import { useToastFeedback } from "@/components/common/Toast";
-import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { BookingHistoryCard, BookingPageHeader, BookingShell } from '../components/BookingComponents';
-import { BookingHistoryListSkeleton } from '../components/BookingSkeletons';
-import { AsyncState } from '@/components/common/AsyncState';
-import { getOrderStatusMeta } from '@/utils/orderStatus';
-import { bookingApi } from '@/features/booking/api/booking.api';
-import type { BookingListItem, BookingStatusTone } from '../types/booking.types';
-import type { Order } from '../../../types/booking';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
+import {
+  BookingHistoryCard,
+  BookingPageHeader,
+  BookingShell,
+} from "../components/BookingComponents";
+import { BookingHistoryListSkeleton } from "../components/BookingSkeletons";
+import { AsyncState } from "@/components/common/AsyncState";
+import { getOrderStatusMeta } from "@/utils/orderStatus";
+import { bookingApi } from "@/features/booking/api/booking.api";
+import type {
+  BookingListItem,
+  BookingStatusTone,
+} from "../types/booking.types";
+import type { Order } from "../../../types/booking";
 import { ChevronDown, FileClock, Plus, Search, X } from "lucide-react";
-import { formatCurrency } from '@/utils/currency';
+import { formatCurrency } from "@/utils/currency";
 
 const filters = [
-  { label: 'Tất cả', value: 'all' },
-  { label: 'Đang xử lý', value: 'created' },
-  { label: 'Đang thực hiện', value: 'in_progress' },
-  { label: 'Đã hoàn thành', value: 'completed' },
-  { label: 'Đã hủy', value: 'cancelled' },
+  { label: "Tất cả", value: "all" },
+  { label: "Đang xử lý", value: "created" },
+  { label: "Thợ đã nhận", value: "accepted" },
+  { label: "Đang thực hiện", value: "in_progress" },
+  { label: "Đã hoàn thành", value: "completed" },
+  { label: "Đã hủy", value: "cancelled" },
 ];
 
 const BookingHistoryPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useToastFeedback<string>('', "error");
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [error, setError] = useToastFeedback<string>("", "error");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [resultQuery, setResultQuery] = useState('');
+  const requestRevision = useRef(0);
+  const inFlight = useRef(false);
+  const committedPage = useRef<{ query: string; page: number } | null>(null);
+  const queryKey = JSON.stringify([activeFilter, debouncedSearch]);
+  const isCurrentQuery = resultQuery === queryKey;
+  const invalidateRequests = useCallback(() => {
+    requestRevision.current++;
+    inFlight.current = false;
+  }, []);
 
-  // Handle debouncing search term to avoid too many API calls
+  // Chờ khách ngừng nhập trước khi tìm kiếm.
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -38,20 +56,35 @@ const BookingHistoryPage = () => {
   }, [searchTerm]);
 
   const fetchOrders = useCallback(async (filter: string, search: string, targetPage: number, append = false) => {
-    // Avoid synchronous setState warning in build
-    setTimeout(() => setLoading(true), 0);
+    const query = JSON.stringify([filter, search]);
+    if (append && (inFlight.current || committedPage.current?.query !== query
+      || targetPage !== committedPage.current.page + 1)) return;
+    const revision = ++requestRevision.current;
+    inFlight.current = true;
+    if (!append) committedPage.current = null;
+    setLoading(true);
+    setError('');
     try {
-      // Map 'all' to undefined for the API
       const statusParam = filter === 'all' ? undefined : filter;
       const data = await bookingApi.getMyOrders(targetPage, 10, statusParam, search);
-      setOrders((current) => append ? [...current, ...data.items] : data.items);
+      if (revision !== requestRevision.current) return;
+      setOrders((current) => append
+        ? [...new Map([...current, ...data.items].map(order => [order._id, order])).values()]
+        : data.items);
       setTotal(data.pagination.total);
       setPage(targetPage);
+      committedPage.current = { query, page: targetPage };
+      setResultQuery(query);
       setError('');
     } catch {
+      if (revision !== requestRevision.current) return;
+      setResultQuery(query);
       setError('Không thể tải lịch sử đặt dịch vụ. Vui lòng thử lại.');
     } finally {
-      setTimeout(() => setLoading(false), 0);
+      if (revision === requestRevision.current) {
+        inFlight.current = false;
+        setLoading(false);
+      }
     }
   }, [setError]);
 
@@ -59,18 +92,24 @@ const BookingHistoryPage = () => {
     const timer = setTimeout(() => {
       fetchOrders(activeFilter, debouncedSearch, 1);
     }, 0);
-    return () => clearTimeout(timer);
-  }, [activeFilter, debouncedSearch, fetchOrders]);
+    return () => {
+      clearTimeout(timer);
+      invalidateRequests();
+    };
+  }, [activeFilter, debouncedSearch, fetchOrders, invalidateRequests]);
 
   const mapStatusToTone = (status: string): BookingStatusTone => {
     switch (status) {
-      case 'completed': return 'completed';
-      case 'cancelled': return 'cancelled';
-      case 'created':
-      case 'accepted':
-      case 'in_progress':
-        return 'active';
-      default: return 'pending';
+      case "completed":
+        return "completed";
+      case "cancelled":
+        return "cancelled";
+      case "created":
+      case "accepted":
+      case "in_progress":
+        return "active";
+      default:
+        return "pending";
     }
   };
 
@@ -81,7 +120,7 @@ const BookingHistoryPage = () => {
     statusTone: mapStatusToTone(order?.status || 'created'),
     status: order?.status || 'created',
     schedule: order?.scheduledAt ? new Date(order.scheduledAt).toLocaleString('vi-VN') : 'Sớm nhất',
-    meta: order?.providerId ? `Chuyên gia: ${order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
+    meta: order?.providerId ? `Chuyên gia: ${order.providerId.userId?.fullName || order.providerId.name || 'Đã phân công'}` : 'Đang tìm chuyên gia',
     price: formatCurrency(order.status === 'completed'
       && (order.inspectionRequired || order.serviceId?.serviceType === 'variable_price')
       ? order.quotationFinalAmount ?? order.pricing?.totalPaidAmount ?? 0
@@ -98,7 +137,11 @@ const BookingHistoryPage = () => {
         action={
           <div className="flex flex-col md:flex-row gap-md items-center justify-between w-full">
             <div className="relative w-full md:w-[400px]">
-              <Search aria-hidden="true" size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+              <Search
+                aria-hidden="true"
+                size={20}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+              />
               <input
                 className="w-full pl-12 pr-10 py-3 bg-primary/5 rounded-full border border-primary/10 focus:border-primary focus:bg-surface-container-lowest focus:ring-4 focus:ring-primary/10 outline-none text-body-md transition-all placeholder:text-on-surface-variant/60"
                 placeholder="Tìm kiếm đơn đặt chỗ..."
@@ -108,7 +151,7 @@ const BookingHistoryPage = () => {
               />
               {searchTerm && (
                 <button
-                  onClick={() => setSearchTerm('')}
+                  onClick={() => setSearchTerm("")}
                   className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full hover:bg-on-surface/10 p-1 transition-colors"
                 >
                   <X aria-hidden="true" size={14} className="block" />
@@ -131,10 +174,11 @@ const BookingHistoryPage = () => {
           <button
             key={filter.value}
             onClick={() => setActiveFilter(filter.value)}
-            className={`px-md py-2 rounded-full font-label-md text-label-md whitespace-nowrap transition-all ${activeFilter === filter.value
-              ? 'bg-primary text-on-primary shadow-md'
-              : 'bg-surface-container-high text-on-surface-variant hover:bg-primary/10'
-              }`}
+            className={`px-md py-2 rounded-full font-label-md text-label-md whitespace-nowrap transition-all ${
+              activeFilter === filter.value
+                ? "bg-primary text-on-primary shadow-md"
+                : "bg-surface-container-high text-on-surface-variant hover:bg-primary/10"
+            }`}
           >
             {filter.label}
           </button>
@@ -143,24 +187,33 @@ const BookingHistoryPage = () => {
 
       <div className="grid grid-cols-1 gap-md">
         <AsyncState
-          loading={loading}
-          error={error}
+          loading={loading || !isCurrentQuery}
+          error={isCurrentQuery ? error : ''}
           onRetry={() => void fetchOrders(activeFilter, debouncedSearch, 1)}
           skeleton={<BookingHistoryListSkeleton />}
         >
           <>
             {formattedBookings.map((booking, index) => (
-              <BookingHistoryCard key={booking.id !== 'unknown' ? booking.id : `booking-${index}`} booking={booking} />
+              <BookingHistoryCard
+                key={booking.id !== "unknown" ? booking.id : `booking-${index}`}
+                booking={booking}
+              />
             ))}
             {formattedBookings.length === 0 && (
               <div className="py-xl text-center">
-                <FileClock aria-hidden="true" size={60} className="mb-2 text-on-surface-variant/30" />
+                <FileClock
+                  aria-hidden="true"
+                  size={60}
+                  className="mb-2 text-on-surface-variant/30"
+                />
                 <p className="font-medium text-on-surface-variant">
-                  {debouncedSearch ? `Không tìm thấy kết quả cho "${debouncedSearch}"` : 'Bạn chưa có đơn đặt lịch nào.'}
+                  {debouncedSearch
+                    ? `Không tìm thấy kết quả cho "${debouncedSearch}"`
+                    : "Bạn chưa có đơn đặt lịch nào."}
                 </p>
-                {activeFilter !== 'all' && (
+                {activeFilter !== "all" && (
                   <button
-                    onClick={() => setActiveFilter('all')}
+                    onClick={() => setActiveFilter("all")}
                     className="mt-4 font-label-md text-primary hover:underline"
                   >
                     Xem tất cả đơn hàng
@@ -172,11 +225,21 @@ const BookingHistoryPage = () => {
         </AsyncState>
       </div>
 
-      {!loading && total > 5 && formattedBookings.length < total && (
+      {!loading && isCurrentQuery && !error && total > 5 && formattedBookings.length < total && (
         <div className="pt-lg flex justify-center">
-          <button type="button" onClick={() => void fetchOrders(activeFilter, debouncedSearch, page + 1, true)} className="px-lg py-3 border-2 border-primary/20 text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-all flex items-center gap-2 group">
+          <button
+            type="button"
+            onClick={() =>
+              void fetchOrders(activeFilter, debouncedSearch, page + 1, true)
+            }
+            className="px-lg py-3 border-2 border-primary/20 text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-all flex items-center gap-2 group"
+          >
             Xem thêm lịch sử
-            <ChevronDown aria-hidden="true" size={24} className="group-hover:translate-y-1 transition-transform" />
+            <ChevronDown
+              aria-hidden="true"
+              size={24}
+              className="group-hover:translate-y-1 transition-transform"
+            />
           </button>
         </div>
       )}

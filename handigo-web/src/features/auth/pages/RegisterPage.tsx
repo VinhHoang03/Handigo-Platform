@@ -5,6 +5,7 @@ import { authService } from "../services/auth.service";
 import { AuthFeedback } from "../components/AuthFeedback";
 import { RegisterDetailsForm } from "../components/RegisterDetailsForm";
 import { RegisterOtpForm } from "../components/RegisterOtpForm";
+import { maskEmail } from "@/features/profile/utils/userProfileForm.utils";
 import {
   isValidVietnamesePhone,
   normalizeVietnamesePhone,
@@ -77,7 +78,7 @@ export default function RegisterPage() {
         email: normalizedEmail,
         otp,
       });
-      if (response.user?.role.toUpperCase() === "PROVIDER" && response.token) {
+      if (registerAsProvider && response.user && response.token) {
         navigate("/register-provider", { replace: true });
         return;
       }
@@ -121,7 +122,7 @@ export default function RegisterPage() {
       description={
         step === "form"
           ? "Hoàn tất thông tin để bắt đầu đặt và quản lý dịch vụ tại nhà."
-          : `Nhập mã 6 số đã được gửi đến ${normalizedEmail}.`
+          : `Mã xác thực đã được gửi đến ${maskEmail(normalizedEmail, "edges")}.`
       }
       brandTitle="Bắt đầu chăm sóc tổ ấm cùng Handigo."
       brandDescription="Một tài khoản giúp bạn đặt lịch nhanh, theo dõi tiến độ và kết nối với chuyên gia phù hợp."

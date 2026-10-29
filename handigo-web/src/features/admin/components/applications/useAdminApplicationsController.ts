@@ -1,22 +1,49 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/common/Toast";
 import type { Category } from "@/features/provider-application/types/providerApplication.types";
 import { adminApi } from "../../api/admin.api";
 import { useAdminList } from "../../hooks/useAdminList";
 import type { AdminApplication, AdminQuery } from "../../types/admin.types";
+import { applicationSummaryFilters } from './application-summary.utils';
 
 /**
  * Toàn bộ state + hành động của trang duyệt hồ sơ thợ. Tách khỏi
  * `AdminProviderApplicationsPage` để trang chính chỉ còn lo bố cục.
  */
 export function useAdminApplicationsController() {
-  const [query, setQuery] = useState<AdminQuery>({ page: 1, limit: 10 });
-  const { result, loading, error, load } = useAdminList("applications", query);
+  const [query, setQuery] = useState<AdminQuery>({ page: 1, limit: 20 });
+  const { result, loading, error, load: loadList } = useAdminList("applications", query);
+  const [summaryRevision, setSummaryRevision] = useState(0);
+  const [summary, setSummary] = useState<{ counts: number[] | null; loading: boolean }>({ counts: null, loading: true });
+  const { addToast } = useToast();
+  const { keyword, categoryId, fromDate, toDate } = query;
+  const reloadSummary = useCallback(() => setSummaryRevision(value => value + 1), []);
+  const load = useCallback(async () => {
+    reloadSummary();
+    await loadList();
+  }, [loadList, reloadSummary]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setSummary({ counts: null, loading: true });
+      void Promise.all(applicationSummaryFilters.map(({ status, applicationType }) => adminApi.applications({
+        keyword, categoryId, fromDate, toDate, status, applicationType, page: 1, limit: 1,
+      }))).then(results => {
+        if (active) setSummary({ counts: results.map(value => value.pagination.total), loading: false });
+      }).catch(() => {
+        if (active) {
+          setSummary({ counts: null, loading: false });
+          addToast('Không thể tải số lượng hồ sơ. Vui lòng nhấn “Làm mới” để tải lại.', 'error');
+        }
+      });
+    }, 300);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [keyword, categoryId, fromDate, toDate, summaryRevision, addToast]);
   const items = (result?.items || []) as AdminApplication[];
   const [categories, setCategories] = useState<Category[]>([]);
   const [selected, setSelected] = useState<AdminApplication | null>(null);
   const [busy, setBusy] = useState(false);
-  const { addToast } = useToast();
 
   useEffect(() => {
     adminApi.categories().then(setCategories).catch(() => setCategories([]));
@@ -60,6 +87,7 @@ export function useAdminApplicationsController() {
     loading,
     error,
     load,
+    summary,
     categories,
     selected,
     busy,

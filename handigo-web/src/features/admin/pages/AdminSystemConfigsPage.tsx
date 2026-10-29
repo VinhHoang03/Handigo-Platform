@@ -1,3 +1,4 @@
+import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -133,23 +134,16 @@ export default function AdminSystemConfigsPage() {
   return (
     <DashboardShell role="ADMIN">
       <div className="space-y-6">
-        <header className="flex flex-col gap-3">
-          <h1 className="text-headline-lg font-bold text-on-background">
-            Cấu hình hệ thống
-          </h1>
-        </header>
+        <header className="admin-page-header">
+          <AdminPageTitle title="Cấu hình hệ thống" />
+        <AdminRefreshButton onRefresh={() => void load()} loading={loading} />
+      </header>
 
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard icon={Settings} label="Đã thiết lập" value={stats.configuredCount} />
-          <StatCard icon={Zap} label="Đã nối logic" value={stats.effectiveCount} />
+          <StatCard icon={Zap} label="Đang áp dụng" value={stats.effectiveCount} />
           <StatCard icon={Globe} label="Công khai" value={stats.publicCount} />
         </div>
-
-        {error && (
-          <div className="rounded-xl bg-error/10 px-4 py-3 text-error">
-            {error}
-          </div>
-        )}
 
         <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
           <AsyncState

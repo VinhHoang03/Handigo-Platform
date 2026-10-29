@@ -56,13 +56,27 @@ export type ReverseGeocodedAddress = {
   attribution: string;
 };
 
-type CacheEntry = {
+type CacheEntry<T = ReverseGeocodedAddress> = {
   expiresAt: number;
-  data: ReverseGeocodedAddress;
+  data: T;
 };
 
 const cache = new Map<string, CacheEntry>();
 const pendingRequests = new Map<string, Promise<ReverseGeocodedAddress>>();
+export interface AddressSearchCandidate {
+  fullAddress: string;
+  province: string;
+  administrativeNames: string[];
+  wardNames: string[];
+  latitude: number;
+  longitude: number;
+  placeId?: string;
+  matchLevel?: string;
+  matchCode?: string;
+  category?: string;
+}
+const searchCache = new Map<string, CacheEntry<AddressSearchCandidate[]>>();
+const pendingSearches = new Map<string, Promise<AddressSearchCandidate[]>>();
 let requestQueue: Promise<void> = Promise.resolve();
 let lastRequestAt = 0;
 
@@ -109,7 +123,7 @@ const getProvinceFromDisplayName = (
 };
 
 const getCacheKey = ({ latitude, longitude }: ReverseGeocodeQuery) =>
-  `${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+  `${latitude.toFixed(6)}:${longitude.toFixed(6)}`;
 
 const validateCoordinates = ({ latitude, longitude }: ReverseGeocodeQuery) => {
   if (
@@ -120,7 +134,7 @@ const validateCoordinates = ({ latitude, longitude }: ReverseGeocodeQuery) => {
     longitude < -180 ||
     longitude > 180
   ) {
-    throw new AppError("Tọa độ vị trí không hợp lệ.", 400);
+    throw new AppError("Tọa độ vị trí không hợp lệ.", 400, "GEO_INVALID_COORDINATES");
   }
 };
 
@@ -181,7 +195,19 @@ const normalizeResponse = (
   resolvedProvince?: string,
 ): ReverseGeocodedAddress => {
   const address = response.address;
-  const fullAddress = response.display_name?.trim() || "";
+  let fullAddress = response.display_name?.trim() || "";
+  const houseNumber = address?.house_number?.trim();
+  const street = firstValue(address?.road, address?.pedestrian, address?.footway, address?.residential);
+  if (houseNumber && street) {
+    const normalizeStreet = (value: string) => value.trim().replace(/^Đường\s+/i, "").toLocaleLowerCase("vi-VN");
+    const parts = fullAddress.split(",").map((part) => part.trim()).filter(Boolean);
+    const streetIndex = parts.findIndex((part) => normalizeStreet(part) === normalizeStreet(street));
+    // Không đoán số nhà; chỉ bổ sung số do nguồn bản đồ cung cấp.
+    if (streetIndex >= 0 && (streetIndex === 0 || parts[streetIndex - 1] !== houseNumber)) {
+      parts[streetIndex] = `${houseNumber} ${parts[streetIndex]}`;
+      fullAddress = parts.join(", ");
+    }
+  }
   const province = resolvedProvince || resolveProvince(response);
   const ward = firstValue(
     address?.quarter,
@@ -205,6 +231,7 @@ const normalizeResponse = (
     throw new AppError(
       "Không xác định được địa chỉ cụ thể từ vị trí hiện tại. Vui lòng chọn địa chỉ đã lưu.",
       422,
+      "GEO_ADDRESS_INCOMPLETE",
     );
   }
 
@@ -232,6 +259,7 @@ const getLocationIqApiKey = () => {
     throw new AppError(
       "Dịch vụ xác định địa chỉ chưa được cấu hình.",
       503,
+      "GEO_NOT_CONFIGURED",
     );
   }
   return apiKey;
@@ -261,6 +289,7 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
       throw new AppError(
         "Không tìm thấy địa chỉ phù hợp với vị trí hiện tại.",
         422,
+        "GEO_ADDRESS_NOT_FOUND",
       );
     }
     // Giữ địa chỉ chi tiết; chỉ tra cứu cấp tỉnh khi kết quả cấp nhà thiếu tỉnh/thành.
@@ -292,6 +321,7 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
         throw new AppError(
           "Dịch vụ xác định địa chỉ chưa được cấu hình đúng.",
           503,
+          "GEO_AUTH_REJECTED",
         );
       }
 
@@ -299,12 +329,23 @@ const fetchFromLocationIq = async (query: ReverseGeocodeQuery) => {
         throw new AppError(
           "Dịch vụ xác định địa chỉ đang quá tải. Vui lòng thử lại sau.",
           503,
+          "GEO_RATE_LIMITED",
         );
+      }
+      if (error.response?.status === 404) {
+        throw new AppError("Không tìm thấy địa chỉ phù hợp với vị trí đã chọn.", 422, "GEO_ADDRESS_NOT_FOUND");
+      }
+      if (["ECONNABORTED", "ETIMEDOUT"].includes(error.code ?? "") || error.response?.status === 504) {
+        throw new AppError("Dịch vụ xác định địa chỉ phản hồi quá chậm. Vui lòng thử lại.", 502, "GEO_TIMEOUT");
+      }
+      if (!error.response) {
+        throw new AppError("Máy chủ chưa kết nối được dịch vụ xác định địa chỉ. Vui lòng thử lại sau.", 502, "GEO_CONNECTION_FAILED");
       }
     }
     throw new AppError(
       "Dịch vụ xác định địa chỉ đang tạm thời gián đoạn. Vui lòng thử lại sau.",
       502,
+      "GEO_SERVICE_UNAVAILABLE",
     );
   }
 };
@@ -322,6 +363,57 @@ export const reverseGeocode = async (query: ReverseGeocodeQuery) => {
     .then((data) => setCached(cacheKey, data))
     .finally(() => pendingRequests.delete(cacheKey));
   pendingRequests.set(cacheKey, request);
+  return request;
+};
+
+/** Tra địa điểm hoặc khu vực cho agent; việc xác thực phường/tỉnh nằm ở bộ phân giải địa chỉ. */
+export const searchAddressLocations = async (query: string): Promise<AddressSearchCandidate[]> => {
+  const key = query.trim().toLocaleLowerCase("vi-VN");
+  const cached = searchCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const pending = pendingSearches.get(key);
+  if (pending) return pending;
+  const request = enqueueLocationIqRequest(async () => {
+    try {
+      const response = await axios.get<Array<LocationIqResponse & {
+        lat?: string; lon?: string; class?: string;
+        matchquality?: { matchlevel?: string; matchcode?: string };
+      }>>("https://us1.locationiq.com/v1/search", {
+        params: { key: getLocationIqApiKey(), q: query, format: "json", countrycodes: "vn",
+          addressdetails: 1, matchquality: 1, limit: 5, "accept-language": "vi" },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      const candidates = (Array.isArray(response.data) ? response.data : []).flatMap((item) => {
+        const latitude = item.lat?.trim() ? Number(item.lat) : NaN;
+        const longitude = item.lon?.trim() ? Number(item.lon) : NaN;
+        if (item.address?.country_code !== "vn" || !Number.isFinite(latitude) || !Number.isFinite(longitude)
+          || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return [];
+        const address = item.address;
+        const wardNames = [address.quarter, address.suburb, address.neighbourhood, address.locality,
+          address.village, address.hamlet, address.municipality, address.borough]
+          .filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
+        return [{ fullAddress: item.display_name ?? "", province: resolveProvince(item),
+          wardNames, administrativeNames: [...wardNames, address.city_district, address.state_district,
+            address.district, address.county, address.city, address.town]
+            .filter((value): value is string => typeof value === "string" && Boolean(value.trim())),
+          latitude, longitude,
+          placeId: item.osm_type && item.osm_id ? `osm:${item.osm_type}:${item.osm_id}`
+            : item.place_id ? `locationiq:${item.place_id}` : undefined,
+          matchLevel: item.matchquality?.matchlevel, matchCode: item.matchquality?.matchcode, category: item.class,
+        }];
+      });
+      if (candidates.length) {
+        if (searchCache.size >= MAX_CACHE_ENTRIES) searchCache.delete(searchCache.keys().next().value!);
+        searchCache.set(key, { data: candidates, expiresAt: Date.now() + CACHE_TTL_MS });
+      }
+      return candidates;
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (axios.isAxiosError(error) && error.response?.status === 404) return [];
+      throw new AppError("Chưa thể tra cứu vị trí địa chỉ lúc này. Vui lòng thử lại sau.", 503);
+    }
+  }).finally(() => pendingSearches.delete(key));
+  pendingSearches.set(key, request);
   return request;
 };
 

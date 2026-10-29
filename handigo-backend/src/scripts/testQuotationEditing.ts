@@ -16,6 +16,8 @@ const stubModule = (path: string, exports: object) => {
 };
 const notifications: unknown[] = [];
 const events: unknown[] = [];
+const realtimeNotifications: unknown[] = [];
+let failCommit = false;
 let scheduleChecks = 0;
 let scheduleConflict = false;
 let settlementCalls = 0;
@@ -23,8 +25,12 @@ const rewardOrders: InstanceType<typeof Order>[] = [];
 stubModule("../configs/payos.config", { payos: {}, payoutPayos: {} });
 stubModule("../sockets/socketServer", { emitToUser: (...args: unknown[]) => events.push(args) });
 stubModule("../services/notification.service", {
-  createNotificationRecord: async (input: unknown) => { notifications.push(input); return input; },
-  emitRealtimeNotification: (input: unknown) => events.push(input),
+  createNotificationRecord: async (input: unknown, options?: { deferRealtime?: boolean }) => {
+    notifications.push(input);
+    if (!options?.deferRealtime) realtimeNotifications.push(input);
+    return input;
+  },
+  emitRealtimeNotification: (input: unknown) => { realtimeNotifications.push(input); events.push(input); },
 });
 stubModule("../services/systemConfig.service", { getBookingPolicy: async () => DEFAULT_BOOKING_POLICY });
 stubModule("../services/providerSchedule.service", {
@@ -65,6 +71,7 @@ const query = (value: unknown): any => ({
 const reset = () => {
   order = new Order({
     customerId, providerId: provider._id, serviceId: new Types.ObjectId(),
+    arrival: { providerId: provider._id, arrivedAt: new Date(), latitude: 10.8, longitude: 106.7 },
     orderCode: "DON-KIEM-THU", status: "accepted", orderType: "normal",
     inspectionRequired: true, depositAmount: 40000, depositPaidAt: new Date(),
     paymentMethod: "bank", paymentStatus: "partially_paid",
@@ -73,6 +80,7 @@ const reset = () => {
   });
   quotation = null; items = []; auditLogs = [];
   notifications.length = 0; events.length = 0;
+  realtimeNotifications.length = 0; failCommit = false;
   scheduleChecks = 0; scheduleConflict = false; failInsert = false; settlementCalls = 0;
 };
 
@@ -124,7 +132,11 @@ async function run() {
     withTransaction: async (operation: () => Promise<unknown>) => {
       const before = { order: cloneOrder(), quotation: cloneQuotation(), items: cloneItems(),
         auditLogs: [...auditLogs], notifications: [...notifications] };
-      try { return await operation(); }
+      try {
+        const result = await operation();
+        if (failCommit) throw new Error("Lỗi commit kiểm thử.");
+        return result;
+      }
       catch (error) {
         order = before.order; quotation = before.quotation; items = before.items; auditLogs = before.auditLogs;
         notifications.splice(0, notifications.length, ...before.notifications);
@@ -151,6 +163,7 @@ async function run() {
   assert.equal(first.customerConfirmed, false);
   assert.equal(order.currentQuotationId?.toString(), first.id);
   assert.equal(notifications.length, 1);
+  assert.equal(realtimeNotifications.length, 1, "Chỉ phát một thông báo sau khi lưu báo giá.");
   assert.equal(auditLogs.length, 1);
   await assert.rejects(save(), /đã có báo giá/);
   const second = await update({ items: [...payload().items,
@@ -231,7 +244,7 @@ async function run() {
   assert.equal(order.status, "in_progress");
 
   // Cho phép bắt đầu trước giờ hẹn để hỗ trợ kiểm thử luồng dịch vụ báo giá.
-  for (const orderType of ["scheduled", "recurring"] as const) {
+  for (const orderType of ["scheduled"] as const) {
     reset();
     const scheduledAt = new Date(Date.now() + 24 * 60 * 60000);
     order.orderType = orderType;
@@ -276,6 +289,13 @@ async function run() {
     await assert.rejects(confirmPayment(), /chưa đủ điều kiện/);
   }
   quotation!.status = "saved";
+  const originalPaymentMethod = order.paymentMethod;
+  order.paymentStatus = "paid";
+  order.paymentMethod = "wallet";
+  await assert.rejects(confirmPayment(), /đã thanh toán báo giá qua hệ thống/);
+  assert.equal(quotation!.directPaymentConfirmedAt, null);
+  order.paymentStatus = "partially_paid";
+  order.paymentMethod = originalPaymentMethod;
   rewardOrders.length = 0;
   const confirmed = await confirmPayment();
   assert.ok(confirmed.directPaymentConfirmedAt);
@@ -314,6 +334,10 @@ async function run() {
   await assert.rejects(confirmPayment(), /trạng thái hiện tại/);
   assert.equal(confirmQuotationPaymentSchema.safeParse({ quotationId: quotation!.id, expectedRevision: -1 }).success, false);
   assert.equal(confirmQuotationPaymentSchema.safeParse({ quotationId: quotation!.id }).success, false);
+  reset(); failCommit = true;
+  await assert.rejects(save(), /Lỗi commit/);
+  assert.equal(notifications.length, 0);
+  assert.equal(realtimeNotifications.length, 0, "Không phát báo giá chưa commit cho khách.");
   console.log("Đạt: lưu/sửa báo giá, quyền sở hữu, phiên bản, lịch làm việc, hoàn thành và xác nhận thanh toán trực tiếp không ghi nhận trùng.");
 }
 

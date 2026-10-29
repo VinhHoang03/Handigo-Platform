@@ -18,7 +18,6 @@ const normalizeApplication = (
   ...application,
   applicationType: application.applicationType || 'initial',
   serviceIds: application.serviceIds || [],
-  workingAreas: application.workingAreas || [],
   certificates: application.certificates || [],
   reviewHistory: application.reviewHistory || [],
 });

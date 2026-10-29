@@ -7,10 +7,10 @@ export interface OrderAttachmentImageAnalysisResult {
   detectedObjects: string[];
 }
 
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const IMAGE_VALIDATION_MODEL = "gemini-3.5-flash-lite";
 const MIN_ACCEPTED_CONFIDENCE = 0.65;
 
-const getGeminiApiKey = () => process.env.GEMINI_API_KEY?.trim();
+const getGeminiApiKey = () => process.env.GEMINI_API_KEY_1?.trim();
 
 const extractJsonObject = (text: string) => {
   const cleaned = text.replace(/```json|```/gi, "").trim();
@@ -43,12 +43,12 @@ export const analyzeOrderProblemImage = async (
 ): Promise<OrderAttachmentImageAnalysisResult> => {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
-    throw new Error("Thiếu cấu hình GEMINI_API_KEY");
+    throw new Error("Thiếu cấu hình GEMINI_API_KEY_1");
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_IMAGE_VALIDATION_MODEL || DEFAULT_MODEL,
+    model: IMAGE_VALIDATION_MODEL,
     generationConfig: {
       temperature: 0.1,
       responseMimeType: "application/json",

@@ -244,3 +244,10 @@ export const updateOrderTrackingLocation = async (
     updatedAt: location?.lastUpdatedAt || new Date(),
   };
 };
+
+export const getOrderTrackingRecipientIds = async (orderId: string, providerUserId: string) => {
+  const participants = await getTrackingParticipants(orderId, providerUserId, "PROVIDER", {
+    requireActiveTracking: true,
+  });
+  return [participants.customerUserId, participants.providerUserId];
+};

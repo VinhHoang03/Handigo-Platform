@@ -13,7 +13,7 @@ export { getOrderInterval, isWithinWorkingCalendar } from '../utils/providerSche
 export const getAvailableProviderIds = async (
   providerIds: Types.ObjectId[],
   intervals: ScheduleInterval[],
-  options: { policy?: BookingPolicy; excludeOrderIds?: Types.ObjectId[]; session?: ClientSession } = {},
+  options: { policy?: BookingPolicy; excludeOrderIds?: Types.ObjectId[]; session?: ClientSession; checkWorkingCalendar?: boolean } = {},
 ) => {
   const policy = options.policy ?? await getBookingPolicy();
   if (intervals.some((interval, index) => intervals.slice(index + 1).some((other) => intervalsConflict(interval, other)))) return new Set<string>();
@@ -21,16 +21,17 @@ export const getAvailableProviderIds = async (
     providerId: { $in: providerIds },
     _id: { $nin: options.excludeOrderIds ?? [] },
     status: { $in: ["accepted", "in_progress", "completed"] },
+    $nor: [{ status: "accepted", "customerNoShow.status": "pending" }],
     isDeleted: false,
   }).session(options.session ?? null);
   return new Set(providerIds.filter((id) => {
-    if (!intervals.every((interval) => isWithinWorkingCalendar(id.toString(), interval, policy))) return false;
+    if (options.checkWorkingCalendar !== false && !intervals.every((interval) => isWithinWorkingCalendar(id.toString(), interval, policy))) return false;
     return !orders.some((order) => {
       if (order.providerId?.toString() !== id.toString()) return false;
       const actualInterval = getOrderInterval(order, policy);
       const scheduledStart = order.scheduledAt?.getTime();
-      // Làm sớm hoặc hoàn thành không giải phóng khung giờ khách đã đặt.
-      const reservedInterval = scheduledStart === undefined ? actualInterval : {
+      // Chỉ giữ khung giờ hẹn gốc khi công việc chưa hoàn thành.
+      const reservedInterval = scheduledStart === undefined || order.status === "completed" ? actualInterval : {
         ...actualInterval,
         start: scheduledStart,
         end: scheduledStart + (order.schedule?.durationMinutes ?? calculateDuration(
@@ -48,16 +49,19 @@ export const lockProviderSchedule = async (providerId: Types.ObjectId, session: 
   const provider = await Provider.findOneAndUpdate(
     { _id: providerId, verified: true, isDeleted: false },
     { $inc: { scheduleVersion: 1 } },
-    { new: true, session, runValidators: true },
+    { returnDocument: "after", session, runValidators: true },
   );
   if (!provider) throw new AppError("Chuyên gia không còn khả dụng.", 409);
   return provider;
 };
 
-export const assertProviderSchedule = async (providerId: Types.ObjectId, orders: IOrder[], session: ClientSession, policy: BookingPolicy) => {
+export const assertProviderSchedule = async (providerId: Types.ObjectId, orders: IOrder[], session: ClientSession, policy: BookingPolicy,
+  options: { checkWorkingCalendar?: boolean } = {}) => {
   const intervals = orders.map((order) => getOrderInterval({ ...order.toObject(), status: "created" }, policy));
-  const available = await getAvailableProviderIds([providerId], intervals, { policy, session, excludeOrderIds: orders.map((order) => order._id as Types.ObjectId) });
-  if (!available.has(providerId.toString())) throw new AppError("Lịch làm việc không đủ thời gian thực hiện, dự phòng và di chuyển. Vui lòng chọn thời điểm khác.", 409);
+  const available = await getAvailableProviderIds([providerId], intervals, { policy, session, ...options, excludeOrderIds: orders.map((order) => order._id as Types.ObjectId) });
+  if (!available.has(providerId.toString())) throw new AppError(options.checkWorkingCalendar === false
+    ? "Thời gian thực hiện, dự phòng và di chuyển bị trùng với đơn khác. Vui lòng kiểm tra lại lịch làm việc."
+    : "Lịch làm việc không đủ thời gian thực hiện, dự phòng và di chuyển. Vui lòng chọn thời điểm khác.", 409);
 };
 
 export const updateExpectedEnd = async (orderId: string, userId: string, expectedEndAt: Date) => {
@@ -75,7 +79,8 @@ export const updateExpectedEnd = async (orderId: string, userId: string, expecte
       const interval = getOrderInterval(order, policy);
       order.schedule = { durationMinutes: order.schedule?.durationMinutes ?? policy.defaultDurationMinutes, bufferMinutes: interval.bufferMinutes, travelMinutes: interval.travelMinutes, expectedStartAt: new Date(interval.start), expectedEndAt };
       await order.save({ session });
-      const upcoming = await Order.find({ _id: { $ne: order._id }, providerId: identity._id, status: "accepted", isDeleted: false }).session(session);
+      const upcoming = await Order.find({ _id: { $ne: order._id }, providerId: identity._id, status: "accepted",
+        "customerNoShow.status": { $ne: "pending" }, isDeleted: false }).session(session);
       affected = upcoming.filter((other) => intervalsConflict(getOrderInterval(order, policy), getOrderInterval(other, policy)));
       return order;
     });

@@ -1,8 +1,14 @@
 import { Router } from "express";
 import {
   getAdminOrders,
+  getAdminInsights,
+  getAdminMonthlyTrend,
+  getAdminRecentOrders,
+  getAdminUserPresence,
+  getAdminPendingCounts,
   getAdminProviders,
   getAdminRevenue,
+  getAdminRevenueInsights,
   getDashboardOverview,
   getProviderEarnings,
   updateProviderAvailability,
@@ -17,7 +23,14 @@ const dashboardRoutes = Router();
 dashboardRoutes.use(authMiddleware);
 dashboardRoutes.use(resourceIntensiveRateLimit);
 dashboardRoutes.get("/overview", getDashboardOverview);
+
+dashboardRoutes.get("/insights", roleMiddleware("ADMIN"), getAdminInsights);
+dashboardRoutes.get("/presence", roleMiddleware("ADMIN"), getAdminUserPresence);
+dashboardRoutes.get("/pending-work", roleMiddleware("ADMIN"), getAdminPendingCounts);
+dashboardRoutes.get("/monthly-trend", roleMiddleware("ADMIN"), getAdminMonthlyTrend);
+dashboardRoutes.get("/recent-orders", roleMiddleware("ADMIN"), getAdminRecentOrders);
 dashboardRoutes.get("/revenue", roleMiddleware("ADMIN"), getAdminRevenue);
+dashboardRoutes.get("/revenue-insights", roleMiddleware("ADMIN"), getAdminRevenueInsights);
 dashboardRoutes.get("/orders", roleMiddleware("ADMIN"), getAdminOrders);
 dashboardRoutes.get("/providers", roleMiddleware("ADMIN"), getAdminProviders);
 dashboardRoutes.get(

@@ -37,6 +37,8 @@ export interface ConfirmPaymentSubmitParams {
   setPendingOrderId: (value: string) => void;
   reset: () => void;
   navigate: NavigateFunction;
+  paymentCancelPath?: string;
+  beforeExternalRedirect?: () => void;
 }
 
 /** Trích thông điệp lỗi dễ đọc từ response API (giữ nguyên logic gốc). */

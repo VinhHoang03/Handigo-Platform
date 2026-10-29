@@ -39,7 +39,6 @@ export function ProviderDescriptionStep({
 }: ProviderDescriptionStepProps) {
   const {
     uploadingKey,
-    ocrMessages,
     uploadIdentity,
     uploadCertificate,
   } = useProviderDescriptionUploads(onChange, onUploadAsset);
@@ -99,7 +98,6 @@ export function ProviderDescriptionStep({
         dateErrors={dateErrors.identity}
         today={today}
         uploadingKey={uploadingKey}
-        ocrMessages={ocrMessages}
         description={form.description}
         onUpdateIdentity={updateIdentity}
         onUploadIdentity={(key, kind, file) =>
@@ -113,7 +111,6 @@ export function ProviderDescriptionStep({
       <ProviderCertificatesSection
         certificates={form.certificates}
         uploadingKey={uploadingKey}
-        ocrMessages={ocrMessages}
         dateErrors={dateErrors.certificates}
         today={today}
         onAddCertificate={() =>
@@ -142,9 +139,6 @@ export function ProviderDescriptionStep({
         </p>
         <p>
           <b>Dịch vụ:</b> {selectedNames.join(", ") || "Chưa chọn"}
-        </p>
-        <p>
-          <b>Khu vực:</b> {form.workingAreas.join(", ") || "Chưa thêm"}
         </p>
         <p>
           <b>Giấy tờ:</b>{" "}

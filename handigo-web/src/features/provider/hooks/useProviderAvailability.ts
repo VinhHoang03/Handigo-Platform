@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   providerDashboardApi,
   type ProviderAvailabilityStatus,
@@ -6,8 +6,9 @@ import {
 import { useToast } from "@/components/common/Toast";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useProviderAvailabilityStore } from "../store/providerAvailability.store";
+import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 
-const getCurrentCoordinates = () =>
+export const getCurrentCoordinates = () =>
   new Promise<GeolocationCoordinates>((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Trình duyệt không hỗ trợ xác định vị trí"));
@@ -82,6 +83,25 @@ export function useProviderAvailability(enabled = true) {
     enabled && storedProviderUserId === providerUserId
       ? storedAvailabilityStatus
       : "offline";
+  const socketRef = useRef<ReturnType<typeof createAuthenticatedSocket>["socket"] | null>(null);
+  const requestVersion = useRef(0);
+  const invalidateRequests = useCallback(() => { requestVersion.current++; }, []);
+
+  const synchronizeAvailability = useCallback(async () => {
+    if (!enabled || !providerUserId || useProviderAvailabilityStore.getState().isUpdating) return;
+    const version = ++requestVersion.current;
+    try {
+      const overview = await providerDashboardApi.overview();
+      const store = useProviderAvailabilityStore.getState();
+      if (version !== requestVersion.current || store.providerUserId !== providerUserId || store.isUpdating) return;
+      store.completeInitialization(providerUserId, overview.availabilityStatus || "offline");
+    } catch {
+      const store = useProviderAvailabilityStore.getState();
+      if (version === requestVersion.current && store.providerUserId === providerUserId) {
+        store.completeInitialization(providerUserId, store.availabilityStatus);
+      }
+    }
+  }, [enabled, providerUserId]);
 
   useEffect(() => {
     if (!enabled || !providerUserId) return;
@@ -89,55 +109,44 @@ export function useProviderAvailability(enabled = true) {
     const store = useProviderAvailabilityStore.getState();
     if (!store.startInitialization(providerUserId)) return;
 
-    void providerDashboardApi
-      .overview()
-      .then((overview) => {
-        useProviderAvailabilityStore
-          .getState()
-          .completeInitialization(
-            providerUserId,
-            overview.availabilityStatus || "offline",
-          );
-      })
-      .catch(() => {
-        useProviderAvailabilityStore
-          .getState()
-          .completeInitialization(providerUserId, "offline");
-      });
-  }, [enabled, providerUserId]);
+    void synchronizeAvailability();
+  }, [enabled, providerUserId, synchronizeAvailability]);
 
   useEffect(() => {
-    if (!enabled) return;
-
-    const keepOffline = () => {
-      useProviderAvailabilityStore
-        .getState()
-        .setAvailabilityStatus("offline");
-    };
-    const persistOfflineAfterReconnect = () => {
-      keepOffline();
-      void providerDashboardApi.updateAvailability("offline").catch(() => undefined);
-    };
-
-    window.addEventListener("offline", keepOffline);
-    window.addEventListener("online", persistOfflineAfterReconnect);
+    if (!enabled || !providerUserId) return;
+    // Giữ kết nối nhận việc ở cấp dashboard, không phụ thuộc việc mở/đóng chat.
+    const { socket, dispose } = createAuthenticatedSocket();
+    socketRef.current = socket;
+    const synchronize = () => { void synchronizeAvailability(); };
+    socket.on("connect", synchronize);
+    socket.on("provider:availability", synchronize);
+    window.addEventListener("online", synchronize);
 
     return () => {
-      window.removeEventListener("offline", keepOffline);
-      window.removeEventListener("online", persistOfflineAfterReconnect);
+      invalidateRequests();
+      socketRef.current = null;
+      socket.off("connect", synchronize);
+      socket.off("provider:availability", synchronize);
+      window.removeEventListener("online", synchronize);
+      dispose();
     };
-  }, [enabled]);
+  }, [enabled, providerUserId, synchronizeAvailability, invalidateRequests]);
 
   const toggleAvailability = useCallback(async () => {
     const store = useProviderAvailabilityStore.getState();
-    if (!enabled || store.isUpdating) return;
+    if (!enabled || store.providerUserId !== providerUserId || store.isUpdating) return;
 
     const previousStatus = store.availabilityStatus;
     const nextStatus = previousStatus === "online" ? "offline" : "online";
+    requestVersion.current++;
     store.setIsUpdating(true);
 
     try {
       if (nextStatus === "online") {
+        if (socketRef.current && !socketRef.current.connected) {
+          addToast("Chưa kết nối được kênh nhận việc. Vui lòng chờ kết nối lại rồi thử bật nhận việc.", "error");
+          return;
+        }
         let coordinates: GeolocationCoordinates;
         try {
           coordinates = await getCurrentCoordinates();
@@ -150,6 +159,7 @@ export function useProviderAvailability(enabled = true) {
           return;
         }
         try {
+          if (useProviderAvailabilityStore.getState().providerUserId !== providerUserId) return;
           await providerDashboardApi.updateCurrentLocation(
             coordinates.latitude,
             coordinates.longitude,
@@ -160,12 +170,16 @@ export function useProviderAvailability(enabled = true) {
         }
       }
 
+      if (useProviderAvailabilityStore.getState().providerUserId !== providerUserId) return;
+      if (nextStatus === "online" && socketRef.current && !socketRef.current.connected) throw new Error("Mất kết nối kênh nhận việc.");
       const result = await providerDashboardApi.updateAvailability(nextStatus);
+      if (useProviderAvailabilityStore.getState().providerUserId !== providerUserId) return;
       useProviderAvailabilityStore
         .getState()
         .setAvailabilityStatus(result.availabilityStatus);
       addToast(result.availabilityStatus === "online" ? "Đã bật trạng thái nhận việc." : "Đã tắt trạng thái nhận việc.", "success");
     } catch {
+      if (useProviderAvailabilityStore.getState().providerUserId !== providerUserId) return;
       useProviderAvailabilityStore
         .getState()
         .setAvailabilityStatus(previousStatus);
@@ -176,9 +190,9 @@ export function useProviderAvailability(enabled = true) {
         "error",
       );
     } finally {
-      useProviderAvailabilityStore.getState().setIsUpdating(false);
+      if (useProviderAvailabilityStore.getState().providerUserId === providerUserId) useProviderAvailabilityStore.getState().setIsUpdating(false);
     }
-  }, [enabled, addToast]);
+  }, [enabled, addToast, providerUserId]);
 
   return {
     availabilityStatus,

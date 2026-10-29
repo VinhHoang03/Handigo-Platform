@@ -144,6 +144,7 @@ test('API hủy giữ nguyên thông tin số tiền xác nhận cho đơn và c
   const calls = [];
   const { bookingApi } = load('features/booking/api/booking.api.ts', {
     '@/api/client': { patch: async (url, body) => { calls.push({ url, body }); return { data: { data: {} } }; } },
+    '../utils/createBookingOnce': {},
   });
   const expectation = { paidAmount: 40000, refundAmount: 40000, cancellationFee: 0, providerCompensation: 0 };
   const items = [{ orderId: 'buoi-1', ...expectation }];
@@ -219,6 +220,7 @@ test('Xác nhận đặt đơn chặn mọi phương thức thanh toán nếu ch
     '@/api/tokenStorage': { tokenStorage: { prepareExternalRedirect() {} } },
     '@/utils/airConditionerCleaning': { isAirConditionerCleaning: () => false },
     './step2Helpers': { getEarliestScheduledAt: () => new Date(0) },
+    '../utils/bookingSessionStorage': { getBookingSessionRevision: () => 0 },
     './confirmPaymentSubmitTypes': { getConfirmPaymentErrorMessage: () => 'Lỗi kiểm thử' },
     './pendingBookingRecovery': { PENDING_ORDER_ID_KEY: 'order', PENDING_ORDER_FINGERPRINT_KEY: 'fingerprint',
       PENDING_ORDER_VOUCHER_KEY: 'voucher', clearPendingBooking() {} },
@@ -541,7 +543,7 @@ test('Lỗi lưu hồ sơ provider không thay toàn bộ trang bằng khung bá
     '../components/profile/ProviderProfileDialogsGroup': { ProviderProfileDialogsGroup: 'profile-dialogs' },
     '../components/profile/ProviderProfilePageSkeleton': { ProviderProfilePageSkeleton: 'skeleton' },
   };
-  for (const name of ['useProviderIdentityFlow', 'useProviderCertificateFlow', 'useProviderServiceAreaFlow', 'useProviderPasswordFlow', 'useProviderProfileUiState']) {
+  for (const name of ['useProviderIdentityFlow', 'useProviderCertificateFlow', 'useProviderPasswordFlow', 'useProviderProfileUiState']) {
     modules[`../components/profile/${name}`] = { [name]: () => ({}) };
   }
   const { default: ProviderProfilePage } = load('features/provider/pages/ProviderProfilePage.tsx', modules);

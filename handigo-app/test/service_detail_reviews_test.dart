@@ -63,8 +63,18 @@ final reviews = [
 final previewKey = GlobalKey();
 
 class _BookingRepository implements ServiceCatalogRepository {
+  _BookingRepository([this.savedAddresses = const []]);
+  final List<Address> savedAddresses;
   @override
-  Future<List<Address>> addresses() async => [];
+  Future<Map<String, dynamic>> bookingPolicies() async => {
+    'paymentHoldMinutes': 15,
+  };
+  @override
+  Future<List<Address>> addresses() async => savedAddresses;
+  @override
+  Future<List<Map<String, dynamic>>> nearbyProviders(
+    Map<String, dynamic> query,
+  ) async => [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -94,6 +104,7 @@ Future<void> showScreen(
   void Function(ServiceReviewQuery)? onQuery,
   bool error = false,
   List<ServiceReview>? items,
+  List<Address> addresses = const [],
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -123,7 +134,9 @@ Future<void> showScreen(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        serviceCatalogRepositoryProvider.overrideWithValue(_BookingRepository()),
+        serviceCatalogRepositoryProvider.overrideWithValue(
+          _BookingRepository(addresses),
+        ),
         serviceDetailProvider('1').overrideWith((ref) async => value),
         serviceReviewsProvider.overrideWith((ref, query) async {
           onQuery?.call(query);
@@ -152,40 +165,129 @@ Future<void> showScreen(
 }
 
 void main() {
-  testWidgets('Thiếu địa chỉ hiện toast warning phía trên thay banner trong form', (tester) async {
-    await showScreen(tester, booking: true);
-    await tester.tap(find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'));
+  testWidgets('Tự chọn địa chỉ mặc định và chỉ hiện một địa chỉ trên form', (
+    tester,
+  ) async {
+    final addresses = [
+      for (final isDefault in [false, true])
+        Address(
+          id: '$isDefault',
+          recipientName: isDefault ? 'Nhà riêng' : 'Văn phòng',
+          recipientPhone: '0900000000',
+          fullAddress: isDefault ? 'Địa chỉ nhà riêng' : 'Địa chỉ văn phòng',
+          province: '',
+          ward: '',
+          isDefault: isDefault,
+        ),
+    ];
+    await showScreen(tester, booking: true, addresses: addresses);
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'),
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Vệ sinh tiêu chuẩn'));
-    await tester.pump();
-    final next = find.text('Tiếp tục sang Thanh toán');
-    await tester.scrollUntilVisible(next, 250,
-      scrollable: find.descendant(of: find.byType(ListView).last, matching: find.byType(Scrollable)).first);
-    await tester.tap(next);
-    await tester.pump();
-    expect(find.text('Vui lòng chọn địa chỉ thực hiện.'), findsOneWidget);
-    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
-    final message = find.text('Vui lòng chọn địa chỉ thực hiện.');
-    expect(tester.getTopLeft(message).dy, lessThan(100));
-    final container = ProviderScope.containerOf(tester.element(find.byType(BookingScreen)));
-    expect(container.read(bookingDraftProvider).selectedOptionIds, ['option-1']);
-    await tester.tap(find.byTooltip('Đóng thông báo'));
-    await tester.pump();
-    expect(message, findsNothing);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(BookingScreen)),
+    );
+    expect(container.read(bookingDraftProvider).addressId, 'true');
+    expect(find.text('Nhà riêng'), findsOneWidget);
+    expect(find.text('Văn phòng'), findsNothing);
+    final providerChoiceY = tester
+        .getTopLeft(find.text('Lựa chọn thợ phù hợp'))
+        .dy;
+    expect(
+      providerChoiceY,
+      greaterThan(tester.getTopLeft(find.text('Địa chỉ làm việc')).dy),
+    );
+    expect(
+      providerChoiceY,
+      lessThan(tester.getTopLeft(find.text('Thời gian thực hiện')).dy),
+    );
+    await tester.scrollUntilVisible(
+      find.text('Đổi'),
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byType(BookingScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đổi'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.tap(find.text('Văn phòng'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(container.read(bookingDraftProvider).addressId, 'false');
+    expect(find.text('Văn phòng'), findsOneWidget);
+    expect(find.text('Nhà riêng'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Ghi chú chứa ảnh vuông, xem và xóa ảnh, tự giãn theo nội dung', (tester) async {
+  testWidgets(
+    'Thiếu địa chỉ hiện toast warning phía trên thay banner trong form',
+    (tester) async {
+      await showScreen(tester, booking: true);
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Vệ sinh tiêu chuẩn'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Vệ sinh tiêu chuẩn'));
+      await tester.pump();
+      final next = find.text('Tiếp tục');
+      await tester.ensureVisible(next);
+      await tester.tap(next);
+      await tester.pump();
+      expect(find.text('Vui lòng chọn địa chỉ thực hiện.'), findsOneWidget);
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+      final message = find.text('Vui lòng chọn địa chỉ thực hiện.');
+      expect(tester.getTopLeft(message).dy, lessThan(100));
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(BookingScreen)),
+      );
+      expect(container.read(bookingDraftProvider).selectedOptionIds, [
+        'option-1',
+      ]);
+      await tester.tap(find.byTooltip('Đóng thông báo'));
+      await tester.pump();
+      expect(message, findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Ghi chú chứa ảnh vuông, xem và xóa ảnh, tự giãn theo nội dung', (
+    tester,
+  ) async {
     final controller = TextEditingController(text: 'Ghi chú đã nhập');
     addTearDown(controller.dispose);
-    await tester.pumpWidget(ProviderScope(child: MaterialApp(theme: AppTheme.light,
-      home: Scaffold(body: SingleChildScrollView(child: BookingNoteInput(controller: controller))))));
-    final container = ProviderScope.containerOf(tester.element(find.byType(BookingNoteInput)));
-    container.read(bookingDraftProvider.notifier).setAttachments(['https://example.com/incident.jpg']);
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: BookingNoteInput(controller: controller),
+            ),
+          ),
+        ),
+      ),
+    );
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(BookingNoteInput)),
+    );
+    container.read(bookingDraftProvider.notifier).setAttachments([
+      'https://example.com/incident.jpg',
+    ]);
     await tester.pump();
     final image = find.byType(Image).first;
     expect(tester.getSize(image).width, tester.getSize(image).height);
-    expect(tester.getTopLeft(image).dy, lessThan(tester.getTopLeft(find.byType(TextField)).dy));
+    expect(
+      tester.getTopLeft(image).dy,
+      lessThan(tester.getTopLeft(find.byType(TextField)).dy),
+    );
     await tester.tap(image);
     await tester.pumpAndSettle();
     expect(find.byType(InteractiveViewer), findsOneWidget);
@@ -196,66 +298,141 @@ void main() {
     expect(container.read(bookingDraftProvider).attachments, isEmpty);
     expect(controller.text, 'Ghi chú đã nhập');
     final smallHeight = tester.getSize(find.byType(BookingNoteInput)).height;
-    await tester.enterText(find.byType(TextField), 'Dòng một\nDòng hai\nDòng ba\nDòng bốn');
+    await tester.enterText(
+      find.byType(TextField),
+      'Dòng một\nDòng hai\nDòng ba\nDòng bốn',
+    );
     await tester.pump();
-    expect(tester.getSize(find.byType(BookingNoteInput)).height, greaterThan(smallHeight));
-    expect(container.read(bookingDraftProvider).problemDescription, controller.text);
+    expect(
+      tester.getSize(find.byType(BookingNoteInput)).height,
+      greaterThan(smallHeight),
+    );
+    expect(
+      container.read(bookingDraftProvider).problemDescription,
+      controller.text,
+    );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Chọn nhanh 5 ngày, cuộn giờ phút và đổi ngày vẫn giữ giờ', (tester) async {
-    await tester.pumpWidget(ProviderScope(child: MaterialApp(theme: AppTheme.light,
-      home: const Scaffold(body: SizedBox(width: 320, child: SingleChildScrollView(child: BookingScheduleSelector()))))));
-    expect(find.byType(OutlinedButton), findsNWidgets(7));
-    await tester.tap(find.byType(OutlinedButton).at(2));
-    await tester.pump();
-    final container = ProviderScope.containerOf(tester.element(find.byType(BookingScheduleSelector)));
+  testWidgets('Cuộn ngày giờ phút, xác nhận và đổi ngày vẫn giữ giờ', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          bookingScheduleClockProvider.overrideWithValue(() {
+            final now = DateTime.now();
+            return DateTime(now.year, now.month, now.day, 10);
+          }),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const Scaffold(
+            body: SizedBox(width: 320, child: BookingScheduleButton()),
+          ),
+        ),
+      ),
+    );
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(BookingScheduleButton)),
+    );
+    await tester.tap(find.text('Hẹn lịch'));
+    await tester.pumpAndSettle();
+    FixedExtentScrollController wheel(String label) =>
+        tester
+                .widget<ListWheelScrollView>(
+                  find.byKey(ValueKey('schedule-$label')),
+                )
+                .controller!
+            as FixedExtentScrollController;
+    wheel('Ngày').jumpToItem(1);
+    wheel('Giờ').jumpToItem(6);
+    await tester.pumpAndSettle();
+    wheel('Phút').jumpToItem(30);
+    await tester.pumpAndSettle();
+    expect(container.read(bookingDraftProvider).scheduledAt, isNull);
+    await tester.tap(find.text('Xác nhận'));
+    await tester.pumpAndSettle();
     final firstDate = container.read(bookingDraftProvider).scheduledAt!;
-    await tester.tap(find.byIcon(Icons.access_time_rounded));
+    expect(firstDate.hour, 14);
+    expect(firstDate.minute, 30);
+    await tester.tap(find.byIcon(Icons.calendar_month_outlined));
     await tester.pumpAndSettle();
-    final wheels = tester.widgetList<ListWheelScrollView>(find.byType(ListWheelScrollView)).toList();
-    (wheels[0].controller! as FixedExtentScrollController).jumpToItem(6);
-    (wheels[1].controller! as FixedExtentScrollController).jumpToItem(30);
+    wheel('Ngày').jumpToItem(2);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Chọn 14:30'));
+    await tester.tap(find.text('Xác nhận'));
     await tester.pumpAndSettle();
-    expect(container.read(bookingDraftProvider).scheduledAt!.hour, 14);
-    expect(container.read(bookingDraftProvider).scheduledAt!.minute, 30);
-    await tester.tap(find.byType(OutlinedButton).at(3));
-    await tester.pump();
     final changed = container.read(bookingDraftProvider).scheduledAt!;
-    expect(changed.day, firstDate.add(const Duration(days: 1)).day);
+    expect(changed.difference(firstDate), const Duration(days: 1));
     expect(changed.hour, 14);
     expect(changed.minute, 30);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Nhóm bắt buộc có sao đỏ, option tự giãn và chọn đúng kiểu', (tester) async {
-    const description = 'Kiểm tra và vệ sinh toàn bộ thiết bị, làm sạch từng bộ phận, kiểm tra vận hành và hướng dẫn khách hàng sử dụng sau khi hoàn tất công việc tại nhà.';
-    await tester.pumpWidget(ProviderScope(child: MaterialApp(
-      theme: AppTheme.light,
-      home: Scaffold(body: SizedBox(width: 320, child: SingleChildScrollView(
-        child: ServiceOptionSelector(detail: ServiceDetail(service: detail.service, options: const [
-          ServiceOption(id: 'single', name: 'Gói tiêu chuẩn', price: 180000,
-            groupId: 'required', selectionGroup: 'Diện tích', selectionMode: 'single',
-            isRequired: true, description: description),
-          ServiceOption(id: 'multiple', name: 'Vệ sinh thêm', price: 50000,
-            groupId: 'extra', selectionGroup: 'Bổ sung'),
-        ])),
-      ))),
-    )));
+  testWidgets('Nhóm bắt buộc có sao đỏ, option tự giãn và chọn đúng kiểu', (
+    tester,
+  ) async {
+    const description =
+        'Kiểm tra và vệ sinh toàn bộ thiết bị, làm sạch từng bộ phận, kiểm tra vận hành và hướng dẫn khách hàng sử dụng sau khi hoàn tất công việc tại nhà.';
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: SingleChildScrollView(
+                child: ServiceOptionSelector(
+                  detail: ServiceDetail(
+                    service: detail.service,
+                    options: const [
+                      ServiceOption(
+                        id: 'single',
+                        name: 'Gói tiêu chuẩn',
+                        price: 180000,
+                        groupId: 'required',
+                        selectionGroup: 'Diện tích',
+                        selectionMode: 'single',
+                        isRequired: true,
+                        description: description,
+                      ),
+                      ServiceOption(
+                        id: 'multiple',
+                        name: 'Vệ sinh thêm',
+                        price: 50000,
+                        groupId: 'extra',
+                        selectionGroup: 'Bổ sung',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
     expect(find.text(description), findsOneWidget);
     expect(find.textContaining('Không bắt buộc'), findsNothing);
     expect(find.textContaining('Chọn một'), findsNothing);
     expect(find.textContaining('Chọn nhiều'), findsNothing);
-    final title = tester.widget<Text>(find.byWidgetPredicate((widget) =>
-        widget is Text && widget.textSpan?.toPlainText(includeSemanticsLabels: false) == 'Diện tích *'));
+    final title = tester.widget<Text>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.textSpan?.toPlainText(includeSemanticsLabels: false) ==
+                'Diện tích *',
+      ),
+    );
     final star = (title.textSpan! as TextSpan).children!.last as TextSpan;
     expect(star.style!.color, Colors.red);
     expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget);
     expect(find.byIcon(Icons.check_box_outline_blank), findsOneWidget);
     final cards = find.byType(Card);
-    expect(tester.getSize(cards.first).height, greaterThan(tester.getSize(cards.last).height));
+    expect(
+      tester.getSize(cards.first).height,
+      greaterThan(tester.getSize(cards.last).height),
+    );
     await tester.tap(find.text('Gói tiêu chuẩn'));
     await tester.tap(find.text('Vệ sinh thêm'));
     await tester.pump();
@@ -268,27 +445,46 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Chọn gói trong sheet 65%, bỏ thẻ dịch vụ và mở lại được', (tester) async {
+  testWidgets('Chọn gói trong sheet 65%, bỏ thẻ dịch vụ và mở lại được', (
+    tester,
+  ) async {
     await showScreen(tester, booking: true);
-    await tester.tap(find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'));
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Dịch vụ đã chọn'), findsNothing);
     expect(find.text('Vệ sinh tiêu chuẩn'), findsOneWidget);
     final sheet = tester.widget<BottomSheet>(find.byType(BottomSheet));
     expect(sheet.constraints!.maxHeight, closeTo(844 * .65, .1));
+    await tester.ensureVisible(find.text('Vệ sinh tiêu chuẩn'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Vệ sinh tiêu chuẩn'));
     await tester.pumpAndSettle();
     final note = find.widgetWithText(TextField, 'Ghi chú gì đó cho thợ');
-    await tester.scrollUntilVisible(note, 250,
-        scrollable: find.descendant(of: find.byType(ListView).last, matching: find.byType(Scrollable)).first);
+    await tester.scrollUntilVisible(
+      note,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).last,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tester.enterText(note, 'Gọi trước khi đến');
-    final voucher = find.widgetWithText(TextField, 'Mã voucher (không bắt buộc)');
+    final voucher = find.widgetWithText(
+      TextField,
+      'Mã voucher (không bắt buộc)',
+    );
     await tester.ensureVisible(voucher);
     await tester.enterText(voucher, 'handigo10');
     tester.testTextInput.hide();
     await tester.tap(find.byTooltip('Quay lại'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'));
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'),
+    );
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.check_box), findsOneWidget);
     expect(find.byType(BottomSheet), findsOneWidget);
@@ -310,8 +506,8 @@ void main() {
       }).processSteps.single.title,
       'Kiểm tra',
     );
-    expect(AppTheme.light.textTheme.bodyMedium?.fontFamily, 'Inter');
-    expect(AppTheme.dark.textTheme.titleMedium?.fontFamily, 'Hanken Grotesk');
+    expect(AppTheme.light.textTheme.bodyMedium?.fontFamily, 'Roboto');
+    expect(AppTheme.dark.textTheme.titleMedium?.fontFamily, 'Roboto');
   });
 
   testWidgets(
@@ -339,37 +535,26 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Ẩn quy trình rỗng và giới hạn 4 đánh giá tốt, xem tất cả chuyển trang',
-    (tester) async {
-      await showScreen(
-        tester,
-        value: const ServiceDetail(
-          service: Service(
-            id: '1',
-            name: 'Dịch vụ',
-            description: '',
-            serviceType: 'fixed_price',
-          ),
-          options: [],
+  testWidgets('Ẩn quy trình rỗng và bỏ phần đánh giá trong chi tiết dịch vụ', (
+    tester,
+  ) async {
+    await showScreen(
+      tester,
+      value: const ServiceDetail(
+        service: Service(
+          id: '1',
+          name: 'Dịch vụ',
+          description: '',
+          serviceType: 'fixed_price',
         ),
-      );
-      await tester.scrollUntilVisible(find.text('Đánh giá thực tế'), 200);
-      expect(find.text('Quy trình thực hiện'), findsNothing);
-      expect(find.byType(ServiceReviewCard), findsNWidgets(4));
-      expect(find.text('Khách 1'), findsNothing);
-      expect(find.text('Khách 2'), findsNothing);
-      final cards = tester
-          .widgetList<ServiceReviewCard>(find.byType(ServiceReviewCard))
-          .toList();
-      expect(cards.first.review.id, '6');
-      await tester.tap(find.text('Xem tất cả ›'));
-      await tester.pumpAndSettle();
-      expect(find.text('Đánh giá dịch vụ'), findsOneWidget);
-      expect(find.text('Khách 1'), findsOneWidget);
-      await capturePreview(tester, 'service-reviews-preview');
-    },
-  );
+        options: [],
+      ),
+    );
+    expect(find.text('Quy trình thực hiện'), findsNothing);
+    expect(find.text('Đánh giá thực tế'), findsNothing);
+    expect(find.byType(ServiceReviewCard), findsNothing);
+    expect(find.byType(ServiceReviewPreview), findsNothing);
+  });
 
   testWidgets('Lọc sao, ảnh, tìm kiếm, gói và phân trang gửi đúng truy vấn', (
     tester,
@@ -473,7 +658,8 @@ void main() {
         tester,
       ) async {
         await showScreen(tester, size: size, scale: scale);
-        await tester.scrollUntilVisible(find.text('Đánh giá thực tế'), 200);
+        await tester.scrollUntilVisible(find.text('Quy trình thực hiện'), 200);
+        expect(find.byType(ServiceReviewPreview), findsNothing);
         expect(tester.takeException(), isNull);
         final button = tester.getRect(
           find.widgetWithText(FilledButton, 'Đặt lịch dịch vụ ngay'),
@@ -481,7 +667,9 @@ void main() {
         expect(button.right, closeTo(size.width - 26, 1));
         await showScreen(tester, full: true, size: size, scale: scale);
         await tester.scrollUntilVisible(
-          find.byType(ServiceReviewCard).first,
+          find.byWidgetPredicate(
+            (widget) => widget is ServiceReviewCard && widget.review.id == '6',
+          ),
           200,
           scrollable: find.byType(Scrollable).first,
         );

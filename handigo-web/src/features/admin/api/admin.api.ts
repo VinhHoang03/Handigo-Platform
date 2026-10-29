@@ -7,7 +7,14 @@ export const adminApi = {
   users: async (query: AdminQuery) => data<ListResult<AdminUser>>(await api.get('/admin/users', { params: query })),
   user: async (id: string) => data<AdminUser>(await api.get(`/admin/users/${id}`)),
   updateUserStatus: async (id: string, status: 'active' | 'locked') => data<AdminUser>(await api.patch(`/admin/users/${id}/status`, { status })),
-  applications: async (query: AdminQuery) => data<ListResult<AdminApplication>>(await api.get('/admin/provider-applications', { params: query })),
+  applications: async (query: AdminQuery) => data<ListResult<AdminApplication>>(await api.get('/admin/provider-applications', { params: {
+    ...query,
+    status: query.status || undefined,
+    applicationType: query.applicationType || undefined,
+    categoryId: query.categoryId || undefined,
+    fromDate: query.fromDate || undefined,
+    toDate: query.toDate || undefined,
+  } })),
   application: async (id: string) => data<AdminApplication>(await api.get(`/admin/provider-applications/${id}`)),
   review: async (
     id: string,

@@ -1,11 +1,13 @@
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import User from "../models/user.model";
 import { Session } from "../models/session.model";
 import { disconnectUserSockets } from "../sockets/socketServer";
 import * as providerApplicationService from "./providerApplication.service";
-import { getAdminFeedbacks as listFeedbacks } from "./feedback.service";
+import { getAdminFeedbacks as listFeedbacks, getAdminFeedbackDetail } from "./feedback.service";
+import { getAdminOrderDetail } from "./adminOrderDetail.service";
 import { SAFE_USER_PROJECTION } from "./user.service";
+import { Violation } from "../models/violation.model";
 
 interface UserQuery {
   keyword?: string;
@@ -104,8 +106,13 @@ export const updateUserStatus = async (
     throw new AppError("Không thể khóa tài khoản quản trị trong phiên bản này", 400);
   }
 
-  user.status = status;
-  await user.save();
+  await mongoose.connection.transaction(async (session) => {
+    await User.updateOne({ _id: userId, isDeleted: false },
+      { $set: { status }, $unset: { temporaryLockId: 1 } }, { session, runValidators: true });
+    if (status === "active") await Violation.updateMany({ userId, status: "active", isDeleted: false,
+      penaltyType: { $in: ["TEMPORARY_SUSPEND", "PERMANENT_BAN", "account_locked", "provider_suspended"] } },
+      { $set: { status: "resolved" } }, { session, runValidators: true });
+  });
 
   if (status === "locked") {
     disconnectUserSockets(userId);
@@ -122,3 +129,9 @@ export const getProviderApplications = providerApplicationService.getApplication
 export const getProviderApplicationById = providerApplicationService.getApplicationById;
 export const reviewProviderApplication = providerApplicationService.reviewApplication;
 export const getFeedbacks = listFeedbacks;
+export const getFeedbackDetail = getAdminFeedbackDetail;
+export const getOrderDetail = async (id: string) => {
+  const result = await getAdminOrderDetail(id);
+  if (!result.order) throw new AppError("Không tìm thấy đơn hàng.", 404);
+  return result;
+};

@@ -1,8 +1,8 @@
 import { AddressBookManager } from '@/features/profile/components/AddressBookManager';
 import { useAuthStore } from '@/features/auth/store/auth.store';
 import type { UserAddress } from '@/features/profile/types/profile.types';
-import { MIN_DESCRIPTION_LENGTH } from './step2Helpers';
 import { ImagePlus, Loader2, X } from "lucide-react";
+import { useBookingStore } from '../hooks/useBookingStore';
 
 interface Step2ExecutionInfoSectionProps {
   addressId?: string;
@@ -26,6 +26,7 @@ export const Step2ExecutionInfoSection = ({
   customerAttachments, isUploadingImages, uploadError, onUploadImages, onRemoveAttachment,
 }: Step2ExecutionInfoSectionProps) => {
   const user = useAuthStore((state) => state.user);
+  const rebookSource = useBookingStore(state => state.rebookSource);
 
   return (
     <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm">
@@ -38,6 +39,7 @@ export const Step2ExecutionInfoSection = ({
           <AddressBookManager
             compact
             selectable
+            autoSelect={!rebookSource}
             singleAddressMode={isFromServiceDetail}
             selectedAddressId={addressId}
             defaultRecipient={{
@@ -67,9 +69,6 @@ export const Step2ExecutionInfoSection = ({
           {problemDescriptionError && (
             <p className="mt-xs text-xs font-medium text-error">{problemDescriptionError}</p>
           )}
-          <p className="mt-xs text-[10px] text-on-surface-variant italic">
-            Mô tả tối thiểu {MIN_DESCRIPTION_LENGTH} ký tự để provider nắm rõ tình trạng.
-          </p>
         </div>
       </div>
       <div className="mt-md pt-md border-t border-outline-variant/30">

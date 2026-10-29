@@ -8,7 +8,6 @@ export const initialProviderApplicationForm: ProviderApplicationPayload = {
   description: "",
   experienceYears: 2,
   serviceIds: [],
-  workingAreas: [],
   identityDocument: {
     type: "cccd",
     documentNumber: "",
@@ -40,7 +39,6 @@ export const applicationToForm = (
   description: application.description || "",
   experienceYears: application.experienceYears || 0,
   serviceIds: (application.serviceIds || []).map(serviceId).filter(Boolean),
-  workingAreas: application.workingAreas || [],
   identityDocument: {
     type: application.identityDocument?.type || "cccd",
     documentNumber: application.identityDocument?.documentNumber || "",

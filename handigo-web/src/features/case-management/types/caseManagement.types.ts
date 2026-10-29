@@ -23,6 +23,8 @@ export interface EvidenceFile {
   mimeType?: string | null;
   fileName?: string | null;
   uploadedAt?: string;
+  uploadedBy?: CaseUser | null;
+  note?: string | null;
 }
 
 export interface ComplaintEvidence extends EvidenceFile {
@@ -77,7 +79,7 @@ export type SupportTicketCategory =
 export type SupportTicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export interface SupportTicketResponse {
-  responderId: CaseUser;
+  responderId: CaseUser | null;
   responderRole: "USER" | "ADMIN";
   message: string;
   attachments: EvidenceFile[];
@@ -86,7 +88,10 @@ export interface SupportTicketResponse {
 
 export interface SupportTicket {
   _id: string;
-  requesterId: CaseUser;
+  requesterId: CaseUser | null;
+  assignedAdminId?: CaseUser | null;
+  resolvedBy?: CaseUser | null;
+  resolvedAt?: string | null;
   orderId?: CaseOrder | null;
   category: SupportTicketCategory;
   priority: SupportTicketPriority;
@@ -111,6 +116,7 @@ export type ReportTargetType =
   | "app";
 
 export type ReportType =
+  | "service_quality"
   | "spam_chat"
   | "harassment"
   | "insulting_language"
@@ -130,6 +136,8 @@ export type ReportType =
   | "other";
 
 export type ReportStatus =
+  | "evidence_requested"
+  | "cancelled"
   | "pending"
   | "under_review"
   | "confirmed"
@@ -137,12 +145,57 @@ export type ReportStatus =
   | "resolved";
 
 export interface Report {
+  noShowDetails?: {
+    callComparison?: {
+      expectedPhone: string; phoneSource: 'order_recipient' | 'customer_account';
+      waitStartedAt: string; checkedAt: string; validCount: number; skipWaitForTesting: boolean;
+      events: Array<{
+        phoneNumber: string | null; normalizedPhone: string; resolvedAt: string | null;
+        phoneMatched: boolean; inWindow: boolean; direction: 'outgoing' | 'incoming' | 'unknown';
+        outcome: 'no_answer' | 'answered' | 'unknown'; eligible: boolean; failures: string[];
+      }>;
+    };
+    location: {
+      orderAddress: string | null; arrivalAddress: string | null; attribution: string | null;
+      arrivedAt: string | null; distanceMeters: number | null; withinRadius: boolean | null; radiusMeters: number;
+    };
+    evidence: Array<{
+      id: string; kind: 'arrival' | 'contact'; url: string; analysisStatus: 'analyzed' | 'unavailable';
+      analysisFailure?: { reason: string; httpStatus: number | null } | null;
+      resolvedContactAt?: string | null;
+      callEvents?: Array<{
+        phoneNumber: string | null; dateLabel: string | null; time: string | null;
+        occurredAt: string | null; resolvedAt: string | null;
+        eligible?: boolean; failures?: string[]; timePrecision?: 'minute' | 'second';
+        direction: 'outgoing' | 'incoming' | 'unknown'; outcome: 'no_answer' | 'answered' | 'unknown';
+      }>;
+      analysis: {
+        imageType: 'arrival' | 'chat' | 'call' | 'other'; locationText: string | null;
+        chatChannel?: 'handigo' | 'external' | 'unknown';
+        phoneNumbers: string[]; contactAt: string | null; providerMessage: string | null;
+        contactDateLabel?: string | null; contactTime?: string | null;
+        contactOutcome: 'no_response' | 'no_answer' | 'answered' | 'unknown'; uncertainties: string[];
+      } | null;
+    }>;
+  } | null;
+  noShowVerification?: {
+    decision: 'auto_eligible' | 'manual_review'; reasons: string[]; checkedAt: string; policyVersion: string;
+    checks?: {
+      location: { passed: boolean; distanceMeters: number | null; radiusMeters: number };
+      waiting: { passed: boolean; skippedForTesting: boolean; waitStartedAt: string; requiredMinutes: number };
+      calls: { passed: boolean; validCount: number; requiredCount: number };
+      chat: { passed: boolean; messageCount: number; customerReplied: boolean };
+    } | null;
+  } | null;
+  reviewedByType?: 'system' | 'admin' | null;
+  isCustomerNoShow?: boolean;
   _id: string;
   reporterId: CaseUser;
   targetType: ReportTargetType;
   targetUserId?: CaseUser | null;
   orderId?: CaseOrder | null;
   reportType: ReportType;
+  requestedEvidenceNote?: string | null;
   title: string;
   description: string;
   evidenceImages: string[];
@@ -191,6 +244,7 @@ export interface CreateReportPayload {
   targetFeedbackId?: string;
   conversationId?: string;
   reportType: ReportType;
+  requestedEvidenceNote?: string | null;
   title: string;
   description: string;
   evidenceImages?: string[];
