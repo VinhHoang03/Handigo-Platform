@@ -3,6 +3,7 @@ import { mock } from "node:test";
 import mongoose, { Types } from "mongoose";
 import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
+import { Payment } from "../models/payment.model";
 import { Service } from "../models/service.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
@@ -56,6 +57,7 @@ let quotation: InstanceType<typeof RepairQuotation> | null = null;
 let items: InstanceType<typeof RepairQuotationItem>[] = [];
 let auditLogs: Record<string, unknown>[] = [];
 let failInsert = false;
+let pendingQuotationPayment = false;
 const cloneOrder = () => new Order(order.toObject());
 const cloneQuotation = () => quotation ? new RepairQuotation(quotation.toObject()) : null;
 const cloneItems = () => items.map((item) => new RepairQuotationItem(item.toObject()));
@@ -82,6 +84,7 @@ const reset = () => {
   notifications.length = 0; events.length = 0;
   realtimeNotifications.length = 0; failCommit = false;
   scheduleChecks = 0; scheduleConflict = false; failInsert = false; settlementCalls = 0;
+  pendingQuotationPayment = false;
 };
 
 const payload = () => ({
@@ -97,6 +100,7 @@ async function run() {
   mock.method(Order, "findOne", () => query(cloneOrder()));
   mock.method(Order, "findById", () => query(cloneOrder()));
   mock.method(Order, "exists", () => query(null));
+  mock.method(Payment, "exists", () => query(pendingQuotationPayment ? { _id: new Types.ObjectId() } : null));
   mock.method(Order, "updateOne", async (_filter: unknown, update: any) => {
     if (update.$set?.paymentStatus) order.paymentStatus = update.$set.paymentStatus;
     return { matchedCount: 1 };
@@ -243,8 +247,8 @@ async function run() {
   assert.equal(quotation!.finalAmount, 200000);
   assert.equal(order.status, "in_progress");
 
-  // Cho phép bắt đầu trước giờ hẹn để hỗ trợ kiểm thử luồng dịch vụ báo giá.
-  for (const orderType of ["scheduled"] as const) {
+  // Đơn báo giá có lịch hẹn không bị chặn bởi kiểm tra trùng thời lượng khi bắt đầu.
+  for (const orderType of ["scheduled", "recurring"] as const) {
     reset();
     const scheduledAt = new Date(Date.now() + 24 * 60 * 60000);
     order.orderType = orderType;
@@ -253,6 +257,7 @@ async function run() {
     order.schedule = { durationMinutes: 60, bufferMinutes: 15, travelMinutes: 30,
       expectedStartAt: scheduledAt, expectedEndAt: new Date(scheduledAt.getTime() + 60 * 60000) };
     await save();
+    scheduleConflict = true;
     const beforeStart = Date.now();
     await OrderService.startOrder(order.id, provider.userId.toString());
     assert.equal(order.status, "in_progress");
@@ -260,8 +265,16 @@ async function run() {
     assert.ok(order.schedule!.expectedStartAt!.getTime() >= beforeStart);
     assert.ok(order.schedule!.expectedStartAt!.getTime() < scheduledAt.getTime());
     assert.equal(order.schedule!.expectedEndAt!.getTime(), order.schedule!.expectedStartAt!.getTime() + 60 * 60000);
-    assert.equal(scheduleChecks, 1);
+    assert.equal(scheduleChecks, 0);
   }
+
+  reset();
+  order.schedule = { durationMinutes: 60, bufferMinutes: 15, travelMinutes: 30 };
+  await save();
+  scheduleConflict = true;
+  await assert.rejects(OrderService.startOrder(order.id, provider.userId.toString()), /Lịch làm việc/);
+  assert.equal(order.status, "accepted");
+  assert.equal(scheduleChecks, 1);
 
   reset();
   for (const amount of [39999, 40000]) {
@@ -297,6 +310,10 @@ async function run() {
   order.paymentStatus = "partially_paid";
   order.paymentMethod = originalPaymentMethod;
   rewardOrders.length = 0;
+  pendingQuotationPayment = true;
+  await assert.rejects(confirmPayment(), /Đang có QR/);
+  assert.equal(quotation!.directPaymentConfirmedAt, null);
+  pendingQuotationPayment = false;
   const confirmed = await confirmPayment();
   assert.ok(confirmed.directPaymentConfirmedAt);
   assert.equal(confirmed.directPaymentConfirmedAmount, 60000);

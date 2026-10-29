@@ -986,8 +986,8 @@ export const OrderService = {
         if (await Order.exists({ providerId: provider._id, _id: { $ne: order._id }, status: "in_progress", isDeleted: false }).session(session)) throw new AppError("Bạn đang thực hiện một đơn khác.", 409);
         const now = new Date();
         order.schedule = { durationMinutes: duration, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes, expectedStartAt: now, expectedEndAt: new Date(now.getTime() + duration * 60000) };
-        // Đơn giá cố định đã nhận được bắt đầu theo thực tế; đơn khảo sát cần kiểm tra thời lượng báo giá mới.
-        if (order.inspectionRequired) {
+        // Đơn báo giá có lịch hẹn đã nhận được bắt đầu theo thời gian thực tế.
+        if (order.inspectionRequired && !["scheduled", "recurring"].includes(order.orderType)) {
           await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy, { checkWorkingCalendar: false });
         }
         order.status = "in_progress";

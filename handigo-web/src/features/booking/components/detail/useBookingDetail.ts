@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { getAppliedQuotationDeposit, getRemainingQuotationPayment, isQuotationPaidByWallet } from '@/utils/quotationPayment';
-import { useBookingQuotationPayment } from './useBookingQuotationPayment';
+import { getAppliedQuotationDeposit, getRemainingQuotationPayment, isQuotationPaidOnline } from '@/utils/quotationPayment';
 import { useParams } from "react-router-dom";
 import { useBookingDetailData } from "./useBookingDetailData";
 import { useMatchingCountdown } from "./useMatchingCountdown";
@@ -27,10 +26,6 @@ export const useBookingDetail = () => {
   const { isWaitingForProvider, matchingSecondsRemaining } =
     useMatchingCountdown(order);
 
-  const canChangePayment = Boolean(order && !order.inspectionRequired &&
-    order.status === "in_progress" && order.paymentStatus === "unpaid" &&
-    !payments.some((payment) => payment.paymentType === "full" && payment.status === "paid"));
-  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy, canChangePayment, data.updateOrder);
   const cancellationFlow = useBookingCancellationFlow(
     order,
     quotation,
@@ -74,9 +69,18 @@ export const useBookingDetail = () => {
   const appliedDepositAmount = order ? getAppliedQuotationDeposit(order, paidDepositAmount) : paidDepositAmount;
   const remainingQuotationAmount = quotation
     ? getRemainingQuotationPayment(quotation.quotation, appliedDepositAmount, order?.status,
-      order ? isQuotationPaidByWallet(order, quotation.quotation) : false)
+      order ? isQuotationPaidOnline(order, quotation.quotation) : false)
     : 0;
-  const quotationPaymentFlow = useBookingQuotationPayment(order, quotation, remainingQuotationAmount, busy, setBusy, loadData);
+  const canPayQuotation = Boolean(order?.inspectionRequired && order.status === "completed" && order.depositPaidAt
+    && order.paymentStatus === "partially_paid" && quotation && !quotation.quotation.directPaymentConfirmedAt
+    && (quotation.quotation.status === "saved" || (quotation.quotation.status === "approved" && quotation.quotation.customerConfirmed))
+    && remainingQuotationAmount > 0);
+  const canChangePayment = canPayQuotation || Boolean(order && !order.inspectionRequired &&
+    order.status === "in_progress" && order.paymentStatus === "unpaid" &&
+    !payments.some((payment) => payment.paymentType === "full" && payment.status === "paid"));
+  const paymentFlow = useBookingPaymentFlow(order, busy, setBusy, canChangePayment, data.updateOrder,
+    canPayQuotation && quotation ? { quotation, amount: remainingQuotationAmount } : undefined);
+
   const canMakeInitialPayment = Boolean(
     order &&
       !hasPaidInitialPayment &&
@@ -95,7 +99,7 @@ export const useBookingDetail = () => {
     isWaitingForProvider,
     matchingSecondsRemaining,
     paymentFlow,
-    quotationPaymentFlow,
+    canPayQuotation,
     cancellationFlow,
     reassignmentFlow,
     providerInfo,

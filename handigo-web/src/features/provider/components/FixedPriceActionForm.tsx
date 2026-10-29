@@ -196,7 +196,8 @@ export function FixedPriceActionForm({
         {showPaymentConfirmation && (order.paymentStatus === 'paid' ? (
           <p role="status" className="flex items-center gap-2 rounded-xl bg-success-container px-4 py-3 text-sm font-semibold text-on-success-container">
             <CircleCheckBig aria-hidden="true" size={20} />
-            {repairQuotation.directPaymentConfirmedAt ? 'Đã xác nhận thanh toán báo giá' : 'Khách đã thanh toán bằng Ví Handigo'}
+            {repairQuotation.directPaymentConfirmedAt ? 'Đã xác nhận thanh toán báo giá'
+              : order.paymentMethod === 'bank' ? 'Khách đã thanh toán qua QR PayOS' : 'Khách đã thanh toán bằng Ví Handigo'}
           </p>
         ) : (
           <button
