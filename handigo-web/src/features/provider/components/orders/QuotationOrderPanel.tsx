@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Order } from '@/types/booking';
-import { getAppliedQuotationDeposit, getDirectRepairPayment, isQuotationPaidByWallet } from '@/utils/quotationPayment';
+import { getAppliedQuotationDeposit, getDirectRepairPayment, isQuotationPaidOnline } from '@/utils/quotationPayment';
 import type { CreateQuotationPayload, QuotationDetail } from '../../types/providerOrder.types';
 import { formatMoney } from '../../utils/providerOrder.utils';
 import { FixedPriceActionForm } from '../FixedPriceActionForm';
@@ -48,9 +48,6 @@ export function QuotationOrderPanel({
           <CalendarX aria-hidden="true" size={36} className="mb-2" />
           <p className="font-bold text-on-surface">Đang chờ khách hàng thanh toán giữ lịch</p>
           <p className="mt-1 text-sm">Form báo giá sẽ hiển thị sau khi lịch hẹn được thanh toán và xác nhận.</p>
-          {quotation && order.status === 'accepted' && !showForm && (
-            <button type="button" disabled={busy} onClick={onCancel} className="btn-secondary mt-md text-error">Hủy đơn dịch vụ</button>
-          )}
         </div>
       ) : quotation && !showForm && (
         <section className={`h-full space-y-md rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md ${order.status === 'accepted' ? 'lg:col-span-2' : ''}`}>
@@ -102,7 +99,7 @@ export function QuotationOrderPanel({
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-sm border-t border-primary/15 pt-3">
             <dt className="text-base font-semibold text-primary">{quotation.quotation.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách'
-              : isQuotationPaidByWallet(order, quotation.quotation) ? 'Đã thanh toán qua Ví Handigo' : 'Còn cần thanh toán'}</dt>
+              : isQuotationPaidOnline(order, quotation.quotation) ? order.paymentMethod === 'bank' ? 'Đã thanh toán qua QR PayOS' : 'Đã thanh toán qua Ví Handigo' : 'Còn cần thanh toán'}</dt>
             <dd className="ml-auto text-right text-headline-md font-bold tabular-nums text-primary">
               {formatMoney(getDirectRepairPayment(quotation.quotation.finalAmount, appliedDepositAmount))}
             </dd>
@@ -112,10 +109,6 @@ export function QuotationOrderPanel({
           </div>
           {(canEdit || order.status === 'accepted') && (
             <div className="flex flex-col gap-sm border-t border-outline-variant/20 pt-md sm:flex-row sm:flex-wrap sm:items-center">
-              {order.status === 'accepted' && <button type="button" disabled={busy} onClick={onCancel}
-                className="order-3 flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-error hover:bg-error/5 disabled:opacity-50 sm:order-none sm:mr-auto">
-                Hủy đơn dịch vụ
-              </button>}
               {canEdit && <button type="button" disabled={busy} onClick={() => setEditing(true)}
                 className="btn-secondary order-2 sm:order-none sm:ml-auto">Chỉnh sửa báo giá</button>}
           {usableQuotation && order.status === 'accepted' && order.arrival && order.arrival.providerId === order.providerId?._id && (

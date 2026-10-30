@@ -25,11 +25,11 @@ export const earnOrderRewards = async (order: IOrder, session: ClientSession) =>
     }).session(session);
     if (!quotation) return;
     if (!quotation.directPaymentConfirmedAt || quotation.directPaymentConfirmedAmount == null) {
-      const paidByWallet = order.paymentMethod === "wallet" && await Payment.exists({
-        orderId: order._id, customerId: order.customerId, paymentType: "remaining", method: "wallet", status: "paid",
+      const paidOnline = ["wallet", "bank"].includes(order.paymentMethod) && await Payment.exists({
+        orderId: order._id, customerId: order.customerId, paymentType: "remaining", method: { $in: ["wallet", "payos"] }, status: "paid",
         "metadata.quotationId": quotation.id, "metadata.quotationRevision": quotation.revision ?? 0, isDeleted: false,
       }).session(session);
-      if (!paidByWallet) return;
+      if (!paidOnline) return;
     }
     // Tổng cuối cùng đã bao gồm phần cọc được khấu trừ, không cộng cọc lần nữa.
     rewardAmount = quotation.finalAmount;

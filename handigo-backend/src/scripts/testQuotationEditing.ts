@@ -3,6 +3,7 @@ import { mock } from "node:test";
 import mongoose, { Types } from "mongoose";
 import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
+import { Payment } from "../models/payment.model";
 import { Service } from "../models/service.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { RepairQuotationItem } from "../models/repairQuotationItem.model";
@@ -43,7 +44,8 @@ stubModule("../services/providerSchedule.service", {
 
 stubModule("../services/wallet.service", { recordCompletedOrderSettlement: async () => { settlementCalls++; } });
 stubModule("../services/reward.service", { earnOrderRewards: async (value: InstanceType<typeof Order>) => { rewardOrders.push(new Order(value.toObject())); } });
-for (const name of ["orderReassignment", "providerWalletEligibility", "dispatch", "address", "matching", "voucher"]) {
+stubModule("../services/voucher.service", { markOrderVoucherAsUsed: async () => {} });
+for (const name of ["orderReassignment", "providerWalletEligibility", "dispatch", "address", "matching"]) {
   stubModule(`../services/${name}.service`, {});
 }
 const { AssignmentService } = require("../services/assignment.service") as typeof import("../services/assignment.service");
@@ -56,6 +58,8 @@ let quotation: InstanceType<typeof RepairQuotation> | null = null;
 let items: InstanceType<typeof RepairQuotationItem>[] = [];
 let auditLogs: Record<string, unknown>[] = [];
 let failInsert = false;
+let pendingQuotationPayment = false;
+let cashPayment: InstanceType<typeof Payment> | null = null;
 const cloneOrder = () => new Order(order.toObject());
 const cloneQuotation = () => quotation ? new RepairQuotation(quotation.toObject()) : null;
 const cloneItems = () => items.map((item) => new RepairQuotationItem(item.toObject()));
@@ -82,6 +86,8 @@ const reset = () => {
   notifications.length = 0; events.length = 0;
   realtimeNotifications.length = 0; failCommit = false;
   scheduleChecks = 0; scheduleConflict = false; failInsert = false; settlementCalls = 0;
+  pendingQuotationPayment = false;
+  cashPayment = null;
 };
 
 const payload = () => ({
@@ -97,6 +103,11 @@ async function run() {
   mock.method(Order, "findOne", () => query(cloneOrder()));
   mock.method(Order, "findById", () => query(cloneOrder()));
   mock.method(Order, "exists", () => query(null));
+  mock.method(Payment, "exists", () => query(pendingQuotationPayment ? { _id: new Types.ObjectId() } : null));
+  mock.method(Payment, "findOne", () => query(cashPayment ? new Payment(cashPayment.toObject()) : null));
+  mock.method(Payment.prototype, "save", async function (this: InstanceType<typeof Payment>) {
+    cashPayment = new Payment(this.toObject()); return this;
+  });
   mock.method(Order, "updateOne", async (_filter: unknown, update: any) => {
     if (update.$set?.paymentStatus) order.paymentStatus = update.$set.paymentStatus;
     return { matchedCount: 1 };
@@ -131,7 +142,8 @@ async function run() {
   mock.method(mongoose, "startSession", async () => ({
     withTransaction: async (operation: () => Promise<unknown>) => {
       const before = { order: cloneOrder(), quotation: cloneQuotation(), items: cloneItems(),
-        auditLogs: [...auditLogs], notifications: [...notifications] };
+        auditLogs: [...auditLogs], notifications: [...notifications], settlementCalls, rewardCount: rewardOrders.length,
+        cashPayment: cashPayment ? new Payment(cashPayment.toObject()) : null };
       try {
         const result = await operation();
         if (failCommit) throw new Error("Lỗi commit kiểm thử.");
@@ -140,6 +152,7 @@ async function run() {
       catch (error) {
         order = before.order; quotation = before.quotation; items = before.items; auditLogs = before.auditLogs;
         notifications.splice(0, notifications.length, ...before.notifications);
+        cashPayment = before.cashPayment; settlementCalls = before.settlementCalls; rewardOrders.length = before.rewardCount;
         throw error;
       }
     },
@@ -243,8 +256,8 @@ async function run() {
   assert.equal(quotation!.finalAmount, 200000);
   assert.equal(order.status, "in_progress");
 
-  // Cho phép bắt đầu trước giờ hẹn để hỗ trợ kiểm thử luồng dịch vụ báo giá.
-  for (const orderType of ["scheduled"] as const) {
+  // Đơn báo giá có lịch hẹn không bị chặn bởi kiểm tra trùng thời lượng khi bắt đầu.
+  for (const orderType of ["scheduled", "recurring"] as const) {
     reset();
     const scheduledAt = new Date(Date.now() + 24 * 60 * 60000);
     order.orderType = orderType;
@@ -253,6 +266,7 @@ async function run() {
     order.schedule = { durationMinutes: 60, bufferMinutes: 15, travelMinutes: 30,
       expectedStartAt: scheduledAt, expectedEndAt: new Date(scheduledAt.getTime() + 60 * 60000) };
     await save();
+    scheduleConflict = true;
     const beforeStart = Date.now();
     await OrderService.startOrder(order.id, provider.userId.toString());
     assert.equal(order.status, "in_progress");
@@ -260,8 +274,16 @@ async function run() {
     assert.ok(order.schedule!.expectedStartAt!.getTime() >= beforeStart);
     assert.ok(order.schedule!.expectedStartAt!.getTime() < scheduledAt.getTime());
     assert.equal(order.schedule!.expectedEndAt!.getTime(), order.schedule!.expectedStartAt!.getTime() + 60 * 60000);
-    assert.equal(scheduleChecks, 1);
+    assert.equal(scheduleChecks, 0);
   }
+
+  reset();
+  order.schedule = { durationMinutes: 60, bufferMinutes: 15, travelMinutes: 30 };
+  await save();
+  scheduleConflict = true;
+  await assert.rejects(OrderService.startOrder(order.id, provider.userId.toString()), /Lịch làm việc/);
+  assert.equal(order.status, "accepted");
+  assert.equal(scheduleChecks, 1);
 
   reset();
   for (const amount of [39999, 40000]) {
@@ -297,6 +319,10 @@ async function run() {
   order.paymentStatus = "partially_paid";
   order.paymentMethod = originalPaymentMethod;
   rewardOrders.length = 0;
+  pendingQuotationPayment = true;
+  await assert.rejects(confirmPayment(), /Đang có QR/);
+  assert.equal(quotation!.directPaymentConfirmedAt, null);
+  pendingQuotationPayment = false;
   const confirmed = await confirmPayment();
   assert.ok(confirmed.directPaymentConfirmedAt);
   assert.equal(confirmed.directPaymentConfirmedAmount, 60000);
@@ -338,6 +364,30 @@ async function run() {
   await assert.rejects(save(), /Lỗi commit/);
   assert.equal(notifications.length, 0);
   assert.equal(realtimeNotifications.length, 0, "Không phát báo giá chưa commit cho khách.");
+
+  reset();
+  order.status = 'in_progress'; order.inspectionRequired = false; order.paymentMethod = 'cash'; order.paymentStatus = 'unpaid';
+  cashPayment = new Payment({ orderId: order._id, customerId, amount: order.pricing.totalPaidAmount,
+    method: 'cash', paymentType: 'full', status: 'pending' });
+  await OrderService.completeOrder(order.id, provider.userId.toString(), ['https://example.com/hoan-thanh.jpg']);
+  assert.equal(order.status, 'completed');
+  assert.equal(order.paymentStatus, 'unpaid', 'Hoàn thành công việc chưa có nghĩa đã nhận tiền mặt.');
+  assert.equal(cashPayment!.status, 'pending'); assert.equal(settlementCalls, 0);
+  const confirmCash = (amount = order.pricing.totalPaidAmount) => OrderService.confirmCashPayment(order.id, provider.userId.toString(), amount);
+  await assert.rejects(confirmCash(order.pricing.totalPaidAmount + 1), /Số tiền/);
+  assert.equal(cashPayment!.status, 'pending');
+  failCommit = true;
+  await assert.rejects(confirmCash(), /Lỗi commit/);
+  assert.equal(order.paymentStatus, 'unpaid'); assert.equal(cashPayment!.status, 'pending'); assert.equal(settlementCalls, 0);
+  failCommit = false;
+  const beforeReward = rewardOrders.length;
+  await confirmCash();
+  assert.equal(order.paymentStatus, 'paid'); assert.equal(cashPayment!.status, 'paid'); assert.ok(cashPayment!.paidAt);
+  assert.equal(settlementCalls, 1); assert.equal(rewardOrders.length, beforeReward + 1);
+  await confirmCash(); assert.equal(settlementCalls, 1); assert.equal(rewardOrders.length, beforeReward + 1);
+  order.status = 'in_progress'; await assert.rejects(confirmCash(), /đã hoàn thành/);
+  order.status = 'completed'; order.paymentMethod = 'wallet'; await assert.rejects(confirmCash(), /đã hoàn thành/);
+  order.paymentMethod = 'cash'; order.providerId = new Types.ObjectId(); await assert.rejects(confirmCash(), /không phải thợ/);
   console.log("Đạt: lưu/sửa báo giá, quyền sở hữu, phiên bản, lịch làm việc, hoàn thành và xác nhận thanh toán trực tiếp không ghi nhận trùng.");
 }
 

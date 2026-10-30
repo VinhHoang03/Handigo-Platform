@@ -23,6 +23,7 @@ import {
 import { formatOrderAddress } from "../components/detail/bookingDetailProvider";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { RebookButton } from '../components/RebookButton';
+import { OrderReschedulePanel } from '../components/detail/OrderReschedulePanel';
 
 const BookingDetailContent = () => {
   const {
@@ -36,7 +37,7 @@ const BookingDetailContent = () => {
     isWaitingForProvider,
     matchingSecondsRemaining,
     paymentFlow,
-    quotationPaymentFlow,
+    canPayQuotation,
     cancellationFlow,
     reassignmentFlow,
     providerInfo,
@@ -47,6 +48,7 @@ const BookingDetailContent = () => {
     canMakeInitialPayment,
     canChangePayment,
     timeline,
+    loadData,
   } = useBookingDetail();
 
   if (loading) {
@@ -112,6 +114,7 @@ const BookingDetailContent = () => {
             busy={busy}
             canMakeInitialPayment={canMakeInitialPayment}
             canChangePayment={canChangePayment}
+            quotationAmount={canPayQuotation ? remainingQuotationAmount : undefined}
             paymentError={paymentFlow.paymentError}
             paymentMethodModalOpen={paymentFlow.paymentMethodModalOpen}
             initialPaymentMethod={paymentFlow.initialPaymentMethod}
@@ -132,6 +135,12 @@ const BookingDetailContent = () => {
             recurringOrders={recurringOrders}
           />
 
+          <OrderReschedulePanel
+            order={order}
+            viewerRole="CUSTOMER"
+            onChanged={() => loadData()}
+          />
+
           <BookingServiceSummary
             order={order}
             statusLabel={getStatusLabel(order.status)}
@@ -146,7 +155,6 @@ const BookingDetailContent = () => {
               appliedDepositAmount={appliedDepositAmount}
               remainingQuotationAmount={remainingQuotationAmount}
               onReject={cancellationFlow.handleRejectQuotation}
-              paymentFlow={quotationPaymentFlow}
             />
           </BookingServiceSummary>
 

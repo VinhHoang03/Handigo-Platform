@@ -24,11 +24,22 @@ const matches = (row, filter) => Object.entries(filter).every(([key, expected]) 
   const actual = get(row, key);
   if (expected && '$in' in Object(expected)) return expected.$in.some(value => String(actual) === String(value));
   if (expected && '$gte' in Object(expected)) return actual >= expected.$gte;
+  if (expected && '$ne' in Object(expected)) return String(actual) !== String(expected.$ne);
   return expected == null ? actual == null : String(actual) === String(expected);
 });
 const view = session => session?.snapshot ?? state;
-const document = (collection, row) => row ? constructors[collection]?.hydrate(copy(row)) ?? copy(row) : null;
-const query = work => ({ session(session) { this.context = session; return this; }, select() { return this; },
+const document = (collection, row) => {
+  if (!row) return null;
+  const result = constructors[collection]?.hydrate(copy(row)) ?? copy(row);
+  result.save = async (options = {}) => {
+    const rows = view(options.session)[collection];
+    const index = rows.findIndex(value => String(value._id) === String(result._id));
+    rows[index] = copy(result.toObject ? result.toObject() : result);
+    return result;
+  };
+  return result;
+};
+const query = work => ({ session(session) { this.context = session; return this; }, select() { return this; }, sort() { return this; },
   then(resolve, reject) { return Promise.resolve().then(() => work(this.context)).then(resolve, reject); } });
 function update(collection, filter, change, options) {
   assert.ok(options.session, 'Ghi tài chính phải nằm trong giao dịch.');
@@ -48,19 +59,34 @@ function update(collection, filter, change, options) {
 function model(collection) {
   return {
     findOne: filter => query(session => document(collection, view(session)[collection].find(row => matches(row, filter)))),
+    findById: value => query(session => document(collection, view(session)[collection].find(row => String(row._id) === String(value)))),
+    find: filter => query(session => view(session)[collection].filter(row => matches(row, filter)).map(row => document(collection, row))),
     exists: filter => query(session => view(session)[collection].some(row => matches(row, filter)) ? { _id: orderId } : null),
     findOneAndUpdate: (filter, change, options) => query(() => document(collection, update(collection, filter, change, options))),
-    updateOne: (filter, change, options) => query(() => ({ matchedCount: update(collection, filter, change, options) ? 1 : 0 })),
+    updateOne: (filter, change, options = {}) => query(() => {
+      const row = update(collection, filter, change, options.session ? options : { ...options, session: {} });
+      return { matchedCount: row ? 1 : 0, modifiedCount: row ? 1 : 0 };
+    }),
     create: async (rows, options) => {
       assert.ok(options.session);
       if (collection === 'ledgers' && failLedger) throw new Error('Lỗi ghi sổ ví giả lập');
       const created = [];
-      for (const value of rows) {
+      const documents = rows.map(value => {
         const row = constructors[collection] ? new constructors[collection]({ ...value, createdAt: new Date() })
           : { ...value, _id: value._id ?? id(), isDeleted: false };
-        if (row.validate) await row.validate();
-        const stored = row.toObject ? row.toObject() : row;
-        view(options.session)[collection].push(copy(stored)); created.push(document(collection, stored));
+        row.$save = async () => {
+          if (row.validate) await row.validate();
+          const stored = row.toObject ? row.toObject() : { ...value, _id: row._id, isDeleted: false };
+          view(options.session)[collection].push(copy(stored)); created.push(document(collection, stored));
+          return row;
+        };
+        return row;
+      });
+      // Dùng Model.create thật để giữ ràng buộc session/ordered của Mongoose; chỉ giả lập thao tác lưu.
+      if (constructors[collection]) {
+        await constructors[collection].create(documents, options);
+      } else {
+        for (const row of documents) await row.$save();
       }
       return created;
     },
@@ -77,7 +103,7 @@ const connection = { startSession: async () => ({
 const modules = {
   mongoose: { __esModule: true, default: connection, Types: mongoose.Types },
   '../utils/appError': { AppError }, '../utils/transaction': { withTransactionRetry, buildTransactionCode },
-  '../utils/logger': { createLogger: () => ({ warn() {} }) },
+    '../utils/logger': { createLogger: () => ({ warn() {}, error() {} }) },
   '../sockets/socketServer': { emitToUser() {} },
   './notification.service': { createNotificationRecord: async () => {
     if (failNotification) throw new Error('Lỗi thông báo giả lập'); notifications++;
@@ -107,7 +133,7 @@ function load(file) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(require.resolve(file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
-  }).outputText, { exports, Date, Number, require: name => {
+  }).outputText, { exports, Date, Number, process: { env: {} }, require: name => {
     if (name in modules) return modules[name];
     if (name === 'crypto') return require(name);
     throw new Error(`Chưa giả lập module: ${name}`);
@@ -115,7 +141,41 @@ function load(file) {
   return exports;
 }
 modules['./reward.service'] = load('../services/reward.service');
-const { payQuotationByWallet } = load('../services/quotationWalletPayment.service');
+const quotationService = load('../services/quotationWalletPayment.service');
+const { payQuotationByWallet } = quotationService;
+const links = new Map();
+let gatewaySequence = 0, cancellationMode = 'cancel';
+modules['./quotationWalletPayment.service'] = quotationService;
+modules['../configs/payos.config'] = { payos: {
+  webhooks: { verify: async payload => payload.data },
+  paymentRequests: {
+    create: async data => {
+      const link = { ...data, id: `lien-ket-${++gatewaySequence}`, paymentLinkId: `lien-ket-${gatewaySequence}`,
+        amountPaid: 0, status: 'PENDING', checkoutUrl: `https://pay.test/${gatewaySequence}`, qrCode: 'du-lieu-qr' };
+      links.set(data.orderCode, link); return link;
+    },
+    get: async code => links.get(code),
+    cancel: async code => {
+      const link = links.get(code);
+      if (cancellationMode === 'unknown') return;
+      link.status = cancellationMode === 'paid' ? 'PAID' : 'CANCELLED';
+      if (link.status === 'PAID') { link.amountPaid = link.amount; link.transactions = [{ reference: `tham-chieu-${code}` }]; }
+    },
+  },
+} };
+modules['../models/promotion.model'] = {};
+modules['../models/service.model'] = {};
+modules['../models/refund.model'] = { Refund: model('refunds') };
+modules['./wallet.service'] = {};
+modules['./voucher.service'] = { markOrderVoucherAsUsed: async () => {} };
+modules['../utils/actionPreconditionError'] = require('../utils/actionPreconditionError');
+modules['./paymentStatus.service'] = { publishPaymentStatus() {} };
+modules['../utils/paymentRedirect'] = {
+  resolvePaymentFrontendOrigin: () => 'https://handigo.test',
+  buildOrderPaymentRedirects: () => ({ returnUrl: 'https://handigo.test/result', cancelUrl: 'https://handigo.test/cancel' }),
+};
+modules['./notification.service'].emitRealtimeNotification = () => {};
+const paymentService = load('../services/payment.service');
 const user = { id: String(customer), role: 'CUSTOMER' };
 const input = { orderId: String(orderId), method: 'WALLET', paymentType: 'REMAINING', expectedAmount: 180000,
   quotationId: String(quotationId), expectedRevision: 2 };
@@ -130,7 +190,7 @@ function reset() {
       directPaymentConfirmedAt: null, isDeleted: false }],
     wallets: [{ _id: id(), userId: customer, balance: 500000, pendingBalance: 0, isDeleted: false },
       { _id: id(), userId: providerUser, balance: 100000, pendingBalance: 9000, isDeleted: false }],
-    payments: [], ledgers: [], rewards: [], rewardAccounts: [],
+    payments: [], ledgers: [], rewards: [], rewardAccounts: [], refunds: [],
   };
 }
 async function rejectedWithoutChanges(work, pattern) {
@@ -186,5 +246,58 @@ async function rejectedWithoutChanges(work, pattern) {
   reset(); directRace = true;
   await assert.rejects(payQuotationByWallet(user, input), /đã được thanh toán/);
   assert.equal(state.wallets[0].balance, 500000); assert.equal(state.wallets[1].balance, 100000); assert.equal(state.ledgers.length, 0);
-  console.log('Đạt: trừ/cộng ví nguyên tử, không phí nền tảng, chống trùng, cọc mới/cũ, tích điểm, phân quyền, trạng thái, báo giá cũ, hoàn tác và cạnh tranh với thu trực tiếp.');
+  // Tạo QR chưa thanh toán; webhook xác minh mới cộng ví thợ đúng một lần.
+  reset();
+  const payosInput = { ...input, method: 'PAYOS' };
+  const qr = await paymentService.createOrderPayment(user, payosInput);
+  assert.equal(qr.payment.paymentType, 'remaining'); assert.equal(qr.payment.amount, 180000);
+  assert.equal(state.orders[0].paymentStatus, 'partially_paid'); assert.equal(state.wallets[1].balance, 100000);
+  const reused = await paymentService.createOrderPayment(user, payosInput);
+  assert.equal(String(reused.payment._id), String(qr.payment._id)); assert.equal(state.payments.length, 1);
+  const webhook = { success: true, data: { orderCode: Number(qr.payment.gatewayOrderCode), amount: 180000,
+    paymentLinkId: qr.payment.gatewayPaymentLinkId, reference: 'tham-chieu-webhook', code: '00' } };
+  await assert.rejects(paymentService.handlePayosWebhook({ ...webhook, data: { ...webhook.data, amount: 170000 } }), /không khớp/);
+  assert.equal(state.wallets[1].balance, 100000);
+  failLedger = true;
+  await rejectedWithoutChanges(() => paymentService.handlePayosWebhook(webhook), /giả lập/);
+  failLedger = false;
+  await paymentService.handlePayosWebhook(webhook);
+  await paymentService.handlePayosWebhook(webhook);
+  assert.equal(state.wallets[0].balance, 500000); assert.equal(state.wallets[1].balance, 280000);
+  assert.equal(state.ledgers.length, 1); assert.equal(state.orders[0].paymentStatus, 'paid');
+  assert.equal(state.orders[0].paymentMethod, 'bank'); assert.equal(state.rewards[0].points, 20);
+
+  // Đổi PayOS sang ví: chỉ hủy QR sau khi biết ví đủ và xác minh cổng đã hủy.
+  reset(); cancellationMode = 'cancel';
+  const oldQr = await paymentService.createOrderPayment(user, payosInput);
+  state.wallets[0].balance = 100;
+  await assert.rejects(paymentService.createOrderPayment(user, input), /không đủ/);
+  assert.equal(links.get(Number(oldQr.payment.gatewayOrderCode)).status, 'PENDING');
+  state.wallets[0].balance = 500000; cancellationMode = 'unknown';
+  await assert.rejects(paymentService.createOrderPayment(user, input), /Chưa xác minh/);
+  assert.equal(state.wallets[0].balance, 500000);
+  cancellationMode = 'cancel'; await paymentService.createOrderPayment(user, input);
+  assert.equal(state.payments.filter(row => row.status === 'paid').length, 1);
+  assert.equal(state.wallets[0].balance, 320000); assert.equal(state.wallets[1].balance, 280000);
+  // QR cũ đến muộn được hoàn ví khách, không cộng ví thợ lần hai.
+  await paymentService.handlePayosWebhook({ success: true, data: { orderCode: Number(oldQr.payment.gatewayOrderCode), amount: 180000,
+    paymentLinkId: oldQr.payment.gatewayPaymentLinkId, reference: 'qr-cu-den-muon', code: '00' } });
+  assert.equal(state.wallets[0].balance, 500000); assert.equal(state.wallets[1].balance, 280000);
+  assert.equal(state.refunds.length, 1);
+
+  reset();
+  const staleQr = await paymentService.createOrderPayment(user, payosInput);
+  state.payments[0].status = 'failed'; state.quotations[0].revision++;
+  await paymentService.handlePayosWebhook({ success: true, data: { orderCode: Number(staleQr.payment.gatewayOrderCode), amount: 180000,
+    paymentLinkId: staleQr.payment.gatewayPaymentLinkId, reference: 'bao-gia-cu-den-muon', code: '00' } });
+  assert.equal(state.wallets[0].balance, 680000); assert.equal(state.wallets[1].balance, 100000);
+  assert.equal(state.payments[0].status, 'refunded'); assert.equal(state.orders[0].paymentStatus, 'partially_paid');
+
+  // Cổng vừa nhận tiền khi đổi phương thức: đối soát rồi trả kết quả, không trừ ví khách.
+  reset(); cancellationMode = 'paid';
+  await paymentService.createOrderPayment(user, payosInput);
+  const paid = await paymentService.createOrderPayment(user, input);
+  assert.equal(paid.payment.method, 'payos'); assert.equal(paid.payment.status, 'paid');
+  assert.equal(state.wallets[0].balance, 500000); assert.equal(state.wallets[1].balance, 280000);
+  console.log('Đạt: thanh toán báo giá bằng ví/PayOS, đổi QR sang ví, đối soát khi vừa nhận tiền, webhook lặp/sai tiền, hoàn QR cũ, cộng ví thợ không phí, hoàn tác và cạnh tranh với thu trực tiếp.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

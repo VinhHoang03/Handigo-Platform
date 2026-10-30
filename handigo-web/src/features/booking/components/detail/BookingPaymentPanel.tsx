@@ -12,6 +12,7 @@ type BookingPaymentPanelProps = {
   busy: boolean;
   canMakeInitialPayment: boolean;
   canChangePayment: boolean;
+  quotationAmount?: number;
   paymentError: string | null;
   paymentMethodModalOpen: boolean;
   initialPaymentMethod: InitialPaymentMethod;
@@ -29,6 +30,7 @@ export const BookingPaymentPanel = ({
   busy,
   canMakeInitialPayment,
   canChangePayment,
+  quotationAmount,
   paymentError,
   paymentMethodModalOpen,
   initialPaymentMethod,
@@ -87,8 +89,10 @@ export const BookingPaymentPanel = ({
           </p>
           {canChangePayment && (
             <div className="rounded-xl bg-surface-container-low p-3 text-sm">
-              <p className="font-bold text-on-surface">Số tiền: {formatCurrency(order.pricing.totalPaidAmount)}</p>
-              <p className="mt-1 text-on-surface-variant">Giữ nguyên giá và voucher của đơn. Chỉ xác nhận nếu bạn chưa trả tiền mặt cho chuyên gia.</p>
+              <p className="font-bold text-on-surface">Số tiền: {formatCurrency(quotationAmount ?? order.pricing.totalPaidAmount)}</p>
+              <p className="mt-1 text-on-surface-variant">{quotationAmount !== undefined
+                ? "Thanh toán phần còn lại theo báo giá sau khi trừ cọc. Chỉ xác nhận nếu bạn chưa trả trực tiếp cho thợ."
+                : "Giữ nguyên giá và voucher của đơn. Chỉ xác nhận nếu bạn chưa trả tiền mặt cho chuyên gia."}</p>
             </div>
           )}
           <div className="space-y-3">

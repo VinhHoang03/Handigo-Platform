@@ -10,7 +10,8 @@ export async function getPayosPaymentQr(paymentId: string, user: RequestUser) {
   if (!payment) throw new AppError("Không tìm thấy giao dịch thanh toán của bạn.", 404);
   const order = await Order.findOne({ _id: payment.orderId, customerId: user.id, isDeleted: false }).select("status").lean();
   if (!order) throw new AppError("Không tìm thấy đơn hàng của bạn.", 404);
-  if (payment.method !== "payos" || payment.status !== "pending" || ["cancelled", "completed"].includes(order.status)) {
+  if (payment.method !== "payos" || payment.status !== "pending" || order.status === "cancelled"
+    || (order.status === "completed" && payment.paymentType !== "remaining")) {
     throw new AppError("Giao dịch không còn cho phép thanh toán bằng mã QR PayOS.", 409);
   }
   const link = payment.gatewayResponse?.paymentLink as { qrCode?: unknown } | undefined;

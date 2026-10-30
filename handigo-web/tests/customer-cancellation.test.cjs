@@ -33,6 +33,7 @@ function setup(order) {
       async cancelOrder() { calls.push('cancel'); },
     } },
     '@/utils/apiError': { getErrorMessage: (_, fallback) => fallback },
+    './bookingDetailConstants': { getCustomerCancellationReasons: () => ['Không còn nhu cầu sử dụng dịch vụ', 'Lý do khác'] },
   };
   const exports = {};
   vm.runInNewContext(code, {
@@ -94,4 +95,18 @@ test('Hộp thoại đã mở cũng không gửi yêu cầu hủy khi quá hạn
 test('Đơn chưa có thợ vẫn được hủy, đơn đã nhận thiếu mốc xác minh bị khóa', () => {
   assert.equal(setup({ status: 'created' }).render().cancellationLocked, false);
   assert.equal(setup({ status: 'accepted' }).render().cancellationLocked, true);
+});
+
+test('Khóa hủy ngay khi đúng thợ xác nhận đến nơi, kể cả hộp thoại đã mở trong 5 phút', async () => {
+  const order = { _id: 'don-thu', status: 'accepted', providerId: { _id: 'tho-A' }, customerCancellationDeadline: new Date(300000).toISOString() };
+  const app = setup(order);
+  await app.render().handleCancelOrder();
+  app.render().updateActionReason('Không còn nhu cầu sử dụng dịch vụ');
+  order.arrival = { providerId: 'tho-A', arrivedAt: new Date().toISOString() };
+  assert.equal(app.render().cancellationLocked, true);
+  await app.render().executePendingAction();
+  assert.deepEqual(app.calls, ['preview']);
+  assert.match(app.messages[0], /đã xác nhận đến nơi/);
+  order.arrival.providerId = 'tho-cu';
+  assert.equal(app.render().cancellationLocked, false);
 });

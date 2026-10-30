@@ -6,6 +6,7 @@ import type {
 import { useAddressBookForm } from "@/features/profile/hooks/useAddressBookForm";
 import { AddressBookFormFields } from "./AddressBookFormFields";
 import { LocationPickerMap } from "@/components/common/LocationPickerMap";
+import { AddressLabelBadge } from "./AddressLabelBadge";
 
 interface AddressBookModalProps {
   open: boolean;
@@ -100,6 +101,7 @@ export function AddressBookModal({
           onPositionChange={updateAddressFromCoordinate}
         /> : <div className="space-y-4">
           <div className="rounded-xl bg-surface-container-low p-4 text-sm">
+            <AddressLabelBadge label={addressForm.addressLabel} className="mb-2" />
             <p className="font-bold">{addressForm.recipientName} · {addressForm.recipientPhone}</p>
             <p className="mt-2">{[addressForm.addressLine, addressForm.ward, addressForm.province].filter(Boolean).join(', ')}</p>
             <p className="mt-2 text-xs text-on-surface-variant">Kiểm tra ghim và kéo đến đúng điểm thực hiện dịch vụ. Phần địa chỉ bạn nhập được giữ nguyên.</p>

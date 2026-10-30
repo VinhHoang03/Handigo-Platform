@@ -49,7 +49,19 @@ export function getOrderRecipient(order: Order) {
 export function shortAddress(order: Order) {
   const address = order.addressId;
   if (!address) return '';
-  return [address.ward, address.province].filter(Boolean).join(', ');
+  return address.fullAddress?.trim() || [address.ward, address.province].filter(Boolean).join(', ');
+}
+
+export function getProviderCancellationReasons(order: Order) {
+  const arrived = Boolean(order.arrival && order.arrival.providerId === order.providerId?._id);
+  return [
+    ...(arrived && order.inspectionRequired && order.status === 'accepted' ? ['Khách hàng không đồng ý báo giá'] : []),
+    ...(arrived ? ['Không thể sửa chữa hoặc thực hiện dịch vụ'] : ['Không thể đến địa chỉ khách hàng']),
+    'Khách hàng cung cấp thông tin chưa đầy đủ',
+    ...(!arrived ? ['Không thể liên hệ với khách hàng'] : []),
+    ...(!arrived && order.orderType !== 'normal' ? ['Lịch hẹn không còn phù hợp'] : []),
+    'Lý do khác',
+  ];
 }
 
 export function getOrderFromAssignment(assignment: OrderAssignment): Order | null {
