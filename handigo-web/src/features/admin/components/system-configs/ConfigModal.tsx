@@ -57,7 +57,7 @@ export function ConfigModal({
           </span>
           <input
             type="checkbox"
-            disabled={['BOOKING_POLICY', 'REFUND_POLICY', 'REWARD_POLICY'].includes(item.key)}
+            disabled={['BOOKING_POLICY', 'REFUND_POLICY', 'REWARD_POLICY', 'PROVIDER_ARRIVAL_RADIUS_METERS', 'CUSTOMER_NO_SHOW_WAIT_MINUTES', 'CUSTOMER_CANCELLATION_MINUTES'].includes(item.key)}
             checked={form.isPublic}
             onChange={(event) =>
               onChange({ ...form, isPublic: event.target.checked })

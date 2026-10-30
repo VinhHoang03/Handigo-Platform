@@ -9,6 +9,7 @@ import { lockProviderSchedule } from "./providerSchedule.service";
 import { CustomerNoShowEvidence } from "../models/customerNoShowEvidence.model";
 import { verifyNoShowEvidence } from "./customerNoShowVerification.service";
 import { releaseProviderAfterNoShow } from "./providerPresence.service";
+import { getOrderOperationPolicy } from "./systemConfig.service";
 
 export interface CustomerNoShowReview {
   automated?: boolean;
@@ -30,7 +31,8 @@ export const settleCustomerNoShow = async (
     throw new AppError("Đơn hoặc báo cáo đã thay đổi, chưa thể chấp thuận hỗ trợ.", 409);
   }
   const provider = await lockProviderSchedule(order.providerId, session);
-  assertCustomerNoShowWait(order);
+  const { customerNoShowWaitMinutes } = await getOrderOperationPolicy(session);
+  assertCustomerNoShowWait(order, Date.now(), customerNoShowWaitMinutes);
   if (order.currentQuotationId) throw new AppError("Đơn đã có báo giá, cần kiểm tra lại trước khi xử lý khách vắng mặt.", 409);
   if (review.automated) {
     const ids = order.customerNoShow.evidenceIds ?? [];

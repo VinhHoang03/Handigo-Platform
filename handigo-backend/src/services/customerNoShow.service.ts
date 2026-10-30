@@ -11,7 +11,8 @@ import { haversineMeters } from "./matching.service";
 import { lockProviderSchedule } from "./providerSchedule.service";
 import { createNotificationRecord } from "./notification.service";
 import { emitToUser } from "../sockets/socketServer";
-import { assertCustomerNoShowWait, CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS, CUSTOMER_NO_SHOW_COMPENSATION } from "../utils/customerNoShow";
+import { assertCustomerNoShowWait, CUSTOMER_NO_SHOW_COMPENSATION } from "../utils/customerNoShow";
+import { getOrderOperationPolicy } from "./systemConfig.service";
 import { cancelOrderWithSettlement } from "./orderCancellation.service";
 import { getNoShowEvidence, storeNoShowEvidence, verifyNoShowEvidence } from "./customerNoShowVerification.service";
 import type { NoShowEvidenceKind } from "../ai/customer-no-show/evidence-agent";
@@ -58,8 +59,9 @@ export const markOrderArrival = async (orderId: string, userId: string) => {
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(address?.latitude) || !Number.isFinite(address?.longitude)) {
     throw new AppError("Chưa có tọa độ hợp lệ để xác nhận đã đến nơi.", 409);
   }
-  if (haversineMeters(latitude, longitude, address!.latitude!, address!.longitude!) > CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS) {
-    throw new AppError("Bạn cần ở trong phạm vi 200 m quanh địa chỉ khách để xác nhận đã đến nơi.", 409);
+  const { providerArrivalRadiusMeters } = await getOrderOperationPolicy();
+  if (haversineMeters(latitude, longitude, address!.latitude!, address!.longitude!) > providerArrivalRadiusMeters) {
+    throw new AppError(`Bạn cần ở trong phạm vi ${providerArrivalRadiusMeters} m quanh địa chỉ khách để xác nhận đã đến nơi.`, 409);
   }
   const updated = await Order.findOneAndUpdate({
     _id: orderId, providerId: provider._id, status: "accepted", isDeleted: false,
@@ -79,7 +81,8 @@ export const checkCustomerNoShowEligibility = async (orderId: string, userId: st
   const order = assertAccepted(await Order.findOne({ _id: orderId, providerId: provider._id, isDeleted: false }));
   if (order.currentQuotationId) throw new AppError("Đơn đã lưu báo giá, không thể báo khách không có mặt.", 409);
   if (order.customerNoShow) throw new AppError("Đơn này đã có báo cáo khách không có mặt. Vui lòng xem kết quả xử lý.", 409);
-  assertCustomerNoShowWait(order);
+  const { customerNoShowWaitMinutes } = await getOrderOperationPolicy();
+  assertCustomerNoShowWait(order, Date.now(), customerNoShowWaitMinutes);
   return { eligible: true, compensationAmount: CUSTOMER_NO_SHOW_COMPENSATION };
 };
 
@@ -104,7 +107,8 @@ export const reportCustomerNoShow = async (
       const order = assertAccepted(await Order.findOne({ _id: orderId, providerId: provider._id, isDeleted: false }).session(session));
       if (order.currentQuotationId) throw new AppError("Đơn đã lưu báo giá, không thể báo khách không có mặt.", 409);
       if (order.customerNoShow) throw new AppError("Đơn này đã có báo cáo khách không có mặt.", 409);
-      assertCustomerNoShowWait(order);
+      const { customerNoShowWaitMinutes } = await getOrderOperationPolicy(session);
+      assertCustomerNoShowWait(order, Date.now(), customerNoShowWaitMinutes);
       const evidence = await getNoShowEvidence(order._id, userId, payload.arrivalEvidenceIds, payload.contactEvidenceIds, session);
       const verification = await verifyNoShowEvidence(order, userId, evidence, session);
       const [report] = await Report.create([{
@@ -125,7 +129,7 @@ export const reportCustomerNoShow = async (
     try {
       result = await orderActorContext.exit(() => cancelOrderWithSettlement({
         orderId, role: "admin", system: true,
-        reason: "Hệ thống xác minh khách không có mặt sau thời gian chờ 10 phút.",
+        reason: "Hệ thống xác minh khách không có mặt sau thời gian chờ theo cấu hình.",
         customerNoShowReview: { reportId: String(report._id), automated: true },
       }));
     } catch {
@@ -158,7 +162,7 @@ export const reviewCustomerNoShowReport = async (
     if (!["pending", "under_review"].includes(report.status)) throw new AppError("Báo cáo đã có kết quả xử lý.", 409);
     const order = await cancelOrderWithSettlement({
       orderId: String(report.orderId), actorId: adminId, role: "admin",
-      reason: "Khách không có mặt, không liên hệ được sau thời gian chờ 10 phút.",
+      reason: "Khách không có mặt, không liên hệ được sau thời gian chờ theo cấu hình.",
       customerNoShowReview: { reportId, reviewNote: payload.reviewNote, resolutionNote: payload.resolutionNote },
     });
     if (order.customerNoShow?.status !== "approved") throw new AppError("Đơn đã được xử lý theo luồng khác. Vui lòng kiểm tra lại.", 409);

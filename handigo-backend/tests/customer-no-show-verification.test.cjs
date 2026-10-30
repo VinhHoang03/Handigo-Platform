@@ -43,6 +43,8 @@ const facts = () => ({ addressLine: '12 Nguyễn Trãi, Phường A, Thành ph�
 function service(options = {}) {
   const receipts = options.receipts ?? evidence();
   const modules = {
+    './systemConfig.service': { getOrderOperationPolicy: async () => ({ providerArrivalRadiusMeters: 200,
+      customerNoShowWaitMinutes: 10, customerCancellationMinutes: 5, ...options.policy }) },
     '../utils/customerNoShowEvidence': evidenceTime,
     '../utils/appError': { AppError }, 'node:crypto': require('node:crypto'),
     '../utils/logger': { createLogger: () => ({ warn: (message, context) => options.logs?.push({ message, context }) }) },
@@ -305,6 +307,16 @@ test('Đối chiếu dữ liệu thật kiểm tra GPS mới, hội thoại và 
     assert.equal((await service(options).verifyNoShowEvidence(order, 'tho', evidence())).decision, 'manual_review');
   }
   assert.equal((await service().verifyNoShowEvidence({ ...order, customerNoShow: { customerRepliedAt: new Date(now) } }, 'tho', evidence())).decision, 'manual_review');
+  const policy = { providerArrivalRadiusMeters: 300, customerNoShowWaitMinutes: 10 };
+  const configured = await service({ distance: 250, skipWait: false, policy }).verifyNoShowEvidence(order, 'tho', evidence());
+  assert.equal(configured.decision, 'auto_eligible');
+  assert.equal(configured.checks.location.radiusMeters, 300);
+  assert.equal(configured.checks.waiting.requiredMinutes, 10);
+  const notWaited = await service({ distance: 250, skipWait: false, policy: { ...policy, customerNoShowWaitMinutes: 12 } })
+    .verifyNoShowEvidence(order, 'tho', evidence());
+  assert.equal(notWaited.decision, 'manual_review');
+  assert.equal(notWaited.checks.waiting.requiredMinutes, 12);
+  assert.equal(notWaited.checks.waiting.passed, false);
 });
 
 test('Đối chiếu số tài khoản đang hiển thị cho thợ thay vì số người nhận cũ trong snapshot', async () => {
@@ -517,7 +529,8 @@ test('Tin khách trả lời ghi dấu trên đơn trước khi tạo tin; tin c
       './penaltyPolicy.service': { async assertFeatureAllowed() {} },
       '../models/order.model': { Order: {
         findOne: async () => order,
-        async updateOne(filter, update, options) {
+        exists: () => query(true),
+        async updateMany(filter, update, options) {
           assert.equal(options.session, session);
           assert.equal(options.runValidators, true);
           assert.equal(filter['customerNoShow.status'], 'pending');
