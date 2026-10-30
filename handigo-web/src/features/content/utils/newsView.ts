@@ -2,7 +2,7 @@ import type {
   NewsArticleRecord,
   NewsContentBlock,
 } from "../api/news.api";
-import type { NewsArticle as StaticNewsArticle } from "../data/content.data";
+import type { JSONContent } from "@tiptap/core";
 
 export interface NewsViewArticle {
   id: string;
@@ -15,6 +15,7 @@ export interface NewsViewArticle {
   image: string;
   authorName: string;
   content: NewsContentBlock[];
+  richContent?: JSONContent;
   isFeatured: boolean;
 }
 
@@ -46,35 +47,7 @@ export const toNewsViewArticle = (
   image: article.coverImage,
   authorName: article.authorName,
   content: article.content,
+  richContent: article.richContent,
   isFeatured: article.isFeatured,
 });
 
-export const toStaticNewsViewArticle = (
-  article: StaticNewsArticle,
-): NewsViewArticle => ({
-  id: article.id,
-  slug: article.id,
-  category: article.category,
-  title: article.title,
-  excerpt: article.excerpt,
-  date: article.date,
-  readTime: article.readTime,
-  image: article.image,
-  authorName: "Ban biên tập Handigo",
-  content: article.content || [{ type: "paragraph", text: article.excerpt }],
-  isFeatured: false,
-});
-
-export const mergeNewsArticles = (
-  records: NewsArticleRecord[],
-  staticArticles: StaticNewsArticle[],
-) => {
-  const dynamicArticles = records.map(toNewsViewArticle);
-  const dynamicSlugs = new Set(dynamicArticles.map((article) => article.slug));
-  return [
-    ...dynamicArticles,
-    ...staticArticles
-      .filter((article) => !dynamicSlugs.has(article.id))
-      .map(toStaticNewsViewArticle),
-  ];
-};

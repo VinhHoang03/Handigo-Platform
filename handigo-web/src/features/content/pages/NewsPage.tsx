@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { newsApi, type NewsArticleRecord } from "../api/news.api";
 import { PublicContentLayout } from "../components/PublicContentLayout";
-import { newsArticles, newsCategories } from "../data/content.data";
-import { mergeNewsArticles } from "../utils/newsView";
+import { toNewsViewArticle } from "../utils/newsView";
 import { Reveal } from "@/components/common/Reveal";
 import "../components/content-motion.css";
 
@@ -12,6 +11,7 @@ export default function NewsPage() {
   const [category, setCategory] = useState("Tất cả");
   const [records, setRecords] = useState<NewsArticleRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [reload, setReload] = useState(0);
   const [loadError, setLoadError] = useToastFeedback<string>("", "error");
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function NewsPage() {
       } catch {
         if (active) {
           setLoadError(
-            "Chưa thể tải các bài viết mới. Các bài viết hiện có vẫn được hiển thị.",
+            "Không thể tải tin tức. Vui lòng thử lại.",
           );
         }
       } finally {
@@ -34,19 +34,14 @@ export default function NewsPage() {
     return () => {
       active = false;
     };
-  }, [setLoadError]);
+  }, [setLoadError, reload]);
 
   const articles = useMemo(
-    () => mergeNewsArticles(records, newsArticles),
+    () => records.map(toNewsViewArticle),
     [records],
   );
   const categories = useMemo(
-    () => [
-      ...newsCategories,
-      ...records
-        .map((article) => article.category)
-        .filter((item) => !newsCategories.includes(item)),
-    ],
+    () => ["Tất cả", ...new Set(records.map((article) => article.category))],
     [records],
   );
   const featuredArticle =
@@ -139,6 +134,7 @@ export default function NewsPage() {
             }`}
           >
             {loadError || "Đang cập nhật các bài viết mới nhất…"}
+            {loadError && <button type="button" onClick={() => { setLoadError(""); setIsLoading(true); setReload(value => value + 1); }} className="ml-3 min-h-10 font-semibold underline">Thử lại</button>}
           </p>
         )}
 
@@ -179,7 +175,7 @@ export default function NewsPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl bg-surface-container-low p-12 text-center text-on-surface-variant">
+          !isLoading && !loadError && <div className="rounded-3xl bg-surface-container-low p-12 text-center text-on-surface-variant">
             Chưa có bài viết trong danh mục này.
           </div>
         )}

@@ -42,6 +42,9 @@ export const AdminSystemConfigsPage = lazy(
 export const AdminNewsPage = lazy(
   () => import("@/features/admin/pages/AdminNewsPage"),
 );
+export const AdminNewsEditorPage = lazy(
+  () => import("@/features/admin/pages/AdminNewsEditorPage"),
+);
 export const AdminServiceSuggestionsPage = lazy(
   () =>
     import("@/features/service-suggestion/pages/AdminServiceSuggestionsPage"),
