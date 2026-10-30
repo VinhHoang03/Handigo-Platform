@@ -1,5 +1,7 @@
-import { MapPin, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { UserAddress } from "@/features/profile/types/profile.types";
+import { AddressLabelBadge } from "./AddressLabelBadge";
+import { AddressLabelIcon } from "./AddressLabelIcon";
 
 const CURRENT_LOCATION_LEGACY_NOTE =
   "Địa chỉ được tạo từ vị trí hiện tại khi đặt dịch vụ.";
@@ -25,10 +27,15 @@ export function SavedAddressRow({
     <div className="flex items-start justify-between gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low p-3">
       <div className="flex min-w-0 items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-          <MapPin size={18} />
+          <AddressLabelIcon
+            label={address.addressLabel}
+            aria-hidden="true"
+            size={18}
+          />
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            <AddressLabelBadge label={address.addressLabel} />
             {hasNote && (
               <p className="font-bold text-on-surface">
                 {address.note?.trim()}

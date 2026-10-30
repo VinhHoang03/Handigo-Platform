@@ -15,10 +15,18 @@ export function getDirectRepairPayment(quotationAmount: number, depositAmount: n
   return Math.max(quotationAmount - depositAmount, 0);
 }
 
-export function getRemainingQuotationPayment(
-  quotation: OrderQuotation['quotation'], depositAmount: number, orderStatus?: Order['status'],
+export function isQuotationPaidOnline(
+  order: Pick<Order, 'paymentStatus' | 'paymentMethod'>,
+  quotation?: Pick<OrderQuotation['quotation'], 'directPaymentConfirmedAt'> | null,
 ) {
-  if (orderStatus === 'cancelled' || ['rejected', 'cancelled', 'expired'].includes(quotation.status)) return 0;
+  return Boolean(quotation && !quotation.directPaymentConfirmedAt
+    && order.paymentStatus === 'paid' && ['wallet', 'bank'].includes(order.paymentMethod));
+}
+
+export function getRemainingQuotationPayment(
+  quotation: OrderQuotation['quotation'], depositAmount: number, orderStatus?: Order['status'], paidOnline = false,
+) {
+  if (paidOnline || orderStatus === 'cancelled' || ['rejected', 'cancelled', 'expired'].includes(quotation.status)) return 0;
   const confirmedAmount = quotation.directPaymentConfirmedAt ? quotation.directPaymentConfirmedAmount ?? 0 : 0;
   return Math.max(getDirectRepairPayment(quotation.finalAmount, depositAmount) - confirmedAmount, 0);
 }

@@ -26,6 +26,27 @@ interface SendMessagePayload {
 
 const chatEnabledStatuses: IOrder["status"][] = ["accepted", "in_progress", "completed"];
 
+const getOrCreateParticipantConversation = async (
+  order: IOrder, providerId: Types.ObjectId, session: ClientSession, updateOrder = false,
+) => {
+  // Khóa cùng hồ sơ thợ để hai đơn đồng thời không tạo hai chat cho cùng một cặp.
+  const lock = await Provider.updateOne(
+    { _id: providerId, isDeleted: false }, { $inc: { __v: 1 } }, { session, runValidators: true },
+  );
+  if (!lock.matchedCount) throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
+  const filter = { customerId: order.customerId, providerId, isDeleted: false };
+  const previous = await Conversation.findOne(filter).sort({ createdAt: 1, _id: 1 }).session(session);
+  if (previous) {
+    if (updateOrder) {
+      previous.orderId = order._id as Types.ObjectId;
+      await previous.save({ session });
+    }
+    return previous;
+  }
+  const [conversation] = await Conversation.create([{ ...filter, orderId: order._id }], { session });
+  return conversation!;
+};
+
 export const buildAssignmentWelcomeContent = (
   providerName: string,
   order: Pick<IOrder, "orderCode" | "createdAt" | "scheduledAt">,
@@ -56,19 +77,7 @@ export const createAssignmentWelcome = async (
   const existing = await Message.findById(assignmentId).session(session);
   if (existing) return;
   const user = await User.findById(providerUserId).select("fullName").session(session);
-  const previous = await Conversation.findOne({ orderId: order._id }).session(session);
-  const conversation = await Conversation.findOneAndUpdate(
-    { orderId: order._id },
-    {
-      $set: {
-        customerId: order.customerId, providerId,
-        ...(previous && previous.providerId.toString() !== providerId.toString()
-          ? { providerLastSeenAt: null } : {}),
-      },
-      $setOnInsert: { orderId: order._id },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true, session },
-  );
+  const conversation = await getOrCreateParticipantConversation(order, providerId, session, true);
   const content = buildAssignmentWelcomeContent(user?.fullName ?? "", order);
   const [message] = await Message.create([{
     _id: assignmentId, conversationId: conversation._id,
@@ -146,10 +155,10 @@ const resolveParticipant = async (userId: string, role: UserRole, conversation: 
   throw new AppError("Bạn không thuộc cuộc trò chuyện này", 403);
 };
 
-const assertOrderCanChat = async (userId: string, role: UserRole, orderId: string, requireChatEnabled = true) => {
+const assertOrderCanChat = async (userId: string, role: UserRole, orderId: string, requireChatEnabled = true, session?: ClientSession) => {
   assertObjectId(orderId, "order id");
 
-  const order = await Order.findOne({ _id: orderId, isDeleted: false });
+  const order = await Order.findOne({ _id: orderId, isDeleted: false }).session(session ?? null);
 
   if (!order) {
     throw new AppError("Không tìm thấy đơn hàng", 404);
@@ -195,12 +204,6 @@ const getConversationForParticipant = async (
     throw new AppError("Không tìm thấy cuộc trò chuyện", 404);
   }
 
-  const order = await assertOrderCanChat(userId, role, conversation.orderId.toString(), false);
-  if (order.providerId && conversation.providerId.toString() !== order.providerId.toString()) {
-    conversation.providerId = order.providerId!;
-    conversation.providerLastSeenAt = null;
-    await conversation.save();
-  }
   const participant = await resolveParticipant(userId, role, conversation);
 
   return { conversation, participant };
@@ -218,11 +221,7 @@ export const getMyConversations = async (userId: string, role: UserRole, query: 
     if (!provider) {
       throw new AppError("Không tìm thấy hồ sơ nhà cung cấp", 404);
     }
-    const orderIds = await Order.find({ providerId: provider._id, isDeleted: false }).distinct("_id");
-    await Conversation.updateMany({ orderId: { $in: orderIds }, providerId: { $ne: provider._id }, isDeleted: false },
-      { $set: { providerId: provider._id, providerLastSeenAt: null } }, { runValidators: true });
     filter.providerId = provider._id;
-    filter.orderId = { $in: orderIds };
   } else {
     throw new AppError("Chỉ khách hàng và nhà cung cấp có thể truy cập trò chuyện", 403);
   }
@@ -258,21 +257,16 @@ export const getOrCreateConversationByOrder = async (
   role: UserRole,
   orderId: string,
 ) => {
-  const order = await assertOrderCanChat(userId, role, orderId);
-  const previous = await Conversation.findOne({ orderId: order._id, isDeleted: false }).select("providerId");
-
-  const conversation = await Conversation.findOneAndUpdate(
-    { orderId: order._id },
-    {
-      $set: {
-        customerId: order.customerId,
-        providerId: order.providerId,
-        ...(previous && previous.providerId.toString() !== order.providerId!.toString() ? { providerLastSeenAt: null } : {}),
-      },
-      $setOnInsert: { orderId: order._id },
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
-  )
+  const session = await mongoose.startSession();
+  let conversationId: Types.ObjectId;
+  try {
+    conversationId = await withTransactionRetry(session, async () => {
+      const order = await assertOrderCanChat(userId, role, orderId, true, session);
+      const conversation = await getOrCreateParticipantConversation(order, order.providerId!, session);
+      return conversation._id as Types.ObjectId;
+    });
+  } finally { await session.endSession(); }
+  const conversation = await Conversation.findById(conversationId)
     .populate("orderId", "orderCode status")
     .populate("customerId", "fullName avatar")
     .populate({
@@ -326,7 +320,11 @@ export const sendMessage = async (
     conversationId,
   );
 
-  await assertOrderCanChat(userId, role, conversation.orderId.toString());
+  const activeOrder = await Order.exists({
+    customerId: conversation.customerId, providerId: conversation.providerId,
+    status: { $in: chatEnabledStatuses }, isDeleted: false,
+  });
+  if (!activeOrder) throw new AppError("Đơn hàng chưa sẵn sàng để trò chuyện", 400);
 
   const messageType = payload.messageType || "text";
   const content = messageType === "text" ? payload.content : payload.imageUrl;
@@ -338,7 +336,8 @@ export const sendMessage = async (
   const messageId = await withConversationWrite(conversationId, async (current, session) => {
     if (participant.senderRole === "customer") {
       // Ghi cùng giao dịch để tự duyệt phát hiện phản hồi đồng thời và thử lại.
-      await Order.updateOne({ _id: conversation.orderId, status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
+      await Order.updateMany({ customerId: conversation.customerId, providerId: conversation.providerId,
+        status: "accepted", "customerNoShow.status": "pending", isDeleted: false },
         { $set: { "customerNoShow.customerRepliedAt": new Date() } }, { session, runValidators: true });
     }
     const [message] = await Message.create([{

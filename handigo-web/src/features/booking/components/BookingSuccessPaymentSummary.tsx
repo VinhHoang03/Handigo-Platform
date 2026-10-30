@@ -1,7 +1,7 @@
 import { formatCurrency } from '@/utils/currency';
 import type { Order, OrderQuotation } from '../../../types/booking';
 import type { BookingResultState } from '../utils/bookingResultState';
-import { getAppliedQuotationDeposit, getDirectRepairPayment } from '@/utils/quotationPayment';
+import { getAppliedQuotationDeposit, getDirectRepairPayment, isQuotationPaidOnline } from '@/utils/quotationPayment';
 import { getOrderStatusMeta } from '@/utils/orderStatus';
 
 const paymentMethodLabel = (method: Order['paymentMethod']) =>
@@ -14,8 +14,10 @@ export const BookingSuccessPaymentSummary = ({ order, result, quotation, quotati
   const repairQuotation = isInspection && quotation && ['saved', 'approved'].includes(quotation.quotation.status)
     ? quotation.quotation : null;
   const deposit = getAppliedQuotationDeposit(order);
+  const onlinePaid = isQuotationPaidOnline(order, repairQuotation);
   const repairCollected = repairQuotation?.directPaymentConfirmedAt && repairQuotation.directPaymentConfirmedAmount != null
-    ? repairQuotation.directPaymentConfirmedAmount : null;
+    ? repairQuotation.directPaymentConfirmedAmount : onlinePaid && repairQuotation
+      ? getDirectRepairPayment(repairQuotation.finalAmount, deposit) : null;
   const remaining = repairQuotation ? getDirectRepairPayment(repairQuotation.finalAmount, deposit) : 0;
   const paymentLabel = result === 'order_cancelled'
     ? order.paymentStatus === 'paid' ? 'Đã thanh toán' : order.paymentStatus === 'partially_paid' ? 'Đã thanh toán cọc' : 'Chưa thanh toán'

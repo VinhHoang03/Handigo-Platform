@@ -5,6 +5,7 @@ import type { RequestUser } from "../middlewares/authContext";
 import { AppError } from "../utils/appError";
 import { Order } from "../models/order.model";
 import { Payment, PaymentType } from "../models/payment.model";
+import { RepairQuotation } from "../models/repairQuotation.model";
 import { Promotion } from "../models/promotion.model";
 import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
@@ -20,6 +21,7 @@ import { markOrderVoucherAsUsed } from "./voucher.service";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { publishPaymentStatus } from "./paymentStatus.service";
 import { buildOrderPaymentRedirects, resolvePaymentFrontendOrigin } from "../utils/paymentRedirect";
+import { payQuotationByWallet, validateQuotationPayment, settleQuotationPayosPayment } from "./quotationWalletPayment.service";
 
 export interface ConfirmedPaymentExpectation {
   amount: number;
@@ -42,8 +44,9 @@ const assertConfirmedPayment = (order: InstanceType<typeof Order>, amount: numbe
   paymentType: PaymentType, expected?: ConfirmedPaymentExpectation) => {
   if (!expected) return;
   if (expected.amount !== amount || expected.paymentType !== paymentType
-    || (!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order))
-    || order.paymentStatus !== "unpaid") {
+    || (paymentType === "remaining"
+      ? !order.inspectionRequired || order.status !== "completed" || !["partially_paid", "paid"].includes(order.paymentStatus)
+      : (!["created", "accepted"].includes(order.status) && !isFixedPriceWorkPayment(order)) || order.paymentStatus !== "unpaid")) {
     throw new ActionPreconditionError();
   }
 };
@@ -220,10 +223,8 @@ const getPaymentType = (
   requestedType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING",
 ): PaymentType => {
   if (requestedType === "REMAINING") {
-    throw new AppError(
-      "Dịch vụ báo giá chỉ thanh toán tiền cọc qua Handigo. Chi phí báo giá được khách hàng và provider tự thanh toán trực tiếp.",
-      400,
-    );
+    if (!order.inspectionRequired || order.status !== "completed") throw new AppError("Chỉ thanh toán báo giá sau khi hoàn thành dịch vụ.", 409);
+    return "remaining";
   }
 
   if (order.inspectionRequired) {
@@ -238,10 +239,10 @@ const getPaymentAmount = async (
   paymentType: PaymentType,
 ) => {
   if (paymentType === "remaining") {
-    throw new AppError(
-      "Dịch vụ báo giá không thanh toán chi phí báo giá qua Handigo.",
-      400,
-    );
+    const quotation = await RepairQuotation.findOne({ _id: order.currentQuotationId, orderId: order._id, isDeleted: false });
+    if (!quotation) throw new AppError("Không tìm thấy báo giá hiện tại.", 409);
+    const deposit = order.pricing.baseAmount !== undefined ? order.pricing.totalPaidAmount : order.depositAmount;
+    return Math.max(quotation.finalAmount - Math.max(deposit, 0), 0);
   }
 
   if (paymentType === "full") {
@@ -463,13 +464,15 @@ const reserveExternalPayment = async (
       }
 
       const paymentType = getPaymentType(order, input.paymentType);
+      const quotationContext = paymentType === "remaining" ? await validateQuotationPayment(user, input, session) : null;
+      if (quotationContext && quotationContext.order.paymentStatus !== "partially_paid") throw new AppError("Báo giá đã thanh toán.", 409);
       assertAppointmentPaymentReady(order, paymentType);
 
       if (order.inspectionRequired && method === "cash") {
         throw new AppError("Đơn khảo sát phải thanh toán tiền đặt cọc qua PayOS", 400);
       }
 
-      const amount = await getPaymentAmount(order, paymentType);
+      const amount = quotationContext?.amount ?? await getPaymentAmount(order, paymentType);
       assertConfirmedPayment(order, amount, paymentType, expected);
       if (amount <= 0) {
         throw new AppError("Số tiền thanh toán không hợp lệ", 400);
@@ -507,6 +510,9 @@ const reserveExternalPayment = async (
             paymentType,
             status: "pending",
             transactionCode,
+            ...(quotationContext ? { metadata: { quotationId: quotationContext.quotation.id,
+              quotationRevision: quotationContext.quotation.revision ?? 0, quotationFinalAmount: quotationContext.quotation.finalAmount,
+              appliedDepositAmount: quotationContext.appliedDepositAmount, platformCommissionAmount: 0 } } : {}),
             ...(method === "cash"
               ? {
                   metadata: {
@@ -747,6 +753,24 @@ export const createAgentOrderPayment = async (user: RequestUser, input: CreatePa
 };
 
 export const createOrderPayment = async (user: RequestUser, input: CreatePaymentInput) => {
+  if (input.paymentType === "REMAINING") {
+    const session = await mongoose.startSession();
+    try { await withTransactionRetry(session, () => validateQuotationPayment(user, input, session)); }
+    finally { await session.endSession(); }
+    const previous = await Payment.findOne({ orderId: input.orderId, customerId: user.id, paymentType: "remaining",
+      status: { $in: ["pending", "paid"] }, isDeleted: false });
+    if (previous?.status === "paid") return { payment: previous, amount: previous.amount, paymentType: previous.paymentType };
+    if (previous?.method === "payos" && input.method === "WALLET") {
+      const wallet = await Wallet.findOne({ userId: user.id, isDeleted: false }).select("balance");
+      if (!wallet || wallet.balance < input.expectedAmount!) throw new AppError("Số dư Ví Handigo không đủ để thanh toán báo giá.", 400);
+      if (await cancelPendingPayosPayment(previous, user, "Khách hàng đổi phương thức thanh toán báo giá") === "paid") {
+        const paid = await Payment.findById(previous._id);
+        if (!paid || paid.status !== "paid") throw new AppError("Chưa xác minh được thanh toán. Vui lòng kiểm tra lại.", 409);
+        return { payment: paid, amount: paid.amount, paymentType: paid.paymentType };
+      }
+    }
+    return createPayment(user, input);
+  }
   const order = await Order.findById(input.orderId);
   if (!order || order.isDeleted) throw new AppError("Không tìm thấy đơn hàng", 404);
   if (order.customerId.toString() !== user.id) {
@@ -782,6 +806,7 @@ export const createOrderPayment = async (user: RequestUser, input: CreatePayment
 };
 
 export const createPayment = async (user: RequestUser, input: CreatePaymentInput, expected?: ConfirmedPaymentExpectation, previousCashPaymentId?: string) => {
+  if (input.paymentType === "REMAINING" && input.method === "WALLET") return payQuotationByWallet(user, input);
   const order = await Order.findById(input.orderId);
 
   if (!order || order.isDeleted) {
@@ -1057,6 +1082,11 @@ const syncPaidPayosPaymentToOrder = async (
     return false;
   }
 
+  if (payment.paymentType === "remaining") {
+    await settleQuotationPayosPayment(payment, session);
+    return false;
+  }
+
   if (payment.paymentType === "inspection_deposit") {
     if (order.pricing.baseAmount === undefined) order.depositAmount = payment.amount;
     order.depositPaidAt = payment.paidAt;
@@ -1081,7 +1111,6 @@ const syncPaidPayosPaymentToOrder = async (
   }
 
   const shouldDispatch =
-    payment.paymentType !== "remaining" &&
     order.status === "created" &&
     (payment.paymentType === "inspection_deposit" || order.paymentStatus === "paid");
   if (shouldDispatch) {
@@ -1117,12 +1146,19 @@ const refundUnappliedPayosPayment = async (payment: InstanceType<typeof Payment>
     _id: { $ne: payment._id }, orderId: payment.orderId, paymentType: payment.paymentType,
     status: { $in: ["pending", "paid"] }, isDeleted: false,
   }).session(session);
-  if (!order.isDeleted && !replacement) return false;
+  const quotation = payment.paymentType === "remaining" ? await RepairQuotation.findOne({
+    _id: order.currentQuotationId, orderId: order._id, isDeleted: false,
+  }).session(session) : null;
+  const staleQuotation = payment.paymentType === "remaining" && (order.status !== "completed"
+    || !quotation || quotation.directPaymentConfirmedAt
+    || quotation.id !== payment.metadata?.quotationId || (quotation.revision ?? 0) !== payment.metadata?.quotationRevision);
+  if (!order.isDeleted && !replacement && !staleQuotation) return false;
 
   const now = new Date();
   const reason = order.isDeleted
     ? "Hoàn tiền QR đến muộn sau khi đơn chưa thanh toán đã được loại bỏ."
-    : "Hoàn tiền QR cũ vì đơn đã có giao dịch thanh toán thay thế.";
+    : staleQuotation ? "Hoàn tiền QR cũ vì báo giá đã thay đổi hoặc đã thu trực tiếp."
+      : "Hoàn tiền QR cũ vì đơn đã có giao dịch thanh toán thay thế.";
   const wallet = await Wallet.findOneAndUpdate(
     { userId: payment.customerId, isDeleted: false },
     { $inc: { balance: payment.amount }, $setOnInsert: { pendingBalance: 0, currency: "VND" } },

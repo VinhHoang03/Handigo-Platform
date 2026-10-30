@@ -15,6 +15,7 @@ import { withOrderAddress } from "../utils/orderAddress";
 import { OrderStatus } from "../models/orderStatus.model";
 import { ensureAddressCoordinates, createAddress } from "./address.service";
 import { AppError } from "../utils/appError";
+import { withTransactionRetry } from "../utils/transaction";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { getBookingPolicy, getNumberConfigValue } from "./systemConfig.service";
 import { getOrderInterval, lockProviderSchedule, assertProviderSchedule } from "./providerSchedule.service";
@@ -38,7 +39,8 @@ import { MatchingService } from "./matching.service";
 import { emitToUser } from "../sockets/socketServer";
 import { createNotificationRecord } from "./notification.service";
 import { requestProviderReassignment } from "./orderReassignment.service";
-import { hasProviderArrived } from "./refundPolicy.service";
+import { getOrderRescheduleContext } from "./orderReschedule.service";
+import { hasProviderArrived, isQuotationDeclinedReason } from "./refundPolicy.service";
 import {
   markOrderVoucherAsUsed,
   resolveVoucherForAmount,
@@ -956,7 +958,11 @@ export const OrderService = {
       .select("status previousStatus statusVersion changedByRole note createdAt")
       .sort({ createdAt: 1, statusVersion: 1 }).lean();
     const customerCancellationDeadline = await getCustomerCancellationDeadline(order, undefined, statusHistory);
-    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline };
+    const rescheduleContext = await getOrderRescheduleContext(order as unknown as IOrder, {
+      id: userId,
+      role: isCustomer ? "CUSTOMER" : "PROVIDER",
+    });
+    return { ...withOrderAddress(order), matchingSearch, matchingExpiresAt, statusHistory, customerCancellationDeadline, ...rescheduleContext };
   },
 
   async startOrder(orderId: string, providerUserId: string): Promise<IOrder> {
@@ -986,8 +992,8 @@ export const OrderService = {
         if (await Order.exists({ providerId: provider._id, _id: { $ne: order._id }, status: "in_progress", isDeleted: false }).session(session)) throw new AppError("Bạn đang thực hiện một đơn khác.", 409);
         const now = new Date();
         order.schedule = { durationMinutes: duration, bufferMinutes: order.schedule?.bufferMinutes ?? policy.bufferMinutes, travelMinutes: order.schedule?.travelMinutes ?? policy.travelMinutes, expectedStartAt: now, expectedEndAt: new Date(now.getTime() + duration * 60000) };
-        // Đơn giá cố định đã nhận được bắt đầu theo thực tế; đơn khảo sát cần kiểm tra thời lượng báo giá mới.
-        if (order.inspectionRequired) {
+        // Đơn báo giá có lịch hẹn đã nhận được bắt đầu theo thời gian thực tế.
+        if (order.inspectionRequired && !["scheduled", "recurring"].includes(order.orderType)) {
           await assertProviderSchedule(provider._id as Types.ObjectId, [order], session, policy, { checkWorkingCalendar: false });
         }
         order.status = "in_progress";
@@ -1155,20 +1161,15 @@ export const OrderService = {
               409,
             );
           }
-          if (cashPayment.status === "pending") {
-            cashPayment.status = "paid";
-            cashPayment.paidAt = new Date();
-            await cashPayment.save({ session });
+          if (cashPayment.status === "paid") {
+            transactionalOrder.paymentStatus = "paid";
+            await markOrderVoucherAsUsed(transactionalOrder, session);
           }
-          transactionalOrder.paymentStatus = "paid";
-          await markOrderVoucherAsUsed(transactionalOrder, session);
         }
 
-        await recordCompletedOrderSettlement(
-          transactionalOrder,
-          transactionalProvider,
-          session,
-        );
+        if (transactionalOrder.paymentMethod !== "cash" || transactionalOrder.paymentStatus === "paid") {
+          await recordCompletedOrderSettlement(transactionalOrder, transactionalProvider, session);
+        }
 
         transactionalOrder.status = "completed";
         transactionalOrder.completionEvidenceImages = evidenceImages;
@@ -1193,9 +1194,53 @@ export const OrderService = {
     return completedOrder;
   },
 
-  /**
-   * Customer cancel an order (only when status is "created" or "accepted").
-   */
+  /** Thợ xác nhận khoản tiền mặt thực nhận sau khi hoàn thành đơn giá cố định. */
+  async confirmCashPayment(orderId: string, providerUserId: string, expectedAmount: number) {
+    const session = await mongoose.startSession();
+    let result;
+    try {
+      result = await withTransactionRetry(session, async () => {
+        const provider = await Provider.findOne({ userId: providerUserId, verified: true, isDeleted: false }).session(session);
+        if (!provider) throw new AppError("Không tìm thấy hồ sơ thợ đã được duyệt.", 403);
+        await lockProviderSchedule(provider._id as Types.ObjectId, session);
+        const order = await Order.findById(orderId).session(session);
+        if (!order || order.isDeleted) throw new AppError("Đơn hàng không tồn tại.", 404);
+        if (order.providerId?.toString() !== provider.id) throw new AppError("Bạn không phải thợ được phân công cho đơn hàng này.", 403);
+        if (order.inspectionRequired || order.status !== "completed" || order.paymentMethod !== "cash") {
+          throw new AppError("Chỉ xác nhận tiền mặt cho đơn giá cố định đã hoàn thành.", 409);
+        }
+        const payment = await Payment.findOne({ orderId: order._id, customerId: order.customerId,
+          paymentType: "full", method: "cash", status: { $in: ["pending", "paid"] }, isDeleted: false }).session(session);
+        if (!payment || !Number.isSafeInteger(expectedAmount) || expectedAmount < 0
+          || payment.amount !== expectedAmount || order.pricing.totalPaidAmount !== expectedAmount) {
+          throw new AppError("Số tiền thanh toán đã thay đổi. Vui lòng tải lại đơn hàng.", 409);
+        }
+        if (order.paymentStatus === "paid" && payment.status === "paid") return { order, provider, created: false };
+        if (order.paymentStatus !== "unpaid" || payment.status !== "pending") {
+          throw new AppError("Trạng thái thanh toán không còn phù hợp để xác nhận thu tiền mặt.", 409);
+        }
+        payment.status = "paid";
+        payment.paidAt = new Date();
+        payment.metadata = { ...payment.metadata, cashConfirmedBy: providerUserId, cashConfirmedAt: payment.paidAt };
+        await payment.save({ session });
+        order.paymentStatus = "paid";
+        await markOrderVoucherAsUsed(order, session);
+        await recordCompletedOrderSettlement(order, provider, session);
+        await order.save({ session });
+        await earnOrderRewards(order, session);
+        return { order, provider, created: true };
+      });
+    } finally { await session.endSession(); }
+    if (!result) throw new AppError("Chưa hoàn tất xác nhận thanh toán tiền mặt.", 500);
+    if (result.created) {
+      for (const userId of [result.order.customerId.toString(), providerUserId]) {
+        try { emitToUser(userId, "order:updated", { orderId }); } catch { /* Dữ liệu đã được lưu, giao diện có thể tải lại. */ }
+      }
+    }
+    return result.order;
+  },
+
+  /** Khách hoặc thợ yêu cầu hủy đơn theo chính sách hiện tại. */
   async cancelOrder(
     orderId: string,
     userId: string,
@@ -1205,6 +1250,9 @@ export const OrderService = {
   ): Promise<IOrder> {
     if (role === "provider") {
       const order = await Order.findById(orderId).select("status currentQuotationId reassignment customerNoShow providerId arrival");
+      if (order && !hasProviderArrived(order) && isQuotationDeclinedReason(reason)) {
+        throw new AppError("Chỉ được chọn lý do khách không đồng ý báo giá sau khi thợ xác nhận đến nơi.", 409);
+      }
       if (order?.customerNoShow?.status === "pending") {
         throw new AppError("Báo cáo khách không có mặt đang chờ xử lý, chưa thể hủy nhận đơn.", 409);
       }

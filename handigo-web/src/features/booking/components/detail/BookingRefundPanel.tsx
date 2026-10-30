@@ -48,6 +48,7 @@ export const BookingRefundPanel = ({
   return (
     <>
       {["created", "accepted"].includes(order.status) &&
+        !(order.arrival && order.arrival.providerId === order.providerId?._id) &&
         order.reassignment?.status !== "awaiting_customer" && (
         <div className="space-y-2">
           <button
@@ -75,7 +76,8 @@ export const BookingRefundPanel = ({
       )}
 
       {pendingAction && actionDialogConfig &&
-        (!isCancellationAction || ["created", "accepted"].includes(order.status)) && (
+        (!isCancellationAction || (["created", "accepted"].includes(order.status)
+          && !(order.arrival && order.arrival.providerId === order.providerId?._id))) && (
         <Modal
           open
           title={actionDialogConfig.title}
@@ -102,6 +104,7 @@ export const BookingRefundPanel = ({
 
             {isCancellationAction ? (
               <BookingCancellationReasonForm
+                order={order}
                 reason={pendingAction.reason}
                 additionalInfo={pendingAction.additionalInfo}
                 busy={busy}

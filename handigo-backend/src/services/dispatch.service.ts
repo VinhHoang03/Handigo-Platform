@@ -169,7 +169,7 @@ async function getDispatchContext(
 
 async function getTriedProviderState(orderId: Types.ObjectId | string) {
   const order = await Order.findById(orderId)
-    .select("reassignment")
+    .select("reassignment matchingStartedAt")
     .lean();
   const isReassignment = order?.reassignment?.status === "matching";
   const triedAssignments = await OrderAssignment.find({
@@ -177,7 +177,7 @@ async function getTriedProviderState(orderId: Types.ObjectId | string) {
     status: { $in: ["rejected", "timeout"] },
     ...(isReassignment && order.reassignment?.respondedAt
       ? { assignedAt: { $gte: order.reassignment.respondedAt } }
-      : {}),
+      : order?.matchingStartedAt ? { assignedAt: { $gte: order.matchingStartedAt } } : {}),
   })
     .select("providerId")
     .lean();
@@ -318,14 +318,20 @@ async function sendDirectProviderRequest(
   ctx: DispatchContext,
   deadline: Date,
 ) {
-  const assignment = await OrderAssignment.create({
+  const data = {
     orderId: new Types.ObjectId(orderId),
     providerId: candidate.providerId,
-    assignmentType: ctx.scheduledDates?.length ? "appointment" : "direct_request",
-    status: "pending",
+    assignmentType: ctx.scheduledDates?.length ? "appointment" as const : "direct_request" as const,
+    status: "pending" as const,
     assignedAt: new Date(),
     responseDeadline: deadline,
-  });
+  };
+  const assignment = await OrderAssignment.findOneAndUpdate(
+    { orderId: data.orderId, providerId: data.providerId,
+      status: { $in: ["cancelled", "rejected", "timeout"] }, isDeleted: false },
+    { $set: { ...data, respondedAt: null, rejectReason: null } },
+    { new: true, runValidators: true },
+  ) ?? await OrderAssignment.create(data);
 
   const realtimeAssignment = await getAssignmentRealtimePayload(
     assignment._id.toString(),
@@ -561,7 +567,7 @@ export const DispatchService = {
       ctx,
       batchNumber,
       deadline,
-      Boolean(isAutomaticReplacement),
+      true,
     );
   },
 
@@ -784,36 +790,42 @@ export const DispatchService = {
           .lean();
 
         for (const order of activeOrders) {
-          const hasPendingAssignment = await OrderAssignment.exists({
-            orderId: order._id,
-            status: "pending",
-          });
-          if (hasPendingAssignment) continue;
+          try {
+            const hasPendingAssignment = await OrderAssignment.exists({
+              orderId: order._id,
+              status: "pending",
+            });
+            if (hasPendingAssignment) continue;
 
-          if (order.preferredProviderId) {
-            if (!recoverStalledOrders) continue;
-            await Order.updateOne(
-              { _id: order._id, status: "created" },
-              { $set: { matchingStartedAt: null } },
-              { runValidators: true },
+            if (order.preferredProviderId) {
+              if (!recoverStalledOrders) continue;
+              await Order.updateOne(
+                { _id: order._id, status: "created" },
+                { $set: { matchingStartedAt: null } },
+                { runValidators: true },
+              );
+              await DispatchService.dispatchReadyOrder(order._id.toString());
+              continue;
+            }
+
+            const ctx = await getDispatchContext(order._id.toString());
+            if (!ctx) continue;
+
+            const triedState = await getTriedProviderState(order._id);
+            dispatchLogger.debug("Kiểm tra lại đơn đang chờ thợ.", {
+              orderId: order._id.toString(),
+              attemptNumber: triedState.attemptNumber,
+            });
+            await DispatchService.dispatchOrder(
+              order._id.toString(),
+              ctx,
+              triedState.triedProviderIds,
             );
-            await DispatchService.dispatchReadyOrder(order._id.toString());
-            continue;
+          } catch (error: unknown) {
+            dispatchLogger.error("Không thể xử lý đơn trong lượt quét điều phối.", error, {
+              orderId: order._id.toString(),
+            });
           }
-
-          const ctx = await getDispatchContext(order._id.toString());
-          if (!ctx) continue;
-
-          const triedState = await getTriedProviderState(order._id);
-          dispatchLogger.debug("Kiểm tra lại đơn đang chờ thợ.", {
-            orderId: order._id.toString(),
-            attemptNumber: triedState.attemptNumber,
-          });
-          await DispatchService.dispatchOrder(
-            order._id.toString(),
-            ctx,
-            triedState.triedProviderIds,
-          );
         }
       }
     };

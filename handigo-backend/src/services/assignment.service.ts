@@ -609,6 +609,12 @@ export const AssignmentService = {
         if ((quotation.revision ?? 0) !== expectedRevision) {
           throw new AppError("Báo giá đã thay đổi. Vui lòng tải lại và kiểm tra số tiền trước khi xác nhận.", 409);
         }
+        if (order.paymentStatus === "paid" && !quotation.directPaymentConfirmedAt) {
+          throw new AppError("Khách đã thanh toán báo giá qua hệ thống. Không xác nhận thu trực tiếp thêm.", 409);
+        }
+        if (await Payment.exists({ orderId: order._id, paymentType: "remaining", method: "payos", status: "pending", isDeleted: false }).session(session)) {
+          throw new AppError("Đang có QR thanh toán báo giá. Vui lòng để khách kiểm tra thanh toán trước khi xác nhận thu trực tiếp.", 409);
+        }
         const appliedDeposit = order.pricing.baseAmount !== undefined
           ? Math.max(order.pricing.totalPaidAmount, 0)
           : Math.max(order.depositAmount, 0);
@@ -835,7 +841,7 @@ export const AssignmentService = {
         ].join(" "),
         populate: [
           { path: "serviceId", select: "name image coverImage serviceType depositAmount fixedPrice", transform: serviceImageResponse },
-          { path: "addressId", select: "ward province" },
+          { path: "addressId", select: "fullAddress ward province" },
         ],
         transform: withAssignmentArea,
       })

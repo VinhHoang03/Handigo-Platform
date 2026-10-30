@@ -6,6 +6,7 @@ import { ProviderRevenueChart } from "../components/home/ProviderRevenueChart";
 import { ProviderRecentBookings } from "../components/home/ProviderRecentBookings";
 import { ProviderTodaySchedule } from "../components/home/ProviderTodaySchedule";
 import { useProviderHomeData } from "../components/home/useProviderHomeData";
+import { ProviderWorkingAreaSection } from "../components/ProviderWorkingAreaSection";
 
 const ProviderHomePage = () => {
   const user = useAuthStore((state) => state.user);
@@ -55,7 +56,7 @@ const ProviderHomePage = () => {
               isLoadingSchedule={data.isLoadingSchedule}
               scheduleError={data.scheduleError}
             />
-
+            <ProviderWorkingAreaSection />
           </div>
         </section>
       </div>

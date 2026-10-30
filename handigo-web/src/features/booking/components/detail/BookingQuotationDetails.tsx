@@ -13,6 +13,8 @@ type BookingQuotationDetailsProps = {
   remainingQuotationAmount: number;
   onReject: () => void;
   orderStatus?: Order['status'];
+  paidOnline?: boolean;
+  paymentMethod?: string;
 };
 
 /** Hiển thị bản báo giá đã lưu gần nhất của chuyên gia. */
@@ -23,6 +25,8 @@ export const BookingQuotationDetails = ({
   remainingQuotationAmount,
   onReject,
   orderStatus,
+  paidOnline = false,
+  paymentMethod,
 }: BookingQuotationDetailsProps) => (
   <>
     <div className="flex flex-col gap-3 mb-lg sm:flex-row sm:items-center sm:justify-between">
@@ -119,25 +123,32 @@ export const BookingQuotationDetails = ({
               <p className="text-xs font-bold uppercase text-on-surface-variant">
                 {orderStatus === "cancelled" || ["rejected", "cancelled", "expired"].includes(quotation.quotation.status)
                   ? "Không còn khoản phải thu theo báo giá này"
-                  : quotation.quotation.status === "approved" ? "Còn cần thanh toán" : "Phần trực tiếp theo báo giá"}
+                  : "Còn cần thanh toán"}
               </p>
               <p className="mt-1 text-xs text-on-surface-variant">
                 {orderStatus === "cancelled" || ["rejected", "cancelled", "expired"].includes(quotation.quotation.status)
                   ? "Đơn hoặc báo giá đã kết thúc hiệu lực. Liên hệ hỗ trợ nếu cần đối soát khoản đã trả."
-                  : "Thanh toán trực tiếp theo thỏa thuận với chuyên gia"}
+                  : paidOnline ? "Khoản thanh toán đã được chuyển vào ví thợ."
+                    : quotation.quotation.directPaymentConfirmedAt ? "Thợ đã xác nhận nhận tiền trực tiếp."
+                      : orderStatus === "completed" ? "Trả trực tiếp cho thợ hoặc chọn Ví Handigo, QR PayOS tại phần đổi phương thức thanh toán."
+                        : "Thanh toán sau khi thợ hoàn thành dịch vụ."}
               </p>
             </div>
             <p className="shrink-0 text-headline-sm font-bold leading-tight text-primary tabular-nums">
               {formatCurrency(remainingQuotationAmount)}
             </p>
           </div>
-          <div className="flex items-center justify-between gap-4 text-sm">
+          {paidOnline && <div className="flex items-center justify-between gap-4 text-sm text-success">
+            <span>{paymentMethod === "bank" ? "Đã thanh toán qua QR PayOS" : "Đã thanh toán qua Ví Handigo"}</span>
+            <span className="font-bold tabular-nums">{formatCurrency(Math.max(quotation.quotation.finalAmount - appliedDepositAmount, 0))}</span>
+          </div>}
+          {!paidOnline && <div className="flex items-center justify-between gap-4 text-sm">
             <span className="text-on-surface-variant">Thợ xác nhận đã nhận trực tiếp</span>
             <span className="font-bold tabular-nums">
               {quotation.quotation.directPaymentConfirmedAt
                 ? formatCurrency(quotation.quotation.directPaymentConfirmedAmount ?? 0) : "Chưa xác nhận"}
             </span>
-          </div>
+          </div>}
           {quotation.quotation.directPaymentConfirmedAt && (
             <p className="text-xs text-on-surface-variant">
               Đây là ghi nhận của thợ, không phải xác minh giao dịch tiền mặt hoặc chuyển khoản của Handigo.

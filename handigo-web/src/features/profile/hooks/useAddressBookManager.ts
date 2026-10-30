@@ -4,6 +4,7 @@ import {
   createUserAddress,
   deleteUserAddress,
   getUserAddresses,
+  setDefaultUserAddress,
   updateUserAddress,
 } from "@/features/profile/api/addressBook.api";
 import type {
@@ -145,6 +146,32 @@ export function useAddressBookManager({
     }
   };
 
+  const handleSetDefault = async (address: UserAddress) => {
+    if (address.isDefault) return;
+
+    try {
+      setIsSaving(true);
+      const updatedAddress = await setDefaultUserAddress(address.id);
+      setAddresses((currentAddresses) =>
+        currentAddresses.map((item) => ({
+          ...item,
+          isDefault: item.id === updatedAddress.id,
+        })),
+      );
+      setError("");
+      addToast("Đã đặt địa chỉ mặc định.", "success");
+    } catch (updateError) {
+      setError(
+        getErrorMessage(
+          updateError,
+          "Không thể đặt địa chỉ mặc định. Vui lòng thử lại.",
+        ),
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return {
     addresses,
     displayedAddresses,
@@ -159,6 +186,7 @@ export function useAddressBookManager({
     setIsModalOpen,
     setDeleteTarget,
     handleSubmit,
+    handleSetDefault,
     confirmDelete,
   };
 }

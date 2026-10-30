@@ -1,6 +1,5 @@
 import type { Server } from "socket.io";
 import { Conversation } from "../models/conversation.model";
-import { Order } from "../models/order.model";
 import { Provider } from "../models/provider.model";
 import { createLogger } from "../utils/logger";
 
@@ -31,15 +30,13 @@ export const emitToUser = (userId: string, event: string, payload: unknown) => {
 
 export const emitToConversation = (conversationId: string, event: string, payload: unknown) => {
   if (!socketServer) return;
-  // Người tham gia hiện tại của đơn quyết định người nhận, không dùng room của thợ cũ.
+  // Chat thuộc cặp khách–thợ, không đổi người nhận khi đơn được giao cho thợ khác.
   void (async () => {
-    const conversation = await Conversation.findOne({ _id: conversationId, isDeleted: false }).select("orderId").lean();
+    const conversation = await Conversation.findOne({ _id: conversationId, isDeleted: false }).select("customerId providerId").lean();
     if (!conversation) return;
-    const order = await Order.findOne({ _id: conversation.orderId, isDeleted: false }).select("customerId providerId").lean();
-    if (!order?.providerId) return;
-    const provider = await Provider.findOne({ _id: order.providerId, isDeleted: false }).select("userId").lean();
+    const provider = await Provider.findOne({ _id: conversation.providerId, isDeleted: false }).select("userId").lean();
     if (!provider) return;
-    socketServer?.to([`user:${order.customerId}`, `user:${provider.userId}`]).emit(event, payload);
+    socketServer?.to([`user:${conversation.customerId}`, `user:${provider.userId}`]).emit(event, payload);
   })().catch((error) => logger.error("Không thể gửi sự kiện trò chuyện.", error, { conversationId }));
 };
 

@@ -1,4 +1,4 @@
-import { useToastFeedback } from "@/components/common/Toast";
+import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { FileSpreadsheet, ImagePlus, Mic, ScanLine, TriangleAlert, UploadCloud, X } from 'lucide-react';
 import { Modal } from '@/components/common/Modal';
@@ -66,6 +66,7 @@ export function RepairQuotationForm({
   initialQuotation,
   onDiscard,
 }: RepairQuotationFormProps) {
+  const { addToast } = useToast();
   const [inspectionNote, setInspectionNote] = useState(initialQuotation?.quotation.inspectionNote ?? '');
   const estimatedDurationMinutes = initialQuotation?.quotation.estimatedDurationMinutes ?? defaultDurationMinutes ?? 60;
   const [recommendation, setRecommendation] = useState(initialQuotation?.quotation.recommendation ?? '');
@@ -89,6 +90,8 @@ export function RepairQuotationForm({
   const [, setScanImageError] = useToastFeedback<string | null>(null, "error");
   const [, setError] = useToastFeedback<string | null>(null, "error");
   const [discardOpen, setDiscardOpen] = useState(false);
+  const quotationItemsRef = useRef<HTMLDivElement>(null);
+  const pendingQuotationFocus = useRef<string | null | undefined>(undefined);
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const finalAmount = Math.max(subtotal - discountAmount, 0);
@@ -99,6 +102,20 @@ export function RepairQuotationForm({
   useEffect(() => () => {
     if (selectedImageUrl) URL.revokeObjectURL(selectedImageUrl);
   }, [selectedImageUrl]);
+
+  useEffect(() => {
+    if (scanOpen || voiceOpen || pendingQuotationFocus.current === undefined) return;
+    // Đợi modal đóng và trả focus trước khi chuyển tới hạng mục vừa điền.
+    const frame = window.requestAnimationFrame(() => {
+      const rowId = pendingQuotationFocus.current;
+      const target = (rowId ? document.getElementById(`quotation-title-${rowId}`) : null)
+        || quotationItemsRef.current;
+      pendingQuotationFocus.current = undefined;
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [scanOpen, voiceOpen, formRevision]);
 
   useEffect(() => {
     if (!formRevision) return;
@@ -113,6 +130,7 @@ export function RepairQuotationForm({
     if (result.revision !== revision.current || busy || isScanningImage) return false;
     const previous = { items, inspectionNote, recommendation };
     const next = [...items];
+    let firstUpdatedRowId: string | undefined;
     for (const update of result.updates) {
       const target = update.rowId ? next.findIndex((item) => item.rowId === update.rowId) : next.findIndex(isEmptyItem);
       const source = result.sources.find((item) => item.id === update.historyId);
@@ -120,12 +138,18 @@ export function RepairQuotationForm({
         historySource: update.fields.unitPrice !== undefined ? source : next[target].historySource };
       else if (!update.rowId) next.push({ ...newItem(), ...update.fields, historySource: source });
       else return false;
+      firstUpdatedRowId ??= next[target >= 0 ? target : next.length - 1].rowId;
     }
     if (next.length > MAX_QUOTATION_ITEMS) return false;
     changed(); setItems(next);
     if (result.inspectionNote !== undefined) setInspectionNote(result.inspectionNote);
     if (result.recommendation !== undefined) setRecommendation(result.recommendation);
     setUndo({ ...previous, revision: revision.current });
+    if (!result.choiceGroups?.length) {
+      pendingQuotationFocus.current = firstUpdatedRowId ?? null;
+      setVoiceOpen(false);
+      if (result.warnings.length) addToast(result.warnings.join(' '), 'info');
+    }
     return true;
   };
 
@@ -218,16 +242,14 @@ export function RepairQuotationForm({
         return;
       }
 
+      const newItems = acceptedItems.map((item) => ({
+        ...item,
+        rowId: crypto.randomUUID(),
+        description: item.description || "",
+        note: item.note || "",
+      }));
       changed();
-      setItems([
-        ...currentItems,
-        ...acceptedItems.map((item) => ({
-          ...item,
-          rowId: crypto.randomUUID(),
-          description: item.description || "",
-          note: item.note || "",
-        })),
-      ]);
+      setItems([...currentItems, ...newItems]);
       if (acceptedItems.length < scannedItems.length) {
         setError(
           `Đã thêm ${acceptedItems.length} hạng mục. Các hạng mục còn lại vượt quá giới hạn 100 dòng.`,
@@ -235,6 +257,8 @@ export function RepairQuotationForm({
       }
       setScanComplete(true);
       setScanStatus(`Đã thêm ${acceptedItems.length} hạng mục vào danh sách.`);
+      pendingQuotationFocus.current = newItems[0].rowId;
+      setScanOpen(false);
     } catch (scanError) {
       setScanImageError(
         getErrorMessage(
@@ -251,6 +275,10 @@ export function RepairQuotationForm({
     event.preventDefault();
     if (agentBusy || isScanningImage || busy) return;
     const validItems = items.filter((item) => !isEmptyItem(item));
+    if (validItems.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000)) {
+      setError('Số lượng của tất cả hạng mục phải là số nguyên từ 1 đến 1000.');
+      return;
+    }
     if (validItems.some((item) => !item.title.trim() || item.unitPrice <= 0)) {
       setError('Vui lòng hoàn tất tên và đơn giá của tất cả hạng mục, hoặc xóa dòng chưa dùng.');
       return;
@@ -272,9 +300,6 @@ export function RepairQuotationForm({
           item.title.trim().length > MAX_ITEM_TITLE_LENGTH ||
           item.description.trim().length > MAX_GENERAL_TEXT_LENGTH ||
           item.note.trim().length > MAX_ITEM_NOTE_LENGTH ||
-          !Number.isInteger(item.quantity) ||
-          item.quantity < 1 ||
-          item.quantity > 1000 ||
           !Number.isFinite(item.unitPrice) ||
           item.unitPrice < 0,
       )
@@ -353,7 +378,7 @@ export function RepairQuotationForm({
         onClick={() => { if (revision.current !== undo.revision) return; const previous = undo; changed(); setItems(previous.items); setInspectionNote(previous.inspectionNote); setRecommendation(previous.recommendation); }}>Hoàn tác lần điền AI vừa rồi</button>}
 
       <fieldset disabled={busy} className="space-y-md">
-      <div className="space-y-sm">
+      <div ref={quotationItemsRef} tabIndex={-1} className="space-y-sm outline-none">
         <div className="flex flex-wrap items-end justify-between gap-sm">
           <div>
             <h4 className="font-label-md text-on-surface">Hạng mục báo giá</h4>
@@ -434,10 +459,10 @@ export function RepairQuotationForm({
       </dl>
 
       <div className="grid grid-cols-2 items-center gap-sm sm:flex sm:flex-wrap">
-        <button type="button" onClick={onCancel} disabled={inputBusy}
+        {!initialQuotation && <button type="button" onClick={onCancel} disabled={inputBusy}
           className="col-start-1 row-start-2 flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-error hover:bg-error/5 disabled:opacity-50 sm:mr-auto">
           <TriangleAlert size={18} aria-hidden="true" />Hủy đơn
-        </button>
+        </button>}
         {onDiscard && <button type="button" disabled={inputBusy}
           onClick={() => formRevision ? setDiscardOpen(true) : onDiscard()} className="btn-secondary col-start-2 row-start-2">Đóng chỉnh sửa</button>}
         <button

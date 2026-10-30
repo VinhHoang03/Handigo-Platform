@@ -1,4 +1,5 @@
 import type { Order, OrderQuotation } from "@/types/booking";
+import { isQuotationPaidOnline } from "@/utils/quotationPayment";
 import { BookingQuotationDetails } from "./BookingQuotationDetails";
 import { BookingQuotationPending } from "./BookingQuotationPending";
 
@@ -36,6 +37,8 @@ export const BookingQuotationPanel = ({
         <BookingQuotationDetails
           quotation={quotation}
           orderStatus={order.status}
+          paidOnline={isQuotationPaidOnline(order, quotation.quotation)}
+          paymentMethod={order.paymentMethod}
           busy={busy}
           appliedDepositAmount={appliedDepositAmount}
           remainingQuotationAmount={remainingQuotationAmount}
