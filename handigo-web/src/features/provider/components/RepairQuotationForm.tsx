@@ -459,10 +459,10 @@ export function RepairQuotationForm({
       </dl>
 
       <div className="grid grid-cols-2 items-center gap-sm sm:flex sm:flex-wrap">
-        <button type="button" onClick={onCancel} disabled={inputBusy}
+        {!initialQuotation && <button type="button" onClick={onCancel} disabled={inputBusy}
           className="col-start-1 row-start-2 flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-error hover:bg-error/5 disabled:opacity-50 sm:mr-auto">
           <TriangleAlert size={18} aria-hidden="true" />Hủy đơn
-        </button>
+        </button>}
         {onDiscard && <button type="button" disabled={inputBusy}
           onClick={() => formRevision ? setDiscardOpen(true) : onDiscard()} className="btn-secondary col-start-2 row-start-2">Đóng chỉnh sửa</button>}
         <button

@@ -7,6 +7,7 @@ import {
   getServiceHistory,
   checkAddressUpdate,
   confirmAddressUpdate,
+  setDefaultAddress,
 } from "../controllers/address.controller";
 
 import { authMiddleware } from "../middlewares/auth.middleware";
@@ -43,6 +44,13 @@ router.put(
   validate(addressIdParamSchema, "params"),
   validate(updateAddressSchema),
   updateAddress
+);
+
+router.patch(
+  "/:id/default",
+  authMiddleware,
+  validate(addressIdParamSchema, "params"),
+  setDefaultAddress,
 );
 
 router.post(

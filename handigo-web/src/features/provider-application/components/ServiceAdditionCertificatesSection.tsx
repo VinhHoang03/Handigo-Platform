@@ -31,7 +31,7 @@ export function ServiceAdditionCertificatesSection({
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-bold text-on-surface">Chứng chỉ mới</h3>
+          <h3 className="font-bold text-on-surface">Chứng chỉ mới (không bắt buộc)</h3>
           <p className="text-sm text-on-surface-variant">
             Đã thêm {certificates.length} chứng chỉ vào đơn.
           </p>

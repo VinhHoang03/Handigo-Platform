@@ -1,4 +1,5 @@
 import { Banknote, Landmark, Wallet, type LucideIcon } from "lucide-react";
+import type { Order } from '@/types/booking';
 export type PendingAction = {
   type: "rejectQuotation" | "cancelOrder" | "cancelSeries";
   reason: string;
@@ -38,10 +39,14 @@ export const customerCancellationReasons = [
   "Không còn nhu cầu sử dụng dịch vụ",
   "Đặt nhầm dịch vụ hoặc thông tin",
   "Thời gian thực hiện không còn phù hợp",
-  "Không liên hệ được với chuyên gia",
   "Chi phí không phù hợp",
   "Lý do khác",
 ];
+
+export const getCustomerCancellationReasons = (order: Order) => customerCancellationReasons.filter((reason) =>
+  (reason !== 'Thời gian thực hiện không còn phù hợp' || order.orderType !== 'normal')
+  && (reason !== 'Chi phí không phù hợp' || !order.inspectionRequired || Boolean(order.currentQuotationId)),
+);
 
 export type ActionDialogConfig = {
   title: string;

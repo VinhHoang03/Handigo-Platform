@@ -3,6 +3,7 @@ export const defaultBookingPolicy = {
   inspectionImmediateFee: 30000, providerFeePercent: 80, minAdvanceMinutes: 240,
   defaultDurationMinutes: 60, inspectionDurationMinutes: 60, bufferMinutes: 15,
   travelMinutes: 30, paymentHoldMinutes: 15, workdayStart: 0, workdayEnd: 1440,
+  rescheduleResponseMinutes: 30, providerMonthlyRescheduleWarningThreshold: 3,
   services: {} as Record<string, { durationMinutes: number; inspectionMinutes?: number }>,
   options: {} as Record<string, { minutes: number; mode: 'replace' | 'add' }>,
   providerCalendars: {} as Record<string, {
@@ -18,6 +19,8 @@ export const bookingPolicyFields = [
   ['bufferMinutes', 'Dự phòng mỗi đơn (phút)', 0, 1440],
   ['travelMinutes', 'Di chuyển giữa hai đơn (phút)', 0, 1440],
   ['paymentHoldMinutes', 'Giữ lịch chờ thanh toán (phút)', 1, 1440],
+  ['rescheduleResponseMinutes', 'Thời hạn phản hồi dời lịch (phút)', 1, 1440],
+  ['providerMonthlyRescheduleWarningThreshold', 'Ngưỡng cảnh báo dời lịch của chuyên gia mỗi tháng', 1, 100],
   ['workdayStart', 'Bắt đầu ca mặc định (phút từ 00:00)', 0, 1439],
   ['workdayEnd', 'Kết thúc ca mặc định (phút từ 00:00)', 1, 1440],
 ] as const;

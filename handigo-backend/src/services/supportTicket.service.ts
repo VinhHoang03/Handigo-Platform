@@ -1,3 +1,5 @@
+import { createSupportTicketSchema } from "../validations/supportTicket.validator";
+import { SUPPORT_CATEGORY_LABELS, SUPPORT_CATEGORY_PRIORITIES } from "./supportTicketPolicy";
 import { Types } from "mongoose";
 import { AppError } from "../utils/appError";
 import { Order } from "../models/order.model";
@@ -168,9 +170,16 @@ const normalizeAttachments = (attachments: AttachmentPayload[] = []) =>
     uploadedAt: new Date(),
   }));
 
-const populateTicket = () => [
+const populateTicket = (includeParticipants = false) => [
   { path: "requesterId", select: "fullName email avatar role" },
-  { path: "orderId", select: "orderCode status paymentStatus" },
+  includeParticipants ? {
+    path: "orderId", select: "orderCode status paymentStatus customerId providerId",
+    populate: [
+      { path: "customerId", select: "fullName email role", match: { isDeleted: false } },
+      { path: "providerId", select: "userId", match: { isDeleted: false },
+        populate: { path: "userId", select: "fullName email role", match: { isDeleted: false } } },
+    ],
+  } : { path: "orderId", select: "orderCode status paymentStatus" },
   { path: "assignedAdminId", select: "fullName email" },
   { path: "resolvedBy", select: "fullName email" },
   { path: "responses.responderId", select: "fullName email avatar role" },
@@ -210,7 +219,7 @@ export const createSupportTicket = async (
     orderId?: string | null;
     category: SupportTicketCategory;
     priority?: SupportTicketPriority;
-    subject: string;
+    subject?: string;
     description: string;
     attachments?: AttachmentPayload[];
   },
@@ -221,14 +230,17 @@ export const createSupportTicket = async (
     throw new AppError("Chỉ khách hàng và thợ được tạo yêu cầu hỗ trợ", 403);
   }
 
+  const parsed = createSupportTicketSchema.safeParse(payload);
+  if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+  payload = parsed.data;
   const orderId = await assertOrderVisibleToRequester(requesterId, role, payload.orderId);
   const ticket = await SupportTicket.create({
     ...(resourceId ? { _id: resourceId } : {}),
     requesterId,
     orderId,
     category: payload.category,
-    priority: payload.priority ?? "MEDIUM",
-    subject: payload.subject,
+    priority: SUPPORT_CATEGORY_PRIORITIES[payload.category],
+    subject: payload.subject || SUPPORT_CATEGORY_LABELS[payload.category],
     description: payload.description,
     attachments: normalizeAttachments(payload.attachments),
   });
@@ -375,7 +387,7 @@ export const getAdminSupportTickets = async (query: Query = {}) => {
 export const getAdminSupportTicketById = async (ticketId: string) => {
   assertObjectId(ticketId, "Support ticket id");
   const ticket = await SupportTicket.findOne({ _id: ticketId, isDeleted: false }).populate(
-    populateTicket(),
+    populateTicket(true),
   );
   if (!ticket) throw new AppError("Không tìm thấy yêu cầu hỗ trợ", 404);
   return ticket;

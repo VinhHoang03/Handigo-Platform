@@ -1,3 +1,4 @@
+import { NewsArticleContent } from "../components/NewsArticleContent";
 import { Link, useParams } from "react-router-dom";
 import { Skeleton, SkeletonText } from "@/components/common/Skeleton";
 import { PublicContentLayout } from "../components/PublicContentLayout";
@@ -89,42 +90,11 @@ export default function NewsDetailPage() {
           className="mt-10 h-[280px] w-full rounded-3xl object-cover shadow-lg sm:h-[460px]"
         />
 
-        <div className="mx-auto mt-10 max-w-3xl space-y-6 text-base leading-8 text-on-surface-variant">
+        <div className="mx-auto mt-10 max-w-3xl space-y-6 break-words whitespace-pre-wrap text-base leading-8 text-on-surface-variant">
           <p className="text-xl font-medium leading-8 text-on-surface">
             {article.excerpt}
           </p>
-          {article.content.map((block, index) => {
-            const key = `${block.type}-${index}`;
-            if (block.type === "heading") {
-              return (
-                <h2 key={key} className="pt-4 text-3xl font-bold text-primary">
-                  {block.text}
-                </h2>
-              );
-            }
-            if (block.type === "quote") {
-              return (
-                <blockquote
-                  key={key}
-                  className="rounded-2xl border-l-4 border-secondary bg-surface-container-low p-6 font-medium text-on-surface"
-                >
-                  {block.text}
-                </blockquote>
-              );
-            }
-            if (block.type === "list") {
-              return (
-                <ul key={key} className="space-y-2 pl-5">
-                  {block.items.map((item) => (
-                    <li key={item} className="list-disc pl-1">
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              );
-            }
-            return <p key={key}>{block.text}</p>;
-          })}
+          <NewsArticleContent content={article.content} richContent={article.richContent} />
         </div>
       </article>
 

@@ -136,7 +136,7 @@ test('Báo giá trả bằng ví: cả khách và thợ hiển thị đã trả,
   const { BookingQuotationDetails } = load(path.join(sourceRoot, 'features/booking/components/detail/BookingQuotationDetails.tsx'));
   const customer = renderToStaticMarkup(React.createElement(BookingQuotationDetails, {
     quotation, busy: false, appliedDepositAmount: 30000, remainingQuotationAmount: 0,
-    onReject() {}, orderStatus: 'completed', paidByWallet: true,
+    onReject() {}, orderStatus: 'completed', paidOnline: true, paymentMethod: 'wallet',
   }));
   assert.match(customer, /Đã thanh toán qua Ví Handigo/);
   assert.doesNotMatch(customer, /Thợ xác nhận đã nhận trực tiếp|Chưa xác nhận/);
@@ -144,4 +144,18 @@ test('Báo giá trả bằng ví: cả khách và thợ hiển thị đã trả,
   const summary = renderToStaticMarkup(React.createElement(BookingSuccessPaymentSummary, { order, quotation, result: 'paid' }));
   assert.doesNotMatch(summary, /Chưa xác nhận/);
   assert.match(summary, /120.000/);
+});
+
+test('Báo giá PayOS: hiển thị phương thức QR và không yêu cầu thu trực tiếp', () => {
+  const order = makeOrder({ status: 'completed', inspectionRequired: true, paymentMethod: 'bank', paymentStatus: 'paid',
+    serviceId: { serviceType: 'variable_price' }, depositPaidAt: '2026-10-15T01:00:00Z' });
+  order.pricing.totalPaidAmount = 30000;
+  const quotation = { quotation: { finalAmount: 150000, status: 'saved' }, items: [] };
+  const provider = render(order, quotation, 'Đã thanh toán');
+  assert.equal(value(provider, 'Phương thức thanh toán'), 'QRPayOS');
+  assert.equal(value(provider, 'Đã thanh toán qua QR PayOS'), '120.000₫');
+  assert.doesNotMatch(provider, /Còn cần thanh toán|Trạng thái tiền cọc/);
+  const { BookingSuccessPaymentSummary } = load(path.join(sourceRoot, 'features/booking/components/BookingSuccessPaymentSummary.tsx'));
+  const summary = renderToStaticMarkup(React.createElement(BookingSuccessPaymentSummary, { order, quotation, result: 'paid' }));
+  assert.doesNotMatch(summary, /Chưa xác nhận/);
 });

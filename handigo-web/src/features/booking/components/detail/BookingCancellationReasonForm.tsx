@@ -1,6 +1,8 @@
-import { customerCancellationReasons } from "./bookingDetailConstants";
+import { getCustomerCancellationReasons } from "./bookingDetailConstants";
+import type { Order } from '@/types/booking';
 
 type BookingCancellationReasonFormProps = {
+  order: Order;
   reason: string;
   additionalInfo?: string;
   busy: boolean;
@@ -8,8 +10,9 @@ type BookingCancellationReasonFormProps = {
   onUpdateAdditionalInfo: (info: string) => void;
 };
 
-/** Chọn lý do hủy đơn (danh sách cố định) + ghi chú thêm — dùng trong modal hủy đơn/chuỗi lịch. */
+/** Chọn lý do phù hợp với loại đơn và trạng thái hiện tại, kèm ghi chú thêm. */
 export const BookingCancellationReasonForm = ({
+  order,
   reason,
   additionalInfo,
   busy,
@@ -21,7 +24,7 @@ export const BookingCancellationReasonForm = ({
       <legend className="mb-2 text-label-sm font-bold uppercase text-on-surface-variant">
         Chọn lý do hủy
       </legend>
-      {customerCancellationReasons.map((cancellationReason) => (
+      {getCustomerCancellationReasons(order).map((cancellationReason) => (
         <label
           key={cancellationReason}
           className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition ${reason === cancellationReason ? "border-error/30 bg-error/8" : "border-outline-variant/50 hover:bg-surface-container-low"}`}

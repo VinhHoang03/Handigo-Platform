@@ -1,6 +1,7 @@
 import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { RebookButton } from "../components/RebookButton";
 import {
   BookingHistoryCard,
   BookingPageHeader,
@@ -28,6 +29,8 @@ const filters = [
 ];
 
 const BookingHistoryPage = () => {
+  const [searchParams] = useSearchParams();
+  const quickRebookOrderId = searchParams.get('quickRebook') || '';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>("", "error");
@@ -131,6 +134,9 @@ const BookingHistoryPage = () => {
 
   return (
     <BookingShell>
+      {/^[a-f\d]{24}$/i.test(quickRebookOrderId) && (
+        <RebookButton key={quickRebookOrderId} orderId={quickRebookOrderId} restoreOnly />
+      )}
       <BookingPageHeader
         title="Lịch sử đặt lịch"
         description="Quản lý và theo dõi các dịch vụ bạn đã đặt trên HandiGo."

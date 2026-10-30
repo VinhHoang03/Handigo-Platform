@@ -13,6 +13,7 @@ import {
 } from "./serviceAdditionApplicationHelpers";
 import { useServiceAdditionCategories } from "./useServiceAdditionCategories";
 import { useServiceAdditionCertificates } from "./useServiceAdditionCertificates";
+import { validateDateFields } from '../utils/providerApplicationValidation';
 
 interface Props {
   open: boolean;
@@ -69,8 +70,14 @@ export function ServiceAdditionApplicationDialog({
   };
 
   const submit = async () => {
-    if (!selectedServiceIds.length || !certificates.length) {
-      setError("Vui lòng chọn dịch vụ mới và cung cấp ít nhất một chứng chỉ.");
+    if (!selectedServiceIds.length) {
+      setError("Vui lòng chọn ít nhất một dịch vụ mới.");
+      return;
+    }
+    const invalidDate = certificates.map((certificate) => validateDateFields(certificate.issuedAt, certificate.expiresAt))
+      .find((errors) => errors.issuedAt || errors.expiresAt);
+    if (invalidDate) {
+      setError(invalidDate.issuedAt || invalidDate.expiresAt || 'Ngày tháng chứng chỉ không hợp lệ.');
       return;
     }
 
@@ -114,7 +121,7 @@ export function ServiceAdditionApplicationDialog({
         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
           <p className="font-bold text-on-surface">Dịch vụ chỉ được thêm sau khi admin phê duyệt</p>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Chỉ các dịch vụ chưa có trong hồ sơ được hiển thị. Chứng chỉ mới sẽ được xét duyệt cùng đơn này.
+            Chỉ các dịch vụ chưa có trong hồ sơ được hiển thị. Bạn có thể bổ sung chứng chỉ để admin xét duyệt cùng đơn.
           </p>
         </div>
 
@@ -173,7 +180,7 @@ export function ServiceAdditionApplicationDialog({
           <button
             type="button"
             className="btn-primary"
-            disabled={isSubmitting || !selectedServiceIds.length || !certificates.length}
+            disabled={isSubmitting || !selectedServiceIds.length}
             onClick={() => void submit()}
           >
             {isSubmitting ? "Đang gửi..." : application ? "Gửi lại đơn" : "Gửi đơn xét duyệt"}

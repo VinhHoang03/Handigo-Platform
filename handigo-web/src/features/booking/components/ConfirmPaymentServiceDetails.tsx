@@ -1,19 +1,31 @@
 import type { Address, Service, ServiceOption } from '../../../types/booking';
+import type { ReactNode } from 'react';
 import { isAirConditionerCleaning } from '@/utils/airConditionerCleaning';
+import { normalizeAddressPart } from '@/features/profile/utils/addressLineParsing.utils';
+import { AddressLabelIcon } from '@/features/profile/components/AddressLabelIcon';
 import { getOptionPrice } from './useConfirmPaymentFlow';
-import { Calendar, CalendarCheck, MapPin, ReceiptText, SprayCan, UserSearch, type LucideIcon } from "lucide-react";
+import { Calendar, CalendarCheck, ReceiptText, SprayCan, UserSearch } from "lucide-react";
 
 const formatAddress = (address: Address | null) => {
   if (!address) return '';
-  return [
-    address.detailAddress,
-    address.ward,
+  const parts: string[] = [];
+
+  [
+    address.fullAddress || address.detailAddress,
     address.district,
+    address.ward,
     address.province,
   ]
     .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(', ');
+    .filter((part): part is string => Boolean(part))
+    .forEach((part) => {
+      const currentAddress = normalizeAddressPart(parts.join(', '));
+      if (!currentAddress.includes(normalizeAddressPart(part))) {
+        parts.push(part);
+      }
+    });
+
+  return parts.join(', ');
 };
 
 interface ConfirmPaymentServiceDetailsProps {
@@ -34,20 +46,27 @@ export const ConfirmPaymentServiceDetails = ({
   preferredProviderId, preferredProviderName, selectedOptions, selectedOptionQuantities, uniformQuantity = 1,
 }: ConfirmPaymentServiceDetailsProps) => {
   const addressText = formatAddress(address);
-  const detailItems: Array<[LucideIcon, string, string]> = [
-    [SprayCan, 'Dịch vụ', service?.name || '…'],
+  const addressLabel = address?.addressLabel?.trim() || address?.label?.trim();
+  const detailItems: Array<[ReactNode, string, string, boolean?, boolean?]> = [
+    [<SprayCan aria-hidden="true" size={20} />, 'Dịch vụ', service?.name || '…'],
     ...(isAirConditionerCleaning(service)
-      ? [[SprayCan, 'Số lượng', `${uniformQuantity} máy`] as [LucideIcon, string, string]] : []),
+      ? [[<SprayCan aria-hidden="true" size={20} />, 'Số lượng', `${uniformQuantity} máy`] as [ReactNode, string, string]] : []),
     [
-      Calendar,
+      <Calendar aria-hidden="true" size={20} />,
       'Thời gian',
       scheduledAt
         ? new Date(scheduledAt).toLocaleString('vi-VN')
         : 'Chưa chọn thời gian',
     ],
-    ...(addressText ? [[MapPin, 'Địa chỉ', addressText] as [LucideIcon, string, string]] : []),
+    ...(addressText ? [[
+      <AddressLabelIcon label={addressLabel} aria-hidden="true" size={20} />,
+      'Địa chỉ',
+      addressText,
+      true,
+      true,
+    ] as [ReactNode, string, string, boolean, boolean]] : []),
     [
-      UserSearch,
+      <UserSearch aria-hidden="true" size={20} />,
       isAppointment && preferredProviderId ? 'Chuyên gia đặt trước' : 'Điều phối chuyên gia',
       preferredProviderId
         ? isAppointment
@@ -76,19 +95,21 @@ export const ConfirmPaymentServiceDetails = ({
           Chi tiết dịch vụ
         </h2>
         <div className="grid md:grid-cols-2 gap-5">
-          {detailItems.map(([Icon, label, value], index) => (
+          {detailItems.map(([icon, label, value, hideLabel, wide]) => (
             <div
               key={label}
-              className={`flex items-start gap-3 ${index === 2 ? 'md:col-span-2' : ''}`}
+              className={`flex min-w-0 items-start gap-3 ${wide ? 'md:col-span-2' : ''}`}
             >
               <div className="bg-primary-fixed-dim/30 p-2.5 rounded-lg text-primary">
-                <Icon aria-hidden="true" size={20} />
+                {icon}
               </div>
-              <div>
-                <p className="font-label-md text-label-md text-on-surface-variant">
-                  {label}
-                </p>
-                <p className="font-body-md text-body-md font-semibold">
+              <div className="min-w-0">
+                {!hideLabel && (
+                  <p className="font-label-md text-label-md text-on-surface-variant">
+                    {label}
+                  </p>
+                )}
+                <p className="break-words font-body-md text-body-md font-semibold leading-6">
                   {value}
                 </p>
               </div>
@@ -99,7 +120,7 @@ export const ConfirmPaymentServiceDetails = ({
         {selectedOptions.length > 0 && (
           <div className="mt-5 pt-5 border-t border-outline-variant">
             <p className="font-label-md text-on-surface-variant mb-3">
-              Dịch vụ bổ sung:
+              Tùy chọn dịch vụ:
             </p>
             <div className="flex flex-wrap gap-2">
               {selectedOptions.map((opt) => (

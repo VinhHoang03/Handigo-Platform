@@ -8,6 +8,7 @@ import type { OrderAssignment, QuotationDetail } from '../types/providerOrder.ty
 import { useToast } from '@/components/common/Toast';
 import { getCurrentCoordinates } from './useProviderAvailability';
 import { providerDashboardApi } from '../api/providerDashboard.api';
+import { getProviderCancellationReasons } from '../utils/providerOrder.utils';
 
 /** State, tải dữ liệu và các thao tác của trang chi tiết đơn dịch vụ (thợ). */
 export function useProviderOrderDetail(orderId: string | undefined, navigate: NavigateFunction) {
@@ -234,10 +235,18 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     }, 'Không thể xác nhận thanh toán báo giá.', true, 'Đã xác nhận nhận đủ tiền sửa chữa theo báo giá.');
   };
 
+  const handleConfirmCashPayment = async (expectedAmount: number) => {
+    if (!order || busy) return false;
+    return runAction(async () => {
+      await providerOrderApi.confirmCashPayment(order._id, expectedAmount);
+    }, 'Không thể xác nhận thanh toán tiền mặt.', true, 'Đã xác nhận nhận đủ tiền mặt từ khách.');
+  };
+
   const requestCancelConfirmation = () => {
+    if (!order || order.currentQuotationId || quotation || order.status !== 'accepted') return;
     const reason = cancelReason.trim();
     const explanation = cancelExplanation.trim();
-    if (!reason) {
+    if (!getProviderCancellationReasons(order).includes(reason)) {
       setCancelError('Vui lòng chọn lý do hủy đơn.');
       return;
     }
@@ -254,7 +263,8 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
   };
 
   const handleCancel = async () => {
-    if (!order) return;
+    if (!order || order.currentQuotationId || quotation || order.status !== 'accepted'
+      || !getProviderCancellationReasons(order).includes(cancelReason.trim())) return;
     const reason = cancelReason.trim();
     const explanation = cancelExplanation.trim();
     const cancellationReason = explanation ? `${reason}: ${explanation}` : reason;
@@ -308,6 +318,7 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
     handleNoShow,
     handleComplete,
     handleConfirmQuotationPayment,
+    handleConfirmCashPayment,
     requestCancelConfirmation,
     handleCancel,
     handleCreateQuotation,

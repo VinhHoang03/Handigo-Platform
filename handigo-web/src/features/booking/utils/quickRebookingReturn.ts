@@ -3,14 +3,24 @@ import { useBookingStore } from '../hooks/useBookingStore';
 import { QUICK_REBOOKING_RETURN_KEY } from './bookingSessionStorage';
 import { prepareRebooking, type PreparedRebooking, type RebookingDraft } from './rebooking';
 
-export const quickRebookingReturnPath = (orderId: string) =>
-  `/customer/services?quickRebook=${encodeURIComponent(orderId)}`;
+export const quickRebookingReturnPath = (orderId: string, sourcePath?: string) => {
+  let savedPath: string | undefined;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(QUICK_REBOOKING_RETURN_KEY) ?? 'null');
+    if (saved?.orderId === orderId && typeof saved.returnPath === 'string') savedPath = saved.returnPath;
+  } catch { /* Bỏ qua ngữ cảnh quay về không hợp lệ. */ }
+  const candidate = (sourcePath ?? savedPath ?? window.location?.pathname ?? '').split('?')[0];
+  const path = candidate === '/customer/bookings' || candidate === `/customer/bookings/${orderId}`
+    || /^\/customer\/services\/[a-f\d]{24}$/i.test(candidate) ? candidate : '/customer/bookings';
+  return `${path}?quickRebook=${encodeURIComponent(orderId)}`;
+};
 
-export const rememberQuickRebookingReturn = (orderId: string) => {
+export const rememberQuickRebookingReturn = (orderId: string, sourcePath?: string) => {
   const user = useAuthStore.getState().user;
-  sessionStorage.setItem(QUICK_REBOOKING_RETURN_KEY, JSON.stringify({ orderId, userId: user?.id ?? user?._id }));
-  // Cả nút quay lại trình duyệt cũng về danh sách dịch vụ và mở lại form.
-  window.history.replaceState(window.history.state, '', quickRebookingReturnPath(orderId));
+  const returnPath = quickRebookingReturnPath(orderId, sourcePath);
+  sessionStorage.setItem(QUICK_REBOOKING_RETURN_KEY, JSON.stringify({ orderId, userId: user?.id ?? user?._id, returnPath }));
+  // Cả nút quay lại trình duyệt cũng về trang đã bắt đầu đặt và mở lại form.
+  window.history.replaceState(window.history.state, '', returnPath);
 };
 
 /** Chỉ phục hồi nháp trong cùng tài khoản và đúng đơn gốc, không dựa vào query PayOS. */
@@ -48,5 +58,5 @@ export const restoreQuickRebookingDraft = (prepared: PreparedRebooking, saved: R
   }, prepared.service, prepared.options, prepared.addresses);
   return { ...draft, orderType: saved.orderType, scheduledAt: saved.scheduledAt,
     preferredProviderId: saved.preferredProviderId, preferredProviderName: saved.preferredProviderName,
-    problemDescription: saved.problemDescription };
+    problemDescription: saved.problemDescription, voucherCode: saved.voucherCode };
 };

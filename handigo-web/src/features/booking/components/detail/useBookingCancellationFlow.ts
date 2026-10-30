@@ -4,7 +4,7 @@ import { useToast } from "@/components/common/Toast";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { getErrorMessage } from "@/utils/apiError";
 import type { CancellationPreview, Order, OrderQuotation } from "@/types/booking";
-import type { PendingAction } from "./bookingDetailConstants";
+import { getCustomerCancellationReasons, type PendingAction } from "./bookingDetailConstants";
 
 /** Giữ số tiền khách đã xem để đối chiếu và yêu cầu xác nhận lại khi thay đổi. */
 export const useBookingCancellationFlow = (
@@ -24,7 +24,7 @@ export const useBookingCancellationFlow = (
   const hasAcceptedProvider = order?.status === "accepted";
   const cancellationDeadline = order?.customerCancellationDeadline
     ? Date.parse(order.customerCancellationDeadline) : NaN;
-  const cancellationLocked = order?.status === "in_progress" || (hasAcceptedProvider
+  const cancellationLocked = order?.status === "in_progress" || Boolean(order?.arrival && order.arrival.providerId === order.providerId?._id) || (hasAcceptedProvider
     && (!Number.isFinite(cancellationDeadline) || cancellationNow > cancellationDeadline));
 
   useEffect(() => {
@@ -128,14 +128,16 @@ export const useBookingCancellationFlow = (
     if (isCancellationAction && cancellationLocked) {
       addToast(order?.status === "in_progress"
         ? "Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng."
-        : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn.", "error");
+        : order?.arrival && order.arrival.providerId === order.providerId?._id
+          ? "Thợ đã xác nhận đến nơi, bạn không thể hủy đơn hàng."
+          : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn.", "error");
       return;
     }
     if (isCancellationAction && (!cancellationPreview || !cancellationPreview.canCancel)) {
       addToast("Vui lòng tải lại chính sách hoàn tiền trước khi xác nhận hủy.", "error");
       return;
     }
-    if (!reason) {
+    if (!reason || (isCancellationAction && order && !getCustomerCancellationReasons(order).includes(reason))) {
       addToast(isCancellationAction ? "Vui lòng chọn lý do hủy đơn." : "Vui lòng nhập lý do.", "error");
       setPendingAction({
         ...pendingAction,

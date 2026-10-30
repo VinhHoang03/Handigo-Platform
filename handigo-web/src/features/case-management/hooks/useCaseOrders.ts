@@ -4,7 +4,7 @@ import { providerOrderApi } from '@/features/provider/api/providerOrder.api';
 import type { Order } from '@/types/booking';
 import { getErrorMessage } from '@/utils/apiError';
 
-export function useCaseOrders(role: 'CUSTOMER' | 'PROVIDER', initialOrderId?: string) {
+export function useCaseOrders(role: 'CUSTOMER' | 'PROVIDER', initialOrderId?: string, enabled = true) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,7 +15,7 @@ export function useCaseOrders(role: 'CUSTOMER' | 'PROVIDER', initialOrderId?: st
   const invalidate = useCallback(() => { revision.current++; }, []);
 
   const load = useCallback(async (nextPage = 1) => {
-    if (pending.current) return;
+    if (!enabled || pending.current) return;
     pending.current = true;
     const request = ++revision.current;
     setLoading(true);
@@ -38,13 +38,14 @@ export function useCaseOrders(role: 'CUSTOMER' | 'PROVIDER', initialOrderId?: st
     } finally {
       if (request === revision.current) { pending.current = false; setLoading(false); }
     }
-  }, [role, initialOrderId]);
+  }, [role, initialOrderId, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     pending.current = false;
     const timer = window.setTimeout(() => { setOrders([]); setPage(0); void load(); }, 0);
     return () => { window.clearTimeout(timer); invalidate(); };
-  }, [load, invalidate]);
+  }, [load, invalidate, enabled]);
 
-  return { orders, loading, error, hasMore, loadMore: () => load(page + 1) };
+  return { orders, loading: enabled && loading, error, hasMore, loadMore: () => load(page + 1) };
 }

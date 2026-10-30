@@ -4,16 +4,21 @@ import { bookingVoucherApi } from '@/features/booking/api/voucher.api';
 import type { AvailableVoucher } from '../types/voucher.types';
 
 /** State + validation của mã voucher ở bước xác nhận thanh toán — tách khỏi hook chính cho gọn. */
-export const useConfirmPaymentVoucher = (orderAmount: number, inspectionRequired: boolean, enabled = true, initialCode = '') => {
+export const useConfirmPaymentVoucher = (orderAmount: number | undefined, inspectionRequired: boolean, enabled = true, initialCode = '') => {
   const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
   const [voucherCode, setVoucherCode] = useState(initialCode);
   const [appliedVoucher, setAppliedVoucher] = useState<AvailableVoucher | null>(null);
   const [voucherError, setVoucherError] = useToastFeedback<string>('', "error");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!enabled) return;
     let isMounted = true;
     const resetTimer = window.setTimeout(() => {
+      setLoading(true);
+      setLoadError('');
       setAppliedVoucher(null);
       setVoucherCode(initialCode);
       setVoucherError('');
@@ -25,22 +30,26 @@ export const useConfirmPaymentVoucher = (orderAmount: number, inspectionRequired
             (voucher.applicableOrderType === 'variable_price') === inspectionRequired);
           setAvailableVouchers(available);
           const restored = available.find((voucher) => voucher.code.toUpperCase() === initialCode.toUpperCase());
-          if (restored && orderAmount >= (restored.minOrderAmount ?? 0)) {
+          if (restored && (orderAmount === undefined || orderAmount >= (restored.minOrderAmount ?? 0))) {
             setVoucherCode(restored.code);
             setAppliedVoucher(restored);
-          }
+          } else if (initialCode) setVoucherError('Mã giảm giá đã lưu không còn khả dụng. Vui lòng chọn mã khác hoặc gỡ mã.');
         })
         .catch(() => {
-          if (isMounted) setAvailableVouchers([]);
-        });
+          if (isMounted) {
+            setAvailableVouchers([]);
+            setLoadError('Không thể tải mã giảm giá. Vui lòng thử lại.');
+          }
+        })
+        .finally(() => { if (isMounted) setLoading(false); });
     }, 0);
     return () => {
       isMounted = false;
       window.clearTimeout(resetTimer);
     };
-  }, [inspectionRequired, enabled, initialCode, orderAmount, setVoucherError]);
+  }, [inspectionRequired, enabled, initialCode, orderAmount, setVoucherError, attempt]);
 
-  const voucherDiscountAmount = appliedVoucher
+  const voucherDiscountAmount = appliedVoucher && orderAmount !== undefined
     ? Math.min(
         appliedVoucher.discountType === 'PERCENT'
           ? Math.floor((orderAmount * appliedVoucher.discountValue) / 100)
@@ -66,7 +75,7 @@ export const useConfirmPaymentVoucher = (orderAmount: number, inspectionRequired
       setVoucherError('Voucher không tồn tại hoặc không còn khả dụng.');
       return;
     }
-    if (orderAmount < (voucher.minOrderAmount ?? 0)) {
+    if (orderAmount !== undefined && orderAmount < (voucher.minOrderAmount ?? 0)) {
       setAppliedVoucher(null);
       setVoucherError('Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng voucher.');
       return;
@@ -81,5 +90,6 @@ export const useConfirmPaymentVoucher = (orderAmount: number, inspectionRequired
     availableVouchers, voucherCode, setVoucherCode,
     appliedVoucher, setAppliedVoucher, voucherError, setVoucherError,
     voucherDiscountAmount, applyVoucherCode,
+    loading, loadError, retry: () => setAttempt(value => value + 1),
   };
 };

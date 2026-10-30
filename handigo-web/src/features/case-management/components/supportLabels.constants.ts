@@ -13,15 +13,16 @@ export const SUPPORT_CATEGORY_LABELS: Record<SupportTicketCategory, string> = {
   ACCOUNT: "Tài khoản",
   PAYMENT: "Thanh toán",
   ORDER: "Đơn dịch vụ",
-  TECHNICAL: "Kỹ thuật",
+  TECHNICAL: "Lỗi ứng dụng",
   SECURITY: "Bảo mật",
-  APPEAL: "Khiếu nại quyết định",
+  APPEAL: "Đề nghị xem xét",
+  GUIDANCE: "Hướng dẫn",
   OTHER: "Khác",
 };
 
 export const SUPPORT_PRIORITY_LABELS: Record<SupportTicketPriority, string> = {
   LOW: "Thấp",
-  MEDIUM: "Trung bình",
+  MEDIUM: "Vừa",
   HIGH: "Cao",
   URGENT: "Khẩn cấp",
 };

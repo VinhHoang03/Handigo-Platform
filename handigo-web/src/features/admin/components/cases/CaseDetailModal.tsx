@@ -1,7 +1,7 @@
 import { Modal } from "@/components/common/Modal";
 import { caseDateTime } from "./case-table-columns";
 import type { SelectedAdminCase } from "./case-detail.types";
-import { CASE_STATUS_LABELS, PENALTY_LABELS, VIOLATION_SEVERITY_LABELS } from "./case-status.constants";
+import { CASE_STATUS_LABELS, PENALTY_LABELS, VIOLATION_SEVERITY_LABELS, getCaseStatusClasses } from "./case-status.constants";
 import { NoShowReviewDetails } from "./NoShowReviewDetails";
 import { NoShowVerificationSummary } from "./NoShowVerificationSummary";
 import { getNoShowUserDescription } from "./no-show-review.utils";
@@ -76,7 +76,7 @@ export function CaseDetailModal({
           <div className="space-y-5">
             <section className="rounded-2xl bg-surface-container-low p-5">
               <div className="flex flex-wrap gap-2 text-xs text-on-surface-variant">
-                <span className="rounded-full bg-primary/10 px-3 py-1 font-bold text-primary">{CASE_STATUS_LABELS[selected.item.status] || selected.item.status}</span>
+                <span className={`inline-flex rounded-full px-3 py-1 font-bold ${getCaseStatusClasses(selected.item.status)}`}>{CASE_STATUS_LABELS[selected.item.status] || selected.item.status}</span>
                 <span>#{selected.item._id.slice(-8).toUpperCase()}</span>
                 <span>{caseDateTime.format(new Date(selected.item.createdAt))}</span>
               </div>

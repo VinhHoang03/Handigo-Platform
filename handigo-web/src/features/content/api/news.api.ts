@@ -1,5 +1,6 @@
 import api from "@/api/client";
 import { unwrap } from "@/api/response";
+import type { JSONContent } from "@tiptap/core";
 
 export type NewsContentBlock =
   | { type: "paragraph" | "heading" | "quote"; text: string }
@@ -14,6 +15,7 @@ export interface NewsArticleRecord {
   coverImage: string;
   authorName: string;
   content: NewsContentBlock[];
+  richContent?: JSONContent;
   status: "draft" | "published";
   isFeatured: boolean;
   publishedAt?: string | null;
@@ -28,6 +30,7 @@ export interface NewsArticlePayload {
   coverImage: string;
   authorName: string;
   content: NewsContentBlock[];
+  richContent?: JSONContent;
   status: "draft" | "published";
   isFeatured: boolean;
 }

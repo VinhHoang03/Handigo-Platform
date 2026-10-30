@@ -15,15 +15,16 @@ const addresses = [{ _id: 'address-old', fullAddress: 'Địa chỉ cũ' }, { _i
 const source = { _id: sourceId, orderCode: 'HD-CU', status: 'completed', serviceId: service,
   addressId: addresses[0], selectedOptionIds: ['option'], selectedOptionsSnapshot: [], paymentMethod: 'cash' };
 
-function runtime({ paid = false, recoveryFails = false, sourceFails = false, userId = 'customer', paused, restoreOnly = true } = {}) {
+function runtime({ paid = false, recoveryFails = false, sourceFails = false, userId = 'customer', paused, restoreOnly = true,
+  pathname = '/customer/bookings', returnPath } = {}) {
   let state = { categoryId: 'category', serviceId: service._id, selectedOptionIds: ['option'], selectedOptionQuantities: { option: 5 },
     uniformQuantity: 1, addressId: 'address-new', paymentMethod: 'bank', orderType: 'scheduled',
     scheduledAt: '2099-01-01T14:30', preferredProviderId: 'provider-new', preferredProviderName: 'Thợ đã chọn',
-    problemDescription: 'Nhu cầu đã chỉnh sửa', rebookSource: { orderId: sourceId, orderCode: 'HD-CU', notices: [] },
+    problemDescription: 'Nhu cầu đã chỉnh sửa', voucherCode: 'GIAM20', rebookSource: { orderId: sourceId, orderCode: 'HD-CU', notices: [] },
     reset() { state = { ...state, rebookSource: undefined }; } };
   const auth = { user: { id: userId }, sessionRevision: 0 };
   const saved = new Map([
-    ['quickRebookingReturn', JSON.stringify({ orderId: sourceId, userId: 'customer' })],
+    ['quickRebookingReturn', JSON.stringify({ orderId: sourceId, userId: 'customer', returnPath })],
     ['pendingBookingOrderId', pendingId], ['bookingCreateAttempt', 'attempt'],
   ]);
   const storage = { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value), removeItem: key => saved.delete(key) };
@@ -82,6 +83,7 @@ function runtime({ paid = false, recoveryFails = false, sourceFails = false, use
     '@/utils/apiError': { getErrorMessage: error => error.message },
   };
   const globals = { sessionStorage: storage, window: {
+    location: { pathname },
     setTimeout(callback) { const id = ++timerId; timers.set(id, callback); return id; },
     clearTimeout: id => timers.delete(id),
     addEventListener: (name, handler) => listeners.set(name, handler),
@@ -133,6 +135,7 @@ test('Quay về từ PayOS tự mở form nhanh, đối soát trước và giữ
   assert.equal(restored.selectedOptionQuantities.option, 5);
   assert.equal(restored.preferredProviderId, 'provider-new');
   assert.equal(restored.problemDescription, 'Nhu cầu đã chỉnh sửa');
+  assert.equal(restored.voucherCode, 'GIAM20');
   assert.equal(app.calls[0][1], pendingId);
   assert.equal(app.calls[1][0], 'discard');
   assert.equal(app.saved.size, 0);
@@ -172,12 +175,39 @@ test('Trang được khôi phục từ bộ nhớ trình duyệt cũng phục h�
   assert.equal(app.calls.some(([type]) => type === 'navigate'), false);
 });
 
-test('Quay lại trang đơn cũ chuyển sang danh sách dịch vụ trước khi phục hồi form', async () => {
+test('Nháp từ lịch sử quay lại lịch sử trước khi phục hồi form', async () => {
   const app = runtime({ restoreOnly: false }); app.render(); app.timers(); await tick();
   assert.equal(app.calls.length, 1);
   assert.equal(app.calls[0][0], 'navigate');
-  assert.equal(app.calls[0][1], `/customer/services?quickRebook=${sourceId}`);
+  assert.equal(app.calls[0][1], `/customer/bookings?quickRebook=${sourceId}`);
   assert.equal(app.calls[0][2].replace, true);
+  assert.equal(find(app.render(), node => node.type === 'quick-panel'), undefined);
+});
+
+test('Đường dẫn quay về giữ đúng nơi bắt đầu đặt và bỏ đường dẫn ngoài phạm vi', () => {
+  const app = runtime();
+  const makePath = app.helpers.quickRebookingReturnPath;
+  assert.equal(makePath(sourceId, '/customer/bookings'), `/customer/bookings?quickRebook=${sourceId}`);
+  assert.equal(makePath(sourceId, `/customer/bookings/${sourceId}`), `/customer/bookings/${sourceId}?quickRebook=${sourceId}`);
+  assert.equal(makePath(sourceId, `/customer/services/${sourceId}`), `/customer/services/${sourceId}?quickRebook=${sourceId}`);
+  assert.equal(makePath(sourceId, 'https://khac.example.test'), `/customer/bookings?quickRebook=${sourceId}`);
+  app.saved.set('quickRebookingReturn', JSON.stringify({ orderId: sourceId, userId: 'customer', returnPath: `/customer/bookings/${sourceId}` }));
+  assert.equal(makePath(sourceId), `/customer/bookings/${sourceId}?quickRebook=${sourceId}`);
+});
+
+test('Đặt lại tại chi tiết đơn phục hồi form tại chính chi tiết đơn đó', async () => {
+  const app = runtime({ restoreOnly: false, pathname: `/customer/bookings/${sourceId}`,
+    returnPath: `/customer/bookings/${sourceId}` });
+  app.render(); app.timers(); await tick();
+  assert.ok(find(app.render(), node => node.type === 'quick-panel'));
+  assert.equal(app.calls.some(([type]) => type === 'navigate'), false);
+});
+
+test('Liên kết cũ về danh sách dịch vụ được chuyển về lịch sử đã bắt đầu đặt', async () => {
+  const app = runtime({ pathname: '/customer/services', returnPath: '/customer/bookings' });
+  app.render(); app.timers(); await tick();
+  assert.equal(app.calls.length, 1);
+  assert.equal(app.calls[0][1], `/customer/bookings?quickRebook=${sourceId}`);
   assert.equal(find(app.render(), node => node.type === 'quick-panel'), undefined);
 });
 

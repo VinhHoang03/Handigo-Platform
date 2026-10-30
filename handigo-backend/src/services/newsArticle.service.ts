@@ -5,6 +5,7 @@ import {
   NewsArticleStatus,
 } from "../models/newsArticle.model";
 import { AppError } from "../utils/appError";
+import type { NewsRichNode } from "../utils/newsRichContent";
 
 interface ArticlePayload {
   title?: string;
@@ -17,6 +18,7 @@ interface ArticlePayload {
     | { type: "list"; items: string[] }
   >;
   status?: NewsArticleStatus;
+  richContent?: NewsRichNode;
   isFeatured?: boolean;
 }
 
@@ -49,6 +51,7 @@ const formatArticle = (article: INewsArticle) => ({
   coverImage: article.coverImage,
   authorName: article.authorName,
   content: article.content,
+  ...(article.richContent ? { richContent: article.richContent } : {}),
   status: article.status,
   isFeatured: article.isFeatured,
   publishedAt: article.publishedAt,
@@ -152,6 +155,8 @@ export const updateArticle = async (id: string, payload: ArticlePayload) => {
     article.slug = await createUniqueSlug(payload.title, id);
   }
   Object.assign(article, payload);
+  // Client cũ chỉ cập nhật nội dung thuần: bỏ bản định dạng đã không còn đồng bộ.
+  if (payload.content && payload.richContent === undefined) article.richContent = undefined;
   if (payload.status === "published" && !article.publishedAt) {
     article.publishedAt = new Date();
   }

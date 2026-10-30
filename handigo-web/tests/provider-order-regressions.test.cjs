@@ -85,6 +85,7 @@ function fixture() {
     }, { filename });
     return exports;
   }
+  modules['../utils/providerOrder.utils'] = load('features/provider/utils/providerOrder.utils.ts');
   const hook = load('features/provider/hooks/useProviderOrderDetail.ts').useProviderOrderDetail;
   const render = fn => {
     cursor = 0; const value = fn();
@@ -264,7 +265,7 @@ test('KH-42: lỗi tải đề nghị có thông báo thử lại, không bị h
   assert.match(children(tree).map(item => item.props?.children).join(' '), /Không thể tải đề nghị nhận việc/);
 });
 
-test('KH-41: thẻ và popup không lỗi khi địa chỉ null và chỉ hiển thị khu vực', () => {
+test('KH-41: thẻ và popup không lỗi khi địa chỉ null và hiển thị địa chỉ đầy đủ được gửi riêng', () => {
   for (const addressId of [null, { ward: 'Phường thử', province: 'Tỉnh thử', fullAddress: 'Địa chỉ bí mật' }]) {
     const app = fixture(); const value = { ...order('A'), addressId };
     const assignment = { _id: 'de-nghi', orderId: value, responseDeadline: new Date(Date.now() + 60000).toISOString() };
@@ -276,8 +277,7 @@ test('KH-41: thẻ và popup không lỗi khi địa chỉ null và chỉ hiển
     for (const tree of [app.render(() => Card({ assignment })), Modal()]) {
       const text = children(tree).map(item => item.props?.children).flat(Infinity).join(' ');
       const props = children(tree).map(item => item.props?.value).filter(Boolean).join(' ');
-      assert.doesNotMatch(text + props, /Địa chỉ bí mật/);
-      assert.match(text + props, addressId ? /Phường thử, Tỉnh thử/ : /Chưa có thông tin khu vực/);
+      assert.match(text + props, addressId ? /Địa chỉ bí mật/ : /Chưa có thông tin khu vực/);
     }
   }
 });

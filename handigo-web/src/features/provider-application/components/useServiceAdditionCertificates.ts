@@ -5,6 +5,7 @@ import {
   type CertificateForm,
 } from "@/features/provider/utils/providerProfilePage";
 import { providerApplicationApi } from "../api/providerApplication.api";
+import { validateDateFields } from '../utils/providerApplicationValidation';
 
 /**
  * Gom trạng thái + thao tác quản lý danh sách chứng chỉ mới trong đơn đăng ký
@@ -47,6 +48,11 @@ export function useServiceAdditionCertificates(
     event.preventDefault();
     if (!certificateForm.title.trim() || !certificateForm.imageUrls.length) {
       setError("Vui lòng nhập tên và tải ít nhất một tệp chứng chỉ.");
+      return;
+    }
+    const dateErrors = validateDateFields(certificateForm.issuedAt, certificateForm.expiresAt);
+    if (dateErrors.issuedAt || dateErrors.expiresAt) {
+      setError(dateErrors.issuedAt || dateErrors.expiresAt || 'Ngày tháng chứng chỉ không hợp lệ.');
       return;
     }
     setCertificates((current) => [...current, { ...certificateForm }]);

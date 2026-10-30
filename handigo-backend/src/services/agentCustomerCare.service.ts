@@ -1,3 +1,4 @@
+import { SUPPORT_CATEGORY_LABELS, SUPPORT_CATEGORY_PRIORITIES } from "./supportTicketPolicy";
 import { z } from "zod";
 import * as tickets from "./supportTicket.service";
 import * as complaints from "./complaint.service";
@@ -16,11 +17,8 @@ export const agentComplaintSchema = createComplaintSchema.omit({ evidenceImages:
 export const agentResponseSchema = addSupportTicketResponseSchema.omit({ attachments: true }).extend({ customerAttachments: bookingAttachmentsSchema.optional() }).strict();
 const imageFiles = (urls: string[] = []) => urls.map((url) => ({ fileType: "image" as const, url }));
 
-const categoryLabels: Record<string, string> = {
-  ACCOUNT: "Tài khoản", PAYMENT: "Thanh toán", ORDER: "Đơn dịch vụ", TECHNICAL: "Kỹ thuật",
-  SECURITY: "Bảo mật", APPEAL: "Khiếu nại quyết định", OTHER: "Khác",
-};
-const priorityLabels: Record<string, string> = { LOW: "Thấp", MEDIUM: "Trung bình", HIGH: "Cao", URGENT: "Khẩn cấp" };
+const categoryLabels = SUPPORT_CATEGORY_LABELS;
+const priorityLabels: Record<string, string> = { LOW: "Thấp", MEDIUM: "Vừa", HIGH: "Cao", URGENT: "Khẩn cấp" };
 const statusLabels: Record<string, string> = {
   open: "Mới tiếp nhận", in_progress: "Đang xử lý", waiting_user: "Chờ khách phản hồi",
   resolved: "Đã xử lý", closed: "Đã đóng", cancelled: "Đã hủy", pending: "Chờ xem xét",
@@ -49,7 +47,7 @@ export function customerCaseView(value: unknown, detail = false) {
     id: String(item._id), title: item.subject ?? item.title, status: item.status,
     statusLabel: statusLabels[item.status] ?? item.status, createdAt: item.createdAt.toISOString(),
     orderId: item.orderId ? String(item.orderId._id) : null, orderCode: item.orderId?.orderCode ?? null,
-    category: item.category ? categoryLabels[item.category] : undefined,
+    category: item.category ? categoryLabels[item.category as keyof typeof categoryLabels] : undefined,
     priority: item.priority ? priorityLabels[item.priority] : undefined,
     ...(detail ? { description: item.description, resolutionNote: item.resolutionNote,
       requestedEvidenceNote: item.requestedEvidenceNote } : {}),
@@ -60,8 +58,8 @@ export function customerCaseView(value: unknown, detail = false) {
 export const AgentCustomerCareService = {
   async previewTicket(userId: string, args: z.infer<typeof agentTicketSchema>) {
     const order = args.orderId ? await AgentBookingService.getBooking(userId, args.orderId) : null;
-    return { title: "Gửi yêu cầu hỗ trợ", subject: args.subject, description: args.description,
-      category: categoryLabels[args.category], priority: priorityLabels[args.priority ?? "MEDIUM"],
+    return { title: "Gửi yêu cầu hỗ trợ", subject: args.subject || categoryLabels[args.category], description: args.description,
+      category: categoryLabels[args.category], priority: priorityLabels[SUPPORT_CATEGORY_PRIORITIES[args.category]],
       orderCode: order?.orderCode ?? "Không gắn với đơn dịch vụ",
       customerAttachments: args.customerAttachments ?? [],
       note: "Yêu cầu được gửi tới bộ phận hỗ trợ. Đây chưa phải kết quả xử lý." };

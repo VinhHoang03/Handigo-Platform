@@ -5,6 +5,7 @@ import { geocodeSavedAddress } from "@/features/customer/utils/googlePlacesAutoc
 interface BackendAddress {
   _id?: string;
   id?: string;
+  addressLabel?: string;
   recipientName?: string;
   recipientPhone?: string;
   fullAddress: string;
@@ -21,6 +22,7 @@ interface BackendAddress {
 
 const mapAddress = (address: BackendAddress): UserAddress => ({
   id: address.id || address._id || "",
+  addressLabel: address.addressLabel,
   recipientName: address.recipientName,
   recipientPhone: address.recipientPhone,
   fullAddress: address.fullAddress,
@@ -36,6 +38,7 @@ const mapAddress = (address: BackendAddress): UserAddress => ({
 });
 
 const sanitizeAddressPayload = (payload: UserAddressPayload): UserAddressPayload => ({
+  addressLabel: payload.addressLabel?.trim() || undefined,
   recipientName: payload.recipientName.trim(),
   recipientPhone: payload.recipientPhone.trim(),
   fullAddress: payload.fullAddress.trim(),
@@ -96,6 +99,16 @@ export const updateUserAddress = async (
     `/addresses/${id}`,
     sanitizeAddressPayload(payload),
   );
+  return mapAddress(response.data.data);
+};
+
+export const setDefaultUserAddress = async (
+  id: string,
+): Promise<UserAddress> => {
+  const response = await api.patch<{
+    success: boolean;
+    data: BackendAddress;
+  }>(`/addresses/${id}/default`);
   return mapAddress(response.data.data);
 };
 

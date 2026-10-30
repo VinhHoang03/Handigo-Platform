@@ -24,6 +24,7 @@ const { MonthlyOperationsChart } = load('features/admin/components/dashboard/Das
   '@/components/common/chart/chart-theme': { chartAxisStyle: { fill: '#000' }, chartTooltipStyle: {}, chartGridStroke: '#ddd' },
   '@/components/common/chart/use-prefers-reduced-motion': { usePrefersReducedMotion: () => true },
   '@/utils/apiError': {}, '../../api/adminDashboard.api': {},
+  '../../hooks/useAdminRead': {},
 });
 const points = [{ month: '2026-10', orders: 12, completedRevenue: 5000000, platformRevenue: 989200 }];
 const flatten = node => !node || typeof node !== 'object' ? [] : [node, ...[node.props?.children].flat(Infinity).flatMap(flatten)];

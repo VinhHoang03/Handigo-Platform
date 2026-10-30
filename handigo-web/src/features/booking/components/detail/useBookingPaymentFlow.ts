@@ -1,15 +1,15 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "@/features/booking/api/booking.api";
 import { tokenStorage } from "@/api/tokenStorage";
 import { getErrorMessage } from "@/utils/apiError";
-import type { Order } from "@/types/booking";
+import type { Order, OrderQuotation } from "@/types/booking";
 import type { InitialPaymentMethod } from "./bookingDetailConstants";
 
 /**
- * Thanh toán ban đầu và đổi phương thức cho đơn giá cố định chưa thu tiền.
+ * Thanh toán ban đầu và đổi phương thức cho khoản dịch vụ chưa thu tiền.
  */
 export const useBookingPaymentFlow = (
   order: Order | null,
@@ -17,16 +17,21 @@ export const useBookingPaymentFlow = (
   setBusy: (busy: boolean) => void,
   canChangePayment: boolean,
   updateOrder: (order: Order) => void,
+  quotationPayment?: { quotation: OrderQuotation; amount: number },
 ) => {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [paymentError, setPaymentError] = useToastFeedback<string | null>(null, "error");
   const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
+  const pending = useRef(false);
+  const [confirmation, setConfirmation] = useState<{ quotationId: string; revision: number; amount: number } | null>(null);
   const [initialPaymentMethod, setInitialPaymentMethod] =
     useState<InitialPaymentMethod>("PAYOS");
 
   const openInitialPaymentModal = () => {
-    if (!order) return;
+    if (!order || busy || pending.current) return;
+    setConfirmation(quotationPayment ? { quotationId: quotationPayment.quotation.quotation._id,
+      revision: quotationPayment.quotation.quotation.revision ?? 0, amount: quotationPayment.amount } : null);
     const currentMethod: InitialPaymentMethod =
       order.paymentMethod === "bank"
         ? "PAYOS"
@@ -41,27 +46,37 @@ export const useBookingPaymentFlow = (
   };
 
   const closeInitialPaymentModal = () => {
-    if (!busy) setPaymentMethodModalOpen(false);
+    if (!busy && !pending.current) setPaymentMethodModalOpen(false);
   };
 
   const handleInitialPayment = async () => {
     if (
-      busy || !order ||
-      order.paymentStatus !== "unpaid" ||
+      busy || pending.current || !order ||
+      (!quotationPayment && order.paymentStatus !== "unpaid") ||
       (!canChangePayment && (order.paymentMethod === "cash" ||
       !["created", "accepted"].includes(order.status) ||
       !["not_required", "awaiting_payment"].includes(order.bookingStatus || "")))
     ) return;
 
+    if (quotationPayment && (!confirmation || confirmation.quotationId !== quotationPayment.quotation.quotation._id
+      || confirmation.revision !== (quotationPayment.quotation.quotation.revision ?? 0) || confirmation.amount !== quotationPayment.amount)) {
+      setPaymentError("Báo giá đã thay đổi. Vui lòng đóng cửa sổ và kiểm tra lại.");
+      return;
+    }
+    if (quotationPayment && initialPaymentMethod === "CASH") return;
+
     try {
+      pending.current = true;
       setBusy(true);
       setPaymentError(null);
       const detailUrl = `${window.location.origin}/customer/bookings/result?orderId=${order._id}`;
       const result = await bookingApi.createPayment({
         orderId: order._id,
-        expectedAmount: canChangePayment ? order.pricing.totalPaidAmount : undefined,
+        expectedAmount: confirmation?.amount ?? (canChangePayment ? order.pricing.totalPaidAmount : undefined),
+        quotationId: confirmation?.quotationId,
+        expectedRevision: confirmation?.revision,
         method: initialPaymentMethod,
-        paymentType: order.inspectionRequired ? "INSPECTION_DEPOSIT" : "FULL",
+        paymentType: quotationPayment ? "REMAINING" : order.inspectionRequired ? "INSPECTION_DEPOSIT" : "FULL",
         returnUrl: `${detailUrl}&payos=success`,
         cancelUrl: `${window.location.origin}/customer/bookings/${order._id}?payos=cancel`,
       });
@@ -94,6 +109,7 @@ export const useBookingPaymentFlow = (
         ),
       );
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   };

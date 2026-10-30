@@ -8,8 +8,9 @@ import { getBookingFingerprint } from './bookingFingerprint';
 import type { BookingPreview } from '../api/booking.api';
 import type { PreparedRebooking, RebookingDraft } from './rebooking';
 import type { NearbyProvider } from '@/features/customer-service/api/customerService.api';
+import type { AvailableVoucher } from '../types/voucher.types';
 import { isRequiredOptionSelectionMissing } from './serviceOptionSelection';
-import { getEarliestScheduledAt, isWithinImmediateBookingHours } from '../components/step2Helpers';
+import { getEarliestScheduledAt, isWithinImmediateBookingHours, isWithinScheduledBookingHours } from '../components/step2Helpers';
 import { quickRebookingReturnPath, rememberQuickRebookingReturn } from './quickRebookingReturn';
 
 export const assertNoPendingRebooking = () => {
@@ -22,12 +23,14 @@ export const assertNoPendingRebooking = () => {
 export async function submitQuickRebooking(input: {
   prepared: PreparedRebooking; draft: RebookingDraft; preview: BookingPreview;
   providers: NearbyProvider[]; policyAccepted: boolean;
+  appliedVoucher?: AvailableVoucher | null;
   navigate: NavigateFunction; setError: (message: string) => void;
 }) {
-  const { prepared, draft, preview, providers, policyAccepted, navigate, setError } = input;
+  const { prepared, draft, preview, providers, policyAccepted, navigate, setError, appliedVoucher = null } = input;
   assertNoPendingRebooking();
   if (prepared.session !== useAuthStore.getState().sessionRevision) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng mở lại yêu cầu đặt lại.');
   if (!policyAccepted) throw new Error('Vui lòng đồng ý chính sách trước khi xác nhận.');
+  if ((draft.voucherCode || undefined) !== appliedVoucher?.code) throw new Error('Vui lòng áp dụng mã giảm giá hợp lệ trước khi xác nhận.');
   if (!draft.addressId || !prepared.addresses.some(address => address._id === draft.addressId)) throw new Error('Vui lòng chọn địa chỉ thực hiện.');
   if (!providers.length || (draft.preferredProviderId && !providers.some(provider => provider.id === draft.preferredProviderId))) {
     throw new Error('Thợ chưa khả dụng với lựa chọn này. Vui lòng chọn lại thợ hoặc thời gian.');
@@ -37,24 +40,28 @@ export async function submitQuickRebooking(input: {
   if (prepared.service.serviceType === 'variable_price' && draft.paymentMethod === 'cash') throw new Error('Khoản cọc cần thanh toán bằng ví hoặc ngân hàng.');
   if (draft.orderType === 'scheduled' && (!draft.scheduledAt || !Number.isFinite(new Date(draft.scheduledAt).getTime())
     || new Date(draft.scheduledAt).getTime() < getEarliestScheduledAt().getTime())) throw new Error('Vui lòng chọn giờ hẹn hợp lệ.');
+  if (draft.orderType === 'scheduled' && !isWithinScheduledBookingHours(draft.scheduledAt?.split('T')[1]?.slice(0, 5) ?? '')) {
+    throw new Error('Vui lòng chọn giờ hẹn trong khung giờ từ 08:00 đến 21:00.');
+  }
   if (draft.orderType === 'normal' && !isWithinImmediateBookingHours()) throw new Error('Đặt ngay chưa khả dụng. Vui lòng chọn giờ hẹn.');
+  const paymentCancelPath = quickRebookingReturnPath(prepared.order._id, window.location?.pathname);
   resetBookingSession();
   invalidateBookingPreview();
   useBookingStore.setState({ ...draft, customerAttachments: [], requestedProviderId: undefined, requestedProviderName: undefined });
   const booking = useBookingStore.getState();
   return runConfirmPaymentSubmit({
     policyAccepted, expectedBookingAmount: preview.bookingAmount, expectedFinalAmount: preview.discountedAmount,
-    expectedVoucherCode: null, hasServiceOptions: prepared.options.length > 0,
+    expectedVoucherCode: appliedVoucher?.code ?? null, hasServiceOptions: prepared.options.length > 0,
     serviceId: draft.serviceId, addressId: draft.addressId, orderType: draft.orderType, scheduledAt: draft.scheduledAt,
     service: prepared.service, selectedOptionIds: draft.selectedOptionIds, selectedOptionQuantities: draft.selectedOptionQuantities,
     uniformQuantity: draft.uniformQuantity, preferredProviderId: draft.preferredProviderId,
     recurrenceUnit: booking.recurrenceUnit, recurrenceCount: booking.recurrenceCount,
     problemDescription: draft.problemDescription, customerAttachments: [], effectivePaymentMethod: draft.paymentMethod,
-    appliedVoucher: null, voucherCode: '', pendingOrderId: '', bookingFingerprint: getBookingFingerprint(booking),
+    appliedVoucher, voucherCode: draft.voucherCode ?? '', pendingOrderId: '', bookingFingerprint: getBookingFingerprint(booking),
     isAppointment: draft.orderType === 'scheduled', isOptionSelectionMissing: missingOptions,
     showSystemAlert: setError, setPaymentError: setError, setVoucherError: setError,
     setIsSubmitting: () => {}, setPendingOrderId: () => {}, reset: booking.reset, navigate,
-    paymentCancelPath: quickRebookingReturnPath(prepared.order._id),
-    beforeExternalRedirect: () => rememberQuickRebookingReturn(prepared.order._id),
+    paymentCancelPath,
+    beforeExternalRedirect: () => rememberQuickRebookingReturn(prepared.order._id, paymentCancelPath),
   });
 }

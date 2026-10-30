@@ -1,9 +1,7 @@
 import type { Order, OrderQuotation } from "@/types/booking";
-import { isQuotationPaidByWallet } from "@/utils/quotationPayment";
+import { isQuotationPaidOnline } from "@/utils/quotationPayment";
 import { BookingQuotationDetails } from "./BookingQuotationDetails";
 import { BookingQuotationPending } from "./BookingQuotationPending";
-import { BookingQuotationWalletPayment } from "./BookingQuotationWalletPayment";
-import type { useBookingQuotationPayment } from "./useBookingQuotationPayment";
 
 type BookingQuotationPanelProps = {
   order: Order;
@@ -12,7 +10,6 @@ type BookingQuotationPanelProps = {
   appliedDepositAmount: number;
   remainingQuotationAmount: number;
   onReject: () => void;
-  paymentFlow: ReturnType<typeof useBookingQuotationPayment>;
 };
 
 /**
@@ -26,7 +23,6 @@ export const BookingQuotationPanel = ({
   appliedDepositAmount,
   remainingQuotationAmount,
   onReject,
-  paymentFlow,
 }: BookingQuotationPanelProps) => {
   const shouldShow =
     order.serviceId?.serviceType !== "fixed_price" ||
@@ -41,7 +37,8 @@ export const BookingQuotationPanel = ({
         <BookingQuotationDetails
           quotation={quotation}
           orderStatus={order.status}
-          paidByWallet={isQuotationPaidByWallet(order, quotation.quotation)}
+          paidOnline={isQuotationPaidOnline(order, quotation.quotation)}
+          paymentMethod={order.paymentMethod}
           busy={busy}
           appliedDepositAmount={appliedDepositAmount}
           remainingQuotationAmount={remainingQuotationAmount}
@@ -50,7 +47,6 @@ export const BookingQuotationPanel = ({
       ) : (
         <BookingQuotationPending orderStatus={order.status} />
       )}
-      <BookingQuotationWalletPayment flow={paymentFlow} busy={busy} />
     </div>
   );
 };

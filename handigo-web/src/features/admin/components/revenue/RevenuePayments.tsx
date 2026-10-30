@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { Pagination } from "@/components/common/Pagination";
 import { ChartCard, ChartDataTable, chartMoney } from "@/components/common/chart";
-import { getErrorMessage } from "@/utils/apiError";
+import { useAdminRead } from "../../hooks/useAdminRead";
 import { adminOperationsApi } from "../../api/adminOperations.api";
-import type { AdminPayment, Paginated, PaymentMethod } from "../../types/adminOperations.types";
+import type { PaymentMethod } from "../../types/adminOperations.types";
 import type { AdminRevenueInsights, RevenueQuery } from "../../types/adminRevenue.types";
 import { RevenuePaymentChannels } from './RevenuePaymentChannels';
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_TYPE_LABELS, paymentDateTime } from "../payments/payment-constants";
@@ -14,25 +14,12 @@ export function RevenuePayments({ range, initialMethod = '', channels }: { range
   const [mode, setMode] = useState<"paidAt" | "refundedAt">("paidAt");
   const [method, setMethod] = useState<PaymentMethod | "">(initialMethod);
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<(Paginated<AdminPayment> & { totalOrders?: number }) | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
   const [orderId, setOrderId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const timer = window.setTimeout(() => {
-      setLoading(true);
-      setError("");
-      void adminOperationsApi.payments({ ...range, page, limit: 20, dateField: mode,
-        ...(mode === "refundedAt" ? { status: "refunded" as const } : {}), ...(method ? { method } : {}) })
-        .then(data => { if (active) setResult(data); })
-        .catch(cause => { if (active) setError(getErrorMessage(cause, "Không thể tải giao dịch thanh toán.")); })
-        .finally(() => { if (active) setLoading(false); });
-    }, 0);
-    return () => { active = false; window.clearTimeout(timer); };
-  }, [range, mode, method, page, attempt]);
+  const key = JSON.stringify([range.fromDate, range.toDate, mode, method, page]);
+  const state = useAdminRead(key, signal => adminOperationsApi.payments({ ...range, page, limit: 20, dateField: mode,
+    ...(mode === "refundedAt" ? { status: "refunded" as const } : {}), ...(method ? { method } : {}) }, signal), { errorMessage: "Không thể tải giao dịch thanh toán." });
+  const result = state.dataKey === key ? state.data : null;
+  const { loading, error } = state;
 
   return <div id="revenue-payments" className="scroll-mt-28">
     <ChartCard title={channels ? "Dòng tiền theo kênh thanh toán" : "Chi tiết thu tiền và hoàn tiền"}>
@@ -49,7 +36,7 @@ export function RevenuePayments({ range, initialMethod = '', channels }: { range
         </select>
         <p className="ml-auto text-sm text-on-surface-variant" aria-live="polite">{loading ? 'Đang tải…' : !error && <><strong className="text-on-surface">{(result?.totalOrders ?? 0).toLocaleString('vi-VN')}</strong> đơn · {(result?.pagination.total ?? 0).toLocaleString('vi-VN')} giao dịch</>}</p>
       </div>
-      <AsyncState loading={loading} error={error} empty={!result?.items.length} emptyMessage="Không có giao dịch trong khoảng ngày này." onRetry={() => setAttempt(value => value + 1)}>
+      <AsyncState loading={loading} error={error} empty={!result?.items.length} emptyMessage="Không có giao dịch trong khoảng ngày này." onRetry={state.reload}>
         {result && <>
           <ChartDataTable caption="Giao dịch trong khoảng ngày đã chọn" columns={["Thời gian", "Mã đơn", "Loại", "Phương thức", "Số tiền", "Trạng thái"]}
             rows={result.items.map(payment => [
