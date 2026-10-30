@@ -22,7 +22,7 @@ function mount(storage, overrides = {}) {
         const index = cursor++;
         if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial;
         return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }];
-      }, useEffect() {}, useRef: initial => ({ current: initial }),
+      }, useEffect() {}, useRef: initial => ({ current: initial }), useDeferredValue: value => value, memo: component => component,
     };
     if (name === './ChartCard') return { ChartCard: () => null };
     if (name === './ChartTypeMenu') return { ChartTypeMenu: Menu };
@@ -35,7 +35,11 @@ function mount(storage, overrides = {}) {
     onReload: async () => [2], children: (data, type) => { displayed = { data, type }; return null; },
     ...overrides,
   };
-  const render = (updates = {}) => { props = { ...props, ...updates }; cursor = 0; tree = exports.SelectableChartCard(props); };
+  const render = (updates = {}) => {
+    props = { ...props, ...updates }; cursor = 0; tree = exports.SelectableChartCard(props);
+    const content = tree.props.children[0].props.children;
+    content.type(content.props);
+  };
   const actions = () => tree.props.action.props.children;
   render();
   return {

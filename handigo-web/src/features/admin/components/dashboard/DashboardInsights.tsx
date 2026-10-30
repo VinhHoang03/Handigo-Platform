@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
-import { getErrorMessage } from "@/utils/apiError";
+import { useAdminRead } from "../../hooks/useAdminRead";
 import { adminDashboardApi } from "../../api/adminDashboard.api";
 import type { AdminDashboardInsights } from "../../types/adminDashboard.types";
 import { DashboardPendingWork } from "./DashboardPendingWork";
@@ -10,30 +10,10 @@ import { AdminToastNotice } from '../shared/AdminToastNotice';
 
 export function DashboardInsights({ fromDate, toDate, summary }: { fromDate?: string; toDate?: string; summary?: (data: AdminDashboardInsights | null) => ReactNode }) {
   const monthly = Boolean(fromDate?.endsWith("-01") && toDate === new Date(Date.UTC(Number(fromDate.slice(0, 4)), Number(fromDate.slice(5, 7)), 0)).toISOString().slice(0, 10));
-  const [data, setData] = useState<AdminDashboardInsights | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const requestRef = useRef(0);
-  const busyRef = useRef(false);
-  const load = useCallback(async () => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    const id = ++requestRef.current;
-    setLoading(true);
-    try {
-      const result = await adminDashboardApi.insights({ fromDate, toDate });
-      if (id === requestRef.current) { setData(result); setError(""); }
-    } catch (requestError) {
-      if (id === requestRef.current) setError(getErrorMessage(requestError, "Không thể tải thông tin vận hành. Vui lòng thử lại."));
-    } finally {
-      busyRef.current = false;
-      if (id === requestRef.current) setLoading(false);
-    }
-  }, [fromDate, toDate]);
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => { requestRef.current += 1; window.clearTimeout(timer); };
-  }, [load]);
+  const requestKey = String(fromDate) + ":" + String(toDate);
+  const state = useAdminRead(requestKey, signal => adminDashboardApi.insights({ fromDate, toDate }, signal), { delay: 0, errorMessage: "Không thể tải thông tin vận hành. Vui lòng thử lại." });
+  const data = state.dataKey === requestKey ? state.data : null;
+  const { loading, error, reload: load } = state;
 
   return <section className="min-w-0 space-y-5" aria-label="Thông tin vận hành bổ sung">
     <div className="flex flex-wrap items-start justify-between gap-3">

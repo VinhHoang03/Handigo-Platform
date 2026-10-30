@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useId } from "react";
 import {
   Area,
   Bar,
@@ -26,7 +26,7 @@ import {
   chartTooltipStyle,
 } from "@/components/common/chart/chart-theme";
 import { usePrefersReducedMotion } from "@/components/common/chart/use-prefers-reduced-motion";
-import { getErrorMessage } from "@/utils/apiError";
+import { useAdminRead } from "../../hooks/useAdminRead";
 import { adminDashboardApi } from "../../api/adminDashboard.api";
 import type { AdminMonthlyTrend } from "../../types/adminDashboard.types";
 
@@ -295,37 +295,15 @@ export function DashboardMonthlyTrend({
   fromDate?: string;
   toDate?: string;
 }) {
-  const [data, setData] = useState<AdminMonthlyTrend | null>(null);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    let active = true;
-    adminDashboardApi
-      .monthlyTrend({ fromDate, toDate })
-      .then((value) => {
-        if (active) setData(value);
-      })
-      .catch((cause: unknown) => {
-        if (active)
-          setError(
-            getErrorMessage(
-              cause,
-              "Không thể tải số đơn và doanh thu theo tháng.",
-            ),
-          );
-      });
-    return () => {
-      active = false;
-    };
-  }, [fromDate, toDate, attempt]);
+  const key = String(fromDate) + ":" + String(toDate);
+  const state = useAdminRead(key, signal => adminDashboardApi.monthlyTrend({ fromDate, toDate }, signal), { delay: 0, errorMessage: "Không thể tải số đơn và doanh thu theo tháng." });
+  const data = state.dataKey === key ? state.data : null;
+  const { error } = state;
   return (
     <AsyncState
-      loading={!data && !error}
+      loading={!data && state.loading}
       error={error}
-      onRetry={() => {
-        setError("");
-        setAttempt((value) => value + 1);
-      }}
+      onRetry={state.reload}
     >
       {data && (
         <SelectableChartCard

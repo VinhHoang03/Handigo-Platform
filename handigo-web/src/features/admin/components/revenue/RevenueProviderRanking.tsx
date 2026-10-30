@@ -1,23 +1,16 @@
-import { useEffect, useState } from "react";
 import { ChartCard, chartMoney } from "@/components/common/chart";
 import { adminOperationsApi } from "../../api/adminOperations.api";
 import type { AdminProviderAnalytics } from "../../types/adminOperations.types";
 import type { RevenueQuery } from "../../types/adminRevenue.types";
 import { AsyncState } from "@/components/common/AsyncState";
-import { getErrorMessage } from "@/utils/apiError";
+import { useAdminRead } from "../../hooks/useAdminRead";
 import { Link } from "react-router-dom";
 
-export function RevenueProviderRanking({ range }: { range: RevenueQuery }) {
-  const [data, setData] = useState<AdminProviderAnalytics | null>(null);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    let active = true;
-    void adminOperationsApi.providerAnalytics({ ...range, topLimit: 5 }).then(result => { if (active) { setData(result); setError(""); } })
-      .catch(cause => { if (active) setError(getErrorMessage(cause, "Không thể tải xếp hạng nhà cung cấp.")); });
-    return () => { active = false; };
-  }, [range, attempt]);
-  return <AsyncState loading={!data && !error} error={error} onRetry={() => setAttempt(value => value + 1)}>
+export function RevenueProviderRanking({ range, providers }: { range: RevenueQuery; providers?: AdminProviderAnalytics }) {
+  const key = range.fromDate + ':' + range.toDate;
+  const state = useAdminRead(key, signal => adminOperationsApi.providerAnalytics({ ...range, topLimit: 5 }, signal), { delay: 0, enabled: !providers, errorMessage: "Không thể tải xếp hạng nhà cung cấp." });
+  const data = providers ?? (state.dataKey === key ? state.data : null);
+  return <AsyncState loading={!data && state.loading} error={state.error} onRetry={state.reload}>
     {data && <ChartCard title="Bảng xếp hạng doanh thu theo thợ" description="Top 5 theo thu nhập ròng được ghi nhận trong khoảng đã chọn. Điểm và số đơn hoàn tất là lũy kế hồ sơ."
       isEmpty={!data.topProvidersByRevenue.length}>
         <ol className="divide-y divide-outline-variant/30">

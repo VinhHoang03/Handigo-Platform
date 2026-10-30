@@ -11,7 +11,6 @@ const root = path.join(__dirname, '../src');
 
 function loader(data) {
   const cache = new Map();
-  let stateIndex = 0;
   const chart = {
     chartNumber: new Intl.NumberFormat('vi-VN'),
     chartMoney: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }),
@@ -33,10 +32,7 @@ function loader(data) {
       if (name === '../feedback/AdminFeedbackDetailModal') return { AdminFeedbackDetailModal: () => null };
       if (name === './DashboardMonthlyTrend') return { DashboardMonthlyTrend: () => React.createElement('div', { 'data-monthly-history': 'true' }) };
       if (name === './DashboardUserStats') return { DashboardUserStats: () => React.createElement('a', { href: '/admin/users' }, 'Người dùng hệ thống') };
-      if (name === 'react' && file.endsWith('DashboardInsights.tsx')) return {
-        ...React, useState: () => [[data, false, '', null][stateIndex++], () => {}],
-        useCallback: value => value, useEffect() {}, useRef: value => ({ current: value }),
-      };
+      if (name.endsWith('/useAdminRead')) return { useAdminRead: key => ({ data, dataKey: key, loading: false, error: '', reload() {} }) };
       if (!name.startsWith('.') && !name.startsWith('@/')) return require(name);
       const base = name.startsWith('@/') ? path.join(root, name.slice(2)) : path.resolve(path.dirname(file), name);
       return load(['.ts', '.tsx'].map(ext => base + ext).find(fs.existsSync));
@@ -84,7 +80,7 @@ test('Tổng quan bỏ đơn cần chú ý và cảnh báo chất lượng, gi�
   assert.ok(!html.includes('So sánh với kỳ trước'));
   assert.ok(html.indexOf('Hỗ trợ chưa phản hồi') < html.indexOf('Hồ sơ chờ xét duyệt'));
   assert.ok(html.includes('bg-warning-container'));
-  for (const route of ['/admin/support', '/admin/withdrawals', '/admin/cases']) assert.ok(html.includes(`href="${route}"`));
+  for (const route of ['/admin/support', '/admin/withdrawals', '/admin/cases?reportType=service_quality']) assert.ok(html.includes(`href="${route}"`));
 });
 
 test('Thẻ phí nền tảng dẫn đến báo cáo doanh thu ngay trong Tổng quan', () => {
