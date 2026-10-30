@@ -10,7 +10,8 @@ const root = path.join(__dirname, '../src/features/admin/components/cases');
 const cache = new Map();
 function load(name) {
   if (cache.has(name)) return cache.get(name);
-  const filename = ['.tsx', '.ts'].map(ext => path.join(root, name + ext)).find(file => fs.existsSync(file));
+  const base = name.startsWith('@/') ? path.join(__dirname, '../src', name.slice(2)) : path.join(root, name);
+  const filename = ['.tsx', '.ts'].map(ext => base + ext).find(file => fs.existsSync(file));
   const exports = {};
   cache.set(name, exports);
   const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
@@ -21,6 +22,7 @@ function load(name) {
     if (module === 'lucide-react') return { AlertCircle: () => null, CheckCircle2: () => null, HelpCircle: () => null };
     if (module === '@/components/common/Modal') return { Modal: ({ children }) => React.createElement('div', {}, children) };
     if (module.startsWith('./')) return load(module.slice(2));
+    if (module.startsWith('@/')) return load(module);
     return require(module);
   } }, { filename });
   return exports;

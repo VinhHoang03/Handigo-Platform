@@ -210,6 +210,18 @@ Không tin bất kỳ dữ liệu nào từ client nếu chưa được xác th�
 
 # AI Working Rules
 
+## Sử dụng Graphify
+
+- Với mỗi nhiệm vụ phân tích, sửa hoặc review code, tra Graphify trước để xác định module liên quan và phạm vi ảnh hưởng. Không cần tra graph cho câu hỏi chung hoặc thay đổi văn bản không liên quan tới code.
+- Chạy từ thư mục gốc dự án, dùng graph tại `graphify-out/graph.json`: `graphify query "<chủ đề hoặc tên thành phần>"`, `graphify explain "<tên thành phần>"`, hoặc `graphify path "<A>" "<B>"` theo nhu cầu.
+- Chỉ truy vấn phần liên quan; không đọc toàn bộ `graph.json` hoặc báo cáo lớn vào ngữ cảnh. Đọc code thực tế để xác minh kết quả trước khi kết luận hoặc sửa đổi.
+- Nếu lệnh không khả dụng, graph thiếu, cũ hoặc không bao phủ phần cần tìm, nêu rõ giới hạn và tiếp tục kiểm tra trực tiếp code; không suy diễn rằng thành phần không tồn tại chỉ vì graph không tìm thấy.
+- Khi cần tạo hoặc cập nhật graph, dùng phạm vi loại trừ trong `.graphifyignore` và chế độ code-only. Không tự cài hook hoặc chạy chức năng Graphify gọi Git khi chưa được phép theo mục Git Safety.
+- Sau khi thay đổi code, nếu watch đang chạy thì chờ cập nhật hoàn tất trước khi tra lại; nếu chưa cập nhật được thì ghi rõ graph có thể cũ. Không mặc định rằng cài Graphify hoặc MCP đồng nghĩa graph tự cập nhật.
+- Trong báo cáo hoàn thành nhiệm vụ liên quan tới code, nêu ngắn gọn truy vấn Graphify đã dùng hoặc lý do không dùng được.
+
+## Quy trình thực hiện
+
 Mặc định:
 
 1. Phân tích trước khi code.

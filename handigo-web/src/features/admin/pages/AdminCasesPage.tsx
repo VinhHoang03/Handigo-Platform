@@ -2,7 +2,6 @@ import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/
 import { useToastFeedback } from "@/components/common/Toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Eye } from "lucide-react";
 import { AsyncState } from "@/components/common/AsyncState";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
@@ -79,6 +78,7 @@ export default function AdminCasesPage() {
       <CaseTabs tab={tab} onSwitch={switchTab} />
 
       <TableToolbar
+        fieldsClassName={tab === "reports" ? "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]" : "sm:grid-cols-2"}
         search={{
           value: query.keyword || "",
           onChange: (value) => setQuery((current) => ({ ...current, page: 1, keyword: value || undefined })),
@@ -98,25 +98,14 @@ export default function AdminCasesPage() {
         }
       />
 
-      <AsyncState loading={loading} error={error} onRetry={load} skeleton={<TableSkeleton columns={caseTableColumns.length + 1} rowCount={query.limit || 10} />}>
+      <AsyncState loading={loading} error={error} onRetry={load} skeleton={<TableSkeleton columns={caseTableColumns.length} rowCount={query.limit || 10} />}>
         <DataTable
-          columns={[
-            ...caseTableColumns,
-            {
-              key: "actions",
-              header: "Thao tác",
-              className: "text-right",
-              render: (item) => (
-                <button type="button" onClick={() => void detail.openDetail(item._id)} title="Xem chi tiết" className="inline-grid h-10 w-10 place-items-center rounded-xl border border-outline-variant text-primary">
-                  <Eye size={18} />
-                </button>
-              ),
-            },
-          ]}
+          columns={caseTableColumns}
+          onRowClick={(item) => void detail.openDetail(item._id)}
           rows={items}
           rowKey={(item) => item._id}
           emptyState={<div className="p-10 text-center text-on-surface-variant">Không có hồ sơ phù hợp.</div>}
-          minWidthClassName="min-w-[900px]"
+          minWidthClassName="min-w-[1150px]"
         />
       </AsyncState>
       <Pagination page={query.page || 1} totalPages={totalPages} onChange={(page) => setQuery((current) => ({ ...current, page }))} />

@@ -104,6 +104,6 @@ flutter build web --release --dart-define=API_BASE_URL=https://api.example.com
 - `lib/core`: cấu hình, network, lưu trữ bảo mật và tiện ích dùng chung.
 - `lib/features`: module theo nghiệp vụ (`auth`, `services`, `orders`, ...).
 - `lib/shared`: widget và theme dùng lại.
-- `docs/backend-contract.md`: contract backend được app tái sử dụng.
+- [Contract backend](../note/handigo-app/docs/backend-contract.md): contract backend được app tái sử dụng.
 
 Các thư mục mở rộng có `.gitkeep` để không bị mất khi commit lên GitHub.

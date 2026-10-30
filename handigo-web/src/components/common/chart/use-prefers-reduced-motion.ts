@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+
+export const ReducedChartMotionContext = createContext(false);
 
 const QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -8,6 +10,7 @@ const QUERY = "(prefers-reduced-motion: reduce)";
  * animation do JS điều khiển). Hook này để truyền vào `isAnimationActive`.
  */
 export function usePrefersReducedMotion() {
+  const reduceForDashboard = useContext(ReducedChartMotionContext);
   const [reduced, setReduced] = useState(
     () => typeof window !== "undefined" && window.matchMedia(QUERY).matches,
   );
@@ -19,5 +22,5 @@ export function usePrefersReducedMotion() {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
-  return reduced;
+  return reduced || reduceForDashboard;
 }

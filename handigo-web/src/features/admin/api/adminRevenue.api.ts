@@ -8,8 +8,8 @@ import type {
 const data = <T>(response: { data: { data: T } }) => response.data.data;
 
 export const adminRevenueApi = {
-  getInsights: async (query: RevenueQuery) =>
-    data<AdminRevenueInsights>(await api.get("/dashboard/revenue-insights", { params: query })),
+  getInsights: async (query: RevenueQuery, signal?: AbortSignal) =>
+    data<AdminRevenueInsights>(await api.get("/dashboard/revenue-insights", { params: query, signal })),
   getRevenue: async (query: RevenueQuery) =>
     data<AdminRevenue>(await api.get("/dashboard/revenue", { params: query })),
 };

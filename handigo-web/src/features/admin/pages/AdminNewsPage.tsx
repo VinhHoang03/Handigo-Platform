@@ -5,7 +5,7 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { DataTable } from "@/components/common/dashboard/DataTable";
 import { TableSkeleton } from "@/components/common/dashboard/TableSkeleton";
 import { TableToolbar } from "@/components/common/dashboard/TableToolbar";
-import { NewsFormModal } from "../components/news/NewsFormModal";
+import { NewsDraftResume } from "../components/news/NewsDraftResume";
 import { NewsStatsBar } from "../components/news/NewsStatsBar";
 import { newsTableColumns } from "../components/news/news-table-columns";
 import { useAdminNewsController } from "../components/news/useAdminNewsController";
@@ -33,6 +33,7 @@ export default function AdminNewsPage() {
       </header>
 
 
+        <NewsDraftResume />
         <NewsStatsBar {...news.stats} />
 
         <TableToolbar
@@ -82,18 +83,6 @@ export default function AdminNewsPage() {
         </AsyncState>
       </div>
 
-      <NewsFormModal
-        open={news.isFormOpen}
-        editing={news.editing}
-        form={news.form}
-        onFormChange={news.setForm}
-        isSaving={news.isSaving}
-        isUploading={news.isUploading}
-        error={news.error}
-        onSubmit={news.save}
-        onClose={() => news.setIsFormOpen(false)}
-        onUploadCover={(file) => void news.uploadCover(file)}
-      />
 
       <ConfirmDialog
         open={Boolean(news.deleteTarget)}

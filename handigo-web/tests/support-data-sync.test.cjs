@@ -207,6 +207,12 @@ test('Nút phân công chặn resolved và lựa chọn trạng thái cũ không
     onReloadAdmins() {}, onAssign: async () => true, onStatusChange: async () => { statusWrites++; return true; }, onCreateViolation() {} };
   const render = () => h.render(() => component({ ...props, ticket }));
   let tree = render();
+  all(tree, node => node.type === 'select')[1].props.onChange({ target: { value: 'resolved' } });
+  tree = render();
+  const resolve = all(tree, node => node.type === 'button').find(node => node.props.children === 'Cập nhật trạng thái');
+  assert.equal(resolve.props.disabled, false, 'Có thể hoàn tất hỗ trợ khi không nhập kết quả xử lý.');
+  await resolve.props.onClick(); assert.equal(statusWrites, 1);
+  statusWrites = 0; tree = render();
   all(tree, node => node.type === 'select')[1].props.onChange({ target: { value: 'waiting_user' } });
   ticket = { ...ticket, status: 'resolved' }; tree = render();
   const selects = all(tree, node => node.type === 'select');
@@ -243,4 +249,142 @@ test('Danh sách hỗ trợ tự quay về trang hợp lệ khi tổng số tran
   state = render(); state.setTicketQuery({ page: 2, limit: 10, keyword: 'mới' }); render();
   pending.resolve({ items: [], pagination: { totalPages: 1 } }); await oldRequest;
   state = render(); assert.equal(state.ticketQuery.page, 2); assert.equal(state.ticketQuery.keyword, 'mới');
+});
+
+function createFormFixture(role = 'CUSTOMER', kind = 'ticket') {
+  const h = hooks(); h.react.useMemo = fn => fn();
+  const sent = [], loads = [];
+  const orders = [{ _id: 'order-A', orderCode: 'ORD-KHONG-HIEN', status: 'completed',
+    customerId: 'customer', providerId: { _id: 'provider' }, serviceId: { name: 'Sửa máy lạnh' }, createdAt: '2026-10-30T02:00:00Z' }];
+  const component = load('features/case-management/components/CreateCaseModal.tsx', {
+    react: h.react, 'react/jsx-runtime': jsxRuntime,
+    '@/components/common/Toast': { useToast: () => ({ addToast() {} }), useToastFeedback: h.react.useState },
+    '@/components/common/Modal': { Modal: 'modal' }, '../hooks/useCaseOrders': { useCaseOrders: (_, __, enabled) => {
+      loads.push(enabled); return { orders, loading: false, error: '', hasMore: false, loadMore() {} };
+    } },
+    '@/utils/apiError': { getErrorMessage: error => error.message },
+    '../api/caseManagement.api': { caseManagementApi: { createTicket: async payload => sent.push(payload), createReport: async payload => sent.push(payload) } },
+    './EvidenceImagePicker': { EvidenceImagePicker: 'images' }, './ReportExtraFields': { ReportExtraFields: 'report-fields' },
+    './TicketExtraFields': { TicketExtraFields: 'ticket-fields' }, './SupportOrderPicker': { SupportOrderPicker: 'orders' },
+  }).CreateCaseModal;
+  return { sent, loads, render: () => h.render(() => component({ open: true, role, kind, onClose() {}, onCreated() {} })) };
+}
+
+test('Dropdown người vi phạm gộp người gửi trùng khách, dùng tài khoản thợ thay vì mã hồ sơ', () => {
+  const { getSupportViolationTargets } = load('features/admin/components/cases/violation-form-options.ts', {});
+  const customer = { _id: 'customer', fullName: 'Khách A', email: 'khach@example.com', role: 'CUSTOMER' };
+  const targets = getSupportViolationTargets({ requesterId: customer, orderId: { customerId: customer,
+    providerId: { _id: 'provider-profile', userId: { _id: 'provider-user', fullName: 'Thợ B', role: 'PROVIDER' } } } });
+  assert.equal(targets.length, 2);
+  assert.equal(targets[0].userId, 'customer');
+  assert.match(targets[0].label, /khach@example.com.*Người gửi hỗ trợ, Khách trong đơn/);
+  assert.equal(targets[1].userId, 'provider-user');
+  assert.equal(getSupportViolationTargets({ requesterId: null, orderId: null }).length, 0);
+  assert.equal(getSupportViolationTargets({ requesterId: { _id: 'admin', role: 'ADMIN' } }).length, 0);
+});
+
+test('Form vi phạm bắt buộc chọn người liên quan, hỗ trợ loại có sẵn và nhập loại khác', async () => {
+  const h = hooks(), sent = [];
+  const { ViolationFormModal } = load('features/admin/components/cases/ViolationFormModal.tsx', {
+    react: h.react, 'react/jsx-runtime': jsxRuntime, '@/components/common/Modal': { Modal: 'modal' },
+    '@/components/common/Toast': { useToast: () => ({ addToast() {} }), useToastFeedback: h.react.useState },
+    '@/utils/apiError': { getErrorMessage: error => error.message },
+    '../../api/adminCases.api': { adminCasesApi: { createViolation: async payload => sent.push(payload) } },
+    './case-status.constants': { PENALTY_LABELS: { WARNING: 'Cảnh cáo' } },
+    '@/features/case-management/components/reportFieldOptions.constants': { REPORT_TYPES: [{ value: 'fraud', label: 'Gian lận' }, { value: 'other', label: 'Khác' }] },
+  });
+  const render = () => h.render(() => ViolationFormModal({ open: true, sourceType: 'SUPPORT_TICKET', sourceId: 'ticket',
+    relatedUsers: [{ userId: 'customer', label: 'Khách A' }], onClose() {}, onCreated() {} }));
+  let tree = render();
+  await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
+  assert.equal(sent.length, 0);
+  all(tree, node => node.type === 'select')[0].props.onChange({ target: { value: 'stranger' } });
+  tree = render();
+  await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
+  assert.equal(sent.length, 0);
+  all(tree, node => node.type === 'select')[0].props.onChange({ target: { value: 'customer' } });
+  all(tree, node => node.type === 'select')[1].props.onChange({ target: { value: 'other' } });
+  tree = render();
+  all(tree, node => node.type === 'input')[0].props.onChange({ target: { value: '  Lạm dụng hỗ trợ  ' } });
+  tree = render();
+  await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
+  assert.equal(sent[0].userId, 'customer'); assert.equal(sent[0].violationType, 'Lạm dụng hỗ trợ');
+  all(tree, node => node.type === 'select')[1].props.onChange({ target: { value: 'Gian lận' } });
+  tree = render();
+  assert.equal(all(tree, node => node.type === 'input').length, 0);
+  await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
+  assert.equal(sent[1].violationType, 'Gian lận');
+});
+
+test('Form hỗ trợ có tiêu đề, không chọn ưu tiên; chỉ thanh toán hiện đơn và đổi loại không gửi đơn bị ẩn', async () => {
+  for (const role of ['CUSTOMER', 'PROVIDER']) {
+    const f = createFormFixture(role);
+    let tree = f.render();
+    assert.equal(all(tree, node => node.type === 'input').length, 1);
+    await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
+    assert.equal(f.sent.length, 0, 'Không gửi yêu cầu khi tiêu đề trống.');
+    all(tree, node => node.type === 'input')[0].props.onChange({ target: { value: '  Cần kiểm tra thanh toán  ' } });
+    assert.equal(all(tree, node => node.type === 'orders').length, 0);
+    assert.equal(f.loads.at(-1), false);
+    all(tree, node => node.type === 'ticket-fields')[0].props.onCategoryChange('PAYMENT');
+    tree = f.render(); assert.equal(f.loads.at(-1), true);
+    all(tree, node => node.type === 'orders')[0].props.onChange('order-A');
+    all(tree, node => node.type === 'textarea')[0].props.onChange({ target: { value: 'Kiểm tra thanh toán cho đơn này' } });
+    tree = f.render(); await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
+    assert.equal(f.sent[0].orderId, 'order-A'); assert.equal(f.sent[0].subject, 'Cần kiểm tra thanh toán'); assert.equal(f.sent[0].priority, undefined);
+    all(tree, node => node.type === 'ticket-fields')[0].props.onCategoryChange('GUIDANCE');
+    tree = f.render(); assert.equal(all(tree, node => node.type === 'orders').length, 0);
+    await all(tree, node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
+    assert.equal(f.sent[1].orderId, undefined); assert.equal(f.sent[1].category, 'GUIDANCE');
+  }
+  const report = createFormFixture('CUSTOMER', 'report').render();
+  assert.equal(all(report, node => node.type === 'input').length, 1, 'Báo cáo vẫn giữ trường tiêu đề riêng.');
+});
+
+test('Loại hỗ trợ chỉ có năm lựa chọn; không có điều khiển mức ưu tiên', () => {
+  const options = load('features/case-management/components/ticketFieldOptions.constants.ts', {
+    './supportLabels.constants': load('features/case-management/components/supportLabels.constants.ts', {}),
+  });
+  const component = load('features/case-management/components/TicketExtraFields.tsx', {
+    'react/jsx-runtime': jsxRuntime, '@/components/common/FormSelect': { FormSelect: 'select' },
+    './ticketFieldOptions.constants': options,
+  }).TicketExtraFields;
+  const tree = component({ category: 'ACCOUNT', disabled: false, onCategoryChange() {} });
+  assert.equal(tree.props.label, 'Loại hỗ trợ');
+  assert.deepEqual(Array.from(options.CATEGORY_OPTIONS, option => option.value), ['PAYMENT', 'ACCOUNT', 'TECHNICAL', 'APPEAL', 'GUIDANCE']);
+  assert.equal(all(tree, node => node.type === 'option').length, 5);
+});
+
+test('Dropdown đơn hiển thị tên dịch vụ/ngày, không hiện mã đơn; chọn đơn và Escape hoạt động', () => {
+  const h = hooks(); h.react.useId = () => 'order-picker';
+  const chosen = [];
+  const component = load('features/case-management/components/SupportOrderPicker.tsx', {
+    react: h.react, 'react/jsx-runtime': jsxRuntime, 'lucide-react': {},
+  }, { document: { addEventListener() {}, removeEventListener() {} } }).SupportOrderPicker;
+  const order = { _id: 'A', orderCode: 'ORD-KHONG-HIEN', serviceId: { name: 'Sửa máy lạnh' }, scheduledAt: '2026-10-30T02:00:00Z', createdAt: '2026-10-29T00:00:00Z' };
+  const props = { orders: [order], value: '', disabled: false, loading: false, error: '', hasMore: false, onChange: id => chosen.push(id), onLoadMore() {} };
+  const render = () => h.render(() => component(props));
+  let tree = render(); all(tree, node => node.type === 'button')[0].props.onClick(); tree = render();
+  const option = all(tree, node => node.props.role === 'option')[1];
+  const text = JSON.stringify(option);
+  assert.match(text, /Sửa máy lạnh/); assert.match(text, /30\/10\/2026/); assert.doesNotMatch(text, /ORD-KHONG-HIEN/);
+  option.props.onClick(); assert.deepEqual(chosen, ['A']);
+  tree = render(); assert.equal(all(tree, node => node.props.role === 'listbox').length, 0);
+  all(tree, node => node.type === 'button')[0].props.onClick(); tree = render();
+  tree.props.onKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} });
+  tree = render(); assert.equal(all(tree, node => node.props.role === 'listbox').length, 0);
+  h.unmount();
+});
+
+test('Không tải danh sách đơn khi loại hỗ trợ không cần chọn đơn', async () => {
+  const h = hooks(); let calls = 0, enabled = false;
+  const { useCaseOrders } = load('features/case-management/hooks/useCaseOrders.ts', {
+    react: h.react, '@/features/booking/api/booking.api': { bookingApi: { getMyOrders: async () => { calls++; return { items: [], pagination: { totalPages: 1 } }; } } },
+    '@/features/provider/api/providerOrder.api': {}, '@/utils/apiError': {},
+  }, { window: { setTimeout, clearTimeout } });
+  const render = () => h.render(() => useCaseOrders('CUSTOMER', undefined, enabled));
+  render(); await tick(); assert.equal(calls, 0);
+  enabled = true; render(); await tick(); assert.equal(calls, 1);
+  enabled = false; render(); await tick(); assert.equal(calls, 1);
+  h.unmount();
 });

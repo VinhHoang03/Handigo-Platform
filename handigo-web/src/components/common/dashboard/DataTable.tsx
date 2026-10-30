@@ -70,8 +70,15 @@ export function DataTable<T>({
                 <Fragment key={key}>
                   <tr
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onKeyDown={onRowClick ? (event) => {
+                      if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                        event.preventDefault();
+                        onRowClick(row);
+                      }
+                    } : undefined}
                     className={`group border-t border-outline-variant/30 ${
-                      onRowClick ? "cursor-pointer hover:bg-surface-container-low" : ""
+                      onRowClick ? "cursor-pointer hover:bg-surface-container-low focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary" : ""
                     }`}
                   >
                     {columns.map((column) => (

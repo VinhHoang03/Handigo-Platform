@@ -29,7 +29,7 @@ export function DashboardCharts({ orders, query }: {
   const statusTitle = `Trạng thái các đơn hiện tại (tháng ${fromMonth === toMonth ? label(toMonth) : `${label(fromMonth)} – ${label(toMonth)}`})`;
   return <>
     <section className="grid min-w-0 items-start gap-5 min-[80rem]:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
-      <div className="min-w-0"><DashboardMonthlyTrend key={`${query.fromDate}:${query.toDate}`} fromDate={query.fromDate} toDate={query.toDate} /></div>
+      <div className="min-w-0"><DashboardMonthlyTrend fromDate={query.fromDate} toDate={query.toDate} /></div>
       <DashboardRecentOrders />
     </section>
     <section className="grid min-w-0 gap-5 xl:grid-cols-2">

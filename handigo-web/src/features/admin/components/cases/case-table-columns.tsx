@@ -1,12 +1,19 @@
 import type { DataTableColumn } from "@/components/common/dashboard/DataTable";
 import type { CaseRow } from "./case-detail.types";
-import { CASE_STATUS_LABELS, VIOLATION_SOURCE_LABELS } from "./case-status.constants";
+import { CASE_STATUS_LABELS, VIOLATION_SOURCE_LABELS, getCaseStatusClasses } from "./case-status.constants";
 import { CaseTitle } from "@/features/case-management/components/CaseTitle";
+import { ticketAge } from "../support/support.constants";
 
 export const caseDateTime = new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" });
 
-/** Cột dùng chung cho báo cáo và vi phạm — trang tự thêm cột "Thao tác". */
+/** Các cột thông tin dùng chung cho báo cáo và vi phạm. */
 export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
+  {
+    key: "code",
+    header: "Mã hồ sơ",
+    className: "whitespace-nowrap text-sm tabular-nums",
+    render: (item) => `#${item._id.slice(-8).toUpperCase()}`,
+  },
   {
     key: "case",
     header: "Hồ sơ",
@@ -16,7 +23,6 @@ export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
       return (
         <>
           <p className="max-w-xl whitespace-normal break-normal font-bold leading-6"><CaseTitle title={title} /></p>
-          <p className="mt-1 text-xs text-on-surface-variant">#{item._id.slice(-8).toUpperCase()}</p>
         </>
       );
     },
@@ -35,7 +41,7 @@ export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
     header: "Trạng thái",
     className: "whitespace-nowrap",
     render: (item) => (
-      <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getCaseStatusClasses(item.status)}`}>
         {CASE_STATUS_LABELS[item.status] || item.status}
       </span>
     ),
@@ -45,5 +51,11 @@ export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
     header: "Ngày tạo",
     className: "whitespace-nowrap text-sm tabular-nums",
     render: (item) => caseDateTime.format(new Date(item.createdAt)),
+  },
+  {
+    key: "waitingTime",
+    header: "Thời gian chờ",
+    className: "whitespace-nowrap text-sm tabular-nums",
+    render: (item) => ticketAge(item.createdAt),
   },
 ];

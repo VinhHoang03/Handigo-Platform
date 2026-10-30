@@ -11,16 +11,17 @@ export function useChatSocket(
 ) {
   useEffect(() => {
     if (!conversationId) return;
+    const conversationIds = conversationId.split(',');
     const { socket, dispose } = createAuthenticatedSocket();
     const joinConversation = () => {
-      socket.emit('conversation:join', { conversationId });
+      for (const id of conversationIds) socket.emit('conversation:join', { conversationId: id });
       onReconnect?.();
     };
     const handleMessage = (message: ChatMessage) => {
-      if (message.conversationId === conversationId) onMessage(message);
+      if (conversationIds.includes(message.conversationId)) onMessage(message);
     };
     const handleUpdatedMessage = (message: ChatMessage) => {
-      if (message.conversationId === conversationId) onMessageUpdated(message);
+      if (conversationIds.includes(message.conversationId)) onMessageUpdated(message);
     };
     const handleDeletedMessage = (payload: { messageId: string }) =>
       onMessageDeleted(payload.messageId);

@@ -6,7 +6,7 @@ import { agentRequestAttachments } from "../../agent/booking-attachments";
 
 export const createSupportTicketTool: AgentTool<z.infer<typeof agentTicketSchema>> = {
   name: "create_support_ticket",
-  description: "Gửi yêu cầu hỗ trợ về tài khoản, thanh toán, đơn, kỹ thuật hoặc bảo mật. Cần tiêu đề và mô tả khách cung cấp; orderId chỉ dùng khi đã xác định đúng đơn. Luôn xem trước và xác nhận, hỗ trợ ảnh đã tải trong phiên chat.",
+  description: "Gửi yêu cầu hỗ trợ về thanh toán, tài khoản, lỗi ứng dụng, đề nghị xem xét hoặc hướng dẫn. Chỉ cần loại và mô tả; không yêu cầu tiêu đề hoặc mức ưu tiên. Backend tự gán ưu tiên theo loại. orderId không bắt buộc, chỉ chọn khi hỗ trợ thanh toán của một đơn đã xác định. Luôn xem trước và xác nhận, hỗ trợ ảnh đã tải trong phiên chat.",
   inputSchema: agentTicketSchema,
   roles: ["CUSTOMER"],
   mutates: true,
