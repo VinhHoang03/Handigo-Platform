@@ -12,6 +12,7 @@ export const CUSTOMER_NO_SHOW_SKIP_DUPLICATE_EVIDENCE_FOR_TESTING = true;
 export const assertCustomerNoShowWait = (
   order: Pick<IOrder, "arrival" | "providerId" | "orderType" | "scheduledAt">,
   now = Date.now(),
+  waitMinutes = CUSTOMER_NO_SHOW_WAIT_MINUTES,
 ) => {
   if (!order.arrival || String(order.arrival.providerId) !== String(order.providerId)) {
     throw new AppError("Vui lòng xác nhận đã đến nơi trước khi báo khách không có mặt.", 409);
@@ -19,7 +20,7 @@ export const assertCustomerNoShowWait = (
   if (CUSTOMER_NO_SHOW_SKIP_WAIT_FOR_TESTING) return;
   const scheduledAt = ["scheduled", "recurring"].includes(order.orderType) ? order.scheduledAt?.getTime() ?? 0 : 0;
   const waitStartedAt = Math.max(order.arrival.arrivedAt.getTime(), scheduledAt);
-  const remaining = waitStartedAt + CUSTOMER_NO_SHOW_WAIT_MINUTES * 60_000 - now;
+  const remaining = waitStartedAt + waitMinutes * 60_000 - now;
   if (remaining > 0) {
     throw new AppError(`Bạn cần chờ thêm ${Math.ceil(remaining / 60_000)} phút trước khi báo khách không có mặt. Vui lòng tiếp tục gọi hoặc nhắn tin cho khách.`, 409);
   }

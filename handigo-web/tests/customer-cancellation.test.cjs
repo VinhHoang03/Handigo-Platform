@@ -69,6 +69,17 @@ for (const status of ['accepted']) {
   });
 }
 
+test('Hạn hủy 8 phút từ backend được giữ đúng đến biên, không tự khóa theo 5 phút cũ', () => {
+  const context = setup({ _id: 'don-cau-hinh', status: 'accepted', customerCancellationDeadline: new Date(480000).toISOString() });
+  context.render();
+  context.advance(300001);
+  assert.equal(context.render().cancellationLocked, false);
+  context.advance(480000);
+  assert.equal(context.render().cancellationLocked, false);
+  context.advance(480001);
+  assert.equal(context.render().cancellationLocked, true);
+});
+
 test('Thợ đã bắt đầu: khóa hủy ngay dù còn trong thời hạn 5 phút', async () => {
   const order = { _id: 'don-kiem-thu', status: 'accepted', customerCancellationDeadline: new Date(300000).toISOString() };
   const context = setup(order);
@@ -89,7 +100,7 @@ test('Hộp thoại đã mở cũng không gửi yêu cầu hủy khi quá hạn
   context.advance(300001);
   await context.render().executePendingAction();
   assert.deepEqual(context.calls, ['preview']);
-  assert.match(context.messages[0], /hết thời hạn hủy 5 phút/);
+  assert.match(context.messages[0], /hết thời hạn hủy/);
 });
 
 test('Đơn chưa có thợ vẫn được hủy, đơn đã nhận thiếu mốc xác minh bị khóa', () => {

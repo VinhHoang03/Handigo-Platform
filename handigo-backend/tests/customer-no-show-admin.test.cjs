@@ -16,6 +16,7 @@ function setup(options = {}) {
     customerNoShow: { evidenceIds: ['anh-da-gui'] }, ...options.order };
   const query = value => ({ select() { return this; }, lean() { return Promise.resolve(value); } });
   const modules = {
+    './systemConfig.service': { getOrderOperationPolicy: async () => ({ providerArrivalRadiusMeters: 200 }) },
     '../utils/customerNoShowEvidence': timeExports,
     '../utils/logger': { createLogger: () => ({ warn() {} }) },
     '../models/user.model': { __esModule: true, default: { findOne: () => query({ phone: options.customerPhone ?? '0773368198' }) } },

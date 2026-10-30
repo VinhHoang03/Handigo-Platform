@@ -130,7 +130,7 @@ export const useBookingCancellationFlow = (
         ? "Thợ đã bắt đầu làm việc, bạn không thể hủy đơn hàng."
         : order?.arrival && order.arrival.providerId === order.providerId?._id
           ? "Thợ đã xác nhận đến nơi, bạn không thể hủy đơn hàng."
-          : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn.", "error");
+          : "Đã hết thời hạn hủy kể từ khi thợ nhận đơn.", "error");
       return;
     }
     if (isCancellationAction && (!cancellationPreview || !cancellationPreview.canCancel)) {

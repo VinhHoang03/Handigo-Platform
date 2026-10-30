@@ -1,11 +1,11 @@
-import { getBookingPolicy, getNumberConfigValue, getRefundPolicy } from "./systemConfig.service";
+import { getBookingPolicy, getNumberConfigValue, getOrderOperationPolicy, getRefundPolicy } from "./systemConfig.service";
 import { getProviderResponseTimeoutSeconds } from "../utils/matchingSearch";
 import { createHash } from "node:crypto";
 
 /** Chỉ trả các điều khoản dành cho khách, không công khai lịch riêng hoặc cấu hình nội bộ. */
 export const getCustomerBookingPolicies = async () => {
-  const [booking, refund, initialRadius, expandedRadius, expandAfter, expandedDuration, responseTimeout] = await Promise.all([
-    getBookingPolicy(), getRefundPolicy(),
+  const [booking, operation, refund, initialRadius, expandedRadius, expandAfter, expandedDuration, responseTimeout] = await Promise.all([
+    getBookingPolicy(), getOrderOperationPolicy(), getRefundPolicy(),
     getNumberConfigValue("INITIAL_PROVIDER_RADIUS_KM", 5),
     getNumberConfigValue("MAX_PROVIDER_RADIUS_KM", 10),
     getNumberConfigValue("MATCHING_EXPAND_AFTER_MINUTES", 1),
@@ -13,6 +13,7 @@ export const getCustomerBookingPolicies = async () => {
     getNumberConfigValue("MATCHING_PROVIDER_TIMEOUT_SECONDS", 60),
   ]);
   const policies = {
+    customerCancellationMinutes: operation.customerCancellationMinutes,
     paymentHoldMinutes: booking.paymentHoldMinutes,
     matching: {
       initialRadiusKm: Math.max(initialRadius, 0.1),

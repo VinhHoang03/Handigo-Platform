@@ -32,6 +32,7 @@ export interface RefundPolicyInput {
   cancellationReason?: string;
   providerAcceptedAt?: Date | null;
   providerArrived?: boolean;
+  customerCancellationMinutes?: number;
 }
 
 export interface RefundPolicyResult {
@@ -56,6 +57,7 @@ export const calculateRefundPolicy = (
 ): RefundPolicyResult => {
   const paidAmount = roundMoney(input.paidAmount);
   const now = input.now || new Date();
+  const cancellationMinutes = input.customerCancellationMinutes ?? CUSTOMER_CANCELLATION_WINDOW_MS / 60_000;
   const hoursBeforeStart = input.scheduledAt
     ? (input.scheduledAt.getTime() - now.getTime()) / 3_600_000
     : null;
@@ -103,7 +105,7 @@ export const calculateRefundPolicy = (
     && input.orderStatus === "accepted") {
     const acceptedAt = input.providerAcceptedAt?.getTime();
     const elapsed = acceptedAt === undefined ? NaN : now.getTime() - acceptedAt;
-    const canCancel = !input.providerArrived && Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= CUSTOMER_CANCELLATION_WINDOW_MS;
+    const canCancel = !input.providerArrived && Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= cancellationMinutes * 60_000;
     return {
       policyVersion: CUSTOMER_CANCELLATION_POLICY_VERSION,
       canCancel, refundRate: canCancel ? 100 : 0, paidAmount,
@@ -112,8 +114,8 @@ export const calculateRefundPolicy = (
       hoursBeforeStart,
       policyReason: input.providerArrived ? "Thợ đã xác nhận đến nơi, bạn không thể hủy đơn hàng."
         : canCancel
-        ? "Hủy trong vòng 5 phút kể từ khi thợ nhận đơn, hoàn toàn bộ khoản đã thanh toán về ví Handigo."
-        : "Đã hết thời hạn hủy 5 phút kể từ khi thợ nhận đơn hoặc chưa xác minh được thời điểm nhận đơn.",
+        ? `Hủy trong vòng ${cancellationMinutes} phút kể từ khi thợ nhận đơn, hoàn toàn bộ khoản đã thanh toán về ví Handigo.`
+        : `Đã hết thời hạn hủy ${cancellationMinutes} phút kể từ khi thợ nhận đơn hoặc chưa xác minh được thời điểm nhận đơn.`,
     };
   }
 

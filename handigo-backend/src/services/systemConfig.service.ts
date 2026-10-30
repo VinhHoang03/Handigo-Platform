@@ -27,6 +27,21 @@ type SystemConfigDocument = {
 
 const collection = () => mongoose.connection.collection<SystemConfigDocument>("system_configs");
 
+const orderOperationLimits: Record<string, number> = {
+  PROVIDER_ARRIVAL_RADIUS_METERS: 10000,
+  CUSTOMER_NO_SHOW_WAIT_MINUTES: 1440,
+  CUSTOMER_CANCELLATION_MINUTES: 1440,
+};
+
+const validateOrderOperationConfig = (key: string, value: unknown, type: SystemConfigType, isPublic: boolean) => {
+  const maximum = orderOperationLimits[key];
+  if (!maximum) return;
+  if (type !== "NUMBER" || isPublic || typeof value !== "number" || !Number.isInteger(value)
+    || value < 1 || value > maximum) {
+    throw new AppError(`Cấu hình ${key} phải là số nguyên nội bộ từ 1 đến ${maximum}.`, 400);
+  }
+};
+
 let indexesReady: Promise<string> | null = null;
 
 const ensureIndexes = () => {
@@ -194,6 +209,7 @@ export const getConfigByKey = async (admin: RequestUser, key: string) => {
 
 export const createConfig = async (admin: RequestUser, input: CreateSystemConfigInput) => {
   assertAdmin(admin);
+  validateOrderOperationConfig(input.key, input.value, input.type, input.isPublic);
   validateRewardOffer(input.key, input.value, input.type, input.isPublic);
   validateBookingPolicy(input.key, input.value, input.type, input.isPublic);
   validateBusinessPolicy(input.key, input.value, input.type, input.isPublic);
@@ -248,6 +264,7 @@ export const updateConfig = async (
   }
 
   const nextType = input.type ?? existing.type;
+  validateOrderOperationConfig(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   validateRewardOffer(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   validateBookingPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
   validateBusinessPolicy(key, input.value, nextType, input.isPublic ?? existing.isPublic);
@@ -303,6 +320,22 @@ export const getBookingPolicy = async () => {
   const parsed = bookingPolicySchema.safeParse(config.value);
   if (!parsed.success) throw new AppError("Chính sách đặt dịch vụ không hợp lệ. Vui lòng liên hệ quản trị viên.", 503);
   return parsed.data;
+};
+
+export const getOrderOperationPolicy = async (session?: mongoose.ClientSession) => {
+  const configs = await collection().find({ key: { $in: Object.keys(orderOperationLimits) } }, { session }).toArray();
+  const read = (key: string, fallback: number) => {
+    const config = configs.find(item => item.key === key);
+    if (!config) return fallback;
+    try { validateOrderOperationConfig(key, config.value, config.type, config.isPublic); }
+    catch { throw new AppError(`Cấu hình ${key} không hợp lệ. Vui lòng liên hệ quản trị viên.`, 503); }
+    return config.value as number;
+  };
+  return {
+    providerArrivalRadiusMeters: read("PROVIDER_ARRIVAL_RADIUS_METERS", 200),
+    customerNoShowWaitMinutes: read("CUSTOMER_NO_SHOW_WAIT_MINUTES", 10),
+    customerCancellationMinutes: read("CUSTOMER_CANCELLATION_MINUTES", 5),
+  };
 };
 
 const validateBusinessPolicy = (key: string, value: unknown, type: SystemConfigType, isPublic: boolean) => {

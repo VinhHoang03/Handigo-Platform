@@ -82,7 +82,8 @@ function setup({ method = 'wallet', inspection = false, arrived = true, quotatio
   const modules = {
     mongoose: { __esModule: true, default: { startSession: async () => session }, Types },
     './refundPolicy.service': policy,
-    './systemConfig.service': { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }) },
+    './systemConfig.service': { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }),
+      getOrderOperationPolicy: async () => ({ customerCancellationMinutes: 5 }) },
     '../utils/transaction': { buildTransactionCode: prefix => `${prefix}_${entries.length}`,
       withTransactionRetry: (current, run) => current.withTransaction(() => run(current)) },
     '../models/order.model': { Order: {

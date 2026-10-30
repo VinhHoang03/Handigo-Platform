@@ -1,4 +1,5 @@
 export interface BookingPolicies {
+  customerCancellationMinutes?: number;
   version?: string;
   paymentHoldMinutes: number;
   matching: {
