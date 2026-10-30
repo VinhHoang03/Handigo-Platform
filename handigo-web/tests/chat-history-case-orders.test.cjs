@@ -42,6 +42,137 @@ const deferred = () => { let resolve; const promise = new Promise(done => { reso
 const message = n => ({ _id: String(n).padStart(4, '0'), conversationId: 'A',
   createdAt: new Date(1700000000000 + n * 1000).toISOString(), content: `Nội dung ${n}` });
 
+test('Gộp theo đúng cặp khách và thợ, không gộp nhầm người khi thiếu định danh', () => {
+  const { groupConversations } = load('features/chat/utils/conversationGroups.ts');
+  const items = [
+    { _id: '1', customerId: 'c1', providerId: { _id: 'p1' } },
+    { _id: '2', customerId: { _id: 'c1' }, providerId: 'p1' },
+    { _id: '3', customerId: 'c2', providerId: 'p1' },
+    { _id: '4', customerId: 'c1', providerId: 'p2' },
+    { _id: '5', customerId: 'c1' },
+    { _id: '6', customerId: 'c1' },
+  ];
+  const groups = groupConversations(items);
+  assert.equal(groups.length, 5);
+  assert.equal(groups[0].map(item => item._id).join(','), '1,2');
+});
+
+test('Tin đơn cũ nằm trọn phía trên đơn mới dù có phản hồi muộn', () => {
+  const { orderConversationMessages, conversationOrderStatus } = load('features/chat/utils/conversationGroups.ts');
+  const oldOrder = { _id: 'A', orderId: { _id: '0001', status: 'completed' } };
+  const newOrder = { _id: 'B', orderId: { _id: '0002', status: 'accepted' } };
+  const messages = [message(1), { ...message(2), conversationId: 'B' }, message(3)];
+  const ordered = orderConversationMessages(messages, [newOrder, oldOrder]);
+  assert.equal(ordered.map(item => item._id).join(','), '0001,0003,0002');
+  assert.equal(messages.map(item => item._id).join(','), '0001,0002,0003');
+  assert.equal(conversationOrderStatus(oldOrder), 'Đã hoàn thành');
+});
+
+test('Tự nối đơn đang xử lý mới nhất và ngừng gửi khi mọi đơn đã kết thúc', () => {
+  const { activeOrderConversation } = load('features/chat/utils/conversationGroups.ts');
+  const items = [
+    { _id: 'C', orderId: { _id: '0003', status: 'cancelled' } },
+    { _id: 'A', orderId: { _id: '0001', status: 'completed' } },
+    { _id: 'B', orderId: { _id: '0002', status: 'in_progress' } },
+  ];
+  assert.equal(activeOrderConversation(items)._id, 'B');
+  const next = { _id: 'D', orderId: { _id: '0004', status: 'accepted' } };
+  assert.equal(activeOrderConversation([next, ...items])._id, 'D');
+  items[2].orderId.status = 'completed';
+  assert.equal(activeOrderConversation(items), undefined);
+});
+
+test('Danh sách hội thoại tải mọi trang trước khi gộp cùng thợ', async () => {
+  const calls = [];
+  const { chatApi } = load('features/chat/api/chat.api.ts', {
+    '@/api/client': { __esModule: true, default: { get: async (_url, { params }) => {
+      calls.push(params.page);
+      return { data: { data: { items: [{ _id: String(params.page), customerId: 'c1', providerId: 'p1' }],
+        pagination: { totalPages: 2 } } } };
+    } } },
+  });
+  const items = await chatApi.allConversations();
+  assert.equal(calls.join(','), '1,2');
+  assert.equal(items.length, 2);
+  const { groupConversations } = load('features/chat/utils/conversationGroups.ts');
+  assert.equal(groupConversations(items).length, 1);
+});
+
+test('Socket tham gia mọi đơn trong nhóm và chỉ nhận tin thuộc nhóm', () => {
+  const handlers = new Map();
+  const joined = [], received = [], updated = [];
+  let cleanup, disposed = false, reconnected = false;
+  const { useChatSocket } = load('features/chat/hooks/useChatSocket.ts', {
+    react: { useEffect: fn => { cleanup = fn(); } },
+    '@/realtime/authenticatedSocket': { createAuthenticatedSocket: () => ({
+      socket: {
+        on: (event, handler) => handlers.set(event, handler),
+        off: event => handlers.delete(event),
+        emit: (_event, payload) => joined.push(payload.conversationId),
+      },
+      dispose: () => { disposed = true; },
+    }) },
+  });
+  useChatSocket('A,B', item => received.push(item._id), item => updated.push(item._id), () => {},
+    () => { reconnected = true; });
+  handlers.get('connect')();
+  handlers.get('message:new')({ _id: '1', conversationId: 'A' });
+  handlers.get('message:new')({ _id: '2', conversationId: 'B' });
+  handlers.get('message:new')({ _id: '3', conversationId: 'C' });
+  handlers.get('message:updated')({ _id: '2', conversationId: 'B' });
+  assert.equal(joined.join(','), 'A,B');
+  assert.equal(received.join(','), '1,2');
+  assert.equal(updated.join(','), '2');
+  assert.equal(reconnected, true);
+  cleanup();
+  assert.equal(disposed, true);
+  assert.equal(handlers.size, 0);
+});
+
+test('Lịch sử nhiều đơn tải liên tục theo thời gian, nhận realtime từ mọi đơn và đọc hết các trang', async () => {
+  const app = hooks();
+  const rows = [
+    ...Array.from({ length: 120 }, (_, i) => message(i + 1)),
+    { ...message(10), _id: 'B10', conversationId: 'B' },
+    { ...message(90), _id: 'B90', conversationId: 'B' },
+  ];
+  let receive;
+  const seen = [];
+  const { useChatMessages } = load('features/chat/hooks/useChatMessages.ts', {
+    react: app.react,
+    '../api/chat.api': { chatApi: {
+      messages: async (id, page) => {
+        const items = rows.filter(item => item.conversationId === id);
+        return { items: items.slice().reverse().slice((page - 1) * 50, page * 50).reverse(),
+          pagination: { totalPages: Math.ceil(items.length / 50) } };
+      },
+      seen: async id => { seen.push(id); },
+    } },
+    '../utils/chatHistory': load('features/chat/utils/chatHistory.ts'),
+    './useChatSocket': { useChatSocket(_ids, onMessage) { receive = onMessage; } },
+  });
+  const render = () => app.render(() => useChatMessages('A,B'));
+  render(); await tick();
+  let current = render();
+  assert.equal(current.messages[0]._id, '0071');
+  assert.equal(current.messages.some(item => item._id === 'B10'), false);
+  assert.equal(current.messages.some(item => item._id === 'B90'), true);
+  await current.loadOlder();
+  current = render();
+  assert.equal(current.messages[0]._id, '0021');
+  await current.loadOlder();
+  current = render();
+  assert.equal(current.messages.length, 122);
+  assert.equal(current.hasMore, false);
+  receive({ ...message(121), _id: 'B121', conversationId: 'B' });
+  receive({ ...message(122), _id: 'C122', conversationId: 'C' });
+  current = render();
+  assert.equal(current.messages.at(-1)._id, 'B121');
+  assert.equal(new Set(current.messages.map(item => item._id)).size, 123);
+  assert.ok(seen.includes('A') && seen.includes('B'));
+  app.unmount();
+});
+
 function chatFixture() {
   const app = hooks();
   let rows = Array.from({ length: 101 }, (_, i) => message(i + 1));

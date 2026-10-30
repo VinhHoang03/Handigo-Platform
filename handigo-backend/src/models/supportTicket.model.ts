@@ -9,6 +9,7 @@ export const SUPPORT_TICKET_CATEGORIES = [
   "TECHNICAL",
   "SECURITY",
   "APPEAL",
+  "GUIDANCE",
   "OTHER",
 ] as const;
 

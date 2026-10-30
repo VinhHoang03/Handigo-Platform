@@ -1,4 +1,5 @@
 import { SUPPORT_CATEGORY_LABELS } from "./supportLabels.constants";
 import type { SupportTicketCategory } from "../types/caseManagement.types";
 
-export const CATEGORY_OPTIONS = (Object.entries(SUPPORT_CATEGORY_LABELS) as Array<[SupportTicketCategory, string]>).map(([value, label]) => ({ value, label }));
+const CREATE_CATEGORIES: SupportTicketCategory[] = ["PAYMENT", "ACCOUNT", "TECHNICAL", "APPEAL", "GUIDANCE"];
+export const CATEGORY_OPTIONS = CREATE_CATEGORIES.map(value => ({ value, label: SUPPORT_CATEGORY_LABELS[value] }));

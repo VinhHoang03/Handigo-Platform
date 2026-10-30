@@ -96,14 +96,14 @@ export function TicketSidebar({ ticket, admins, adminsLoading, adminsError, onRe
             onChange={(event) => setResolutionNote(event.target.value)}
             rows={4}
             maxLength={3000}
-            placeholder="Kết quả xử lý (tối thiểu 10 ký tự)..."
+            placeholder="Kết quả xử lý (không bắt buộc)..."
             className="mt-3 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3"
           />
         )}
         <button
           type="button"
           onClick={() => void submitStatus()}
-          disabled={busy || !nextStatus || !transitions.includes(nextStatus) || (nextStatus === "resolved" && resolutionNote.trim().length < 10)}
+          disabled={busy || !nextStatus || !transitions.includes(nextStatus)}
           className="mt-3 w-full btn-primary disabled:opacity-40"
         >
           {busy ? "Đang cập nhật..." : "Cập nhật trạng thái"}

@@ -19,6 +19,7 @@ import { getOrderInterval } from "./providerSchedule.service";
 import { getBookingPolicy } from "./systemConfig.service";
 import { ScheduleInterval } from "../utils/bookingPolicy";
 import { findOverdueOrders } from "./orderOverdue.service";
+import { isRetryableWriteConflict } from "../utils/transaction";
 
 async function createMatchingSearch(startedAt: Date) {
   const [initial, expanded, delay, duration] = await Promise.all([
@@ -109,14 +110,34 @@ export async function getMaxMatchingDurationSeconds(): Promise<number> {
   return (search.expiresAt.getTime() - startedAt.getTime()) / 1000;
 }
 
-async function cancelUnmatchedOrder(orderId: string, reason: string) {
-  const order = await Order.findById(orderId).select("status");
-  if (!order || order.status !== "created") {
-    return false;
-  }
+const pendingUnmatchedCancellations = new Map<string, Promise<boolean>>();
 
-  await cancelSystemOrderWithSettlement(orderId, reason, "provider_unavailable");
-  return true;
+async function cancelUnmatchedOrder(orderId: string, reason: string) {
+  const pending = pendingUnmatchedCancellations.get(orderId);
+  if (pending) return pending;
+
+  // Timer và bộ quét có thể cùng hết hạn một đơn; chỉ chạy một lần hủy trong tiến trình.
+  const task = (async () => {
+    const order = await Order.findById(orderId).select("status");
+    if (!order || order.status !== "created") return false;
+
+    try {
+      await cancelSystemOrderWithSettlement(orderId, reason, "provider_unavailable");
+      return true;
+    } catch (error) {
+      if (!isRetryableWriteConflict(error)) throw error;
+      const current = await Order.findById(orderId).select("status readyForMatching");
+      // Không che lỗi quyết toán sau khi hủy; chỉ hoãn đơn còn trong hàng đợi điều phối.
+      if (!current || current.status !== "created" || !current.readyForMatching) throw error;
+      dispatchLogger.warn("Tạm hoãn hủy đơn do xung đột ghi; sẽ thử lại ở lượt quét tiếp theo.", { orderId });
+      return false;
+    }
+  })();
+  pendingUnmatchedCancellations.set(orderId, task);
+  try { return await task; }
+  finally {
+    if (pendingUnmatchedCancellations.get(orderId) === task) pendingUnmatchedCancellations.delete(orderId);
+  }
 }
 
 async function getDispatchContext(

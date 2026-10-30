@@ -3,6 +3,18 @@ import type { ChatMessage, Conversation, ConversationPage, MessagePage } from '.
 
 const data = <T>(response: { data: { data: T } }) => response.data.data;
 export const chatApi = {
+  allConversations: async () => {
+    const items: Conversation[] = [];
+    let page = 1;
+    let totalPages: number;
+    do {
+      const result = await chatApi.conversations(page, 100);
+      items.push(...result.items);
+      totalPages = result.pagination.totalPages;
+      page++;
+    } while (page <= totalPages);
+    return [...new Map(items.map((item) => [item._id, item])).values()];
+  },
   conversations: async (page = 1, limit = 50) => data<ConversationPage>(await api.get('/chat/conversations', { params: { page, limit } })),
   getOrCreateByOrder: async (orderId: string) => data<Conversation>(await api.get(`/chat/orders/${orderId}/conversation`)),
   messages: async (conversationId: string, page = 1) => data<MessagePage>(await api.get(`/chat/conversations/${conversationId}/messages`, { params: { page, limit: 50 } })),

@@ -33,6 +33,7 @@ export default function SupportPage({ role }: SupportPageProps) {
       ? normalizedRole
       : undefined;
   const supportRole = role ?? authenticatedSupportRole;
+  const isAdmin = isAuthenticated && normalizedRole === "ADMIN";
 
   useEffect(() => {
     const shouldFocusCreateTicket =
@@ -128,7 +129,7 @@ export default function SupportPage({ role }: SupportPageProps) {
       </Reveal>
 
       <Reveal>
-        {supportRole ? (
+        {supportRole || isAdmin ? (
           <div
             className={
               role
@@ -136,7 +137,7 @@ export default function SupportPage({ role }: SupportPageProps) {
                 : "mx-auto grid max-w-7xl gap-8 px-6 pb-4 pt-3"
             }
           >
-            <SupportTicketSection role={supportRole} />
+            {!isAdmin && supportRole && <SupportTicketSection role={supportRole} />}
             <section className="rounded-3xl bg-surface-container p-5 sm:p-6">
               <h2 className="mb-5 text-xl font-semibold text-on-surface">
                 Kênh hỗ trợ

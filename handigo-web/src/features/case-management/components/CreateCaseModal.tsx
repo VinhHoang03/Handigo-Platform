@@ -9,10 +9,10 @@ import type {
   CreateReportPayload,
   ReportType,
   SupportTicketCategory,
-  SupportTicketPriority,
 } from "../types/caseManagement.types";
 import { EvidenceImagePicker } from "./EvidenceImagePicker";
 import { ReportExtraFields } from "./ReportExtraFields";
+import { SupportOrderPicker } from "./SupportOrderPicker";
 import { TicketExtraFields } from "./TicketExtraFields";
 
 export type CreateCaseKind = "ticket" | "report";
@@ -45,12 +45,12 @@ export function CreateCaseModal({
   onCreated,
 }: CreateCaseModalProps) {
   const { addToast } = useToast();
-  const { orders, loading: ordersLoading, error: ordersError, hasMore, loadMore } = useCaseOrders(role, initialOrderId);
   const [orderId, setOrderId] = useState(initialOrderId ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<SupportTicketCategory>("ORDER");
-  const [priority, setPriority] = useState<SupportTicketPriority>("MEDIUM");
+  const [category, setCategory] = useState<SupportTicketCategory>(initialOrderId ? "PAYMENT" : "ACCOUNT");
+  const showOrders = kind === "report" || category === "PAYMENT";
+  const { orders, loading: ordersLoading, error: ordersError, hasMore, loadMore } = useCaseOrders(role, initialOrderId, showOrders);
   const [reportType, setReportType] = useState<ReportType>(initialReportType ?? "user_behavior");
   const [reportTarget, setReportTarget] = useState<"participant" | "order">(
     initialOrderId ? "order" : "participant",
@@ -68,8 +68,17 @@ export function CreateCaseModal({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (kind === "ticket" && title.trim().length < 5) {
+      setError("Tiêu đề cần có ít nhất 5 ký tự.");
+      return;
+    }
     if (kind === "report" && !selectedOrder) {
       setError("Vui lòng chọn đơn dịch vụ liên quan.");
+      return;
+    }
+
+    if (kind === "ticket" && category === "PAYMENT" && orderId && !selectedOrder) {
+      setError("Không tìm thấy đơn đã chọn. Vui lòng chọn lại đơn dịch vụ.");
       return;
     }
 
@@ -86,10 +95,9 @@ export function CreateCaseModal({
 
       if (kind === "ticket") {
         await caseManagementApi.createTicket({
-          orderId: orderId || undefined,
-          category,
-          priority,
           subject: title.trim(),
+          orderId: category === "PAYMENT" ? orderId || undefined : undefined,
+          category,
           description: description.trim(),
           attachments: uploadedFiles,
         });
@@ -131,12 +139,18 @@ export function CreateCaseModal({
   return (
     <Modal open={open} title={KIND_TITLES[kind]} onClose={onClose} size="lg" closeOnEsc={!busy} closeOnOverlayClick={!busy}>
       <form onSubmit={submit} className="space-y-5">
+        {kind === "ticket" && <TicketExtraFields category={category} disabled={busy}
+          onCategoryChange={value => { setCategory(value); setOrderId(""); }} />}
+        {kind === "ticket" && category === "PAYMENT" && <SupportOrderPicker orders={orders} value={orderId}
+          disabled={busy} loading={ordersLoading} error={ordersError} hasMore={hasMore}
+          onChange={setOrderId} onLoadMore={() => void loadMore()} />}
+        {kind === "report" && <>
         <label className="block text-sm font-semibold">
-          Đơn dịch vụ {kind === "ticket" ? "(không bắt buộc)" : ""}
+          Đơn dịch vụ
           <select
             value={orderId}
             onChange={(event) => setOrderId(event.target.value)}
-            required={kind !== "ticket"}
+            required
             disabled={busy || ordersLoading}
             className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
           >
@@ -152,15 +166,7 @@ export function CreateCaseModal({
         {ordersError && <p role="alert" className="text-sm text-error">{ordersError}</p>}
         {(hasMore || ordersError) && <button type="button" onClick={() => void loadMore()} disabled={busy || ordersLoading} className="text-sm font-semibold text-primary">{ordersError ? "Thử tải lại đơn" : "Tải thêm đơn cũ"}</button>}
         {!ordersLoading && !ordersError && !orders.length && <p className="text-sm text-on-surface-variant">Bạn chưa có đơn dịch vụ.</p>}
-        {kind === "ticket" && (
-          <TicketExtraFields
-            category={category}
-            priority={priority}
-            disabled={busy}
-            onCategoryChange={setCategory}
-            onPriorityChange={setPriority}
-          />
-        )}
+        </>}
         {kind === "report" && reportType === "service_quality" && <p className="text-sm text-on-surface-variant">Gửi trong vòng 3 ngày từ khi hoàn thành đơn. Mỗi người chỉ được gửi một báo cáo chất lượng cho mỗi đơn.</p>}
         {kind === "report" && (
           <ReportExtraFields
@@ -178,8 +184,8 @@ export function CreateCaseModal({
           <input value={title} onChange={(event) => setTitle(event.target.value)} minLength={5} maxLength={200} required disabled={busy} className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3" />
         </label>
         <label className="block text-sm font-semibold">
-          Nội dung chi tiết
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} minLength={10} maxLength={3000} rows={6} required disabled={busy} className="mt-2 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3" />
+          {kind === "ticket" ? "Mô tả" : "Nội dung chi tiết"}
+          <textarea name="description" autoComplete="off" value={description} onChange={(event) => setDescription(event.target.value)} minLength={10} maxLength={3000} rows={6} required disabled={busy} className="mt-2 w-full resize-y rounded-xl border border-outline-variant bg-surface p-3" />
         </label>
 
         <div>
@@ -189,7 +195,7 @@ export function CreateCaseModal({
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary">Quay lại</button>
-          <button type="submit" disabled={busy || ordersLoading} className="btn-primary">
+          <button type="submit" disabled={busy || (kind === "report" && ordersLoading)} className="btn-primary">
             {busy ? "Đang gửi..." : "Gửi yêu cầu"}
           </button>
         </div>

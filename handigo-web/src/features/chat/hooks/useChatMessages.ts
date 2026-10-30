@@ -4,13 +4,13 @@ import type { ChatMessage } from '../types/chat.types';
 import { loadChatHistory, mergeChatHistory, type MessageChange } from '../utils/chatHistory';
 import { useChatSocket } from './useChatSocket';
 
-export function useChatMessages(conversationId: string | null) {
+export function useChatMessages(conversationKey: string | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasMore, setHasMore] = useState(false);
   const request = useRef(0);
-  const pages = useRef(1);
+  const pages = useRef<Record<string, number>>({});
   const oldest = useRef<ChatMessage | undefined>(undefined);
   const changes = useRef<MessageChange[]>([]);
   const invalidate = useCallback(() => { request.current++; }, []);
@@ -20,40 +20,48 @@ export function useChatMessages(conversationId: string | null) {
     setMessages((current) => mergeChatHistory(current, [change]));
   }, []);
   const addMessage = useCallback((message: ChatMessage) => {
-    if (message.conversationId === conversationId) changeMessage({ message });
-  }, [changeMessage, conversationId]);
+    if (conversationKey?.split(',').includes(message.conversationId)) changeMessage({ message });
+  }, [changeMessage, conversationKey]);
   const removeMessage = useCallback((deletedId: string) => changeMessage({ deletedId }), [changeMessage]);
 
   const synchronize = useCallback(async (loadOlder = false) => {
-    if (!conversationId) return;
+    if (!conversationKey) return;
+    const conversationIds = conversationKey.split(',');
     const revision = ++request.current;
     const isCurrent = () => revision === request.current;
-    const minimumPages = pages.current + (loadOlder ? 1 : 0);
     changes.current = [];
     setLoading(true);
     setError('');
     try {
-      const result = await loadChatHistory((page) => chatApi.messages(conversationId, page),
-        minimumPages, oldest.current, isCurrent);
-      if (!result || !isCurrent()) return;
-      const merged = mergeChatHistory(result.items, changes.current);
+      const results = await Promise.all(conversationIds.map(async (id) => {
+        const result = await loadChatHistory((page) => chatApi.messages(id, page),
+          (pages.current[id] ?? 1) + (loadOlder ? 1 : 0), oldest.current, isCurrent);
+        return { id, result };
+      }));
+      if (!isCurrent() || results.some(({ result }) => !result)) return;
+      // Chỉ hiển thị khoảng thời gian đã tải đủ ở tất cả các đơn.
+      const boundaries = results.flatMap(({ result }) => result?.hasMore && result.items[0] ? [result.items[0].createdAt] : []);
+      const boundary = boundaries.length ? Math.max(...boundaries.map((date) => new Date(date).getTime())) : -Infinity;
+      const items = results.flatMap(({ result }) => result?.items ?? [])
+        .filter((message) => new Date(message.createdAt).getTime() >= boundary);
+      const merged = mergeChatHistory(items, changes.current);
       setMessages(merged);
       oldest.current = merged[0];
-      pages.current = result.pages;
-      setHasMore(result.hasMore);
+      for (const { id, result } of results) if (result) pages.current[id] = result.pages;
+      setHasMore(results.some(({ result }) => result?.hasMore));
       changes.current = [];
-      await chatApi.seen(conversationId);
+      await Promise.all(conversationIds.map((id) => chatApi.seen(id)));
     } catch {
       if (isCurrent()) setError('Không thể tải tin nhắn. Vui lòng thử lại.');
     } finally {
       if (isCurrent()) setLoading(false);
     }
-  }, [conversationId]);
+  }, [conversationKey]);
   const reconnect = useCallback(() => { void synchronize(); }, [synchronize]);
-  useChatSocket(conversationId, addMessage, addMessage, removeMessage, reconnect);
+  useChatSocket(conversationKey, addMessage, addMessage, removeMessage, reconnect);
 
   useEffect(() => {
-    pages.current = 1;
+    pages.current = {};
     oldest.current = undefined;
     changes.current = [];
     const timer = window.setTimeout(() => { setMessages([]); void synchronize(); }, 0);

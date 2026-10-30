@@ -15,6 +15,8 @@ export interface CaseOrder {
   orderCode: string;
   status: string;
   paymentStatus?: string;
+  customerId?: CaseUser | null;
+  providerId?: { _id: string; userId?: CaseUser | null } | null;
 }
 
 export interface EvidenceFile {
@@ -74,6 +76,7 @@ export type SupportTicketCategory =
   | "TECHNICAL"
   | "SECURITY"
   | "APPEAL"
+  | "GUIDANCE"
   | "OTHER";
 
 export type SupportTicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -231,7 +234,7 @@ export interface CreateSupportTicketPayload {
   orderId?: string | null;
   category: SupportTicketCategory;
   priority?: SupportTicketPriority;
-  subject: string;
+  subject?: string;
   description: string;
   attachments?: EvidenceFile[];
 }

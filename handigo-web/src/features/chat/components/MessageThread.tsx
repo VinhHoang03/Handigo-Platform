@@ -1,9 +1,10 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Modal } from "@/components/common/Modal";
 import { ReliableImage } from "@/components/common/ReliableImage";
-import type { ChatMessage } from "../types/chat.types";
+import type { ChatMessage, Conversation } from "../types/chat.types";
+import { conversationOrderLabel, conversationOrderStatus, orderConversationMessages } from "../utils/conversationGroups";
 import { MessageRow } from "./MessageRow";
 
 const getSenderId = (message: ChatMessage) =>
@@ -13,6 +14,7 @@ const getSenderId = (message: ChatMessage) =>
 
 interface MessageThreadProps {
   messages: ChatMessage[];
+  conversations?: Conversation[];
   currentUserId: string;
   onEdit: (messageId: string, content: string) => Promise<void>;
   onDelete: (messageId: string) => Promise<void>;
@@ -23,6 +25,7 @@ interface MessageThreadProps {
 
 export function MessageThread({
   messages,
+  conversations = [],
   currentUserId,
   onEdit,
   onDelete,
@@ -33,7 +36,8 @@ export function MessageThread({
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollBeforeLoad = useRef<{ height: number; top: number } | null>(null);
-  const lastMessageId = messages.at(-1)?._id;
+  const orderedMessages = orderConversationMessages(messages, conversations);
+  const lastMessageId = orderedMessages.at(-1)?._id;
   const { addToast } = useToast();
   const [menuMessageId, setMenuMessageId] = useState("");
   const [editingMessageId, setEditingMessageId] = useState("");
@@ -102,12 +106,19 @@ export function MessageThread({
           if (scrollRef.current) scrollBeforeLoad.current = { height: scrollRef.current.scrollHeight, top: scrollRef.current.scrollTop };
           onLoadOlder?.();
         }}>{loadingOlder ? "Đang tải..." : "Tải tin nhắn cũ hơn"}</button>}
-        {messages.map((message) => {
+        {orderedMessages.map((message, index) => {
           const isMine = getSenderId(message) === currentUserId;
           const isEditing = editingMessageId === message._id;
+          const conversation = conversations.find((item) => item._id === message.conversationId);
+          const showOrder = conversation && orderedMessages[index - 1]?.conversationId !== message.conversationId;
           return (
+            <Fragment key={message._id}>
+            {showOrder && <div className="flex items-center gap-3 py-2" role="separator" aria-label={conversationOrderLabel(conversation)}>
+              <span className="h-px flex-1 bg-outline-variant/50" />
+              <span className="rounded-xl border border-outline-variant/40 bg-surface px-3 py-2 text-center text-xs text-on-surface-variant"><span className="block font-semibold">{conversationOrderLabel(conversation)}</span><span className="mt-0.5 block">{conversationOrderStatus(conversation)}</span></span>
+              <span className="h-px flex-1 bg-outline-variant/50" />
+            </div>}
             <MessageRow
-              key={message._id}
               message={message}
               isMine={isMine}
               isEditing={isEditing}
@@ -133,6 +144,7 @@ export function MessageThread({
               }}
               onPreviewImage={setPreviewImageUrl}
             />
+            </Fragment>
           );
         })}
         <div ref={bottomRef} />

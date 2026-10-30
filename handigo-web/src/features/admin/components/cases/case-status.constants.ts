@@ -1,5 +1,20 @@
 import type { AdminCaseTab } from "./case-detail.types";
 import type { PenaltyType, ViolationSeverity, ViolationSourceType } from "@/features/case-management/types/caseManagement.types";
+import { toneChipClasses, type StatusTone } from "@/utils/statusTone";
+
+const CASE_STATUS_TONES: Record<string, StatusTone> = {
+  pending: "warning",
+  evidence_requested: "brand",
+  under_review: "info",
+  confirmed: "success",
+  resolved: "success",
+  rejected: "error",
+  cancelled: "neutral",
+  active: "error",
+};
+
+export const getCaseStatusClasses = (status: string) =>
+  toneChipClasses[CASE_STATUS_TONES[status] || "neutral"];
 
 export const VIOLATION_SEVERITY_LABELS: Record<ViolationSeverity, string> = {
   LOW: "Thấp",
