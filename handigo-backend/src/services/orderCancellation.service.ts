@@ -27,7 +27,6 @@ import { emitToUser } from "../sockets/socketServer";
 import {
   calculateRefundPolicy,
   CUSTOMER_CANCELLATION_POLICY_VERSION,
-  CUSTOMER_CANCELLATION_WINDOW_MS,
   QUOTATION_DEPOSIT_POLICY_VERSION,
   PROVIDER_ARRIVAL_CANCELLATION_POLICY_VERSION,
   PROVIDER_ARRIVAL_CANCELLATION_SUPPORT,
@@ -36,7 +35,7 @@ import {
   type RefundPolicyResult,
 } from "./refundPolicy.service";
 import { getRefundRetryDecision } from "./refundProcessing";
-import { getRefundPolicy } from "./systemConfig.service";
+import { getOrderOperationPolicy, getRefundPolicy } from "./systemConfig.service";
 import { settleCustomerNoShow, CustomerNoShowReview } from "./customerNoShowSettlement.service";
 
 type CancellationRole = "customer" | "provider" | "admin";
@@ -175,8 +174,10 @@ export const getCustomerCancellationDeadline = async (
   order: { _id: Types.ObjectId; status: string; providerId?: unknown },
   session?: ClientSession,
   history?: Array<{ status: string; createdAt: Date }>,
+  cancellationMinutes?: number,
 ): Promise<Date | null> => {
   if (order.status !== "accepted" || !order.providerId) return null;
+  const windowMinutes = cancellationMinutes ?? (await getOrderOperationPolicy(session)).customerCancellationMinutes;
   const accepted = history
     ? [...history].reverse().find((event) => event.status === "accepted")
     : await OrderStatus.findOne({ orderId: order._id, status: "accepted", isDeleted: false })
@@ -190,7 +191,7 @@ export const getCustomerCancellationDeadline = async (
     acceptedAt = assignment?.respondedAt ?? undefined;
   }
   return acceptedAt && Number.isFinite(acceptedAt.getTime())
-    ? new Date(acceptedAt.getTime() + CUSTOMER_CANCELLATION_WINDOW_MS) : null;
+    ? new Date(acceptedAt.getTime() + windowMinutes * 60_000) : null;
 };
 
 const calculateOrderRefundPolicy = async (
@@ -208,7 +209,8 @@ const calculateOrderRefundPolicy = async (
   }
   const quotationDeclined = role === "provider" && isQuotationDeclinedReason(cancellationReason);
   const hasRepairQuotation = Boolean(order.currentQuotationId);
-  const deadline = role === "customer" ? await getCustomerCancellationDeadline(order, session) : null;
+  const customerCancellationMinutes = role === "customer" ? (await getOrderOperationPolicy(session)).customerCancellationMinutes : undefined;
+  const deadline = role === "customer" ? await getCustomerCancellationDeadline(order, session, undefined, customerCancellationMinutes) : null;
   if (quotationDeclined && (!providerArrived || !order.inspectionRequired || order.status !== "accepted")) {
     throw new AppError("Chỉ được hủy do khách không đồng ý báo giá khi thợ đã đến nơi, đơn sửa chữa chưa bắt đầu thực hiện.", 409);
   }
@@ -229,7 +231,8 @@ const calculateOrderRefundPolicy = async (
     cancellationReason,
     providerArrived: hasProviderArrived(order),
     paidInspectionDeposit: deposits.reduce((sum, payment) => sum + getPaidPaymentAmount(payment), 0),
-    providerAcceptedAt: deadline ? new Date(deadline.getTime() - CUSTOMER_CANCELLATION_WINDOW_MS) : null,
+    providerAcceptedAt: deadline ? new Date(deadline.getTime() - customerCancellationMinutes! * 60_000) : null,
+    customerCancellationMinutes,
   }, policy);
 };
 

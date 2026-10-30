@@ -19,6 +19,24 @@ export const groupOptions: Array<{
 
 export const configDefinitions: ConfigDefinition[] = [
   {
+    key: 'PROVIDER_ARRIVAL_RADIUS_METERS', label: 'Khoảng cách xác nhận đã đến nơi',
+    group: 'booking', type: 'NUMBER', defaultValue: 200, unit: 'mét', isPublic: false, isEffective: true,
+    description: 'Khoảng cách tối đa giữa thợ và địa chỉ khách khi xác nhận đã đến nơi. Nhập số nguyên từ 1 đến 10.000 mét.',
+    effect: 'Áp dụng khi xác nhận đến nơi và xác minh báo cáo khách không có mặt, kể cả đơn đang xử lý.',
+  },
+  {
+    key: 'CUSTOMER_NO_SHOW_WAIT_MINUTES', label: 'Thời gian chờ khách không có mặt',
+    group: 'booking', type: 'NUMBER', defaultValue: 10, unit: 'phút', isPublic: false, isEffective: true,
+    description: 'Thời gian chờ trước khi báo khách không có mặt. Nhập số nguyên từ 1 đến 1.440 phút.',
+    effect: 'Tính từ lúc thợ xác nhận đến nơi hoặc giờ hẹn nếu thợ đến sớm. Áp dụng khi gửi và duyệt báo cáo.',
+  },
+  {
+    key: 'CUSTOMER_CANCELLATION_MINUTES', label: 'Thời hạn khách hủy sau khi thợ nhận đơn',
+    group: 'booking', type: 'NUMBER', defaultValue: 5, unit: 'phút', isPublic: false, isEffective: true,
+    description: 'Thời hạn khách được hủy sau khi thợ nhận đơn. Nhập số nguyên từ 1 đến 1.440 phút.',
+    effect: 'Tính từ mốc thợ nhận đơn gần nhất; hết hạn sẽ ẩn nút hủy và backend từ chối hủy. Thợ đã đến nơi hoặc bắt đầu làm việc thì khách không thể hủy.',
+  },
+  {
     key: 'BOOKING_POLICY', label: 'Chính sách đặt lịch và thời lượng', group: 'policy', type: 'JSON',
     defaultValue: defaultBookingPolicy, isPublic: false, isEffective: true,
     description: 'Thời lượng dịch vụ, giữ lịch chờ thanh toán, dự phòng, di chuyển và ca làm việc.',

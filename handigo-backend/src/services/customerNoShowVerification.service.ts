@@ -18,6 +18,7 @@ import { Order } from "../models/order.model";
 import { reverseGeocode } from "./reverseGeocoding.service";
 import { createLogger } from "../utils/logger";
 import { getNoShowEvidenceTimePrecision, resolveNoShowEvidenceTime } from "../utils/customerNoShowEvidence";
+import { getOrderOperationPolicy } from "./systemConfig.service";
 
 const logger = createLogger("CustomerNoShowAI");
 
@@ -29,6 +30,8 @@ export const getAdminNoShowDetails = async (report: IReport) => {
   const order = await Order.findOne({ _id: report.orderId._id, "customerNoShow.reportId": report._id, isDeleted: false })
     .select("addressId addressSnapshot arrival customerNoShow.evidenceIds customerId orderType scheduledAt").lean();
   if (!order) return null;
+  const radiusMeters = report.noShowVerification?.checks?.location?.radiusMeters
+    ?? (await getOrderOperationPolicy()).providerArrivalRadiusMeters;
   const [address, evidence, customer] = await Promise.all([
     order.addressSnapshot ?? Address.findOne({ _id: order.addressId, isDeleted: false }).lean(),
     CustomerNoShowEvidence.find({ _id: { $in: order.customerNoShow?.evidenceIds ?? [] }, orderId: order._id,
@@ -65,8 +68,8 @@ export const getAdminNoShowDetails = async (report: IReport) => {
       orderAddress: address?.fullAddress ?? null, arrivalAddress, attribution,
       arrivedAt: arrival?.arrivedAt ?? null,
       distanceMeters: distanceMeters === null ? null : Math.round(distanceMeters * 10) / 10,
-      withinRadius: distanceMeters === null ? null : distanceMeters <= CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS,
-      radiusMeters: CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS,
+      withinRadius: distanceMeters === null ? null : distanceMeters <= radiusMeters,
+      radiusMeters,
     },
     evidence: evidence.map((item) => ({ id: String(item._id), kind: item.kind, url: item.url,
       analysisStatus: item.analysisStatus, analysis: item.analysis, analysisFailure: item.analysisFailure ?? null,
@@ -85,6 +88,8 @@ const normalizeText = (value: string) => value.normalize("NFD").replace(/[\u0300
 const normalizePhone = (value: string) => value.replace(/\D/g, "").replace(/^84(?=\d{9}$)/, "0");
 
 export interface VerificationFacts {
+  arrivalRadiusMeters?: number;
+  waitMinutes?: number;
   addressLine: string;
   customerPhone: string;
   waitStartedAt: number;
@@ -151,7 +156,11 @@ export const evaluateNoShowEvidence = (
   evidence: VerificationEvidence[],
   facts: VerificationFacts,
 ): NonNullable<IReport["noShowVerification"]> => {
+  const radiusMeters = facts.arrivalRadiusMeters ?? CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS;
+  const requiredMinutes = facts.waitMinutes ?? CUSTOMER_NO_SHOW_WAIT_MINUTES;
+  const waited = CUSTOMER_NO_SHOW_SKIP_WAIT_FOR_TESTING || facts.now - facts.waitStartedAt >= requiredMinutes * 60_000;
   const reasons: string[] = [];
+  if (!waited) reasons.push(`Chưa đủ thời gian chờ khách ${requiredMinutes} phút theo cấu hình.`);
   const arrival = evidence.filter((item) => item.kind === "arrival");
   const contact = evidence.filter((item) => item.kind === "contact");
   if (!arrival.length || !contact.length) reasons.push("Chưa đủ hai nhóm ảnh bắt buộc.");
@@ -203,16 +212,15 @@ export const evaluateNoShowEvidence = (
   reasons.push(...callVerification.reasons);
   return {
     decision: reasons.length ? "manual_review" : "auto_eligible",
-    reasons: reasons.length ? reasons : [`Vị trí trong 200 m, có ảnh địa điểm, ảnh chat khớp tin nhắn Handigo và ${comparison.validCount} cuộc gọi đi không được trả lời tới đúng số khách; chưa ghi nhận khách phản hồi.`],
+    reasons: reasons.length ? reasons : [`Vị trí trong ${radiusMeters} m, có ảnh địa điểm, ảnh chat khớp tin nhắn Handigo và ${comparison.validCount} cuộc gọi đi không được trả lời tới đúng số khách; chưa ghi nhận khách phản hồi.`],
     checkedAt: new Date(facts.now), policyVersion: NO_SHOW_VERIFICATION_VERSION,
     checks: {
       location: { passed: facts.locationValid, distanceMeters: typeof facts.locationDistanceMeters === "number"
         && Number.isFinite(facts.locationDistanceMeters) ? facts.locationDistanceMeters : null,
-        radiusMeters: CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS },
-      waiting: { passed: CUSTOMER_NO_SHOW_SKIP_WAIT_FOR_TESTING
-        || facts.now - facts.waitStartedAt >= CUSTOMER_NO_SHOW_WAIT_MINUTES * 60_000,
+        radiusMeters },
+      waiting: { passed: waited,
         skippedForTesting: CUSTOMER_NO_SHOW_SKIP_WAIT_FOR_TESTING, waitStartedAt: new Date(facts.waitStartedAt),
-        requiredMinutes: CUSTOMER_NO_SHOW_WAIT_MINUTES },
+        requiredMinutes },
       calls: callVerification.checks,
       chat: { passed: chatMatched && messages.length > 0 && !facts.customerReplied, messageCount: messages.length,
         customerReplied: facts.customerReplied },
@@ -286,6 +294,7 @@ export const getNoShowEvidence = async (orderId: Types.ObjectId, userId: string,
 };
 
 export const verifyNoShowEvidence = async (order: IOrder, userId: string, evidence: ICustomerNoShowEvidence[], session?: ClientSession) => {
+  const policy = await getOrderOperationPolicy(session);
   const [address, customer, location, conversation, reused] = await Promise.all([
     order.addressSnapshot ?? Address.findOne({ _id: order.addressId, isDeleted: false }).session(session ?? null).lean(),
     User.findOne({ _id: order.customerId, isDeleted: false }).select("phone").session(session ?? null).lean(),
@@ -310,11 +319,11 @@ export const verifyNoShowEvidence = async (order: IOrder, userId: string, eviden
   const distanceMeters = coordinates && Number.isFinite(address?.latitude) && Number.isFinite(address?.longitude)
     ? haversineMeters(coordinates[1], coordinates[0], address!.latitude!, address!.longitude!) : null;
   const locationValid = distanceMeters !== null && age >= 0 && age <= 120_000
-    && distanceMeters <= CUSTOMER_NO_SHOW_ARRIVAL_RADIUS_METERS;
+    && distanceMeters <= policy.providerArrivalRadiusMeters;
   return evaluateNoShowEvidence(evidence, {
     addressLine: address?.fullAddress ?? "", customerPhone: customer?.phone?.trim() || address?.recipientPhone || "",
     waitStartedAt, now, locationValid, locationDistanceMeters: distanceMeters, reusedEvidence: !!reused,
     customerReplied: !!reply || !!order.customerNoShow?.customerRepliedAt,
-    providerMessages: messages,
+    providerMessages: messages, arrivalRadiusMeters: policy.providerArrivalRadiusMeters, waitMinutes: policy.customerNoShowWaitMinutes,
   });
 };

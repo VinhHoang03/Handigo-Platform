@@ -25,7 +25,8 @@ function loadService(name, modules, internals = []) {
       }
       if (name === '../utils/logger') return { createLogger: () => ({ info() {}, warn() {}, error() {}, debug() {} }) };
       if (name === '../validations/refundPolicy.validator') return { DEFAULT_REFUND_POLICY: { providerCompensationPercent: 80 } };
-      if (name === './systemConfig.service') return { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }) };
+      if (name === './systemConfig.service') return { getRefundPolicy: async () => ({ providerCompensationPercent: 80 }),
+        getOrderOperationPolicy: async () => ({ customerCancellationMinutes: 5 }) };
       if (name === './penaltyPolicy.service') return { assertFeatureAllowed: async () => {} };
       // Chỉ nạp các module được giả lập, không chạm cấu hình hoặc database thật.
       return {};
@@ -459,6 +460,26 @@ test('Lấy mốc nhận gần nhất sau thay thợ, không lấy updatedAt', a
 test('Đơn đang thực hiện không còn thời hạn hủy cho khách', async () => {
   const context = cancellationSetup('wallet', { customer: true, status: 'in_progress' });
   assert.equal(await context.service.getCustomerCancellationDeadline(context.order), null);
+});
+
+test('Hạn hủy và điều kiện hoàn tiền dùng thời gian admin cấu hình thay cho 5 phút cố định', async () => {
+  const acceptedAt = new Date('2026-10-15T01:00:00Z');
+  const { calculateRefundPolicy } = loadService('refundPolicy.service', {});
+  const input = { role: 'customer', orderStatus: 'accepted', orderType: 'normal', hasAssignedProvider: true,
+    paidAmount: 120000, providerAcceptedAt: acceptedAt, now: new Date(acceptedAt.getTime() + 180000) };
+  assert.equal(calculateRefundPolicy({ ...input, customerCancellationMinutes: 2 }).canCancel, false);
+  assert.equal(calculateRefundPolicy({ ...input, customerCancellationMinutes: 8 }).refundAmount, 120000);
+  const service = loadService('orderCancellation.service', {
+    './systemConfig.service': { getOrderOperationPolicy: async () => ({ customerCancellationMinutes: 8 }) },
+  });
+  const order = { _id: new Types.ObjectId(), providerId: new Types.ObjectId(), status: 'accepted' };
+  assert.equal((await service.getCustomerCancellationDeadline(order, undefined, [{ status: 'accepted', createdAt: acceptedAt }]))
+    .getTime(), acceptedAt.getTime() + 480000);
+  assert.equal(calculateRefundPolicy({ ...input, customerCancellationMinutes: 8,
+    now: new Date(acceptedAt.getTime() + 480000) }).canCancel, true);
+  assert.equal(calculateRefundPolicy({ ...input, customerCancellationMinutes: 8,
+    now: new Date(acceptedAt.getTime() + 480001) }).canCancel, false);
+  assert.equal(calculateRefundPolicy({ ...input, customerCancellationMinutes: 8, providerArrived: true }).canCancel, false);
 });
 
 test('Chặn hủy sau khi bắt đầu cho mọi loại lịch, kể cả còn trong 5 phút hoặc thiếu provider', () => {

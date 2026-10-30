@@ -68,6 +68,8 @@ function setup(overrides = {}, options = {}) {
     async save() {}, ...overrides };
   const location = { coordinates: { coordinates: options.coordinates ?? [106.7, 10.8] }, lastUpdatedAt: new Date(now - (options.locationAge ?? 0)) };
   const modules = {
+    './systemConfig.service': { getOrderOperationPolicy: async () => ({ providerArrivalRadiusMeters: 200,
+      customerNoShowWaitMinutes: 10, customerCancellationMinutes: 5, ...options.policy }) },
     mongoose: { __esModule: true, Types, default: { startSession: async () => ({ endSession: async () => {} }) } },
     '../models/order.model': { Order: {
       findById: () => query(order),
@@ -209,4 +211,16 @@ test('Báo cáo đủ điều kiện được chuyển tự duyệt; lỗi tự 
 test('Đã lưu báo giá thì không nhận thêm báo cáo khách vắng mặt', async () => {
   const ctx = setup({ currentQuotationId: new Types.ObjectId() });
   await assert.rejects(ctx.checkCustomerNoShowEligibility(String(ctx.order._id), ctx.userId), /đã lưu báo giá/);
+});
+
+test('Bán kính đến nơi và thời gian chờ lấy cấu hình admin, giữ mốc giờ hẹn khi thợ đến sớm', async () => {
+  const within = setup({ arrival: null }, { coordinates: [105, 10], policy: { providerArrivalRadiusMeters: 1000 } });
+  await within.markOrderArrival(String(within.order._id), within.userId);
+  const outside = setup({ arrival: null }, { coordinates: [105, 10], policy: { providerArrivalRadiusMeters: 999 } });
+  await assert.rejects(outside.markOrderArrival(String(outside.order._id), outside.userId), /999 m/);
+  const waitingOrder = { ...waiting(7), orderType: 'scheduled', bookingStatus: 'confirmed', scheduledAt: new Date(now - 3 * 60000) };
+  const eligible = setup(waitingOrder, { policy: { customerNoShowWaitMinutes: 3 } });
+  assert.equal((await eligible.checkCustomerNoShowEligibility(String(eligible.order._id), eligible.userId)).eligible, true);
+  const tooEarly = setup(waitingOrder, { policy: { customerNoShowWaitMinutes: 4 } });
+  await assert.rejects(tooEarly.checkCustomerNoShowEligibility(String(tooEarly.order._id), tooEarly.userId), /chờ thêm 1 phút/);
 });
