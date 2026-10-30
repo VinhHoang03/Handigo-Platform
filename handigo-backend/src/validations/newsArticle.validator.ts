@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isNewsRichContent, type NewsRichNode } from "../utils/newsRichContent";
 
 const textBlock = z.object({
   type: z.enum(["paragraph", "heading", "quote"]),
@@ -20,6 +21,7 @@ const articleFields = {
   coverImage: z.string().trim().url().max(1000),
   authorName: z.string().trim().min(2).max(120),
   content: z.array(z.union([textBlock, listBlock])).min(1).max(100),
+  richContent: z.custom<NewsRichNode>(isNewsRichContent, "Nội dung định dạng không hợp lệ hoặc vượt giới hạn cho phép").optional(),
   status: z.enum(["draft", "published"]),
   isFeatured: z.boolean().optional(),
 };

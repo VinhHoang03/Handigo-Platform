@@ -32,4 +32,9 @@ export const formatDuration = (milliseconds: number) => {
   return (hours / 24).toFixed(1) + " ngày";
 };
 
-export const ticketAge = (createdAt: string) => formatDuration(Date.now() - new Date(createdAt).getTime());
+export const ticketAge = (createdAt: string) => {
+  const elapsed = Date.now() - new Date(createdAt).getTime();
+  if (!Number.isFinite(elapsed)) return "Chưa có dữ liệu";
+  if (elapsed < 86_400_000) return Math.max(0, Math.round(elapsed / 3_600_000)) + " giờ";
+  return Math.round(elapsed / 86_400_000) + " ngày";
+};

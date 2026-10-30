@@ -1,7 +1,6 @@
 import type {
   NewsArticlePayload,
   NewsArticleRecord,
-  NewsContentBlock,
 } from "@/features/content/api/news.api";
 import { toneChipClasses } from "@/utils/statusTone";
 
@@ -16,13 +15,6 @@ export const emptyNewsForm: NewsArticlePayload = {
   isFeatured: false,
 };
 
-export const blockLabels: Record<NewsContentBlock["type"], string> = {
-  paragraph: "Đoạn văn",
-  heading: "Tiêu đề mục",
-  quote: "Trích dẫn / lưu ý",
-  list: "Danh sách",
-};
-
 export const toNewsForm = (article: NewsArticleRecord): NewsArticlePayload => ({
   title: article.title,
   excerpt: article.excerpt,
@@ -34,6 +26,7 @@ export const toNewsForm = (article: NewsArticleRecord): NewsArticlePayload => ({
       ? { type: "list", items: [...block.items] }
       : { type: block.type, text: block.text },
   ),
+  ...(article.richContent ? { richContent: structuredClone(article.richContent) } : {}),
   status: article.status,
   isFeatured: article.isFeatured,
 });

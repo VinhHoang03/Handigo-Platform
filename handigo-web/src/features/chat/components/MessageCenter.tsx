@@ -4,6 +4,7 @@ import { useAuthStore } from "@/features/auth/store/auth.store";
 import { createAuthenticatedSocket } from "@/realtime/authenticatedSocket";
 import { chatApi } from "../api/chat.api";
 import type { Conversation } from "../types/chat.types";
+import { conversationGroupKey, groupConversations } from "../utils/conversationGroups";
 import { ChatPopup } from "./ChatPopup";
 import { ConversationListItem } from "./ConversationListItem";
 import { ConversationListSkeleton } from "./ConversationListSkeleton";
@@ -42,17 +43,15 @@ function AccountMessageCenter() {
     return !seenAt || new Date(sentAt).getTime() > new Date(seenAt).getTime();
   }, [currentUserId, role]);
 
-  const unreadCount = useMemo(
-    () => items.filter(isUnread).length,
-    [isUnread, items],
-  );
+  const groups = useMemo(() => groupConversations(items), [items]);
+  const unreadCount = groups.filter((group) => group.some(isUnread)).length;
   const load = useCallback(async (showLoading = false) => {
     const revision = ++requestRevision.current;
     try {
       if (showLoading) setLoading(true);
       setError("");
-      const result = await chatApi.conversations();
-      if (requestRevision.current === revision) setItems(result.items);
+      const result = await chatApi.allConversations();
+      if (requestRevision.current === revision) setItems(result);
     } catch {
       if (requestRevision.current === revision) setError("Không thể tải danh sách tin nhắn.");
     } finally {
@@ -87,6 +86,7 @@ function AccountMessageCenter() {
     socket.on("message:updated", refresh);
     socket.on("message:deleted", refresh);
     socket.on("message:seen", refresh);
+    socket.on("order:updated", refresh);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refreshVisible);
     return () => {
@@ -95,6 +95,7 @@ function AccountMessageCenter() {
       socket.off("message:updated", refresh);
       socket.off("message:deleted", refresh);
       socket.off("message:seen", refresh);
+      socket.off("order:updated", refresh);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refreshVisible);
       dispose();
@@ -146,15 +147,16 @@ function AccountMessageCenter() {
                   <MessagesSquare aria-hidden="true" size={36} />
                   <p className="mt-2 text-sm">Bạn chưa có cuộc trò chuyện nào.</p>
                 </div>
-              ) : items.map((conversation) => {
+              ) : groups.map((group) => {
+                const conversation = group[0];
                 const customer = typeof conversation.customerId === "object" ? conversation.customerId : undefined;
                 const providerUser = typeof conversation.providerId === "object" && typeof conversation.providerId.userId === "object" ? conversation.providerId.userId : undefined;
                 const partner = role === "PROVIDER" ? customer : providerUser;
                 const partnerName = partner?.fullName || "Người dùng Handigo";
-                const unread = isUnread(conversation);
+                const unread = group.some(isUnread);
                 return (
                   <ConversationListItem
-                    key={conversation._id}
+                    key={conversationGroupKey(conversation)}
                     conversation={conversation}
                     partnerName={partnerName}
                     partnerAvatar={partner?.avatar}
@@ -171,6 +173,7 @@ function AccountMessageCenter() {
       {selected && (
         <ChatPopup
           conversation={selected}
+          relatedConversations={groups.find((group) => conversationGroupKey(group[0]) === conversationGroupKey(selected))}
           open
           onClose={() => {
             setSelected(null);

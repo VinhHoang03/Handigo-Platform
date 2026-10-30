@@ -63,6 +63,20 @@ handigo-backend/sample-data/
 # Backup migration mã hóa, khóa và journal cục bộ
 handigo-backend/.migration-backups/
 
+# Dữ liệu graph, báo cáo và cache Graphify cục bộ ở mọi cấp thư mục.
+graphify-out/
+.graphify/
+.graphify_*
+.graphify-*
+GRAPH_REPORT.md
+# Đầu ra xuất trực tiếp tại gốc dự án.
+/graph.json
+/graph.html
+/graph.svg
+/graph.graphml
+/graph.gexf
+/graphifyignore
+
 # Local development files
 *.local
 *.tmp

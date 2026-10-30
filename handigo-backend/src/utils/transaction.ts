@@ -4,6 +4,13 @@ import { createLogger } from "./logger";
 
 const transactionLogger = createLogger("Transaction");
 
+export const isRetryableWriteConflict = (error: unknown) => {
+  const failure = error as { code?: number; codeName?: string; errorLabels?: string[]; hasErrorLabel?: (label: string) => boolean } | null;
+  const unknownCommit = failure?.errorLabels?.includes("UnknownTransactionCommitResult")
+    || failure?.hasErrorLabel?.("UnknownTransactionCommitResult");
+  return !unknownCommit && (failure?.code === 112 || failure?.codeName === "WriteConflict");
+};
+
 // Một số lỗi WriteConflict không có nhãn tạm thời nên driver không tự thử lại.
 export async function withTransactionRetry<T>(session: ClientSession, operation: (session: ClientSession) => Promise<T>) {
   const startedAt = Date.now();
@@ -11,10 +18,7 @@ export async function withTransactionRetry<T>(session: ClientSession, operation:
     try { return await session.withTransaction(operation); }
     catch (error) {
       const failure = error as { code?: number; codeName?: string; errorLabels?: string[]; hasErrorLabel?: (label: string) => boolean } | null;
-      const unknownCommit = failure?.errorLabels?.includes("UnknownTransactionCommitResult")
-        || failure?.hasErrorLabel?.("UnknownTransactionCommitResult");
-      const conflict = failure?.code === 112 || failure?.codeName === "WriteConflict";
-      if (!conflict || unknownCommit || attempt >= 3 || Date.now() - startedAt >= 5000) throw error;
+      if (!isRetryableWriteConflict(error) || attempt >= 3 || Date.now() - startedAt >= 5000) throw error;
       transactionLogger.warn("Xung đột ghi, đang thử lại toàn bộ giao dịch.", {
         attempt, code: failure?.code, codeName: failure?.codeName, errorLabels: failure?.errorLabels,
       });

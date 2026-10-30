@@ -1,5 +1,6 @@
 import { Document, Schema, Types, model } from "mongoose";
 import { baseFields, IBaseDocument } from "./common";
+import { isNewsRichContent, type NewsRichNode } from "../utils/newsRichContent";
 
 export type NewsArticleStatus = "draft" | "published";
 export type NewsContentBlockType = "paragraph" | "heading" | "quote" | "list";
@@ -18,6 +19,7 @@ export interface INewsArticle extends Document, IBaseDocument {
   coverImage: string;
   authorName: string;
   content: INewsContentBlock[];
+  richContent?: NewsRichNode;
   status: NewsArticleStatus;
   isFeatured: boolean;
   publishedAt?: Date | null;
@@ -51,6 +53,14 @@ const NewsArticleSchema = new Schema<INewsArticle>(
       validate: {
         validator: (blocks: INewsContentBlock[]) => blocks.length > 0,
         message: "Bài viết phải có ít nhất một khối nội dung",
+      },
+    },
+    richContent: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+      validate: {
+        validator: (value: unknown) => value === undefined || isNewsRichContent(value),
+        message: "Nội dung định dạng không hợp lệ hoặc vượt giới hạn cho phép",
       },
     },
     status: {

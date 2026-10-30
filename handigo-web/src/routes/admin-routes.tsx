@@ -17,6 +17,7 @@ import {
   AdminWalletsPage,
   AdminSystemConfigsPage,
   AdminNewsPage,
+  AdminNewsEditorPage,
   AdminServiceSuggestionsPage,
   AdminFeedbackPage,
   NotificationsPage,
@@ -160,14 +161,11 @@ export function AdminRoutes() {
           </RouteGuard>
         }
       />
-      <Route
-        path="/admin/news"
-        element={
-          <RouteGuard roles={["ADMIN"]}>
-            <AdminNewsPage />
-          </RouteGuard>
-        }
-      />
+      <Route path="/admin/news">
+        <Route index element={<AdminNewsPage />} />
+        <Route path="new" element={<AdminNewsEditorPage />} />
+        <Route path=":articleId/edit" element={<AdminNewsEditorPage />} />
+      </Route>
     </Route>
   );
 }

@@ -24,13 +24,13 @@ export interface DashboardQuery {
 export const adminOperationsApi = {
   overview: async (query: DashboardQuery) =>
     unwrap<AdminOverview>(await api.get("/dashboard/overview", { params: query })),
-  orderAnalytics: async (query: DashboardQuery) =>
-    unwrap<AdminOrderAnalytics>(await api.get("/dashboard/orders", { params: query })),
-  providerAnalytics: async (query: DashboardQuery) =>
-    unwrap<AdminProviderAnalytics>(await api.get("/dashboard/providers", { params: query })),
+  orderAnalytics: async (query: DashboardQuery, signal?: AbortSignal) =>
+    unwrap<AdminOrderAnalytics>(await api.get("/dashboard/orders", { params: query, signal })),
+  providerAnalytics: async (query: DashboardQuery, signal?: AbortSignal) =>
+    unwrap<AdminProviderAnalytics>(await api.get("/dashboard/providers", { params: query, signal })),
 
-  payments: async (query: PaymentQuery) =>
-    unwrap<Paginated<AdminPayment> & { totalOrders: number }>(await api.get("/payments/history", { params: query })),
+  payments: async (query: PaymentQuery, signal?: AbortSignal) =>
+    unwrap<Paginated<AdminPayment> & { totalOrders: number }>(await api.get("/payments/history", { params: query, signal })),
   payment: async (id: string) =>
     unwrap<AdminPayment>(await api.get(`/payments/${id}`)),
   retryPaymentRefund: async (paymentId: string) =>

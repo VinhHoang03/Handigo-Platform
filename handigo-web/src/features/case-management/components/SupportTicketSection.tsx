@@ -32,48 +32,39 @@ function SupportTicketWorkspace({ role, initialCreate = false, initialOrderId, o
   const support = useSupportTickets();
 
   return (
-    <>
+    <div className="space-y-8">
       <section
         id="tao-yeu-cau-ho-tro"
-        className="scroll-mt-28 space-y-6 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-5 sm:p-7"
+        aria-labelledby="tao-ho-tro-heading"
+        className="scroll-mt-28 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-5 sm:p-7"
       >
-        <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-label-sm font-semibold uppercase tracking-wider text-primary">
-              Hỗ trợ của bạn
-            </p>
-            <h2 className="mt-2 font-headline-lg text-3xl font-bold tracking-[-0.02em] text-on-surface">
-              Theo dõi và trao đổi trên cùng một trang
+            <h2 id="tao-ho-tro-heading" className="font-headline-lg text-2xl font-bold tracking-[-0.02em] text-on-surface">
+              Tạo yêu cầu
             </h2>
-            <p className="mt-2 max-w-3xl text-pretty leading-6 text-on-surface-variant">
-              Tạo yêu cầu mới, xem tiến độ xử lý và phản hồi từ bộ phận hỗ trợ mà
-              không cần chuyển sang trang khác.
-            </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void support.loadTickets()}
-              disabled={support.loading}
-              className="btn-secondary min-h-11"
-            >
-              <span
-                aria-hidden="true"
-                className={support.loading ? "animate-spin" : ""}
-              >
-                <RefreshCw aria-hidden="true" size={18} />
-              </span>
-              Làm mới
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="btn-primary"
-            >
-              <Plus aria-hidden="true" size={18} className="leading-none" />
-              Tạo yêu cầu hỗ trợ
-            </button>
+          <button type="button" onClick={() => setCreateOpen(true)} className="btn-primary shrink-0">
+            <Plus aria-hidden="true" size={18} />
+            Tạo yêu cầu
+          </button>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="danh-sach-ho-tro-heading"
+        className="space-y-6 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-5 sm:p-7"
+      >
+        <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 id="danh-sach-ho-tro-heading" className="font-headline-lg text-2xl font-bold tracking-[-0.02em] text-on-surface">
+              Yêu cầu đã gửi
+            </h2>
           </div>
+          <button type="button" onClick={() => void support.loadTickets()} disabled={support.loading} className="btn-secondary min-h-11 shrink-0">
+            <RefreshCw aria-hidden="true" size={18} className={support.loading ? "animate-spin" : ""} />
+            Làm mới
+          </button>
         </header>
 
         {(support.refreshError || support.detailError) && <p role="status" className="rounded-xl bg-warning-container p-3 text-sm text-on-warning-container">{support.refreshError || support.detailError} Dữ liệu đang hiển thị có thể chưa cập nhật.</p>}
@@ -134,6 +125,6 @@ function SupportTicketWorkspace({ role, initialCreate = false, initialOrderId, o
         onAddEvidence={async () => false}
         onRespond={support.respondTicket}
       />
-    </>
+    </div>
   );
 }
