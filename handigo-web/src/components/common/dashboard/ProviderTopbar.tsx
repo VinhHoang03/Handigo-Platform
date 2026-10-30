@@ -64,7 +64,7 @@ export function ProviderTopbar({
   };
 
   return (
-    <header className="fixed left-4 right-4 top-6 z-30 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/92 px-4 py-3 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl lg:left-80 xl:left-[21rem]">
+    <header className="fixed left-4 right-4 top-6 z-30 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/92 px-4 py-3 shadow-[0_14px_40px_rgba(19,27,46,0.08)] backdrop-blur-xl transition-[left] duration-300 ease-out motion-reduce:transition-none lg:left-24 xl:left-28">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <Link

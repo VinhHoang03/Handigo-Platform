@@ -56,6 +56,7 @@ export function ProviderRevenueChart({
           >
             <option value="week">Tuần</option>
             <option value="month">Tháng</option>
+            <option value="year">Năm</option>
           </select>
         </div>
       }

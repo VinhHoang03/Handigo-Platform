@@ -6,7 +6,7 @@ export const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
-export type RevenuePeriod = "week" | "month";
+export type RevenuePeriod = "week" | "month" | "year";
 
 export const dateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -24,23 +24,38 @@ export const getRevenueRange = (period: RevenuePeriod) => {
   if (period === "week") {
     const daysSinceMonday = (today.getDay() + 6) % 7;
     start.setDate(today.getDate() - daysSinceMonday);
-  } else {
+  } else if (period === "month") {
     start.setDate(1);
     dayCount = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  } else {
+    start.setMonth(0, 1);
+    dayCount = 12;
   }
 
   const dates = Array.from({ length: dayCount }, (_, index) => {
     const date = new Date(start);
-    date.setDate(start.getDate() + index);
+    if (period === "year") {
+      date.setMonth(index, 1);
+    } else {
+      date.setDate(start.getDate() + index);
+    }
     return date;
   });
 
+  const queryEnd = period === "year"
+    ? new Date(today.getFullYear(), 11, 31)
+    : dates[dates.length - 1];
+
   return {
     dates,
+    queryStart: dates[0],
+    queryEnd,
     label:
       period === "week"
         ? `${dates[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} - ${dates[dates.length - 1].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}`
-        : `Tháng ${today.getMonth() + 1}/${today.getFullYear()}`,
+        : period === "month"
+          ? `Tháng ${today.getMonth() + 1}/${today.getFullYear()}`
+          : `Năm ${today.getFullYear()}`,
   };
 };
 
@@ -49,6 +64,7 @@ export function getRevenueChart(
   period: RevenuePeriod,
   dates: Date[],
   earningsByDay: ReadonlyMap<string, number>,
+  earningsByMonth: ReadonlyMap<string, number>,
 ) {
   if (period === "week") {
     return dates.map((date) => ({
@@ -57,6 +73,18 @@ export function getRevenueChart(
       fullLabel: date.toLocaleDateString("vi-VN"),
       amount: earningsByDay.get(dateKey(date)) ?? 0,
     }));
+  }
+
+  if (period === "year") {
+    return dates.map((date) => {
+      const monthKey = dateKey(date).slice(0, 7);
+      return {
+        key: monthKey,
+        label: `T${date.getMonth() + 1}`,
+        fullLabel: `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`,
+        amount: earningsByMonth.get(monthKey) ?? 0,
+      };
+    });
   }
 
   const weeks: { key: string; label: string; fullLabel: string; amount: number }[] = [];
