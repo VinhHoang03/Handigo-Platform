@@ -10,7 +10,9 @@ export const getVietnamMonthBounds = (now = new Date()) => {
   };
 };
 
-export const rescheduleConsumesQuota = (status: RescheduleRequestStatus) => status === "applied";
+export const RESCHEDULE_QUOTA_STATUSES: RescheduleRequestStatus[] = ["applied", "rejected"];
+
+export const rescheduleConsumesQuota = (status: RescheduleRequestStatus) => RESCHEDULE_QUOTA_STATUSES.includes(status);
 
 export const canUseRescheduleQuota = (appliedCount: number) => appliedCount < 1;
 

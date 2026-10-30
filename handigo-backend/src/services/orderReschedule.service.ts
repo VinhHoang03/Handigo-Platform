@@ -17,6 +17,7 @@ import {
   canUseRescheduleQuota,
   getVietnamMonthBounds,
   requiresProviderMonthlyWarning,
+  RESCHEDULE_QUOTA_STATUSES,
 } from "../utils/orderReschedule";
 import { createNotificationRecord } from "./notification.service";
 import { DispatchService } from "./dispatch.service";
@@ -155,7 +156,7 @@ const assertOrderCanBeRescheduled = async (
 };
 
 const getAppliedCountForRole = (orderId: Types.ObjectId, role: RescheduleInitiatorRole, session?: ClientSession) =>
-  OrderRescheduleRequest.countDocuments({ orderId, initiatorRole: role, status: "applied", isDeleted: false })
+  OrderRescheduleRequest.countDocuments({ orderId, initiatorRole: role, status: { $in: RESCHEDULE_QUOTA_STATUSES }, isDeleted: false })
     .session(session ?? null);
 
 const getProviderMonthlyAppliedCount = (providerId: Types.ObjectId, now = new Date(), session?: ClientSession) => {
