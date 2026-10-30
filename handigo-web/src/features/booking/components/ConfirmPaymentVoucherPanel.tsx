@@ -11,15 +11,18 @@ interface ConfirmPaymentVoucherPanelProps {
   onRemoveVoucher: () => void;
   voucherError: string;
   isSubmitting: boolean;
+  showAppliedVoucherNotice?: boolean;
+  manualInputValue?: string;
 }
 
 /** Chọn/nhập mã voucher trong thẻ tóm tắt đơn hàng ở bước xác nhận thanh toán. */
 export const ConfirmPaymentVoucherPanel = ({
   voucherCode, onSelectVoucher, onManualInputChange, onApplyClick, availableVouchers,
   appliedVoucher, voucherDiscountAmount, onRemoveVoucher, voucherError, isSubmitting,
+  showAppliedVoucherNotice = true, manualInputValue = voucherCode,
 }: ConfirmPaymentVoucherPanelProps) => (
   <div className="border-t border-dashed border-outline-variant pt-md">
-    {appliedVoucher ? (
+    {appliedVoucher && showAppliedVoucherNotice ? (
       <div className="flex items-center justify-between gap-2 rounded-lg bg-success-container px-3 py-2 text-sm font-semibold text-on-success-container">
         <span>Giảm {voucherDiscountAmount.toLocaleString('vi-VN')}đ</span>
         <button
@@ -54,7 +57,7 @@ export const ConfirmPaymentVoucherPanel = ({
         </label>
         <div className="mt-2 flex gap-2">
           <input
-            value={voucherCode}
+            value={manualInputValue}
             onChange={(event) => onManualInputChange(event.target.value.toUpperCase())}
             maxLength={50}
             disabled={isSubmitting}
@@ -63,11 +66,11 @@ export const ConfirmPaymentVoucherPanel = ({
           />
           <button
             type="button"
-            onClick={onApplyClick}
+            onClick={appliedVoucher && !showAppliedVoucherNotice ? onRemoveVoucher : onApplyClick}
             disabled={isSubmitting || !voucherCode.trim()}
             className="rounded-xl bg-primary px-3 font-semibold text-on-primary disabled:opacity-50"
           >
-            Áp dụng
+            {appliedVoucher && !showAppliedVoucherNotice ? 'Gỡ mã' : 'Áp dụng'}
           </button>
         </div>
       </>

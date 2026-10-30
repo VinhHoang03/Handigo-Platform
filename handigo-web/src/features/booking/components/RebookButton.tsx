@@ -86,8 +86,18 @@ export function RebookButton({ orderId, status, restoreOnly = false }: { orderId
   useEffect(() => {
     const resume = () => {
       if (!getQuickRebookingReturn(orderId)) return;
-      if (restoreOnly) void load();
-      else if (canRebook(status)) navigate(quickRebookingReturnPath(orderId), { replace: true });
+      if (restoreOnly) {
+        const returnPath = quickRebookingReturnPath(orderId);
+        if (window.location?.pathname && returnPath.split('?')[0] !== window.location.pathname) {
+          navigate(returnPath, { replace: true });
+        } else void load();
+      }
+      else if (canRebook(status)) {
+        const returnPath = quickRebookingReturnPath(orderId);
+        if (returnPath.split('?')[0] === `/customer/bookings/${orderId}`
+          && window.location?.pathname === `/customer/bookings/${orderId}`) void load();
+        else navigate(returnPath, { replace: true });
+      }
     };
     const timer = window.setTimeout(resume, 0);
     const onPageShow = (event: PageTransitionEvent) => {

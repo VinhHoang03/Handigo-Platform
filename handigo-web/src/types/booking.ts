@@ -368,6 +368,7 @@ export interface OrderQuotation {
 }
 
 export interface BookingState {
+  voucherCode?: string;
   rebookSource?: { orderId: string; orderCode: string; notices: string[] };
   categoryId?: string;
   serviceId?: string;

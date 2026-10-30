@@ -33,10 +33,13 @@ export const buildOrderPaymentRedirects = (orderId: string, frontendUrl: string,
     && /^\/customer\/bookings\/[a-f\d]{24}$/i.test(requestedCancel.pathname)
     && requestedCancel.searchParams.get('quickRebook') === '1';
   const quickRebookOrderId = isLegacyQuickRebooking ? requestedCancel.pathname.split('/').pop()
-    : requestedCancel?.origin === frontend.origin && requestedCancel.pathname === '/customer/services'
+    : requestedCancel?.origin === frontend.origin
+      && (['/customer/services', '/customer/bookings'].includes(requestedCancel.pathname)
+        || /^\/customer\/(?:services|bookings)\/[a-f\d]{24}$/i.test(requestedCancel.pathname))
       && /^[a-f\d]{24}$/i.test(requestedCancel.searchParams.get('quickRebook') ?? '')
     ? requestedCancel.searchParams.get('quickRebook') : undefined;
-  const cancelPath = quickRebookOrderId ? '/customer/services'
+  const cancelPath = quickRebookOrderId
+    ? requestedCancel?.pathname === '/customer/services' ? '/customer/bookings' : requestedCancel!.pathname
     : requestedCancel?.origin === frontend.origin && requestedCancel.pathname === '/customer/bookings/new/payment'
     ? '/customer/bookings/new/payment'
     : `/customer/bookings/${orderId}`;

@@ -30,6 +30,8 @@ test('KH-29/KH-30: lịch sử có bộ lọc đã nhận, bỏ phản hồi cũ
   };
   const modules = {
     react,
+    'react-router-dom': { Link: 'link', useSearchParams: () => [new URLSearchParams('quickRebook=507f1f77bcf86cd799439011')] },
+    '../components/RebookButton': { RebookButton: 'rebook-return' },
     '@/components/common/Toast': { useToastFeedback: initial => react.useState(initial) },
     '@/features/booking/api/booking.api': { bookingApi: { getMyOrders(page, limit, status, search) {
       let resolve, reject;
@@ -78,6 +80,9 @@ test('KH-29/KH-30: lịch sử có bộ lọc đã nhận, bỏ phản hồi cũ
     items: entries.map(([id, status]) => ({ _id: id, status })), pagination: { total },
   });
   let tree = render(); runTimers(0);
+  const returnForm = find(tree, node => node.type === 'rebook-return');
+  assert.equal(returnForm.props.orderId, '507f1f77bcf86cd799439011');
+  assert.equal(returnForm.props.restoreOnly, true);
   const oldAll = requests.at(-1);
   button(tree, 'Đã hoàn thành').props.onClick(); tree = render(); runTimers(0);
   assert.equal(requests.at(-1).status, 'completed');

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { bookingApi, type BookingPreview } from '../api/booking.api';
 import { customerServiceApi, type NearbyProvider } from '@/features/customer-service/api/customerService.api';
 import { getErrorMessage } from '@/utils/apiError';
-import { getEarliestScheduledAt, isWithinImmediateBookingHours } from '../components/step2Helpers';
+import { getEarliestScheduledAt, isWithinImmediateBookingHours, isWithinScheduledBookingHours } from '../components/step2Helpers';
 import { isRequiredOptionSelectionMissing } from '../utils/serviceOptionSelection';
 import type { PreparedRebooking, RebookingDraft } from '../utils/rebooking';
 
@@ -14,12 +14,14 @@ export function useQuickRebookingQuote(prepared: PreparedRebooking, draft: Reboo
   const request = {
     serviceId: draft.serviceId!, orderType: draft.orderType, selectedOptions,
     uniformQuantity: draft.uniformQuantity > 1 ? draft.uniformQuantity : undefined,
+    voucherCode: draft.voucherCode,
   };
   const key = JSON.stringify({ ...request, addressId: draft.addressId, scheduledAt: draft.scheduledAt, attempt });
   const missingOptions = isRequiredOptionSelectionMissing(prepared.service, draft.selectedOptionIds, prepared.options);
   const scheduledTime = draft.scheduledAt ? new Date(draft.scheduledAt).getTime() : NaN;
   const scheduleValid = draft.orderType === 'normal' ? isWithinImmediateBookingHours()
-    : Number.isFinite(scheduledTime) && scheduledTime >= getEarliestScheduledAt().getTime();
+    : Number.isFinite(scheduledTime) && scheduledTime >= getEarliestScheduledAt().getTime()
+      && isWithinScheduledBookingHours(draft.scheduledAt?.split('T')[1]?.slice(0, 5) ?? '');
   const valid = Boolean(draft.addressId && scheduleValid && !missingOptions);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function useQuickRebookingQuote(prepared: PreparedRebooking, draft: Reboo
     const timer = window.setTimeout(() => {
       void Promise.all([
         bookingApi.preview({ serviceId: input.serviceId, orderType: input.orderType,
-          selectedOptions: input.selectedOptions, uniformQuantity: input.uniformQuantity }),
+          selectedOptions: input.selectedOptions, uniformQuantity: input.uniformQuantity, voucherCode: input.voucherCode }),
         customerServiceApi.nearbyProviders(input.serviceId, input.addressId,
           input.orderType === 'scheduled' && input.scheduledAt ? new Date(input.scheduledAt).toISOString() : undefined,
           undefined, undefined, undefined, JSON.stringify(input.selectedOptions)),

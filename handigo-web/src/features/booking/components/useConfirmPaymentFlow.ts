@@ -63,7 +63,7 @@ export const useConfirmPaymentFlow = () => {
   const navigate = useNavigate();
   const currentPendingOrderId = sessionStorage.getItem(PENDING_ORDER_FINGERPRINT_KEY) === bookingFingerprint ? pendingOrderId : '';
   const [recoverPending, setRecoverPending] = useState(() => Boolean(currentPendingOrderId));
-  const [restoredVoucherCode, setRestoredVoucherCode] = useState(() => sessionStorage.getItem(PENDING_ORDER_VOUCHER_KEY) || '');
+  const [restoredVoucherCode, setRestoredVoucherCode] = useState(() => sessionStorage.getItem(PENDING_ORDER_VOUCHER_KEY) || useBookingStore.getState().voucherCode || '');
   const [pendingError, setPendingError] = useState('');
   const [pendingRetry, setPendingRetry] = useState(0);
   const needsRecovery = Boolean(currentPendingOrderId && recoverPending);
