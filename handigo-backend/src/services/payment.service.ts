@@ -20,6 +20,7 @@ import { markOrderVoucherAsUsed } from "./voucher.service";
 import { ActionPreconditionError } from "../utils/actionPreconditionError";
 import { publishPaymentStatus } from "./paymentStatus.service";
 import { buildOrderPaymentRedirects, resolvePaymentFrontendOrigin } from "../utils/paymentRedirect";
+import { payQuotationByWallet } from "./quotationWalletPayment.service";
 
 export interface ConfirmedPaymentExpectation {
   amount: number;
@@ -747,6 +748,7 @@ export const createAgentOrderPayment = async (user: RequestUser, input: CreatePa
 };
 
 export const createOrderPayment = async (user: RequestUser, input: CreatePaymentInput) => {
+  if (input.paymentType === "REMAINING") return payQuotationByWallet(user, input);
   const order = await Order.findById(input.orderId);
   if (!order || order.isDeleted) throw new AppError("Không tìm thấy đơn hàng", 404);
   if (order.customerId.toString() !== user.id) {
@@ -782,6 +784,7 @@ export const createOrderPayment = async (user: RequestUser, input: CreatePayment
 };
 
 export const createPayment = async (user: RequestUser, input: CreatePaymentInput, expected?: ConfirmedPaymentExpectation, previousCashPaymentId?: string) => {
+  if (input.paymentType === "REMAINING") return payQuotationByWallet(user, input);
   const order = await Order.findById(input.orderId);
 
   if (!order || order.isDeleted) {
@@ -1580,9 +1583,12 @@ export const getPaymentHistory = async (user: RequestUser, query: PaymentHistory
   }
 
   const skip = (query.page - 1) * query.limit;
-  const [items, total] = await Promise.all([
+  const [items, total, orderTotals] = await Promise.all([
     Payment.find(filter).sort(query.dateField ? { [query.dateField]: -1, _id: -1 } : { createdAt: -1 }).skip(skip).limit(query.limit),
     Payment.countDocuments(filter),
+    user.role === "ADMIN" ? Payment.aggregate<{ total: number }>([
+      { $match: filter }, { $group: { _id: "$orderId" } }, { $count: "total" },
+    ]) : Promise.resolve([]),
   ]);
 
   const orders = user.role === "ADMIN" && items.length
@@ -1591,6 +1597,7 @@ export const getPaymentHistory = async (user: RequestUser, query: PaymentHistory
   const orderCodes = new Map(orders.map(order => [String(order._id), order.orderCode]));
 
   return {
+    ...(user.role === "ADMIN" ? { totalOrders: orderTotals[0]?.total ?? 0 } : {}),
     items: user.role === "ADMIN" ? items.map(payment => ({ ...payment.toObject(), orderCode: orderCodes.get(String(payment.orderId)) ?? null })) : items,
     pagination: {
       page: query.page,

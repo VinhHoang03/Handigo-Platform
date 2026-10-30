@@ -12,13 +12,13 @@ export const BookingStatusTimeline = ({
   statusLabel,
   timeline,
 }: BookingStatusTimelineProps) => (
-  <section className="rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm sm:p-lg">
-    <div className="mb-md flex items-center justify-between gap-sm">
+  <section className="min-w-0 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md shadow-sm sm:p-lg">
+    <div className="mb-md flex flex-wrap items-center justify-between gap-3">
       <h3 className="font-label-sm text-label-sm font-bold uppercase tracking-wider text-on-surface-variant">
         Theo dõi tiến độ
       </h3>
       <span
-        className={`rounded-full px-3 py-1 text-xs font-bold ${status === "cancelled" ? "bg-error/10 text-error" : "bg-primary/10 text-primary"}`}
+        className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${status === "cancelled" ? "bg-error/10 text-error" : "bg-primary/10 text-primary"}`}
       >
         {statusLabel}
       </span>
@@ -61,7 +61,7 @@ export const BookingStatusTimeline = ({
             >
               <div>
                 <h4
-                  className={`text-sm leading-5 ${isCancelled ? "font-bold text-error" : isActive ? "font-bold text-primary" : isDone ? "font-semibold text-on-surface" : "font-semibold text-on-surface-variant"}`}
+                  className={`break-words text-sm leading-5 ${isCancelled ? "font-bold text-error" : isActive ? "font-bold text-primary" : isDone ? "font-semibold text-on-surface" : "font-semibold text-on-surface-variant"}`}
                 >
                   {step.title}
                 </h4>

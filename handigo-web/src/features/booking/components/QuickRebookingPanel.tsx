@@ -190,6 +190,7 @@ export function QuickRebookingPanel({ prepared, onBusyChange }: {
     </fieldset>
     <ConfirmPaymentVoucherPanel manualInputValue={manualVoucherCode} showAppliedVoucherNotice={false} voucherCode={voucher.voucherCode} availableVouchers={voucher.availableVouchers}
       appliedVoucher={voucher.appliedVoucher} voucherError={voucher.voucherError}
+      voucherDiscountAmount={quote.preview?.voucherDiscountAmount ?? 0}
       isSubmitting={busy || recoveryRequired || voucher.loading}
       onSelectVoucher={code => { pendingVoucherToast.current = code || null; setManualVoucherCode(''); voucher.setVoucherCode(code); voucher.applyVoucherCode(code); setError(''); }}
       onManualInputChange={code => { pendingVoucherToast.current = null; setManualVoucherCode(code); voucher.setVoucherCode(code); voucher.setAppliedVoucher(null); voucher.setVoucherError(''); setError(''); }}

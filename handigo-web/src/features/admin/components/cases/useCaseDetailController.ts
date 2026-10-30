@@ -1,8 +1,7 @@
 import { useToast, useToastFeedback } from "@/components/common/Toast";
 import { useMemo, useState } from "react";
 import type {
-  Complaint,
-  ComplaintStatus,
+  Report,
   ReportStatus,
   ViolationSourceType,
 } from "@/features/case-management/types/caseManagement.types";
@@ -18,7 +17,7 @@ export interface SourceForViolation {
 }
 
 /**
- * Toàn bộ state + hành động của modal chi tiết khiếu nại/báo cáo/vi phạm.
+ * Toàn bộ state + hành động của modal chi tiết báo cáo/vi phạm.
  * Tách khỏi `AdminCasesPage` để trang chính chỉ còn lo bảng + phân trang.
  */
 export function useCaseDetailController(
@@ -50,9 +49,7 @@ export function useCaseDetailController(
       setDetailLoading(true);
       setActionError("");
       resetForm();
-      if (tab === "complaints") {
-        setSelected({ kind: "complaint", item: await adminCasesApi.complaint(id) });
-      } else if (tab === "reports") {
+      if (tab === "reports") {
         setSelected({ kind: "report", item: await adminCasesApi.report(id) });
       } else {
         setSelected({ kind: "violation", item: await adminCasesApi.violation(id) });
@@ -69,17 +66,17 @@ export function useCaseDetailController(
     setActionError("");
   };
 
-  const runComplaintAction = async (action: () => Promise<Complaint>) => {
+  const requestEvidence = async (action: () => Promise<Report>) => {
     try {
       setBusy(true);
       setActionError("");
       const item = await action();
-      setSelected({ kind: "complaint", item });
+      setSelected({ kind: "report", item });
       resetForm();
       await reload();
       addToast("Đã cập nhật hồ sơ xử lý.", "success");
     } catch (requestError) {
-      setActionError(getErrorMessage(requestError, "Không thể cập nhật khiếu nại."));
+      setActionError(getErrorMessage(requestError, "Không thể yêu cầu bổ sung bằng chứng."));
     } finally {
       setBusy(false);
     }
@@ -109,21 +106,12 @@ export function useCaseDetailController(
 
   const openViolationForm = () => {
     if (!selected || selected.kind === "violation") return;
-    if (selected.kind === "complaint") {
-      setViolationSource({
-        sourceType: "COMPLAINT",
-        sourceId: selected.item._id,
-        userId: selected.item.targetUserId._id,
-        orderId: selected.item.orderId._id,
-      });
-    } else {
-      setViolationSource({
-        sourceType: "REPORT",
-        sourceId: selected.item._id,
-        userId: selected.item.targetUserId?._id,
-        orderId: selected.item.orderId?._id,
-      });
-    }
+    setViolationSource({
+      sourceType: "REPORT",
+      sourceId: selected.item._id,
+      userId: selected.item.targetUserId?._id,
+      orderId: selected.item.orderId?._id,
+    });
   };
 
   const reverifyReport = async () => {
@@ -141,20 +129,12 @@ export function useCaseDetailController(
     } finally { setBusy(false); }
   };
 
-  const selectedTitle = selected?.kind === "complaint"
-    ? selected.item.title
-    : selected?.kind === "report"
+  const selectedTitle = selected?.kind === "report"
       ? selected.item.title
       : selected?.item.violationType;
 
   const detailEvidence = useMemo(() => {
     if (!selected) return [];
-    if (selected.kind === "complaint") {
-      return [
-        ...selected.item.evidenceImages,
-        ...(selected.item.evidence?.map((evidence) => evidence.url) || []),
-      ];
-    }
     if (selected.kind === "report") {
       return [
         ...selected.item.evidenceImages,
@@ -185,13 +165,8 @@ export function useCaseDetailController(
     openDetail,
     closeDetail,
     onRequestEvidence: () =>
-      selected?.kind === "complaint" &&
-      void runComplaintAction(() => adminCasesApi.requestComplaintEvidence(selected.item._id, evidenceNote.trim())),
-    onUpdateComplaint: () =>
-      selected?.kind === "complaint" &&
-      void runComplaintAction(() =>
-        adminCasesApi.updateComplaint(selected.item._id, nextStatus as ComplaintStatus, resolutionNote.trim() || undefined),
-      ),
+      selected?.kind === "report" &&
+      void requestEvidence(() => adminCasesApi.requestReportEvidence(selected.item._id, evidenceNote.trim())),
     onReviewReport: () => void runReportAction(),
     onReverifyReport: () => void reverifyReport(),
     openViolationForm,

@@ -24,6 +24,8 @@ export const feedbackListQuerySchema = z.object({
 
 export const adminFeedbackListQuerySchema = feedbackListQuerySchema.extend({
   ratingBelow: z.coerce.number().min(1).max(5).optional(),
+  categoryId: objectIdSchema.optional(),
+  sort: z.enum(["attention", "newest"]).optional(),
 });
 
 export const serviceFeedbackQuerySchema = feedbackListQuerySchema.extend({

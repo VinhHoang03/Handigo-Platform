@@ -291,6 +291,7 @@ export interface QuotationItem {
 
 export interface OrderQuotation {
   quotation: {
+    customerConfirmed?: boolean;
     estimatedDurationMinutes?: number;
     _id: string;
     quotationCode?: string;

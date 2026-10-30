@@ -91,3 +91,18 @@ test('Mở trực tiếp đơn đang xử lý không cần có đánh giá', asy
   assert.equal(result.quotation, null);
   await assert.rejects(getAdminOrderDetail('sai'), error => error.statusCode === 400);
 });
+
+test('Mở trực tiếp đơn hoàn thành trả cả đánh giá và phản hồi của thợ, loại bản ghi đã xóa', async t => {
+  t.after(() => mock.restoreAll());
+  mock.method(Order, 'findOne', () => chain({ _id: id, status: 'completed', currentQuotationId: null }));
+  mock.method(OrderStatus, 'find', () => chain([]));
+  const selections = [];
+  mock.method(Feedback, 'findOne', filter => {
+    assert.deepEqual(filter, { orderId: id, isDeleted: false });
+    return chain({ rating: 4.5, comment: 'Dịch vụ tốt', images: ['danh-gia.jpg'], providerReply: { content: 'Cảm ơn khách hàng', images: ['phan-hoi.jpg'] } }, selections);
+  });
+  const result = await getAdminOrderDetail(id);
+  assert.equal(result.feedback.rating, 4.5);
+  assert.equal(result.feedback.providerReply.content, 'Cảm ơn khách hàng');
+  assert.ok(selections.every(fields => !/password|token|credential/i.test(fields)));
+});

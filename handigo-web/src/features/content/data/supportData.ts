@@ -49,41 +49,10 @@ export const supportChannels = [
   },
 ];
 
-export const ticketDate = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' });
+export {
+  SUPPORT_STATUS_LABELS as TICKET_STATUS_LABELS,
+  SUPPORT_CATEGORY_LABELS as TICKET_CATEGORY_LABELS,
+  SUPPORT_PRIORITY_LABELS as TICKET_PRIORITY_LABELS,
+} from "@/features/case-management/components/supportLabels.constants";
 
-export const TICKET_STATUS_LABELS: Record<string, string> = {
-  open: 'Mới tiếp nhận',
-  in_progress: 'Đang xử lý',
-  waiting_user: 'Chờ phản hồi',
-  resolved: 'Đã xử lý',
-  closed: 'Đã đóng',
-  cancelled: 'Đã hủy',
-};
-
-export const TICKET_CATEGORY_LABELS: Record<string, string> = {
-  ACCOUNT: 'Tài khoản',
-  PAYMENT: 'Thanh toán',
-  ORDER: 'Đơn dịch vụ',
-  TECHNICAL: 'Kỹ thuật',
-  SECURITY: 'Bảo mật',
-  APPEAL: 'Khiếu nại quyết định',
-  OTHER: 'Khác',
-};
-
-export const TICKET_PRIORITY_LABELS: Record<string, string> = {
-  LOW: 'Thấp',
-  MEDIUM: 'Trung bình',
-  HIGH: 'Cao',
-  URGENT: 'Khẩn cấp',
-};
-
-/** Ánh xạ sang token ngữ nghĩa thay vì palette mặc định của Tailwind. */
-export const TICKET_PRIORITY_CLASSES: Record<string, string> = {
-  LOW: 'bg-surface-container-high text-on-surface-variant',
-  MEDIUM: 'bg-secondary-container text-on-secondary-container',
-  HIGH: 'bg-warning-container text-on-warning-container',
-  URGENT: 'bg-error-container text-on-error-container',
-};
-
-export const TICKET_PRIORITY_FALLBACK =
-  'bg-surface-container-high text-on-surface-variant';
+export { ticketDate, TICKET_PRIORITY_CLASSES, TICKET_PRIORITY_FALLBACK } from "@/features/case-management/components/supportLabels.constants";

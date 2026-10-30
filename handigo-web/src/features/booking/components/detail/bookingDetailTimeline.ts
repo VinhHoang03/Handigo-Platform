@@ -8,8 +8,16 @@ export type TimelineStep = {
   state: "done" | "active" | "pending" | "cancelled";
 };
 
-export const formatTimelineTime = (value?: string | null) =>
-  value ? new Date(value).toLocaleString("vi-VN") : "";
+const timelineDateFormatter = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+
+export const formatTimelineTime = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? timelineDateFormatter.format(date) : '';
+};
 
 const getCancellationDescription = (order: Order) => {
   const event = [...(order.statusHistory ?? [])].reverse()
@@ -189,7 +197,7 @@ export const buildOrderTimeline = (order: Order): TimelineStep[] => {
           ? `${serviceName} đã được hoàn tất thành công.`
           : "Hoàn tất sau khi dịch vụ được thực hiện và xác nhận.",
       time:
-        order.status === "completed" ? formatTimelineTime(historyTime('completed') || order.updatedAt) : "",
+        order.status === "completed" ? formatTimelineTime(historyTime('completed') || order.confirmation?.providerConfirmedAt || order.updatedAt) : "",
       state: currentStatusIndex === 3 ? "done" : "pending",
     },
   ];

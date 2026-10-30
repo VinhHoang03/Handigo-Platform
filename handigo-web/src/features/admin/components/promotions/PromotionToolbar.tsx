@@ -13,6 +13,7 @@ export function PromotionToolbar({
 }) {
   return (
     <TableToolbar
+      fieldsClassName="sm:grid-cols-[minmax(0,1fr)_auto_auto]"
       search={{
         value: query.search || "",
         onChange: (value) => onQueryChange({ ...query, search: value, page: 1 }),

@@ -1,4 +1,4 @@
-import { QueryFilter, Types } from "mongoose";
+import mongoose, { QueryFilter, Types, type ClientSession } from "mongoose";
 import { Category } from "../models/category.model";
 import { Provider } from "../models/provider.model";
 import { Service } from "../models/service.model";
@@ -14,6 +14,8 @@ import {
 } from "../validations/serviceSuggestion.validator";
 import * as categoryService from "./category.service";
 import * as catalogService from "./service.service";
+import { withTransactionRetry } from '../utils/transaction';
+import { createNotificationRecord, emitRealtimeNotification } from "./notification.service";
 
 const ensureObjectId = (id: string, fieldName: string) => {
   if (!Types.ObjectId.isValid(id)) {
@@ -91,8 +93,7 @@ export const getServiceSuggestions = async (
 
   const [suggestions, total] = await Promise.all([
     ServiceSuggestion.find(query)
-      .populate("providerId", "userId verified mainServiceText")
-      .populate("providerId.userId", "fullName email phone")
+      .populate({ path: "providerId", select: "userId verified mainServiceText", populate: { path: "userId", select: "fullName email phone" } })
       .populate("categoryId", "name slug isActive")
       .populate("createdServiceId", "name slug categoryId isActive")
       .populate("createdCategoryId", "name slug isActive")
@@ -107,24 +108,33 @@ export const getServiceSuggestions = async (
   return { suggestions, total };
 };
 
-export const updateServiceSuggestion = async (
+const updateServiceSuggestionInSession = async (
   suggestionId: string,
   data: UpdateServiceSuggestionPayload,
   adminId: string,
-): Promise<IServiceSuggestion> => {
+  session: ClientSession,
+) => {
   ensureObjectId(suggestionId, "Mã đề xuất");
   ensureObjectId(adminId, "Mã admin");
 
   const suggestion = await ServiceSuggestion.findOne({
     _id: suggestionId,
     isDeleted: false,
-  });
+  }).session(session);
 
   if (!suggestion) {
     throw new AppError("Không tìm thấy đề xuất", 404);
   }
 
-  const updateData: any = {
+  if (data.serviceDraft) {
+    if (suggestion.suggestionType !== 'service') throw new AppError('Chỉ đề xuất dịch vụ mới được tạo dịch vụ.', 400);
+    if (suggestion.status !== 'pending' || suggestion.createdServiceId) throw new AppError('Đề xuất đã được xử lý hoặc đã có dịch vụ liên kết. Vui lòng làm mới.', 409);
+    if (data.status !== 'approved' || data.serviceDraft.isActive !== false || data.createdServiceId != null) throw new AppError('Dữ liệu duyệt và tạo dịch vụ không hợp lệ.', 400);
+    if (data.categoryId !== undefined && data.categoryId !== data.serviceDraft.categoryId) throw new AppError('Danh mục đề xuất phải khớp danh mục dịch vụ mới.', 400);
+    if (!await Category.exists({ _id: data.serviceDraft.categoryId, isDeleted: false }).session(session)) throw new AppError('Không tìm thấy danh mục.', 404);
+  }
+
+  const updateData: Partial<IServiceSuggestion> = {
     reviewedBy: new Types.ObjectId(adminId),
     reviewedAt: new Date(),
   };
@@ -144,7 +154,7 @@ export const updateServiceSuggestion = async (
       const category = await Category.exists({
         _id: data.categoryId,
         isDeleted: false,
-      });
+      }).session(session);
       if (!category) {
         throw new AppError("Không tìm thấy danh mục", 404);
       }
@@ -161,7 +171,7 @@ export const updateServiceSuggestion = async (
       const service = await Service.exists({
         _id: data.createdServiceId,
         isDeleted: false,
-      });
+      }).session(session);
       if (!service) {
         throw new AppError("Không tìm thấy dịch vụ đã tạo", 404);
       }
@@ -178,7 +188,7 @@ export const updateServiceSuggestion = async (
       const category = await Category.exists({
         _id: data.createdCategoryId,
         isDeleted: false,
-      });
+      }).session(session);
       if (!category) {
         throw new AppError("Không tìm thấy danh mục đã tạo", 404);
       }
@@ -194,14 +204,14 @@ export const updateServiceSuggestion = async (
       !updateData.createdServiceId
     ) {
       const categoryId =
-        data.categoryId ||
+        data.serviceDraft?.categoryId || data.categoryId ||
         suggestion.categoryId?.toString();
 
       if (!categoryId) {
         throw new AppError("Vui lòng chọn danh mục trước khi duyệt đề xuất dịch vụ", 400);
       }
 
-      const createdService = await catalogService.createService({
+      const createdService = await catalogService.createService(data.serviceDraft ? { ...data.serviceDraft } : {
         categoryId,
         name: suggestion.suggestedServiceName || "",
         description: suggestion.description,
@@ -209,7 +219,7 @@ export const updateServiceSuggestion = async (
         fixedPrice: null,
         depositAmount: null,
         isActive: false,
-      });
+      }, session);
 
       updateData.categoryId = new Types.ObjectId(categoryId);
       updateData.createdServiceId = createdService._id;
@@ -224,28 +234,53 @@ export const updateServiceSuggestion = async (
         name: suggestion.suggestedCategoryName || "",
         description: suggestion.description,
         isActive: true,
-      });
+      }, session);
 
       updateData.createdCategoryId = createdCategory._id;
     }
   }
 
-  const updatedSuggestion = await ServiceSuggestion.findByIdAndUpdate(
-    suggestionId,
+  const updatedSuggestion = await ServiceSuggestion.findOneAndUpdate(
+    { _id: suggestionId, isDeleted: false, ...(data.serviceDraft ? { status: 'pending', createdServiceId: null } : {}) },
     { $set: updateData },
-    { new: true, runValidators: true },
-  )
-    .populate("providerId", "userId verified mainServiceText")
-    .populate("categoryId", "name slug isActive")
-    .populate("createdServiceId", "name slug categoryId isActive")
-    .populate("createdCategoryId", "name slug isActive")
-    .populate("reviewedBy", "fullName email role")
-    .lean<IServiceSuggestion>();
+    { new: true, runValidators: true, session },
+  ).lean<IServiceSuggestion>();
 
   if (!updatedSuggestion) {
-    throw new AppError("Không tìm thấy đề xuất", 404);
+    throw new AppError("Đề xuất đã thay đổi. Vui lòng làm mới để kiểm tra lại.", 409);
   }
-  return updatedSuggestion;
+  let notification = null;
+  if (data.adminNote?.trim()) {
+    const provider = await Provider.findOne({
+      _id: suggestion.providerId,
+      isDeleted: false,
+    }).select("userId").session(session);
+    if (!provider) throw new AppError("Không tìm thấy người gửi đề xuất", 404);
+
+    notification = await createNotificationRecord({
+      userId: provider.userId,
+      type: "SYSTEM",
+      title: "Phản hồi đề xuất của bạn",
+      content: `Đề xuất “${suggestion.suggestedServiceName || suggestion.suggestedCategoryName || ""}”: ${data.adminNote.trim()}`,
+      data: { suggestionId, actionUrl: "/provider/service-suggestions" },
+    }, { session, deferRealtime: true });
+  }
+  return { suggestion: updatedSuggestion, notification };
+};
+
+export const updateServiceSuggestion = async (suggestionId: string, data: UpdateServiceSuggestionPayload, adminId: string): Promise<IServiceSuggestion> => {
+  ensureObjectId(suggestionId, 'Mã đề xuất');
+  ensureObjectId(adminId, 'Mã admin');
+  const session = await mongoose.startSession();
+  try {
+    const result = await withTransactionRetry(session, () => updateServiceSuggestionInSession(suggestionId, data, adminId, session));
+    if (!result) throw new AppError('Không thể cập nhật đề xuất. Vui lòng thử lại.', 409);
+    if (result.notification) emitRealtimeNotification(result.notification);
+    return await getServiceSuggestionById(suggestionId);
+  } catch (error) {
+    if ((error as { code?: number })?.code === 11000) throw new AppError('Dịch vụ hoặc danh mục đã tồn tại. Vui lòng kiểm tra lại tên và đường dẫn.', 409);
+    throw error;
+  } finally { await session.endSession(); }
 };
 
 export const getServiceSuggestionById = async (suggestionId: string) => {
@@ -255,7 +290,7 @@ export const getServiceSuggestionById = async (suggestionId: string) => {
     _id: suggestionId,
     isDeleted: false,
   })
-    .populate("providerId", "userId verified mainServiceText")
+    .populate({ path: "providerId", select: "userId verified mainServiceText", populate: { path: "userId", select: "fullName email phone" } })
     .populate("categoryId", "name slug isActive")
     .populate("createdServiceId", "name slug categoryId isActive")
     .populate("createdCategoryId", "name slug isActive")

@@ -7,10 +7,15 @@ import { providerOrderApi } from '../api/providerOrder.api';
 import { getOrderStatusMeta } from '@/utils/orderStatus';
 import { toneChipClasses } from '@/utils/statusTone';
 import { formatProviderOrderAmount, getCustomer } from '../utils/providerOrder.utils';
-import { getOrderDate as orderDate } from '../components/home/providerHome.utils';
+import { dateKey, formatMoney, getOrderDate as orderDate } from '../components/home/providerHome.utils';
+import { useProviderCalendarRevenue } from '../hooks/useProviderCalendarRevenue';
 import { CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
 
-const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+const formatDayRevenue = (amount: number) => {
+  const unit = amount >= 1_000_000 ? 1_000_000 : amount >= 1_000 ? 1_000 : 1;
+  const suffix = unit === 1_000_000 ? 'tr' : unit === 1_000 ? 'k' : 'đ';
+  return `+${Number((amount / unit).toFixed(1))}${suffix}`;
+};
 
 const formatAddress = (order: Order) => {
   const address = order.addressId;
@@ -31,6 +36,7 @@ export default function ProviderSchedulePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastFeedback<string>('', "error");
+  const revenue = useProviderCalendarRevenue(visibleMonth);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +84,7 @@ export default function ProviderSchedulePage() {
       <div className="space-y-gutter">
         <header>
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Lịch làm việc</h1>
-          <p className="mt-1 text-on-surface-variant">Theo dõi lịch hẹn và công việc được phân công theo ngày.</p>
+          <p className="mt-1 text-on-surface-variant">Theo dõi lịch hẹn, công việc và doanh thu theo ngày.</p>
         </header>
 
         {error && <div className="rounded-2xl bg-error/10 px-4 py-3 text-sm text-error">{error}</div>}
@@ -91,14 +97,37 @@ export default function ProviderSchedulePage() {
         ) : (
           <div className="grid items-start gap-gutter xl:grid-cols-12">
             <section className="min-w-0 rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-4 shadow-sm sm:p-md xl:col-span-9">
-              <div className="mb-md flex items-center justify-between gap-3">
+              <div className="mb-md flex flex-wrap items-center justify-between gap-3">
                 <h2 className="font-headline-md text-headline-md capitalize text-on-surface">
                   {visibleMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
                 </h2>
                 <div className="flex gap-2">
+                  <input
+                    type="month"
+                    aria-label="Chọn tháng xem lịch và doanh thu"
+                    value={`${year}-${String(month + 1).padStart(2, '0')}`}
+                    onChange={(event) => {
+                      if (!/^\d{4}-\d{2}$/.test(event.target.value)) return;
+                      const [nextYear, nextMonth] = event.target.value.split('-').map(Number);
+                      const date = new Date(nextYear, nextMonth - 1, 1);
+                      setVisibleMonth(date);
+                      setSelectedDate(date);
+                    }}
+                    className="min-w-0 rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3 text-sm focus-visible:outline-primary"
+                  />
                   <button type="button" onClick={() => changeMonth(-1)} aria-label="Tháng trước" className="grid h-10 w-10 place-items-center rounded-xl border border-outline-variant/40 hover:bg-surface-container-low"><ChevronLeft aria-hidden="true" size={24} /></button>
                   <button type="button" onClick={() => changeMonth(1)} aria-label="Tháng sau" className="grid h-10 w-10 place-items-center rounded-xl border border-outline-variant/40 hover:bg-surface-container-low"><ChevronRight aria-hidden="true" size={24} /></button>
                 </div>
+              </div>
+
+              <div className="mb-md rounded-2xl bg-primary/5 px-4 py-3" aria-live="polite" aria-busy={revenue.loading}>
+                <p className="text-sm text-on-surface-variant">Doanh thu tháng {month + 1}/{year}</p>
+                {revenue.loading ? <p className="mt-1 text-sm">Đang tải doanh thu…</p>
+                  : revenue.error ? <p className="mt-1 text-sm text-error" role="alert">{revenue.error}</p>
+                    : <>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-primary">{formatMoney(revenue.total)}</p>
+                      {revenue.total === 0 && <p className="mt-1 text-xs text-on-surface-variant">Tháng này chưa phát sinh doanh thu.</p>}
+                    </>}
               </div>
 
               <div className="overflow-x-auto rounded-2xl border border-outline-variant/30">
@@ -111,20 +140,24 @@ export default function ProviderSchedulePage() {
                       const dayOrders = ordersByDate[dateKey(date)] || [];
                       const selected = dateKey(date) === dateKey(selectedDate);
                       const current = dateKey(date) === dateKey(today);
+                      const dayRevenue = outside ? 0 : revenue.earningsByDay.get(dateKey(date)) ?? 0;
                       return (
                         <button
                           key={date.toISOString()}
                           type="button"
                           onClick={() => { setSelectedDate(date); setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1)); }}
-                          className={`min-h-28 bg-surface-container-lowest p-2 text-left align-top transition hover:bg-primary/5 ${outside ? 'text-outline/50' : ''} ${selected ? 'ring-2 ring-inset ring-primary' : ''}`}
+                          className={`flex min-h-36 min-w-0 flex-col bg-surface-container-lowest p-2 text-left transition hover:bg-primary/5 ${outside ? 'text-outline/50' : ''} ${selected ? 'ring-2 ring-inset ring-primary' : ''}`}
                         >
-                          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${current ? 'bg-primary text-on-primary' : ''}`}>{date.getDate()}</span>
-                          <span className="mt-1 block space-y-1">
+                          <span className="flex w-full items-center justify-between gap-1">
+                            <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${current ? 'bg-primary text-on-primary' : ''}`}>{date.getDate()}</span>
+                            {dayOrders.length > 2 && <span className="whitespace-nowrap text-[9px] font-bold text-primary">+{dayOrders.length - 2} công việc</span>}
+                          </span>
+                          <span className="mt-1 block w-full min-w-0 space-y-1">
                             {dayOrders.slice(0, 2).map((order) => (
                               <span key={order._id} className={`block truncate rounded-md px-1.5 py-1 text-[10px] font-bold ${toneChipClasses[getOrderStatusMeta(order.status).tone]}`}>{orderDate(order).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · {order.serviceId?.name || 'Dịch vụ'}</span>
                             ))}
-                            {dayOrders.length > 2 && <span className="block px-1 text-[10px] font-bold text-primary">+{dayOrders.length - 2} công việc</span>}
                           </span>
+                          {dayRevenue > 0 && <span className="mt-auto self-center pt-2"><span className="block rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold tabular-nums text-amber-800" title={`Doanh thu: ${formatMoney(dayRevenue)}`} aria-label={`Doanh thu: ${formatMoney(dayRevenue)}`}>{formatDayRevenue(dayRevenue)}</span></span>}
                         </button>
                       );
                     })}

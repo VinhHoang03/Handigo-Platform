@@ -9,6 +9,7 @@ import { Payment } from "../models/payment.model";
 import { RepairQuotation } from "../models/repairQuotation.model";
 import { Refund } from "../models/refund.model";
 import { SupportTicket } from "../models/supportTicket.model";
+import { Report } from "../models/report.model";
 import { Complaint } from "../models/complaint.model";
 import * as socketServer from "../sockets/socketServer";
 import { combineAgentBookingPayment, describeOrderProgress, mergeAgentOrderMessages, publishAgentOrderChange, restoreAgentProgressTracking, restoreAgentSessionTracking, safelyTrackAgentBooking, safelyTrackAgentCase, trackAgentBooking } from "../services/agentOrderProgress.service";
@@ -53,7 +54,7 @@ async function run() {
     assert.equal(filter.sessionId, subscription.sessionId);
     return { lean: async () => stored.get(filter._id) ?? null };
   });
-  for (const model of [Refund, Payment, SupportTicket, Complaint]) mock.method(model, "find", () => ({ lean: async () => [] }));
+  for (const model of [Refund, Payment, SupportTicket, Report]) mock.method(model, "find", () => ({ lean: async () => [] }));
   mock.method(Order, "findOne", (filter: Record<string, unknown>) => {
     assert.equal(filter.customerId, subscription.userId);
     assert.equal(filter.isDeleted, false);
@@ -266,15 +267,15 @@ async function run() {
     "Theo dõi yêu cầu tạo qua agent ngay cả khi không gắn với đơn.");
   tracked = true;
   caseTracked = false;
-  await publishAgentOrderChange(change("yeu-cau-bang-chung", Complaint.collection.collectionName,
+  await publishAgentOrderChange(change("yeu-cau-bang-chung", Report.collection.collectionName,
     { status: "evidence_requested", requestedEvidenceNote: "Vui lòng bổ sung ảnh." },
-    { complainantId: subscription.userId, complainantRole: "CUSTOMER", title: "Chất lượng dịch vụ" }));
+    { reportType: "service_quality", reporterId: subscription.userId, reporterRole: "CUSTOMER", title: "Chất lượng dịch vụ" }));
   assert.ok([...stored.values()].some((message) => message.content.includes("Vui lòng bổ sung ảnh.")));
   const beforeForbidden = stored.size;
   await publishAgentOrderChange(change("ho-tro-tho", SupportTicket.collection.collectionName, { status: "resolved" },
     { ...ticket, requesterId: new Types.ObjectId() }));
-  await publishAgentOrderChange(change("khieu-nai-tho", Complaint.collection.collectionName, { status: "resolved" },
-    { complainantId: subscription.userId, complainantRole: "PROVIDER" }));
+  await publishAgentOrderChange(change("khieu-nai-tho", Report.collection.collectionName, { status: "resolved" },
+    { reportType: "service_quality", reporterId: subscription.userId, reporterRole: "PROVIDER" }));
   ownsOrder = false;
   await publishAgentOrderChange(change("ho-tro-khong-so-huu", SupportTicket.collection.collectionName, { status: "resolved" }, ticket));
   ownsOrder = true;

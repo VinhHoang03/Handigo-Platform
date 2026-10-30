@@ -8,6 +8,8 @@ const objectIdSchema = z
 export const createPaymentSchema = z.object({
   orderId: objectIdSchema,
   expectedAmount: z.number().int().min(0).optional(),
+  quotationId: objectIdSchema.optional(),
+  expectedRevision: z.number().int().min(0).optional(),
   method: z.enum(["PAYOS", "CASH", "WALLET"]),
   paymentType: z.enum(["INSPECTION_DEPOSIT", "FULL", "REMAINING"]).optional(),
   returnUrl: z.string().url("returnUrl không hợp lệ").optional(),

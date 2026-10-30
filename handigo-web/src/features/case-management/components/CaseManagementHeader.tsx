@@ -12,7 +12,7 @@ export function CaseManagementHeader({ loading, activeLabel, onRefresh, onCreate
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p className="text-sm font-bold uppercase tracking-wider text-primary">Trung tâm hỗ trợ</p>
-        <h1 className="mt-1 text-headline-lg font-bold">Khiếu nại, hỗ trợ và báo cáo</h1>
+        <h1 className="mt-1 text-headline-lg font-bold">Hỗ trợ và báo cáo</h1>
         <p className="mt-2 max-w-3xl text-on-surface-variant">Theo dõi toàn bộ yêu cầu đã gửi và phản hồi trực tiếp khi quản trị viên cần thêm thông tin.</p>
       </div>
       <div className="flex flex-wrap gap-2">

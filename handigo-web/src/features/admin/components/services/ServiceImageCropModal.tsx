@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AdminToastNotice } from '../shared/AdminToastNotice';
 import { getErrorMessage } from '@/utils/apiError';
 
 interface Props {
@@ -106,7 +107,7 @@ export function ServiceImageCropModal({ image, busy, onCancel, onConfirm }: Prop
             onChange={event => { setZoom(Number(event.target.value)); setPosition({ x, y }); }} />
         </label>
         {small && <p role="status" className="mb-3 text-amber-700">Vùng ảnh nguồn nhỏ hơn 800 × 450 px. Ảnh có thể bị mờ khi phóng lớn; nên chọn ảnh có độ phân giải cao hơn.</p>}
-        {error && <p role="alert" className="mb-3 text-error">{error}</p>}
+        <AdminToastNotice message={error} />
         <div className="flex justify-end gap-3">
           <button type="button" disabled={locked} onClick={onCancel} className="rounded-lg border px-4 py-2">Hủy</button>
           <button type="button" disabled={locked} onClick={() => void confirm()} className="rounded-lg bg-primary px-4 py-2 text-on-primary">{locked ? 'Đang tải ảnh…' : 'Xác nhận và lưu ảnh'}</button>

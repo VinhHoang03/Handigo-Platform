@@ -44,7 +44,7 @@ export function FormTextArea({ label, name, value, onChange }: { label: string; 
   );
 }
 
-export function ToggleRow({ checked, onChange, label, name, compact = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; name: string; compact?: boolean }) {
+export function ToggleRow({ checked, onChange, label, name, compact = false, disabled = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; name: string; compact?: boolean; disabled?: boolean }) {
   return (
     <label className={`flex items-center justify-between bg-surface-container-low font-semibold ${compact ? 'rounded-lg px-3 py-2 text-sm' : 'rounded-xl p-3'}`}>
       <span>{label}</span>
@@ -52,6 +52,7 @@ export function ToggleRow({ checked, onChange, label, name, compact = false }: {
         type="checkbox"
         name={name}
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30`}
       />
@@ -59,7 +60,7 @@ export function ToggleRow({ checked, onChange, label, name, compact = false }: {
   );
 }
 
-export function FormActions({ busy, onCancel }: { busy: boolean; onCancel: () => void }) {
+export function FormActions({ busy, onCancel, submitLabel = 'Lưu' }: { busy: boolean; onCancel: () => void; submitLabel?: string }) {
   return (
     <div className="flex justify-end gap-3 pt-2">
       <button
@@ -75,7 +76,7 @@ export function FormActions({ busy, onCancel }: { busy: boolean; onCancel: () =>
         disabled={busy}
         className="min-h-11 rounded-xl bg-primary px-5 py-2.5 font-semibold text-on-primary transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
       >
-        {busy ? 'Đang lưu…' : 'Lưu'}
+        {busy ? 'Đang lưu…' : submitLabel}
       </button>
     </div>
   );

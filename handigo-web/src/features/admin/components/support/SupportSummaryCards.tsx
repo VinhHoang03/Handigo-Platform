@@ -38,7 +38,7 @@ export function SupportSummaryCards({ summary }: { summary: SupportSummary }) {
   ];
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <section aria-label="Thống kê hỗ trợ toàn hệ thống, không phụ thuộc bộ lọc danh sách" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       {cards.map((card) => (
         <SummaryCard key={card.label} {...card} />
       ))}

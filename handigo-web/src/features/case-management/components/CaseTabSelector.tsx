@@ -9,7 +9,7 @@ interface CaseTabSelectorProps {
 
 export function CaseTabSelector({ active, onChange }: CaseTabSelectorProps) {
   return (
-    <section className="grid gap-3 md:grid-cols-3">
+    <section className="grid gap-3 md:grid-cols-2">
       {TAB_CONFIG.map((item) => {
         const Icon = item.icon;
         const isActive = active === item.value;

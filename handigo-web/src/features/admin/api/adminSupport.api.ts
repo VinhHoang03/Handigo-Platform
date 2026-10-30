@@ -16,12 +16,19 @@ export const adminSupportApi = {
     ),
   getTicket: async (id: string) =>
     data<AdminSupportTicket>(await api.get("/admin/support-tickets/" + id)),
-  getActiveAdmins: async () =>
-    data<ListResult<AdminUser>>(
-      await api.get("/admin/users", {
-        params: { role: "ADMIN", status: "active", page: 1, limit: 50 },
-      }),
-    ),
+  getActiveAdmins: async () => {
+    let page = 1;
+    const items: AdminUser[] = [];
+    let result: ListResult<AdminUser>;
+    do {
+      result = data<ListResult<AdminUser>>(await api.get("/admin/users", {
+        params: { role: "ADMIN", status: "active", page, limit: 50 },
+      }));
+      items.push(...result.items);
+      page++;
+    } while (page <= result.pagination.totalPages);
+    return { ...result, items };
+  },
   assignTicket: async (id: string, assignedAdminId: string) =>
     data<AdminSupportTicket>(
       await api.patch("/admin/support-tickets/" + id + "/assign", {

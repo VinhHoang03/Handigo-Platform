@@ -31,8 +31,8 @@ function MetricCard({
   hint?: string;
   children?: ReactNode;
 }) {
-  return (
-    <Link to={path} title={hint} data-metric={path.startsWith('/admin/revenue') ? 'revenue' : 'orders'} className="dashboard-metric min-w-0 rounded-xl border border-outline-variant/40 p-4 hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-primary">
+  const content = (
+    <>
       <div className="flex items-start gap-2"><Icon aria-hidden="true" size={20} className="shrink-0 text-primary" /><p className="min-w-0 flex-1 text-sm font-medium">{label}</p><ArrowUpRight aria-hidden="true" size={16} className="shrink-0 text-primary" /></div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="min-w-0 flex-1 break-words text-2xl font-bold tabular-nums">{value}</p>
@@ -41,8 +41,13 @@ function MetricCard({
         </div>
       </div>
       {children && <div className="mt-3 space-y-1 border-t border-outline-variant/30 pt-3 text-xs tabular-nums">{children}</div>}
-    </Link>
+    </>
   );
+  const className = "dashboard-metric min-w-0 rounded-xl border border-outline-variant/40 p-4 hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-primary";
+  const metric = path === "#admin-revenue" || path.startsWith("/admin/revenue") ? "revenue" : "orders";
+  return path.startsWith("#")
+    ? <a href={path} title={hint} data-metric={metric} className={className}>{content}</a>
+    : <Link to={path} title={hint} data-metric={metric} className={className}>{content}</Link>;
 }
 
 const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
@@ -72,7 +77,7 @@ export function DashboardMetricGrid({
   previousPeriodLabel,
   ratingStats,
   monthly = false,
-  revenuePath = "/admin/revenue",
+  revenuePath = "#admin-revenue",
 }: {
   monthly?: boolean;
   revenuePath?: string;

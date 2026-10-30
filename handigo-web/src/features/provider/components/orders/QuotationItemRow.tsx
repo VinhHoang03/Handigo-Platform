@@ -86,7 +86,7 @@ export function QuotationItemRow({ orderId, item, removable, maxTitleLength, onU
         min={1}
         max={1000}
         step={1}
-        value={item.quantity}
+        value={item.quantity === 0 ? '' : item.quantity}
         onChange={(event) => onUpdate({ quantity: Number(event.target.value) })}
         aria-label="Số lượng"
         placeholder="Số lượng"

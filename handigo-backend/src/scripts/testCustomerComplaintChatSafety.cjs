@@ -34,6 +34,7 @@ function set(row, key, value) {
 const matches = (row, filter) => Object.entries(filter).every(([key, value]) => {
   const actual = get(row, key);
   if (value && '$ne' in Object(value)) return String(actual) !== String(value.$ne);
+  if (value && '$in' in Object(value)) return value.$in.some(item => String(actual) === String(item));
   return value == null ? actual == null : String(actual) === String(value);
 });
 function apply(row, update) {
@@ -90,6 +91,7 @@ function model(collection) {
       return document(rows[0], collection, session);
     }),
     findById: id => query(session => document(view(session)[collection].find(row => String(row._id) === String(id)), collection, session)),
+    exists: filter => query(session => view(session)[collection].some(row => matches(row, filter)) ? { _id: orderId } : null),
     find: filter => query(session => view(session)[collection].filter(row => matches(row, filter)).map(row => document(row, collection, session))),
     findOneAndUpdate: (filter, update, options) => query(() => {
       assert.ok(options.session); assert.equal(options.runValidators, true);
@@ -102,6 +104,11 @@ function model(collection) {
       const row = view(options.session)[collection].find(item => matches(item, filter));
       if (!row) return { matchedCount: 0 };
       apply(row, update); return { matchedCount: 1 };
+    },
+    updateMany: async (filter, update, options) => {
+      assert.ok(options.session); assert.equal(options.runValidators, true);
+      const rows = view(options.session)[collection].filter(row => matches(row, filter));
+      rows.forEach(row => apply(row, update)); return { matchedCount: rows.length };
     },
     create: async (rows, { session }) => {
       assert.ok(session);
@@ -140,7 +147,6 @@ const modules = {
   '../sockets/socketServer': { emitToConversation: () => {} },
   './penaltyPolicy.service': { assertFeatureAllowed: async () => {} },
 };
-const complaints = load('../services/complaint.service', modules);
 const chat = load('../services/chat.service', modules);
 function reset() {
   version = 0; hold = deferred(); reached = deferred(); pauseKind = null; failEvidence = false; failPreview = false;
@@ -149,42 +155,9 @@ function reset() {
 }
 const payload = { orderId: String(orderId), title: 'Khiếu nại đơn hàng', description: 'Nội dung cần được xử lý' };
 async function complaintCases() {
-  reset(); pauseKind = 'create';
-  const first = complaints.createComplaint(String(customer), 'CUSTOMER', payload);
-  await reached.promise;
-  await complaints.createComplaint(String(customer), 'CUSTOMER', payload);
-  hold.resolve(); await assert.rejects(first, /đã tạo khiếu nại/);
-  assert.equal(state.complaints.length, 1);
-  await complaints.createComplaint(String(providerUser), 'PROVIDER', payload);
-  assert.equal(state.complaints.length, 2, 'Khách và thợ vẫn có hồ sơ riêng.');
-  for (const target of ['resolved', 'rejected', 'cancelled']) {
-    reset();
-    state.complaints.push(new Complaint({ ...payload, orderId, complainantId: customer, targetUserId: providerUser,
-      status: 'evidence_requested', __v: 0 }).toObject());
-    const id = String(state.complaints[0]._id);
-    pauseKind = 'evidence';
-    const adding = complaints.addComplaintEvidence(String(customer), 'CUSTOMER', id,
-      { files: [{ fileType: 'image', url: 'https://example.test/bang-chung.jpg' }] });
-    await reached.promise;
-    if (target === 'cancelled') await complaints.cancelComplaint(String(customer), id);
-    else await complaints.updateComplaintStatus(String(admin), id, { status: target });
-    hold.resolve(); await assert.rejects(adding, /đã kết thúc/);
-    assert.equal(state.complaints[0].status, target); assert.equal(state.evidence.length, 0);
-    assert.ok(state.complaints[0].resolvedAt);
-  }
-  reset();
-  const created = await complaints.createComplaint(String(customer), 'CUSTOMER', payload);
-  const id = String(created._id);
-  await complaints.requestEvidence(String(admin), id, 'Vui lòng bổ sung hình ảnh');
-  await complaints.addComplaintEvidence(String(customer), 'CUSTOMER', id,
-    { files: [{ fileType: 'image', url: 'https://example.test/anh.jpg' }] });
-  assert.equal(state.complaints[0].status, 'under_review'); assert.equal(state.evidence.length, 1);
-  failEvidence = true;
-  await assert.rejects(complaints.addComplaintEvidence(String(customer), 'CUSTOMER', id,
-    { files: [{ fileType: 'image', url: 'https://example.test/anh-loi.jpg' }] }), /Lỗi lưu bằng chứng/);
-  assert.equal(state.evidence.length, 1);
-  await assert.rejects(complaints.cancelComplaint(String(admin), id), /Không tìm thấy/);
-  console.log('Đạt KH-23, KH-24: khóa trạng thái, hoàn tác bằng chứng, chống trùng và ownership.');
+  const { spawnSync } = require('node:child_process');
+  const result = spawnSync(process.execPath, ['-r', 'ts-node/register', require('node:path').join(__dirname, 'testReportConsolidation.cjs')], { stdio: 'inherit' });
+  assert.equal(result.status, 0, 'Kiểm thử khiếu nại dùng chung báo cáo phải vượt qua.');
 }
 async function chatCases() {
   reset(); pauseKind = 'preview';
@@ -220,6 +193,15 @@ async function chatCases() {
     assert.equal(String(state.conversations[0].lastMessage.messageId), String(latest._id));
     assert.equal(state.conversations[0].lastMessage.content, latest.content);
   }
-  console.log('Đạt KH-26: gửi đồng thời, sửa/xóa tin cuối và hoàn tác khi lỗi.');
+  reset();
+  state.orders[0].status = 'accepted';
+  state.orders[0].customerNoShow = { status: 'pending' };
+  state.orders.push({ ...copy(state.orders[0]), _id: new mongoose.Types.ObjectId() });
+  state.orders.push({ ...copy(state.orders[0]), _id: new mongoose.Types.ObjectId(), providerId: new mongoose.Types.ObjectId() });
+  await chat.sendMessage(String(customer), 'CUSTOMER', String(state.conversations[0]._id), { content: 'Tôi đang có mặt' });
+  assert.ok(state.orders[0].customerNoShow.customerRepliedAt);
+  assert.ok(state.orders[1].customerNoShow.customerRepliedAt, 'Phản hồi chat chung được ghi nhận cho các đơn cùng cặp khách–thợ.');
+  assert.equal(state.orders[2].customerNoShow.customerRepliedAt, undefined, 'Không ảnh hưởng đơn do thợ khác nhận.');
+  console.log('Đạt KH-26: gửi đồng thời, sửa/xóa tin cuối, hoàn tác khi lỗi và phản hồi xác minh vắng mặt qua chat dùng chung.');
 }
 (async () => { await complaintCases(); await chatCases(); })().catch(error => { console.error(error); process.exitCode = 1; });

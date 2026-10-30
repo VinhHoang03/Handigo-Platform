@@ -124,6 +124,8 @@ export const bookingApi = {
   createPayment: async (payload: {
     orderId: string;
     expectedAmount?: number;
+    quotationId?: string;
+    expectedRevision?: number;
     method: "PAYOS" | "CASH" | "WALLET";
     paymentType?: "INSPECTION_DEPOSIT" | "FULL" | "REMAINING";
     returnUrl?: string;

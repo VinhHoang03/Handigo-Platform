@@ -34,13 +34,15 @@ test('Báo cáo doanh thu và tổng quan dùng cùng ranh giới ngày với b�
 test('Mã đơn bổ sung cho lịch sử quản trị không thay đổi orderId', async () => {
   const payment = { orderId: 'order1', amount: 200000, toObject() { return { orderId: this.orderId, amount: this.amount }; } };
   const chain = { sort() { return this; }, skip() { return this; }, limit() { return Promise.resolve([payment]); } };
-  const Payment = { find() { return chain; }, countDocuments() { return Promise.resolve(1); } };
+  const Payment = { find() { return chain; }, countDocuments() { return Promise.resolve(3); }, aggregate() { return Promise.resolve([{ total: 1 }]); } };
   const Order = { find() { return { select() { return { lean() { return Promise.resolve([{ _id: 'order1', orderCode: 'ORD-01' }]); } }; } }; } };
   const exports = {};
   vm.runInNewContext(ts.transpileModule(body, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, Payment, Order });
   const result = await exports.getPaymentHistory({ id: 'admin', role: 'ADMIN' }, paymentHistoryQuerySchema.parse({}));
   assert.equal(result.items[0].orderId, 'order1');
   assert.equal(result.items[0].orderCode, 'ORD-01');
+  assert.equal(result.totalOrders, 1);
+  assert.equal(result.pagination.total, 3);
 });
 
 test('Phí nền tảng chỉ lấy giao dịch thành công; tiền thu ròng trừ đúng tiền hoàn', async () => {
@@ -79,7 +81,12 @@ test('Phí nền tảng chỉ lấy giao dịch thành công; tiền thu ròng t
 test('Bảng thu tiền gồm cả khoản đã hoàn, lọc trước phân trang và giữ quyền sở hữu khách', async () => {
   let filter, sort;
   const chain = { sort(value) { sort = value; return this; }, skip() { return this; }, limit() { return Promise.resolve([]); } };
-  const Payment = { find(value) { filter = value; return chain; }, countDocuments() { return Promise.resolve(0); } };
+  const Payment = { find(value) { filter = value; return chain; }, countDocuments() { return Promise.resolve(0); }, aggregate(pipeline) {
+    assert.deepEqual(pipeline[0].$match, filter);
+    assert.equal(pipeline[1].$group._id, '$orderId');
+    assert.equal(pipeline[2].$count, 'total');
+    return Promise.resolve([]);
+  } };
   const exports = {};
   vm.runInNewContext(ts.transpileModule(body, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports, Payment });
   const query = paymentHistoryQuerySchema.parse({ fromDate: '2026-10-01', toDate: '2026-10-31', dateField: 'paidAt' });

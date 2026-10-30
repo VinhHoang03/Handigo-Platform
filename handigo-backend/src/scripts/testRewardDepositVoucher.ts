@@ -20,6 +20,7 @@ let dispatches = 0;
 stubModule("../configs/payos.config", { payos: {}, payoutPayos: {} });
 stubModule("../services/systemConfig.service", { getRewardOffers: async () => REWARD_POLICY.offers.map((offer) => ({ ...offer, isActive: true })), getRewardPolicy: async () => DEFAULT_REWARD_POLICY });
 stubModule("../services/notification.service", { createNotificationRecord: async () => ({}) });
+stubModule("../services/penaltyPolicy.service", { assertFeatureAllowed: async () => ({}) });
 stubModule("../services/dispatch.service", { DispatchService: { dispatchReadyOrder: async () => { dispatches++; } } });
 const { createPayment } = require("../services/payment.service") as typeof import("../services/payment.service");
 const { resolveVoucherForAmount, reservePersonalVoucher, releaseVoucherReservation, getAvailableVouchers } = require("../services/voucher.service") as typeof import("../services/voucher.service");

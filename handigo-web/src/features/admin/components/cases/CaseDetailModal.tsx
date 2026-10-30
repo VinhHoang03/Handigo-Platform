@@ -37,7 +37,6 @@ interface CaseDetailModalProps {
   onReviewNoteChange: (value: string) => void;
   resolutionNote: string;
   onResolutionNoteChange: (value: string) => void;
-  onUpdateComplaint: () => void;
   onReviewReport: () => void;
   onReverifyReport?: () => void;
   onOpenViolationForm: () => void;
@@ -60,15 +59,13 @@ export function CaseDetailModal({
   onReviewNoteChange,
   resolutionNote,
   onResolutionNoteChange,
-  onUpdateComplaint,
   onReviewReport,
   onReverifyReport,
   onOpenViolationForm,
   onClose,
 }: CaseDetailModalProps) {
   const hasReviewPanel = selected?.kind === "violation"
-    || (selected?.kind === "complaint" && !["resolved", "rejected", "cancelled"].includes(selected.item.status))
-    || (selected?.kind === "report" && !selected.item.createdViolationId
+    || (selected?.kind === "report" && selected.item.status !== "cancelled" && !selected.item.createdViolationId
       && (!selected.item.isCustomerNoShow || ["pending", "under_review"].includes(selected.item.status)));
   return (
     <Modal open={open} title={selectedTitle || "Chi tiết hồ sơ"} onClose={onClose} size="xl" closeOnOverlayClick={!busy}>
@@ -106,7 +103,8 @@ export function CaseDetailModal({
               </div>}
             {selected.kind === "report" && selected.item.noShowDetails && <NoShowReviewDetails details={selected.item.noShowDetails} report={selected.item} />}
             {selected.kind !== "violation" && !(selected.kind === "report" && selected.item.noShowDetails?.evidence.length) && <section><h3 className="mb-3 font-bold">Bằng chứng</h3><EvidenceLinks urls={detailEvidence} /></section>}
-            {selected.kind === "complaint" && selected.item.requestedEvidenceNote && (
+            {selected.kind === "report" && selected.item.evidenceFiles.some(file => file.note) && <section className="space-y-2 text-sm"><h3 className="font-bold">Ghi chú bằng chứng</h3>{selected.item.evidenceFiles.filter(file => file.note).map((file, index) => <p key={`${file.url}-${index}`}><b>{file.uploadedBy?.fullName || file.fileName || "Bằng chứng"}:</b> {file.note}</p>)}</section>}
+            {selected.kind === "report" && selected.item.requestedEvidenceNote && (
               <section className="rounded-xl bg-warning-container p-4 text-sm text-on-warning-container">
                 <b>Nội dung yêu cầu bổ sung:</b>
                 <p className="mt-2">{selected.item.requestedEvidenceNote}</p>
@@ -121,27 +119,14 @@ export function CaseDetailModal({
           </div>
 
           {hasReviewPanel && <aside className="space-y-5">
-            {selected.kind === "complaint" && !["resolved", "rejected", "cancelled"].includes(selected.item.status) && (
-              <>
-                <section className="rounded-2xl border border-outline-variant p-4">
-                  <h3 className="font-bold">Yêu cầu bổ sung bằng chứng</h3>
-                  <textarea value={evidenceNote} onChange={(event) => onEvidenceNoteChange(event.target.value)} minLength={5} maxLength={3000} rows={4} className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
-                  <button type="button" onClick={onRequestEvidence} disabled={busy || evidenceNote.trim().length < 5} className="btn-primary mt-3 w-full">Gửi yêu cầu</button>
-                </section>
-                <section className="rounded-2xl border border-outline-variant p-4">
-                  <h3 className="font-bold">Cập nhật kết quả</h3>
-                  <select value={nextStatus} onChange={(event) => onNextStatusChange(event.target.value)} className="mt-3 min-h-11 w-full rounded-xl border border-outline-variant px-3">
-                    <option value="">Chọn trạng thái</option>
-                    <option value="under_review">Đang xem xét</option>
-                    <option value="resolved">Đã xử lý</option>
-                    <option value="rejected">Từ chối</option>
-                  </select>
-                  <textarea value={resolutionNote} onChange={(event) => onResolutionNoteChange(event.target.value)} maxLength={3000} rows={4} placeholder="Kết luận xử lý..." className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
-                  <button type="button" onClick={onUpdateComplaint} disabled={busy || !nextStatus} className="btn-primary mt-3 w-full">Cập nhật</button>
-                </section>
-              </>
+            {selected.kind === "report" && !selected.item.isCustomerNoShow && !["confirmed", "resolved", "rejected", "cancelled"].includes(selected.item.status) && (
+              <section className="rounded-2xl border border-outline-variant p-4">
+                <h3 className="font-bold">Yêu cầu bổ sung bằng chứng</h3>
+                <textarea value={evidenceNote} onChange={(event) => onEvidenceNoteChange(event.target.value)} minLength={5} maxLength={3000} rows={4} className="mt-3 w-full rounded-xl border border-outline-variant p-3" />
+                <button type="button" onClick={onRequestEvidence} disabled={busy || evidenceNote.trim().length < 5} className="btn-primary mt-3 w-full">Gửi yêu cầu</button>
+              </section>
             )}
-            {selected.kind === "report" && !selected.item.createdViolationId
+            {selected.kind === "report" && selected.item.status !== "cancelled" && !selected.item.createdViolationId
               && (!selected.item.isCustomerNoShow || ["pending", "under_review"].includes(selected.item.status)) && (
               <section className="rounded-2xl border border-outline-variant p-4">
                 <h3 className="font-bold">Xem xét báo cáo</h3>
@@ -167,7 +152,7 @@ export function CaseDetailModal({
               </section>
             )}
           </aside>}
-          {selected.kind !== "violation" && !selected.item.createdViolationId
+          {selected.kind !== "violation" && !["cancelled", "rejected"].includes(selected.item.status) && !selected.item.createdViolationId
             && !(selected.kind === "report" && selected.item.isCustomerNoShow && selected.item.status !== "confirmed") && (
             <div className="flex justify-end border-t border-outline-variant/40 pt-4 xl:col-span-full">
               <button type="button" onClick={onOpenViolationForm} className="w-full rounded-xl bg-error px-6 py-3 font-bold text-on-error sm:w-auto sm:min-w-48">Tạo vi phạm</button>

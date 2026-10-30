@@ -4,6 +4,7 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { ApplicationDetailModal } from "../components/applications/ApplicationDetailModal";
 import { ApplicationFilters } from "../components/applications/ApplicationFilters";
+import { ApplicationSummary } from '../components/applications/ApplicationSummary';
 import { ApplicationList } from "../components/applications/ApplicationList";
 import { useAdminApplicationsController } from "../components/applications/useAdminApplicationsController";
 
@@ -18,7 +19,9 @@ export default function AdminProviderApplicationsPage() {
           <AdminRefreshButton onRefresh={() => void applications.load()} loading={applications.loading} />
         </header>
 
-        <section>
+        <ApplicationSummary query={applications.query} {...applications.summary} onChange={applications.setQuery} />
+
+        <section aria-label="Bộ lọc hồ sơ">
           <ApplicationFilters query={applications.query} categories={applications.categories} onChange={applications.setQuery} />
         </section>
 

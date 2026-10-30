@@ -36,7 +36,7 @@ function renderDetail(data, { loading = false, error = '', byOrder = false } = {
 }
 
 const feedback = { _id: 'review1', customerId: null, serviceId: null, rating: 2, createdAt: '2026-10-27T01:00:00Z', images: ['https://example.com/danh-gia.jpg'], isVisible: true,
-  comment: 'Cần cải thiện', providerReply: { content: 'Thợ đã tiếp nhận', images: ['https://example.com/phan-hoi.jpg'] } };
+  comment: 'Cần cải thiện', providerReply: { content: 'Thợ đã tiếp nhận', repliedAt: '2026-10-28T01:00:00Z', images: ['https://example.com/phan-hoi.jpg'] } };
 const order = { _id: 'order1', orderCode: 'DH01', customerId: { fullName: 'Khách A', phone: '0900000000' },
   providerId: { userId: { fullName: 'Thợ A', phone: '0900000001' } }, serviceId: { name: 'Vệ sinh nhà', serviceType: 'fixed_price' },
   addressId: { fullAddress: 'Địa chỉ đơn hàng' }, orderType: 'scheduled', status: 'completed', paymentMethod: 'wallet', paymentStatus: 'paid',
@@ -44,11 +44,26 @@ const order = { _id: 'order1', orderCode: 'DH01', customerId: { fullName: 'Khác
   statusHistory: [{ _id: 'event1', status: 'completed', changedByRole: 'provider', createdAt: '2026-10-26T01:00:00Z' }],
   confirmation: { providerConfirmedAt: '2026-10-26T01:00:00Z' }, completionEvidenceImages: ['https://example.com/hoan-thanh.jpg'], completionNote: 'Đã hoàn thành dịch vụ' };
 
-test('Modal hiển thị đơn, khách, thợ, thanh toán, phản hồi và cả ba nhóm ảnh', () => {
+test('Modal gộp đánh giá và phản hồi cạnh tiến độ, chỉ có sao, thời gian, nội dung và ảnh đánh giá/phản hồi', () => {
   const html = renderDetail({ feedback, order, quotation: null });
-  for (const value of ['DH01', 'Khách A', 'Thợ A', '0900000000', '0900000001', 'Đã thanh toán', 'Xác nhận hoàn thành', 'Thợ xác nhận', 'Khách hàng xác nhận', 'Cần cải thiện', 'Thợ đã tiếp nhận', 'danh-gia.jpg', 'phan-hoi.jpg', 'hoan-thanh.jpg']) {
+  for (const value of ['DH01', 'Khách A', 'Thợ A', '0900000000', '0900000001', 'Đã thanh toán', 'Theo dõi tiến độ', 'Đã tạo đơn hàng', 'Thợ A đã nhận đơn', 'Đang thực hiện', 'Hoàn thành', 'Đánh giá và phản hồi', '2/5', '27/10/2026', '28/10/2026', 'Cần cải thiện', 'Thợ đã tiếp nhận', 'danh-gia.jpg', 'phan-hoi.jpg']) {
     assert.ok(html.includes(value), `Thiếu thông tin: ${value}`);
   }
+  assert.equal((html.match(/Đánh giá và phản hồi/g) || []).length, 1);
+  for (const value of ['Xác nhận hoàn thành', 'Thợ xác nhận', 'Khách hàng xác nhận', 'hoan-thanh.jpg', 'Bằng chứng hoàn thành', 'Thời gian đánh giá']) assert.ok(!html.includes(value));
+});
+
+test('Thông tin và mô tả đơn nằm ở tóm tắt, phần khách chỉ giữ thông tin liên hệ', () => {
+  const html = renderDetail({ feedback, order: { ...order, scheduledAt: '2026-11-01T01:10:00Z', problemDescription: 'Máy lạnh cần vệ sinh', customerAttachments: ['https://example.com/mo-ta.jpg'] }, quotation: null });
+  const header = html.match(/<header\b[^>]*>(.*?)<\/header>/s)?.[1];
+  const customer = html.match(/<section class="order-1\b[^>]*>(.*?)<\/section>/s)?.[1];
+  const provider = html.match(/<section class="order-2\b[^>]*>(.*?)<\/section>/s)?.[1];
+  assert(header && customer && provider);
+  for (const value of ['DH01', 'Vệ sinh nhà', 'Thời gian đặt lịch', '01/11/2026', 'Mô tả yêu cầu', 'Máy lạnh cần vệ sinh', 'mo-ta.jpg', 'lucide-clock']) assert.ok(header.includes(value));
+  for (const value of ['DH01', 'Vệ sinh nhà', 'Thời gian đặt lịch', 'Mã đơn hàng', 'Loại dịch vụ', 'Máy lạnh cần vệ sinh', 'mo-ta.jpg']) assert.ok(!customer.includes(value));
+  for (const value of ['Khách A', '0900000000', 'Địa chỉ đơn hàng']) assert.ok(customer.includes(value));
+  assert.ok(provider.includes('0900000001'));
+  assert.ok(provider.includes('lucide-phone'));
 });
 
 test('Đơn hoặc liên kết không còn tồn tại vẫn hiển thị modal và đánh giá', () => {
@@ -63,10 +78,19 @@ test('Modal có trạng thái đang tải và nút thử lại khi API lỗi', (
   assert.ok(html.includes('Thử lại'));
 });
 
-test('Chi tiết đơn đang xử lý mở được khi chưa có đánh giá và chưa xác nhận hoàn thành', () => {
+test('Chi tiết đơn chưa có đánh giá vẫn có ô rỗng rõ ràng và không có thông tin xác nhận hoàn thành', () => {
   const html = renderDetail({ feedback: null, order: { ...order, status: 'in_progress', statusHistory: [], confirmation: null }, quotation: null }, { byOrder: true });
   assert.ok(html.includes('Chi tiết đơn hàng'));
   assert.ok(html.includes('Đang thực hiện'));
-  assert.ok(!html.includes('Đánh giá và phản hồi'));
-  assert.ok(html.includes('Chưa ghi nhận thời điểm xác nhận hoàn thành'));
+  assert.ok(html.includes('Đánh giá và phản hồi'));
+  assert.ok(html.includes('Đơn hàng chưa có đánh giá.'));
+  assert.ok(!html.includes('Xác nhận hoàn thành'));
+});
+
+test('Không dựng phần ảnh hoặc phản hồi rỗng khi đánh giá chỉ có số sao', () => {
+  const html = renderDetail({ feedback: { ...feedback, rating: 4.5, comment: null, images: [], providerReply: null }, order, quotation: null });
+  assert.ok(html.includes('4,5/5'));
+  assert.ok(!html.includes('Ảnh đánh giá'));
+  assert.ok(!html.includes('Phản hồi của thợ'));
+  assert.ok(!html.includes('Chưa có hình ảnh'));
 });

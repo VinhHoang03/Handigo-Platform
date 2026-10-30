@@ -92,7 +92,10 @@ export function useProviderOrderDetail(orderId: string | undefined, navigate: Na
 
   // Cập nhật thanh toán trong lúc thợ chờ khách trả tiền, giữ nguyên ảnh và ghi chú đang nhập.
   useEffect(() => {
-    if (!orderId || busy || currentOrder?.inspectionRequired || currentOrder?.status !== 'in_progress' || currentOrder.paymentStatus !== 'unpaid') return;
+    const waitingForPayment = currentOrder?.inspectionRequired
+      ? currentOrder.status === 'completed' && currentOrder.paymentStatus === 'partially_paid'
+      : currentOrder?.status === 'in_progress' && currentOrder.paymentStatus === 'unpaid';
+    if (!orderId || busy || !waitingForPayment) return;
     let active = true;
     let pending = false;
     const refreshPayment = async () => {

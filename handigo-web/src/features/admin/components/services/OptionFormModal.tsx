@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { Modal } from '@/components/common/Modal';
+import { AdminToastNotice } from '../shared/AdminToastNotice';
 import type { Service, ServiceOptionSelectionMode, ServiceOptionType } from '../../types/categoryService.types';
 import { ImageInput } from './ImageInput';
 import { FormActions, FormInput, FormTextArea, ToggleRow } from './service-form-fields';
@@ -36,11 +37,7 @@ export function OptionFormModal({
   return (
     <Modal open={open} title={mode === 'edit' ? 'Sửa tùy chọn' : 'Thêm tùy chọn dịch vụ'} onClose={onClose} closeOnEsc={!blockClose} closeOnOverlayClick={!blockClose}>
       <form onSubmit={onSubmit} className="space-y-4">
-        {formError && (
-          <div role="alert" className="rounded-xl bg-error/10 px-4 py-3 text-sm font-medium text-error">
-            {formError}
-          </div>
-        )}
+        <AdminToastNotice message={formError} />
         <FormInput label="Tên tùy chọn" name="option-name" required value={form.name} onChange={(value) => onChange({ ...form, name: value })} />
         <FormTextArea label="Mô tả" name="option-description" value={form.description} onChange={(value) => onChange({ ...form, description: value })} />
         <ImageInput value={form.image} onChange={(value) => onChange({ ...form, image: value })} label="Ảnh tùy chọn" inputName="option-image" />

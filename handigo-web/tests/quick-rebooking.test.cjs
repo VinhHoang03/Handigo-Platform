@@ -432,12 +432,17 @@ test('Chọn voucher giữ ô nhập trống; toast thành công xuất hiện m
 test('Bộ chọn voucher giữ ô nhập thủ công độc lập với mã đang chọn', () => {
   const { ConfirmPaymentVoucherPanel } = load('features/booking/components/ConfirmPaymentVoucherPanel.tsx');
   const props = { voucherCode: voucher.code, availableVouchers: [voucher], appliedVoucher: voucher,
+    voucherDiscountAmount: 12000,
     voucherError: '', isSubmitting: false, onSelectVoucher() {}, onManualInputChange() {}, onApplyClick() {}, onRemoveVoucher() {} };
   const quick = ConfirmPaymentVoucherPanel({ ...props, manualInputValue: '', showAppliedVoucherNotice: false });
   assert.equal(find(quick, node => node.type === 'select').props.value, voucher.code);
   assert.equal(find(quick, node => node.type === 'input').props.value, '');
   assert.equal(find(quick, node => node.type === 'button').props.children, 'Gỡ mã');
-  assert.equal(find(ConfirmPaymentVoucherPanel(props), node => node.type === 'input').props.value, voucher.code);
+  const standard = ConfirmPaymentVoucherPanel(props);
+  assert.equal(find(standard, node => node.type === 'input'), undefined);
+  assert.ok(find(standard, node => node.type === 'span' && node.props.children.join('') === 'Giảm 12.000đ'));
+  assert.equal(find(standard, node => node.type === 'button').props.onClick, props.onRemoveVoucher);
+  assert.ok(find(ConfirmPaymentVoucherPanel({ ...props, appliedVoucher: null }), node => node.type === 'input'));
 });
 
 test('Nhập mã thủ công vẫn áp dụng được và hiện toast sau khi lấy giá thành công', () => {

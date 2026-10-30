@@ -7,6 +7,7 @@ import type {
 import { ProviderApplicationHistory } from "@/features/provider-application/components/ProviderApplicationHistory";
 import type { ProviderApplication } from "@/features/provider-application/types/providerApplication.types";
 import { ProviderFeedbackSection } from "../ProviderFeedbackSection";
+import { ProviderWorkingAreaSection } from "../ProviderWorkingAreaSection";
 import {
   ProfessionalSummarySection,
   ProviderCertificatesSection,
@@ -148,6 +149,7 @@ export function ProviderProfileMainGrid({
 
       <div className="col-span-12 flex min-w-0 flex-col gap-gutter xl:col-span-5">
         <VerificationPanel items={verificationItems} />
+        {canReceiveJobs && <ProviderWorkingAreaSection />}
         <AccountFunctionsPanel
           onPasswordClick={onPasswordClick}
           canChangePassword={canChangePassword}

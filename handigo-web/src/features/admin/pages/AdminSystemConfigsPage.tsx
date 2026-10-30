@@ -145,12 +145,6 @@ export default function AdminSystemConfigsPage() {
           <StatCard icon={Globe} label="Công khai" value={stats.publicCount} />
         </div>
 
-        {error && (
-          <div className="rounded-xl bg-error/10 px-4 py-3 text-error">
-            {error}
-          </div>
-        )}
-
         <section className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
           <AsyncState
             loading={loading}

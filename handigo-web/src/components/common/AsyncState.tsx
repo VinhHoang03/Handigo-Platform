@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { SkeletonRegion } from './Skeleton';
+import { useAdminErrorToast } from './Toast/useAdminErrorToast';
 
 interface AsyncStateProps {
   loading?: boolean;
@@ -25,6 +26,7 @@ export function AsyncState({
   skeleton,
   children,
 }: AsyncStateProps) {
+  const admin = useAdminErrorToast(error);
   if (loading) {
     if (skeleton) return <SkeletonRegion>{skeleton}</SkeletonRegion>;
     return (
@@ -38,6 +40,7 @@ export function AsyncState({
     );
   }
   if (error) {
+    if (admin) return null;
     return (
       <div role="alert" className="rounded-lg border border-error/20 bg-error/10 p-6 text-center text-error">
         <p>{error}</p>

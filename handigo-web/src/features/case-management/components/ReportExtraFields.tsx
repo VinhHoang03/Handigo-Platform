@@ -23,9 +23,9 @@ export function ReportExtraFields({
       <label className="text-sm font-semibold">
         Đối tượng báo cáo
         <select
-          value={reportTarget}
+          value={reportType === "service_quality" ? "order" : reportTarget}
           onChange={(event) => onReportTargetChange(event.target.value as "participant" | "order")}
-          disabled={disabled}
+          disabled={disabled || reportType === "service_quality"}
           className="mt-2 min-h-12 w-full rounded-xl border border-outline-variant bg-surface px-3"
         >
           <option value="participant">{role === "CUSTOMER" ? "Nhà cung cấp của đơn" : "Khách hàng của đơn"}</option>

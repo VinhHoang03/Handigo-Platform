@@ -15,6 +15,10 @@ export interface Feedback {
 }
 export interface Pagination { page: number; limit: number; total: number; totalPages: number }
 export interface FeedbackList {
+  moderationStats?: {
+    total: number; averageRating: number; visible: number; hidden: number;
+    lowRating: number; hasImages: number; replied: number; fiveStars: number;
+  };
   items: Feedback[];
   pagination: Pagination;
   summary?: {
@@ -24,6 +28,8 @@ export interface FeedbackList {
   };
 }
 export interface FeedbackQuery {
+  categoryId?: string;
+  sort?: 'attention' | 'newest';
   page?: number;
   limit?: number;
   rating?: number | '';

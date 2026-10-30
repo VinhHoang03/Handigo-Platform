@@ -1,4 +1,4 @@
-import type { Category, Service } from "@/features/admin/types/categoryService.types";
+import type { Category, Service, ServicePayload } from "@/features/admin/types/categoryService.types";
 
 export type SuggestionType = "service" | "category";
 export type SuggestionStatus = "pending" | "approved" | "rejected";
@@ -49,6 +49,7 @@ export interface CreateServiceSuggestionPayload {
 }
 
 export interface UpdateServiceSuggestionPayload {
+  serviceDraft?: ServicePayload;
   status?: SuggestionStatus;
   adminNote?: string | null;
   categoryId?: string | null;

@@ -290,7 +290,8 @@ export const verifyNoShowEvidence = async (order: IOrder, userId: string, eviden
     order.addressSnapshot ?? Address.findOne({ _id: order.addressId, isDeleted: false }).session(session ?? null).lean(),
     User.findOne({ _id: order.customerId, isDeleted: false }).select("phone").session(session ?? null).lean(),
     Location.findOne({ userId, ownerType: "provider", isActive: true, isDeleted: false }).sort({ lastUpdatedAt: -1 }).session(session ?? null).lean(),
-    Conversation.findOne({ orderId: order._id, providerId: order.providerId, customerId: order.customerId, isDeleted: false }).session(session ?? null).lean(),
+    Conversation.findOne({ providerId: order.providerId, customerId: order.customerId, isDeleted: false })
+      .sort({ createdAt: 1, _id: 1 }).session(session ?? null).lean(),
     CUSTOMER_NO_SHOW_SKIP_DUPLICATE_EVIDENCE_FOR_TESTING ? false
       : CustomerNoShowEvidence.exists({ sha256: { $in: evidence.map((item) => item.sha256) }, orderId: { $ne: order._id }, isDeleted: false }).session(session ?? null),
   ]);

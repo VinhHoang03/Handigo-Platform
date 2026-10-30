@@ -289,6 +289,13 @@ async function run() {
     await assert.rejects(confirmPayment(), /chưa đủ điều kiện/);
   }
   quotation!.status = "saved";
+  const originalPaymentMethod = order.paymentMethod;
+  order.paymentStatus = "paid";
+  order.paymentMethod = "wallet";
+  await assert.rejects(confirmPayment(), /đã thanh toán báo giá qua hệ thống/);
+  assert.equal(quotation!.directPaymentConfirmedAt, null);
+  order.paymentStatus = "partially_paid";
+  order.paymentMethod = originalPaymentMethod;
   rewardOrders.length = 0;
   const confirmed = await confirmPayment();
   assert.ok(confirmed.directPaymentConfirmedAt);

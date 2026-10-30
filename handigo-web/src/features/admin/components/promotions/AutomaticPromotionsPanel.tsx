@@ -1,6 +1,8 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Modal } from '@/components/common/Modal';
+import { useToast, useToastFeedback } from '@/components/common/Toast';
+import { AdminToastNotice } from '../shared/AdminToastNotice';
 import { AdminDatePicker } from '../shared/AdminDatePicker';
 import { AsyncState } from '@/components/common/AsyncState';
 import { promotionApi, type AutomaticPromotion, type PromotionPayload } from '../../api/promotion.api';
@@ -11,11 +13,12 @@ const empty: PromotionPayload = { name: '', description: '', discountType: 'PERC
   maxDiscountAmount: null, minOrderAmount: null, usageLimit: null, startAt: '', endAt: '', status: 'INACTIVE', serviceIds: [], priority: 0, allowVoucher: false };
 const localDate = (value: string) => value ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
 export function AutomaticPromotionsPanel() {
+  const { addToast } = useToast();
   const [items, setItems] = useState<AutomaticPromotion[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useToastFeedback<string>('', 'error');
   const [editing, setEditing] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PromotionPayload>(empty);
@@ -29,11 +32,11 @@ export function AutomaticPromotionsPanel() {
     }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể tải chương trình khuyến mãi.'); }
     finally { setLoading(false); }
-  }, []);
+  }, [setError]);
   useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
   const save = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError('');
-    try { await promotionApi.save({ ...form, startAt: new Date(form.startAt).toISOString(), endAt: new Date(form.endAt).toISOString() }, editing ?? undefined); setOpen(false); await load(); }
+    try { await promotionApi.save({ ...form, startAt: new Date(form.startAt).toISOString(), endAt: new Date(form.endAt).toISOString() }, editing ?? undefined); setOpen(false); addToast('Đã lưu chương trình khuyến mãi.', 'success'); await load(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể lưu chương trình.'); }
     finally { setBusy(false); }
   };
@@ -51,7 +54,7 @@ export function AutomaticPromotionsPanel() {
     </AsyncState>
     <Modal open={open} title={editing ? 'Sửa chương trình' : 'Tạo chương trình'} onClose={() => { if (!busy) setOpen(false); }}>
       <form onSubmit={save} className="space-y-4">
-        {error && <p role="alert" className="text-error">{error}</p>}
+        <AdminToastNotice message={error} />
         <label className="block">Tên chương trình<input required maxLength={120} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} className="mt-1 w-full rounded-lg border p-3" /></label>
         <label className="block">Mô tả<textarea value={form.description ?? ''} onChange={event => setForm({ ...form, description: event.target.value })} className="mt-1 w-full rounded-lg border p-3" /></label>
         <label className="block">Loại giảm giá<select value={form.discountType} onChange={event => setForm({ ...form, discountType: event.target.value as 'AMOUNT' | 'PERCENT' })} className="ml-3 rounded-lg border p-2"><option value="PERCENT">Phần trăm</option><option value="AMOUNT">Số tiền</option></select></label>
@@ -64,6 +67,6 @@ export function AutomaticPromotionsPanel() {
         <button disabled={busy} className="rounded-xl bg-primary p-3 text-on-primary">{busy ? 'Đang lưu…' : 'Lưu chương trình'}</button>
       </form>
     </Modal>
-    <Modal open={Boolean(deleting)} title="Xóa chương trình khuyến mãi" onClose={() => { if (!busy) setDeleting(null); }}><p>Ngừng và xóa chương trình “{deleting?.name}”? Ưu đãi trên đơn đã tạo được giữ nguyên.</p><button type="button" disabled={busy} className="mt-4 rounded-lg bg-error p-3 text-white" onClick={async () => { if (!deleting) return; setBusy(true); try { await promotionApi.remove(deleting._id); setDeleting(null); await load(); } catch { setError('Không thể xóa chương trình.'); } finally { setBusy(false); } }}>Xác nhận xóa</button></Modal>
+    <Modal open={Boolean(deleting)} title="Xóa chương trình khuyến mãi" onClose={() => { if (!busy) setDeleting(null); }}><p>Ngừng và xóa chương trình “{deleting?.name}”?</p><button type="button" disabled={busy} className="mt-4 rounded-lg bg-error p-3 text-white" onClick={async () => { if (!deleting) return; setBusy(true); try { await promotionApi.remove(deleting._id); setDeleting(null); addToast('Đã xóa chương trình khuyến mãi.', 'success'); await load(); } catch { setError('Không thể xóa chương trình.'); } finally { setBusy(false); } }}>Xác nhận xóa</button></Modal>
   </div>;
 }

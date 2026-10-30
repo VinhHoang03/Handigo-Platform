@@ -23,9 +23,8 @@ export function ServiceProcessEditor({ steps, disabled, onChange }: ServiceProce
 
   return (
     <fieldset disabled={disabled} className="space-y-4 rounded-xl border border-outline-variant/40 p-4">
-      <legend className="px-2 text-sm font-bold text-primary">Quy trình dịch vụ</legend>
-      <p className="text-sm text-on-surface-variant">Thêm tối đa 20 bước theo thứ tự thực hiện. Có thể bỏ trống nếu chưa có quy trình.</p>
-      {steps.length === 0 && <p className="rounded-lg border border-dashed border-outline-variant p-3 text-sm text-on-surface-variant">Chưa có bước nào. Nhấn “Thêm bước” để bắt đầu.</p>}
+      <legend className="px-2 text-sm font-bold text-primary">Quy trình dịch vụ ({steps.length}/20 bước)</legend>
+      {steps.length === 0 && <p className="text-sm text-on-surface-variant">Chưa có bước nào.</p>}
       {steps.map((step, index) => (
         <div key={index} className="space-y-3 rounded-xl bg-surface-container-low p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
