@@ -16,7 +16,7 @@ const chain = value => ({
   then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); },
 });
 
-function setup() {
+function setup(history = []) {
   const policyExports = {};
   const policyCode = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/utils/orderReschedule.ts'), 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
@@ -37,7 +37,12 @@ function setup() {
       findOne: query => chain(String(query.userId) === String(providerUserId) ? { _id: providerId } : null),
     } },
     '../models/orderRescheduleRequest.model': { OrderRescheduleRequest: {
-      find: () => chain([]), findOne: () => chain(null), countDocuments: () => chain(0),
+      find: () => chain([]), findOne: () => chain(null),
+      countDocuments: query => chain(history.filter(item =>
+        (typeof query.status === 'string' ? query.status === item.status : query.status.$in.includes(item.status))
+        && (!query.initiatorRole || query.initiatorRole === item.initiatorRole)
+        && (!query.initiatorProviderId || String(query.initiatorProviderId) === String(item.initiatorProviderId))
+      ).length),
     } },
     './systemConfig.service': { getBookingPolicy: async () => ({
       minAdvanceMinutes: 240, rescheduleResponseMinutes: 30,
@@ -49,6 +54,33 @@ function setup() {
   }, { filename });
   return exports;
 }
+
+test('Khách bị từ chối mất lượt trên đơn; phía provider vẫn còn lượt riêng', async () => {
+  const service = setup([{ status: 'rejected', initiatorRole: 'customer' }]);
+  const current = order(true, 'accepted');
+  const customer = await service.getOrderRescheduleContext(current, { id: String(customerId), role: 'CUSTOMER' });
+  assert.equal(customer.rescheduleEligibility.canRequest, false);
+  assert.equal(customer.rescheduleEligibility.remainingCount, 0);
+  const provider = await service.getOrderRescheduleContext(current, { id: String(providerUserId), role: 'PROVIDER' });
+  assert.equal(provider.rescheduleEligibility.canRequest, true);
+});
+
+test('Provider bị từ chối mất lượt trên đơn nhưng không tăng bộ đếm tháng', async () => {
+  const service = setup([{ status: 'rejected', initiatorRole: 'provider', initiatorProviderId: providerId }]);
+  const result = await service.getOrderRescheduleContext(order(true, 'accepted'), { id: String(providerUserId), role: 'PROVIDER' });
+  assert.equal(result.rescheduleEligibility.providerMonthlyAppliedCount, 0);
+  assert.equal(result.rescheduleEligibility.remainingCount, 0);
+});
+
+test('Bộ đếm tháng chỉ lấy hai lần thành công, bỏ qua các lần bị từ chối', async () => {
+  const history = ['applied', 'rejected', 'applied', 'rejected'].map(status => ({
+    status, initiatorRole: 'provider', initiatorProviderId: providerId,
+  }));
+  const result = await setup(history).getOrderRescheduleContext(order(true, 'accepted'), {
+    id: String(providerUserId), role: 'PROVIDER',
+  });
+  assert.equal(result.rescheduleEligibility.providerMonthlyAppliedCount, 2);
+});
 
 function order(populated, status = 'created') {
   return {

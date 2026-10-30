@@ -12,11 +12,12 @@ const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
 const exportsObject = {};
 vm.runInNewContext(code, { exports: exportsObject, Date, Math, require: () => ({}) }, { filename });
 
-test('Mỗi phía chỉ được dùng một lượt dời lịch thành công trên đơn', () => {
+test('Mỗi phía chỉ có một lượt, yêu cầu bị từ chối vẫn mất lượt', () => {
   assert.equal(exportsObject.canUseRescheduleQuota(0), true);
   assert.equal(exportsObject.canUseRescheduleQuota(1), false);
   assert.equal(exportsObject.rescheduleConsumesQuota('applied'), true);
-  for (const status of ['pending', 'rejected', 'cancelled', 'expired', 'conflicted']) {
+  assert.equal(exportsObject.rescheduleConsumesQuota('rejected'), true);
+  for (const status of ['pending', 'cancelled', 'expired', 'conflicted']) {
     assert.equal(exportsObject.rescheduleConsumesQuota(status), false);
   }
 });
