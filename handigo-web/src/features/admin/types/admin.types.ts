@@ -3,6 +3,14 @@ export interface AdminUser {
   _id: string; fullName: string; email: string; phone?: string; avatar?: string;
   role: 'CUSTOMER' | 'PROVIDER' | 'ADMIN'; status: 'active' | 'locked'; createdAt: string;
 }
+export type UpdateUserStatusPayload = { status: 'active' } | {
+  status: 'locked';
+  reason: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  penaltyType: 'TEMPORARY_SUSPEND' | 'PERMANENT_BAN';
+  duration?: number;
+  durationUnit?: 'hours' | 'days';
+};
 export interface CategoryRef { _id: string; name: string; slug?: string; icon?: string }
 export interface ServiceRef {
   _id: string;

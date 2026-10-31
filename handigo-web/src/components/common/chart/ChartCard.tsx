@@ -7,6 +7,7 @@ interface ChartCardProps {
   description?: string;
   /** Nút lọc, nút đổi kỳ... nằm bên phải tiêu đề. */
   action?: ReactNode;
+  toolbar?: ReactNode;
   loading?: boolean;
   error?: string;
   onRetry?: () => void;
@@ -28,6 +29,7 @@ export function ChartCard({
   title,
   description,
   action,
+  toolbar,
   loading,
   error,
   onRetry,
@@ -39,6 +41,7 @@ export function ChartCard({
   const admin = useAdminErrorToast(error);
   return (
     <article className="min-w-0 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
+      {toolbar && <div className="mb-4 border-b border-outline-variant/30 pb-4">{toolbar}</div>}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-title-lg font-bold text-on-surface" title={admin ? description : undefined}>{title}</h2>

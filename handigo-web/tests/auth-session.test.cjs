@@ -120,7 +120,7 @@ test('KH-40: đăng xuất vô hiệu hóa phiên ngay và phản hồi muộn k
   assert.equal(runtime.store.getState().user.id, 'B');
 });
 
-function setup({ initialToken, rememberedUser, remember = true, transport } = {}) {
+function setup({ initialToken, rememberedUser, remember = true, transport, env = { DEV: true } } = {}) {
   const memoryStorage = entries => {
     const values = new Map(entries);
     return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: key => values.delete(key) };
@@ -139,7 +139,7 @@ function setup({ initialToken, rememberedUser, remember = true, transport } = {}
   const response = (config, data, status = 200) => ({ config, data, status, statusText: String(status), headers: {} });
   const fail = (config, status) => { throw new axios.AxiosError('Lỗi thử nghiệm', undefined, config, {}, response(config, {}, status)); };
   const adapter = async config => {
-    calls.push({ url: config.url, authorization: config.headers.get('Authorization') });
+    calls.push({ url: config.url, baseURL: config.baseURL, withCredentials: config.withCredentials, authorization: config.headers.get('Authorization') });
     if (transport) {
       const result = await transport(config, { response, fail, freshToken });
       if (result !== undefined) return result;
@@ -155,7 +155,7 @@ function setup({ initialToken, rememberedUser, remember = true, transport } = {}
   function load(file) {
     const filename = path.resolve(sourceRoot, file);
     if (cache.has(filename)) return cache.get(filename);
-    const code = ts.transpileModule(fs.readFileSync(filename, 'utf8').replace(/import\.meta\.env/g, '({ DEV: true })'), {
+    const code = ts.transpileModule(fs.readFileSync(filename, 'utf8').replace(/import\.meta\.env/g, `(${JSON.stringify(env)})`), {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
     }).outputText;
     const exports = {};
@@ -197,6 +197,40 @@ test('Khởi động bằng cookie: một refresh và một /me, chuẩn hóa id
   assert.equal(result.id, user._id);
   assert.equal(runtime.store.getState().token, runtime.freshToken);
   assert.equal(runtime.store.getState().isInitializing, false);
+  assert.equal(runtime.store.getState().isAuthenticated, true);
+});
+
+test('Production qua proxy: F5 khôi phục bằng cookie cùng website, API nghiệp vụ vẫn gọi Render', async () => {
+  const runtime = setup({
+    rememberedUser: user,
+    env: { DEV: false, VITE_API_BASE_URL: 'https://handigo-platform.onrender.com', VITE_AUTH_API_BASE_URL: '/api' },
+  });
+  assert.equal(runtime.store.getState().token, null);
+  assert.equal(runtime.store.getState().isAuthenticated, false);
+  await runtime.auth.restoreSession();
+  assert.deepEqual(runtime.calls.map(({ url, baseURL, withCredentials }) => ({ url, baseURL, withCredentials })), [
+    { url: '/auth/refresh-token', baseURL: '/api', withCredentials: true },
+    { url: '/auth/me', baseURL: '/api', withCredentials: true },
+  ]);
+  assert.equal(runtime.guard({ roles: ['ADMIN'] }), 'Nội dung được bảo vệ');
+  await runtime.load('api/client.ts').default.get('/users/profile');
+  assert.equal(runtime.calls.at(-1).baseURL, 'https://handigo-platform.onrender.com');
+  assert.equal(runtime.calls.at(-1).authorization, `Bearer ${runtime.freshToken}`);
+});
+
+test('Production qua proxy: đăng nhập, đăng xuất và các API xác thực đều dùng cùng nơi lưu cookie', async () => {
+  const runtime = setup({ env: { DEV: false, VITE_API_BASE_URL: 'https://handigo-platform.onrender.com', VITE_AUTH_API_BASE_URL: '/api' } });
+  const api = runtime.load('api/client.ts').default;
+  for (const endpoint of ['login', 'google-login', 'facebook-login', 'verify-register-otp', 'logout']) {
+    await api.post(`/auth/${endpoint}`);
+  }
+  assert.ok(runtime.calls.every(call => call.baseURL === '/api' && call.withCredentials === true));
+});
+
+test('Không cấu hình proxy: giữ tương thích với backend trực tiếp', async () => {
+  const runtime = setup({ env: { DEV: false, VITE_API_BASE_URL: 'https://api.handigo.test' } });
+  await runtime.auth.restoreSession();
+  assert.ok(runtime.calls.every(call => call.baseURL === 'https://api.handigo.test'));
   assert.equal(runtime.store.getState().isAuthenticated, true);
 });
 

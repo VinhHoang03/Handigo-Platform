@@ -6,7 +6,7 @@ export const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
-export type RevenuePeriod = "week" | "month";
+export type RevenuePeriod = "week" | "month" | "year";
 
 export const dateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -15,8 +15,15 @@ export const dateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-export const getRevenueRange = (period: RevenuePeriod) => {
-  const today = new Date();
+export const getRevenueToday = () => {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const part = (type: string) => parts.find(item => item.type === type)!.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
+
+export const getRevenueRange = (period: RevenuePeriod, anchor = getRevenueToday()) => {
+  const today = new Date(`${anchor}T00:00:00`);
   today.setHours(0, 0, 0, 0);
   const start = new Date(today);
   let dayCount = 7;
@@ -24,9 +31,12 @@ export const getRevenueRange = (period: RevenuePeriod) => {
   if (period === "week") {
     const daysSinceMonday = (today.getDay() + 6) % 7;
     start.setDate(today.getDate() - daysSinceMonday);
-  } else {
+  } else if (period === "month") {
     start.setDate(1);
     dayCount = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  } else {
+    start.setMonth(0, 1);
+    dayCount = Math.round((new Date(today.getFullYear() + 1, 0, 1).getTime() - start.getTime()) / 86_400_000);
   }
 
   const dates = Array.from({ length: dayCount }, (_, index) => {
@@ -39,10 +49,38 @@ export const getRevenueRange = (period: RevenuePeriod) => {
     dates,
     label:
       period === "week"
-        ? `${dates[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} - ${dates[dates.length - 1].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}`
-        : `Tháng ${today.getMonth() + 1}/${today.getFullYear()}`,
+        ? `${dates[0].toLocaleDateString("vi-VN")} – ${dates[dates.length - 1].toLocaleDateString("vi-VN")}`
+        : period === 'month' ? `Tháng ${today.getMonth() + 1}/${today.getFullYear()}` : `Năm ${today.getFullYear()}`,
   };
 };
+
+export function getRevenueSelection(period: RevenuePeriod, anchor: string): string {
+  if (period === 'year') return anchor.slice(0, 4);
+  if (period === 'month') return anchor.slice(0, 7);
+  const date = new Date(`${anchor}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 3 - ((date.getUTCDay() + 6) % 7));
+  const year = date.getUTCFullYear();
+  const week = Math.ceil(((date.getTime() - Date.UTC(year, 0, 1)) / 86_400_000 + 1) / 7);
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+export function parseRevenueSelection(period: RevenuePeriod, value: string): string | null {
+  if (period === 'year') return /^\d{4}$/.test(value) && Number(value) >= 2025 ? `${value}-01-01` : null;
+  if (period === 'month') return /^\d{4}-(0[1-9]|1[0-2])$/.test(value) && Number(value.slice(0, 4)) >= 2025 ? `${value}-01` : null;
+  if (!/^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$/.test(value) || Number(value.slice(0, 4)) < 2025) return null;
+  const date = new Date(Number(value.slice(0, 4)), 0, 4);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + (Number(value.slice(-2)) - 1) * 7);
+  const anchor = dateKey(date);
+  return getRevenueSelection(period, anchor) === value ? anchor : null;
+}
+
+export function moveRevenuePeriod(period: RevenuePeriod, anchor: string, step: number): string {
+  const start = new Date(getRevenueRange(period, anchor).dates[0]);
+  if (period === 'week') start.setDate(start.getDate() + step * 7);
+  else if (period === 'month') start.setMonth(start.getMonth() + step);
+  else start.setFullYear(start.getFullYear() + step);
+  return dateKey(start);
+}
 
 /** Gộp doanh thu tháng theo tuần, chỉ tính các ngày nằm trong tháng. */
 export function getRevenueChart(
@@ -56,6 +94,16 @@ export function getRevenueChart(
       label: date.toLocaleDateString("vi-VN", { weekday: "short" }),
       fullLabel: date.toLocaleDateString("vi-VN"),
       amount: earningsByDay.get(dateKey(date)) ?? 0,
+    }));
+  }
+
+  if (period === 'year') {
+    return Array.from({ length: 12 }, (_, month) => ({
+      key: `${dates[0].getFullYear()}-${String(month + 1).padStart(2, '0')}`,
+      label: `T${month + 1}`,
+      fullLabel: `Tháng ${month + 1}/${dates[0].getFullYear()}`,
+      amount: dates.filter(date => date.getMonth() === month)
+        .reduce((total, date) => total + (earningsByDay.get(dateKey(date)) ?? 0), 0),
     }));
   }
 

@@ -1,4 +1,3 @@
-import { useToastFeedback } from "@/components/common/Toast";
 import { useEffect, useState } from "react";
 import {
   providerDashboardApi,
@@ -8,58 +7,51 @@ import {
   dateKey,
   getRevenueChart,
   getRevenueRange,
+  getRevenueToday,
   type RevenuePeriod,
 } from "./providerHome.utils";
 
-/** Doanh thu theo tuần/tháng cho biểu đồ trang chủ thợ. */
+/** Doanh thu theo kỳ đã chọn, không hiển thị dữ liệu của kỳ trước khi đang tải. */
 export function useProviderRevenue() {
   const [revenuePeriod, setRevenuePeriodState] = useState<RevenuePeriod>("week");
-  const [revenueEarnings, setRevenueEarnings] = useState<
-    ProviderEarningPoint[]
-  >([]);
-  const [isLoadingEarnings, setIsLoadingEarnings] = useState(true);
-  const [earningsError, setEarningsError] = useToastFeedback<string | null>(null, "error");
+  const [revenueAnchor, setRevenueAnchor] = useState(getRevenueToday);
+  const [result, setResult] = useState<{ key: string; earnings: ProviderEarningPoint[]; error: string | null } | null>(null);
+  const revenueRange = getRevenueRange(revenuePeriod, revenueAnchor);
+  const fromDate = dateKey(revenueRange.dates[0]);
+  const toDate = dateKey(revenueRange.dates[revenueRange.dates.length - 1]);
+  const key = `${fromDate}/${toDate}`;
 
   useEffect(() => {
     let cancelled = false;
-    const range = getRevenueRange(revenuePeriod);
 
     providerDashboardApi
       .earnings(
-        dateKey(range.dates[0]),
-        dateKey(range.dates[range.dates.length - 1]),
+        fromDate,
+        toDate,
       )
       .then((result) => {
         if (!cancelled) {
-          setRevenueEarnings(result.earningsByDay);
-          setEarningsError(null);
+          setResult({ key, earnings: result.earningsByDay, error: null });
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setEarningsError("Không thể tải dữ liệu doanh thu.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoadingEarnings(false);
+          setResult({ key, earnings: [], error: "Không thể tải dữ liệu doanh thu." });
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [revenuePeriod, setEarningsError]);
+  }, [fromDate, toDate, key]);
 
   const setRevenuePeriod = (period: RevenuePeriod) => {
     setRevenuePeriodState(period);
-    setIsLoadingEarnings(true);
-    setEarningsError(null);
   };
 
-  const revenueRange = getRevenueRange(revenuePeriod);
+  const current = result?.key === key ? result : null;
   const earningsByDay = new Map(
-    revenueEarnings.map((item) => [item.day, item.amount]),
+    (current?.earnings ?? []).map((item) => [item.day, item.amount]),
   );
   const revenueChart = getRevenueChart(revenuePeriod, revenueRange.dates, earningsByDay);
   const revenueTotal = revenueChart.reduce(
@@ -70,8 +62,10 @@ export function useProviderRevenue() {
   return {
     revenuePeriod,
     setRevenuePeriod,
-    isLoadingEarnings,
-    earningsError,
+    revenueAnchor,
+    setRevenueAnchor,
+    isLoadingEarnings: !current,
+    earningsError: current?.error ?? null,
     revenueRange,
     revenueChart,
     revenueTotal,

@@ -24,6 +24,9 @@ const REFRESH_LOCK_NAME = "handigo-refresh-token";
 const apiBaseUrl = import.meta.env.DEV
   ? "/api"
   : import.meta.env.VITE_API_BASE_URL;
+const authApiBaseUrl = import.meta.env.DEV
+  ? "/api"
+  : import.meta.env.VITE_AUTH_API_BASE_URL;
 
 const isNetworkError = (error: unknown) => {
   return axios.isAxiosError(error) && !error.response;
@@ -102,6 +105,10 @@ export const refreshAccessToken = async () => {
 };
 
 api.interceptors.request.use(async (config) => {
+  // Proxy cùng website giúp cookie xác thực không phụ thuộc cookie bên thứ ba.
+  if (authApiBaseUrl && config.url?.startsWith("/auth/")) {
+    config.baseURL = authApiBaseUrl;
+  }
   const request = config as RetriableRequestConfig;
   request._sessionRevision ??= useAuthStore.getState().sessionRevision;
   assertCurrentSession(request._sessionRevision);
