@@ -1,5 +1,7 @@
 import { BarChart, ChartCard, chartCompactMoney, chartMoney } from "@/components/common/chart";
-import type { RevenuePeriod } from "./providerHome.utils";
+import { CalendarRange } from "lucide-react";
+import { useId, useState } from "react";
+import { dateKey, revenueWeekKey, type RevenueCustomRange, type RevenuePeriod } from "./providerHome.utils";
 
 interface RevenueChartItem {
   key: string;
@@ -11,6 +13,14 @@ interface RevenueChartItem {
 interface ProviderRevenueChartProps {
   revenuePeriod: RevenuePeriod;
   onPeriodChange: (period: RevenuePeriod) => void;
+  revenueWeek: string;
+  onWeekChange: (week: string) => void;
+  revenueMonth: string;
+  onMonthChange: (month: string) => void;
+  revenueYear: number;
+  onYearChange: (year: number) => void;
+  customRevenueRange: RevenueCustomRange | null;
+  onCustomRangeApply: (range: RevenueCustomRange) => void;
   isLoadingEarnings: boolean;
   earningsError: string | null;
   revenueChart: RevenueChartItem[];
@@ -26,12 +36,65 @@ interface ProviderRevenueChartProps {
 export function ProviderRevenueChart({
   revenuePeriod,
   onPeriodChange,
+  revenueWeek,
+  onWeekChange,
+  revenueMonth,
+  onMonthChange,
+  revenueYear,
+  onYearChange,
+  customRevenueRange,
+  onCustomRangeApply,
   isLoadingEarnings,
   earningsError,
   revenueChart,
   revenueTotal,
   revenueLabel,
 }: ProviderRevenueChartProps) {
+  const dateFieldId = useId();
+  const today = new Date();
+  const todayKey = dateKey(today);
+  const currentWeek = revenueWeekKey(today);
+  const currentMonth = todayKey.slice(0, 7);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [showCustomRange, setShowCustomRange] = useState(false);
+  const [fromDate, setFromDate] = useState(customRevenueRange?.fromDate ?? dateKey(monthStart));
+  const [toDate, setToDate] = useState(customRevenueRange?.toDate ?? todayKey);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  const currentYear = today.getFullYear();
+  const years = Array.from({ length: 10 }, (_, index) => currentYear - index);
+
+  const choosePeriod = (period: Exclude<RevenuePeriod, "custom">) => {
+    setShowCustomRange(false);
+    setRangeError(null);
+    onPeriodChange(period);
+  };
+
+  const applyCustomRange = () => {
+    if (!fromDate || !toDate) {
+      setRangeError("Hãy chọn đủ ngày bắt đầu và ngày kết thúc.");
+      return;
+    }
+    if (fromDate > toDate) {
+      setRangeError("Ngày kết thúc phải từ ngày bắt đầu trở đi.");
+      return;
+    }
+    if (toDate > todayKey) {
+      setRangeError("Không thể lọc thu nhập ở thời gian tương lai.");
+      return;
+    }
+
+    setRangeError(null);
+    setShowCustomRange(false);
+    onCustomRangeApply({ fromDate, toDate });
+  };
+
+  const filterButtonClass = (active: boolean) =>
+    `min-h-10 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 ${
+      active
+        ? "bg-primary text-on-primary shadow-sm"
+        : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
+    }`;
+
   return (
     <ChartCard
       title="Thu nhập"
@@ -41,23 +104,126 @@ export function ProviderRevenueChart({
       emptyMessage="Chưa phát sinh thu nhập trong khoảng thời gian này."
       height={256}
       action={
-        <div className="flex items-center justify-between gap-3 sm:justify-end">
-          <div className="text-left sm:text-right">
-            <p className="text-sm font-bold text-primary tabular-nums">
-              {chartMoney.format(revenueTotal)}
-            </p>
-            <p className="text-xs text-on-surface-variant">{revenueLabel}</p>
+        <div className="text-right">
+          <p className="text-sm font-bold text-primary tabular-nums">
+            {chartMoney.format(revenueTotal)}
+          </p>
+          <p className="text-xs text-on-surface-variant">{revenueLabel}</p>
+        </div>
+      }
+      toolbar={
+        <div className="mb-5 rounded-xl border border-outline-variant/35 bg-surface-container-low/70 p-2.5">
+          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+            <div
+              className="grid grid-cols-2 gap-1 rounded-xl bg-surface-container-lowest p-1 sm:flex sm:flex-wrap"
+              role="group"
+              aria-label="Chọn nhanh khoảng thu nhập"
+            >
+              <button type="button" className={filterButtonClass(revenuePeriod === "week")} aria-pressed={revenuePeriod === "week"} onClick={() => choosePeriod("week")}>
+                Theo tuần
+              </button>
+              <button type="button" className={filterButtonClass(revenuePeriod === "month")} aria-pressed={revenuePeriod === "month"} onClick={() => choosePeriod("month")}>
+                Theo tháng
+              </button>
+              <button type="button" className={filterButtonClass(revenuePeriod === "year")} aria-pressed={revenuePeriod === "year"} onClick={() => choosePeriod("year")}>
+                Theo năm
+              </button>
+              <button
+                type="button"
+                className={filterButtonClass(revenuePeriod === "custom" || showCustomRange)}
+                aria-expanded={showCustomRange}
+                aria-controls={`${dateFieldId}-custom-range`}
+                onClick={() => {
+                  setShowCustomRange((visible) => !visible);
+                  setRangeError(null);
+                }}
+              >
+                <span className="inline-flex items-center gap-1.5"><CalendarRange aria-hidden="true" size={16} />Khoảng ngày</span>
+              </button>
+            </div>
+
+            {revenuePeriod === "week" && !showCustomRange && (
+              <label className="flex items-center justify-between gap-3 px-1 text-sm font-medium text-on-surface-variant xl:justify-start">
+                Tuần cần xem
+                <input
+                  type="week"
+                  name="revenueWeek"
+                  autoComplete="off"
+                  value={revenueWeek}
+                  max={currentWeek}
+                  onChange={(event) => onWeekChange(event.target.value)}
+                  className="min-h-10 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
+                />
+              </label>
+            )}
+
+            {revenuePeriod === "month" && !showCustomRange && (
+              <label className="flex items-center justify-between gap-3 px-1 text-sm font-medium text-on-surface-variant xl:justify-start">
+                Tháng cần xem
+                <input
+                  type="month"
+                  name="revenueMonth"
+                  autoComplete="off"
+                  value={revenueMonth}
+                  max={currentMonth}
+                  onChange={(event) => onMonthChange(event.target.value)}
+                  className="min-h-10 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
+                />
+              </label>
+            )}
+
+            {revenuePeriod === "year" && !showCustomRange && (
+              <label className="flex items-center justify-between gap-3 px-1 text-sm font-medium text-on-surface-variant xl:justify-start">
+                Năm cần xem
+                <select
+                  value={revenueYear}
+                  name="revenueYear"
+                  autoComplete="off"
+                  onChange={(event) => onYearChange(Number(event.target.value))}
+                  className="min-h-10 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
+                >
+                  {years.map((year) => <option key={year} value={year}>{year}</option>)}
+                </select>
+              </label>
+            )}
           </div>
-          <select
-            value={revenuePeriod}
-            onChange={(event) => onPeriodChange(event.target.value as RevenuePeriod)}
-            aria-label="Lọc biểu đồ doanh thu"
-            className="rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm font-semibold text-on-surface outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
-          >
-            <option value="week">Tuần</option>
-            <option value="month">Tháng</option>
-            <option value="year">Năm</option>
-          </select>
+
+          {showCustomRange && (
+            <div id={`${dateFieldId}-custom-range`} className="mt-2.5 border-t border-outline-variant/35 px-1 pt-3">
+              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <label className="space-y-1 text-xs font-semibold text-on-surface-variant">
+                  Từ ngày
+                  <input
+                    type="date"
+                    name="revenueFromDate"
+                    autoComplete="off"
+                    value={fromDate}
+                    max={todayKey}
+                    onChange={(event) => setFromDate(event.target.value)}
+                    className="block min-h-11 w-full rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 text-sm font-medium text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-on-surface-variant">
+                  Đến ngày
+                  <input
+                    type="date"
+                    name="revenueToDate"
+                    autoComplete="off"
+                    value={toDate}
+                    min={fromDate || undefined}
+                    max={todayKey}
+                    onChange={(event) => setToDate(event.target.value)}
+                    className="block min-h-11 w-full rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 text-sm font-medium text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
+                  />
+                </label>
+                <button type="button" onClick={applyCustomRange} className="min-h-11 rounded-lg bg-primary px-5 text-sm font-bold text-on-primary shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20">
+                  Áp dụng
+                </button>
+              </div>
+              {rangeError && <p className="mt-2 text-sm font-medium text-error" role="alert">{rangeError}</p>}
+              <p className="mt-2 text-xs text-on-surface-variant">Khoảng ngắn hiển thị theo ngày; khoảng dài tự gộp theo tuần hoặc tháng.</p>
+            </div>
+          )}
         </div>
       }
     >
