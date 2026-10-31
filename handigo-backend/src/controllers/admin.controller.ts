@@ -28,7 +28,7 @@ export const updateUserStatus = async (req: Request, res: Response) => {
     const user = await adminService.updateUserStatus(
       getUserId(req),
       req.params.id as string,
-      req.body.status,
+      req.body,
     );
     return res.json({
       success: true,

@@ -1,5 +1,5 @@
 import { AdminPageTitle, AdminRefreshButton } from "@/features/admin/components/shared/AdminPageHeader";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useToast } from "@/components/common/Toast";
 import { getErrorMessage } from "@/utils/apiError";
 import { AsyncState } from "@/components/common/AsyncState";
@@ -8,10 +8,11 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { Pagination } from "@/components/common/Pagination";
 import { adminApi } from "../api/admin.api";
 import { UserDetailModal } from "../components/users/UserDetailModal";
+import { LockUserModal } from "../components/users/LockUserModal";
 import { UserFilters } from "../components/users/UserFilters";
 import { UserTable } from "../components/users/UserTable";
 import { useAdminList } from "../hooks/useAdminList";
-import type { AdminQuery, AdminUser } from "../types/admin.types";
+import type { AdminQuery, AdminUser, UpdateUserStatusPayload } from "../types/admin.types";
 
 export default function AdminUsersPage() {
   const { addToast } = useToast();
@@ -21,14 +22,17 @@ export default function AdminUsersPage() {
   const [detail, setDetail] = useState<AdminUser | null>(null);
   const [target, setTarget] = useState<AdminUser | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
+  const close = () => { if (!submitting.current) setTarget(null); };
 
-  const update = async () => {
-    if (!target) return;
+  const update = async (payload: UpdateUserStatusPayload) => {
+    if (!target || submitting.current) return;
     try {
+      submitting.current = true;
       setBusy(true);
       await adminApi.updateUserStatus(
         target._id,
-        target.status === "active" ? "locked" : "active",
+        payload,
       );
       setTarget(null);
       addToast("Đã cập nhật trạng thái tài khoản.", "success");
@@ -36,6 +40,7 @@ export default function AdminUsersPage() {
     } catch (error) {
       addToast(getErrorMessage(error, "Không thể cập nhật trạng thái tài khoản."), "error");
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   };
@@ -66,17 +71,14 @@ export default function AdminUsersPage() {
         onChange={(page) => setQuery({ ...query, page })}
       />
       <UserDetailModal user={detail} onClose={() => setDetail(null)} />
+      {target?.status === "active" && <LockUserModal key={target._id} user={target} busy={busy} onClose={close} onConfirm={update} />}
       <ConfirmDialog
-        open={Boolean(target)}
-        title={
-          target?.status === "active" ? "Khóa tài khoản" : "Mở khóa tài khoản"
-        }
-        message="Bạn có chắc chắn muốn khóa tài khoản này không?
-
-Người dùng sẽ không thể đăng nhập hoặc sử dụng các chức năng của hệ thống cho đến khi tài khoản được mở khóa lại."
+        open={target?.status === "locked"}
+        title="Mở khóa tài khoản"
+        message="Bạn có chắc chắn muốn mở khóa tài khoản này không? Các hình phạt khóa tài khoản đang áp dụng sẽ được kết thúc. Người dùng cần đăng nhập lại để tiếp tục sử dụng."
         busy={busy}
-        onCancel={() => setTarget(null)}
-        onConfirm={update}
+        onCancel={close}
+        onConfirm={() => update({ status: "active" })}
       />
     </DashboardShell>
   );

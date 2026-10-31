@@ -33,7 +33,7 @@ export const caseTableColumns: Array<DataTableColumn<CaseRow>> = [
     className: "min-w-[200px] whitespace-normal break-words text-sm",
     render: (item) =>
       "violationType" in item
-        ? VIOLATION_SOURCE_LABELS[item.sourceType]
+        ? (item.sourceType ? VIOLATION_SOURCE_LABELS[item.sourceType] : "Admin xử lý trực tiếp")
         : item.reporterId.fullName,
   },
   {
