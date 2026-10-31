@@ -28,22 +28,24 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
   const isQuotationOnlinePaid = isQuotationPaidOnline(order, repairQuotation);
   const quotationPaymentMethod = repairQuotation?.directPaymentConfirmedAt ? 'Thanh toán trực tiếp'
     : isQuotationOnlinePaid ? order.paymentMethod === 'bank' ? 'QR PayOS' : 'Ví Handigo' : null;
+  const paymentCompleted = displayedPaymentStatus?.startsWith('Đã') ?? false;
 
   return (
     <section className="order-3 h-full rounded-3xl border border-outline-variant/30 bg-surface-container-lowest p-md sm:p-lg md:col-span-2 lg:order-2 lg:col-span-1">
       <CardTitle icon={Wallet} title="Thanh toán đơn hàng" />
       <dl className="mt-md space-y-3 text-sm">
-        {displayedPaymentStatus && <FinancialRow label={isQuotationOrder && !isQuotationOnlinePaid && !repairQuotation?.directPaymentConfirmedAt ? 'Trạng thái tiền cọc' : 'Trạng thái thanh toán'} value={displayedPaymentStatus} />}
+        {displayedPaymentStatus && <FinancialRow label={isQuotationOrder && !isQuotationOnlinePaid && !repairQuotation?.directPaymentConfirmedAt ? 'Trạng thái tiền cọc' : 'Trạng thái thanh toán'} value={displayedPaymentStatus} tone={paymentCompleted ? 'success' : 'primary'} badge />}
         {isQuotationOrder && (
           <>
-            <FinancialRow label="Tiền cọc đã thanh toán" value={formatMoney(appliedDepositAmount)} />
-            <FinancialRow label="Giá trị đơn hàng" value={quotationAmount === undefined ? '' : formatMoney(quotationAmount)} total />
+            <FinancialRow label="Tiền cọc đã thanh toán" value={formatMoney(appliedDepositAmount)} tone="success" />
+            <FinancialRow label="Giá trị đơn hàng" value={quotationAmount === undefined ? '' : formatMoney(quotationAmount)} tone="primary" total />
             {quotationAmount !== undefined && !isCancelled && (
               <>
                 <FinancialRow
                   label={repairQuotation?.directPaymentConfirmedAt ? 'Đã thu trực tiếp từ khách'
                     : isQuotationOnlinePaid ? order.paymentMethod === 'bank' ? 'Đã thanh toán qua QR PayOS' : 'Đã thanh toán qua ví' : 'Còn cần thanh toán'}
                   value={formatMoney(directRepairAmount)}
+                  tone={repairQuotation?.directPaymentConfirmedAt || isQuotationOnlinePaid ? 'success' : 'primary'}
                   total
                 />
               </>
@@ -53,14 +55,14 @@ export function PaymentSummaryCard({ order, paymentStatus, quotation }: PaymentS
         {!isQuotationOrder && (
           <>
             <FinancialRow label="Giá trị dịch vụ" value={formatMoney(order.pricing.bookingAmount)} />
-            {discount > 0 && <FinancialRow label="Giảm giá" value={`-${formatMoney(discount)}`} />}
-            <FinancialRow label="Tổng tiền khách phải trả" value={formatMoney(order.pricing.totalPaidAmount)} total />
+            {discount > 0 && <FinancialRow label="Giảm giá" value={`-${formatMoney(discount)}`} tone="success" />}
+            <FinancialRow label="Tổng tiền khách phải trả" value={formatMoney(order.pricing.totalPaidAmount)} tone="primary" total />
           </>
         )}
         {isQuotationOrder ? quotationPaymentMethod && (
-          <FinancialRow label="Phương thức thanh toán" value={quotationPaymentMethod} />
+          <FinancialRow label="Phương thức thanh toán" value={quotationPaymentMethod} tone="primary" badge />
         ) : (
-          <FinancialRow label="Phương thức" value={paymentMethod} />
+          <FinancialRow label="Phương thức" value={paymentMethod} tone="primary" badge />
         )}
       </dl>
       {!isQuotationOrder && !isCancelled && !isCash && order.paymentStatus === 'paid' && (
@@ -74,15 +76,30 @@ function FinancialRow({
   label,
   value,
   total,
+  tone = 'default',
+  badge = false,
 }: {
   label: string;
   value: string;
   total?: boolean;
+  tone?: 'default' | 'primary' | 'success';
+  badge?: boolean;
 }) {
+  const valueTone = tone === 'success'
+    ? 'text-emerald-700'
+    : tone === 'primary'
+      ? 'text-primary'
+      : 'text-on-surface';
+  const badgeTone = tone === 'success'
+    ? 'bg-emerald-50 text-emerald-700'
+    : 'bg-primary/10 text-primary';
+
   return (
     <div className="flex items-start justify-between gap-4 border-b border-outline-variant/20 pb-3 last:border-0 last:pb-0">
       <dt className={total ? 'font-bold text-on-surface' : 'text-on-surface-variant'}>{label}</dt>
-      <dd className={`min-w-0 break-words text-right tabular-nums text-on-surface ${total ? 'text-base font-bold' : 'font-semibold'}`}>{value}</dd>
+      <dd className={`min-w-0 break-words text-right tabular-nums ${valueTone} ${total ? 'text-base font-bold' : 'font-semibold'}`}>
+        {badge ? <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${badgeTone}`}>{value}</span> : value}
+      </dd>
     </div>
   );
 }

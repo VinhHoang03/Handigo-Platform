@@ -34,8 +34,6 @@ export interface IViolationPenalty {
   type: PenaltyType;
   feature?: string | null;
   durationDays?: number | null;
-  duration?: number;
-  durationUnit?: "hours" | "days";
   note?: string | null;
 }
 
@@ -66,8 +64,6 @@ const ViolationPenaltySchema = new Schema<IViolationPenalty>(
     type: { type: String, enum: PENALTY_TYPES, required: true },
     feature: { type: String, default: null, trim: true },
     durationDays: { type: Number, default: null, min: 1 },
-    duration: { type: Number, min: 1, max: 87600 },
-    durationUnit: { type: String, enum: ["hours", "days"] },
     note: { type: String, default: null },
   },
   { _id: false },

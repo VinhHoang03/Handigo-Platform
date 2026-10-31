@@ -10,6 +10,7 @@ import {
 import type { DashboardNavItem, DashboardRole } from "./dashboard.types";
 import { ChevronLeft, ChevronsRight, HardHat, Home } from "lucide-react";
 import { NavPendingBadge } from "./NavPendingBadge";
+import { BrandMark } from "../BrandLogo";
 
 interface DashboardSidebarProps {
   collapsed?: boolean;
@@ -32,10 +33,12 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
   const location = useLocation();
   const isAdmin = role === "ADMIN";
-  const isCollapsed = isAdmin && collapsed;
+  const isProvider = role === "PROVIDER";
+  const [isProviderExpanded, setIsProviderExpanded] = useState(false);
+  const isCollapsed = (isAdmin && collapsed) || (isProvider && !isProviderExpanded);
   const [tooltip, setTooltip] = useState<{ label: string; top: number } | null>(null);
   const showTooltip = (element: HTMLElement, label: string) => {
-    if (isCollapsed) {
+    if (isAdmin && isCollapsed) {
       const bounds = element.getBoundingClientRect();
       setTooltip({ label, top: bounds.top + bounds.height / 2 });
     }
@@ -50,25 +53,34 @@ export function DashboardSidebar({
   return (
     <aside
       aria-label="Điều hướng bảng điều khiển"
-      className={`fixed hidden flex-col gap-5 border border-outline-variant/30 shadow-[0_14px_40px_rgba(19,27,46,0.08)] transition-[width] duration-300 motion-reduce:transition-none lg:flex ${isAdmin ? `inset-y-0 left-0 z-[75] border-y-0 border-l-0 ${isCollapsed ? "w-20 p-3" : "w-72 p-5"}` : `bottom-6 left-4 z-40 w-72 rounded-2xl p-5 xl:left-6 ${sidebarTopClass}`} ${sidebarSurfaceClass}`}
+      onMouseEnter={() => { if (isProvider) setIsProviderExpanded(true); }}
+      onMouseLeave={() => { if (isProvider) setIsProviderExpanded(false); }}
+      onFocusCapture={() => { if (isProvider) setIsProviderExpanded(true); }}
+      onBlurCapture={(event) => {
+        if (isProvider && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsProviderExpanded(false);
+        }
+      }}
+      className={`fixed hidden flex-col gap-5 overflow-hidden border border-outline-variant/30 shadow-[0_14px_40px_rgba(19,27,46,0.08)] transition-[width,padding] duration-300 ease-out motion-reduce:transition-none lg:flex ${isAdmin ? `inset-y-0 left-0 z-[75] border-y-0 border-l-0 ${isCollapsed ? "w-20 p-3" : "w-72 p-5"}` : `bottom-6 left-4 z-40 rounded-2xl xl:left-6 ${sidebarTopClass} ${isCollapsed ? "w-20 p-3" : "w-72 p-5"}`} ${sidebarSurfaceClass}`}
     >
       <div className="mb-1 flex min-h-12 shrink-0 items-center justify-between gap-2">
-        {!isCollapsed && (
-          <Link
-            to={homePath}
-            aria-label={`Handigo - ${subtitle}`}
-            className="flex min-h-12 items-center gap-3 rounded-xl px-1 py-2"
-          >
-            <div>
+        {(!isCollapsed || isProvider) && <Link
+          to={homePath}
+          aria-label={`Handigo - ${subtitle}`}
+          className={`flex min-h-12 items-center rounded-xl py-2 ${isCollapsed ? "w-full justify-center gap-0 px-0" : "gap-3 px-1"}`}
+        >
+          {isProvider && (
+            <BrandMark className="shadow-[0_8px_18px_rgba(53,37,205,0.18)]" />
+          )}
+          <div className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${isCollapsed ? "max-w-0 -translate-x-2 opacity-0" : "max-w-44 translate-x-0 opacity-100 delay-100"}`}>
               <h1 className="font-headline-md text-xl font-bold leading-none text-primary">
                 Handigo
               </h1>
               <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-on-surface-variant">
                 {subtitle}
               </p>
-            </div>
-          </Link>
-        )}
+          </div>
+        </Link>}
         {isAdmin && onToggle && (
           <button
             type="button"
@@ -101,7 +113,7 @@ export function DashboardSidebar({
               onBlur={() => setTooltip(null)}
               onClick={() => setTooltip(null)}
               onKeyDown={(event) => { if (event.key === "Escape") setTooltip(null); }}
-              className={`flex min-h-12 shrink-0 items-center gap-3 rounded-xl py-3 transition-colors ${isCollapsed ? "justify-center px-0" : "px-4"} ${
+              className={`flex min-h-12 shrink-0 items-center rounded-xl py-3 transition-colors ${isCollapsed ? "justify-center gap-0 px-0" : "gap-3 px-4"} ${
                 active
                   ? "bg-primary font-semibold text-on-primary shadow-[0_8px_18px_rgba(53,37,205,0.18)]"
                   : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
@@ -111,10 +123,10 @@ export function DashboardSidebar({
                 <item.icon aria-hidden="true" size={24} />
                 {isCollapsed && <NavPendingBadge count={item.pendingCount} compact stale={item.pendingStale} />}
               </span>
-              {!isCollapsed && <>
+              <span className={`flex min-w-0 items-center overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${isCollapsed ? "max-w-0 -translate-x-2 opacity-0" : "max-w-48 flex-1 translate-x-0 opacity-100 delay-100"}`}>
                 <span className="min-w-0 flex-1 text-sm font-medium">{item.label}</span>
                 <NavPendingBadge count={item.pendingCount} stale={item.pendingStale} />
-              </>}
+              </span>
             </Link>
           );
         })}

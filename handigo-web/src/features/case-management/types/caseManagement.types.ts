@@ -268,8 +268,8 @@ export type PenaltyType =
 export interface Violation {
   _id: string;
   userId: CaseUser;
-  sourceType?: ViolationSourceType | null;
-  sourceId?: string | null;
+  sourceType: ViolationSourceType;
+  sourceId: string;
   violationType: string;
   severity: ViolationSeverity;
   penaltyType: PenaltyType;
@@ -277,8 +277,6 @@ export interface Violation {
     type: PenaltyType;
     feature?: string | null;
     durationDays?: number | null;
-    duration?: number;
-    durationUnit?: 'hours' | 'days';
     note?: string | null;
   } | null;
   status: "active" | "resolved";

@@ -7,6 +7,7 @@ interface ChartCardProps {
   description?: string;
   /** Nút lọc, nút đổi kỳ... nằm bên phải tiêu đề. */
   action?: ReactNode;
+  /** Thanh điều khiển đặt dưới tiêu đề và luôn hiển thị khi biểu đồ đang tải. */
   toolbar?: ReactNode;
   loading?: boolean;
   error?: string;
@@ -41,7 +42,6 @@ export function ChartCard({
   const admin = useAdminErrorToast(error);
   return (
     <article className="min-w-0 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5">
-      {toolbar && <div className="mb-4 border-b border-outline-variant/30 pb-4">{toolbar}</div>}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-title-lg font-bold text-on-surface" title={admin ? description : undefined}>{title}</h2>
@@ -51,6 +51,8 @@ export function ChartCard({
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
+
+      {toolbar}
 
       {loading ? (
         <Skeleton className="w-full" rounded="rounded-xl" style={{ height }} />

@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 import { validateProductionConfig } from "./configs/production";
 import { createLogger } from "./utils/logger";
 import { startTemporaryLockMonitor, stopTemporaryLockMonitor } from "./services/penaltyPolicy.service";
-import { startViolationEmailMonitor, stopViolationEmailMonitor } from "./services/violationEmail.service";
 
 dotenv.config();
 
@@ -43,7 +42,6 @@ const startServer = async () => {
     ]);
 
     await connectDB();
-    await startViolationEmailMonitor();
 
     const server = http.createServer(app);
     server.requestTimeout = REQUEST_TIMEOUT_MS;
@@ -85,7 +83,6 @@ const startServer = async () => {
       forceShutdownTimer.unref();
 
       try {
-        await stopViolationEmailMonitor();
         await stopAgentOrderProgressMonitor();
         server.closeIdleConnections();
         await new Promise<void>((resolve, reject) => {

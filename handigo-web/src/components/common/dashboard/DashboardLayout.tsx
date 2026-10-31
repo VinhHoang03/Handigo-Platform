@@ -99,7 +99,7 @@ export function DashboardLayout({
 
       <main
         id="main-content"
-        className={`relative min-h-dvh pb-12 ${isAdmin ? "pt-28 lg:pt-[88px]" : "pt-32"} transition-[padding-left] duration-300 motion-reduce:transition-none ${hasSidebar ? (isAdmin ? (isSidebarCollapsed ? "lg:pl-20" : "lg:pl-72") : "lg:pl-80 xl:pl-[21rem]") : ""}`}
+        className={`relative min-h-dvh pb-12 ${isAdmin ? "pt-28 lg:pt-[88px]" : "pt-32"} transition-[padding-left] duration-300 motion-reduce:transition-none ${hasSidebar ? (isAdmin ? (isSidebarCollapsed ? "lg:pl-20" : "lg:pl-72") : "lg:pl-24 xl:pl-28") : ""}`}
       >
         <div
           className={`mx-auto px-4 sm:px-5 ${isProvider ? "provider-content space-y-5" : isAdmin ? "admin-content space-y-4" : "space-y-8"} ${

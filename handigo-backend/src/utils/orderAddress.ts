@@ -5,7 +5,17 @@ export const withOrderAddress = <T extends { addressId?: unknown; addressSnapsho
   if (!order.addressSnapshot) return order;
   const address = order.addressId;
   const id = address && typeof address === "object" && "_id" in address ? address._id : address;
-  return { ...order, addressId: { _id: id, ...order.addressSnapshot } };
+  const savedNote = address && typeof address === "object" && "note" in address
+    ? address.note
+    : undefined;
+  return {
+    ...order,
+    addressId: {
+      _id: id,
+      ...order.addressSnapshot,
+      note: order.addressSnapshot.note ?? savedNote,
+    },
+  };
 };
 
 // Đề nghị gửi riêng cho thợ gồm địa chỉ thực hiện, không kèm thông tin liên hệ.

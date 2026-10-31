@@ -7,7 +7,6 @@ import { PenaltyType, Violation } from "../models/violation.model";
 import User from "../models/user.model";
 import { disconnectUserSockets } from "../sockets/socketServer";
 import { normalizeRestrictedFeature } from "./penaltyPolicy.service";
-import { enqueueViolationEmail } from "./violationEmail.service";
 
 interface Query {
   page?: string | number;
@@ -97,7 +96,7 @@ const resolveSource = async (payload: CreateViolationPayload, session: ClientSes
   };
 };
 
-export const applyPenalty = async (userId: string, penaltyType: PenaltyType, violationId: Types.ObjectId, session: ClientSession) => {
+const applyPenalty = async (userId: string, penaltyType: PenaltyType, violationId: Types.ObjectId, session: ClientSession) => {
   if (penaltyType === "WARNING") return;
   if (
     penaltyType === "TEMPORARY_SUSPEND" ||
@@ -143,7 +142,7 @@ export const createViolation = async (adminId: string, payload: CreateViolationP
     }
     assertObjectId(userId, "User id");
 
-    const violatedUser = await User.findOne({ _id: userId, isDeleted: false }).select("_id role email fullName").session(session);
+    const violatedUser = await User.findOne({ _id: userId, isDeleted: false }).select("_id role").session(session);
     if (!violatedUser) throw new AppError("Không tìm thấy người dùng vi phạm", 404);
     if (violatedUser.role === "ADMIN") {
       throw new AppError("Không thể tạo vi phạm cho tài khoản quản trị trong phiên bản này", 400);
@@ -172,7 +171,6 @@ export const createViolation = async (adminId: string, payload: CreateViolationP
     }], { session });
 
     await applyPenalty(userId, payload.penalty.type, violation._id as Types.ObjectId, session);
-    await enqueueViolationEmail(violation, violatedUser, session);
 
     if (payload.sourceType === "REPORT") {
       await Report.findByIdAndUpdate(

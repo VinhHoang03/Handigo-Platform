@@ -137,19 +137,23 @@ function ProviderOrderDetailContent({ orderId }: { orderId: string | undefined }
           onChanged={() => reload(false)}
         />
 
-        <div className="grid grid-cols-1 items-start gap-gutter md:grid-cols-2 lg:grid-cols-3">
-          <CustomerInformationCard
-            order={order}
-            customer={customer}
-            addressLine={addressLine}
-            orderType={orderTypeLabels[order.orderType]}
-          />
-          <PaymentSummaryCard
-            order={order}
-            paymentStatus={getPaymentStatusLabel(order)}
-            quotation={quotation}
-          />
-          <OrderProgressCard order={order} />
+        <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-12">
+          <div className="min-w-0 lg:col-span-7">
+            <CustomerInformationCard
+              order={order}
+              customer={customer}
+              addressLine={addressLine}
+              orderType={orderTypeLabels[order.orderType]}
+            />
+          </div>
+          <div className="min-w-0 space-y-gutter lg:col-span-5">
+            <PaymentSummaryCard
+              order={order}
+              paymentStatus={getPaymentStatusLabel(order)}
+              quotation={quotation}
+            />
+            <OrderProgressCard order={order} />
+          </div>
         </div>
 
         <OrderTrackingMap order={order} viewerRole="PROVIDER" />

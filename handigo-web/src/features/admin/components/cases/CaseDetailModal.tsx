@@ -147,7 +147,7 @@ export function CaseDetailModal({
               <section className="rounded-2xl border border-outline-variant p-4 text-sm">
                 <p><b>Mức độ:</b> {VIOLATION_SEVERITY_LABELS[selected.item.severity]}</p>
                 <p className="mt-2"><b>Hình phạt:</b> {PENALTY_LABELS[selected.item.penaltyType]}</p>
-                {(selected.item.penalty?.duration ?? selected.item.penalty?.durationDays) != null && <p className="mt-2"><b>Thời hạn:</b> {selected.item.penalty?.duration ?? selected.item.penalty?.durationDays} {selected.item.penalty?.durationUnit === 'hours' ? 'giờ' : 'ngày'}</p>}
+                {selected.item.penalty?.durationDays && <p className="mt-2"><b>Thời hạn:</b> {selected.item.penalty.durationDays} ngày</p>}
                 {selected.item.endAt && <p className="mt-2"><b>Kết thúc:</b> {caseDateTime.format(new Date(selected.item.endAt))}</p>}
               </section>
             )}

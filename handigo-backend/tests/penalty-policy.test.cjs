@@ -94,7 +94,7 @@ for (const alreadyLocked of [false, true]) test(`Áp dụng khóa tạm thời $
   t.mock.method(mongoose.connection, 'transaction', async work => { const value = await work(session); events.push('commit'); return value; });
   t.mock.method(User, 'findOne', () => query(user));
   t.mock.method(User, 'findOneAndUpdate', () => query(user));
-  t.mock.method(Report, 'findOneAndUpdate', () => query({ _id: sourceId, targetUserId: userId }));
+  t.mock.method(Report, 'findOne', () => query({ _id: sourceId, targetUserId: userId }));
   t.mock.method(Report, 'findByIdAndUpdate', async (_id, _update, options) => { assert.equal(options.session, session); });
   t.mock.method(Violation, 'create', async (items, options) => {
     assert.equal(options.session, session);
