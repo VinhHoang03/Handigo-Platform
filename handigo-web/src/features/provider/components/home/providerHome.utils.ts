@@ -22,6 +22,9 @@ export const dateKey = (date: Date) => {
 
 const localDate = (value: string) => new Date(`${value}T00:00:00`);
 
+const shortDate = (date: Date) =>
+  `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
+
 export const revenueWeekKey = (date: Date) => {
   const target = new Date(date);
   target.setHours(0, 0, 0, 0);
@@ -41,6 +44,20 @@ const weekStartFromKey = (value: string) => {
   monday.setDate(januaryFourth.getDate() - ((januaryFourth.getDay() + 6) % 7) + (week - 1) * 7);
   monday.setHours(0, 0, 0, 0);
   return monday;
+};
+
+export const getRevenueWeeksInYear = (year: number) => {
+  const lastIsoWeek = revenueWeekKey(new Date(year, 11, 28));
+  return Number(lastIsoWeek.slice(-2));
+};
+
+export const formatRevenueWeekOption = (value: string) => {
+  const start = weekStartFromKey(value);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const week = Number(value.slice(-2));
+
+  return `Tuần ${week} (${shortDate(start)} - ${shortDate(end)})`;
 };
 
 export const getRevenueRange = (
@@ -90,7 +107,7 @@ export const getRevenueRange = (
     queryEnd,
     label:
       period === "week"
-        ? `${dates[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} - ${dates[dates.length - 1].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}`
+        ? `${shortDate(dates[0])} - ${shortDate(dates[dates.length - 1])}`
         : period === "month"
           ? `Tháng ${dates[0].getMonth() + 1}/${dates[0].getFullYear()}`
           : period === "year"

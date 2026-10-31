@@ -1,7 +1,14 @@
 import { BarChart, ChartCard, chartCompactMoney, chartMoney } from "@/components/common/chart";
 import { CalendarRange } from "lucide-react";
 import { useId, useState } from "react";
-import { dateKey, revenueWeekKey, type RevenueCustomRange, type RevenuePeriod } from "./providerHome.utils";
+import {
+  dateKey,
+  formatRevenueWeekOption,
+  getRevenueWeeksInYear,
+  revenueWeekKey,
+  type RevenueCustomRange,
+  type RevenuePeriod,
+} from "./providerHome.utils";
 
 interface RevenueChartItem {
   key: string;
@@ -54,7 +61,6 @@ export function ProviderRevenueChart({
   const today = new Date();
   const todayKey = dateKey(today);
   const currentWeek = revenueWeekKey(today);
-  const currentMonth = todayKey.slice(0, 7);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const [showCustomRange, setShowCustomRange] = useState(false);
   const [fromDate, setFromDate] = useState(customRevenueRange?.fromDate ?? dateKey(monthStart));
@@ -62,6 +68,26 @@ export function ProviderRevenueChart({
   const [rangeError, setRangeError] = useState<string | null>(null);
   const currentYear = today.getFullYear();
   const years = Array.from({ length: 10 }, (_, index) => currentYear - index);
+  const selectedWeekYear = Number(revenueWeek.slice(0, 4));
+  const selectedWeekNumber = Number(revenueWeek.slice(-2));
+  const selectedMonthYear = Number(revenueMonth.slice(0, 4));
+  const selectedMonthNumber = Number(revenueMonth.slice(5, 7));
+  const currentWeekYear = Number(currentWeek.slice(0, 4));
+  const currentWeekNumber = Number(currentWeek.slice(-2));
+  const weekCount = selectedWeekYear === currentWeekYear
+    ? currentWeekNumber
+    : getRevenueWeeksInYear(selectedWeekYear);
+  const monthCount = selectedMonthYear === currentYear ? today.getMonth() + 1 : 12;
+
+  const changeWeekYear = (year: number) => {
+    const maxWeek = year === currentWeekYear ? currentWeekNumber : getRevenueWeeksInYear(year);
+    onWeekChange(`${year}-W${String(Math.min(selectedWeekNumber, maxWeek)).padStart(2, "0")}`);
+  };
+
+  const changeMonthYear = (year: number) => {
+    const maxMonth = year === currentYear ? today.getMonth() + 1 : 12;
+    onMonthChange(`${year}-${String(Math.min(selectedMonthNumber, maxMonth)).padStart(2, "0")}`);
+  };
 
   const choosePeriod = (period: Exclude<RevenuePeriod, "custom">) => {
     setShowCustomRange(false);
@@ -143,33 +169,58 @@ export function ProviderRevenueChart({
             </div>
 
             {revenuePeriod === "week" && !showCustomRange && (
-              <label className="flex items-center justify-between gap-3 px-1 text-sm font-medium text-on-surface-variant xl:justify-start">
-                Tuần cần xem
-                <input
-                  type="week"
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-sm font-medium text-on-surface-variant xl:justify-start">
+                <span>Tuần cần xem</span>
+                <select
                   name="revenueWeek"
-                  autoComplete="off"
+                  aria-label="Chọn tuần cần xem"
                   value={revenueWeek}
-                  max={currentWeek}
                   onChange={(event) => onWeekChange(event.target.value)}
                   className="min-h-10 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
-                />
-              </label>
+                >
+                  {Array.from({ length: weekCount }, (_, index) => {
+                    const value = `${selectedWeekYear}-W${String(index + 1).padStart(2, "0")}`;
+                    return <option key={value} value={value}>{formatRevenueWeekOption(value)}</option>;
+                  }).reverse()}
+                </select>
+                <select
+                  name="revenueWeekYear"
+                  aria-label="Chọn năm của tuần"
+                  value={selectedWeekYear}
+                  onChange={(event) => changeWeekYear(Number(event.target.value))}
+                  className="min-h-10 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
+                >
+                  {years.map((year) => <option key={year} value={year}>Năm {year}</option>)}
+                </select>
+              </div>
             )}
 
             {revenuePeriod === "month" && !showCustomRange && (
-              <label className="flex items-center justify-between gap-3 px-1 text-sm font-medium text-on-surface-variant xl:justify-start">
-                Tháng cần xem
-                <input
-                  type="month"
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-sm font-medium text-on-surface-variant xl:justify-start">
+                <span>Tháng cần xem</span>
+                <select
                   name="revenueMonth"
-                  autoComplete="off"
+                  aria-label="Chọn tháng cần xem"
                   value={revenueMonth}
-                  max={currentMonth}
                   onChange={(event) => onMonthChange(event.target.value)}
                   className="min-h-10 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
-                />
-              </label>
+                >
+                  {Array.from({ length: monthCount }, (_, index) => {
+                    const month = index + 1;
+                    const value = `${selectedMonthYear}-${String(month).padStart(2, "0")}`;
+                    return <option key={value} value={value}>Tháng {month}</option>;
+                  })}
+                </select>
+                <select
+                  name="revenueMonthYear"
+                  aria-label="Chọn năm của tháng"
+                  value={selectedMonthYear}
+                  onChange={(event) => changeMonthYear(Number(event.target.value))}
+                  className="min-h-10 rounded-lg border border-outline-variant/50 bg-surface-container-lowest px-3 font-semibold text-on-surface outline-none focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/10"
+                >
+                  {years.map((year) => <option key={year} value={year}>Năm {year}</option>)}
+                </select>
+              </div>
             )}
 
             {revenuePeriod === "year" && !showCustomRange && (
