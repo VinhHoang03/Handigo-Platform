@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
@@ -12,7 +13,9 @@ import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/account_overview_widgets.dart';
 import '../../../shared/utils/media_url.dart';
+import '../../../shared/widgets/customer_page_header.dart';
 import '../../../shared/widgets/provider_avatar.dart';
 import '../../../shared/widgets/service_images.dart';
 import '../../orders/domain/order_summary.dart';
@@ -82,7 +85,7 @@ final providerOrdersProvider =
 final providerOrderPageProvider = FutureProvider.autoDispose
     .family<PagedResult<OrderSummary>, (int, String, String)>((ref, query) {
       final preview = ref.watch(providerUiPreviewProvider);
-      if (preview != null)
+      if (preview != null) {
         return PagedResult(
           items: preview
               .where((item) => query.$2 == 'all' || item.status == query.$2)
@@ -90,6 +93,7 @@ final providerOrderPageProvider = FutureProvider.autoDispose
           page: 1,
           totalPages: 1,
         );
+      }
       return ref
           .watch(providerRepositoryProvider)
           .orders(page: query.$1, status: query.$2, search: query.$3);
@@ -130,108 +134,573 @@ final providerAssignmentsProvider =
     });
 
 class ProviderShell extends StatefulWidget {
-  const ProviderShell({this.navigationShell, super.key});
+  const ProviderShell({this.navigationShell, this.incomeScreen, super.key})
+    : assert(navigationShell != null || incomeScreen != null);
   final StatefulNavigationShell? navigationShell;
+  final Widget? incomeScreen;
   @override
   State<ProviderShell> createState() => _ProviderShellState();
 }
 
 class _ProviderShellState extends State<ProviderShell> {
   int index = 0;
-  void _showSchedule() => setState(() => index = 2);
+  void _showSchedule() => setState(() => index = 3);
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final activeIndex = widget.navigationShell?.currentIndex ?? index;
+    final content =
+        widget.navigationShell ??
+        IndexedStack(
+          index: index,
+          children: [
+            ProviderDashboardScreen(
+              onOrders: () => setState(() => index = 1),
+              onSchedule: _showSchedule,
+            ),
+            const ProviderOrdersScreen(),
+            widget.incomeScreen ?? const SizedBox.shrink(),
+            ProviderScheduleScreen(isActive: index == 3),
+            const ProviderAccountScreen(),
+          ],
+        );
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body:
-          widget.navigationShell ??
-          IndexedStack(
-            index: index,
-            children: [
-              ProviderDashboardScreen(
-                onOrders: () => setState(() => index = 1),
-                onSchedule: _showSchedule,
+      extendBody: true,
+      backgroundColor: Colors.transparent,
+      body: _ProviderShellBackground(
+        child: Theme(
+          data: Theme.of(
+            context,
+          ).copyWith(scaffoldBackgroundColor: Colors.transparent),
+          child: TweenAnimationBuilder<double>(
+            key: ValueKey('provider-tab-transition-$activeIndex'),
+            tween: Tween(begin: 0, end: 1),
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(14 * (1 - value), 0),
+                child: child,
               ),
-              const ProviderOrdersScreen(),
-              ProviderScheduleScreen(isActive: index == 2),
-              const ProviderAccountScreen(),
-            ],
+            ),
+            child: content,
           ),
+        ),
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Container(
+        minimum: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+        child: Material(
           color: scheme.surfaceContainerLowest,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              for (final (tabIndex, label, icon) in const [
-                (0, 'Tổng quan', Icons.home_rounded),
-                (1, 'Đơn hàng', Icons.assignment_outlined),
-                (2, 'Lịch hẹn', Icons.calendar_month_outlined),
-                (3, 'Tài khoản', Icons.person_outline),
-              ])
-                Expanded(
-                  child: Semantics(
-                    selected: activeIndex == tabIndex,
-                    button: true,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Material(
-                        color: activeIndex == tabIndex
-                            ? scheme.primaryContainer
-                            : scheme.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            if (widget.navigationShell case final shell?) {
-                              shell.goBranch(tabIndex);
-                            } else {
-                              setState(() => index = tabIndex);
-                            }
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  icon,
-                                  size: 22,
-                                  color: activeIndex == tabIndex
-                                      ? scheme.onPrimary
-                                      : scheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  label,
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: activeIndex == tabIndex
-                                            ? scheme.onPrimary
-                                            : scheme.onSurfaceVariant,
-                                        fontWeight: activeIndex == tabIndex
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+          elevation: 8,
+          shadowColor: scheme.primary.withValues(alpha: .16),
+          borderRadius: BorderRadius.circular(28),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(5, 7, 5, 5),
+            child: Row(
+              children: [
+                for (final (tabIndex, label, icon, activeIcon) in const [
+                  (0, 'Tổng quan', Icons.home_outlined, Icons.home_rounded),
+                  (
+                    1,
+                    'Đơn hàng',
+                    Icons.assignment_outlined,
+                    Icons.assignment_rounded,
+                  ),
+                  (
+                    2,
+                    'Thu nhập',
+                    Icons.bar_chart_outlined,
+                    Icons.bar_chart_rounded,
+                  ),
+                  (
+                    3,
+                    'Lịch hẹn',
+                    Icons.calendar_month_outlined,
+                    Icons.calendar_month_rounded,
+                  ),
+                  (4, 'Tài khoản', Icons.person_outline, Icons.person_rounded),
+                ])
+                  Expanded(
+                    child: _ProviderNavItem(
+                      label: label,
+                      icon: icon,
+                      activeIcon: activeIcon,
+                      selected: activeIndex == tabIndex,
+                      emphasized: tabIndex == 2,
+                      onTap: () {
+                        if (widget.navigationShell case final shell?) {
+                          shell.goBranch(
+                            tabIndex,
+                            initialLocation: tabIndex == activeIndex,
+                          );
+                        } else {
+                          setState(() => index = tabIndex);
+                        }
+                      },
                     ),
                   ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProviderNavItem extends StatelessWidget {
+  const _ProviderNavItem({
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+    required this.selected,
+    required this.emphasized,
+    required this.onTap,
+  });
+  final String label;
+  final IconData icon, activeIcon;
+  final bool selected, emphasized;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedScale(
+                scale: selected ? (emphasized ? 1.16 : 1.1) : 1,
+                duration: duration,
+                curve: Curves.easeOutBack,
+                child: AnimatedContainer(
+                  duration: duration,
+                  curve: Curves.easeOutCubic,
+                  width: selected && emphasized ? 34 : 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? scheme.primary.withValues(alpha: .1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    selected ? activeIcon : icon,
+                    size: selected ? 22 : 21,
+                    color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                  ),
                 ),
+              ),
+              const SizedBox(height: 2),
+              AnimatedDefaultTextStyle(
+                duration: duration,
+                curve: Curves.easeOut,
+                style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                  color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 10.5,
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.fade,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 3),
+              AnimatedContainer(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                width: selected ? 22 : 0,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _ProviderShellBackground extends StatelessWidget {
+  const _ProviderShellBackground({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFFCFBFF), Color(0xFFF4F1FF)],
+      ),
+    ),
+    child: Stack(
+      children: [
+        Positioned(
+          top: -80,
+          right: -60,
+          child: IgnorePointer(
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x1F8B72FF), Color(0x008B72FF)],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: -100,
+          bottom: 20,
+          child: IgnorePointer(
+            child: Transform.rotate(
+              angle: -.22,
+              child: Container(
+                width: 300,
+                height: 130,
+                decoration: BoxDecoration(
+                  color: const Color(0x127D64F5),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(child: child),
+      ],
+    ),
+  );
+}
+
+class ProviderIncomeScreen extends ConsumerWidget {
+  const ProviderIncomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final overview = ref.watch(providerOverviewProvider);
+    final orders = ref.watch(providerOrdersProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Thu nhập'),
+        actions: [
+          IconButton(
+            tooltip: 'Làm mới thu nhập',
+            onPressed: () {
+              ref.invalidate(providerOverviewProvider);
+              ref.invalidate(providerOrdersProvider);
+            },
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(providerOverviewProvider);
+          ref.invalidate(providerOrdersProvider);
+          await Future.wait([
+            ref.read(providerOverviewProvider.future),
+            ref.read(providerOrdersProvider.future),
+          ]);
+        },
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 112),
+          children: [
+            Text(
+              'Tổng quan thu nhập',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Theo dõi doanh thu và các khoản tiền trong ví Handigo.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.outline),
+            ),
+            const SizedBox(height: 16),
+            overview.when(
+              loading: () => const AppLoading(),
+              error: (error, _) => AppMessage(
+                message: _message(error),
+                onRetry: () => ref.invalidate(providerOverviewProvider),
+              ),
+              data: (data) => _IncomeSummaryCard(data: data),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Đơn tạo thu nhập',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.go('/provider/orders'),
+                  child: const Text('Xem tất cả'),
+                ),
+              ],
+            ),
+            orders.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (error, _) => AppMessage(
+                message: _message(error),
+                onRetry: () => ref.invalidate(providerOrdersProvider),
+              ),
+              data: (page) {
+                final completed = page.items
+                    .where((order) => order.status == 'completed')
+                    .toList();
+                if (completed.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 28,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withValues(alpha: .35),
+                      ),
+                    ),
+                    child: const Column(
+                      children: [
+                        Icon(Icons.receipt_long_outlined, size: 34),
+                        SizedBox(height: 10),
+                        Text(
+                          'Chưa có đơn hoàn thành trong danh sách gần đây.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return Column(
+                  children: completed
+                      .map(
+                        (order) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _IncomeOrderCard(order: order),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IncomeSummaryCard extends StatelessWidget {
+  const _IncomeSummaryCard({required this.data});
+  final ProviderOverview data;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primary, AppTheme.primaryDark],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: .22),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Thu nhập tháng này',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _money(data.monthlyEarnings),
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _IncomeBalance(
+                  label: 'Khả dụng',
+                  amount: data.walletBalance,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _IncomeBalance(
+                  label: 'Chờ xử lý',
+                  amount: data.pendingBalance,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: () => context.push('/provider/wallet'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: scheme.primary,
+              minimumSize: const Size.fromHeight(46),
+            ),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            label: const Text('Xem ví & rút tiền'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IncomeBalance extends StatelessWidget {
+  const _IncomeBalance({required this.label, required this.amount});
+  final String label;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .12),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: Colors.white.withValues(alpha: .18)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white70)),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            _money(amount),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _IncomeOrderCard extends StatelessWidget {
+  const _IncomeOrderCard({required this.order});
+  final OrderSummary order;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => context.push('/provider/orders/${order.id}'),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryFixed,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    order.serviceName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Mã đơn ${order.code}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _money(order.totalAmount ?? 0),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class ProviderDashboardScreen extends ConsumerWidget {
@@ -1842,145 +2311,170 @@ class ProviderAccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).user;
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryFixed,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.person_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 24,
-              ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: CustomerPageHeader(
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
+        automaticallyImplyLeading: false,
+        backgroundColor: accountSurface,
+        title: 'Tài khoản & Cài đặt',
+        titleColor: accountInk,
+        actions: [
+          IconButton(
+            tooltip: 'Trợ giúp',
+            onPressed: () => context.push('/provider/support'),
+            icon: SvgPicture.asset(
+              '$accountIconPath/app_help.svg',
+              width: 22,
+              height: 22,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Tài khoản',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          Card(
-            margin: EdgeInsets.zero,
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(16),
-              leading: ProviderAvatar(url: user?.avatar, gender: user?.gender),
-              title: Text(
-                user?.fullName ?? 'Đối tác Handigo',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                user?.email ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/provider/profile'),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeading(
-            title: 'Quản lý công việc',
-            icon: Icons.handyman_outlined,
-          ),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _accountItem(
-                  context,
-                  'Hồ sơ đối tác',
-                  Icons.badge_outlined,
-                  '/provider/profile',
-                ),
-                _accountItem(
-                  context,
-                  'Ví và thu nhập',
-                  Icons.account_balance_wallet_outlined,
-                  '/provider/wallet',
-                ),
-                _accountItem(
-                  context,
-                  'Tài khoản ngân hàng',
-                  Icons.account_balance_outlined,
-                  '/provider/banks',
-                ),
-                _accountItem(
-                  context,
-                  'Đánh giá khách hàng',
-                  Icons.star_outline,
-                  '/provider/feedback',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeading(
-            title: 'Cài đặt',
-            icon: Icons.settings_outlined,
-          ),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _accountItem(
-                  context,
-                  'Thông báo',
-                  Icons.notifications_outlined,
-                  '/provider/notifications',
-                ),
-                _accountItem(
-                  context,
-                  'Cài đặt ứng dụng',
-                  Icons.tune_rounded,
-                  '/provider/settings',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: scheme.error,
-              side: BorderSide(color: scheme.error.withValues(alpha: .4)),
-            ),
-            onPressed: () => ref.read(authControllerProvider).logout(),
-            icon: const Icon(Icons.logout),
-            label: const Text('Đăng xuất'),
           ),
         ],
       ),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+              children: [
+                AccountProfileSummaryCard(
+                  name: user?.fullName ?? 'Đối tác Handigo',
+                  contact: user?.email ?? 'Chưa cập nhật email',
+                  avatarUrl: user?.avatar,
+                  onEdit: () => context.push('/provider/personal-info'),
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Hồ sơ đối tác',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Xác thực tài khoản',
+                      subtitle: 'Email, điện thoại và giấy tờ tùy thân',
+                      iconAsset: '$accountIconPath/shield.svg',
+                      onTap: () => context.push('/provider/verification'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Thông tin nghề nghiệp',
+                      subtitle: 'Chuyên môn, dịch vụ và chứng chỉ',
+                      iconAsset: '$accountIconPath/file.svg',
+                      onTap: () => context.push('/provider/professional-info'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Đánh giá khách hàng',
+                      subtitle: 'Theo dõi chất lượng dịch vụ của bạn',
+                      iconAsset: '$accountIconPath/star.svg',
+                      onTap: () => context.push('/provider/feedback'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Quản lý công việc',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Ví và thu nhập',
+                      subtitle: 'Số dư, giao dịch và yêu cầu rút tiền',
+                      iconAsset: '$accountIconPath/card.svg',
+                      onTap: () => context.push('/provider/wallet'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Tài khoản ngân hàng',
+                      subtitle: 'Quản lý tài khoản nhận tiền',
+                      iconAsset: '$accountIconPath/card.svg',
+                      onTap: () => context.push('/provider/banks'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Cài đặt ứng dụng',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Thông báo & nhắc lịch',
+                      subtitle: 'Lịch hẹn, tin nhắn và cập nhật dịch vụ',
+                      iconAsset: '$accountIconPath/bell.svg',
+                      onTap: () => context.push('/provider/notifications'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Ngôn ngữ',
+                      subtitle: 'Tiếng Việt',
+                      iconAsset: '$accountIconPath/globe.svg',
+                      comingSoon: true,
+                    ),
+                    AccountMenuItem(
+                      label: 'Bảo mật & đăng nhập',
+                      subtitle: 'Mật khẩu, Face ID và vân tay',
+                      iconAsset: '$accountIconPath/shield.svg',
+                      onTap: () => context.push('/provider/settings'),
+                    ),
+                    const AccountMenuItem(
+                      label: 'Giao diện',
+                      subtitle: 'Sáng · Theo cài đặt thiết bị',
+                      iconAsset: '$accountIconPath/moon.svg',
+                      comingSoon: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Hỗ trợ & báo cáo',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Trung tâm hỗ trợ',
+                      subtitle: 'Gửi và theo dõi yêu cầu hỗ trợ',
+                      iconAsset: '$accountIconPath/help.svg',
+                      onTap: () => context.push('/provider/support'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Báo cáo sự cố',
+                      subtitle: 'Phản ánh vấn đề trong quá trình làm việc',
+                      iconAsset: '$accountIconPath/chat.svg',
+                      onTap: () => context.push('/provider/reports'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Đề xuất dịch vụ',
+                      subtitle: 'Gửi ý tưởng dịch vụ mới cho Handigo',
+                      iconAsset: '$accountIconPath/gift.svg',
+                      onTap: () =>
+                          context.push('/provider/service-suggestions'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Điều khoản & quyền riêng tư',
+                      subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
+                      iconAsset: '$accountIconPath/file.svg',
+                      onTap: () => context.push('/provider/settings'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Đánh giá Handigo',
+                      subtitle: 'Chia sẻ trải nghiệm của bạn',
+                      iconAsset: '$accountIconPath/star.svg',
+                      onTap: () => context.push('/provider/app-feedback'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountLogoutButton(
+                  onPressed: () async {
+                    final confirmed = await showAccountLogoutConfirmation(
+                      context,
+                      userName: user?.fullName ?? 'Đối tác Handigo',
+                    );
+                    if (confirmed) {
+                      await ref.read(authControllerProvider).logout();
+                    }
+                  },
+                ),
+                const AccountVersionFooter(),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
-
-  Widget _accountItem(
-    BuildContext context,
-    String title,
-    IconData icon,
-    String route,
-  ) => ListTile(
-    leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-    title: Text(title, style: const TextStyle(fontSize: 16)),
-    trailing: const Icon(Icons.chevron_right, size: 20),
-    onTap: () => context.push(route),
-  );
 }
 
 List<OrderSummary> _ordersOnDay(List<OrderSummary> orders, DateTime day) =>
