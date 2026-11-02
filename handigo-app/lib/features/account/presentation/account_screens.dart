@@ -10,6 +10,7 @@ import '../../../app/theme/app_theme.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/account_overview_widgets.dart';
 import '../../../shared/widgets/customer_page_header.dart';
 import '../../home/presentation/device_location_provider.dart';
 import '../data/account_repository.dart';
@@ -117,7 +118,7 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               children: [
-                _ProfileSummaryCard(
+                AccountProfileSummaryCard(
                   name: user?.fullName ?? 'Khách hàng',
                   contact: _maskedPhone('${profile?['phone'] ?? ''}'),
                   avatarUrl: user?.avatar,
@@ -137,10 +138,10 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
                   onHistory: () => context.push('/customer/wallet/history'),
                 ),
                 const SizedBox(height: 24),
-                _AccountSection(
+                AccountSection(
                   title: 'Quản lý cá nhân',
                   items: [
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Sổ địa chỉ',
                       subtitle: addresses == null
                           ? 'Quản lý các địa chỉ đã lưu'
@@ -148,13 +149,13 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
                       iconAsset: '$_accountIconPath/pin.svg',
                       onTap: () => context.push('/customer/addresses'),
                     ),
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Phương thức thanh toán',
                       subtitle: 'Ví & tài khoản ngân hàng đã lưu',
                       iconAsset: '$_accountIconPath/card.svg',
                       onTap: () => context.push('/customer/wallet'),
                     ),
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Voucher & ưu đãi',
                       subtitle: vouchers == null
                           ? 'Xem các ưu đãi đang có'
@@ -165,22 +166,22 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                _AccountSection(
+                AccountSection(
                   title: 'Cài đặt ứng dụng',
                   items: [
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Thông báo & nhắc lịch',
                       subtitle: 'Lịch hẹn, tin nhắn & cập nhật dịch vụ',
                       iconAsset: '$_accountIconPath/bell.svg',
                       onTap: () => context.push('/customer/notifications'),
                     ),
-                    const _MenuItem(
+                    const AccountMenuItem(
                       label: 'Ngôn ngữ & giao diện',
                       subtitle: 'Tiếng Việt · Sáng / Tối',
                       iconAsset: '$_accountIconPath/globe.svg',
                       comingSoon: true,
                     ),
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Bảo mật & đăng nhập',
                       subtitle: 'Mật khẩu, Face ID & vân tay',
                       iconAsset: '$_accountIconPath/shield.svg',
@@ -189,28 +190,28 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                _AccountSection(
+                AccountSection(
                   title: 'Hỗ trợ & thông tin',
                   items: [
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Trung tâm trợ giúp',
                       subtitle: 'Chat với Handigo · Hỗ trợ 24/7',
                       iconAsset: '$_accountIconPath/help.svg',
                       onTap: () => context.push('/customer/support'),
                     ),
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Góp ý & báo cáo sự cố',
                       subtitle: 'Chúng tôi luôn lắng nghe bạn',
                       iconAsset: '$_accountIconPath/chat.svg',
                       onTap: () => context.push('/customer/complaints'),
                     ),
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Điều khoản & quyền riêng tư',
                       subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
                       iconAsset: '$_accountIconPath/file.svg',
                       onTap: () => context.push('/customer/settings'),
                     ),
-                    _MenuItem(
+                    AccountMenuItem(
                       label: 'Đánh giá Handigo',
                       subtitle: 'Chia sẻ trải nghiệm của bạn',
                       iconAsset: '$_accountIconPath/star.svg',
@@ -219,24 +220,18 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                OutlinedButton(
-                  onPressed: () => ref.read(authControllerProvider).logout(),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    backgroundColor: _accountSurface,
-                    foregroundColor: _accountDanger,
-                    elevation: 0,
-                    side: const BorderSide(color: _accountDivider),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  child: const Text('Đăng xuất'),
+                AccountLogoutButton(
+                  onPressed: () async {
+                    final confirmed = await showAccountLogoutConfirmation(
+                      context,
+                      userName: user?.fullName ?? 'Khách hàng Handigo',
+                    );
+                    if (confirmed) {
+                      await ref.read(authControllerProvider).logout();
+                    }
+                  },
                 ),
+                const AccountVersionFooter(),
               ],
             ),
           ),
@@ -247,7 +242,10 @@ class _AccountOverviewScreenState extends ConsumerState<AccountOverviewScreen> {
 }
 
 class ProfileScreen extends ConsumerStatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.addressRoute = '/customer/addresses'});
+
+  final String addressRoute;
+
   @override
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
@@ -478,7 +476,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         label: 'Khu vực thường trú',
                         icon: Icons.location_on_outlined,
                         value: _residenceLabel(addresses),
-                        onTap: () => context.push('/customer/addresses'),
+                        onTap: () => context.push(widget.addressRoute),
                       ),
                     ],
                   ),
@@ -1444,9 +1442,9 @@ class FeedbackScreen extends ConsumerWidget {
   const FeedbackScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Đánh giá của tôi')),
-      body: ref
+    return AccountDetailScaffold(
+      title: 'Đánh giá Handigo',
+      child: ref
           .watch(accountFeedbackProvider)
           .when(
             loading: () => const AppLoading(),
@@ -1514,12 +1512,16 @@ class _CaseList extends ConsumerWidget {
   final FutureProvider<dynamic> provider;
   final VoidCallback onCreate;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(
-      title: Text(title),
-      actions: [IconButton(onPressed: onCreate, icon: const Icon(Icons.add))],
-    ),
-    body: ref
+  Widget build(BuildContext context, WidgetRef ref) => AccountDetailScaffold(
+    title: title,
+    actions: [
+      IconButton(
+        tooltip: 'Tạo mới',
+        onPressed: onCreate,
+        icon: const Icon(Icons.add),
+      ),
+    ],
+    child: ref
         .watch(provider)
         .when(
           loading: () => const AppLoading(),
@@ -1694,84 +1696,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   );
 }
 
-class _MenuItem {
-  const _MenuItem({
-    required this.label,
-    required this.subtitle,
-    required this.iconAsset,
-    this.onTap,
-    this.comingSoon = false,
-  });
-
-  final String label, subtitle;
-  final String iconAsset;
-  final VoidCallback? onTap;
-  final bool comingSoon;
-}
-
-class _ProfileSummaryCard extends StatelessWidget {
-  const _ProfileSummaryCard({
-    required this.name,
-    required this.contact,
-    required this.avatarUrl,
-    required this.onEdit,
-  });
-  final String name, contact;
-  final String? avatarUrl;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(20);
-    return Material(
-      color: _accountSurface,
-      borderRadius: borderRadius,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onEdit,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              _AccountAvatar(name: name, avatarUrl: avatarUrl),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: _accountInk,
-                        fontSize: 22,
-                        height: 1.45,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      contact,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: _accountMuted,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ProviderModeCard extends StatelessWidget {
   const _ProviderModeCard({required this.isApproved, required this.onPressed});
 
@@ -1939,77 +1863,6 @@ class _WalletOverviewCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _AccountAvatar extends StatelessWidget {
-  const _AccountAvatar({required this.name, required this.avatarUrl});
-  final String name;
-  final String? avatarUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = usableMediaUrl(avatarUrl);
-    return Container(
-      width: 64,
-      height: 64,
-      decoration: const BoxDecoration(
-        color: _figmaPrimarySoft,
-        shape: BoxShape.circle,
-      ),
-      clipBehavior: Clip.antiAlias,
-      alignment: Alignment.center,
-      child: imageUrl != null
-          ? Image.network(
-              imageUrl,
-              width: 64,
-              height: 64,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _initial(context),
-            )
-          : _initial(context),
-    );
-  }
-
-  Widget _initial(BuildContext context) => Text(
-    _initials(name),
-    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-      color: _figmaPrimary,
-      fontSize: 22,
-      height: 1.45,
-      fontWeight: FontWeight.w600,
-    ),
-  );
-}
-
-String _initials(String value) {
-  final parts = value.trim().split(RegExp(r'\s+'));
-  if (parts.isEmpty || parts.first.isEmpty) return '?';
-  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-  return '${parts[parts.length - 2][0]}${parts.last[0]}'.toUpperCase();
-}
-
-class _AccountSection extends StatelessWidget {
-  const _AccountSection({required this.title, required this.items});
-  final String title;
-  final List<_MenuItem> items;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        title,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: _accountMuted,
-          fontSize: 16,
-          height: 1.45,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      const SizedBox(height: 10),
-      _MenuCard(items: items),
-    ],
-  );
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -2872,108 +2725,6 @@ class _SettingsToggle extends StatelessWidget {
     value: value,
     onChanged: onChanged,
   );
-}
-
-class _MenuCard extends StatelessWidget {
-  const _MenuCard({required this.items});
-  final List<_MenuItem> items;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: _accountSurface,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          for (var index = 0; index < items.length; index++) ...[
-            if (index > 0)
-              const Divider(height: 1, thickness: 1, color: _accountDivider),
-            _AccountMenuTile(item: items[index]),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _AccountMenuTile extends StatelessWidget {
-  const _AccountMenuTile({required this.item});
-
-  final _MenuItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: item.onTap,
-      child: SizedBox(
-        height: 76,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _figmaPrimarySoft,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: SvgPicture.asset(item.iconAsset, width: 22, height: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: _accountInk,
-                        fontSize: 16,
-                        height: 1.45,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.comingSoon ? 'Chưa triển khai' : item.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: item.comingSoon ? _figmaPrimary : _accountMuted,
-                        fontWeight: item.comingSoon ? FontWeight.w600 : null,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (item.comingSoon)
-                const Icon(
-                  Icons.hourglass_empty_rounded,
-                  size: 18,
-                  color: _figmaPrimary,
-                )
-              else
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 16,
-                  color: _accountMuted,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 String _maskedPhone(String value) {

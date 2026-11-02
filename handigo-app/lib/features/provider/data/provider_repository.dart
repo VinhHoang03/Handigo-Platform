@@ -1,8 +1,10 @@
 import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../orders/domain/order_summary.dart';
 import '../../account/domain/account_models.dart';
+import '../../services/domain/service_category.dart';
 import '../domain/provider_models.dart';
 
 class ProviderRepository {
@@ -169,8 +171,9 @@ class ProviderRepository {
       field: 'image',
       data: {'orderId': orderId},
     );
-    if (data is! Map || data['items'] is! List)
+    if (data is! Map || data['items'] is! List) {
       throw const FormatException('Kết quả đọc ảnh báo giá không hợp lệ.');
+    }
     return (data['items'] as List)
         .whereType<Map<String, dynamic>>()
         .map(QuotationItem.fromJson)
@@ -244,11 +247,15 @@ class ProviderRepository {
     (await _api.request('/wallets/me', authenticated: true))['data']
         as Map<String, dynamic>,
   );
+  Future<WalletSummary> walletSummary() async => WalletSummary.fromJson(
+    (await _api.request('/wallets/me/summary', authenticated: true))['data']
+        as Map<String, dynamic>,
+  );
   Future<PagedResult<WalletTransactionItem>> walletTransactions() async {
     final data =
         (await _api.request(
               '/wallets/me/transactions',
-              query: {'page': 1, 'limit': 20},
+              query: {'page': 1, 'limit': 20, 'groupSettlements': true},
               authenticated: true,
             ))['data']
             as Map<String, dynamic>;
@@ -315,11 +322,68 @@ class ProviderRepository {
     final data =
         (await _api.request(
               '/feedback/provider/me',
-              query: {'page': 1, 'limit': 20},
+              query: {'page': 1, 'limit': 50},
               authenticated: true,
             ))['data']
             as Map<String, dynamic>;
     return PagedResult.fromJson(data, (item) => item);
+  }
+
+  Future<List<String>> uploadFeedbackReplyImages(List<XFile> files) async {
+    final data = await _api.uploadImages('/feedback/provider/images', files);
+    if (data is! List) {
+      throw const ApiException('Phản hồi tải ảnh không hợp lệ.');
+    }
+    return data.whereType<String>().toList();
+  }
+
+  Future<Map<String, dynamic>> replyToFeedback({
+    required String feedbackId,
+    required String content,
+    List<String> images = const [],
+  }) async =>
+      (await _api.request(
+            '/feedback/$feedbackId/reply',
+            method: 'PUT',
+            data: {'content': content.trim(), 'images': images},
+            authenticated: true,
+          ))['data']
+          as Map<String, dynamic>;
+
+  Future<List<ServiceCategory>> suggestionCategories() async {
+    final response = await _api.request('/categories/active');
+    final data = response['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(ServiceCategory.fromJson)
+        .toList();
+  }
+
+  Future<void> createServiceSuggestion({
+    required String serviceName,
+    String? categoryId,
+    String? categoryName,
+    String? description,
+  }) async {
+    await _api.request(
+      '/service-suggestions',
+      method: 'POST',
+      authenticated: true,
+      data: {
+        'suggestionType': 'service',
+        'suggestedServiceName': serviceName.trim(),
+        'suggestedCategoryName': categoryName?.trim().isNotEmpty == true
+            ? categoryName!.trim()
+            : null,
+        'categoryId': categoryId?.trim().isNotEmpty == true
+            ? categoryId!.trim()
+            : null,
+        'description': description?.trim().isNotEmpty == true
+            ? description!.trim()
+            : null,
+      },
+    );
   }
 
   Map<String, dynamic> _overviewJson(ProviderOverview value) => {
