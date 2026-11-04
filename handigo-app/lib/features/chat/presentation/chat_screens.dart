@@ -44,13 +44,13 @@ class _ConversationListScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(conversationListProvider);
-    final scheme = Theme.of(context).colorScheme;
     final isProvider =
         ref.watch(authControllerProvider).user?.role == UserRole.provider;
     return Scaffold(
       appBar: CustomerPageHeader(
         toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        showBottomBorder: true,
         title: 'Đoạn chat',
         centerTitle: false,
         leading: isProvider
@@ -65,13 +65,8 @@ class _ConversationListScreenState
                 },
                 icon: const Icon(Icons.arrow_back_rounded),
               )
-            : Center(
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: scheme.surfaceContainerLow,
-                  foregroundColor: scheme.primary,
-                  child: const Icon(Icons.forum_rounded, size: 19),
-                ),
+            : const Center(
+                child: CustomerHeaderIcon(Icons.forum_outlined),
               ),
       ),
       body: state.when(

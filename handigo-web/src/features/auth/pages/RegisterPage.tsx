@@ -39,7 +39,11 @@ export default function RegisterPage() {
       return;
     }
     const normalizedPhone = normalizeVietnamesePhone(phone);
-    if (normalizedPhone && !isValidVietnamesePhone(normalizedPhone)) {
+    if (!normalizedPhone) {
+      setError("Vui lòng nhập số điện thoại.");
+      return;
+    }
+    if (!isValidVietnamesePhone(normalizedPhone)) {
       setError(
         "Số điện thoại phải bắt đầu bằng 0 và dùng đầu số di động Việt Nam hợp lệ.",
       );
@@ -51,7 +55,7 @@ export default function RegisterPage() {
       await authService.register({
         fullName: fullName.trim(),
         email: normalizedEmail,
-        phone: normalizedPhone || undefined,
+        phone: normalizedPhone,
         password,
         registrationType: registerAsProvider ? "PROVIDER" : "CUSTOMER",
       });

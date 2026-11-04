@@ -246,8 +246,14 @@ class _ServiceReviewsScreenState extends ConsumerState<ServiceReviewsScreen> {
                               key: ValueKey(_optionId),
                               initialValue: _optionId,
                               isExpanded: true,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Gói dịch vụ',
+                                labelStyle: TextStyle(
+                                  color: Theme.of(context).brightness ==
+                                          Brightness.light
+                                      ? Colors.black
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
                               ),
                               items: [
                                 const DropdownMenuItem<String>(

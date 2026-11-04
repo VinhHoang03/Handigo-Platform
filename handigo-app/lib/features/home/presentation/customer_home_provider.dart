@@ -8,6 +8,10 @@ final customerHomeRepositoryProvider = Provider<CustomerHomeRepository>(
   (ref) => CustomerHomeRepository(ref.watch(apiClientProvider)),
 );
 
+final customerHomeRewardsProvider = FutureProvider.autoDispose<HomeRewards>(
+  (ref) => ref.watch(customerHomeRepositoryProvider).loadRewards(),
+);
+
 final customerHomeProvider = FutureProvider<CustomerHomeData>(
   (ref) async {
     final locationState = ref.watch(deviceLocationProvider);

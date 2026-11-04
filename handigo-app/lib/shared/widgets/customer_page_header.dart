@@ -10,6 +10,7 @@ class CustomerPageHeader extends StatelessWidget
     this.actions,
     this.backgroundColor,
     this.titleColor,
+    this.showBottomBorder = false,
     this.centerTitle = true,
     this.automaticallyImplyLeading = true,
     super.key,
@@ -22,6 +23,7 @@ class CustomerPageHeader extends StatelessWidget
   final List<Widget>? actions;
   final Color? backgroundColor;
   final Color? titleColor;
+  final bool showBottomBorder;
   final bool centerTitle;
   final bool automaticallyImplyLeading;
 
@@ -41,6 +43,7 @@ class CustomerPageHeader extends StatelessWidget
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
+      shape: showBottomBorder ? customerHeaderBorder(theme.colorScheme) : null,
       leading: leading,
       title: Column(
         mainAxisSize: MainAxisSize.min,
@@ -73,4 +76,18 @@ class CustomerPageHeader extends StatelessWidget
       actions: actions,
     );
   }
+}
+
+Border customerHeaderBorder(ColorScheme scheme) => Border(
+  bottom: BorderSide(color: scheme.outlineVariant.withValues(alpha: .5)),
+);
+
+class CustomerHeaderIcon extends StatelessWidget {
+  const CustomerHeaderIcon(this.icon, {super.key});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) =>
+      Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24);
 }

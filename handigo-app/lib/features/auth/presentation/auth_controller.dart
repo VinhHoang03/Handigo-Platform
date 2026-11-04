@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../data/auth_repository.dart';
+import '../data/social_sign_in.dart';
 import '../domain/app_user.dart';
 
 enum AuthStatus { initializing, unauthenticated, authenticated }
@@ -12,6 +13,8 @@ class AuthController extends ChangeNotifier {
   AuthController(this._repository, this._api);
   final AuthRepository _repository;
   final ApiClient _api;
+  final _socialSignIn = SocialSignIn();
+  bool _socialLoginPending = false;
   AuthStatus status = AuthStatus.initializing;
   AppUser? user;
   String? message;
@@ -54,6 +57,21 @@ class AuthController extends ChangeNotifier {
     user = await _repository.login(email, password);
     status = AuthStatus.authenticated;
   });
+
+  Future<void> loginSocial(SocialProvider provider) async {
+    if (_socialLoginPending || !provider.isAvailable) return;
+    _socialLoginPending = true;
+    try {
+      await _run(() async {
+        final credential = await _socialSignIn.authenticate(provider);
+        if (credential == null) return;
+        user = await _repository.loginSocial(provider, credential);
+        status = AuthStatus.authenticated;
+      });
+    } finally {
+      _socialLoginPending = false;
+    }
+  }
 
   Future<bool> verifyRegisterOtp(String email, String otp) async =>
       _run(() async {

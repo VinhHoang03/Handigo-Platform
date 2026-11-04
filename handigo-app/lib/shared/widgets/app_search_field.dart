@@ -47,7 +47,9 @@ class AppSearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: theme.textTheme.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
+            color: theme.brightness == Brightness.light
+                ? Colors.black
+                : scheme.onSurface,
           ),
           counterText: '',
           filled: true,
