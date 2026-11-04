@@ -249,6 +249,7 @@ class ApiClient {
     List<XFile> files, {
     String field = 'images',
     Map<String, String> data = const {},
+    Duration? receiveTimeout,
   }) async {
     if (_loggingOut) throw const ApiException('Phiên làm việc đang kết thúc.');
     Future<dynamic> send() async {
@@ -261,6 +262,7 @@ class ApiClient {
         data: form,
         options: Options(
           headers: {if (_token != null) 'Authorization': 'Bearer $_token'},
+          receiveTimeout: receiveTimeout,
         ),
       );
       return response.data?['data'];

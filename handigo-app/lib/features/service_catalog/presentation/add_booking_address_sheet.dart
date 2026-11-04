@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/utils/address_format.dart';
+import '../../../shared/widgets/map_surface.dart';
 
 class _LocationCache {
   LatLng? point;
@@ -33,66 +33,68 @@ class AddBookingAddressSheet extends ConsumerStatefulWidget {
       _AddBookingAddressSheetState();
 }
 
-class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
-    with SingleTickerProviderStateMixin {
+class _AddBookingAddressSheetState
+    extends ConsumerState<AddBookingAddressSheet> {
   final _map = MapController();
-  late final AnimationController _motion;
+  bool _mapMounted = false;
+  LatLng? _cameraTarget;
+  bool _programmaticMove = false, _cameraMoving = false;
+  int _interaction = 0;
   LatLng? _point;
   Map<String, String>? _address;
   bool _locating = false, _resolving = false, _saving = false;
   bool _quietResolution = false;
   int _request = 0;
+  Timer? _cameraDebounce;
   String? _error;
-  LatLng? _from, _to;
-  double _fromZoom = 5, _toZoom = 5;
 
   @override
   void initState() {
     super.initState();
-    _motion =
-        AnimationController(
-          vsync: this,
-          duration: const Duration(milliseconds: 320),
-        )..addListener(() {
-          final t = Curves.easeInOutCubic.transform(_motion.value);
-          _map.move(
-            LatLng(
-              _from!.latitude + (_to!.latitude - _from!.latitude) * t,
-              _from!.longitude + (_to!.longitude - _from!.longitude) * t,
-            ),
-            _fromZoom + (_toZoom - _fromZoom) * t,
-          );
-        });
+    unawaited(
+      ref
+          .read(mapReadyProvider.future)
+          .then((ready) {
+            if (mounted && ready) return _locate(choose: false);
+          })
+          .catchError((Object _) {}),
+    );
   }
 
   void _center(LatLng point, {bool fit = false, bool animate = true}) {
-    _motion.stop();
-    final camera = _map.camera;
-    _from = camera.center;
-    _fromZoom = camera.zoom;
-    _to = point;
-    _toZoom = camera.zoom;
-    if (fit) {
-      const distance = Distance();
-      final target = CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints([
-          for (final bearing in [0, 90, 180, 270])
-            distance.offset(point, 500, bearing.toDouble()),
-        ]),
-        padding: const EdgeInsets.all(24),
-      ).fit(camera);
-      _to = target.center;
-      _toZoom = target.zoom;
+    _cameraTarget = point;
+    if (!_mapMounted) return;
+    _programmaticMove = true;
+    _map.move(point, fit ? 16 : 18);
+    _programmaticMove = false;
+  }
+
+  void _cameraStarted() {
+    if (_programmaticMove || _saving) return;
+    ++_interaction;
+    ++_request;
+    setState(() {
+      _cameraMoving = true;
+      _resolving = false;
+      _address = null;
+      _error = null;
+    });
+  }
+
+  void _cameraIdle() {
+    if (_programmaticMove) {
+      _programmaticMove = false;
+      return;
     }
-    if (animate && !MediaQuery.disableAnimationsOf(context)) {
-      _motion.forward(from: 0);
-    } else {
-      _map.move(_to!, _toZoom);
-    }
+    if (!_cameraMoving || _saving) return;
+    setState(() => _cameraMoving = false);
+    final target = _cameraTarget;
+    if (target != null) unawaited(_choose(target, center: false));
   }
 
   Future<void> _locate({bool choose = true}) async {
     if (_locating || _saving) return;
+    final interaction = ++_interaction;
     final cache = ref.read(_locationCacheProvider);
     final cached = cache.recent;
     if (cached != null) {
@@ -132,7 +134,15 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
           timeLimit: Duration(seconds: 20),
         ),
       ).timeout(const Duration(seconds: 20));
-      if (!mounted) return;
+      if (!mounted || interaction != _interaction) return;
+      if (!position.latitude.isFinite ||
+          !position.longitude.isFinite ||
+          position.latitude.abs() > 90 ||
+          position.longitude.abs() > 180) {
+        throw const ApiException(
+          'Vị trí thiết bị không hợp lệ. Vui lòng chọn trên bản đồ.',
+        );
+      }
       final point = LatLng(position.latitude, position.longitude);
       cache.point = point;
       cache.updatedAt = DateTime.now();
@@ -144,14 +154,14 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
         unawaited(_prefetch(point));
       }
     } on TimeoutException {
-      if (mounted) {
+      if (mounted && interaction == _interaction) {
         setState(
           () => _error =
               'Lấy vị trí mất quá lâu. Vui lòng thử lại hoặc chọn trên bản đồ.',
         );
       }
     } catch (error) {
-      if (mounted) {
+      if (mounted && interaction == _interaction) {
         setState(
           () => _error = error is ApiException
               ? error.message
@@ -172,7 +182,10 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
     bool quiet = false,
   }) async {
     if (_saving) return;
+    _cameraDebounce?.cancel();
+    ++_interaction;
     setState(() {
+      _cameraMoving = false;
       _point = point;
       _address = null;
       _error = null;
@@ -286,7 +299,9 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
   }
 
   Future<void> _select() async {
-    if (_locating || _saving || _resolving || _point == null) return;
+    if (_locating || _saving || _resolving || _cameraMoving || _point == null) {
+      return;
+    }
     setState(() => _saving = true);
     final address = _address ?? await _resolve(_point!);
     if (!mounted) return;
@@ -296,14 +311,17 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
 
   @override
   void dispose() {
-    _motion.dispose();
+    _cameraDebounce?.cancel();
+    ++_interaction;
+    ++_request;
     _map.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final busy = _locating || _resolving || _saving;
+    final busy = _locating || _resolving || _saving || _cameraMoving;
+    final mapsReady = ref.watch(mapReadyProvider).asData?.value == true;
     final label = _address == null
         ? (_point == null
               ? 'Chưa chọn vị trí'
@@ -353,65 +371,69 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
                 ],
               ),
             ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Kéo bản đồ hoặc chạm để ghim đúng cửa nhà, rồi chọn vị trí.',
+              ),
+            ),
             Expanded(
               child: Stack(
                 children: [
-                  FlutterMap(
-                    mapController: _map,
-                    options: MapOptions(
-                      initialCenter:
-                          ref.read(_locationCacheProvider).recent ??
-                          const LatLng(16.0471, 108.2068),
-                      initialZoom: 5,
-                      onMapReady: () => _locate(choose: false),
-                      onTap: (_, point) {
-                        if (!_locating && !_saving) unawaited(_choose(point));
-                      },
-                      onPositionChanged: (_, hasGesture) {
-                        if (hasGesture) _motion.stop();
-                      },
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.handigo.handigo_app',
-                      ),
-                      if (_point != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _point!,
-                              width: 48,
-                              height: 48,
-                              alignment: Alignment.topCenter,
-                              child: const Icon(
-                                Icons.location_pin,
-                                size: 48,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
+                  Listener(
+                    onPointerDown: (_) => _programmaticMove = false,
+                    child: MapSurface(
+                      map: FlutterMap(
+                        mapController: _map,
+                        options: MapOptions(
+                          initialCenter:
+                              ref.read(_locationCacheProvider).recent ??
+                              const LatLng(16.0471, 108.2068),
+                          initialZoom: 5,
+                          maxZoom: 19,
+                          onMapReady: () {
+                            _mapMounted = true;
+                            if (_cameraTarget case final point?) {
+                              _center(point, fit: true, animate: false);
+                            }
+                          },
+                          onTap: (_, point) {
+                            if (!_saving) unawaited(_choose(point));
+                          },
+                          onPositionChanged: (camera, hasGesture) {
+                            if (hasGesture) {
+                              if (!_cameraMoving) _cameraStarted();
+                              _cameraTarget = camera.center;
+                              _cameraDebounce?.cancel();
+                              _cameraDebounce = Timer(
+                                const Duration(milliseconds: 350),
+                                _cameraIdle,
+                              );
+                            }
+                          },
                         ),
-                      RichAttributionWidget(
-                        attributions: [
-                          TextSourceAttribution(
-                            'OpenStreetMap contributors',
-                            onTap: () => launchUrl(
-                              Uri.parse(
-                                'https://www.openstreetmap.org/copyright',
-                              ),
-                            ),
-                          ),
-                        ],
+                        children: [const MapTiles(), mapAttribution()],
                       ),
-                    ],
+                    ),
                   ),
-                  if (_locating || _saving)
+                  if (mapsReady && (_point != null || _cameraMoving))
+                    Center(
+                      child: IgnorePointer(
+                        child: Transform.translate(
+                          offset: Offset(0, -24),
+                          child: Icon(
+                            Icons.location_pin,
+                            size: 48,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_saving)
                     const Positioned.fill(
                       child: AbsorbPointer(child: SizedBox.expand()),
                     ),
-                  if (_locating || _saving || (_resolving && !_quietResolution))
+                  if (_saving || (_resolving && !_quietResolution))
                     Center(
                       child: SizedBox(
                         width: 28,
@@ -451,7 +473,9 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
                           vertical: 10,
                         ),
                       ),
-                      onPressed: _locating || _saving ? null : _locate,
+                      onPressed: !mapsReady || _locating || _saving
+                          ? null
+                          : _locate,
                       child: const Text(
                         'Lấy vị trí hiện tại',
                         textAlign: TextAlign.center,
@@ -469,7 +493,9 @@ class _AddBookingAddressSheetState extends ConsumerState<AddBookingAddressSheet>
                           vertical: 10,
                         ),
                       ),
-                      onPressed: busy || _point == null ? null : _select,
+                      onPressed: !mapsReady || busy || _point == null
+                          ? null
+                          : _select,
                       child: const Text(
                         'Chọn vị trí này',
                         textAlign: TextAlign.center,

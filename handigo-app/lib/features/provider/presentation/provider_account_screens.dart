@@ -14,20 +14,27 @@ import 'provider_screens.dart';
 final providerProfileProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(providerRepositoryProvider).profile(),
 );
-final providerWalletProvider = FutureProvider.autoDispose<WalletInfo>(
-  (ref) => ref.watch(providerRepositoryProvider).wallet(),
-);
+final providerWalletProvider = FutureProvider.autoDispose<WalletInfo>((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).wallet();
+});
+final providerWalletTransactionsProvider = FutureProvider.autoDispose((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).walletTransactions();
+});
+final providerWithdrawalsProvider = FutureProvider.autoDispose((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).withdrawals();
+});
+final providerBanksProvider = FutureProvider.autoDispose((ref) {
+  ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+  return ref.watch(providerRepositoryProvider).bankAccounts();
+});
 final providerWalletSummaryProvider = FutureProvider.autoDispose<WalletSummary>(
-  (ref) => ref.watch(providerRepositoryProvider).walletSummary(),
-);
-final providerWalletTransactionsProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(providerRepositoryProvider).walletTransactions(),
-);
-final providerWithdrawalsProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(providerRepositoryProvider).withdrawals(),
-);
-final providerBanksProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(providerRepositoryProvider).bankAccounts(),
+  (ref) {
+    ref.watch(authControllerProvider.select((auth) => auth.user?.id));
+    return ref.watch(providerRepositoryProvider).walletSummary();
+  },
 );
 final providerFeedbacksProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(providerRepositoryProvider).feedbacks(),
@@ -1031,8 +1038,15 @@ _VerificationTone _identityTone(String value) => switch (value) {
 };
 
 class ProviderWalletScreen extends ConsumerWidget {
-  const ProviderWalletScreen({this.asTab = false, super.key});
+  const ProviderWalletScreen({
+    this.asTab = false,
+    this.embedded = false,
+    this.actionsBuilder,
+    super.key,
+  });
   final bool asTab;
+  final bool embedded;
+  final Widget Function(WalletInfo wallet)? actionsBuilder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1045,6 +1059,125 @@ class ProviderWalletScreen extends ConsumerWidget {
       ref.invalidate(providerWithdrawalsProvider);
     }
 
+    final content = ListView(
+      key: const PageStorageKey('provider-wallet'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      children: [
+        wallet.when(
+          loading: () => const AppLoading(),
+          error: (error, _) =>
+              AppMessage(message: _message(error), onRetry: refresh),
+          data: (value) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ProviderWalletBalanceCard(
+                wallet: value,
+                summary: summary.asData?.value,
+                summaryLoading: summary.isLoading,
+              ),
+              if (actionsBuilder != null) ...[
+                const SizedBox(height: 12),
+                actionsBuilder!(value),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        const AccountDetailSectionTitle(
+          'Lịch sử giao dịch',
+          subtitle: 'Các biến động số dư ví theo thời gian gần nhất.',
+        ),
+        ref
+            .watch(providerWalletTransactionsProvider)
+            .when(
+              loading: () => const LinearProgressIndicator(),
+              error: (error, _) => AppMessage(
+                message: _message(error),
+                onRetry: () =>
+                    ref.invalidate(providerWalletTransactionsProvider),
+              ),
+              data: (page) => page.items.isEmpty
+                  ? const AppMessage(message: 'Chưa có giao dịch ví.')
+                  : Column(
+                      children: page.items
+                          .map(
+                            (item) => Card(
+                              margin: const EdgeInsets.only(top: 8),
+                              child: ListTile(
+                                leading: Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: accountPrimarySoft,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    item.direction == 'in'
+                                        ? Icons.south_west_rounded
+                                        : Icons.north_east_rounded,
+                                    color: accountPrimary,
+                                  ),
+                                ),
+                                title: Text(
+                                  item.description ??
+                                      _transactionType(item.type),
+                                ),
+                                subtitle: Text(
+                                  '${_transactionStatus(item.status)}${item.createdAt == null ? '' : ' • ${_date(item.createdAt)}'}',
+                                ),
+                                trailing: Text(
+                                  '${item.direction == 'in' ? '+' : '-'}${_money(item.amount)}',
+                                  style: TextStyle(
+                                    color: item.direction == 'in'
+                                        ? const Color(0xFF16805B)
+                                        : accountInk,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+            ),
+        const SizedBox(height: 24),
+        const AccountDetailSectionTitle(
+          'Yêu cầu rút tiền',
+          subtitle: 'Theo dõi trạng thái duyệt và tài khoản nhận tiền.',
+        ),
+        ref
+            .watch(providerWithdrawalsProvider)
+            .when(
+              loading: () => const LinearProgressIndicator(),
+              error: (error, _) => AppMessage(
+                message: _message(error),
+                onRetry: () => ref.invalidate(providerWithdrawalsProvider),
+              ),
+              data: (page) => page.items.isEmpty
+                  ? const AppMessage(message: 'Chưa có yêu cầu rút tiền.')
+                  : Column(
+                      children: page.items
+                          .map(
+                            (item) => Card(
+                              margin: const EdgeInsets.only(top: 8),
+                              child: ListTile(
+                                leading: const Icon(
+                                  Icons.payments_outlined,
+                                  color: accountPrimary,
+                                ),
+                                title: Text(_money(_number(item['amount']))),
+                                subtitle: Text(
+                                  '${_transactionStatus(item['status'] as String?)} • ${_date(item['createdAt'])}',
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+            ),
+      ],
+    );
+    if (embedded) return content;
     return AccountDetailScaffold(
       title: 'Ví Handigo',
       showBackButton: !asTab,
@@ -1055,127 +1188,23 @@ class ProviderWalletScreen extends ConsumerWidget {
           icon: const Icon(Icons.refresh_rounded),
         ),
       ],
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, asTab ? 112 : 28),
-        children: [
-          wallet.when(
-            loading: () => const AppLoading(),
-            error: (error, _) =>
-                AppMessage(message: _message(error), onRetry: refresh),
-            data: (value) => _WalletBalanceCard(
-              wallet: value,
-              summary: summary.asData?.value,
-              summaryLoading: summary.isLoading,
-            ),
-          ),
-          const SizedBox(height: 20),
-          const AccountDetailSectionTitle(
-            'Lịch sử giao dịch',
-            subtitle: 'Các biến động số dư ví theo thời gian gần nhất.',
-          ),
-          ref
-              .watch(providerWalletTransactionsProvider)
-              .when(
-                loading: () => const LinearProgressIndicator(),
-                error: (error, _) => AppMessage(
-                  message: _message(error),
-                  onRetry: () =>
-                      ref.invalidate(providerWalletTransactionsProvider),
-                ),
-                data: (page) => page.items.isEmpty
-                    ? const AppMessage(message: 'Chưa có giao dịch ví.')
-                    : Column(
-                        children: page.items
-                            .map(
-                              (item) => Card(
-                                margin: const EdgeInsets.only(top: 8),
-                                child: ListTile(
-                                  leading: Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: accountPrimarySoft,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      item.direction == 'in'
-                                          ? Icons.south_west_rounded
-                                          : Icons.north_east_rounded,
-                                      color: accountPrimary,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    item.description ??
-                                        _transactionType(item.type),
-                                  ),
-                                  subtitle: Text(
-                                    '${_transactionStatus(item.status)}${item.createdAt == null ? '' : ' • ${_date(item.createdAt)}'}',
-                                  ),
-                                  trailing: Text(
-                                    '${item.direction == 'in' ? '+' : '-'}${_money(item.amount)}',
-                                    style: TextStyle(
-                                      color: item.direction == 'in'
-                                          ? const Color(0xFF16805B)
-                                          : accountInk,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-              ),
-          const SizedBox(height: 24),
-          const AccountDetailSectionTitle(
-            'Yêu cầu rút tiền',
-            subtitle: 'Theo dõi trạng thái duyệt và tài khoản nhận tiền.',
-          ),
-          ref
-              .watch(providerWithdrawalsProvider)
-              .when(
-                loading: () => const LinearProgressIndicator(),
-                error: (error, _) => AppMessage(
-                  message: _message(error),
-                  onRetry: () => ref.invalidate(providerWithdrawalsProvider),
-                ),
-                data: (page) => page.items.isEmpty
-                    ? const AppMessage(message: 'Chưa có yêu cầu rút tiền.')
-                    : Column(
-                        children: page.items
-                            .map(
-                              (item) => Card(
-                                margin: const EdgeInsets.only(top: 8),
-                                child: ListTile(
-                                  leading: const Icon(
-                                    Icons.payments_outlined,
-                                    color: accountPrimary,
-                                  ),
-                                  title: Text(_money(_number(item['amount']))),
-                                  subtitle: Text(
-                                    '${_transactionStatus(item['status'] as String?)} • ${_date(item['createdAt'])}',
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-              ),
-        ],
-      ),
+      child: content,
     );
   }
 }
 
-class _WalletBalanceCard extends StatelessWidget {
-  const _WalletBalanceCard({
+class ProviderWalletBalanceCard extends StatelessWidget {
+  const ProviderWalletBalanceCard({
     required this.wallet,
-    required this.summary,
-    required this.summaryLoading,
+    this.summary,
+    this.summaryLoading = false,
+    this.onBankAccounts,
+    super.key,
   });
   final WalletInfo wallet;
   final WalletSummary? summary;
   final bool summaryLoading;
+  final VoidCallback? onBankAccounts;
 
   @override
   Widget build(BuildContext context) {
@@ -1210,56 +1239,11 @@ class _WalletBalanceCard extends StatelessWidget {
                 final primary = entry.key == 0;
                 return SizedBox(
                   width: width,
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 104),
-                    padding: const EdgeInsets.all(13),
-                    decoration: BoxDecoration(
-                      color: primary ? accountPrimary : accountSurface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: primary
-                          ? null
-                          : Border.all(color: accountDivider),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              icon,
-                              size: 19,
-                              color: primary ? Colors.white : accountPrimary,
-                            ),
-                            const SizedBox(width: 7),
-                            Expanded(
-                              child: Text(
-                                label,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: primary
-                                          ? Colors.white70
-                                          : accountMuted,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            _money(amount),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: primary ? Colors.white : accountInk,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: AccountFinancialStatCard(
+                    label: label,
+                    value: _money(amount),
+                    icon: icon,
+                    primary: primary,
                   ),
                 );
               }).toList(),
@@ -1272,7 +1256,7 @@ class _WalletBalanceCard extends StatelessWidget {
             minimumSize: const Size.fromHeight(48),
             foregroundColor: scheme.primary,
           ),
-          onPressed: () => context.push('/provider/banks'),
+          onPressed: onBankAccounts ?? () => context.push('/provider/banks'),
           icon: const Icon(Icons.account_balance_outlined, size: 20),
           label: const Text('Tài khoản ngân hàng'),
         ),

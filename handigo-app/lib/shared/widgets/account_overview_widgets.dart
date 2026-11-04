@@ -13,6 +13,78 @@ const accountDivider = Color(0xFFEDEAF3);
 const accountDanger = Color(0xFFC64050);
 const accountIconPath = 'assets/icons/account';
 
+class AccountFinancialStatCard extends StatelessWidget {
+  const AccountFinancialStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.primary = false,
+    this.subtitle,
+    super.key,
+  });
+
+  final String label, value;
+  final IconData icon;
+  final bool primary;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 104),
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: primary ? accountPrimary : accountSurface,
+      borderRadius: BorderRadius.circular(16),
+      border: primary ? null : Border.all(color: accountDivider),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              icon,
+              size: 19,
+              color: primary ? Colors.white : accountPrimary,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: primary ? Colors.white70 : accountMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: primary ? Colors.white : accountInk,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            subtitle!,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: primary ? Colors.white70 : accountMuted,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
 class AccountMenuItem {
   const AccountMenuItem({
     required this.label,

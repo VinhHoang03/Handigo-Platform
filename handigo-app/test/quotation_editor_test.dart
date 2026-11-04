@@ -163,6 +163,14 @@ void main() {
       );
       expect(find.byTooltip('Quét ảnh bằng AI'), findsOneWidget);
       expect(find.byTooltip('Nhập báo giá bằng giọng nói AI'), findsOneWidget);
+      for (final label in [
+        'Thời lượng sửa chữa (phút)',
+        'Giảm giá (đ)',
+        'Ghi chú khảo sát',
+        'Đề xuất xử lý',
+      ]) {
+        expect(find.text(label), findsNothing);
+      }
       expect(tester.takeException(), isNull);
     });
   }
@@ -260,44 +268,89 @@ void main() {
       findsOneWidget,
     );
   });
-  testWidgets('Chi tiết đơn có sẵn form báo giá khi đủ điều kiện', (
-    tester,
-  ) async {
-    final repository = _Repository();
-    final detail = OrderDetail(
-      id: 'order',
-      code: 'ORD-1',
-      serviceName: 'Sửa điều hòa',
-      status: 'accepted',
-      paymentStatus: 'partially_paid',
-      paymentMethod: 'cash',
-      inspectionRequired: true,
-      depositPaidAt: DateTime(2026, 10, 23),
-      depositAmount: 50000,
-    );
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          providerRepositoryProvider.overrideWithValue(repository),
-          orderDetailProvider.overrideWith((ref, id) async => detail),
-          orderQuotationProvider.overrideWith((ref, id) async => quotation),
-        ],
-        child: MaterialApp(
-          theme: AppTheme.light,
-          home: const ProviderOrderDetailScreen(orderId: 'order'),
+  testWidgets(
+    'Báo giá đã lưu thu gọn, chỉ mở form khi chỉnh sửa và đóng sau khi lưu thành công',
+    (tester) async {
+      final repository = _Repository();
+      final detail = OrderDetail(
+        id: 'order',
+        code: 'ORD-1',
+        serviceName: 'Sửa điều hòa',
+        status: 'accepted',
+        paymentStatus: 'partially_paid',
+        paymentMethod: 'cash',
+        inspectionRequired: true,
+        depositPaidAt: DateTime(2026, 10, 23),
+        depositAmount: 50000,
+        providerId: 'provider',
+        arrivalProviderId: 'provider',
+        arrivedAt: DateTime(2026, 10, 23),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            providerRepositoryProvider.overrideWithValue(repository),
+            orderDetailProvider.overrideWith((ref, id) async => detail),
+            orderQuotationProvider.overrideWith((ref, id) async => quotation),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: const ProviderOrderDetailScreen(orderId: 'order'),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byTooltip('Quét ảnh bằng AI'),
-      180,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.byType(QuotationEditorScreen), findsOneWidget);
-    expect(find.text('Lập báo giá sửa chữa'), findsNothing);
-    expect(find.text('Chỉnh sửa báo giá'), findsNothing);
-    expect(find.text('Hạng mục báo giá (1)'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(QuotationEditorScreen), findsNothing);
+      expect(find.text('Lưu báo giá'), findsNothing);
+      expect(find.text('Cập nhật thời gian hoàn tất'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Chỉnh sửa'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.text('Chỉnh sửa')).dy,
+        greaterThan(
+          tester.getTopLeft(find.textContaining('Tổng báo giá:').last).dy,
+        ),
+      );
+      await tap(tester, find.text('Chỉnh sửa'));
+      await tester.scrollUntilVisible(
+        find.byTooltip('Quét ảnh bằng AI'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.byType(QuotationEditorScreen), findsOneWidget);
+      expect(find.text('Lập báo giá sửa chữa'), findsNothing);
+      expect(find.text('Chỉnh sửa báo giá'), findsNothing);
+      expect(find.text('Hạng mục báo giá (1)'), findsOneWidget);
+      await voice(tester);
+      await tap(tester, find.text('Hủy chỉnh sửa'));
+      expect(repository.saved, isNull);
+      expect(find.byType(QuotationEditorScreen), findsNothing);
+      await tap(tester, find.text('Chỉnh sửa'));
+      await tester.scrollUntilVisible(
+        find.byTooltip('Quét ảnh bằng AI'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.textContaining('Số lượng 2 × 180.000 đ = 360.000 đ'),
+        findsOneWidget,
+      );
+      repository.fail = true;
+      await tap(tester, find.text('Lưu báo giá'));
+      expect(find.text('Chưa thể lưu báo giá.'), findsOneWidget);
+      expect(find.byType(QuotationEditorScreen), findsOneWidget);
+      repository.fail = false;
+      await tap(tester, find.text('Lưu báo giá'));
+      expect(repository.saved, isNotNull);
+      expect(find.byType(QuotationEditorScreen), findsNothing);
+      expect(find.text('Lưu báo giá'), findsNothing);
+      expect(find.text('Chỉnh sửa'), findsOneWidget);
+      expect(find.byType(ProviderOrderDetailScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

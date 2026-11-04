@@ -188,10 +188,12 @@ class OrderSummaryCard extends StatelessWidget {
   const OrderSummaryCard({
     required this.order,
     this.providerView = false,
+    this.providerInfo,
     super.key,
   });
   final bool providerView;
   final OrderSummary order;
+  final Widget? providerInfo;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -329,6 +331,10 @@ class OrderSummaryCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (providerView && providerInfo != null) ...[
+                const SizedBox(height: 10),
+                providerInfo!,
+              ],
               if (!providerView && order.providerName != null) ...[
                 const SizedBox(height: 10),
                 Row(
