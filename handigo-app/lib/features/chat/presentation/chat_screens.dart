@@ -43,20 +43,15 @@ class _ConversationListScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(conversationListProvider);
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: CustomerPageHeader(
         toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        showBottomBorder: true,
         title: 'Đoạn chat',
         centerTitle: false,
-        leading: Center(
-          child: CircleAvatar(
-            radius: 18,
-            backgroundColor: scheme.surfaceContainerLow,
-            foregroundColor: scheme.primary,
-            child: const Icon(Icons.forum_rounded, size: 19),
-          ),
+        leading: const Center(
+          child: CustomerHeaderIcon(Icons.forum_outlined),
         ),
       ),
       body: state.when(

@@ -39,7 +39,9 @@ class ProviderHistoryFilter extends StatelessWidget {
               child: Text(
                 '$count',
                 style: TextStyle(
-                  color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                  color: Theme.of(context).brightness == Brightness.light
+                      ? Colors.black
+                      : scheme.onSurface,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

@@ -15,6 +15,24 @@ flutter pub get
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000
 ```
 
+### Đăng nhập Google và Facebook trên Android
+
+- Google Cloud: đăng ký OAuth Android cho package `com.handigo.handigo_app`
+  với SHA-1 của các bản ký cần dùng. Truyền OAuth Web Client ID qua
+  `GOOGLE_SERVER_CLIENT_ID` và thêm ID đó vào cấu hình audience của backend.
+- Meta Developer Console: thêm nền tảng Android với cùng package và key hash
+  của các bản ký cần dùng. Truyền App ID và Client Token dành cho SDK Android.
+  App ID phải khớp với môi trường backend. Giữ App Secret ở backend.
+- Khi thử trên ứng dụng Meta ở chế độ phát triển, dùng tài khoản có quyền thử
+  nghiệm. Nếu phát hành qua Google Play, đăng ký cả chứng chỉ ký của Google Play.
+
+```powershell
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000 --dart-define=GOOGLE_SERVER_CLIENT_ID=<WEB_CLIENT_ID> --dart-define=FACEBOOK_APP_ID=<META_APP_ID> --dart-define=FACEBOOK_CLIENT_TOKEN=<META_CLIENT_TOKEN>
+```
+
+Mỗi nút OAuth được bật trên Android khi có đủ cấu hình của nhà cung cấp.
+Dùng HTTPS cho API ở bản phát hành.
+
 Đổi `API_BASE_URL` theo thiết bị đang chạy. Không đưa secret backend vào app.
 
 ### Hot reload khi Codex sửa code

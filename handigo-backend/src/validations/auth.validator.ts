@@ -23,10 +23,10 @@ export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   fullName: personNameSchema,
-  phone: z.preprocess(
-    (value) => typeof value === "string" && !value.trim() ? undefined : value,
-    vietnamesePhoneSchema.optional(),
-  ),
+  phone: z.string({ error: "Vui lòng nhập số điện thoại" })
+    .trim()
+    .min(1, "Vui lòng nhập số điện thoại")
+    .pipe(vietnamesePhoneSchema),
   registrationType: z.enum(["CUSTOMER", "PROVIDER"]).default("CUSTOMER"),
 });
 

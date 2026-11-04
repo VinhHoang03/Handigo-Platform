@@ -232,7 +232,7 @@ export const register = async (payload: {
   email: string;
   password: string;
   fullName: string;
-  phone?: string;
+  phone: string;
   registrationType?: "CUSTOMER" | "PROVIDER";
 }): Promise<void> => {
   const existingUser = await User.findOne({ email: payload.email });

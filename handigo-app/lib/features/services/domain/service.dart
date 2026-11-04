@@ -7,6 +7,7 @@ class Service {
     this.slug,
     this.fixedPrice,
     this.minOptionPrice,
+    this.depositAmount,
     this.coverImage,
     this.galleryImages = const [],
     this.categoryName,
@@ -34,6 +35,7 @@ class Service {
       slug: json['slug'] as String?,
       fixedPrice: (json['fixedPrice'] as num?)?.toDouble(),
       minOptionPrice: (json['minOptionPrice'] as num?)?.toDouble(),
+      depositAmount: (json['depositAmount'] as num?)?.toDouble(),
       coverImage:
           (json.containsKey('coverImage') ? json['coverImage'] : json['image'])
               as String?,
@@ -61,6 +63,7 @@ class Service {
   final String? slug;
   final double? fixedPrice;
   final double? minOptionPrice;
+  final double? depositAmount;
   final String? coverImage;
   final List<String> galleryImages;
   final String? categoryName;

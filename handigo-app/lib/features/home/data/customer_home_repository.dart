@@ -60,6 +60,24 @@ class CustomerHomeRepository {
     return (data['count'] as num?)?.toInt() ?? 0;
   }
 
+  Future<HomeRewards> loadRewards() async {
+    final response = await _api.request('/rewards/me', authenticated: true);
+    return HomeRewards.fromJson(response['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> redeemReward(HomeRewardOffer offer, String requestId) async {
+    await _api.request(
+      '/rewards/redeem',
+      method: 'POST',
+      authenticated: true,
+      data: {
+        'offerId': offer.id,
+        'termsVersion': offer.termsVersion,
+        'requestId': requestId,
+      },
+    );
+  }
+
   Future<List<HomeVoucher>> _loadVouchers() async {
     final response = await _api.request(
       '/vouchers/available',

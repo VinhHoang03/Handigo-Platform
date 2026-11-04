@@ -1,6 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../domain/app_user.dart';
+import 'social_sign_in.dart';
 
 class AuthRepository {
   const AuthRepository(this._api);
@@ -22,18 +23,29 @@ class AuthRepository {
     return user;
   }
 
+  Future<AppUser> loginSocial(SocialProvider provider, String credential) async {
+    final json = await _api.request(
+      provider.path,
+      method: 'POST',
+      data: {provider.tokenField: credential, 'remember': true},
+    );
+    final user = await _mobileUser(json['user'] as Map<String, dynamic>);
+    _api.setToken(json['token'] as String);
+    return user;
+  }
+
   Future<void> register({
     required String email,
     required String password,
     required String fullName,
-    String? phone,
+    required String phone,
     UserRole registrationType = UserRole.customer,
   }) async {
     await _api.request('/auth/register', method: 'POST', data: {
       'email': email.trim().toLowerCase(),
       'password': password,
       'fullName': fullName.trim(),
-      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      'phone': phone.trim(),
       'registrationType': registrationType == UserRole.provider ? 'PROVIDER' : 'CUSTOMER',
     });
   }

@@ -143,8 +143,8 @@ abstract final class AppTheme {
             (states) => states.contains(WidgetState.selected)
                 ? scheme.onPrimary
                 : brightness == Brightness.light
-                ? const Color(0xFF595665)
-                : scheme.onSurfaceVariant,
+                ? Colors.black
+                : scheme.onSurface,
           ),
           fontWeight: FontWeight.w500,
         ),

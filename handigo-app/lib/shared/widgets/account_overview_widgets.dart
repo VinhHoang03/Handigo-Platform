@@ -282,6 +282,7 @@ Future<bool> showAccountLogoutConfirmation(
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true,
     useSafeArea: true,
     showDragHandle: true,
     builder: (context) => Padding(
