@@ -94,7 +94,8 @@ export interface IOrder extends Document, IBaseDocument {
   statusVersion: number;
   addressSnapshot?: {
     recipientName?: string; recipientPhone?: string; fullAddress: string;
-    province: string; ward: string; latitude?: number; longitude?: number;
+    province: string; ward: string; note?: string | null;
+    latitude?: number; longitude?: number;
   } | null;
   overdueReview?: {
     escalatedAt?: Date | null;
@@ -260,6 +261,7 @@ const OrderSchema = new Schema<IOrder>(
     addressSnapshot: { type: new Schema({
       recipientName: String, recipientPhone: String, fullAddress: { type: String, required: true },
       province: { type: String, required: true }, ward: { type: String, required: true },
+      note: { type: String, default: null },
       latitude: Number, longitude: Number,
     }, { _id: false }), default: null },
     orderType: {

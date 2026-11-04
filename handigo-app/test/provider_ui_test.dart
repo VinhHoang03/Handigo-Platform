@@ -15,12 +15,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:handigo_app/app/providers/app_providers.dart';
 import 'package:handigo_app/app/theme/app_theme.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
 import 'package:handigo_app/core/network/paged_result.dart';
 import 'package:handigo_app/features/account/domain/account_models.dart';
+import 'package:handigo_app/features/account/presentation/account_screens.dart';
 import 'package:handigo_app/features/auth/data/auth_repository.dart';
 import 'package:handigo_app/features/auth/domain/app_user.dart';
 import 'package:handigo_app/features/auth/presentation/auth_controller.dart';
@@ -34,6 +36,7 @@ import 'package:handigo_app/features/provider/presentation/provider_account_scre
 import 'package:handigo_app/features/provider/presentation/provider_order_detail_screen.dart';
 import 'package:handigo_app/features/provider/presentation/quotation_editor_screen.dart';
 import 'package:handigo_app/features/provider/presentation/provider_order_feedback_panel.dart';
+import 'package:handigo_app/features/services/domain/service_category.dart';
 
 final previewKey = GlobalKey();
 const overview = ProviderOverview(
@@ -98,6 +101,9 @@ class _Repository extends ProviderRepository {
   Completer<ProviderOverview>? availabilityResponse;
   DateTime messagesAt = DateTime.now().toUtc();
   DateTime notificationsAt = DateTime.now().toUtc();
+  int suggestionCount = 0;
+  String? suggestedServiceName;
+  String? suggestedCategoryId;
   @override
   Future<String?> workingAddress({double? latitude, double? longitude}) async =>
       latitude == 10.9 ? 'Địa chỉ GPS mới' : 'Địa chỉ GPS ban đầu';
@@ -131,6 +137,27 @@ class _Repository extends ProviderRepository {
   Future<void> acceptAssignment(String id) {
     acceptCount++;
     return pending.future;
+  }
+
+  @override
+  Future<List<ServiceCategory>> suggestionCategories() async => const [
+    ServiceCategory(
+      id: 'category-air-conditioner',
+      name: 'Điều hòa & thông gió',
+      slug: 'dieu-hoa-thong-gio',
+    ),
+  ];
+
+  @override
+  Future<void> createServiceSuggestion({
+    required String serviceName,
+    String? categoryId,
+    String? categoryName,
+    String? description,
+  }) async {
+    suggestionCount++;
+    suggestedServiceName = serviceName;
+    suggestedCategoryId = categoryId;
   }
 }
 
@@ -217,6 +244,38 @@ Future<void> _showScreen(
         path: '/provider/banks',
         builder: (_, state) => const Scaffold(body: Text('Đã mở ngân hàng')),
       ),
+      GoRoute(
+        path: '/provider/personal-info',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở cá nhân')),
+      ),
+      GoRoute(
+        path: '/provider/addresses',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở địa chỉ')),
+      ),
+      GoRoute(
+        path: '/provider/professional-info',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở nghề nghiệp')),
+      ),
+      GoRoute(
+        path: '/provider/verification',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở xác thực')),
+      ),
+      GoRoute(
+        path: '/provider/support',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở hỗ trợ')),
+      ),
+      GoRoute(
+        path: '/provider/reports',
+        builder: (_, state) => const Scaffold(body: Text('Đã mở báo cáo')),
+      ),
+      GoRoute(
+        path: '/provider/service-suggestions',
+        builder: (_, state) => const ProviderServiceSuggestionScreen(),
+      ),
+      GoRoute(
+        path: '/provider/app-feedback',
+        builder: (_, state) => const Scaffold(body: Text('Đánh giá ứng dụng')),
+      ),
     ],
   );
   addTearDown(router.dispose);
@@ -296,15 +355,27 @@ Future<void> _showScreen(
           return [assignment];
         }),
         providerWalletProvider.overrideWith(
-          (ref) async =>
-              const WalletInfo(balance: 2450000, pendingBalance: 350000),
+          (ref) async => const WalletInfo(
+            balance: 2450000,
+            pendingBalance: 350000,
+            totalEarnings: 12500000,
+            totalWithdrawn: 1800000,
+          ),
+        ),
+        providerWalletSummaryProvider.overrideWith(
+          (ref) async => const WalletSummary(
+            currentBalance: 2450000,
+            totalEarnings: 12500000,
+            totalWithdrawals: 1800000,
+            totalPlatformFeesPaid: 250000,
+          ),
         ),
         providerWalletTransactionsProvider.overrideWith(
           (ref) async => const PagedResult<WalletTransactionItem>(
             items: [
               WalletTransactionItem(
                 id: 'transaction',
-                type: 'earning',
+                type: 'provider_earning',
                 amount: 250000,
                 direction: 'in',
                 description: 'Thanh toán dịch vụ',
@@ -333,9 +404,96 @@ Future<void> _showScreen(
               'mainServiceText': 'Điện lạnh',
               'services': [
                 {'name': 'Vệ sinh máy lạnh'},
+                {'name': 'Sửa chữa điều hòa'},
+              ],
+              'certificates': [
+                {
+                  'id': 'certificate',
+                  'title': 'Chứng chỉ Kĩ Thuật Việt Hàn',
+                  'issuer': 'Trường Cao đẳng Kỹ thuật Việt Hàn',
+                  'status': 'approved',
+                },
               ],
             },
           },
+        ),
+        providerSuggestionCategoriesProvider.overrideWith(
+          (ref) async => const [
+            ServiceCategory(
+              id: 'category-air-conditioner',
+              name: 'Điều hòa & thông gió',
+              slug: 'dieu-hoa-thong-gio',
+            ),
+          ],
+        ),
+        providerBanksProvider.overrideWith(
+          (ref) async => <Map<String, dynamic>>[
+            {
+              '_id': 'bank',
+              'bankName': 'Ngân hàng Handigo',
+              'bankCode': 'HDG',
+              'accountHolderName': 'DOI TAC KIEM TRA',
+              'accountNumber': '123456789',
+              'isDefault': true,
+            },
+          ],
+        ),
+        providerFeedbacksProvider.overrideWith(
+          (ref) async => const PagedResult<Map<String, dynamic>>(
+            items: [
+              {
+                '_id': 'feedback-pending',
+                'rating': 5,
+                'comment': 'Thợ làm việc đúng giờ và rất cẩn thận.',
+                'customerId': {'fullName': 'Nguyễn Minh Anh'},
+                'serviceId': {'name': 'Vệ sinh máy lạnh'},
+                'images': ['https://example.test/feedback.jpg'],
+                'createdAt': '2026-11-02T09:30:00.000Z',
+              },
+              {
+                '_id': 'feedback-replied',
+                'rating': 4,
+                'comment': 'Dịch vụ tốt, tư vấn rõ ràng.',
+                'customerId': {'fullName': 'Trần Ngọc Linh'},
+                'serviceId': {'name': 'Sửa chữa điều hòa'},
+                'images': <String>[],
+                'providerReply': {
+                  'content': 'Cảm ơn bạn đã tin tưởng Handigo.',
+                  'images': <String>[],
+                  'repliedAt': '2026-11-02T10:30:00.000Z',
+                },
+                'createdAt': '2026-11-01T09:30:00.000Z',
+              },
+            ],
+            page: 1,
+            totalPages: 1,
+          ),
+        ),
+        accountProfileProvider.overrideWith(
+          (ref) async => {
+            '_id': 'test-user',
+            'fullName': 'Đối tác kiểm tra giao diện',
+            'phone': '0901234567',
+            'email': 'doitac@example.test',
+            'birthday': '1995-01-15T00:00:00.000Z',
+            'gender': 'male',
+            'isPhoneVerified': true,
+            'isEmailVerified': true,
+          },
+        ),
+        accountAddressesProvider.overrideWith(
+          (ref) async => const <AddressItem>[],
+        ),
+        accountFeedbackProvider.overrideWith(
+          (ref) async => const <FeedbackItem>[],
+        ),
+        accountTicketsProvider.overrideWith(
+          (ref) async =>
+              const PagedResult<SupportItem>(items: [], page: 1, totalPages: 1),
+        ),
+        accountComplaintsProvider.overrideWith(
+          (ref) async =>
+              const PagedResult<SupportItem>(items: [], page: 1, totalPages: 1),
         ),
         orderDetailProvider('detail').overrideWith(
           (ref) async => OrderDetail(
@@ -403,7 +561,8 @@ Future<void> savePreview(WidgetTester tester, String name) async {
   });
 }
 
-void main() {
+Future<void> main() async {
+  await initializeDateFormatting('vi_VN');
   testWidgets(
     'GPS đồng bộ vị trí mới tự thay địa chỉ, không hiện dòng cảnh báo đã bỏ',
     (tester) async {
@@ -725,16 +884,14 @@ void main() {
 
   testWidgets('Thanh điều hướng chuyển tab và giữ bố cục gọn', (tester) async {
     await _showScreen(tester, const ProviderShell());
-    final selectedTab = find
-        .ancestor(of: find.text('Trang chủ'), matching: find.byType(Material))
-        .first;
-    expect(tester.widget<Material>(selectedTab).color, AppTheme.primaryDark);
-    expect(
-      tester.widget<Text>(find.text('Trang chủ')).style?.color,
-      Colors.white,
-    );
+    expect(find.text('Thu nhập'), findsOneWidget);
     await savePreview(tester, 'home');
-    await tester.tap(find.text('Đơn dịch vụ').last);
+    await tester.tap(find.text('Đơn hàng').last);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      find.byKey(const ValueKey('provider-tab-transition')),
+      findsOneWidget,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Mã đơn HDG-001'), findsOneWidget);
     await tester.tap(find.text('Thu nhập').last);
@@ -742,10 +899,10 @@ void main() {
     expect(find.byType(ProviderIncomeScreen), findsOneWidget);
     await tester.tap(find.byTooltip('Quay lại'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Lịch').last);
+    await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     expect(find.text('2 lịch hẹn'), findsOneWidget);
-    await tester.tap(find.text('Hồ sơ').last);
+    await tester.tap(find.text('Tài khoản').last);
     await tester.pumpAndSettle();
     expect(find.text('Quản lý công việc'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -771,6 +928,89 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Tài khoản đối tác gom đủ hồ sơ, hỗ trợ và đề xuất dịch vụ', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderAccountScreen());
+    expect(find.text('Thông tin cá nhân'), findsNothing);
+    for (final label in [
+      'Xác thực tài khoản',
+      'Thông tin nghề nghiệp',
+      'Đánh giá khách hàng',
+      'Trung tâm hỗ trợ',
+      'Báo cáo sự cố',
+      'Đề xuất dịch vụ',
+      'Điều khoản & quyền riêng tư',
+      'Đánh giá Handigo',
+      'Thông báo & nhắc lịch',
+      'Ngôn ngữ',
+      'Bảo mật & đăng nhập',
+      'Giao diện',
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Đăng xuất provider cần xác nhận trước khi rời tài khoản', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderAccountScreen());
+    await tester.scrollUntilVisible(
+      find.text('Đăng xuất'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Đăng xuất'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đăng xuất khỏi Handigo?'), findsOneWidget);
+    expect(find.text('Hủy'), findsOneWidget);
+    expect(find.text('Đăng xuất'), findsNWidgets(2));
+
+    await tester.tap(find.text('Hủy'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đăng xuất khỏi Handigo?'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Đề xuất dịch vụ dùng danh mục và gửi đúng dữ liệu', (
+    tester,
+  ) async {
+    final api = ApiClient(Dio(), CookieJar());
+    addTearDown(api.close);
+    final repository = _Repository(api);
+    await _showScreen(
+      tester,
+      const ProviderServiceSuggestionScreen(),
+      repository: repository,
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tên dịch vụ đề xuất'),
+      'Bảo dưỡng điều hòa âm trần',
+    );
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Điều hòa & thông gió').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mô tả đề xuất'),
+      'Khách hàng doanh nghiệp có nhu cầu bảo dưỡng định kỳ.',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Gửi đề xuất'));
+    await tester.pumpAndSettle();
+    expect(repository.suggestionCount, 1);
+    expect(repository.suggestedServiceName, 'Bảo dưỡng điều hòa âm trần');
+    expect(repository.suggestedCategoryId, 'category-air-conditioner');
+    expect(find.textContaining('Đã gửi đề xuất'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Dữ liệu mẫu chỉ xuất hiện sau khi bật và mất khi mở lại trang', (
     tester,
   ) async {
@@ -792,7 +1032,7 @@ void main() {
     tester,
   ) async {
     await _showScreen(tester, const ProviderShell());
-    await tester.tap(find.text('Lịch').last);
+    await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     final next = DateTime(today.year, today.month, today.day + 1);
     final nextLabel = find.text('${next.day}/${next.month}');
@@ -800,9 +1040,9 @@ void main() {
     await tester.tap(nextLabel);
     await tester.pumpAndSettle();
     expect(find.text('1 lịch hẹn'), findsOneWidget);
-    await tester.tap(find.text('Trang chủ').last);
+    await tester.tap(find.text('Tổng quan').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Lịch').last);
+    await tester.tap(find.text('Lịch hẹn').last);
     await tester.pumpAndSettle();
     expect(find.text('2 lịch hẹn'), findsOneWidget);
     final todayCard = find
@@ -1033,6 +1273,39 @@ void main() {
     });
   }
 
+  testWidgets('Đánh giá provider tìm kiếm, lọc nhanh và sửa phản hồi', (
+    tester,
+  ) async {
+    await _showScreen(tester, const ProviderFeedbackScreen());
+
+    expect(find.bySemanticsLabel('Xem ảnh đánh giá 1'), findsOneWidget);
+    expect(find.text('Phản hồi'), findsOneWidget);
+    expect(find.text('Phản hồi của bạn'), findsOneWidget);
+    expect(find.text('Chưa phản hồi'), findsOneWidget);
+    expect(find.text('Có ảnh'), findsOneWidget);
+
+    await tester.tap(find.text('Chưa phản hồi'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 kết quả'), findsOneWidget);
+
+    await tester.tap(find.text('Tất cả'));
+    await tester.enterText(find.byType(TextField).first, 'Trần Ngọc Linh');
+    await tester.pumpAndSettle();
+    expect(find.text('1 kết quả'), findsOneWidget);
+    expect(find.text('Dịch vụ tốt, tư vấn rõ ràng.'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Xóa tìm kiếm'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Sửa phản hồi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sửa phản hồi'), findsOneWidget);
+    expect(find.text('Lưu chỉnh sửa'), findsOneWidget);
+    expect(find.text('Cảm ơn bạn đã tin tưởng Handigo.'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final size in [
     const Size(320, 640),
     const Size(390, 844),
@@ -1046,17 +1319,30 @@ void main() {
           ProviderShell(),
           ProviderDashboardScreen(),
           ProviderOrdersScreen(),
+          ProviderIncomeScreen(),
           ProviderScheduleScreen(),
           ProviderAccountScreen(),
+          ProfileScreen(addressRoute: '/provider/addresses'),
           ProviderProfileScreen(),
+          ProviderVerificationScreen(),
+          ProviderServiceSuggestionScreen(),
           ProviderWalletScreen(),
+          ProviderBankAccountsScreen(),
+          ProviderFeedbackScreen(),
+          SupportScreen(),
+          ComplaintScreen(),
+          FeedbackScreen(),
+          ProviderSettingsScreen(),
           ProviderOrderDetailScreen(orderId: 'detail'),
         ]) {
           await _showScreen(tester, screen, size: size, scale: scale);
           if (size.width == 390 && scale == 1) {
             final preview = switch (screen) {
               ProviderAccountScreen() => 'account',
+              ProfileScreen() => 'personal-info',
               ProviderProfileScreen() => 'profile',
+              ProviderVerificationScreen() => 'verification',
+              ProviderFeedbackScreen() => 'feedback',
               ProviderWalletScreen() => 'wallet',
               _ => null,
             };
@@ -1069,8 +1355,9 @@ void main() {
             isNull,
             reason: '${screen.runtimeType}',
           );
-          final scroll = find.byType(ListView).first;
-          if (scroll.evaluate().isNotEmpty) {
+          final lists = find.byType(ListView);
+          if (lists.evaluate().isNotEmpty) {
+            final scroll = lists.first;
             await tester.drag(scroll, const Offset(0, -450));
             await tester.pumpAndSettle();
             if (size.width == 390 &&

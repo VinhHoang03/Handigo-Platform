@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
@@ -12,7 +13,9 @@ import '../../../app/theme/app_theme.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/paged_result.dart';
 import '../../../shared/widgets/app_states.dart';
+import '../../../shared/widgets/account_overview_widgets.dart';
 import '../../../shared/utils/media_url.dart';
+import '../../../shared/widgets/customer_page_header.dart';
 import '../../../shared/widgets/provider_avatar.dart';
 import '../../../shared/widgets/service_images.dart';
 import '../../orders/domain/order_summary.dart';
@@ -138,7 +141,7 @@ final providerOrdersProvider =
 final providerOrderPageProvider = FutureProvider.autoDispose
     .family<PagedResult<OrderSummary>, (int, String, String)>((ref, query) {
       final preview = ref.watch(providerUiPreviewProvider);
-      if (preview != null)
+      if (preview != null) {
         return PagedResult(
           items: preview
               .where((item) => query.$2 == 'all' || item.status == query.$2)
@@ -146,6 +149,7 @@ final providerOrderPageProvider = FutureProvider.autoDispose
           page: 1,
           totalPages: 1,
         );
+      }
       return ref
           .watch(providerRepositoryProvider)
           .orders(page: query.$1, status: query.$2, search: query.$3);
@@ -195,6 +199,7 @@ class ProviderShell extends StatefulWidget {
 class _ProviderShellState extends State<ProviderShell> {
   int index = 0;
   void _showSchedule() => setState(() => index = 3);
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -204,109 +209,257 @@ class _ProviderShellState extends State<ProviderShell> {
         : branchIndex >= 2
         ? branchIndex + 1
         : branchIndex;
+    final content =
+        widget.navigationShell ??
+        IndexedStack(
+          index: index >= 3 ? index - 1 : index,
+          children: [
+            ProviderDashboardScreen(
+              onOrders: () => setState(() => index = 1),
+              onIncome: () => context.push('/provider/income'),
+              onSchedule: _showSchedule,
+            ),
+            const ProviderOrdersScreen(),
+            ProviderScheduleScreen(isActive: index == 3),
+            const ProviderAccountScreen(),
+          ],
+        );
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body:
-          widget.navigationShell ??
-          IndexedStack(
-            index: index >= 3 ? index - 1 : index,
-            children: [
-              ProviderDashboardScreen(
-                onOrders: () => setState(() => index = 1),
-                onIncome: () => context.push('/provider/income'),
-                onSchedule: _showSchedule,
+      extendBody: true,
+      backgroundColor: Colors.transparent,
+      body: _ProviderShellBackground(
+        child: Theme(
+          data: Theme.of(
+            context,
+          ).copyWith(scaffoldBackgroundColor: Colors.transparent),
+          child: TweenAnimationBuilder<double>(
+            key: const ValueKey('provider-tab-transition'),
+            tween: Tween(begin: 0, end: 1),
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(14 * (1 - value), 0),
+                child: child,
               ),
-              const ProviderOrdersScreen(),
-              ProviderScheduleScreen(isActive: index == 3),
-              const ProviderAccountScreen(),
-            ],
+            ),
+            child: content,
           ),
+        ),
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Container(
+        minimum: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+        child: Material(
           color: scheme.surfaceContainerLowest,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: Row(
-            children: [
-              for (final (tabIndex, label, icon) in const [
-                (0, 'Trang chủ', Icons.home_rounded),
-                (1, 'Đơn dịch vụ', Icons.assignment_outlined),
-                (2, 'Thu nhập', Icons.account_balance_wallet_outlined),
-                (3, 'Lịch', Icons.calendar_month_outlined),
-                (4, 'Hồ sơ', Icons.person_outline),
-              ])
-                Expanded(
-                  child: Semantics(
-                    selected: activeIndex == tabIndex,
-                    button: true,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Material(
-                        color: activeIndex == tabIndex
-                            ? scheme.primary
-                            : scheme.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            if (tabIndex == 2) {
-                              context.push('/provider/income');
-                              return;
-                            }
-                            if (widget.navigationShell case final shell?) {
-                              shell.goBranch(
-                                tabIndex > 2 ? tabIndex - 1 : tabIndex,
-                              );
-                            } else {
-                              setState(() => index = tabIndex);
-                            }
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  icon,
-                                  size: 22,
-                                  color: activeIndex == tabIndex
-                                      ? scheme.onPrimary
-                                      : scheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  label,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  textScaler: MediaQuery.textScalerOf(
-                                    context,
-                                  ).clamp(maxScaleFactor: 1.3),
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        fontSize: 11,
-                                        color: activeIndex == tabIndex
-                                            ? scheme.onPrimary
-                                            : scheme.onSurfaceVariant,
-                                        fontWeight: activeIndex == tabIndex
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+          elevation: 8,
+          shadowColor: scheme.primary.withValues(alpha: .16),
+          borderRadius: BorderRadius.circular(28),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(5, 7, 5, 5),
+            child: Row(
+              children: [
+                for (final (tabIndex, label, icon, activeIcon) in const [
+                  (0, 'Tổng quan', Icons.home_outlined, Icons.home_rounded),
+                  (
+                    1,
+                    'Đơn hàng',
+                    Icons.assignment_outlined,
+                    Icons.assignment_rounded,
+                  ),
+                  (
+                    2,
+                    'Thu nhập',
+                    Icons.bar_chart_outlined,
+                    Icons.bar_chart_rounded,
+                  ),
+                  (
+                    3,
+                    'Lịch hẹn',
+                    Icons.calendar_month_outlined,
+                    Icons.calendar_month_rounded,
+                  ),
+                  (4, 'Tài khoản', Icons.person_outline, Icons.person_rounded),
+                ])
+                  Expanded(
+                    child: _ProviderNavItem(
+                      label: label,
+                      icon: icon,
+                      activeIcon: activeIcon,
+                      selected: activeIndex == tabIndex,
+                      emphasized: tabIndex == 2,
+                      onTap: () {
+                        if (tabIndex == 2) {
+                          context.push('/provider/income');
+                          return;
+                        }
+                        if (widget.navigationShell case final shell?) {
+                          shell.goBranch(
+                            tabIndex > 2 ? tabIndex - 1 : tabIndex,
+                            initialLocation: tabIndex == activeIndex,
+                          );
+                        } else {
+                          setState(() => index = tabIndex);
+                        }
+                      },
                     ),
                   ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProviderNavItem extends StatelessWidget {
+  const _ProviderNavItem({
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+    required this.selected,
+    required this.emphasized,
+    required this.onTap,
+  });
+  final String label;
+  final IconData icon, activeIcon;
+  final bool selected, emphasized;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedScale(
+                scale: selected ? (emphasized ? 1.16 : 1.1) : 1,
+                duration: duration,
+                curve: Curves.easeOutBack,
+                child: AnimatedContainer(
+                  duration: duration,
+                  curve: Curves.easeOutCubic,
+                  width: selected && emphasized ? 34 : 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? scheme.primary.withValues(alpha: .1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    selected ? activeIcon : icon,
+                    size: selected ? 22 : 21,
+                    color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                  ),
                 ),
+              ),
+              const SizedBox(height: 2),
+              AnimatedDefaultTextStyle(
+                duration: duration,
+                curve: Curves.easeOut,
+                style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                  color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 10.5,
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.fade,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 3),
+              AnimatedContainer(
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                width: selected ? 22 : 0,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _ProviderShellBackground extends StatelessWidget {
+  const _ProviderShellBackground({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFFCFBFF), Color(0xFFF4F1FF)],
+      ),
+    ),
+    child: Stack(
+      children: [
+        Positioned(
+          top: -80,
+          right: -60,
+          child: IgnorePointer(
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x1F8B72FF), Color(0x008B72FF)],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: -100,
+          bottom: 20,
+          child: IgnorePointer(
+            child: Transform.rotate(
+              angle: -.22,
+              child: Container(
+                width: 300,
+                height: 130,
+                decoration: BoxDecoration(
+                  color: const Color(0x127D64F5),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(child: child),
+      ],
+    ),
+  );
 }
 
 class ProviderDashboardScreen extends ConsumerWidget {
@@ -2130,145 +2283,170 @@ class ProviderAccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).user;
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 88 * MediaQuery.textScalerOf(context).scale(1),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryFixed,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.person_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 24,
-              ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: CustomerPageHeader(
+        toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
+        automaticallyImplyLeading: false,
+        backgroundColor: accountSurface,
+        title: 'Tài khoản & Cài đặt',
+        titleColor: accountInk,
+        actions: [
+          IconButton(
+            tooltip: 'Trợ giúp',
+            onPressed: () => context.push('/provider/support'),
+            icon: SvgPicture.asset(
+              '$accountIconPath/app_help.svg',
+              width: 22,
+              height: 22,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Tài khoản',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          Card(
-            margin: EdgeInsets.zero,
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(16),
-              leading: ProviderAvatar(url: user?.avatar, gender: user?.gender),
-              title: Text(
-                user?.fullName ?? 'Đối tác Handigo',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                user?.email ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/provider/profile'),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeading(
-            title: 'Quản lý công việc',
-            icon: Icons.handyman_outlined,
-          ),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _accountItem(
-                  context,
-                  'Hồ sơ đối tác',
-                  Icons.badge_outlined,
-                  '/provider/profile',
-                ),
-                _accountItem(
-                  context,
-                  'Ví và thu nhập',
-                  Icons.account_balance_wallet_outlined,
-                  '/provider/wallet',
-                ),
-                _accountItem(
-                  context,
-                  'Tài khoản ngân hàng',
-                  Icons.account_balance_outlined,
-                  '/provider/banks',
-                ),
-                _accountItem(
-                  context,
-                  'Đánh giá khách hàng',
-                  Icons.star_outline,
-                  '/provider/feedback',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeading(
-            title: 'Cài đặt',
-            icon: Icons.settings_outlined,
-          ),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _accountItem(
-                  context,
-                  'Thông báo',
-                  Icons.notifications_outlined,
-                  '/provider/notifications',
-                ),
-                _accountItem(
-                  context,
-                  'Cài đặt ứng dụng',
-                  Icons.tune_rounded,
-                  '/provider/settings',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: scheme.error,
-              side: BorderSide(color: scheme.error.withValues(alpha: .4)),
-            ),
-            onPressed: () => ref.read(authControllerProvider).logout(),
-            icon: const Icon(Icons.logout),
-            label: const Text('Đăng xuất'),
           ),
         ],
       ),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+              children: [
+                AccountProfileSummaryCard(
+                  name: user?.fullName ?? 'Đối tác Handigo',
+                  contact: user?.email ?? 'Chưa cập nhật email',
+                  avatarUrl: user?.avatar,
+                  onEdit: () => context.push('/provider/personal-info'),
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Hồ sơ đối tác',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Xác thực tài khoản',
+                      subtitle: 'Email, điện thoại và giấy tờ tùy thân',
+                      iconAsset: '$accountIconPath/shield.svg',
+                      onTap: () => context.push('/provider/verification'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Thông tin nghề nghiệp',
+                      subtitle: 'Chuyên môn, dịch vụ và chứng chỉ',
+                      iconAsset: '$accountIconPath/file.svg',
+                      onTap: () => context.push('/provider/professional-info'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Đánh giá khách hàng',
+                      subtitle: 'Theo dõi chất lượng dịch vụ của bạn',
+                      iconAsset: '$accountIconPath/star.svg',
+                      onTap: () => context.push('/provider/feedback'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Quản lý công việc',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Ví và thu nhập',
+                      subtitle: 'Số dư, giao dịch và yêu cầu rút tiền',
+                      iconAsset: '$accountIconPath/card.svg',
+                      onTap: () => context.push('/provider/wallet'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Tài khoản ngân hàng',
+                      subtitle: 'Quản lý tài khoản nhận tiền',
+                      iconAsset: '$accountIconPath/card.svg',
+                      onTap: () => context.push('/provider/banks'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Cài đặt ứng dụng',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Thông báo & nhắc lịch',
+                      subtitle: 'Lịch hẹn, tin nhắn và cập nhật dịch vụ',
+                      iconAsset: '$accountIconPath/bell.svg',
+                      onTap: () => context.push('/provider/notifications'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Ngôn ngữ',
+                      subtitle: 'Tiếng Việt',
+                      iconAsset: '$accountIconPath/globe.svg',
+                      comingSoon: true,
+                    ),
+                    AccountMenuItem(
+                      label: 'Bảo mật & đăng nhập',
+                      subtitle: 'Mật khẩu, Face ID và vân tay',
+                      iconAsset: '$accountIconPath/shield.svg',
+                      onTap: () => context.push('/provider/settings'),
+                    ),
+                    const AccountMenuItem(
+                      label: 'Giao diện',
+                      subtitle: 'Sáng · Theo cài đặt thiết bị',
+                      iconAsset: '$accountIconPath/moon.svg',
+                      comingSoon: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountSection(
+                  title: 'Hỗ trợ & báo cáo',
+                  items: [
+                    AccountMenuItem(
+                      label: 'Trung tâm hỗ trợ',
+                      subtitle: 'Gửi và theo dõi yêu cầu hỗ trợ',
+                      iconAsset: '$accountIconPath/help.svg',
+                      onTap: () => context.push('/provider/support'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Báo cáo sự cố',
+                      subtitle: 'Phản ánh vấn đề trong quá trình làm việc',
+                      iconAsset: '$accountIconPath/chat.svg',
+                      onTap: () => context.push('/provider/reports'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Đề xuất dịch vụ',
+                      subtitle: 'Gửi ý tưởng dịch vụ mới cho Handigo',
+                      iconAsset: '$accountIconPath/gift.svg',
+                      onTap: () =>
+                          context.push('/provider/service-suggestions'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Điều khoản & quyền riêng tư',
+                      subtitle: 'Cách Handigo bảo vệ dữ liệu của bạn',
+                      iconAsset: '$accountIconPath/file.svg',
+                      onTap: () => context.push('/provider/settings'),
+                    ),
+                    AccountMenuItem(
+                      label: 'Đánh giá Handigo',
+                      subtitle: 'Chia sẻ trải nghiệm của bạn',
+                      iconAsset: '$accountIconPath/star.svg',
+                      onTap: () => context.push('/provider/app-feedback'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                AccountLogoutButton(
+                  onPressed: () async {
+                    final confirmed = await showAccountLogoutConfirmation(
+                      context,
+                      userName: user?.fullName ?? 'Đối tác Handigo',
+                    );
+                    if (confirmed) {
+                      await ref.read(authControllerProvider).logout();
+                    }
+                  },
+                ),
+                const AccountVersionFooter(),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
-
-  Widget _accountItem(
-    BuildContext context,
-    String title,
-    IconData icon,
-    String route,
-  ) => ListTile(
-    leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-    title: Text(title, style: const TextStyle(fontSize: 16)),
-    trailing: const Icon(Icons.chevron_right, size: 20),
-    onTap: () => context.push(route),
-  );
 }
 
 List<OrderSummary> _ordersOnDay(List<OrderSummary> orders, DateTime day) =>

@@ -120,4 +120,40 @@ void main() {
     expect(find.text('Khu vực hoạt động'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Hồ sơ đã duyệt luôn có lối hoàn tất và đăng xuất', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(_Api()),
+          providerApplicationProvider.overrideWith(
+            (ref) async => const ProviderApplication(
+              id: 'approved',
+              status: 'approved',
+              serviceIds: ['service'],
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const ProviderOnboardingScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hồ sơ đã được duyệt'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Hoàn tất'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Đăng xuất'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Hoàn tất'))
+          .onPressed,
+      isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

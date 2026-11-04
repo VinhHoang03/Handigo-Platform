@@ -6,7 +6,12 @@ export const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
-export type RevenuePeriod = "week" | "month";
+export type RevenuePeriod = "week" | "month" | "year" | "custom";
+
+export interface RevenueCustomRange {
+  fromDate: string;
+  toDate: string;
+}
 
 export const dateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -15,32 +20,99 @@ export const dateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-export const getRevenueRange = (period: RevenuePeriod) => {
+const localDate = (value: string) => new Date(`${value}T00:00:00`);
+
+const shortDate = (date: Date) =>
+  `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+export const revenueWeekKey = (date: Date) => {
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  target.setDate(target.getDate() + 4 - (target.getDay() || 7));
+  const yearStart = new Date(target.getFullYear(), 0, 1);
+  const week = Math.ceil(((target.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return `${target.getFullYear()}-W${String(week).padStart(2, "0")}`;
+};
+
+const weekStartFromKey = (value: string) => {
+  const match = /^(\d{4})-W(\d{2})$/.exec(value);
+  if (!match) return new Date();
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  const januaryFourth = new Date(year, 0, 4);
+  const monday = new Date(januaryFourth);
+  monday.setDate(januaryFourth.getDate() - ((januaryFourth.getDay() + 6) % 7) + (week - 1) * 7);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+};
+
+export const getRevenueWeeksInYear = (year: number) => {
+  const lastIsoWeek = revenueWeekKey(new Date(year, 11, 28));
+  return Number(lastIsoWeek.slice(-2));
+};
+
+export const formatRevenueWeekOption = (value: string) => {
+  const start = weekStartFromKey(value);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const week = Number(value.slice(-2));
+
+  return `Tuần ${week} (${shortDate(start)} - ${shortDate(end)})`;
+};
+
+export const getRevenueRange = (
+  period: RevenuePeriod,
+  selectedYear = new Date().getFullYear(),
+  customRange?: RevenueCustomRange | null,
+  selectedWeek = revenueWeekKey(new Date()),
+  selectedMonth = dateKey(new Date()).slice(0, 7),
+) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(today);
   let dayCount = 7;
 
   if (period === "week") {
-    const daysSinceMonday = (today.getDay() + 6) % 7;
-    start.setDate(today.getDate() - daysSinceMonday);
-  } else {
-    start.setDate(1);
-    dayCount = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    start.setTime(weekStartFromKey(selectedWeek).getTime());
+  } else if (period === "month") {
+    start.setTime(localDate(`${selectedMonth}-01`).getTime());
+    dayCount = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+  } else if (period === "year") {
+    start.setFullYear(selectedYear, 0, 1);
+    dayCount = 12;
+  } else if (customRange) {
+    const customStart = localDate(customRange.fromDate);
+    const customEnd = localDate(customRange.toDate);
+    start.setTime(customStart.getTime());
+    dayCount = Math.max(1, Math.round((customEnd.getTime() - customStart.getTime()) / 86_400_000) + 1);
   }
 
   const dates = Array.from({ length: dayCount }, (_, index) => {
     const date = new Date(start);
-    date.setDate(start.getDate() + index);
+    if (period === "year") {
+      date.setMonth(index, 1);
+    } else {
+      date.setDate(start.getDate() + index);
+    }
     return date;
   });
 
+  const queryEnd = period === "year"
+    ? new Date(selectedYear, 11, 31)
+    : dates[dates.length - 1];
+
   return {
     dates,
+    queryStart: dates[0],
+    queryEnd,
     label:
       period === "week"
-        ? `${dates[0].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} - ${dates[dates.length - 1].toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}`
-        : `Tháng ${today.getMonth() + 1}/${today.getFullYear()}`,
+        ? `${shortDate(dates[0])} - ${shortDate(dates[dates.length - 1])}`
+        : period === "month"
+          ? `Tháng ${dates[0].getMonth() + 1}/${dates[0].getFullYear()}`
+          : period === "year"
+            ? `Năm ${selectedYear}`
+            : `${dates[0].toLocaleDateString("vi-VN")} - ${dates[dates.length - 1].toLocaleDateString("vi-VN")}`,
   };
 };
 
@@ -49,6 +121,7 @@ export function getRevenueChart(
   period: RevenuePeriod,
   dates: Date[],
   earningsByDay: ReadonlyMap<string, number>,
+  earningsByMonth: ReadonlyMap<string, number>,
 ) {
   if (period === "week") {
     return dates.map((date) => ({
@@ -56,6 +129,57 @@ export function getRevenueChart(
       label: date.toLocaleDateString("vi-VN", { weekday: "short" }),
       fullLabel: date.toLocaleDateString("vi-VN"),
       amount: earningsByDay.get(dateKey(date)) ?? 0,
+    }));
+  }
+
+  if (period === "year") {
+    return dates.map((date) => {
+      const monthKey = dateKey(date).slice(0, 7);
+      return {
+        key: monthKey,
+        label: `T${date.getMonth() + 1}`,
+        fullLabel: `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`,
+        amount: earningsByMonth.get(monthKey) ?? 0,
+      };
+    });
+  }
+
+  if (period === "custom") {
+    if (dates.length <= 14) {
+      return dates.map((date) => ({
+        key: dateKey(date),
+        label: date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
+        fullLabel: date.toLocaleDateString("vi-VN"),
+        amount: earningsByDay.get(dateKey(date)) ?? 0,
+      }));
+    }
+
+    if (dates.length <= 93) {
+      const weeks: { key: string; label: string; fullLabel: string; amount: number }[] = [];
+      for (let index = 0; index < dates.length; index += 7) {
+        const weekDates = dates.slice(index, index + 7);
+        const start = weekDates[0];
+        const end = weekDates[weekDates.length - 1];
+        weeks.push({
+          key: dateKey(start),
+          label: `${start.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}`,
+          fullLabel: `${start.toLocaleDateString("vi-VN")} - ${end.toLocaleDateString("vi-VN")}`,
+          amount: weekDates.reduce((total, date) => total + (earningsByDay.get(dateKey(date)) ?? 0), 0),
+        });
+      }
+      return weeks;
+    }
+
+    const months = new Map<string, Date>();
+    dates.forEach((date) => {
+      const monthKey = dateKey(date).slice(0, 7);
+      if (!months.has(monthKey)) months.set(monthKey, date);
+    });
+    return Array.from(months, ([monthKey, date]) => ({
+      key: monthKey,
+      label: `${date.getMonth() + 1}/${String(date.getFullYear()).slice(-2)}`,
+      fullLabel: `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`,
+      amount: earningsByMonth.get(monthKey) ?? 0,
     }));
   }
 

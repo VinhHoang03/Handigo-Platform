@@ -305,10 +305,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (_, __) => const ProviderAccountScreen(),
               ),
               GoRoute(
-                path: '/provider/profile',
-                builder: (_, __) => const ProviderProfileScreen(),
-              ),
-              GoRoute(
                 path: '/provider/wallet',
                 builder: (_, __) => const ProviderWalletScreen(),
               ),
@@ -317,8 +313,45 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (_, __) => const ProviderBankAccountsScreen(),
               ),
               GoRoute(
+                path: '/provider/profile',
+                builder: (_, __) => const ProviderProfileScreen(),
+              ),
+              GoRoute(
+                path: '/provider/personal-info',
+                builder: (_, __) =>
+                    const ProfileScreen(addressRoute: '/provider/addresses'),
+              ),
+              GoRoute(
+                path: '/provider/addresses',
+                builder: (_, __) => const AddressScreen(),
+              ),
+              GoRoute(
+                path: '/provider/professional-info',
+                builder: (_, __) => const ProviderProfileScreen(),
+              ),
+              GoRoute(
+                path: '/provider/verification',
+                builder: (_, __) => const ProviderVerificationScreen(),
+              ),
+              GoRoute(
                 path: '/provider/feedback',
                 builder: (_, __) => const ProviderFeedbackScreen(),
+              ),
+              GoRoute(
+                path: '/provider/app-feedback',
+                builder: (_, __) => const FeedbackScreen(),
+              ),
+              GoRoute(
+                path: '/provider/support',
+                builder: (_, __) => const SupportScreen(),
+              ),
+              GoRoute(
+                path: '/provider/reports',
+                builder: (_, __) => const ComplaintScreen(),
+              ),
+              GoRoute(
+                path: '/provider/service-suggestions',
+                builder: (_, __) => const ProviderServiceSuggestionScreen(),
               ),
               GoRoute(
                 path: '/provider/settings',

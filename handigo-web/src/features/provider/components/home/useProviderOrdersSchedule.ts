@@ -20,7 +20,9 @@ export function useProviderOrdersSchedule() {
     let cancelled = false;
 
     providerOrderApi.getProviderOrders(1, 1, "in_progress")
-      .then((result) => { if (!cancelled) setActiveOrders(result.pagination.total); })
+      .then((result) => {
+        if (!cancelled) setActiveOrders(result.pagination.total);
+      })
       .catch(() => { /* Giữ null để không hiển thị nhầm 0 đơn khi nguồn lỗi. */ })
       .finally(() => { if (!cancelled) setIsLoadingActiveOrders(false); });
 

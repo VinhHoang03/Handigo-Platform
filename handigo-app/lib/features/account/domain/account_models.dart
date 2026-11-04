@@ -49,14 +49,40 @@ class WalletInfo {
     this.balance = 0,
     this.pendingBalance = 0,
     this.currency = 'VND',
+    this.totalEarnings,
+    this.totalWithdrawn,
   });
   factory WalletInfo.fromJson(Map<String, dynamic> json) => WalletInfo(
     balance: _num(json['balance']),
     pendingBalance: _num(json['pendingBalance']),
     currency: '${json['currency'] ?? 'VND'}',
+    totalEarnings: _nullableNum(json['totalEarnings']),
+    totalWithdrawn: _nullableNum(json['totalWithdrawn']),
   );
   final double balance, pendingBalance;
+  final double? totalEarnings, totalWithdrawn;
   final String currency;
+}
+
+class WalletSummary {
+  const WalletSummary({
+    this.currentBalance = 0,
+    this.totalEarnings = 0,
+    this.totalWithdrawals = 0,
+    this.totalPlatformFeesPaid = 0,
+  });
+
+  factory WalletSummary.fromJson(Map<String, dynamic> json) => WalletSummary(
+    currentBalance: _num(json['currentBalance']),
+    totalEarnings: _num(json['totalEarnings']),
+    totalWithdrawals: _num(json['totalWithdrawals']),
+    totalPlatformFeesPaid: _num(json['totalPlatformFeesPaid']),
+  );
+
+  final double currentBalance;
+  final double totalEarnings;
+  final double totalWithdrawals;
+  final double totalPlatformFeesPaid;
 }
 
 class WalletTransactionItem {
@@ -187,3 +213,8 @@ String? _valueId(dynamic value) =>
     value is Map ? '${value['_id'] ?? value['id'] ?? ''}' : value as String?;
 double _num(dynamic value) =>
     value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+double? _nullableNum(dynamic value) => value == null
+    ? null
+    : value is num
+    ? value.toDouble()
+    : double.tryParse('$value');

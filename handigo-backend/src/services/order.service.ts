@@ -436,6 +436,7 @@ export const OrderService = {
       addressSnapshot: {
         recipientName: address.recipientName, recipientPhone: address.recipientPhone,
         fullAddress: address.fullAddress, province: address.province, ward: address.ward,
+        note: address.note,
         latitude: address.latitude, longitude: address.longitude,
       },
       orderType,

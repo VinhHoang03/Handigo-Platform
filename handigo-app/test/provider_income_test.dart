@@ -483,7 +483,11 @@ void main() {
       final api = _Api();
       await _show(tester, api);
       await _wallet(tester);
-      await tester.ensureVisible(find.text('Xem tất cả').first);
+      await tester.scrollUntilVisible(
+        find.text('Giao dịch gần đây'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Xem tất cả').first);
       await tester.pumpAndSettle();
       expect(find.text('Lịch sử giao dịch'), findsOneWidget);
@@ -511,7 +515,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(NavigationBar), findsNothing);
     expect(find.textContaining('Vietcombank'), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('Quay lại'));
     await tester.pumpAndSettle();
     expect(find.text('Ví Handigo'), findsOneWidget);
     expect(

@@ -364,11 +364,11 @@ void main() {
       router.push(path);
       await tester.pumpAndSettle();
       for (final label in [
-        'Trang chủ',
-        'Đơn dịch vụ',
+        'Tổng quan',
+        'Đơn hàng',
         'Thu nhập',
-        'Lịch',
-        'Hồ sơ',
+        'Lịch hẹn',
+        'Tài khoản',
       ]) {
         expect(_tab(label).hitTestable(), findsOneWidget);
       }
@@ -383,10 +383,10 @@ void main() {
   ) async {
     final router = await _show(tester, UserRole.provider);
     for (final entry in const [
-      ('Trang chủ', '/provider', 0),
-      ('Đơn dịch vụ', '/provider/orders', 1),
-      ('Lịch', '/provider/schedule', 2),
-      ('Hồ sơ', '/provider/account', 3),
+      ('Tổng quan', '/provider', 0),
+      ('Đơn hàng', '/provider/orders', 1),
+      ('Lịch hẹn', '/provider/schedule', 2),
+      ('Tài khoản', '/provider/account', 3),
     ]) {
       await tester.tap(_tab(entry.$1));
       await tester.pumpAndSettle();
@@ -404,7 +404,7 @@ void main() {
     await tester.tap(_tab('Thu nhập'));
     await tester.pumpAndSettle();
     expect(find.byType(ProviderIncomeScreen), findsOneWidget);
-    expect(find.text('Đơn dịch vụ').hitTestable(), findsNothing);
+    expect(find.text('Đơn hàng').hitTestable(), findsNothing);
     expect(
       tester
           .widget<NavigationBar>(find.byType(NavigationBar))

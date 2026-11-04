@@ -18,6 +18,9 @@ class OrderSummary {
     this.addressLatitude,
     this.addressLongitude,
     this.totalAmount,
+    this.providerAmount,
+    this.inspectionRequired = false,
+    this.createdAt,
     this.paymentStatus,
     this.bookingStatus,
     this.readyForMatching = false,
@@ -45,6 +48,7 @@ class OrderSummary {
       hasPendingAssignment: json['hasPendingAssignment'] == true,
       depositPaidAt: _date(json['depositPaidAt']),
       scheduledAt: _date(json['scheduledAt']),
+      createdAt: _date(json['createdAt']),
       addressLabel: address is Map<String, dynamic>
           ? formatAddressData(address)
           : null,
@@ -87,6 +91,10 @@ class OrderSummary {
                     as num?)
                 ?.toDouble()
           : null,
+      providerAmount: pricing is Map<String, dynamic>
+          ? _providerOrderAmount(json, pricing)
+          : null,
+      inspectionRequired: json['inspectionRequired'] == true,
     );
   }
   final String id;
@@ -104,6 +112,9 @@ class OrderSummary {
   final String? serviceType;
   final double? addressLatitude, addressLongitude;
   final double? totalAmount;
+  final double? providerAmount;
+  final bool inspectionRequired;
+  final DateTime? createdAt;
   final String? paymentStatus, bookingStatus;
   final bool readyForMatching, hasPendingAssignment;
   final DateTime? depositPaidAt;
@@ -120,6 +131,29 @@ class OrderSummary {
     }
     return 'awaiting_payment';
   }
+}
+
+double? _providerOrderAmount(
+  Map<String, dynamic> order,
+  Map<String, dynamic> pricing,
+) {
+  if (order['inspectionRequired'] != true) {
+    return (pricing['providerEarningAmount'] as num?)?.toDouble();
+  }
+
+  final quotationAmount = (order['quotationFinalAmount'] as num?)?.toDouble();
+  if (quotationAmount == null) return null;
+
+  final depositPaid = _date(order['depositPaidAt']) != null;
+  final hasPricingSnapshot = pricing['baseAmount'] != null;
+  final appliedDeposit = hasPricingSnapshot
+      ? (depositPaid
+            ? (pricing['totalPaidAmount'] as num?)?.toDouble() ?? 0
+            : 0)
+      : (depositPaid ? (order['depositAmount'] as num?)?.toDouble() ?? 0 : 0);
+  return (quotationAmount - appliedDeposit)
+      .clamp(0, double.infinity)
+      .toDouble();
 }
 
 class OrderDetail {
