@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:handigo_app/app/routing/app_router.dart';
 import 'package:handigo_app/app/providers/app_providers.dart';
 import 'package:handigo_app/core/network/api_client.dart';
 import 'package:handigo_app/core/network/api_exception.dart';
@@ -16,6 +18,7 @@ import 'package:handigo_app/features/orders/domain/order_summary.dart';
 import 'package:handigo_app/features/provider/presentation/provider_assignment_gate.dart';
 import 'package:handigo_app/features/provider/presentation/provider_assignment_sound.dart';
 import 'package:handigo_app/features/provider/presentation/provider_screens.dart';
+import 'package:handigo_app/features/provider/presentation/provider_assignment_customer_info.dart';
 
 class _Sound implements AssignmentAlertSound {
   int plays = 0, stops = 0;
@@ -69,6 +72,7 @@ class _Repository extends ProviderRepository {
 }
 
 class _Harness {
+  late GoRouter router;
   final api = ApiClient(Dio(), CookieJar());
   late final repository = _Repository(api);
   final events = StreamController<AssignmentRealtimeEvent>.broadcast();
@@ -127,9 +131,30 @@ class _Harness {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(api.close);
     addTearDown(events.close);
+    router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) =>
+              const Scaffold(body: Center(child: Text('Màn hình đang xem'))),
+        ),
+        GoRoute(
+          path: '/provider/orders/:id',
+          builder: (_, state) => Scaffold(
+            body: Text('Chi tiết đơn ${state.pathParameters['id']}'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          providerAssignmentPositionProvider.overrideWith(
+            (ref) async =>
+                throw const ApiException('Bật GPS để xem khoảng cách.'),
+          ),
+          appRouterProvider.overrideWithValue(router),
           authControllerProvider.overrideWith(
             (ref) => AuthController(AuthRepository(api), api)
               ..user = AppUser(
@@ -149,14 +174,14 @@ class _Harness {
             (ref) async => List.of(repository.pending),
           ),
         ],
-        child: MaterialApp(
+        child: MaterialApp.router(
+          routerConfig: router,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(
               context,
             ).copyWith(textScaler: TextScaler.linear(scale)),
             child: ProviderAssignmentGate(child: child!),
           ),
-          home: const Scaffold(body: Center(child: Text('Màn hình đang xem'))),
         ),
       ),
     );
@@ -237,6 +262,39 @@ void main() {
     expect(find.text('Hòa Hải, Đà Nẵng'), findsNothing);
     await h.clear(tester);
   });
+
+  testWidgets(
+    'Đơn báo giá hiển thị tên khách và trạng thái khoảng cách khi thiếu GPS',
+    (tester) async {
+      final h = _Harness();
+      h.repository.pending.add(
+        ProviderAssignment(
+          id: 'quote',
+          orderId: 'order-quote',
+          orderCode: 'HD-quote',
+          serviceName: 'Sửa điện',
+          serviceType: 'variable_price',
+          responseDeadline: h.now.add(const Duration(minutes: 1)),
+        ),
+      );
+      h.repository.recent = [
+        const OrderSummary(
+          id: 'order-quote',
+          code: 'HD-quote',
+          serviceName: 'Sửa điện',
+          status: 'pending',
+          customerName: 'Nguyễn An',
+          addressLatitude: 10.01,
+          addressLongitude: 106,
+        ),
+      ];
+      await h.show(tester, scale: 2);
+      expect(find.text('Khách hàng: Nguyễn An'), findsOneWidget);
+      expect(find.text('Bật GPS để xem khoảng cách.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await h.clear(tester);
+    },
+  );
 
   testWidgets('Giữ địa chỉ ban đầu khi không tải được đơn gần đây', (
     tester,
@@ -319,14 +377,34 @@ void main() {
     await tester.tap(find.text('Đồng ý'));
     await tester.pump();
     expect(h.repository.accepts, 1);
+    expect(h.router.routeInformationProvider.value.uri.path, '/');
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNull,
     );
     h.repository.response!.complete();
     await tester.pumpAndSettle();
+    expect(
+      h.router.routeInformationProvider.value.uri.path,
+      '/provider/orders/order-1',
+    );
     expect(find.text('Mã đơn: HD-2', findRichText: true), findsOneWidget);
     expect(h.sound.plays, 2);
+    await h.clear(tester);
+  });
+
+  testWidgets('Nhận đơn thành công đóng thông báo và mở đúng chi tiết đơn', (
+    tester,
+  ) async {
+    final h = _Harness();
+    await h.show(tester);
+    await h.incoming(tester, h.item('accepted'));
+    await tester.tap(find.text('Đồng ý'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Chi tiết đơn order-accepted'), findsOneWidget);
+    expect(h.repository.accepts, 1);
+    expect(tester.takeException(), isNull);
     await h.clear(tester);
   });
 
@@ -374,6 +452,7 @@ void main() {
     await tester.tap(find.text('Đồng ý'));
     await tester.pumpAndSettle();
     expect(find.text('Đề nghị không còn khả dụng.'), findsOneWidget);
+    expect(h.router.routeInformationProvider.value.uri.path, '/');
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNotNull,

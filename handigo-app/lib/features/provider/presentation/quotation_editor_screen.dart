@@ -14,11 +14,13 @@ class QuotationEditorScreen extends ConsumerStatefulWidget {
     this.embedded = false,
     this.onSaved,
     this.onBusyChanged,
+    this.onCancel,
     super.key,
   });
   final bool embedded;
   final Future<void> Function()? onSaved;
   final ValueChanged<bool>? onBusyChanged;
+  final VoidCallback? onCancel;
   final OrderDetail order;
   final RepairQuotation? quotation;
 
@@ -568,42 +570,6 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
             label: const Text('Thêm hạng mục báo giá'),
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: duration,
-            enabled: !busy,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Thời lượng sửa chữa (phút)',
-            ),
-            validator: (value) => _integer(value, 1, 1440),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: discount,
-            onChanged: (_) => setState(() {}),
-            enabled: !busy,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Giảm giá (đ)'),
-            validator: _amount,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: note,
-            enabled: !busy,
-            minLines: 1,
-            maxLines: 5,
-            maxLength: 2000,
-            decoration: const InputDecoration(labelText: 'Ghi chú khảo sát'),
-          ),
-          TextFormField(
-            controller: recommendation,
-            enabled: !busy,
-            minLines: 1,
-            maxLines: 5,
-            maxLength: 2000,
-            decoration: const InputDecoration(labelText: 'Đề xuất xử lý'),
-          ),
-          const SizedBox(height: 12),
           Text(
             'Tổng báo giá: ${_money(total)}',
             style: Theme.of(context).textTheme.titleSmall,
@@ -613,6 +579,11 @@ class _QuotationEditorScreenState extends ConsumerState<QuotationEditorScreen> {
             'Thu trực tiếp: ${_money((total - widget.order.appliedDeposit).clamp(0, double.infinity))}',
           ),
           const SizedBox(height: 12),
+          if (widget.onCancel != null)
+            OutlinedButton(
+              onPressed: busy ? null : widget.onCancel,
+              child: const Text('Hủy chỉnh sửa'),
+            ),
           FilledButton(
             onPressed: busy ? null : save,
             child: Text(busy ? 'Đang xử lý...' : 'Lưu báo giá'),

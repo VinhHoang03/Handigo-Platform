@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../../app/routing/app_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/realtime_connection.dart';
 import '../../auth/domain/app_user.dart';
+import '../../orders/presentation/order_screens.dart';
 import '../domain/provider_models.dart';
 import 'provider_assignment_sound.dart';
 import 'provider_screens.dart';
 import 'provider_schedule_preview.dart';
+import 'provider_assignment_customer_info.dart';
 
 typedef AssignmentRealtimeEvent = ({String name, dynamic data});
 final assignmentNowProvider = Provider<DateTime Function()>(
@@ -160,7 +163,7 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
 
   Future<void> _loadAddress(ProviderAssignment item) async {
     try {
-      final orders = await ref.read(providerRepositoryProvider).recentOrders();
+      final orders = await ref.read(providerAssignmentOrdersProvider.future);
       if (!mounted || _currentId != item.id) return;
       final address = orders
           .where((order) => order.id == item.orderId)
@@ -209,6 +212,10 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
       ref.invalidate(providerOrderPageProvider);
       ref.invalidate(providerScheduleOrdersProvider);
       ref.invalidate(providerOverviewProvider);
+      if (accept) {
+        ref.invalidate(orderDetailProvider(item.orderId));
+        ref.read(appRouterProvider).go('/provider/orders/${item.orderId}');
+      }
     } catch (error) {
       if (mounted && _currentId == item.id) {
         setState(
@@ -331,6 +338,11 @@ class _ActiveAssignmentGateState extends ConsumerState<_ActiveAssignmentGate>
                               ),
                             ],
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        ProviderAssignmentCustomerInfo(
+                          orderId: item.orderId,
+                          assignment: item,
                         ),
                         if (item.serviceType == 'fixed_price') ...[
                           const SizedBox(height: 8),

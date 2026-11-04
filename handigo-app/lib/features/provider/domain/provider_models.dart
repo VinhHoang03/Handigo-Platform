@@ -44,6 +44,11 @@ class ProviderAssignment {
     this.orderType,
     this.totalAmount,
     this.serviceType,
+    this.addressLatitude,
+    this.addressLongitude,
+    this.fullAddress,
+    this.ward,
+    this.province,
   });
 
   factory ProviderAssignment.fromJson(Map<String, dynamic> json) {
@@ -51,7 +56,7 @@ class ProviderAssignment {
         ? json['orderId'] as Map<String, dynamic>
         : <String, dynamic>{};
     final service = order['serviceId'];
-    final address = order['addressId'];
+    final address = order['addressSnapshot'] ?? order['addressId'];
     return ProviderAssignment(
       id: _id(json),
       orderId: _id(order),
@@ -66,6 +71,15 @@ class ProviderAssignment {
       addressLabel: address is Map<String, dynamic>
           ? formatAddressData(address)
           : null,
+      addressLatitude: address is Map
+          ? (address['latitude'] as num?)?.toDouble()
+          : null,
+      addressLongitude: address is Map
+          ? (address['longitude'] as num?)?.toDouble()
+          : null,
+      fullAddress: address is Map ? address['fullAddress'] as String? : null,
+      ward: address is Map ? address['ward'] as String? : null,
+      province: address is Map ? address['province'] as String? : null,
       responseDeadline: _date(json['responseDeadline']),
       serviceImage: service is Map<String, dynamic>
           ? (service['coverImage'] ?? service['image']) as String?
@@ -90,6 +104,8 @@ class ProviderAssignment {
   final String? orderType;
   final double? totalAmount;
   final String? serviceType;
+  final double? addressLatitude, addressLongitude;
+  final String? fullAddress, ward, province;
 }
 
 String _id(Map<String, dynamic> json) => (json['_id'] ?? json['id']).toString();

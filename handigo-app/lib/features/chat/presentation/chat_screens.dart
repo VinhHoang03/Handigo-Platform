@@ -5,6 +5,7 @@ import '../../../core/network/realtime_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../auth/domain/app_user.dart';
 import '../../../shared/utils/media_url.dart';
 import '../../../shared/widgets/app_states.dart';
 import '../../../shared/widgets/customer_page_header.dart';
@@ -43,6 +44,8 @@ class _ConversationListScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(conversationListProvider);
+    final isProvider =
+        ref.watch(authControllerProvider).user?.role == UserRole.provider;
     return Scaffold(
       appBar: CustomerPageHeader(
         toolbarHeight: 64 * MediaQuery.textScalerOf(context).scale(1),
@@ -50,9 +53,21 @@ class _ConversationListScreenState
         showBottomBorder: true,
         title: 'Đoạn chat',
         centerTitle: false,
-        leading: const Center(
-          child: CustomerHeaderIcon(Icons.forum_outlined),
-        ),
+        leading: isProvider
+            ? IconButton(
+                tooltip: 'Quay lại',
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/provider');
+                  }
+                },
+                icon: const Icon(Icons.arrow_back_rounded),
+              )
+            : const Center(
+                child: CustomerHeaderIcon(Icons.forum_outlined),
+              ),
       ),
       body: state.when(
         loading: () => const AppLoading(),

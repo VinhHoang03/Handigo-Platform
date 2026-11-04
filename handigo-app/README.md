@@ -116,6 +116,10 @@ Build bản Web để triển khai:
 flutter build web --release --dart-define=API_BASE_URL=https://api.example.com
 ```
 
+## Bản đồ Flutter
+
+[Cấu hình và xử lý lỗi bản đồ](docs/maps.md)
+
 ## Cấu trúc
 
 - `lib/app`: theme, routing và provider cấp ứng dụng.
